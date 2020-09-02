@@ -14,11 +14,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import json
 import os
 import re
 from email.parser import Parser
+from urllib.parse import urlencode
 
 import pkg_resources
 
@@ -255,15 +255,24 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEquals(200, channel.code, channel.result)
 
-        # Replace the path with the confirmation path
-        path = re.sub(
-            "^/_matrix.*submit_token",
-            "/_matrix/client/unstable/password_reset/email/submit_token_confirm",
-            path,
-        )
+        # Now POST to the same endpoint, mimicking the same behaviour as clicking the
+        # password reset confirm button
+
+        # Send arguments as url-encoded form data, matching the template's behaviour
+        form_args = []
+        for key, value_list in request.args.items():
+            for value in value_list:
+                arg = (key, value)
+                form_args.append(arg)
 
         # Confirm the password reset
-        request, channel = self.make_request("POST", path, shorthand=False)
+        request, channel = self.make_request(
+            "POST",
+            path,
+            content=urlencode(form_args).encode("utf8"),
+            shorthand=False,
+            content_is_form=True,
+        )
         self.render(request)
         self.assertEquals(200, channel.code, channel.result)
 

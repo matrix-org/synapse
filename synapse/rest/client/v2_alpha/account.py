@@ -42,7 +42,7 @@ from synapse.util.threepids import canonicalise_email, check_3pid_allowed
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
-from ._base import client_patterns, interactive_auth_handler
+from ._base import client_patterns, interactive_auth_handler, synapse_client_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -151,37 +151,35 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
 class PasswordResetSubmitTokenServlet(RestServlet):
     """Handles 3PID validation token submission"""
 
-    PATTERNS = client_patterns(
-        "/password_reset/(?P<medium>[^/]*)/submit_token$", releases=(), unstable=True
-    )
+    PATTERNS = synapse_client_patterns("/password_reset/email/submit_token$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         """
         Args:
-            hs (synapse.server.HomeServer): server
+            hs: server
         """
-        super(PasswordResetSubmitTokenServlet, self).__init__()
-        self.config = hs.config
+        super().__init__()
 
-        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+        self.clock = hs.get_clock()
+        self.store = hs.get_datastore()
+
+        self._local_threepid_handling_disabled_due_to_email_config = (
+            hs.config.local_threepid_handling_disabled_due_to_email_config
+        )
+        self._threepid_behaviour_email = hs.config.threepid_behaviour_email
+        if self._threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self._confirmation_email_template = (
-                self.config.email_password_reset_template_confirmation_html
+                hs.config.email_password_reset_template_confirmation_html
+            )
+            self._email_password_reset_template_success_html = (
+                hs.config.email_password_reset_template_success_html_content
+            )
+            self._failure_email_template = (
+                hs.config.email_password_reset_template_failure_html
             )
 
-    async def on_GET(self, request, medium):
-        # We currently only handle threepid token submissions for email
-        if medium != "email":
-            raise SynapseError(
-                400, "This medium is currently not supported for password resets"
-            )
-        if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
-            if self.config.local_threepid_handling_disabled_due_to_email_config:
-                logger.warning(
-                    "Password reset emails have been disabled due to lack of an email config"
-                )
-            raise SynapseError(
-                400, "Email-based password resets are disabled on this server"
-            )
+    async def on_GET(self, request):
+        self._check_threepid_behaviour()
 
         sid = parse_string(request, "sid", required=True)
         token = parse_string(request, "token", required=True)
@@ -194,50 +192,14 @@ class PasswordResetSubmitTokenServlet(RestServlet):
             "sid": sid,
             "token": token,
             "client_secret": client_secret,
-            "medium": medium,
+            "medium": "email",
         }
         respond_with_html(
             request, 200, self._confirmation_email_template.render(**template_vars)
         )
 
-
-class PasswordResetConfirmationSubmitTokenServlet(RestServlet):
-    """Handles confirmation of 3PID validation token submission.
-
-    A user will land on PasswordResetSubmitTokenServlet, confirm the password reset, then
-    submit the same parameters to this servlet.
-    """
-
-    PATTERNS = client_patterns(
-        "/password_reset/email/submit_token_confirm$", releases=(), unstable=True,
-    )
-
-    def __init__(self, hs: "HomeServer"):
-        """
-        Args:
-            hs: server
-        """
-        super(PasswordResetConfirmationSubmitTokenServlet, self).__init__()
-        self.hs = hs
-        self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
-        if hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            self._failure_email_template = (
-                hs.config.email_password_reset_template_failure_html
-            )
-            self._email_password_reset_template_success_html = (
-                hs.config.email_password_reset_template_success_html_content
-            )
-
     async def on_POST(self, request):
-        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
-            if self.hs.config.local_threepid_handling_disabled_due_to_email_config:
-                logger.warning(
-                    "Password reset emails have been disabled due to lack of an email config"
-                )
-            raise SynapseError(
-                400, "Email-based password resets are disabled on this server"
-            )
+        self._check_threepid_behaviour()
 
         sid = parse_string(request, "sid", required=True)
         token = parse_string(request, "token", required=True)
@@ -273,6 +235,28 @@ class PasswordResetConfirmationSubmitTokenServlet(RestServlet):
             html = self._failure_email_template.render(**template_vars)
 
         respond_with_html(request, status_code, html)
+
+    def _check_threepid_behaviour(self):
+        """
+        Ensure that ThreepidBehaviour is set to LOCAL, and handle cases where it is not
+
+        Raises:
+            SynapseError: if threepid_behaviour_email is not set to LOCAL
+        """
+        # We currently only handle threepid token submissions for email
+        if self._threepid_behaviour_email == ThreepidBehaviour.OFF:
+            if self._local_threepid_handling_disabled_due_to_email_config:
+                logger.warning(
+                    "Password reset emails have been disabled due to lack of an email config"
+                )
+            raise SynapseError(
+                400, "Email-based password resets are disabled on this server"
+            )
+        elif self._threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+            raise SynapseError(
+                400,
+                "Password resets for this homeserver are handled by a separate program",
+            )
 
 
 class PasswordRestServlet(RestServlet):
@@ -947,7 +931,6 @@ class WhoamiRestServlet(RestServlet):
 def register_servlets(hs, http_server):
     EmailPasswordRequestTokenRestServlet(hs).register(http_server)
     PasswordResetSubmitTokenServlet(hs).register(http_server)
-    PasswordResetConfirmationSubmitTokenServlet(hs).register(http_server)
     PasswordRestServlet(hs).register(http_server)
     DeactivateAccountRestServlet(hs).register(http_server)
     EmailThreepidRequestTokenRestServlet(hs).register(http_server)
