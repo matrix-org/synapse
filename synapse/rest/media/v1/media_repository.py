@@ -522,7 +522,7 @@ class MediaRepository(object):
 
             return output_path
 
-        # Source not found, cannot return a thumbnail.
+        # Could not generate thumbnail.
         return None
 
     async def generate_remote_exact_thumbnail(
@@ -596,7 +596,7 @@ class MediaRepository(object):
 
             return output_path
 
-        # Source not found, cannot return a thumbnail.
+        # Could not generate thumbnail.
         return None
 
     async def _generate_thumbnails(
