@@ -1,4 +1,6 @@
 from synapse.api.ratelimiting import LimitExceededError, Ratelimiter
+from synapse.appservice import ApplicationService
+from synapse.types import create_requester
 
 from tests import unittest
 
@@ -17,6 +19,77 @@ class TestRatelimiter(unittest.TestCase):
         allowed, time_allowed = limiter.can_do_action(key="test_id", _time_now_s=10)
         self.assertTrue(allowed)
         self.assertEquals(20.0, time_allowed)
+
+    def test_allowed_user_via_can_requester_do_action(self):
+        user_requester = create_requester("@user:example.com")
+        limiter = Ratelimiter(clock=None, rate_hz=0.1, burst_count=1)
+        allowed, time_allowed = limiter.can_requester_do_action(
+            user_requester, _time_now_s=0
+        )
+        self.assertTrue(allowed)
+        self.assertEquals(10.0, time_allowed)
+
+        allowed, time_allowed = limiter.can_requester_do_action(
+            user_requester, _time_now_s=5
+        )
+        self.assertFalse(allowed)
+        self.assertEquals(10.0, time_allowed)
+
+        allowed, time_allowed = limiter.can_requester_do_action(
+            user_requester, _time_now_s=10
+        )
+        self.assertTrue(allowed)
+        self.assertEquals(20.0, time_allowed)
+
+    def test_allowed_appservice_ratelimited_via_can_requester_do_action(self):
+        appservice = ApplicationService(
+            None, "example.com", id="foo", rate_limited=True,
+        )
+        as_requester = create_requester("@user:example.com", app_service=appservice)
+
+        limiter = Ratelimiter(clock=None, rate_hz=0.1, burst_count=1)
+        allowed, time_allowed = limiter.can_requester_do_action(
+            as_requester, _time_now_s=0
+        )
+        self.assertTrue(allowed)
+        self.assertEquals(10.0, time_allowed)
+
+        allowed, time_allowed = limiter.can_requester_do_action(
+            as_requester, _time_now_s=5
+        )
+        self.assertFalse(allowed)
+        self.assertEquals(10.0, time_allowed)
+
+        allowed, time_allowed = limiter.can_requester_do_action(
+            as_requester, _time_now_s=10
+        )
+        self.assertTrue(allowed)
+        self.assertEquals(20.0, time_allowed)
+
+    def test_allowed_appservice_via_can_requester_do_action(self):
+        appservice = ApplicationService(
+            None, "example.com", id="foo", rate_limited=False,
+        )
+        as_requester = create_requester("@user:example.com", app_service=appservice)
+
+        limiter = Ratelimiter(clock=None, rate_hz=0.1, burst_count=1)
+        allowed, time_allowed = limiter.can_requester_do_action(
+            as_requester, _time_now_s=0
+        )
+        self.assertTrue(allowed)
+        self.assertEquals(-1, time_allowed)
+
+        allowed, time_allowed = limiter.can_requester_do_action(
+            as_requester, _time_now_s=5
+        )
+        self.assertTrue(allowed)
+        self.assertEquals(-1, time_allowed)
+
+        allowed, time_allowed = limiter.can_requester_do_action(
+            as_requester, _time_now_s=10
+        )
+        self.assertTrue(allowed)
+        self.assertEquals(-1, time_allowed)
 
     def test_allowed_via_ratelimit(self):
         limiter = Ratelimiter(clock=None, rate_hz=0.1, burst_count=1)
