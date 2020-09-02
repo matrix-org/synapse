@@ -27,6 +27,7 @@ from synapse.api.constants import LoginType, Membership
 from synapse.api.errors import Codes
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import account, register
+from synapse.rest.synapse.client import password_reset
 
 from tests import unittest
 
@@ -38,6 +39,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         register.register_servlets,
         login.register_servlets,
+        password_reset.register_servlets,
     ]
 
     def make_homeserver(self, reactor, clock):
