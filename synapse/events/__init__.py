@@ -18,7 +18,7 @@
 import abc
 import os
 from distutils.util import strtobool
-from typing import Dict, Optional, Type
+from typing import Dict, Optional, Tuple, Type
 
 from unpaddedbase64 import encode_base64
 
@@ -120,7 +120,7 @@ class _EventInternalMetadata(object):
     # be here
     before = DictProperty("before")  # type: str
     after = DictProperty("after")  # type: str
-    order = DictProperty("order")  # type: int
+    order = DictProperty("order")  # type: Tuple[int, int]
 
     def get_dict(self) -> JsonDict:
         return dict(self._dict)

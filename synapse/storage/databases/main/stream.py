@@ -39,7 +39,7 @@ what sort order was used:
 import abc
 import logging
 from collections import namedtuple
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from twisted.internet import defer
 
@@ -50,7 +50,7 @@ from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool, make_in_list_sql_clause
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
-from synapse.types import RoomStreamToken
+from synapse.types import Collection, RoomStreamToken
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 logger = logging.getLogger(__name__)
@@ -202,7 +202,7 @@ def _make_generic_sql_bound(
     )
 
 
-def filter_to_clause(event_filter: Filter) -> Tuple[str, List[str]]:
+def filter_to_clause(event_filter: Optional[Filter]) -> Tuple[str, List[str]]:
     # NB: This may create SQL clauses that don't optimise well (and we don't
     # have indices on all possible clauses). E.g. it may create
     # "room_id == X AND room_id != X", which postgres doesn't optimise.
@@ -302,7 +302,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
     async def get_room_events_stream_for_rooms(
         self,
-        room_ids: Iterable[str],
+        room_ids: Collection[str],
         from_key: str,
         to_key: str,
         limit: int = 0,
@@ -746,6 +746,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             keyvalues={"event_id": event_id, "room_id": room_id},
             retcols=["stream_ordering", "topological_ordering"],
         )
+
+        # This cannot happen as `allow_none=False`.
+        assert results is not None
 
         # Paginating backwards includes the event at the token, but paginating
         # forward doesn't.
