@@ -16,6 +16,7 @@
 import logging
 
 from synapse.api.constants import EventTypes, RoomCreationPreset
+from synapse.types import JsonDict
 
 from ._base import Config, ConfigError
 
@@ -111,11 +112,11 @@ class RoomConfig(Config):
 
     def generate_config_section(self, **kwargs):
         pl_keys = self.power_level_content_default.keys() - {"events", "users"}
-        pl_lines_list = ["          #{}: 50".format(f) for f in pl_keys]
+        pl_lines_list = ["          #{}: 50".format(f) for f in sorted(list(pl_keys))]
         pl_lines = "\n".join(pl_lines_list)
 
         pl_event_keys = self.power_level_content_default["events"].keys()
-        pl_event_lines_list = ["            #{}: 50".format(f) for f in pl_event_keys]
+        pl_event_lines_list = ["            #{}: 50".format(f) for f in sorted(list(pl_event_keys))]
         pl_event_lines = "\n".join(pl_event_lines_list)
 
         return f"""\
