@@ -348,4 +348,3 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         else:
             # A 404 with no body.
             self.assertEqual(channel.code, 404)
-            self.assertEqual(channel.result["body"], "")
