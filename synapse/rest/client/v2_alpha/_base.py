@@ -20,7 +20,7 @@ import re
 from typing import Iterable, Pattern
 
 from synapse.api.errors import InteractiveAuthIncompleteError
-from synapse.api.urls import CLIENT_API_PREFIX, SYNAPSE_CLIENT_API_PREFIX
+from synapse.api.urls import CLIENT_API_PREFIX
 from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
@@ -57,19 +57,6 @@ def client_patterns(
         patterns.append(re.compile("^" + new_prefix + path_regex))
 
     return patterns
-
-
-def synapse_client_patterns(path_regex: str) -> Iterable[Pattern]:
-    """Creates a regex compiled client path with the correct synapse client
-    path prefix.
-
-    Args:
-        path_regex: The regex string to match. This should NOT have a ^
-            as this will be prefixed.
-    Returns:
-        An iterable of patterns.
-    """
-    return [re.compile("^" + SYNAPSE_CLIENT_API_PREFIX + path_regex)]
 
 
 def set_timeline_upper_limit(filter_json: JsonDict, filter_timeline_limit: int) -> None:
