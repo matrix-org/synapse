@@ -1369,8 +1369,6 @@ class FederationHandler(BaseHandler):
 
             # We wait here until this instance has seen the events come down
             # replication (if we're using replication) as the below uses caches.
-            #
-            # TODO: Currently the events stream is written to from master
             await self._replication.wait_for_stream_position(
                 self.config.worker.events_shard_config.get_instance(room_id),
                 "events",
@@ -2923,8 +2921,10 @@ class FederationHandler(BaseHandler):
         necessary.
 
         Args:
-            room_id:
-            event_and_contexts:
+            room_id: The room ID of events being persisted.
+            event_and_contexts: Sequence of events with their associated
+                context that should be persisted. All events must belong to
+                the same room.
             backfilled: Whether these events are a result of
                 backfilling or not
         """

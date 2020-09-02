@@ -80,6 +80,8 @@ class EventsWorkerStore(SQLBaseStore):
         super(EventsWorkerStore, self).__init__(database, db_conn, hs)
 
         if isinstance(database.engine, PostgresEngine):
+            # If we're using Postgres than we can use `MultiWriterIdGenerator`
+            # regardless of whether this process writes to the streams or not.
             self._stream_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
@@ -102,6 +104,11 @@ class EventsWorkerStore(SQLBaseStore):
         else:
             # We shouldn't be running in worker mode with SQLite, but its useful
             # to support it for unit tests.
+            #
+            # If this process is the writer than we need to use
+            # `StreamIdGenerator`, otherwise we use `SlavedIdTracker` which gets
+            # updated over replication. (Multiple writers are not supported for
+            # SQLite).
             if hs.get_instance_name() in hs.config.worker.writers.events:
                 self._stream_id_gen = StreamIdGenerator(
                     db_conn, "events", "stream_ordering",

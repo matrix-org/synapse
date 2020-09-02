@@ -1262,8 +1262,6 @@ class RoomShutdownHandler(object):
             # We now wait for the create room to come back in via replication so
             # that we can assume that all the joins/invites have propogated before
             # we try and auto join below.
-            #
-            # TODO: Currently the events stream is written to from master
             await self._replication.wait_for_stream_position(
                 self.hs.config.worker.events_shard_config.get_instance(new_room_id),
                 "events",

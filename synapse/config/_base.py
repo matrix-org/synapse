@@ -846,8 +846,6 @@ class ShardedWorkerHandlingConfig:
         Therefore `should_handle` should be used where possible.
         """
 
-        # Note: For things like federation sending the config for which instance
-        # is sending is known only to the sender instance if there is only one.
         if not self.instances:
             return "master"
 
