@@ -15,7 +15,7 @@
 -- This schema delta alters the schema to enable 'catching up' remote homeservers
 -- after there has been a connectivity problem for any reason.
 
--- This stores, for each (destination, room) pair and stream_ordering of the
+-- This stores, for each (destination, room) pair, the stream_ordering of the
 -- latest event for that destination.
 CREATE TABLE IF NOT EXISTS destination_rooms (
   -- the destination in question.

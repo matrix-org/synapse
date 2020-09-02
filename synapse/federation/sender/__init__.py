@@ -289,10 +289,7 @@ class FederationSender(object):
         # to allow us to perform catch-up later on if the remote is unreachable
         # for a while.
         await self.store.store_destination_rooms_entries(
-            destinations,
-            pdu.room_id,
-            pdu.event_id,
-            pdu.internal_metadata.stream_ordering,
+            destinations, pdu.room_id, pdu.internal_metadata.stream_ordering,
         )
 
         for destination in destinations:

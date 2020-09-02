@@ -22,6 +22,7 @@ from canonicaljson import encode_canonical_json
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool, LoggingTransaction
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import JsonDict
 from synapse.util.caches.expiringcache import ExpiringCache
 
@@ -275,11 +276,7 @@ class TransactionStore(SQLBaseStore):
         )
 
     async def store_destination_rooms_entries(
-        self,
-        destinations: Iterable[str],
-        room_id: str,
-        event_id: str,
-        stream_ordering: int,
+        self, destinations: Iterable[str], room_id: str, stream_ordering: int,
     ) -> None:
         """
         Updates or creates `destination_rooms` entries in batch for a single event.
@@ -296,7 +293,6 @@ class TransactionStore(SQLBaseStore):
             self._store_destination_rooms_entries_txn,
             destinations,
             room_id,
-            event_id,
             stream_ordering,
         )
 
@@ -305,14 +301,24 @@ class TransactionStore(SQLBaseStore):
         txn: LoggingTransaction,
         destinations: Iterable[str],
         room_id: str,
-        event_id: str,
         stream_ordering: int,
     ) -> None:
 
-        q = """
-            INSERT OR IGNORE INTO destinations (destination)
-                VALUES (?);
-        """
+        # ensure we have a `destinations` row for this destination, as there is
+        # a foreign key constraint.
+        if isinstance(self.database_engine, PostgresEngine):
+            q = """
+                INSERT INTO destinations (destination)
+                    VALUES (?)
+                    ON CONFLICT DO NOTHING;
+            """
+        elif isinstance(self.database_engine, Sqlite3Engine):
+            q = """
+                INSERT OR IGNORE INTO destinations (destination)
+                    VALUES (?);
+            """
+        else:
+            raise RuntimeError("Unknown database engine")
 
         txn.execute_batch(q, ((destination,) for destination in destinations))
 
