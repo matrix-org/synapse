@@ -1,1 +1,1 @@
-Remove obsolete and arbitrary `order` field from federation senders.
+Remove obsolete `order` field from federation send queues.
