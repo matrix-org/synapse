@@ -37,10 +37,10 @@ logger = logging.getLogger(__name__)
 
 CacheKey = Union[Tuple, Any]
 
-R = TypeVar("R")
+F = TypeVar("F", bound=Callable[..., Any])
 
 
-class _CachedFunction(Generic[R]):
+class _CachedFunction(Generic[F]):
     invalidate = None  # type: Any
     invalidate_all = None  # type: Any
     invalidate_many = None  # type: Any
@@ -50,8 +50,9 @@ class _CachedFunction(Generic[R]):
 
     __name__ = None  # type: str
 
-    def __call__(self, *args, **kwargs) -> R:
-        ...
+    # Note: This function signature is actually fiddled with by the synapse mypy
+    # plugin to a) make it a bound methd, and b) remove any `cache_context` arg.
+    __call__ = None  # type: F
 
 
 cache_pending_metric = Gauge(
@@ -666,7 +667,7 @@ class _CacheContext:
 
 def cached(
     max_entries=1000, num_args=None, tree=False, cache_context=False, iterable=False
-) -> Callable[[Callable[..., R]], _CachedFunction[R]]:
+) -> Callable[[F], _CachedFunction[F]]:
     func = lambda orig: CacheDescriptor(
         orig,
         max_entries=max_entries,
@@ -676,12 +677,12 @@ def cached(
         iterable=iterable,
     )
 
-    return cast(Callable[[Callable[..., R]], _CachedFunction[R]], func)
+    return cast(Callable[[F], _CachedFunction[F]], func)
 
 
 def cachedList(
     cached_method_name, list_name, num_args=None
-) -> Callable[[Callable[..., R]], _CachedFunction[R]]:
+) -> Callable[[F], _CachedFunction[F]]:
     """Creates a descriptor that wraps a function in a `CacheListDescriptor`.
 
     Used to do batch lookups for an already created cache. A single argument
@@ -716,4 +717,4 @@ def cachedList(
         num_args=num_args,
     )
 
-    return cast(Callable[[Callable[..., R]], _CachedFunction[R]], func)
+    return cast(Callable[[F], _CachedFunction[F]], func)
