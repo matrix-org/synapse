@@ -13,6 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""This is a mypy plugin for Synpase to deal with some of the funky typing that
+can crop up, e.g the cache descriptors.
+"""
+
 from typing import Callable, Optional
 
 from mypy.plugin import MethodSigContext, Plugin
@@ -72,5 +76,10 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
 
 
 def plugin(version: str):
-    # ignore version argument if the plugin works with all mypy versions.
+    # This is the entry point of the plugin, and let's us deal with the fact
+    # that the mypy plugin interface is *not* stable by looking at the version
+    # string.
+    #
+    # However, since we pin the version of mypy Synapse uses in CI, we don't
+    # really care.
     return SynapsePlugin
