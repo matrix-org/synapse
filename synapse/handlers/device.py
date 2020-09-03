@@ -610,7 +610,8 @@ class DeviceHandler(DeviceWorkerHandler):
         login_submission = token_info["login_submission"]
         device_id = login_submission.get("device_id")
         initial_display_name = login_submission.get("initial_device_display_name")
-        device_id, access_token = await self.registration_handler.register_device(
+        registration_handler = self.hs.get_registration_handler()
+        device_id, access_token = await registration_handler.register_device(
             token_info.get("user_id"), device_id, initial_display_name
         )
 
