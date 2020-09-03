@@ -42,6 +42,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class MappingException(Exception):
+    """Used to catch errors when mapping the SAML2 response to a user."""
+
+
 @attr.s
 class Saml2SessionData:
     """Data we track about SAML2 sessions"""
@@ -216,9 +220,14 @@ class SamlHandler:
         ip_address = self.hs.get_ip_from_request(request)
 
         # Call the mapper to register/login the user
-        user_id = await self._map_saml_response_to_user(
-            resp_bytes, relay_state, user_agent, ip_address
-        )
+        try:
+            user_id = await self._map_saml_response_to_user(
+                resp_bytes, relay_state, user_agent, ip_address
+            )
+        except MappingException as e:
+            logger.exception("Could not map user")
+            self._render_error(request, "mapping_error", str(e))
+            return
 
         # Complete the interactive auth session or the login.
         if current_session and current_session.ui_auth_session_id:
@@ -249,7 +258,7 @@ class SamlHandler:
              The user ID associated with this response.
 
         Raises:
-            SynapseError if there was a problem with the response.
+            MappingException if there was a problem mapping the response to a user.
             RedirectException: some mapping providers may raise this if they need
                 to redirect to an interstitial page.
         """
@@ -259,7 +268,9 @@ class SamlHandler:
         )
 
         if not remote_user_id:
-            raise Exception("Failed to extract remote user id from SAML response")
+            raise MappingException(
+                "Failed to extract remote user id from SAML response"
+            )
 
         with (await self._mapping_lock.queue(self._auth_provider_id)):
             # first of all, check if we already have a mapping for this user
@@ -315,7 +326,7 @@ class SamlHandler:
 
                 localpart = attribute_dict.get("mxid_localpart")
                 if not localpart:
-                    raise Exception(
+                    raise MappingException(
                         "Error parsing SAML2 response: SAML mapping provider plugin "
                         "did not return a mxid_localpart value"
                     )
@@ -332,8 +343,8 @@ class SamlHandler:
             else:
                 # Unable to generate a username in 1000 iterations
                 # Break and return error to the user
-                raise SynapseError(
-                    500, "Unable to generate a Matrix ID from the SAML response"
+                raise MappingException(
+                    "Unable to generate a Matrix ID from the SAML response"
                 )
 
             logger.info("Mapped SAML user to local part %s", localpart)
@@ -428,7 +439,7 @@ class DefaultSamlMappingProvider:
             return saml_response.ava["uid"][0]
         except KeyError:
             logger.warning("SAML2 response lacks a 'uid' attestation")
-            raise SynapseError(400, "'uid' not in SAML2 response")
+            raise MappingException("'uid' not in SAML2 response")
 
     def saml_response_to_user_attributes(
         self,
