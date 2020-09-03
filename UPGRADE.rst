@@ -87,6 +87,12 @@ to include reverse proxy directives for ``/_synapse/client/*`` endpoints. As the
 reset flow now uses endpoints under this prefix, **you must update your reverse proxy
 configurations for user password reset to work**.
 
+Additionally, note that the `Synapse worker documentation
+<https://github.com/matrix-org/synapse/blob/develop/docs/workers.md>`_ has been updated to
+ state that the ``/_synapse/client/password_reset/email/submit_token`` endpoint can be handled
+by all workers. If you make use of Synapse's worker feature, please update your reverse proxy
+configuration to reflect this change.
+
 Upgrading to v1.18.0
 ====================
 
