@@ -18,7 +18,7 @@ import functools
 import inspect
 import logging
 import threading
-from typing import Any, Tuple, Union, cast
+from typing import Any, Optional, Tuple, Union, cast
 from weakref import WeakValueDictionary
 
 from prometheus_client import Gauge
@@ -47,7 +47,9 @@ class _CachedFunction(Protocol):
     cache = None  # type: Any
     num_args = None  # type: Any
 
-    def __name__(self):
+    __name__ = None  # type: str
+
+    def __call__(self, *args, **kwargs):
         ...
 
 
@@ -123,7 +125,7 @@ class Cache(object):
 
         self.name = name
         self.keylen = keylen
-        self.thread = None
+        self.thread = None  # type: Optional[threading.Thread]
         self.metrics = register_cache(
             "cache",
             name,
