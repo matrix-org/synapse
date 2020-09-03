@@ -21,7 +21,6 @@ from typing import Awaitable
 
 from twisted.internet.interfaces import IConsumer
 from twisted.protocols.basic import FileSender
-from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError, cs_error
 from synapse.http.server import finish_request, respond_with_json
@@ -70,30 +69,13 @@ def parse_media_id(request):
         )
 
 
-def respond_404(request: Request):
-    respond_with_code(request, 404)
-
-
-def respond_with_code(request: Request, code: int):
-    """
-    Sends an empty response with a status code.
-
-    Args:
-        request: The http request to respond to.
-        code: The HTTP response code.
-    """
-    # could alternatively use request.notifyFinish() and flip a flag when
-    # the Deferred fires, but since the flag is RIGHT THERE it seems like
-    # a waste.
-    if request._disconnected:
-        logger.warning(
-            "Not sending response to request %s, already disconnected.", request
-        )
-        return
-
-    request.setResponseCode(code)
-    request.setHeader(b"Content-Length", b"0")
-    finish_request(request)
+def respond_404(request):
+    respond_with_json(
+        request,
+        404,
+        cs_error("Not found %r" % (request.postpath,), code=Codes.NOT_FOUND),
+        send_cors=True,
+    )
 
 
 async def respond_with_file(

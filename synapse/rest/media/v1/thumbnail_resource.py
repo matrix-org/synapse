@@ -23,7 +23,6 @@ from ._base import (
     FileInfo,
     parse_media_id,
     respond_404,
-    respond_with_code,
     respond_with_file,
     respond_with_responder,
 )
@@ -174,7 +173,7 @@ class ThumbnailResource(DirectServeJsonResource):
             await respond_with_file(request, desired_type, file_path)
         else:
             logger.warning("Failed to generate thumbnail")
-            respond_with_code(400)
+            respond_404(request)
 
     async def _select_or_generate_remote_thumbnail(
         self,
@@ -236,7 +235,7 @@ class ThumbnailResource(DirectServeJsonResource):
             await respond_with_file(request, desired_type, file_path)
         else:
             logger.warning("Failed to generate thumbnail")
-            respond_with_code(400)
+            respond_404(request)
 
     async def _respond_remote_thumbnail(
         self, request, server_name, media_id, width, height, method, m_type

@@ -130,7 +130,7 @@ with open("test.gif", "rb") as f:
 @parameterized_class(
     ("test_image",),
     [
-        # smol png
+        # smoll png
         (
             _TestImage(
                 unhexlify(
@@ -348,4 +348,11 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         else:
             # A 404 with no body.
             self.assertEqual(channel.code, 404)
-            self.assertNotIn("body", channel.result)
+            self.assertEqual(
+                channel.json_body,
+                {
+                    "errcode": "M_NOT_FOUND",
+                    "error": "Not found [b'example.com', b'12345?width=32&height=32&method=%s']"
+                    % method,
+                },
+            )
