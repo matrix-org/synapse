@@ -21,12 +21,13 @@ CREATE TABLE IF NOT EXISTS destination_rooms (
   -- the destination in question.
   destination TEXT NOT NULL REFERENCES destinations (destination),
   -- the ID of the room in question
-  room_id TEXT NOT NULL,
+  room_id TEXT NOT NULL REFERENCES rooms (room_id),
   -- the stream_ordering of the event
   stream_ordering INTEGER NOT NULL,
-  PRIMARY KEY (destination, room_id),
-  FOREIGN KEY (room_id) REFERENCES rooms (room_id),
-  FOREIGN KEY (stream_ordering) REFERENCES events (stream_ordering)
+  PRIMARY KEY (destination, room_id)
+  -- We don't declare a foreign key on stream_orderings here because that'd mean
+  -- we'd need to either maintain an index (expensive) or do a table scan of
+  -- destination_rooms whenever we delete an event (also potentially expensive).
 );
 
 CREATE INDEX IF NOT EXISTS destination_rooms_room_id
