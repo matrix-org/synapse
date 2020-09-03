@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 class PasswordResetRestResource(JsonResource):
     """Synapse Internal Resource for password reset functionality
 
-    This resource gets mounted under /_synapse/client
+    This resource gets mounted under /_synapse/client/password_reset/email/submit_token
     """
 
     def __init__(self, hs: "HomeServer"):
