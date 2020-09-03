@@ -342,7 +342,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
                 # ensure that the result is at least some valid image
                 Image.open(BytesIO(channel.result["body"]))
         else:
-            # A 404 with no body.
+            # A 404 with a JSON body.
             self.assertEqual(channel.code, 404)
             self.assertEqual(
                 channel.json_body,
