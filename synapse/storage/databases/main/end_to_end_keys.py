@@ -135,7 +135,10 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         include_all_devices: bool = False,
         include_deleted_devices: bool = False,
     ) -> Dict[str, Dict[str, Optional[DeviceKeyLookupResult]]]:
-        """Fetch a list of device keys, together with their cross-signatures.
+        """Fetch a list of device keys
+
+        Any cross-signatures made on the keys by the owner of the device are also
+        included.
 
         Args:
             query_list: List of pairs of user_ids and device_ids. Device id can be None
@@ -178,20 +181,14 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             )
 
             # add each cross-signing signature to the correct device in the result dict.
-            for row in cross_sigs_result:
-                signing_user_id = row["user_id"]
-                signing_key_id = row["key_id"]
-                target_user_id = row["target_user_id"]
-                target_device_id = row["target_device_id"]
-                signature = row["signature"]
-
-                target_device_result = result[target_user_id][target_device_id]
+            for (user_id, key_id, device_id, signature) in cross_sigs_result:
+                target_device_result = result[user_id][device_id]
                 target_device_signatures = target_device_result.signatures
 
                 signing_user_signatures = target_device_signatures.setdefault(
-                    signing_user_id, {}
+                    user_id, {}
                 )
-                signing_user_signatures[signing_key_id] = signature
+                signing_user_signatures[key_id] = signature
 
         log_kv(result)
         return result
@@ -254,12 +251,13 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
 
     def _get_e2e_cross_signing_signatures_for_devices_txn(
         self, txn: Cursor, device_query: Iterable[Tuple[str, str]]
-    ) -> List[Dict]:
+    ) -> List[Tuple[str, str, str, str]]:
         """Get cross-signing signatures for a given list of devices
 
-        Returns signatures made by the owner of the devices. Each entry in the result
-        is a dict containing the fields from the database ('user_id', 'key_id',
-        'target_user_id', 'target_device_id', 'signature').
+        Returns signatures made by the owners of the devices.
+
+        Returns: a list of results; each entry in the list is a tuple of
+            (user_id, key_id, target_device_id, signature).
         """
         signature_query_clauses = []
         signature_query_params = []
@@ -270,12 +268,15 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             )
             signature_query_params.extend([user_id, device_id, user_id])
 
-        signature_sql = "SELECT * FROM e2e_cross_signing_signatures WHERE %s" % (
+        signature_sql = """
+            SELECT user_id, key_id, target_device_id, signature
+            FROM e2e_cross_signing_signatures WHERE %s
+            """ % (
             " OR ".join("(" + q + ")" for q in signature_query_clauses)
         )
 
         txn.execute(signature_sql, signature_query_params)
-        return self.db_pool.cursor_to_dict(txn)
+        return txn.fetchall()
 
     async def get_e2e_one_time_keys(
         self, user_id: str, device_id: str, key_ids: List[str]
