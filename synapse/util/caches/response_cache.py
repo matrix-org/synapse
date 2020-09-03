@@ -23,7 +23,7 @@ from synapse.util.caches import register_cache
 logger = logging.getLogger(__name__)
 
 
-class ResponseCache(object):
+class ResponseCache:
     """
     This caches a deferred response. Until the deferred completes it will be
     returned from the cache. This means that if the client retries the request

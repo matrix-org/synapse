@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-class _Entry(object):
+class _Entry:
     __slots__ = ["end_key", "queue"]
 
     def __init__(self, end_key):
@@ -22,7 +22,7 @@ class _Entry(object):
         self.queue = []
 
 
-class WheelTimer(object):
+class WheelTimer:
     """Stores arbitrary objects that will be returned after their timers have
     expired.
     """
@@ -42,7 +42,7 @@ class WheelTimer(object):
 
         Args:
             now (int): Current time in msec
-            obj (object): Object to be inserted
+            obj : Object to be inserted
             then (int): When to return the object strictly after.
         """
         then_key = int(then / self.bucket_size) + 1

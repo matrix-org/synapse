@@ -713,7 +713,7 @@ class RegistrationHandler(BaseHandler):
 
         Args:
             user_id (str): id of user
-            threepid (object): m.login.email.identity auth response
+            threepid : m.login.email.identity auth response
             token (str|None): access_token for the user, or None if not logged
                 in.
         """
@@ -762,7 +762,7 @@ class RegistrationHandler(BaseHandler):
 
         Args:
             user_id (str): id of user
-            threepid (object): m.login.msisdn auth response
+            threepid : m.login.msisdn auth response
         """
         try:
             assert_params_in_dict(threepid, ["medium", "address", "validated_at"])

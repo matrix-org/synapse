@@ -185,7 +185,7 @@ if TYPE_CHECKING:
 # Helper class
 
 
-class _DummyTagNames(object):
+class _DummyTagNames:
     """wrapper of opentracings tags. We need to have them if we
     want to reference them without opentracing around. Clearly they
     should never actually show up in a trace. `set_tags` overwrites
@@ -288,9 +288,9 @@ def ensure_active_span(message, ret=None):
     Args:
         message (str): Message which fills in "There was no active span when trying to %s"
             in the error log if there is no active span and opentracing is enabled.
-        ret (object): return value if opentracing is None or there is no active span.
+        ret : return value if opentracing is None or there is no active span.
 
-    Returns (object): The result of the func or ret if opentracing is disabled or there
+    Returns : The result of the func or ret if opentracing is disabled or there
         was no active span.
     """
 

@@ -197,7 +197,7 @@ class AdminHandler(BaseHandler):
         return writer.finished()
 
 
-class ExfiltrationWriter(object):
+class ExfiltrationWriter:
     """Interface used to specify how to write exported data.
     """
 

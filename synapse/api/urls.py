@@ -33,7 +33,7 @@ MEDIA_PREFIX = "/_matrix/media/r0"
 LEGACY_MEDIA_PREFIX = "/_matrix/media/v1"
 
 
-class ConsentURIBuilder(object):
+class ConsentURIBuilder:
     def __init__(self, hs_config):
         """
         Args:

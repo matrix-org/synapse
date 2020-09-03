@@ -36,7 +36,7 @@ class RegistrationBehaviour(Enum):
     DENY = "deny"
 
 
-class SpamCheckerApi(object):
+class SpamCheckerApi:
     """A proxy object that gets passed to spam checkers so they can get
     access to rooms and other relevant information.
     """

@@ -96,7 +96,7 @@ class DefaultDictProperty(DictProperty):
         return instance._dict.get(self.key, self.default)
 
 
-class _EventInternalMetadata(object):
+class _EventInternalMetadata:
     __slots__ = ["_dict"]
 
     def __init__(self, internal_metadata_dict: JsonDict):

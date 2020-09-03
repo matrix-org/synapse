@@ -23,7 +23,7 @@ from synapse.util import json_encoder
 logger = logging.getLogger(__name__)
 
 
-class WellKnownBuilder(object):
+class WellKnownBuilder:
     """Utility to construct the well-known response
 
     Args:

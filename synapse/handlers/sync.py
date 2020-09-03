@@ -246,7 +246,7 @@ class SyncResult:
     __bool__ = __nonzero__  # python3
 
 
-class SyncHandler(object):
+class SyncHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs_config = hs.config
         self.store = hs.get_datastore()
@@ -2075,7 +2075,7 @@ class SyncResultBuilder:
 
 
 @attr.s
-class RoomSyncResultBuilder(object):
+class RoomSyncResultBuilder:
     """Stores information needed to create either a `JoinedSyncResult` or
     `ArchivedSyncResult`.
 

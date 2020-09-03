@@ -27,12 +27,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ApplicationServiceState(object):
+class ApplicationServiceState:
     DOWN = "down"
     UP = "up"
 
 
-class AppServiceTransaction(object):
+class AppServiceTransaction:
     """Represents an application service transaction."""
 
     def __init__(self, service, id, events):
@@ -64,7 +64,7 @@ class AppServiceTransaction(object):
         await store.complete_appservice_txn(service=self.service, txn_id=self.id)
 
 
-class ApplicationService(object):
+class ApplicationService:
     """Defines an application service. This definition is mostly what is
     provided to the /register AS API.
 

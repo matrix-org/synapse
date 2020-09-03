@@ -76,7 +76,7 @@ _next_id = 1
 
 
 @attr.s(frozen=True)
-class MatrixFederationRequest(object):
+class MatrixFederationRequest:
     method = attr.ib()
     """HTTP method
     :type: str
@@ -203,7 +203,7 @@ async def _handle_json_response(
     return body
 
 
-class MatrixFederationHttpClient(object):
+class MatrixFederationHttpClient:
     """HTTP client used to talk to other homeservers over the federation
     protocol. Send client certificates and signs requests.
 
@@ -226,7 +226,7 @@ class MatrixFederationHttpClient(object):
         )
 
         @implementer(IReactorPluggableNameResolver)
-        class Reactor(object):
+        class Reactor:
             def __getattr__(_self, attr):
                 if attr == "nameResolver":
                     return nameResolver
@@ -591,7 +591,7 @@ class MatrixFederationHttpClient(object):
                 destination_is must be non-None.
             method (bytes): The HTTP method of the request
             url_bytes (bytes): The URI path of the request
-            content (object): The body of the request
+            content : The body of the request
             destination_is (bytes): As 'destination', but if the destination is an
                 identity server
 

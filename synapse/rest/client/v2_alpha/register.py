@@ -655,10 +655,10 @@ class RegisterRestServlet(RestServlet):
 
         Args:
             (str) user_id: full canonical @user:id
-            (object) params: registration parameters, from which we pull
+             params: registration parameters, from which we pull
                 device_id, initial_device_name and inhibit_login
         Returns:
-            (object) dictionary for response from /register
+             dictionary for response from /register
         """
         result = {"user_id": user_id, "home_server": self.hs.hostname}
         if not params.get("inhibit_login", False):

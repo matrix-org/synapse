@@ -23,7 +23,7 @@ from synapse.types import get_localpart_from_id
 logger = logging.getLogger(__name__)
 
 
-class ConsentServerNotices(object):
+class ConsentServerNotices:
     """Keeps track of whether we need to send users server_notices about
     privacy policy consent, and sends one if we do.
     """
@@ -107,8 +107,8 @@ def copy_with_str_subst(x: Any, substitutions: Any) -> Any:
     """Deep-copy a structure, carrying out string substitions on any strings
 
     Args:
-        x (object): structure to be copied
-        substitutions (object): substitutions to be made - passed into the
+        x : structure to be copied
+        substitutions : substitutions to be made - passed into the
             string '%' operator
 
     Returns:

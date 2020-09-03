@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 MAX_LIMIT = 1000
 
 
-class SourcePaginationConfig(object):
+class SourcePaginationConfig:
 
     """A configuration object which stores pagination parameters for a
     specific event source."""
@@ -45,7 +45,7 @@ class SourcePaginationConfig(object):
         )
 
 
-class PaginationConfig(object):
+class PaginationConfig:
 
     """A configuration object which stores pagination parameters."""
 

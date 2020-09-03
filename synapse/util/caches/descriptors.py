@@ -64,7 +64,7 @@ cache_pending_metric = Gauge(
 _CacheSentinel = object()
 
 
-class CacheEntry(object):
+class CacheEntry:
     __slots__ = ["deferred", "callbacks", "invalidated"]
 
     def __init__(self, deferred, callbacks):
@@ -80,7 +80,7 @@ class CacheEntry(object):
             self.callbacks.clear()
 
 
-class Cache(object):
+class Cache:
     __slots__ = (
         "cache",
         "name",
@@ -288,7 +288,7 @@ class Cache(object):
         self._pending_deferred_cache.clear()
 
 
-class _CacheDescriptorBase(object):
+class _CacheDescriptorBase:
     def __init__(self, orig: _CachedFunction, num_args, cache_context=False):
         self.orig = orig
 
@@ -705,7 +705,7 @@ def cachedList(
 
     Example:
 
-        class Example(object):
+        class Example:
             @cached(num_args=2)
             def do_something(self, first_arg):
                 ...
