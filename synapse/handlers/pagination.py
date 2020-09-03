@@ -312,8 +312,8 @@ class PaginationHandler(object):
     async def get_messages(
         self,
         requester: Requester,
-        room_id: Optional[str] = None,
-        pagin_config: Optional[PaginationConfig] = None,
+        room_id: str,
+        pagin_config: PaginationConfig,
         as_client_event: bool = True,
         event_filter: Optional[Filter] = None,
     ) -> Dict[str, Any]:
