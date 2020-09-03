@@ -655,7 +655,7 @@ class RegisterRestServlet(RestServlet):
 
         Args:
             (str) user_id: full canonical @user:id
-             params: registration parameters, from which we pull
+            (object) params: registration parameters, from which we pull
                 device_id, initial_device_name and inhibit_login
         Returns:
              dictionary for response from /register
