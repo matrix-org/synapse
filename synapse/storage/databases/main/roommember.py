@@ -298,8 +298,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return None
 
     async def get_rooms_for_local_user_where_membership_is(
-        self, user_id: str, membership_list: List[str]
-    ) -> Optional[List[RoomsForUser]]:
+        self, user_id: str, membership_list: Collection[str]
+    ) -> List[RoomsForUser]:
         """Get all the rooms for this *local* user where the membership for this user
         matches one in the membership list.
 
@@ -314,7 +314,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             The RoomsForUser that the user matches the membership types.
         """
         if not membership_list:
-            return None
+            return []
 
         rooms = await self.db_pool.runInteraction(
             "get_rooms_for_local_user_where_membership_is",
