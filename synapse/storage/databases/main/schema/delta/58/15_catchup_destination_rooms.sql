@@ -25,6 +25,6 @@ CREATE TABLE IF NOT EXISTS destination_rooms (
   -- the stream_ordering of the event
   stream_ordering INTEGER NOT NULL,
   PRIMARY KEY (destination, room_id),
-  FOREIGN KEY (room_id) REFERENCES rooms (room_id)
+  FOREIGN KEY (room_id) REFERENCES rooms (room_id),
   FOREIGN KEY (stream_ordering) REFERENCES events (stream_ordering)
 );
