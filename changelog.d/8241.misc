@@ -1,1 +1,1 @@
-Fix type signatures in `simple_select_one_onecol` and friends.
+Add type hints to `synapse.storage.database`.
