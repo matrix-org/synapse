@@ -206,6 +206,8 @@ class SamlHandler:
             saml2_auth.in_response_to, None
         )
 
+        # Ensure that the attributes of the logged in user meet the required
+        # attributes.
         for requirement in self._saml2_attribute_requirements:
             if not _check_attribute_requirement(saml2_auth.ava, requirement):
                 self._render_error(
@@ -222,7 +224,7 @@ class SamlHandler:
         # Call the mapper to register/login the user
         try:
             user_id = await self._map_saml_response_to_user(
-                resp_bytes, relay_state, user_agent, ip_address
+                saml2_auth, relay_state, user_agent, ip_address
             )
         except MappingException as e:
             logger.exception("Could not map user")
