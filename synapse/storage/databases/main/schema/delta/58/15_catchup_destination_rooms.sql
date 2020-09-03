@@ -28,3 +28,6 @@ CREATE TABLE IF NOT EXISTS destination_rooms (
   FOREIGN KEY (room_id) REFERENCES rooms (room_id),
   FOREIGN KEY (stream_ordering) REFERENCES events (stream_ordering)
 );
+
+CREATE INDEX IF NOT EXISTS destination_rooms_room_id
+    ON destination_rooms (room_id);

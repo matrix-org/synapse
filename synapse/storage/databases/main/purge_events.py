@@ -202,11 +202,12 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
         for event_id, _ in event_rows:
             txn.call_after(self._get_state_group_for_event.invalidate, (event_id,))
 
-        logger.info("[purge] removing events from destination_rooms")
+        logger.info("[purge] removing dangling destination_rooms entries")
         txn.execute(
             "DELETE FROM destination_rooms WHERE stream_ordering IN ("
             "   SELECT stream_ordering FROM events_to_purge"
             "       JOIN events USING (event_id)"
+            "       JOIN destination_rooms USING (room_id, stream_ordering)"
             ")"
         )
 
