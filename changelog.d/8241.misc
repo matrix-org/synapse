@@ -1,0 +1,1 @@
+Fix type signatures in `simple_select_one_onecol` and friends.
