@@ -27,7 +27,7 @@ from synapse.api.constants import LoginType, Membership
 from synapse.api.errors import Codes
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import account, register
-from synapse.rest.synapse.client import password_reset
+from synapse.rest.internal.client import password_reset
 
 from tests import unittest
 

@@ -16,7 +16,7 @@
 from typing import TYPE_CHECKING
 
 from synapse.http.server import JsonResource
-from synapse.rest.synapse.client import password_reset
+from synapse.rest.internal.client import password_reset
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
