@@ -73,7 +73,6 @@ class PasswordResetSubmitTokenServlet(RestServlet):
             "sid": sid,
             "token": token,
             "client_secret": client_secret,
-            "medium": "email",
         }
         respond_with_html(
             request, 200, self._confirmation_email_template.render(**template_vars)
