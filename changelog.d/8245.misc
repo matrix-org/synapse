@@ -1,0 +1,1 @@
+Remove obsolete `order` field from federation send queues.
