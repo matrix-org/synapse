@@ -387,12 +387,14 @@ class PaginationHandler(object):
                     room_id, max_topo
                 )
 
+            to_room_key = None
+            if pagin_config.to_token:
+                to_room_key = pagin_config.to_token.room_key
+
             events, next_key = await self.store.paginate_room_events(
                 room_id=room_id,
                 from_key=from_token.room_key,
-                to_key=pagin_config.to_token.room_key
-                if pagin_config.to_token
-                else None,
+                to_key=to_room_key,
                 direction=pagin_config.direction,
                 limit=pagin_config.limit,
                 event_filter=event_filter,
