@@ -25,7 +25,7 @@ for more details of the algorithm used for federation connections, and
 
 Endpoints that are part of the standardised Matrix specification are
 located under `/_matrix`, whereas endpoints specific to Synapse are
-located under `/_synapse`.
+located under `/_synapse/client`.
 
 Let's assume that we expect clients to connect to our server at
 `https://matrix.example.com`, and other servers to connect at
@@ -130,9 +130,9 @@ frontend https
   # Matrix client traffic
   acl matrix-host hdr(host) -i matrix.example.com
   acl matrix-path path_beg /_matrix
-  acl synapse-client-path path_beg /_matrix
+  acl matrix-path path_beg /_synapse/client
 
-  use_backend matrix if matrix-host matrix-path || matrix-host synapse-client-path
+  use_backend matrix if matrix-host matrix-path
 
 frontend matrix-federation
   bind :::8448 v4v6 ssl crt /etc/ssl/haproxy/synapse.pem alpn h2,http/1.1
@@ -163,5 +163,5 @@ Each configured HTTP listener has a `/health` endpoint which always returns
 
 Endpoints for administering your Synapse instance are placed under
 `/_synapse/admin`. These require authentication through an access token of an
-admin user. Nevertheless, it is not advised to expose these ports to the public
-internet.
+admin user. However as access to these endpoints grants the caller a lot of power,
+we do not recommend exposing them to the public internet without good reason.
