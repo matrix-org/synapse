@@ -14,14 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Tuple
-
-from canonicaljson import json
-
-from twisted.internet import defer
+from typing import List, Optional, Tuple
 
 from synapse.api.errors import SynapseError
 from synapse.storage._base import SQLBaseStore, db_to_json
+from synapse.types import JsonDict
+from synapse.util import json_encoder
 
 # The category ID for the "default" category. We don't store as null in the
 # database to avoid the fun of null != null
@@ -211,9 +209,8 @@ class GroupServerWorkerStore(SQLBaseStore):
             "get_rooms_for_summary", _get_rooms_for_summary_txn
         )
 
-    @defer.inlineCallbacks
-    def get_group_categories(self, group_id):
-        rows = yield self.db_pool.simple_select_list(
+    async def get_group_categories(self, group_id):
+        rows = await self.db_pool.simple_select_list(
             table="group_room_categories",
             keyvalues={"group_id": group_id},
             retcols=("category_id", "is_public", "profile"),
@@ -228,9 +225,8 @@ class GroupServerWorkerStore(SQLBaseStore):
             for row in rows
         }
 
-    @defer.inlineCallbacks
-    def get_group_category(self, group_id, category_id):
-        category = yield self.db_pool.simple_select_one(
+    async def get_group_category(self, group_id, category_id):
+        category = await self.db_pool.simple_select_one(
             table="group_room_categories",
             keyvalues={"group_id": group_id, "category_id": category_id},
             retcols=("is_public", "profile"),
@@ -241,9 +237,8 @@ class GroupServerWorkerStore(SQLBaseStore):
 
         return category
 
-    @defer.inlineCallbacks
-    def get_group_roles(self, group_id):
-        rows = yield self.db_pool.simple_select_list(
+    async def get_group_roles(self, group_id):
+        rows = await self.db_pool.simple_select_list(
             table="group_roles",
             keyvalues={"group_id": group_id},
             retcols=("role_id", "is_public", "profile"),
@@ -258,9 +253,8 @@ class GroupServerWorkerStore(SQLBaseStore):
             for row in rows
         }
 
-    @defer.inlineCallbacks
-    def get_group_role(self, group_id, role_id):
-        role = yield self.db_pool.simple_select_one(
+    async def get_group_role(self, group_id, role_id):
+        role = await self.db_pool.simple_select_one(
             table="group_roles",
             keyvalues={"group_id": group_id, "role_id": role_id},
             retcols=("is_public", "profile"),
@@ -449,12 +443,11 @@ class GroupServerWorkerStore(SQLBaseStore):
             "get_attestations_need_renewals", _get_attestations_need_renewals_txn
         )
 
-    @defer.inlineCallbacks
-    def get_remote_attestation(self, group_id, user_id):
+    async def get_remote_attestation(self, group_id, user_id):
         """Get the attestation that proves the remote agrees that the user is
         in the group.
         """
-        row = yield self.db_pool.simple_select_one(
+        row = await self.db_pool.simple_select_one(
             table="group_attestations_remote",
             keyvalues={"group_id": group_id, "user_id": user_id},
             retcols=("valid_until_ms", "attestation_json"),
@@ -500,13 +493,13 @@ class GroupServerWorkerStore(SQLBaseStore):
             "get_all_groups_for_user", _get_all_groups_for_user_txn
         )
 
-    def get_groups_changes_for_user(self, user_id, from_token, to_token):
+    async def get_groups_changes_for_user(self, user_id, from_token, to_token):
         from_token = int(from_token)
         has_changed = self._group_updates_stream_cache.has_entity_changed(
             user_id, from_token
         )
         if not has_changed:
-            return defer.succeed([])
+            return []
 
         def _get_groups_changes_for_user_txn(txn):
             sql = """
@@ -526,7 +519,7 @@ class GroupServerWorkerStore(SQLBaseStore):
                 for group_id, membership, gtype, content_json in txn
             ]
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_groups_changes_for_user", _get_groups_changes_for_user_txn
         )
 
@@ -752,7 +745,7 @@ class GroupServerStore(GroupServerWorkerStore):
         if profile is None:
             insertion_values["profile"] = "{}"
         else:
-            update_values["profile"] = json.dumps(profile)
+            update_values["profile"] = json_encoder.encode(profile)
 
         if is_public is None:
             insertion_values["is_public"] = True
@@ -783,7 +776,7 @@ class GroupServerStore(GroupServerWorkerStore):
         if profile is None:
             insertion_values["profile"] = "{}"
         else:
-            update_values["profile"] = json.dumps(profile)
+            update_values["profile"] = json_encoder.encode(profile)
 
         if is_public is None:
             insertion_values["is_public"] = True
@@ -1007,7 +1000,7 @@ class GroupServerStore(GroupServerWorkerStore):
                         "group_id": group_id,
                         "user_id": user_id,
                         "valid_until_ms": remote_attestation["valid_until_ms"],
-                        "attestation_json": json.dumps(remote_attestation),
+                        "attestation_json": json_encoder.encode(remote_attestation),
                     },
                 )
 
@@ -1088,31 +1081,31 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="update_group_publicity",
         )
 
-    @defer.inlineCallbacks
-    def register_user_group_membership(
+    async def register_user_group_membership(
         self,
-        group_id,
-        user_id,
-        membership,
-        is_admin=False,
-        content={},
-        local_attestation=None,
-        remote_attestation=None,
-        is_publicised=False,
-    ):
+        group_id: str,
+        user_id: str,
+        membership: str,
+        is_admin: bool = False,
+        content: JsonDict = {},
+        local_attestation: Optional[dict] = None,
+        remote_attestation: Optional[dict] = None,
+        is_publicised: bool = False,
+    ) -> int:
         """Registers that a local user is a member of a (local or remote) group.
 
         Args:
-            group_id (str)
-            user_id (str)
-            membership (str)
-            is_admin (bool)
-            content (dict): Content of the membership, e.g. includes the inviter
+            group_id: The group the member is being added to.
+            user_id: THe user ID to add to the group.
+            membership: The type of group membership.
+            is_admin: Whether the user should be added as a group admin.
+            content: Content of the membership, e.g. includes the inviter
                 if the user has been invited.
-            local_attestation (dict): If remote group then store the fact that we
+            local_attestation: If remote group then store the fact that we
                 have given out an attestation, else None.
-            remote_attestation (dict): If remote group then store the remote
+            remote_attestation: If remote group then store the remote
                 attestation from the group, else None.
+            is_publicised: Whether this should be publicised.
         """
 
         def _register_user_group_membership_txn(txn, next_id):
@@ -1131,7 +1124,7 @@ class GroupServerStore(GroupServerWorkerStore):
                     "is_admin": is_admin,
                     "membership": membership,
                     "is_publicised": is_publicised,
-                    "content": json.dumps(content),
+                    "content": json_encoder.encode(content),
                 },
             )
 
@@ -1143,7 +1136,7 @@ class GroupServerStore(GroupServerWorkerStore):
                     "group_id": group_id,
                     "user_id": user_id,
                     "type": "membership",
-                    "content": json.dumps(
+                    "content": json_encoder.encode(
                         {"membership": membership, "content": content}
                     ),
                 },
@@ -1171,7 +1164,7 @@ class GroupServerStore(GroupServerWorkerStore):
                             "group_id": group_id,
                             "user_id": user_id,
                             "valid_until_ms": remote_attestation["valid_until_ms"],
-                            "attestation_json": json.dumps(remote_attestation),
+                            "attestation_json": json_encoder.encode(remote_attestation),
                         },
                     )
             else:
@@ -1189,18 +1182,17 @@ class GroupServerStore(GroupServerWorkerStore):
             return next_id
 
         with self._group_updates_id_gen.get_next() as next_id:
-            res = yield self.db_pool.runInteraction(
+            res = await self.db_pool.runInteraction(
                 "register_user_group_membership",
                 _register_user_group_membership_txn,
                 next_id,
             )
         return res
 
-    @defer.inlineCallbacks
-    def create_group(
+    async def create_group(
         self, group_id, user_id, name, avatar_url, short_description, long_description
-    ):
-        yield self.db_pool.simple_insert(
+    ) -> None:
+        await self.db_pool.simple_insert(
             table="groups",
             values={
                 "group_id": group_id,
@@ -1213,9 +1205,8 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="create_group",
         )
 
-    @defer.inlineCallbacks
-    def update_group_profile(self, group_id, profile):
-        yield self.db_pool.simple_update_one(
+    async def update_group_profile(self, group_id, profile):
+        await self.db_pool.simple_update_one(
             table="groups",
             keyvalues={"group_id": group_id},
             updatevalues=profile,
@@ -1240,7 +1231,7 @@ class GroupServerStore(GroupServerWorkerStore):
             keyvalues={"group_id": group_id, "user_id": user_id},
             updatevalues={
                 "valid_until_ms": attestation["valid_until_ms"],
-                "attestation_json": json.dumps(attestation),
+                "attestation_json": json_encoder.encode(attestation),
             },
             desc="update_remote_attestion",
         )

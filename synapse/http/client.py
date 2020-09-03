@@ -297,7 +297,7 @@ class SimpleHttpClient(object):
         outgoing_requests_counter.labels(method).inc()
 
         # log request but strip `access_token` (AS requests for example include this)
-        logger.info("Sending request %s %s", method, redact_uri(uri))
+        logger.debug("Sending request %s %s", method, redact_uri(uri))
 
         with start_active_span(
             "outgoing-client-request",

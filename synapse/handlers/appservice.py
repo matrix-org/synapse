@@ -101,7 +101,7 @@ class ApplicationServicesHandler(object):
 
                             async def start_scheduler():
                                 try:
-                                    return self.scheduler.start()
+                                    return await self.scheduler.start()
                                 except Exception:
                                     logger.error("Application Services Failure")
 

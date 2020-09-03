@@ -23,14 +23,12 @@ from urllib import parse as urlparse
 
 from mock import Mock
 
-from twisted.internet import defer
-
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.handlers.pagination import PurgeStatus
 from synapse.rest.client.v1 import directory, login, profile, room
 from synapse.rest.client.v2_alpha import account
-from synapse.types import JsonDict, RoomAlias
+from synapse.types import JsonDict, RoomAlias, UserID
 from synapse.util.stringutils import random_string
 
 from tests import unittest
@@ -51,8 +49,8 @@ class RoomBase(unittest.HomeserverTestCase):
 
         self.hs.get_federation_handler = Mock(return_value=Mock())
 
-        def _insert_client_ip(*args, **kwargs):
-            return defer.succeed(None)
+        async def _insert_client_ip(*args, **kwargs):
+            return None
 
         self.hs.get_datastore().insert_client_ip = _insert_client_ip
 
@@ -675,6 +673,91 @@ class RoomMemberStateTestCase(RoomBase):
         self.render(request)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
         self.assertEquals(json.loads(content), channel.json_body)
+
+
+class RoomJoinRatelimitTestCase(RoomBase):
+    user_id = "@sid1:red"
+
+    servlets = [
+        profile.register_servlets,
+        room.register_servlets,
+    ]
+
+    @unittest.override_config(
+        {"rc_joins": {"local": {"per_second": 3, "burst_count": 3}}}
+    )
+    def test_join_local_ratelimit(self):
+        """Tests that local joins are actually rate-limited."""
+        for i in range(5):
+            self.helper.create_room_as(self.user_id)
+
+        self.helper.create_room_as(self.user_id, expect_code=429)
+
+    @unittest.override_config(
+        {"rc_joins": {"local": {"per_second": 3, "burst_count": 3}}}
+    )
+    def test_join_local_ratelimit_profile_change(self):
+        """Tests that sending a profile update into all of the user's joined rooms isn't
+        rate-limited by the rate-limiter on joins."""
+
+        # Create and join more rooms than the rate-limiting config allows in a second.
+        room_ids = [
+            self.helper.create_room_as(self.user_id),
+            self.helper.create_room_as(self.user_id),
+            self.helper.create_room_as(self.user_id),
+        ]
+        self.reactor.advance(1)
+        room_ids = room_ids + [
+            self.helper.create_room_as(self.user_id),
+            self.helper.create_room_as(self.user_id),
+            self.helper.create_room_as(self.user_id),
+        ]
+
+        # Create a profile for the user, since it hasn't been done on registration.
+        store = self.hs.get_datastore()
+        store.create_profile(UserID.from_string(self.user_id).localpart)
+
+        # Update the display name for the user.
+        path = "/_matrix/client/r0/profile/%s/displayname" % self.user_id
+        request, channel = self.make_request("PUT", path, {"displayname": "John Doe"})
+        self.render(request)
+        self.assertEquals(channel.code, 200, channel.json_body)
+
+        # Check that all the rooms have been sent a profile update into.
+        for room_id in room_ids:
+            path = "/_matrix/client/r0/rooms/%s/state/m.room.member/%s" % (
+                room_id,
+                self.user_id,
+            )
+
+            request, channel = self.make_request("GET", path)
+            self.render(request)
+            self.assertEquals(channel.code, 200)
+
+            self.assertIn("displayname", channel.json_body)
+            self.assertEquals(channel.json_body["displayname"], "John Doe")
+
+    @unittest.override_config(
+        {"rc_joins": {"local": {"per_second": 3, "burst_count": 3}}}
+    )
+    def test_join_local_ratelimit_idempotent(self):
+        """Tests that the room join endpoints remain idempotent despite rate-limiting
+        on room joins."""
+        room_id = self.helper.create_room_as(self.user_id)
+
+        # Let's test both paths to be sure.
+        paths_to_test = [
+            "/_matrix/client/r0/rooms/%s/join",
+            "/_matrix/client/r0/join/%s",
+        ]
+
+        for path in paths_to_test:
+            # Make sure we send more requests than the rate-limiting config would allow
+            # if all of these requests ended up joining the user to a room.
+            for i in range(6):
+                request, channel = self.make_request("POST", path % room_id, {})
+                self.render(request)
+                self.assertEquals(channel.code, 200)
 
 
 class RoomMessagesTestCase(RoomBase):

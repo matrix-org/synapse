@@ -15,8 +15,6 @@
 import typing
 from collections import Counter
 
-from twisted.internet import defer
-
 from synapse.metrics import BucketCollector
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore
@@ -69,8 +67,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
         res = await self.db_pool.runInteraction("read_forward_extremities", fetch)
         self._current_forward_extremities_amount = Counter([x[0] for x in res])
 
-    @defer.inlineCallbacks
-    def count_daily_messages(self):
+    async def count_daily_messages(self):
         """
         Returns an estimate of the number of messages sent in the last day.
 
@@ -88,11 +85,9 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             (count,) = txn.fetchone()
             return count
 
-        ret = yield self.db_pool.runInteraction("count_messages", _count_messages)
-        return ret
+        return await self.db_pool.runInteraction("count_messages", _count_messages)
 
-    @defer.inlineCallbacks
-    def count_daily_sent_messages(self):
+    async def count_daily_sent_messages(self):
         def _count_messages(txn):
             # This is good enough as if you have silly characters in your own
             # hostname then thats your own fault.
@@ -109,13 +104,11 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             (count,) = txn.fetchone()
             return count
 
-        ret = yield self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "count_daily_sent_messages", _count_messages
         )
-        return ret
 
-    @defer.inlineCallbacks
-    def count_daily_active_rooms(self):
+    async def count_daily_active_rooms(self):
         def _count(txn):
             sql = """
                 SELECT COALESCE(COUNT(DISTINCT room_id), 0) FROM events
@@ -126,5 +119,4 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             (count,) = txn.fetchone()
             return count
 
-        ret = yield self.db_pool.runInteraction("count_daily_active_rooms", _count)
-        return ret
+        return await self.db_pool.runInteraction("count_daily_active_rooms", _count)
