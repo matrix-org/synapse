@@ -425,7 +425,9 @@ class RoomStreamToken:
 
 @attr.s(slots=True, frozen=True)
 class StreamToken:
-    room_key = attr.ib(type=str)
+    room_key = attr.ib(
+        type=RoomStreamToken, validator=attr.validators.instance_of(RoomStreamToken)
+    )
     presence_key = attr.ib(type=int)
     typing_key = attr.ib(type=int)
     receipt_key = attr.ib(type=int)
@@ -445,21 +447,17 @@ class StreamToken:
             while len(keys) < len(attr.fields(cls)):
                 # i.e. old token from before receipt_key
                 keys.append("0")
-            return cls(keys[0], *(int(k) for k in keys[1:]))
+            return cls(RoomStreamToken.parse(keys[0]), *(int(k) for k in keys[1:]))
         except Exception:
-            raise SynapseError(400, "Invalid Token")
+            # raise SynapseError(400, "Invalid Token")
+            raise
 
     def to_string(self):
-        return self._SEPARATOR.join([str(k) for k in attr.astuple(self)])
+        return self._SEPARATOR.join([str(k) for k in attr.astuple(self, recurse=False)])
 
     @property
     def room_stream_id(self):
-        # TODO(markjh): Awful hack to work around hacks in the presence tests
-        # which assume that the keys are integers.
-        if type(self.room_key) is int:
-            return self.room_key
-        else:
-            return int(self.room_key[1:].split("-")[-1])
+        return self.room_key.stream
 
     def is_after(self, other):
         """Does this token contain events that the other doesn't?"""
@@ -475,7 +473,7 @@ class StreamToken:
             or (int(other.groups_key) < int(self.groups_key))
         )
 
-    def copy_and_advance(self, key, new_value):
+    def copy_and_advance(self, key, new_value) -> "StreamToken":
         """Advance the given key in the token to a new value if and only if the
         new value is after the old value.
         """
@@ -491,7 +489,7 @@ class StreamToken:
         else:
             return self
 
-    def copy_and_replace(self, key, new_value):
+    def copy_and_replace(self, key, new_value) -> "StreamToken":
         return attr.evolve(self, **{key: new_value})
 
 

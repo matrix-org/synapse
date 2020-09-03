@@ -973,6 +973,7 @@ class EventCreationHandler:
         This should only be run on the instance in charge of persisting events.
         """
         assert self._is_event_writer
+        assert self.storage.persistence is not None
 
         if ratelimit:
             # We check if this is a room admin redacting an event so that we
