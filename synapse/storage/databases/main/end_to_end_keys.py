@@ -288,7 +288,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 },
                 values={
                     "key_id": key_id,
-                    "key_json": json.dumps(fallback_key),
+                    "key_json": json_encoder.encode(fallback_key),
                     "used": 0
                 },
                 desc="set_e2e_fallback_key"

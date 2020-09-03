@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from canonicaljson import json
 from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 from synapse.api.errors import Codes, StoreError
@@ -815,7 +816,7 @@ class DeviceWorkerStore(SQLBaseStore):
             self._store_dehydrated_device_txn,
             user_id,
             device_id,
-            json.dumps(device_data),
+            json_encoder.encode(device_data),
         )
 
     async def create_dehydration_token(
@@ -845,7 +846,7 @@ class DeviceWorkerStore(SQLBaseStore):
                         "token": token,
                         "user_id": user_id,
                         "device_id": device_id,
-                        "login_submission": json.dumps(login_submission),
+                        "login_submission": json_encoder.encode(login_submission),
                         "creation_time": self.hs.get_clock().time_msec(),
                     },
                     desc="create_dehydration_token",
