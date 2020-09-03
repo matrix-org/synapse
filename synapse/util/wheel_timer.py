@@ -42,7 +42,7 @@ class WheelTimer:
 
         Args:
             now (int): Current time in msec
-            obj : Object to be inserted
+            obj (object): Object to be inserted
             then (int): When to return the object strictly after.
         """
         then_key = int(then / self.bucket_size) + 1

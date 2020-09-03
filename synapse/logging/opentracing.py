@@ -288,9 +288,9 @@ def ensure_active_span(message, ret=None):
     Args:
         message (str): Message which fills in "There was no active span when trying to %s"
             in the error log if there is no active span and opentracing is enabled.
-        ret : return value if opentracing is None or there is no active span.
+        ret (object): return value if opentracing is None or there is no active span.
 
-    Returns : The result of the func or ret if opentracing is disabled or there
+    Returns (object): The result of the func or ret if opentracing is disabled or there
         was no active span.
     """
 

@@ -40,7 +40,7 @@ def _load_current_id(db_conn, table, column, step=1):
     """
 
     Args:
-        db_conn :
+        db_conn (object):
         table (str):
         column (str):
         step (int):

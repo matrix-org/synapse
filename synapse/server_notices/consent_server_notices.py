@@ -107,8 +107,8 @@ def copy_with_str_subst(x: Any, substitutions: Any) -> Any:
     """Deep-copy a structure, carrying out string substitions on any strings
 
     Args:
-        x : structure to be copied
-        substitutions : substitutions to be made - passed into the
+        x (object): structure to be copied
+        substitutions (object): substitutions to be made - passed into the
             string '%' operator
 
     Returns:

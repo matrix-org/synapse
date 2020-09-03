@@ -591,7 +591,7 @@ class MatrixFederationHttpClient:
                 destination_is must be non-None.
             method (bytes): The HTTP method of the request
             url_bytes (bytes): The URI path of the request
-            content : The body of the request
+            content (object): The body of the request
             destination_is (bytes): As 'destination', but if the destination is an
                 identity server
 

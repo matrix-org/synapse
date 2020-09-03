@@ -297,7 +297,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             fields including:
                 version(str)
                 algorithm(str)
-                auth_data: opaque dict supplied by the client
+                auth_data(object): opaque dict supplied by the client
                 etag(int): tag of the keys in the backup
         """
 
