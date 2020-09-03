@@ -106,7 +106,9 @@ class PaginationHandler(object):
                     job["longest_max_lifetime"],
                 )
 
-    async def purge_history_for_rooms_in_range(self, min_ms: int, max_ms: int):
+    async def purge_history_for_rooms_in_range(
+        self, min_ms: Optional[int], max_ms: Optional[int]
+    ):
         """Purge outdated events from rooms within the given retention range.
 
         If a default retention policy is defined in the server's configuration and its
@@ -114,10 +116,10 @@ class PaginationHandler(object):
         retention policy.
 
         Args:
-            min_ms (int|None): Duration in milliseconds that define the lower limit of
+            min_ms: Duration in milliseconds that define the lower limit of
                 the range to handle (exclusive). If None, it means that the range has no
                 lower limit.
-            max_ms (int|None): Duration in milliseconds that define the upper limit of
+            max_ms: Duration in milliseconds that define the upper limit of
                 the range to handle (inclusive). If None, it means that the range has no
                 upper limit.
         """

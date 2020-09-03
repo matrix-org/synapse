@@ -149,7 +149,9 @@ class EventHandler(BaseHandler):
         super(EventHandler, self).__init__(hs)
         self.storage = hs.get_storage()
 
-    async def get_event(self, user: UserID, room_id: Optional[str], event_id: str):
+    async def get_event(
+        self, user: UserID, room_id: Optional[str], event_id: str
+    ) -> Optional[EventBase]:
         """Retrieve a single specified event.
 
         Args:
