@@ -204,9 +204,10 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
 
         logger.info("[purge] removing events from destination_rooms")
         txn.execute(
-            "DELETE FROM destination_rooms"
-            "   JOIN events USING (stream_ordering)"
-            "   WHERE event_id IN (SELECT event_id from events_to_purge)"
+            "DELETE FROM destination_rooms WHERE stream_ordering IN ("
+            "   SELECT stream_ordering FROM events_to_purge"
+            "       JOIN events USING (event_id)"
+            ")"
         )
 
         # Delete all remote non-state events
