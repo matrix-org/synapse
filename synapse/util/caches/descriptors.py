@@ -51,7 +51,7 @@ class _CachedFunction(Generic[F]):
     __name__ = None  # type: str
 
     # Note: This function signature is actually fiddled with by the synapse mypy
-    # plugin to a) make it a bound methd, and b) remove any `cache_context` arg.
+    # plugin to a) make it a bound method, and b) remove any `cache_context` arg.
     __call__ = None  # type: F
 
 
