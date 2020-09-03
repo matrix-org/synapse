@@ -15,28 +15,29 @@
 
 import logging
 import random
+from typing import TYPE_CHECKING, Iterable, List, Optional
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, SynapseError
 from synapse.events import EventBase
 from synapse.handlers.presence import format_user_presence_state
 from synapse.logging.utils import log_function
-from synapse.types import UserID
+from synapse.streams.config import PaginationConfig
+from synapse.types import JsonDict, UserID
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 
 logger = logging.getLogger(__name__)
 
 
 class EventStreamHandler(BaseHandler):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super(EventStreamHandler, self).__init__(hs)
-
-        # Count of active streams per user
-        self._streams_per_user = {}
-        # Grace timers per user to delay the "stopped" signal
-        self._stop_timer_per_user = {}
 
         self.distributor = hs.get_distributor()
         self.distributor.declare("started_user_eventstream")
@@ -52,14 +53,14 @@ class EventStreamHandler(BaseHandler):
     @log_function
     async def get_stream(
         self,
-        auth_user_id,
-        pagin_config,
-        timeout=0,
-        as_client_event=True,
-        affect_presence=True,
-        room_id=None,
-        is_guest=False,
-    ):
+        auth_user_id: str,
+        pagin_config: PaginationConfig,
+        timeout: int = 0,
+        as_client_event: bool = True,
+        affect_presence: bool = True,
+        room_id: Optional[str] = None,
+        is_guest: bool = False,
+    ) -> JsonDict:
         """Fetches the events stream for a given user.
         """
 
@@ -98,7 +99,7 @@ class EventStreamHandler(BaseHandler):
 
             # When the user joins a new room, or another user joins a currently
             # joined room, we need to send down presence for those users.
-            to_add = []
+            to_add = []  # type: List[JsonDict]
             for event in events:
                 if not isinstance(event, EventBase):
                     continue
@@ -110,7 +111,7 @@ class EventStreamHandler(BaseHandler):
                         # Send down presence for everyone in the room.
                         users = await self.state.get_current_users_in_room(
                             event.room_id
-                        )
+                        )  # type: Iterable[str]
                     else:
                         users = [event.state_key]
 
@@ -144,20 +145,22 @@ class EventStreamHandler(BaseHandler):
 
 
 class EventHandler(BaseHandler):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super(EventHandler, self).__init__(hs)
         self.storage = hs.get_storage()
 
-    async def get_event(self, user, room_id, event_id):
+    async def get_event(
+        self, user: UserID, room_id: Optional[str], event_id: str
+    ) -> Optional[EventBase]:
         """Retrieve a single specified event.
 
         Args:
-            user (synapse.types.UserID): The user requesting the event
-            room_id (str|None): The expected room id. We'll return None if the
+            user: The user requesting the event
+            room_id: The expected room id. We'll return None if the
                 event's room does not match.
-            event_id (str): The event ID to obtain.
+            event_id: The event ID to obtain.
         Returns:
-            dict: An event, or None if there is no event matching this ID.
+            An event, or None if there is no event matching this ID.
         Raises:
             SynapseError if there was a problem retrieving this event, or
             AuthError if the user does not have the rights to inspect this
