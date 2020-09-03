@@ -18,11 +18,10 @@ import functools
 import inspect
 import logging
 import threading
-from typing import Any, Optional, Tuple, Union, cast
+from typing import Any, Callable, Generic, Optional, Tuple, TypeVar, Union, cast
 from weakref import WeakValueDictionary
 
 from prometheus_client import Gauge
-from typing_extensions import Protocol
 
 from twisted.internet import defer
 
@@ -38,8 +37,10 @@ logger = logging.getLogger(__name__)
 
 CacheKey = Union[Tuple, Any]
 
+R = TypeVar("R")
 
-class _CachedFunction(Protocol):
+
+class _CachedFunction(Generic[R]):
     invalidate = None  # type: Any
     invalidate_all = None  # type: Any
     invalidate_many = None  # type: Any
@@ -49,7 +50,7 @@ class _CachedFunction(Protocol):
 
     __name__ = None  # type: str
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs) -> R:
         ...
 
 
@@ -665,8 +666,8 @@ class _CacheContext:
 
 def cached(
     max_entries=1000, num_args=None, tree=False, cache_context=False, iterable=False
-):
-    return lambda orig: CacheDescriptor(
+) -> Callable[[Callable[..., R]], _CachedFunction[R]]:
+    func = lambda orig: CacheDescriptor(
         orig,
         max_entries=max_entries,
         num_args=num_args,
@@ -675,8 +676,12 @@ def cached(
         iterable=iterable,
     )
 
+    return cast(Callable[[Callable[..., R]], _CachedFunction[R]], func)
 
-def cachedList(cached_method_name, list_name, num_args=None):
+
+def cachedList(
+    cached_method_name, list_name, num_args=None
+) -> Callable[[Callable[..., R]], _CachedFunction[R]]:
     """Creates a descriptor that wraps a function in a `CacheListDescriptor`.
 
     Used to do batch lookups for an already created cache. A single argument
@@ -704,9 +709,11 @@ def cachedList(cached_method_name, list_name, num_args=None):
             def batch_do_something(self, first_arg, second_args):
                 ...
     """
-    return lambda orig: CacheListDescriptor(
+    func = lambda orig: CacheListDescriptor(
         orig,
         cached_method_name=cached_method_name,
         list_name=list_name,
         num_args=num_args,
     )
+
+    return cast(Callable[[Callable[..., R]], _CachedFunction[R]], func)
