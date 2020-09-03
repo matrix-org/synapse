@@ -165,7 +165,9 @@ class TransactionStore(SQLBaseStore):
             allow_none=True,
         )
 
-        if result and result["retry_last_ts"] and result["retry_last_ts"] > 0:
+        # check we have a row and retry_last_ts is not null or zero
+        # (retry_last_ts can't be negative)
+        if result and result["retry_last_ts"]:
             return result
         else:
             return None
@@ -284,7 +286,6 @@ class TransactionStore(SQLBaseStore):
         Args:
             destinations: list of destinations
             room_id: the room_id of the event
-            event_id: the ID of the event
             stream_ordering: the stream_ordering of the event
         """
 
