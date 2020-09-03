@@ -204,8 +204,8 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
 
         logger.info("[purge] removing dangling destination_rooms entries")
         txn.execute(
-            "DELETE FROM destination_rooms WHERE stream_ordering IN ("
-            "   SELECT stream_ordering FROM events_to_purge"
+            "DELETE FROM destination_rooms WHERE room_id IN ("
+            "   SELECT room_id FROM events_to_purge"
             "       JOIN events USING (event_id)"
             "       JOIN destination_rooms USING (room_id, stream_ordering)"
             ")"
