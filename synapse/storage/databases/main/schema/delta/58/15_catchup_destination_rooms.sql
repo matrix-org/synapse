@@ -25,10 +25,18 @@ CREATE TABLE IF NOT EXISTS destination_rooms (
   -- the stream_ordering of the event
   stream_ordering INTEGER NOT NULL,
   PRIMARY KEY (destination, room_id)
-  -- We don't declare a foreign key on stream_orderings here because that'd mean
+  -- We don't declare a foreign key on stream_ordering here because that'd mean
   -- we'd need to either maintain an index (expensive) or do a table scan of
   -- destination_rooms whenever we delete an event (also potentially expensive).
+  -- In addition to that, a foreign key on stream_ordering would be redundant
+  -- as this row doesn't need to refer to a specific event; if the event gets
+  -- deleted then it doesn't affect the validity of the stream_ordering here.
 );
 
+-- This index is needed to make it so that a deletion of a room (in the rooms
+-- table) can be efficient, as otherwise a table scan would need to be performed
+-- to check that no destination_rooms rows point to the room to be deleted.
+-- Also: it makes it efficient to delete all the entries for a given room ID,
+-- such as when purging a room.
 CREATE INDEX IF NOT EXISTS destination_rooms_room_id
     ON destination_rooms (room_id);
