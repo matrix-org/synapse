@@ -16,9 +16,10 @@
 import logging
 import re
 from collections import namedtuple
-from typing import List, Optional
+from typing import List, Optional, Set
 
 from synapse.api.errors import SynapseError
+from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
@@ -620,7 +621,9 @@ class SearchStore(SearchBackgroundUpdateStore):
             "count": count,
         }
 
-    def _find_highlights_in_postgres(self, search_query, events):
+    async def _find_highlights_in_postgres(
+        self, search_query: str, events: List[EventBase]
+    ) -> Set[str]:
         """Given a list of events and a search term, return a list of words
         that match from the content of the event.
 
@@ -628,11 +631,11 @@ class SearchStore(SearchBackgroundUpdateStore):
         highlight the matching parts.
 
         Args:
-            search_query (str)
-            events (list): A list of events
+            search_query
+            events: A list of events
 
         Returns:
-            deferred : A set of strings.
+            A set of strings.
         """
 
         def f(txn):
@@ -685,7 +688,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 
             return highlight_words
 
-        return self.db_pool.runInteraction("_find_highlights", f)
+        return await self.db_pool.runInteraction("_find_highlights", f)
 
 
 def _to_postgres_options(options_dict):

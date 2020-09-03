@@ -161,6 +161,9 @@ class BaseProfileHandler(BaseHandler):
                     Codes.FORBIDDEN,
                 )
 
+        if not isinstance(new_displayname, str):
+            raise SynapseError(400, "Invalid displayname")
+
         if len(new_displayname) > MAX_DISPLAYNAME_LEN:
             raise SynapseError(
                 400, "Displayname is too long (max %i)" % (MAX_DISPLAYNAME_LEN,)
@@ -234,6 +237,9 @@ class BaseProfileHandler(BaseHandler):
                 raise SynapseError(
                     400, "Changing avatar is disabled on this server", Codes.FORBIDDEN
                 )
+
+        if not isinstance(new_avatar_url, str):
+            raise SynapseError(400, "Invalid displayname")
 
         if len(new_avatar_url) > MAX_AVATAR_URL_LEN:
             raise SynapseError(

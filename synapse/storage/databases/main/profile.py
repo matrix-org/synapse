@@ -138,7 +138,9 @@ class ProfileStore(ProfileWorkerStore):
                 desc="delete_remote_profile_cache",
             )
 
-    def get_remote_profile_cache_entries_that_expire(self, last_checked):
+    async def get_remote_profile_cache_entries_that_expire(
+        self, last_checked: int
+    ) -> Dict[str, str]:
         """Get all users who haven't been checked since `last_checked`
         """
 
@@ -153,7 +155,7 @@ class ProfileStore(ProfileWorkerStore):
 
             return self.db_pool.cursor_to_dict(txn)
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_remote_profile_cache_entries_that_expire",
             _get_remote_profile_cache_entries_that_expire_txn,
         )

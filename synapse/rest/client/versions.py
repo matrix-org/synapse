@@ -60,6 +60,8 @@ class VersionsRestServlet(RestServlet):
                     "org.matrix.e2e_cross_signing": True,
                     # Implements additional endpoints as described in MSC2432
                     "org.matrix.msc2432": True,
+                    # Implements additional endpoints as described in MSC2666
+                    "uk.half-shot.msc2666": True,
                 },
             },
         )
