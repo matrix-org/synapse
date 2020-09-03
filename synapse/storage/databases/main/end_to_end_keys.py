@@ -201,10 +201,10 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
     ) -> Dict[str, Dict[str, Optional[DeviceKeyLookupResult]]]:
         """Get information on devices from the database
 
-         The results include the device's keys and self-signatures, but *not* any
-         cross-signing signatures which have been added subsequently (for which, see
-         get_e2e_device_keys_and_signatures)
-         """
+        The results include the device's keys and self-signatures, but *not* any
+        cross-signing signatures which have been added subsequently (for which, see
+        get_e2e_device_keys_and_signatures)
+        """
         query_clauses = []
         query_params = []
 
