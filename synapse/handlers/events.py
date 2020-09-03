@@ -160,7 +160,7 @@ class EventHandler(BaseHandler):
                 event's room does not match.
             event_id: The event ID to obtain.
         Returns:
-            dict: An event, or None if there is no event matching this ID.
+            An event, or None if there is no event matching this ID.
         Raises:
             SynapseError if there was a problem retrieving this event, or
             AuthError if the user does not have the rights to inspect this
