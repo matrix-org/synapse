@@ -43,7 +43,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
             "room_tags", {"user_id": user_id}, ["room_id", "tag", "content"]
         )
 
-        tags_by_room = {}
+        tags_by_room = {}  # type: Dict[str, Dict[str, JsonDict]]
         for row in rows:
             room_tags = tags_by_room.setdefault(row["room_id"], {})
             room_tags[row["tag"]] = db_to_json(row["content"])
@@ -123,7 +123,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
 
     async def get_updated_tags(
         self, user_id: str, stream_id: int
-    ) -> Dict[str, List[str]]:
+    ) -> Dict[str, Dict[str, JsonDict]]:
         """Get all the tags for the rooms where the tags have changed since the
         given version
 
