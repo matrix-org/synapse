@@ -204,6 +204,8 @@ class SyncResult:
         device_lists: List of user_ids whose devices have changed
         device_one_time_keys_count: Dict of algorithm to count for one time keys
             for this device
+        device_unused_fallback_keys: List of key types that have an unused fallback
+            key
         groups: Group updates, if any
     """
 
@@ -216,6 +218,7 @@ class SyncResult:
     to_device = attr.ib(type=List[JsonDict])
     device_lists = attr.ib(type=DeviceLists)
     device_one_time_keys_count = attr.ib(type=JsonDict)
+    device_unused_fallback_keys = attr.ib(type=List[str])
     groups = attr.ib(type=Optional[GroupsSyncResult])
 
     def __nonzero__(self) -> bool:
@@ -1025,8 +1028,12 @@ class SyncHandler(object):
         logger.debug("Fetching OTK data")
         device_id = sync_config.device_id
         one_time_key_counts = {}  # type: JsonDict
+        unused_fallback_keys = []  # type: list
         if device_id:
             one_time_key_counts = await self.store.count_e2e_one_time_keys(
+                user_id, device_id
+            )
+            unused_fallback_keys = await self.store.get_e2e_unused_fallback_keys(
                 user_id, device_id
             )
 
@@ -1052,6 +1059,7 @@ class SyncHandler(object):
             device_lists=device_lists,
             groups=sync_result_builder.groups,
             device_one_time_keys_count=one_time_key_counts,
+            device_unused_fallback_keys=unused_fallback_keys,
             next_batch=sync_result_builder.now_token,
         )
 

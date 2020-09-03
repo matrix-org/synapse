@@ -237,6 +237,7 @@ class SyncRestServlet(RestServlet):
                 "leave": sync_result.groups.leave,
             },
             "device_one_time_keys_count": sync_result.device_one_time_keys_count,
+            "device_unused_fallback_keys": sync_result.device_unused_fallback_keys,
             "next_batch": sync_result.next_batch.to_string(),
         }
 
