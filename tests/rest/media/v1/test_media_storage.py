@@ -123,10 +123,6 @@ class _TestImage:
     expected_found = attr.ib(default=True, type=bool)
 
 
-with open("test.gif", "rb") as f:
-    data = f.read()
-
-
 @parameterized_class(
     ("test_image",),
     [
