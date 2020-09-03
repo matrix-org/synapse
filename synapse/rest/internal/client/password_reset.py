@@ -17,22 +17,27 @@ from typing import TYPE_CHECKING
 
 from synapse.api.errors import SynapseError, ThreepidValidationError
 from synapse.config.emailconfig import ThreepidBehaviour
-from synapse.http.server import finish_request, respond_with_html
-from synapse.http.servlet import RestServlet, parse_string
+from synapse.http.server import (
+    DirectServeHtmlResource,
+    finish_request,
+    respond_with_html,
+)
+from synapse.http.servlet import parse_string
 from synapse.util.stringutils import assert_valid_client_secret
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
-from ._base import synapse_client_patterns
-
 logger = logging.getLogger(__name__)
 
 
-class PasswordResetSubmitTokenServlet(RestServlet):
-    """Handles 3PID validation token submission"""
+class PasswordResetSubmitTokenResource(DirectServeHtmlResource):
+    """Handles 3PID validation token submission
 
-    PATTERNS = synapse_client_patterns("/password_reset/email/submit_token$")
+    This resource gets mounted under /_synapse/client/password_reset/email/submit_token
+    """
+
+    isLeaf = 1
 
     def __init__(self, hs: "HomeServer"):
         """
@@ -59,7 +64,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
                 hs.config.email_password_reset_template_failure_html
             )
 
-    async def on_GET(self, request):
+    async def _async_render_GET(self, request):
         self._check_threepid_behaviour()
 
         sid = parse_string(request, "sid", required=True)
@@ -78,7 +83,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
             request, 200, self._confirmation_email_template.render(**template_vars)
         )
 
-    async def on_POST(self, request):
+    async def _async_render_POST(self, request):
         self._check_threepid_behaviour()
 
         sid = parse_string(request, "sid", required=True)
@@ -137,7 +142,3 @@ class PasswordResetSubmitTokenServlet(RestServlet):
                 400,
                 "Password resets for this homeserver are handled by a separate program",
             )
-
-
-def register_servlets(hs, http_server):
-    PasswordResetSubmitTokenServlet(hs).register(http_server)

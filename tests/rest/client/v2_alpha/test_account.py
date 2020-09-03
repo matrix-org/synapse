@@ -27,7 +27,7 @@ from synapse.api.constants import LoginType, Membership
 from synapse.api.errors import Codes
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import account, register
-from synapse.rest.internal.client import password_reset
+from synapse.rest.internal.client.password_reset import PasswordResetSubmitTokenResource
 
 from tests import unittest
 
@@ -39,7 +39,6 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         register.register_servlets,
         login.register_servlets,
-        password_reset.register_servlets,
     ]
 
     def make_homeserver(self, reactor, clock):
@@ -71,6 +70,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
+        self.submit_token_resource = PasswordResetSubmitTokenResource(hs)
 
     def test_basic_password_reset(self):
         """Test basic password reset flow
@@ -254,7 +254,8 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
 
         # Load the password reset confirmation page
         request, channel = self.make_request("GET", path, shorthand=False)
-        self.render(request)
+        request.render(self.submit_token_resource)
+        self.pump()
         self.assertEquals(200, channel.code, channel.result)
 
         # Now POST to the same endpoint, mimicking the same behaviour as clicking the
@@ -275,7 +276,8 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
             shorthand=False,
             content_is_form=True,
         )
-        self.render(request)
+        request.render(self.submit_token_resource)
+        self.pump()
         self.assertEquals(200, channel.code, channel.result)
 
     def _get_link_from_email(self):

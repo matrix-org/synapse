@@ -12,26 +12,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from typing import TYPE_CHECKING
-
-from synapse.http.server import JsonResource
-from synapse.rest.internal.client import password_reset
-
-if TYPE_CHECKING:
-    from synapse.server import HomeServer
-
-
-class PasswordResetRestResource(JsonResource):
-    """Synapse Internal Resource for password reset functionality
-
-    This resource gets mounted under /_synapse/client/password_reset/email/submit_token
-    """
-
-    def __init__(self, hs: "HomeServer"):
-        JsonResource.__init__(self, hs, canonical_json=False)
-        self.register_servlets(self, hs)
-
-    @staticmethod
-    def register_servlets(synapse_client_resource: JsonResource, hs: "HomeServer"):
-        password_reset.register_servlets(hs, synapse_client_resource)

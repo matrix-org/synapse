@@ -211,10 +211,13 @@ class SynapseHomeServer(HomeServer):
                 resources["/_matrix/saml2"] = SAML2Resource(self)
 
             if self.get_config().threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-                from synapse.rest.internal.client import PasswordResetRestResource
+                from synapse.rest.internal.client.password_reset import (
+                    PasswordResetSubmitTokenResource,
+                )
 
-                password_reset = PasswordResetRestResource(self)
-                resources["/_synapse/client/password_reset"] = password_reset
+                resources[
+                    "/_synapse/client/password_reset/email/submit_token"
+                ] = PasswordResetSubmitTokenResource(self)
 
         if name == "consent":
             from synapse.rest.consent.consent_resource import ConsentResource
