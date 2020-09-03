@@ -666,7 +666,11 @@ class _CacheContext:
 
 
 def cached(
-    max_entries=1000, num_args=None, tree=False, cache_context=False, iterable=False
+    max_entries: int = 1000,
+    num_args: Optional[int] = None,
+    tree: bool = False,
+    cache_context: bool = False,
+    iterable: bool = False,
 ) -> Callable[[F], _CachedFunction[F]]:
     func = lambda orig: CacheDescriptor(
         orig,
@@ -681,7 +685,7 @@ def cached(
 
 
 def cachedList(
-    cached_method_name, list_name, num_args=None
+    cached_method_name: str, list_name: str, num_args: Optional[int] = None
 ) -> Callable[[F], _CachedFunction[F]]:
     """Creates a descriptor that wraps a function in a `CacheListDescriptor`.
 
@@ -692,11 +696,11 @@ def cachedList(
     cache.
 
     Args:
-        cached_method_name (str): The name of the single-item lookup method.
+        cached_method_name: The name of the single-item lookup method.
             This is only used to find the cache to use.
-        list_name (str): The name of the argument that is the list to use to
+        list_name: The name of the argument that is the list to use to
             do batch lookups in the cache.
-        num_args (int): Number of arguments to use as the key in the cache
+        num_args: Number of arguments to use as the key in the cache
             (including list_name). Defaults to all named parameters.
 
     Example:
