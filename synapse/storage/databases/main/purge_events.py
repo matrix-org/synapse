@@ -69,6 +69,7 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
         #     room_depth
         #     state_groups
         #     state_groups_state
+        #     destination_rooms
 
         # we will build a temporary table listing the events so that we don't
         # have to keep shovelling the list back and forth across the
@@ -200,6 +201,13 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
         )
         for event_id, _ in event_rows:
             txn.call_after(self._get_state_group_for_event.invalidate, (event_id,))
+
+        logger.info("[purge] removing events from destination_rooms")
+        txn.execute(
+            "DELETE FROM destination_rooms"
+            "   JOIN events USING (stream_ordering)"
+            "   WHERE event_id IN (SELECT event_id from events_to_purge)"
+        )
 
         # Delete all remote non-state events
         for table in (
