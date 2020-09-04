@@ -105,6 +105,10 @@ class PerDestinationQueue:
         # being in catch-up mode, or None if not applicable.
         self._catchup_last_skipped = None  # type: Optional[int]
 
+        # Cache of the last successfully-transmitted stream ordering for this
+        # destination (we are the only updater so this is safe)
+        self._last_successful_stream_ordering = None  # type: Optional[int]
+
         # a list of pending PDUs
         self._pending_pdus = []  # type: List[EventBase]
 
