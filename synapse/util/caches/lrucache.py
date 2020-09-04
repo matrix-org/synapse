@@ -30,7 +30,7 @@ def enumerate_leaves(node, depth):
                 yield m
 
 
-class _Node(object):
+class _Node:
     __slots__ = ["prev_node", "next_node", "key", "value", "callbacks"]
 
     def __init__(self, prev_node, next_node, key, value, callbacks=set()):
@@ -41,7 +41,7 @@ class _Node(object):
         self.callbacks = callbacks
 
 
-class LruCache(object):
+class LruCache:
     """
     Least-recently-used cache.
     Supports del_multi only if cache_type=TreeCache

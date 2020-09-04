@@ -235,7 +235,7 @@ async def respond_with_responder(
     finish_request(request)
 
 
-class Responder(object):
+class Responder:
     """Represents a response that can be streamed to the requester.
 
     Responder is a context manager which *must* be used, so that any resources
@@ -260,7 +260,7 @@ class Responder(object):
         pass
 
 
-class FileInfo(object):
+class FileInfo:
     """Details about a requested/uploaded file.
 
     Attributes:

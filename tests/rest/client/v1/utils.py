@@ -30,7 +30,7 @@ from tests.server import make_request, render
 
 
 @attr.s
-class RestHelper(object):
+class RestHelper:
     """Contains extra helper functions to quickly and clearly perform a given
     REST action, which isn't the focus of the test.
     """

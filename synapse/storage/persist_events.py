@@ -69,7 +69,7 @@ stale_forward_extremities_counter = Histogram(
 )
 
 
-class _EventPeristenceQueue(object):
+class _EventPeristenceQueue:
     """Queues up events so that they can be persisted in bulk with only one
     concurrent transaction per room.
     """
@@ -172,7 +172,7 @@ class _EventPeristenceQueue(object):
             pass
 
 
-class EventsPersistenceStorage(object):
+class EventsPersistenceStorage:
     """High level interface for handling persisting newly received events.
 
     Takes care of batching up events by room, and calculating the necessary

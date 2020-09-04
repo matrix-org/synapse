@@ -23,7 +23,7 @@ from .httppusher import HttpPusher
 logger = logging.getLogger(__name__)
 
 
-class PusherFactory(object):
+class PusherFactory:
     def __init__(self, hs):
         self.hs = hs
         self.config = hs.config

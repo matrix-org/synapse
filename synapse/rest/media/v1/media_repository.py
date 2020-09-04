@@ -62,7 +62,7 @@ logger = logging.getLogger(__name__)
 UPDATE_RECENTLY_ACCESSED_TS = 60 * 1000
 
 
-class MediaRepository(object):
+class MediaRepository:
     def __init__(self, hs):
         self.hs = hs
         self.auth = hs.get_auth()

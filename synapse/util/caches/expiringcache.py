@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 SENTINEL = object()
 
 
-class ExpiringCache(object):
+class ExpiringCache:
     def __init__(
         self,
         cache_name,
@@ -190,7 +190,7 @@ class ExpiringCache(object):
         return False
 
 
-class _CacheEntry(object):
+class _CacheEntry:
     __slots__ = ["time", "value"]
 
     def __init__(self, time, value):

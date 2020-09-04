@@ -35,7 +35,7 @@ class ThumbnailError(Exception):
     """An error occurred generating a thumbnail."""
 
 
-class Thumbnailer(object):
+class Thumbnailer:
 
     FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG"}
 

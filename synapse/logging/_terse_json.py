@@ -152,7 +152,7 @@ def TerseJSONToConsoleLogObserver(outFile: IO[str], metadata: dict) -> FileLogOb
 
 @attr.s
 @implementer(IPushProducer)
-class LogProducer(object):
+class LogProducer:
     """
     An IPushProducer that writes logs from its buffer to its transport when it
     is resumed.
@@ -190,7 +190,7 @@ class LogProducer(object):
 
 @attr.s
 @implementer(ILogObserver)
-class TerseJSONToTCPLogObserver(object):
+class TerseJSONToTCPLogObserver:
     """
     An IObserver that writes JSON logs to a TCP target.
 

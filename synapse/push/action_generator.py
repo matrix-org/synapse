@@ -22,7 +22,7 @@ from .bulk_push_rule_evaluator import BulkPushRuleEvaluator
 logger = logging.getLogger(__name__)
 
 
-class ActionGenerator(object):
+class ActionGenerator:
     def __init__(self, hs):
         self.hs = hs
         self.clock = hs.get_clock()

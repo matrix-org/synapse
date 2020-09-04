@@ -804,9 +804,7 @@ class RoomCreationHandler(BaseHandler):
 
         # Always wait for room creation to progate before returning
         await self._replication.wait_for_stream_position(
-            self.hs.config.worker.events_shard_config.get_instance(room_id),
-            "events",
-            last_stream_id,
+            self.hs.config.worker.writers.events, "events", last_stream_id
         )
 
         return result, last_stream_id
@@ -976,7 +974,7 @@ class RoomCreationHandler(BaseHandler):
         raise StoreError(500, "Couldn't generate a room ID.")
 
 
-class RoomContextHandler(object):
+class RoomContextHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.store = hs.get_datastore()
@@ -1086,7 +1084,7 @@ class RoomContextHandler(object):
         return results
 
 
-class RoomEventSource(object):
+class RoomEventSource:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
 
@@ -1148,7 +1146,7 @@ class RoomEventSource(object):
         return self.store.get_room_events_max_id(room_id)
 
 
-class RoomShutdownHandler(object):
+class RoomShutdownHandler:
 
     DEFAULT_MESSAGE = (
         "Sharing illegal content on this server is not permitted and rooms in"
@@ -1262,10 +1260,10 @@ class RoomShutdownHandler(object):
             # We now wait for the create room to come back in via replication so
             # that we can assume that all the joins/invites have propogated before
             # we try and auto join below.
+            #
+            # TODO: Currently the events stream is written to from master
             await self._replication.wait_for_stream_position(
-                self.hs.config.worker.events_shard_config.get_instance(new_room_id),
-                "events",
-                stream_id,
+                self.hs.config.worker.writers.events, "events", stream_id
             )
         else:
             new_room_id = None
@@ -1295,9 +1293,7 @@ class RoomShutdownHandler(object):
 
                 # Wait for leave to come in over replication before trying to forget.
                 await self._replication.wait_for_stream_position(
-                    self.hs.config.worker.events_shard_config.get_instance(room_id),
-                    "events",
-                    stream_id,
+                    self.hs.config.worker.writers.events, "events", stream_id
                 )
 
                 await self.room_member_handler.forget(target_requester.user, room_id)
