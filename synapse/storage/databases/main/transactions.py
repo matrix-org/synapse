@@ -342,7 +342,7 @@ class TransactionStore(SQLBaseStore):
         to the specified destination.
 
         Args:
-            destination: the destination we have successfully sent to
+            destination: the destination to query
         """
         return await self.db_pool.simple_select_one_onecol(
             "destinations",
