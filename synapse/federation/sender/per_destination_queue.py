@@ -15,7 +15,7 @@
 # limitations under the License.
 import datetime
 import logging
-from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Tuple
+from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Tuple
 
 from prometheus_client import Counter
 
@@ -91,6 +91,19 @@ class PerDestinationQueue:
 
         self._destination = destination
         self.transmission_loop_running = False
+
+        # True whilst we are sending events that the remote homeserver missed
+        # because it was unreachable.
+        # False whilst we are known to not be catching up.
+        # None when it has not been determined if we are catching-up yet (we
+        # do so lazily).
+        # New events will only be sent once this is finished, at which point
+        # _catching_up is flipped to False.
+        self._catching_up = None  # type: Optional[bool]
+
+        # The stream_ordering of the most recent PDU that was discarded due to
+        # being in catch-up mode, or None if not applicable.
+        self._catchup_last_skipped = None  # type: Optional[int]
 
         # a list of pending PDUs
         self._pending_pdus = []  # type: List[EventBase]
@@ -351,8 +364,9 @@ class PerDestinationQueue:
             if e.retry_interval > 60 * 60 * 1000:
                 # we won't retry for another hour!
                 # (this suggests a significant outage)
-                # We drop pending PDUs and EDUs because otherwise they will
+                # We drop pending EDUs because otherwise they will
                 # rack up indefinitely.
+                # (Dropping PDUs is already performed by `_start_catching_up`.)
                 # Note that:
                 # - the EDUs that are being dropped here are those that we can
                 #   afford to drop (specifically, only typing notifications,
@@ -364,11 +378,12 @@ class PerDestinationQueue:
 
                 # dropping read receipts is a bit sad but should be solved
                 # through another mechanism, because this is all volatile!
-                self._pending_pdus = []
                 self._pending_edus = []
                 self._pending_edus_keyed = {}
                 self._pending_presence = {}
                 self._pending_rrs = {}
+
+            self._start_catching_up()
         except FederationDeniedError as e:
             logger.info(e)
         except HttpResponseException as e:
@@ -378,6 +393,8 @@ class PerDestinationQueue:
                 e.code,
                 e,
             )
+
+            self._start_catching_up()
         except RequestSendFailed as e:
             logger.warning(
                 "TX [%s] Failed to send transaction: %s", self._destination, e
@@ -387,12 +404,16 @@ class PerDestinationQueue:
                 logger.info(
                     "Failed to send event %s to %s", p.event_id, self._destination
                 )
+
+            self._start_catching_up()
         except Exception:
             logger.exception("TX [%s] Failed to send transaction", self._destination)
             for p in pending_pdus:
                 logger.info(
                     "Failed to send event %s to %s", p.event_id, self._destination
                 )
+
+            self._start_catching_up()
         finally:
             # We want to be *very* sure we clear this after we stop processing
             self.transmission_loop_running = False
@@ -457,3 +478,12 @@ class PerDestinationQueue:
         ]
 
         return (edus, stream_id)
+
+    def _start_catching_up(self) -> None:
+        """
+        Marks this destination as being in catch-up mode.
+
+        This throws away the PDU queue.
+        """
+        self._catching_up = True
+        self._pending_pdus = []
