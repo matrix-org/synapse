@@ -1104,7 +1104,7 @@ class DatabasePool:
         self,
         table: str,
         keyvalues: Dict[str, Any],
-        retcol: Iterable[str],
+        retcol: str,
         allow_none: Literal[False] = False,
         desc: str = "simple_select_one_onecol",
     ) -> Any:
@@ -1115,7 +1115,7 @@ class DatabasePool:
         self,
         table: str,
         keyvalues: Dict[str, Any],
-        retcol: Iterable[str],
+        retcol: str,
         allow_none: Literal[True] = True,
         desc: str = "simple_select_one_onecol",
     ) -> Optional[Any]:
@@ -1125,7 +1125,7 @@ class DatabasePool:
         self,
         table: str,
         keyvalues: Dict[str, Any],
-        retcol: Iterable[str],
+        retcol: str,
         allow_none: bool = False,
         desc: str = "simple_select_one_onecol",
     ) -> Optional[Any]:
@@ -1156,7 +1156,7 @@ class DatabasePool:
         txn: LoggingTransaction,
         table: str,
         keyvalues: Dict[str, Any],
-        retcol: Iterable[str],
+        retcol: str,
         allow_none: Literal[False] = False,
     ) -> Any:
         ...
@@ -1168,7 +1168,7 @@ class DatabasePool:
         txn: LoggingTransaction,
         table: str,
         keyvalues: Dict[str, Any],
-        retcol: Iterable[str],
+        retcol: str,
         allow_none: Literal[True] = True,
     ) -> Optional[Any]:
         ...
@@ -1179,7 +1179,7 @@ class DatabasePool:
         txn: LoggingTransaction,
         table: str,
         keyvalues: Dict[str, Any],
-        retcol: Iterable[str],
+        retcol: str,
         allow_none: bool = False,
     ) -> Optional[Any]:
         ret = cls.simple_select_onecol_txn(
@@ -1196,10 +1196,7 @@ class DatabasePool:
 
     @staticmethod
     def simple_select_onecol_txn(
-        txn: LoggingTransaction,
-        table: str,
-        keyvalues: Dict[str, Any],
-        retcol: Iterable[str],
+        txn: LoggingTransaction, table: str, keyvalues: Dict[str, Any], retcol: str,
     ) -> List[Any]:
         sql = ("SELECT %(retcol)s FROM %(table)s") % {"retcol": retcol, "table": table}
 
