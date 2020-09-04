@@ -235,6 +235,13 @@ class PerDestinationQueue:
             # hence why we throw the result away.
             await get_retry_limiter(self._destination, self._clock, self._store)
 
+            if self._catching_up is None or self._catching_up is True:
+                # we potentially need to catch-up first
+                await self._catch_up_transmission_loop()
+                if self._catching_up:
+                    # not caught up yet
+                    return
+
             pending_pdus = []
             while True:
                 # We have to keep 2 free slots for presence and rr_edus
@@ -457,6 +464,11 @@ class PerDestinationQueue:
                 # we are done catching up!
                 self._catching_up = False
                 break
+
+            if self._catching_up is None:
+                # we didn't know if we're in catch-up mode yet but now we know
+                # we are — so mark us as in catch-up mode and drop the queue.
+                self._start_catching_up()
 
             # fetch the relevant events from the event store
             # - redacted behaviour of REDACT is fine, since we only send metadata
