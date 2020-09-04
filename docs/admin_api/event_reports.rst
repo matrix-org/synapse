@@ -1,4 +1,4 @@
-Shows reported events
+Show reported events
 ====================
 
 This API returns information about reported events.
@@ -37,13 +37,13 @@ It returns a JSON body like the following:
         ],
         "next_token": "2",
         "total": 4
-}
+    }
 
 To paginate, check for ``next_token`` and if present, call the endpoint again
-with from set to the value of ``next_token``. This will return a new page.
+with ``from`` set to the value of ``next_token``. This will return a new page.
 
 If the endpoint does not return a ``next_token`` then there are no more
-users to paginate through.
+reports to paginate through.
 
 **URL parameters:**
 
@@ -51,7 +51,7 @@ users to paginate through.
   denoting the maximum number of items to return in this call. Defaults to ``100``.
 - ``from``: Is optional but used for pagination,
   denoting the offset in the returned results. This should be treated as an opaque value and
-  not explicitly set to anything other than the return value of next_token from a previous call.
+  not explicitly set to anything other than the return value of ``next_token`` from a previous call.
   Defaults to ``0``.
 - ``user_id``: Is optional and filters to only return users with user IDs that contain this value.
 - ``room_id``: Is optional and filters to only return rooms with room IDs that contain this value.

@@ -50,7 +50,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         )
         self.helper.join(self.room_id2, user=self.admin_user, tok=self.admin_user_tok)
 
-        # Two rooms and two users. Every user sends and reports in every room events
+        # Two rooms and two users. Every user sends and reports every room event
         for i in range(5):
             self._create_event_and_report(
                 room_id=self.room_id1, user_tok=self.other_user_tok,
@@ -116,7 +116,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
     def test_from(self):
         """
-        Testing list of reported events with definied starting point (from)
+        Testing list of reported events with a defined starting point (from)
         """
 
         request, channel = self.make_request(
@@ -132,7 +132,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
     def test_limit_and_from(self):
         """
-        Testing list of reported events with definied starting point and limit
+        Testing list of reported events with a defined starting point and limit
         """
 
         request, channel = self.make_request(
@@ -226,7 +226,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
     def _check_fields(self, content):
-        """ Checks that all attributes are present in result
+        """Checks that all attributes are present in a event report
         """
         for c in content:
             self.assertIn("id", c)

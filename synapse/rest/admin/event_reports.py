@@ -30,7 +30,7 @@ class EventReportsRestServlet(RestServlet):
     returns:
         200 OK with list of reports if success otherwise an error.
 
-    Args
+    Args:
         The parameters `from` and `limit` are required only for pagination.
         By default, a `limit` of 100 is used.
         The parameter `user_id` can be used to filter by user id.

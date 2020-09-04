@@ -1323,12 +1323,12 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
     async def get_event_reports_paginate(
         self, start: int, limit: int, user_id: str = None, room_id: str = None
     ) -> Tuple[List[Dict[str, Any]], int]:
-        """Function to retrieve a paginated list of event reports
+        """Retrieve a paginated list of event reports
         This will return a json list of event reports and the
         total number of event reports matching the filter criteria.
 
         Args:
-            start: start number to begin the query from
+            start: event offset to begin the query from
             limit: number of rows to retrieve
             user_id: search for user_id. ignored if name is not None
             room_id: search for room_id. ignored if name is not None
