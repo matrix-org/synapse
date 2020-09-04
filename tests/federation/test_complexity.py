@@ -78,10 +78,10 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
 
         # Mock out some things, because we don't want to test the whole join
         fed_transport.client.get_json = Mock(
-            side_effect=lambda *args, **kwargs: make_awaitable({"v1": 9999})
+            return_value=make_awaitable({"v1": 9999})
         )
         handler.federation_handler.do_invite_join = Mock(
-            side_effect=lambda *args, **kwargs: make_awaitable(("", 1))
+            return_value=make_awaitable(("", 1))
         )
 
         d = handler._remote_join(
@@ -111,10 +111,10 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
 
         # Mock out some things, because we don't want to test the whole join
         fed_transport.client.get_json = Mock(
-            side_effect=lambda *args, **kwargs: make_awaitable({"v1": 9999})
+            return_value=make_awaitable({"v1": 9999})
         )
         handler.federation_handler.do_invite_join = Mock(
-            side_effect=lambda *args, **kwargs: make_awaitable(("", 1))
+            return_value=make_awaitable(("", 1))
         )
 
         d = handler._remote_join(
@@ -151,10 +151,10 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
 
         # Mock out some things, because we don't want to test the whole join
         fed_transport.client.get_json = Mock(
-            side_effect=lambda *args, **kwargs: make_awaitable(None)
+            return_value=make_awaitable(None)
         )
         handler.federation_handler.do_invite_join = Mock(
-            side_effect=lambda *args, **kwargs: make_awaitable(("", 1))
+            return_value=make_awaitable(("", 1))
         )
 
         # Artificially raise the complexity
@@ -209,10 +209,10 @@ class RoomComplexityAdminTests(unittest.FederatingHomeserverTestCase):
 
         # Mock out some things, because we don't want to test the whole join
         fed_transport.client.get_json = Mock(
-            side_effect=lambda *args, **kwargs: make_awaitable({"v1": 9999})
+            return_value=make_awaitable({"v1": 9999})
         )
         handler.federation_handler.do_invite_join = Mock(
-            side_effect=lambda *args, **kwargs: make_awaitable(("", 1))
+            return_value=make_awaitable(("", 1))
         )
 
         d = handler._remote_join(
@@ -241,10 +241,10 @@ class RoomComplexityAdminTests(unittest.FederatingHomeserverTestCase):
 
         # Mock out some things, because we don't want to test the whole join
         fed_transport.client.get_json = Mock(
-            side_effect=lambda *args, **kwargs: make_awaitable({"v1": 9999})
+            return_value=make_awaitable({"v1": 9999})
         )
         handler.federation_handler.do_invite_join = Mock(
-            side_effect=lambda *args, **kwargs: make_awaitable(("", 1))
+            return_value=make_awaitable(("", 1))
         )
 
         d = handler._remote_join(
