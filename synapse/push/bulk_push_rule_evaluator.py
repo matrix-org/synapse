@@ -95,7 +95,7 @@ def _should_count_as_unread(event: EventBase, context: EventContext) -> bool:
     return False
 
 
-class BulkPushRuleEvaluator(object):
+class BulkPushRuleEvaluator:
     """Calculates the outcome of push rules for an event for all users in the
     room at once.
     """
@@ -263,7 +263,7 @@ def _condition_checker(evaluator, conditions, uid, display_name, cache):
     return True
 
 
-class RulesForRoom(object):
+class RulesForRoom:
     """Caches push rules for users in a room.
 
     This efficiently handles users joining/leaving the room by not invalidating

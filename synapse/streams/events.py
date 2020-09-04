@@ -23,7 +23,7 @@ from synapse.handlers.typing import TypingNotificationEventSource
 from synapse.types import StreamToken
 
 
-class EventSources(object):
+class EventSources:
     SOURCE_TYPES = {
         "room": RoomEventSource,
         "presence": PresenceEventSource,

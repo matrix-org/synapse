@@ -46,7 +46,7 @@ def unwrapFirstError(failure):
 
 
 @attr.s
-class Clock(object):
+class Clock:
     """
     A Clock wraps a Twisted reactor and provides utilities on top of it.
 

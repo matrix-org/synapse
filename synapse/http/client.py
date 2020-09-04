@@ -86,7 +86,7 @@ def _make_scheduler(reactor):
     return _scheduler
 
 
-class IPBlacklistingResolver(object):
+class IPBlacklistingResolver:
     """
     A proxy for reactor.nameResolver which only produces non-blacklisted IP
     addresses, preventing DNS rebinding attacks on URL preview.
@@ -133,7 +133,7 @@ class IPBlacklistingResolver(object):
             r.resolutionComplete()
 
         @provider(IResolutionReceiver)
-        class EndpointReceiver(object):
+        class EndpointReceiver:
             @staticmethod
             def resolutionBegan(resolutionInProgress):
                 pass
@@ -192,7 +192,7 @@ class BlacklistingAgentWrapper(Agent):
         )
 
 
-class SimpleHttpClient(object):
+class SimpleHttpClient:
     """
     A simple, no-frills HTTP client with methods that wrap up common ways of
     using HTTP in Matrix
@@ -244,7 +244,7 @@ class SimpleHttpClient(object):
             )
 
             @implementer(IReactorPluggableNameResolver)
-            class Reactor(object):
+            class Reactor:
                 def __getattr__(_self, attr):
                     if attr == "nameResolver":
                         return nameResolver

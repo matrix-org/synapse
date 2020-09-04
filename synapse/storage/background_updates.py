@@ -24,7 +24,7 @@ from . import engines
 logger = logging.getLogger(__name__)
 
 
-class BackgroundUpdatePerformance(object):
+class BackgroundUpdatePerformance:
     """Tracks the how long a background update is taking to update its items"""
 
     def __init__(self, name):
@@ -71,7 +71,7 @@ class BackgroundUpdatePerformance(object):
             return float(self.total_item_count) / float(self.total_duration_ms)
 
 
-class BackgroundUpdater(object):
+class BackgroundUpdater:
     """ Background updates are updates to the database that run in the
     background. Each update processes a batch of data at once. We attempt to
     limit the impact of each update by monitoring how long each batch takes to
