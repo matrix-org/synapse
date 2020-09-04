@@ -171,7 +171,7 @@ class SAML2Config(Config):
 
         self.saml2_error_html_template = self.read_templates(
             ["saml_error.html"], saml2_config.get("template_dir")
-        )
+        )[0]
 
     def _default_saml_config_dict(
         self, required_attributes: set, optional_attributes: set
