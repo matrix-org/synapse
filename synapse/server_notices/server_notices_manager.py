@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 SERVER_NOTICE_ROOM_TAG = "m.server_notice"
 
 
-class ServerNoticesManager(object):
+class ServerNoticesManager:
     def __init__(self, hs):
         """
 

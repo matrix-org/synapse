@@ -255,9 +255,7 @@ class DeviceWorkerStore(SQLBaseStore):
             List of objects representing an device update EDU
         """
         devices = (
-            await self.db_pool.runInteraction(
-                "get_e2e_device_keys_and_signatures_txn",
-                self._get_e2e_device_keys_and_signatures_txn,
+            await self.get_e2e_device_keys_and_signatures(
                 query_map.keys(),
                 include_all_devices=True,
                 include_deleted_devices=True,

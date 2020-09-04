@@ -77,7 +77,7 @@ def _gen_state_id():
     return s
 
 
-class _StateCacheEntry(object):
+class _StateCacheEntry:
     __slots__ = ["state", "state_group", "state_id", "prev_group", "delta_ids"]
 
     def __init__(
@@ -113,7 +113,7 @@ class _StateCacheEntry(object):
         return len(self.state)
 
 
-class StateHandler(object):
+class StateHandler:
     """Fetches bits of state from the stores, and does state resolution
     where necessary
     """
@@ -462,7 +462,7 @@ class StateHandler(object):
         return {key: state_map[ev_id] for key, ev_id in new_state.items()}
 
 
-class StateResolutionHandler(object):
+class StateResolutionHandler:
     """Responsible for doing state conflict resolution.
 
     Note that the storage layer depends on this handler, so all functions must
@@ -679,7 +679,7 @@ def resolve_events_with_store(
 
 
 @attr.s
-class StateResolutionStore(object):
+class StateResolutionStore:
     """Interface that allows state resolution algorithms to access the database
     in well defined way.
 

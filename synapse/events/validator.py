@@ -20,7 +20,7 @@ from synapse.events.utils import validate_canonicaljson
 from synapse.types import EventID, RoomID, UserID
 
 
-class EventValidator(object):
+class EventValidator:
     def validate_new(self, event, config):
         """Validates the event has roughly the right format
 

@@ -18,7 +18,7 @@ from synapse.events.snapshot import EventContext
 from synapse.types import Requester
 
 
-class ThirdPartyEventRules(object):
+class ThirdPartyEventRules:
     """Allows server admins to provide a Python module implementing an extra
     set of rules to apply when processing events.
 

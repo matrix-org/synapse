@@ -34,7 +34,7 @@ solutions, please read https://github.com/matrix-org/synapse/blob/master/docs/AC
 --------------------------------------------------------------------------------"""
 
 
-class AcmeHandler(object):
+class AcmeHandler:
     def __init__(self, hs):
         self.hs = hs
         self.reactor = hs.get_reactor()

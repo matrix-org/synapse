@@ -28,7 +28,7 @@ from tests.test_utils import make_awaitable
 from tests.utils import setup_test_homeserver
 
 
-class AuthHandlers(object):
+class AuthHandlers:
     def __init__(self, hs):
         self.auth_handler = AuthHandler(hs)
 

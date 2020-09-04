@@ -57,7 +57,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 logger = logging.getLogger(__name__)
 
 
-class ApplicationServiceScheduler(object):
+class ApplicationServiceScheduler:
     """ Public facing API for this module. Does the required DI to tie the
     components together. This also serves as the "event_pool", which in this
     case is a simple array.
@@ -86,7 +86,7 @@ class ApplicationServiceScheduler(object):
         self.queuer.enqueue(service, event)
 
 
-class _ServiceQueuer(object):
+class _ServiceQueuer:
     """Queue of events waiting to be sent to appservices.
 
     Groups events into transactions per-appservice, and sends them on to the
@@ -133,7 +133,7 @@ class _ServiceQueuer(object):
             self.requests_in_flight.discard(service.id)
 
 
-class _TransactionController(object):
+class _TransactionController:
     """Transaction manager.
 
     Builds AppServiceTransactions and runs their lifecycle. Also starts a Recoverer
@@ -209,7 +209,7 @@ class _TransactionController(object):
         return state == ApplicationServiceState.UP or state is None
 
 
-class _Recoverer(object):
+class _Recoverer:
     """Manages retries and backoff for a DOWN appservice.
 
     We have one of these for each appservice which is currently considered DOWN.

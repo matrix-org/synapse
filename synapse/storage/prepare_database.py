@@ -569,7 +569,7 @@ def _get_or_create_schema_state(txn, database_engine):
 
 
 @attr.s()
-class _DirectoryListing(object):
+class _DirectoryListing:
     """Helper class to store schema file name and the
     absolute path to it.
 

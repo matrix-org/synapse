@@ -25,7 +25,7 @@ def user_left_room(distributor, user, room_id):
     distributor.fire("user_left_room", user=user, room_id=room_id)
 
 
-class Distributor(object):
+class Distributor:
     """A central dispatch point for loosely-connected pieces of code to
     register, observe, and fire signals.
 
@@ -72,7 +72,7 @@ class Distributor(object):
         run_as_background_process(name, self.signals[name].fire, *args, **kwargs)
 
 
-class Signal(object):
+class Signal:
     """A Signal is a dispatch point that stores a list of callables as
     observers of it.
 

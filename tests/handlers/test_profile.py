@@ -28,7 +28,7 @@ from tests.test_utils import make_awaitable
 from tests.utils import setup_test_homeserver
 
 
-class ProfileHandlers(object):
+class ProfileHandlers:
     def __init__(self, hs):
         self.profile_handler = MasterProfileHandler(hs)
 

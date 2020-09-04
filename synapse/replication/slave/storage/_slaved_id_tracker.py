@@ -16,7 +16,7 @@
 from synapse.storage.util.id_generators import _load_current_id
 
 
-class SlavedIdTracker(object):
+class SlavedIdTracker:
     def __init__(self, db_conn, table, column, extra_tables=[], step=1):
         self.step = step
         self._current = _load_current_id(db_conn, table, column, step)
