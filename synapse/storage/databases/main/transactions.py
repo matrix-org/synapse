@@ -339,7 +339,8 @@ class TransactionStore(SQLBaseStore):
     ) -> Optional[int]:
         """
         Gets the stream ordering of the PDU most-recently successfully sent
-        to the specified destination.
+        to the specified destination, or None if this information has not been
+        tracked yet.
 
         Args:
             destination: the destination to query
