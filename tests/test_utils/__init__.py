@@ -45,6 +45,6 @@ def make_awaitable(result: Any) -> Awaitable[Any]:
     This uses Futures as they can be awaited multiple times so can be returned
     to multiple callers.
     """
-    future = Future()
+    future = Future()  # type: ignore
     future.set_result(result)
     return future
