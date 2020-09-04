@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS destination_rooms (
   -- the ID of the room in question
   room_id TEXT NOT NULL REFERENCES rooms (room_id),
   -- the stream_ordering of the event
-  stream_ordering INTEGER NOT NULL,
+  stream_ordering BIGINT NOT NULL,
   PRIMARY KEY (destination, room_id)
   -- We don't declare a foreign key on stream_ordering here because that'd mean
   -- we'd need to either maintain an index (expensive) or do a table scan of
