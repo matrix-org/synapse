@@ -155,7 +155,11 @@ class PerDestinationQueue:
         Args:
             pdu: pdu to send
         """
-        self._pending_pdus.append(pdu)
+        if not self._catching_up:
+            # only enqueue the PDU if we are not catching up (False) or do not
+            # yet know if we are to catch up (None)
+            self._pending_pdus.append(pdu)
+
         self.attempt_new_transaction()
 
     def send_presence(self, states: Iterable[UserPresenceState]) -> None:
