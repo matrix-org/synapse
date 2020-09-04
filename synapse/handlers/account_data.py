@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-class AccountDataEventSource(object):
+class AccountDataEventSource:
     def __init__(self, hs):
         self.store = hs.get_datastore()
 

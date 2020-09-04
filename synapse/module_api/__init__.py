@@ -31,7 +31,7 @@ __all__ = ["errors", "make_deferred_yieldable", "run_in_background", "ModuleApi"
 logger = logging.getLogger(__name__)
 
 
-class ModuleApi(object):
+class ModuleApi:
     """A proxy object that gets passed to various plugin modules so they
     can register new users etc if necessary.
     """

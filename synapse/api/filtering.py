@@ -130,7 +130,7 @@ def matrix_user_id_validator(user_id_str):
     return UserID.from_string(user_id_str)
 
 
-class Filtering(object):
+class Filtering:
     def __init__(self, hs):
         super(Filtering, self).__init__()
         self.store = hs.get_datastore()
@@ -168,7 +168,7 @@ class Filtering(object):
             raise SynapseError(400, str(e))
 
 
-class FilterCollection(object):
+class FilterCollection:
     def __init__(self, filter_json):
         self._filter_json = filter_json
 
@@ -249,7 +249,7 @@ class FilterCollection(object):
         )
 
 
-class Filter(object):
+class Filter:
     def __init__(self, filter_json):
         self.filter_json = filter_json
 

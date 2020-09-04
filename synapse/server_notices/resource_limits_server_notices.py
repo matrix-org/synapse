@@ -27,7 +27,7 @@ from synapse.server_notices.server_notices_manager import SERVER_NOTICE_ROOM_TAG
 logger = logging.getLogger(__name__)
 
 
-class ResourceLimitsServerNotices(object):
+class ResourceLimitsServerNotices:
     """ Keeps track of whether the server has reached it's resource limit and
     ensures that the client is kept up to date.
     """

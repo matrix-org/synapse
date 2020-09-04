@@ -52,7 +52,7 @@ def _create_rerouter(func_name):
     return f
 
 
-class GroupsLocalWorkerHandler(object):
+class GroupsLocalWorkerHandler:
     def __init__(self, hs):
         self.hs = hs
         self.store = hs.get_datastore()

@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 CLEANUP_PERIOD_MS = 1000 * 60 * 30  # 30 mins
 
 
-class HttpTransactionCache(object):
+class HttpTransactionCache:
     def __init__(self, hs):
         self.hs = hs
         self.auth = self.hs.get_auth()

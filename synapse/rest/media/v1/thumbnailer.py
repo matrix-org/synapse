@@ -31,7 +31,7 @@ EXIF_TRANSPOSE_MAPPINGS = {
 }
 
 
-class Thumbnailer(object):
+class Thumbnailer:
 
     FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG"}
 

@@ -248,7 +248,7 @@ class LoggingTransaction:
         self.txn.close()
 
 
-class PerformanceCounters(object):
+class PerformanceCounters:
     def __init__(self):
         self.current_counters = {}
         self.previous_counters = {}
@@ -286,7 +286,7 @@ class PerformanceCounters(object):
 R = TypeVar("R")
 
 
-class DatabasePool(object):
+class DatabasePool:
     """Wraps a single physical database and connection pool.
 
     A single database may be used by multiple data stores.

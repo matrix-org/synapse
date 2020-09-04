@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 
 
 @attr.s(slots=True, cmp=False)
-class VerifyJsonRequest(object):
+class VerifyJsonRequest:
     """
     A request to verify a JSON object.
 
@@ -96,7 +96,7 @@ class KeyLookupError(ValueError):
     pass
 
 
-class Keyring(object):
+class Keyring:
     def __init__(self, hs, key_fetchers=None):
         self.clock = hs.get_clock()
 
@@ -420,7 +420,7 @@ class Keyring(object):
         remaining_requests.difference_update(completed)
 
 
-class KeyFetcher(object):
+class KeyFetcher:
     async def get_keys(self, keys_to_fetch):
         """
         Args:
@@ -456,7 +456,7 @@ class StoreKeyFetcher(KeyFetcher):
         return keys
 
 
-class BaseV2KeyFetcher(object):
+class BaseV2KeyFetcher:
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.config = hs.get_config()

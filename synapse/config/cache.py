@@ -33,7 +33,7 @@ _DEFAULT_FACTOR_SIZE = 0.5
 _DEFAULT_EVENT_CACHE_SIZE = "10K"
 
 
-class CacheProperties(object):
+class CacheProperties:
     def __init__(self):
         # The default factor size for all caches
         self.default_factor_size = float(

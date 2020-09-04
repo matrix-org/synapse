@@ -78,7 +78,7 @@ def create_issuing_service(reactor, acme_url, account_key_file, well_known_resou
 
 @attr.s
 @implementer(ICertificateStore)
-class ErsatzStore(object):
+class ErsatzStore:
     """
     A store that only stores in memory.
     """
