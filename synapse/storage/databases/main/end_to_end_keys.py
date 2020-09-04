@@ -43,12 +43,8 @@ class DeviceKeyLookupResult:
 
     # the key data from e2e_device_keys_json. Typically includes fields like
     # "algorithm", "keys" (including the curve25519 identity key and the ed25519 signing
-    # key) and "signatures" (a signature of the structure by the ed25519 key)
-    key_json = attr.ib(type=Optional[str])
-
-    # cross-signing sigs on this device.
-    # dict from (signing user_id)->(signing device_id)->sig
-    signatures = attr.ib(type=Optional[Dict[str, Dict[str, str]]], factory=dict)
+    # key) and "signatures" (a map from (user id) to (key id/device_id) to signature.)
+    keys = attr.ib(type=Optional[JsonDict])
 
 
 class EndToEndKeyWorkerStore(SQLBaseStore):
@@ -70,15 +66,9 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             for device_id, device in user_devices.items():
                 result = {"device_id": device_id}
 
-                key_json = device.key_json
-                if key_json:
-                    result["keys"] = db_to_json(key_json)
-
-                    if device.signatures:
-                        for sig_user_id, sigs in device.signatures.items():
-                            result["keys"].setdefault("signatures", {}).setdefault(
-                                sig_user_id, {}
-                            ).update(sigs)
+                keys = device.keys
+                if keys:
+                    result["keys"] = keys
 
                 device_display_name = device.display_name
                 if device_display_name:
@@ -114,16 +104,11 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         for user_id, device_keys in results.items():
             rv[user_id] = {}
             for device_id, device_info in device_keys.items():
-                r = db_to_json(device_info.key_json)
+                r = device_info.keys
                 r["unsigned"] = {}
                 display_name = device_info.display_name
                 if display_name is not None:
                     r["unsigned"]["device_display_name"] = display_name
-                if device_info.signatures:
-                    for sig_user_id, sigs in device_info.signatures.items():
-                        r.setdefault("signatures", {}).setdefault(
-                            sig_user_id, {}
-                        ).update(sigs)
                 rv[user_id][device_id] = r
 
         return rv
@@ -139,6 +124,9 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
 
         Any cross-signatures made on the keys by the owner of the device are also
         included.
+
+        The cross-signatures are added to the `signatures` field within the `keys`
+        object in the response.
 
         Args:
             query_list: List of pairs of user_ids and device_ids. Device id can be None
@@ -170,7 +158,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             (user_id, device_id)
             for user_id, dev in result.items()
             for device_id, d in dev.items()
-            if d is not None
+            if d is not None and d.keys is not None
         )
 
         for batch in batch_iter(signature_query, 50):
@@ -183,8 +171,9 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             # add each cross-signing signature to the correct device in the result dict.
             for (user_id, key_id, device_id, signature) in cross_sigs_result:
                 target_device_result = result[user_id][device_id]
-                target_device_signatures = target_device_result.signatures
-
+                target_device_signatures = target_device_result.keys.setdefault(
+                    "signatures", {}
+                )
                 signing_user_signatures = target_device_signatures.setdefault(
                     user_id, {}
                 )
@@ -240,7 +229,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             if include_deleted_devices:
                 deleted_devices.remove((user_id, device_id))
             result.setdefault(user_id, {})[device_id] = DeviceKeyLookupResult(
-                display_name, key_json
+                display_name, db_to_json(key_json) if key_json else None
             )
 
         if include_deleted_devices:
