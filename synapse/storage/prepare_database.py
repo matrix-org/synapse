@@ -66,10 +66,18 @@ def prepare_database(db_conn, database_engine, config, databases=["main", "state
 
     try:
         cur = db_conn.cursor()
+
+        logger.info("%r: Checking existing schema version", databases)
         version_info = _get_or_create_schema_state(cur, database_engine)
 
         if version_info:
             user_version, delta_files, upgraded = version_info
+            logger.info(
+                "%r: Existing schema is %i (+%i deltas)",
+                databases,
+                user_version,
+                len(delta_files),
+            )
 
             if config is None:
                 if user_version != SCHEMA_VERSION:
@@ -90,6 +98,7 @@ def prepare_database(db_conn, database_engine, config, databases=["main", "state
                     databases=databases,
                 )
         else:
+            logger.info("%r: Initialising new database", databases)
             _setup_new_database(cur, database_engine, databases=databases)
 
         # check if any of our configured dynamic modules want a database
