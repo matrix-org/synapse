@@ -98,7 +98,7 @@ def prepare_database(db_conn, database_engine, config, databases=["main", "state
         else:
             # if it's a worker app, refuse to upgrade the database, to avoid multiple
             # workers doing it at once.
-            if config.worker_app is not None:
+            if config and config.worker_app is not None:
                 raise UpgradeDatabaseException("Database schema uninitialised.")
 
             _setup_new_database(cur, database_engine, databases=databases)
