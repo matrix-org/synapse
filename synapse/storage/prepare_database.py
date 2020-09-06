@@ -19,7 +19,7 @@ import logging
 import os
 import re
 from collections import Counter
-from typing import Iterable, Optional, TextIO
+from typing import Optional, TextIO
 
 import attr
 
