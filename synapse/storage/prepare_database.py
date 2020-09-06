@@ -459,6 +459,8 @@ def _upgrade_existing_database(
                 (v, True),
             )
 
+    logger.info("Schema now up to date")
+
 
 def _apply_module_schemas(txn, database_engine, config):
     """Apply the module schemas for the dynamic modules, if any
