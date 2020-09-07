@@ -19,7 +19,7 @@ import logging
 import os.path
 import re
 from textwrap import indent
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Set
 
 import attr
 import yaml
@@ -543,15 +543,17 @@ class ServerConfig(Config):
         )  # type: set
 
         # Whitelist of domain names that given next_link parameters must have
-        self.next_link_domain_whitelist = config.get("next_link_domain_whitelist")
-        if self.next_link_domain_whitelist is not None:
-            if not isinstance(self.next_link_domain_whitelist, list):
+        next_link_domain_whitelist = config.get(
+            "next_link_domain_whitelist"
+        )  # type: Optional[List[str]]
+
+        self.next_link_domain_whitelist = None  # type: Optional[Set[str]]
+        if next_link_domain_whitelist is not None:
+            if not isinstance(next_link_domain_whitelist, list):
                 raise ConfigError("'next_link_domain_whitelist' must be a list")
 
             # Turn the list into a set to improve lookup speed.
-            self.next_link_domain_whitelist = set(
-                self.next_link_domain_whitelist
-            )  # type: set
+            self.next_link_domain_whitelist = set(next_link_domain_whitelist)
 
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)
