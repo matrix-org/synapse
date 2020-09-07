@@ -19,8 +19,8 @@
 
 -- Add columns to event_push_actions and event_push_actions_staging to track unread
 -- messages and calculate unread counts.
-ALTER TABLE event_push_actions_staging ADD COLUMN unread SMALLINT NOT NULL DEFAULT 0;
-ALTER TABLE event_push_actions ADD COLUMN unread SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE event_push_actions_staging ADD COLUMN unread SMALLINT;
+ALTER TABLE event_push_actions ADD COLUMN unread SMALLINT;
 
 -- Add column to event_push_summary
-ALTER TABLE event_push_summary ADD COLUMN unread_count BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE event_push_summary ADD COLUMN unread_count BIGINT;

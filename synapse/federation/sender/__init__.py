@@ -56,7 +56,7 @@ sent_pdus_destination_dist_total = Counter(
 )
 
 
-class FederationSender(object):
+class FederationSender:
     def __init__(self, hs: "synapse.server.HomeServer"):
         self.hs = hs
         self.server_name = hs.hostname

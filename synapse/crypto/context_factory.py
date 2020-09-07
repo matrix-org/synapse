@@ -83,7 +83,7 @@ class ServerContextFactory(ContextFactory):
 
 
 @implementer(IPolicyForHTTPS)
-class FederationPolicyForHTTPS(object):
+class FederationPolicyForHTTPS:
     """Factory for Twisted SSLClientConnectionCreators that are used to make connections
     to remote servers for federation.
 
@@ -152,7 +152,7 @@ class FederationPolicyForHTTPS(object):
 
 
 @implementer(IPolicyForHTTPS)
-class RegularPolicyForHTTPS(object):
+class RegularPolicyForHTTPS:
     """Factory for Twisted SSLClientConnectionCreators that are used to make connections
     to remote servers, for other than federation.
 
@@ -189,7 +189,7 @@ def _context_info_cb(ssl_connection, where, ret):
 
 
 @implementer(IOpenSSLClientConnectionCreator)
-class SSLClientConnectionCreator(object):
+class SSLClientConnectionCreator:
     """Creates openssl connection objects for client connections.
 
     Replaces twisted.internet.ssl.ClientTLSOptions
@@ -214,7 +214,7 @@ class SSLClientConnectionCreator(object):
         return connection
 
 
-class ConnectionVerifier(object):
+class ConnectionVerifier:
     """Set the SNI, and do cert verification
 
     This is a thing which is attached to the TLSMemoryBIOProtocol, and is called by

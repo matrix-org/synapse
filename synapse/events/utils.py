@@ -322,7 +322,7 @@ def serialize_event(
     return d
 
 
-class EventClientSerializer(object):
+class EventClientSerializer:
     """Serializes events that are to be sent to clients.
 
     This is used for bundling extra information with any events to be sent to

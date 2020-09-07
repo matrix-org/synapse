@@ -43,7 +43,7 @@ from tests import unittest
 from tests.test_utils import make_awaitable
 
 
-class MockPerspectiveServer(object):
+class MockPerspectiveServer:
     def __init__(self):
         self.server_name = "mock_server"
         self.key = signedjson.key.generate_signing_key(0)

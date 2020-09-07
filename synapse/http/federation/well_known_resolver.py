@@ -71,11 +71,11 @@ _had_valid_well_known_cache = TTLCache("had-valid-well-known")
 
 
 @attr.s(slots=True, frozen=True)
-class WellKnownLookupResult(object):
+class WellKnownLookupResult:
     delegated_server = attr.ib()
 
 
-class WellKnownResolver(object):
+class WellKnownResolver:
     """Handles well-known lookups for matrix servers.
     """
 

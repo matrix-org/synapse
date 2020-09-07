@@ -25,7 +25,7 @@ from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.util.sequence import PostgresSequenceGenerator
 
 
-class IdGenerator(object):
+class IdGenerator:
     def __init__(self, db_conn, table, column):
         self._lock = threading.Lock()
         self._next_id = _load_current_id(db_conn, table, column)
@@ -59,7 +59,7 @@ def _load_current_id(db_conn, table, column, step=1):
     return (max if step > 0 else min)(current_id, step)
 
 
-class StreamIdGenerator(object):
+class StreamIdGenerator:
     """Used to generate new stream ids when persisting events while keeping
     track of which transactions have been completed.
 

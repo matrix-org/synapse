@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class PurgeStatus(object):
+class PurgeStatus:
     """Object tracking the status of a purge request
 
     This class contains information on the progress of a purge request, for
@@ -65,7 +65,7 @@ class PurgeStatus(object):
         return {"status": PurgeStatus.STATUS_TEXT[self.status]}
 
 
-class PaginationHandler(object):
+class PaginationHandler:
     """Handles pagination and purge history requests.
 
     These are in the same handler due to the fact we need to block clients

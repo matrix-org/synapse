@@ -785,7 +785,7 @@ def _acl_entry_matches(server_name: str, acl_entry: str) -> Match:
     return regex.match(server_name)
 
 
-class FederationHandlerRegistry(object):
+class FederationHandlerRegistry:
     """Allows classes to register themselves as handlers for a given EDU or
     query type for incoming federation traffic.
     """

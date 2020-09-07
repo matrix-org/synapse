@@ -999,7 +999,7 @@ class RoomMemberStore(RoomMemberWorkerStore, RoomMemberBackgroundUpdateStore):
         await self.db_pool.runInteraction("forget_membership", f)
 
 
-class _JoinedHostsCache(object):
+class _JoinedHostsCache:
     """Cache for joined hosts in a room that is optimised to handle updates
     via state deltas.
     """

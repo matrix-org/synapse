@@ -35,7 +35,7 @@ class TimedOutException(Exception):
 
 
 @attr.s
-class FakeChannel(object):
+class FakeChannel:
     """
     A fake Twisted Web Channel (the part that interfaces with the
     wire).
@@ -242,7 +242,7 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         lookups = self.lookups = {}
 
         @implementer(IResolverSimple)
-        class FakeResolver(object):
+        class FakeResolver:
             def getHostByName(self, name, timeout=None):
                 if name not in lookups:
                     return fail(DNSLookupError("OH NO: unknown %s" % (name,)))
@@ -371,7 +371,7 @@ def get_clock():
 
 
 @attr.s(cmp=False)
-class FakeTransport(object):
+class FakeTransport:
     """
     A twisted.internet.interfaces.ITransport implementation which sends all its data
     straight into an IProtocol object: it exists to connect two IProtocols together.

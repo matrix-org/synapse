@@ -71,7 +71,7 @@ def create_event(
     return event
 
 
-class StateGroupStore(object):
+class StateGroupStore:
     def __init__(self):
         self._event_to_state_group = {}
         self._group_to_state = {}
@@ -129,7 +129,7 @@ class DictObj(dict):
         self.__dict__ = self
 
 
-class Graph(object):
+class Graph:
     def __init__(self, nodes, edges):
         events = {}
         clobbered = set(events.keys())

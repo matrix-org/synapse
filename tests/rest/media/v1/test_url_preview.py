@@ -32,7 +32,7 @@ from tests.server import FakeTransport
 
 
 @attr.s
-class FakeResponse(object):
+class FakeResponse:
     version = attr.ib()
     code = attr.ib()
     phrase = attr.ib()
@@ -43,7 +43,7 @@ class FakeResponse(object):
     @property
     def request(self):
         @attr.s
-        class FakeTransport(object):
+        class FakeTransport:
             absoluteURI = self.absoluteURI
 
         return FakeTransport()
@@ -111,7 +111,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         self.lookups = {}
 
-        class Resolver(object):
+        class Resolver:
             def resolveHostName(
                 _self,
                 resolutionReceiver,

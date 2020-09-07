@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # TODO: Flairs
 
 
-class GroupsServerWorkerHandler(object):
+class GroupsServerWorkerHandler:
     def __init__(self, hs):
         self.hs = hs
         self.store = hs.get_datastore()

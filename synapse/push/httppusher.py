@@ -49,7 +49,7 @@ http_badges_failed_counter = Counter(
 )
 
 
-class HttpPusher(object):
+class HttpPusher:
     INITIAL_BACKOFF_SEC = 1  # in seconds because that's what Twisted takes
     MAX_BACKOFF_SEC = 60 * 60
 
