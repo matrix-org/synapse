@@ -608,7 +608,7 @@ def check_database_before_upgrade(cur, database_engine, config: HomeServerConfig
 
     raise Exception(
         "Found users in database not native to %s!\n"
-        "You cannot changed a synapse server_name after it's been configured"
+        "You cannot change a synapse server_name after it's been configured"
         % (config.server_name,)
     )
 
