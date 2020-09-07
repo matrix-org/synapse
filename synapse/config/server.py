@@ -543,14 +543,15 @@ class ServerConfig(Config):
         )  # type: set
 
         # Whitelist of domain names that given next_link parameters must have
-        next_link_domain_whitelist = config.get("next_link_domain_whitelist")
-        if next_link_domain_whitelist is not None and not isinstance(
-            next_link_domain_whitelist, list
-        ):
-            raise ConfigError("'next_link_domain_whitelist' must be a list")
+        self.next_link_domain_whitelist = config.get("next_link_domain_whitelist")
+        if self.next_link_domain_whitelist is not None:
+            if not isinstance(self.next_link_domain_whitelist, list):
+                raise ConfigError("'next_link_domain_whitelist' must be a list")
 
-        # Turn the list into a set to improve lookup speed.
-        self.next_link_domain_whitelist = set(next_link_domain_whitelist)  # type: set
+            # Turn the list into a set to improve lookup speed.
+            self.next_link_domain_whitelist = set(
+                self.next_link_domain_whitelist
+            )  # type: set
 
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)
