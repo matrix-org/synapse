@@ -29,7 +29,7 @@ from synapse.storage.util.id_generators import (
     MultiWriterIdGenerator,
     StreamIdGenerator,
 )
-from synapse.types import UserID
+from synapse.types import get_domain_from_id
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from .account_data import AccountDataStore
@@ -602,8 +602,8 @@ def check_database_before_upgrade(cur, database_engine, config: HomeServerConfig
     if not rows:
         return
 
-    mxid = UserID.from_string(rows[0][0])
-    if mxid.domain == config.server_name:
+    user_domain = get_domain_from_id(rows[0][0])
+    if user_domain == config.server_name:
         return
 
     raise Exception(
