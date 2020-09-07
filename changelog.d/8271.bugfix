@@ -1,0 +1,1 @@
+Remove slow table scan of `users` table from startup code.
