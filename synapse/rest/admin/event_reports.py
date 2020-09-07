@@ -63,14 +63,14 @@ class EventReportsRestServlet(RestServlet):
             raise SynapseError(
                 400,
                 "The start parameter must be a positive integer.",
-                errcode=Codes.INVALID_PARAM
+                errcode=Codes.INVALID_PARAM,
             )
 
         if limit < 0:
             raise SynapseError(
                 400,
                 "The limit parameter must be a positive integer.",
-                errcode=Codes.INVALID_PARAM
+                errcode=Codes.INVALID_PARAM,
             )
 
         if direction not in ("f", "b"):
