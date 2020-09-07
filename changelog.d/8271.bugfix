@@ -1,1 +1,1 @@
-Remove slow table scan of `users` table from startup code.
+Fix slow start times for large servers by removing a table scan of the `users` table from startup code.
