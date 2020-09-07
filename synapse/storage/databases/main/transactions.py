@@ -15,7 +15,7 @@
 
 import logging
 from collections import namedtuple
-from typing import Iterable, Optional, Tuple, List
+from typing import Iterable, List, Optional, Tuple
 
 from canonicaljson import encode_canonical_json
 
@@ -373,9 +373,7 @@ class TransactionStore(SQLBaseStore):
         )
 
     async def get_catch_up_room_event_ids(
-        self,
-        destination: str,
-        last_successful_stream_ordering: int,
+        self, destination: str, last_successful_stream_ordering: int,
     ) -> List[str]:
         """
         Returns at most 50 event IDs and their corresponding stream_orderings
@@ -399,9 +397,7 @@ class TransactionStore(SQLBaseStore):
 
     @staticmethod
     def _get_catch_up_room_event_ids_txn(
-        txn,
-        destination: str,
-        last_successful_stream_ordering: int,
+        txn, destination: str, last_successful_stream_ordering: int,
     ) -> List[str]:
         q = """
                 SELECT event_id FROM destination_rooms

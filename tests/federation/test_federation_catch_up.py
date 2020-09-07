@@ -1,4 +1,4 @@
-from typing import Tuple, List
+from typing import List, Tuple
 
 from mock import Mock
 
@@ -208,8 +208,8 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # (this pretends we are starting up fresh.)
         self.assertFalse(
             self.hs.get_federation_sender()
-                ._per_destination_queues["host2"]
-                .transmission_loop_running
+            ._per_destination_queues["host2"]
+            .transmission_loop_running
         )
         del self.hs.get_federation_sender()._per_destination_queues["host2"]
 
@@ -317,4 +317,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         self.assertEqual(sent_pdus[0].event_id, event_id_4)
         self.assertEqual(sent_pdus[1].event_id, event_id_5)
         self.assertFalse(per_dest_queue._catching_up)
-        self.assertEqual(per_dest_queue._last_successful_stream_ordering, event_5.internal_metadata.stream_ordering)
+        self.assertEqual(
+            per_dest_queue._last_successful_stream_ordering,
+            event_5.internal_metadata.stream_ordering,
+        )

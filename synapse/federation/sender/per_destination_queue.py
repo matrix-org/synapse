@@ -452,8 +452,7 @@ class PerDestinationQueue:
         # get at most 50 catchup room/PDUs
         while True:
             event_ids = await self._store.get_catch_up_room_event_ids(
-                self._destination,
-                self._last_successful_stream_ordering,
+                self._destination, self._last_successful_stream_ordering,
             )
 
             if not event_ids:
@@ -461,7 +460,11 @@ class PerDestinationQueue:
                 # of a race condition, so we check that no new events have been
                 # skipped due to us being in catch-up mode
 
-                if self._catchup_last_skipped is not None and self._catchup_last_skipped > self._last_successful_stream_ordering:
+                if (
+                    self._catchup_last_skipped is not None
+                    and self._catchup_last_skipped
+                    > self._last_successful_stream_ordering
+                ):
                     # another event has been skipped because we were in catch-up mode
                     continue
 
