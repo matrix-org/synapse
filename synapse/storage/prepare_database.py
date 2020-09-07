@@ -82,10 +82,18 @@ def prepare_database(db_conn, database_engine, config, databases=["main", "state
 
     try:
         cur = db_conn.cursor()
+
+        logger.info("%r: Checking existing schema version", databases)
         version_info = _get_or_create_schema_state(cur, database_engine)
 
         if version_info:
             user_version, delta_files, upgraded = version_info
+            logger.info(
+                "%r: Existing schema is %i (+%i deltas)",
+                databases,
+                user_version,
+                len(delta_files),
+            )
 
             # config should only be None when we are preparing an in-memory SQLite db,
             # which should be empty.
@@ -111,6 +119,8 @@ def prepare_database(db_conn, database_engine, config, databases=["main", "state
                 databases=databases,
             )
         else:
+            logger.info("%r: Initialising new database", databases)
+
             # if it's a worker app, refuse to upgrade the database, to avoid multiple
             # workers doing it at once.
             if config and config.worker_app is not None:

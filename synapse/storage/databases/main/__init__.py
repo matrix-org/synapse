@@ -591,6 +591,7 @@ def check_database_before_upgrade(cur, database_engine, config: HomeServerConfig
     """Called before upgrading an existing database to check that it is broadly sane
     compared with the configuration.
     """
+    logger.info("Running sanity-checks on database...")
     domain = config.server_name
 
     sql = database_engine.convert_param_style(
