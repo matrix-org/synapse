@@ -95,6 +95,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 20)
+        self.assertEqual(len(channel.json_body["event_reports"]), 20)
         self.assertNotIn("next_token", channel.json_body)
         self._check_fields(channel.json_body["event_reports"])
 
@@ -110,8 +111,8 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 20)
-        self.assertEqual(channel.json_body["next_token"], "5")
         self.assertEqual(len(channel.json_body["event_reports"]), 5)
+        self.assertEqual(channel.json_body["next_token"], "5")
         self._check_fields(channel.json_body["event_reports"])
 
     def test_from(self):
@@ -164,8 +165,8 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         self.assertNotIn("next_token", channel.json_body)
         self._check_fields(channel.json_body["event_reports"])
 
-        for f in channel.json_body["event_reports"]:
-            self.assertEqual(f["room_id"], self.room_id1)
+        for report in channel.json_body["event_reports"]:
+            self.assertEqual(report["room_id"], self.room_id1)
 
     def test_filter_user(self):
         """
@@ -185,8 +186,8 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         self.assertNotIn("next_token", channel.json_body)
         self._check_fields(channel.json_body["event_reports"])
 
-        for f in channel.json_body["event_reports"]:
-            self.assertEqual(f["user_id"], self.other_user)
+        for report in channel.json_body["event_reports"]:
+            self.assertEqual(report["user_id"], self.other_user)
 
     def test_filter_user_and_room(self):
         """
@@ -206,12 +207,91 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         self.assertNotIn("next_token", channel.json_body)
         self._check_fields(channel.json_body["event_reports"])
 
-        for f in channel.json_body["event_reports"]:
-            self.assertEqual(f["user_id"], self.other_user)
-            self.assertEqual(f["room_id"], self.room_id1)
+        for report in channel.json_body["event_reports"]:
+            self.assertEqual(report["user_id"], self.other_user)
+            self.assertEqual(report["room_id"], self.room_id1)
+
+    def test_valid_search_order(self):
+        """
+        Testing search order. Order by timestamps.
+        """
+
+        # fetch the most recent first, largest timestamp
+        request, channel = self.make_request(
+            "GET", self.url + "?dir=b", access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["total"], 20)
+        self.assertEqual(len(channel.json_body["event_reports"]), 20)
+        report = 1
+        while report < len(channel.json_body["event_reports"]):
+            self.assertGreaterEqual(
+                channel.json_body["event_reports"][report - 1]["received_ts"],
+                channel.json_body["event_reports"][report]["received_ts"],
+            )
+            report += 1
+
+        # fetch the oldest first, smallest timestamp
+        request, channel = self.make_request(
+            "GET", self.url + "?dir=f", access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["total"], 20)
+        self.assertEqual(len(channel.json_body["event_reports"]), 20)
+        report = 1
+        while report < len(channel.json_body["event_reports"]):
+            self.assertLessEqual(
+                channel.json_body["event_reports"][report - 1]["received_ts"],
+                channel.json_body["event_reports"][report]["received_ts"],
+            )
+            report += 1
+
+    def test_invalid_search_order(self):
+        """
+        Testing that a invalid search order returns a 400
+        """
+
+        request, channel = self.make_request(
+            "GET", self.url + "?dir=bar", access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+        self.assertEqual("Unknown direction: bar", channel.json_body["error"])
+
+    def test_limit_is_negative(self):
+        """
+        Testing that a negative list parameter returns a 400
+        """
+
+        request, channel = self.make_request(
+            "GET", self.url + "?limit=-5", access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+
+    def test_from_is_negative(self):
+        """
+        Testing that a negative from parameter returns a 400
+        """
+
+        request, channel = self.make_request(
+            "GET", self.url + "?from=-5", access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
     def _create_event_and_report(self, room_id, user_tok):
-        """ Create and report events
+        """Create and report events
         """
         resp = self.helper.send(room_id, tok=user_tok)
         event_id = resp["event_id"]

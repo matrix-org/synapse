@@ -53,5 +53,8 @@ reports to paginate through.
   denoting the offset in the returned results. This should be treated as an opaque value and
   not explicitly set to anything other than the return value of ``next_token`` from a previous call.
   Defaults to ``0``.
+- `dir` - Direction of event report order. Whether to fetch the most recent first (``b``) or the
+  oldest first (``f``). Defaults to ``b``.
 - ``user_id``: Is optional and filters to only return users with user IDs that contain this value.
+  This is the user who reported the event and wrote the reason.
 - ``room_id``: Is optional and filters to only return rooms with room IDs that contain this value.

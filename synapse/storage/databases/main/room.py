@@ -1321,17 +1321,25 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         )
 
     async def get_event_reports_paginate(
-        self, start: int, limit: int, user_id: str = None, room_id: str = None
+        self,
+        start: int,
+        limit: int,
+        direction: str = "b",
+        user_id: str = None,
+        room_id: str = None,
     ) -> Tuple[List[Dict[str, Any]], int]:
         """Retrieve a paginated list of event reports
-        This will return a json list of event reports and the
-        total number of event reports matching the filter criteria.
 
         Args:
             start: event offset to begin the query from
             limit: number of rows to retrieve
-            user_id: search for user_id. ignored if name is not None
-            room_id: search for room_id. ignored if name is not None
+            direction: Whether to fetch the most recent first (`"b"`) or the
+                oldest first (`"f"`).
+            user_id: search for user_id. Ignored if user_id is None
+            room_id: search for room_id. Ignored if room_id is None
+        Returns:
+            event_reports: json list of event reports
+            count: total number of event reports matching the filter criteria
         """
 
         def _get_event_reports_paginate_txn(txn):
@@ -1345,6 +1353,11 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                 filters.append("room_id LIKE ?")
                 args.extend(["%" + room_id + "%"])
 
+            if direction == "b":
+                order = "DESC"
+            else:
+                order = "ASC"
+
             where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
 
             sql_base = """
@@ -1353,16 +1366,20 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                 """.format(
                 where_clause
             )
-            logger.warning("sql_base: %s ", sql_base)
+
             sql = "SELECT COUNT(*) as total_event_reports " + sql_base
             txn.execute(sql, args)
             count = txn.fetchone()[0]
 
-            sql = (
-                "SELECT id, received_ts, room_id, event_id, user_id, reason, content "
-                + sql_base
-                + " ORDER BY received_ts LIMIT ? OFFSET ?"
+            sql = """
+                SELECT id, received_ts, room_id, event_id, user_id, reason, content
+                {sql_base}
+                ORDER BY received_ts {order}
+                LIMIT ? OFFSET ?
+            """.format(
+                sql_base=sql_base, order=order,
             )
+
             args += [limit, start]
             txn.execute(sql, args)
             event_reports = self.db_pool.cursor_to_dict(txn)
