@@ -177,7 +177,12 @@ class EventPushActionsWorkerStore(SQLBaseStore):
 
         if row:
             notif_count += row[0]
-            unread_count += row[1]
+
+            if row[1] is not None:
+                # The unread_count column of event_push_summary is NULLable, so we need
+                # to make sure we don't try increasing the unread counts if it's NULL
+                # for this row.
+                unread_count += row[1]
 
         return {
             "notify_count": notif_count,
