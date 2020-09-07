@@ -903,8 +903,8 @@ def assert_valid_next_link(hs: "HomeServer", next_link: str):
     # Parse the contents of the URL
     next_link_parsed = urlparse(next_link)
 
-    # Scheme must be http(s)
-    if next_link_parsed.scheme not in ["http", "https"]:
+    # Scheme must not point to the local drive
+    if next_link_parsed.scheme.startswith("file:///"):
         valid = False
 
     # If the domain whitelist is set, the domain must be in it

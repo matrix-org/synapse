@@ -544,7 +544,9 @@ class ServerConfig(Config):
 
         # Whitelist of domain names that given next_link parameters must have
         next_link_domain_whitelist = config.get("next_link_domain_whitelist")
-        if not isinstance(next_link_domain_whitelist, list):
+        if next_link_domain_whitelist is not None and not isinstance(
+            next_link_domain_whitelist, list
+        ):
             raise ConfigError("'next_link_domain_whitelist' must be a list")
 
         # Turn the list into a set to improve lookup speed.
