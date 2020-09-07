@@ -47,6 +47,22 @@ class UpgradeDatabaseException(PrepareDatabaseException):
     pass
 
 
+OUTDATED_SCHEMA_ON_WORKER_ERROR = (
+    "Expected database schema version %i but got %i: run the main synapse process to "
+    "upgrade the database schema before starting worker processes."
+)
+
+EMPTY_DATABASE_ON_WORKER_ERROR = (
+    "Uninitialised database: run the main synapse process to prepare the database "
+    "schema before starting worker processes."
+)
+
+UNAPPLIED_DELTA_ON_WORKER_ERROR = (
+    "Database schema delta %s has not been applied: run the main synapse process to "
+    "upgrade the database schema before starting worker processes."
+)
+
+
 def prepare_database(db_conn, database_engine, config, databases=["main", "state"]):
     """Prepares a physical database for usage. Will either create all necessary tables
     or upgrade from an older schema version.
@@ -82,8 +98,7 @@ def prepare_database(db_conn, database_engine, config, databases=["main", "state
             # workers doing it at once.
             if config.worker_app is not None and user_version != SCHEMA_VERSION:
                 raise UpgradeDatabaseException(
-                    "Expected database schema version %i but got %i"
-                    % (SCHEMA_VERSION, user_version)
+                    OUTDATED_SCHEMA_ON_WORKER_ERROR % (SCHEMA_VERSION, user_version)
                 )
 
             _upgrade_existing_database(
@@ -99,7 +114,7 @@ def prepare_database(db_conn, database_engine, config, databases=["main", "state
             # if it's a worker app, refuse to upgrade the database, to avoid multiple
             # workers doing it at once.
             if config and config.worker_app is not None:
-                raise UpgradeDatabaseException("Database schema uninitialised.")
+                raise UpgradeDatabaseException(EMPTY_DATABASE_ON_WORKER_ERROR)
 
             _setup_new_database(cur, database_engine, databases=databases)
 
@@ -401,7 +416,7 @@ def _upgrade_existing_database(
                 # package and then execute its `run_upgrade` function.
                 if is_worker:
                     raise PrepareDatabaseException(
-                        "Not applying delta %s on worker process", relative_path
+                        UNAPPLIED_DELTA_ON_WORKER_ERROR % relative_path
                     )
 
                 module_name = "synapse.storage.v%d_%s" % (v, root_name)
@@ -420,7 +435,7 @@ def _upgrade_existing_database(
                 # A plain old .sql file, just read and execute it
                 if is_worker:
                     raise PrepareDatabaseException(
-                        "Not applying delta %s on worker process", relative_path
+                        UNAPPLIED_DELTA_ON_WORKER_ERROR % relative_path
                     )
                 logger.info("Applying schema %s", relative_path)
                 executescript(cur, absolute_path)
@@ -428,7 +443,7 @@ def _upgrade_existing_database(
                 # A .sql file specific to our engine; just read and execute it
                 if is_worker:
                     raise PrepareDatabaseException(
-                        "Not applying delta %s on worker process", relative_path
+                        UNAPPLIED_DELTA_ON_WORKER_ERROR % relative_path
                     )
                 logger.info("Applying engine-specific schema %s", relative_path)
                 executescript(cur, absolute_path)
