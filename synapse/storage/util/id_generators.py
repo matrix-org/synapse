@@ -351,7 +351,7 @@ class MultiWriterIdGenerator:
 
     def _mark_id_as_finished(self, next_id: int):
         """The ID has finished being processed so we should advance the
-        current poistion if possible.
+        current position if possible.
         """
 
         with self._lock:
@@ -369,7 +369,7 @@ class MultiWriterIdGenerator:
                 min_unfinshed = min(self._unfinished_ids)
                 for s in self._finished_ids:
                     if s < min_unfinshed:
-                        if not new_cur or new_cur < s:
+                        if new_cur is None or new_cur < s:
                             new_cur = s
                     else:
                         finished.add(s)
