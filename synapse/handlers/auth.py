@@ -1236,7 +1236,7 @@ class AuthHandler(BaseHandler):
 
 
 @attr.s
-class MacaroonGenerator(object):
+class MacaroonGenerator:
 
     hs = attr.ib()
 

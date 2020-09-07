@@ -248,7 +248,7 @@ class LoggingTransaction:
         self.txn.close()
 
 
-class PerformanceCounters(object):
+class PerformanceCounters:
     def __init__(self):
         self.current_counters = {}
         self.previous_counters = {}
@@ -286,7 +286,7 @@ class PerformanceCounters(object):
 R = TypeVar("R")
 
 
-class DatabasePool(object):
+class DatabasePool:
     """Wraps a single physical database and connection pool.
 
     A single database may be used by multiple data stores.
@@ -952,7 +952,7 @@ class DatabasePool(object):
         key_names: Collection[str],
         key_values: Collection[Iterable[Any]],
         value_names: Collection[str],
-        value_values: Iterable[Iterable[str]],
+        value_values: Iterable[Iterable[Any]],
     ) -> None:
         """
         Upsert, many times.
@@ -981,7 +981,7 @@ class DatabasePool(object):
         key_names: Iterable[str],
         key_values: Collection[Iterable[Any]],
         value_names: Collection[str],
-        value_values: Iterable[Iterable[str]],
+        value_values: Iterable[Iterable[Any]],
     ) -> None:
         """
         Upsert, many times, but without native UPSERT support or batching.
@@ -1104,7 +1104,7 @@ class DatabasePool(object):
         self,
         table: str,
         keyvalues: Dict[str, Any],
-        retcol: Iterable[str],
+        retcol: str,
         allow_none: Literal[False] = False,
         desc: str = "simple_select_one_onecol",
     ) -> Any:
@@ -1115,7 +1115,7 @@ class DatabasePool(object):
         self,
         table: str,
         keyvalues: Dict[str, Any],
-        retcol: Iterable[str],
+        retcol: str,
         allow_none: Literal[True] = True,
         desc: str = "simple_select_one_onecol",
     ) -> Optional[Any]:
@@ -1125,7 +1125,7 @@ class DatabasePool(object):
         self,
         table: str,
         keyvalues: Dict[str, Any],
-        retcol: Iterable[str],
+        retcol: str,
         allow_none: bool = False,
         desc: str = "simple_select_one_onecol",
     ) -> Optional[Any]:
@@ -1156,7 +1156,7 @@ class DatabasePool(object):
         txn: LoggingTransaction,
         table: str,
         keyvalues: Dict[str, Any],
-        retcol: Iterable[str],
+        retcol: str,
         allow_none: Literal[False] = False,
     ) -> Any:
         ...
@@ -1168,7 +1168,7 @@ class DatabasePool(object):
         txn: LoggingTransaction,
         table: str,
         keyvalues: Dict[str, Any],
-        retcol: Iterable[str],
+        retcol: str,
         allow_none: Literal[True] = True,
     ) -> Optional[Any]:
         ...
@@ -1179,7 +1179,7 @@ class DatabasePool(object):
         txn: LoggingTransaction,
         table: str,
         keyvalues: Dict[str, Any],
-        retcol: Iterable[str],
+        retcol: str,
         allow_none: bool = False,
     ) -> Optional[Any]:
         ret = cls.simple_select_onecol_txn(
@@ -1196,10 +1196,7 @@ class DatabasePool(object):
 
     @staticmethod
     def simple_select_onecol_txn(
-        txn: LoggingTransaction,
-        table: str,
-        keyvalues: Dict[str, Any],
-        retcol: Iterable[str],
+        txn: LoggingTransaction, table: str, keyvalues: Dict[str, Any], retcol: str,
     ) -> List[Any]:
         sql = ("SELECT %(retcol)s FROM %(table)s") % {"retcol": retcol, "table": table}
 

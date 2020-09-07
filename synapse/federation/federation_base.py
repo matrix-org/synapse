@@ -39,7 +39,7 @@ from synapse.types import JsonDict, get_domain_from_id
 logger = logging.getLogger(__name__)
 
 
-class FederationBase(object):
+class FederationBase:
     def __init__(self, hs):
         self.hs = hs
 

@@ -745,7 +745,7 @@ class GenericWorkerReplicationHandler(ReplicationDataHandler):
             self.send_handler.wake_destination(server)
 
 
-class FederationSenderHandler(object):
+class FederationSenderHandler:
     """Processes the fedration replication stream
 
     This class is only instantiate on the worker responsible for sending outbound

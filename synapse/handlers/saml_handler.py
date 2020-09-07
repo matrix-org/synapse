@@ -360,12 +360,12 @@ MXID_MAPPER_MAP = {
 
 
 @attr.s
-class SamlConfig(object):
+class SamlConfig:
     mxid_source_attribute = attr.ib()
     mxid_mapper = attr.ib()
 
 
-class DefaultSamlMappingProvider(object):
+class DefaultSamlMappingProvider:
     __version__ = "0.0.1"
 
     def __init__(self, parsed_config: SamlConfig, module_api: ModuleApi):
