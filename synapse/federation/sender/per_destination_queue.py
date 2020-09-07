@@ -487,19 +487,19 @@ class PerDestinationQueue:
                 )
 
             success = await self._transaction_manager.send_new_transaction(
-                self._destination, catch_up_pdus, []
+                self._destination, catchup_pdus, []
             )
 
             if not success:
                 return
 
             sent_transactions_counter.inc()
-            final_pdu, _ = catch_up_pdus[-1]
+            final_pdu, _ = catchup_pdus[-1]
             self._last_successful_stream_ordering = cast(
                 int, final_pdu.internal_metadata.stream_ordering
             )
             await self._store.set_destination_last_successful_stream_ordering(
-                self._destination, self._last_successful_stream_order
+                self._destination, self._last_successful_stream_ordering
             )
 
     def _get_rr_edus(self, force_flush: bool) -> Iterable[Edu]:
