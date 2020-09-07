@@ -1,0 +1,1 @@
+Do not attempt to upgrade upgrade database schema on worker processes.
