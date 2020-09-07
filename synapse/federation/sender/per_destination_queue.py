@@ -494,7 +494,7 @@ class PerDestinationQueue:
                 return
 
             sent_transactions_counter.inc()
-            final_pdu, _ = catchup_pdus[-1]
+            final_pdu = catchup_pdus[-1]
             self._last_successful_stream_ordering = cast(
                 int, final_pdu.internal_metadata.stream_ordering
             )
