@@ -669,6 +669,29 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertFalse(channel.json_body["threepids"])
 
+    @override_config({"next_link_domain_whitelist": None})
+    def test_next_link(self):
+        """Tests a valid next_link parameter value with no whitelist (good case)"""
+        self._request_token(
+            "something@example.com",
+            "some_secret",
+            next_link="https://example.com/a/good/site",
+            expect_code=200,
+        )
+
+    @override_config({"next_link_domain_whitelist": None})
+    def test_next_link_exotic_protocol(self):
+        """Tests using a esoteric protocol as a next_link parameter value.
+        Someone may be hosting a client on IPFS etc.
+        """
+        self._request_token(
+            "something@example.com",
+            "some_secret",
+            next_link="some-protocol://abcdefghijklmopqrstuvwxyz",
+            expect_code=200,
+        )
+
+    @override_config({"next_link_domain_whitelist": None})
     def test_next_link_file_uri(self):
         """Tests next_link parameters cannot be file URI"""
         # Attempt to use a next_link value that points to the local disk
@@ -705,7 +728,9 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
 
     @override_config({"next_link_domain_whitelist": []})
     def test_empty_next_link_domain_whitelist(self):
-        """Tests an empty next_lint_domain_whitelist value means next_link is disallowed"""
+        """Tests an empty next_lint_domain_whitelist value, meaning next_link is essentially
+        disallowed
+        """
         self._request_token(
             "something@example.com",
             "some_secret",
