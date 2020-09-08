@@ -720,7 +720,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         next_link: Optional[str] = None,
         expect_code: int = 200,
     ) -> str:
-        """Request validating and adding an email to a user account
+        """Request a validation token to add an email address to a user's account
 
         Args:
             email: The email address to validate
