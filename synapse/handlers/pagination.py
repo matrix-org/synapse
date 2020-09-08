@@ -346,8 +346,6 @@ class PaginationHandler(object):
 
         room_token = RoomStreamToken.parse(from_token.room_key)
 
-        from_token = from_token.copy_and_replace("room_key", str(room_token))
-
         with await self.pagination_lock.read(room_id):
             (
                 membership,

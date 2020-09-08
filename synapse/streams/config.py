@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 MAX_LIMIT = 1000
 
 
-@attr.s
+@attr.s(slots=True)
 class PaginationConfig(object):
     """A configuration object which stores pagination parameters."""
 
