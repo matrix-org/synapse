@@ -373,12 +373,15 @@ class PaginationHandler:
                     # case "JOIN" would have been returned.
                     assert member_event_id
 
-                    leave_token = await self.store.get_topological_token_for_event(
+                    leave_token_str = await self.store.get_topological_token_for_event(
                         member_event_id
                     )
-                    if RoomStreamToken.parse(leave_token).topological < max_topo:
+                    leave_token = RoomStreamToken.parse(leave_token_str)
+                    assert leave_token.topological is not None
+
+                    if leave_token.topological < max_topo:
                         from_token = from_token.copy_and_replace(
-                            "room_key", leave_token
+                            "room_key", leave_token_str
                         )
 
                 await self.hs.get_handlers().federation_handler.maybe_backfill(
