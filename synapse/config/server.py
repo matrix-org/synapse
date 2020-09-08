@@ -1038,7 +1038,7 @@ class ServerConfig(Config):
         # process.
         #
         # The whitelist is applied whether the homeserver or an
-        # account_threepid_delegate is handling validation.
+        # identity server is handling validation.
         #
         # The default value is no whitelist functionality; all domains are
         # allowed. Setting this value to an empty list will instead disallow
