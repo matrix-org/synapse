@@ -209,7 +209,7 @@ def yieldable_gather_results(
 class _LinearizerEntry:
     # The number of things executing.
     count = attr.ib(type=int)
-    # Deferreds for the things bocked from executing.
+    # Deferreds for the things blocked from executing.
     deferreds = attr.ib(type=collections.OrderedDict)
 
 
