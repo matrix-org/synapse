@@ -1,1 +1,0 @@
-Fix builds of the Docker image on non-x86 platforms.

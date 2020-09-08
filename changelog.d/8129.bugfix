@@ -1,1 +1,0 @@
-Return a proper error code when the rooms of an invalid group are requested.
