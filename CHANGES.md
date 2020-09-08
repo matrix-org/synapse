@@ -80,7 +80,7 @@ Internal Changes
 - Remove obsolete `order` field from federation send queues. ([\#8245](https://github.com/matrix-org/synapse/issues/8245))
 - Stop sub-classing from object. ([\#8249](https://github.com/matrix-org/synapse/issues/8249))
 - Add more logging to debug slow startup. ([\#8264](https://github.com/matrix-org/synapse/issues/8264))
-- Do not attempt to upgrade upgrade database schema on worker processes. ([\#8266](https://github.com/matrix-org/synapse/issues/8266), [\#8276](https://github.com/matrix-org/synapse/issues/8276))
+- Do not attempt to upgrade database schema on worker processes. ([\#8266](https://github.com/matrix-org/synapse/issues/8266), [\#8276](https://github.com/matrix-org/synapse/issues/8276))
 
 
 Synapse 1.19.1 (2020-08-27)
