@@ -377,7 +377,7 @@ class PaginationHandler:
                         member_event_id
                     )
                     leave_token = RoomStreamToken.parse(leave_token_str)
-                    assert leave_token.topological
+                    assert leave_token.topological is not None
 
                     if leave_token.topological < max_topo:
                         from_token = from_token.copy_and_replace(
