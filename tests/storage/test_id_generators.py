@@ -122,6 +122,56 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self.assertEqual(id_gen.get_positions(), {"master": 8})
         self.assertEqual(id_gen.get_current_token_for_writer("master"), 8)
 
+    def test_out_of_order_finish(self):
+        """Test that IDs persisted out of order are correctly handled
+        """
+
+        # Prefill table with 7 rows written by 'master'
+        self._insert_rows("master", 7)
+
+        id_gen = self._create_id_generator()
+
+        self.assertEqual(id_gen.get_positions(), {"master": 7})
+        self.assertEqual(id_gen.get_current_token_for_writer("master"), 7)
+
+        ctx1 = self.get_success(id_gen.get_next())
+        ctx2 = self.get_success(id_gen.get_next())
+        ctx3 = self.get_success(id_gen.get_next())
+        ctx4 = self.get_success(id_gen.get_next())
+
+        s1 = ctx1.__enter__()
+        s2 = ctx2.__enter__()
+        s3 = ctx3.__enter__()
+        s4 = ctx4.__enter__()
+
+        self.assertEqual(s1, 8)
+        self.assertEqual(s2, 9)
+        self.assertEqual(s3, 10)
+        self.assertEqual(s4, 11)
+
+        self.assertEqual(id_gen.get_positions(), {"master": 7})
+        self.assertEqual(id_gen.get_current_token_for_writer("master"), 7)
+
+        ctx2.__exit__(None, None, None)
+
+        self.assertEqual(id_gen.get_positions(), {"master": 7})
+        self.assertEqual(id_gen.get_current_token_for_writer("master"), 7)
+
+        ctx1.__exit__(None, None, None)
+
+        self.assertEqual(id_gen.get_positions(), {"master": 9})
+        self.assertEqual(id_gen.get_current_token_for_writer("master"), 9)
+
+        ctx4.__exit__(None, None, None)
+
+        self.assertEqual(id_gen.get_positions(), {"master": 9})
+        self.assertEqual(id_gen.get_current_token_for_writer("master"), 9)
+
+        ctx3.__exit__(None, None, None)
+
+        self.assertEqual(id_gen.get_positions(), {"master": 11})
+        self.assertEqual(id_gen.get_current_token_for_writer("master"), 11)
+
     def test_multi_instance(self):
         """Test that reads and writes from multiple processes are handled
         correctly.
