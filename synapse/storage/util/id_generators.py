@@ -15,6 +15,7 @@
 
 import contextlib
 import heapq
+import logging
 import threading
 from collections import deque
 from typing import Dict, List, Set
@@ -24,8 +25,10 @@ from typing_extensions import Deque
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.util.sequence import PostgresSequenceGenerator
 
+logger = logging.getLogger(__name__)
 
-class IdGenerator(object):
+
+class IdGenerator:
     def __init__(self, db_conn, table, column):
         self._lock = threading.Lock()
         self._next_id = _load_current_id(db_conn, table, column)
@@ -48,6 +51,8 @@ def _load_current_id(db_conn, table, column, step=1):
     Returns:
         int
     """
+    # debug logging for https://github.com/matrix-org/synapse/issues/7968
+    logger.info("initialising stream generator for %s(%s)", table, column)
     cur = db_conn.cursor()
     if step == 1:
         cur.execute("SELECT MAX(%s) FROM %s" % (column, table))
@@ -59,7 +64,7 @@ def _load_current_id(db_conn, table, column, step=1):
     return (max if step > 0 else min)(current_id, step)
 
 
-class StreamIdGenerator(object):
+class StreamIdGenerator:
     """Used to generate new stream ids when persisting events while keeping
     track of which transactions have been completed.
 
@@ -231,12 +236,8 @@ class MultiWriterIdGenerator:
         # gaps should be relatively rare it's still worth doing the book keeping
         # that allows us to skip forwards when there are gapless runs of
         # positions.
-        #
-        # We start at 1 here as a) the first generated stream ID will be 2, and
-        # b) other parts of the code assume that stream IDs are strictly greater
-        # than 0.
         self._persisted_upto_position = (
-            min(self._current_positions.values()) if self._current_positions else 1
+            min(self._current_positions.values()) if self._current_positions else 0
         )
         self._known_persisted_positions = []  # type: List[int]
 
@@ -366,7 +367,9 @@ class MultiWriterIdGenerator:
         equal to it have been successfully persisted.
         """
 
-        return self.get_persisted_upto_position()
+        # Currently we don't support this operation, as it's not obvious how to
+        # condense the stream positions of multiple writers into a single int.
+        raise NotImplementedError()
 
     def get_current_token_for_writer(self, instance_name: str) -> int:
         """Returns the position of the given writer.

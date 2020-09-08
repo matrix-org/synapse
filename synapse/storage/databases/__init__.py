@@ -24,7 +24,7 @@ from synapse.storage.prepare_database import prepare_database
 logger = logging.getLogger(__name__)
 
 
-class Databases(object):
+class Databases:
     """The various databases.
 
     These are low level interfaces to physical databases.
@@ -47,9 +47,14 @@ class Databases(object):
             engine = create_engine(database_config.config)
 
             with make_conn(database_config, engine) as db_conn:
-                logger.info("Preparing database %r...", db_name)
-
+                logger.info("[database config %r]: Checking database server", db_name)
                 engine.check_database(db_conn)
+
+                logger.info(
+                    "[database config %r]: Preparing for databases %r",
+                    db_name,
+                    database_config.databases,
+                )
                 prepare_database(
                     db_conn, engine, hs.config, databases=database_config.databases,
                 )
@@ -57,7 +62,9 @@ class Databases(object):
                 database = DatabasePool(hs, database_config, engine)
 
                 if "main" in database_config.databases:
-                    logger.info("Starting 'main' data store")
+                    logger.info(
+                        "[database config %r]: Starting 'main' database", db_name
+                    )
 
                     # Sanity check we don't try and configure the main store on
                     # multiple databases.
@@ -68,11 +75,13 @@ class Databases(object):
 
                     # If we're on a process that can persist events also
                     # instantiate a `PersistEventsStore`
-                    if hs.get_instance_name() in hs.config.worker.writers.events:
+                    if hs.config.worker.writers.events == hs.get_instance_name():
                         persist_events = PersistEventsStore(hs, database, main)
 
                 if "state" in database_config.databases:
-                    logger.info("Starting 'state' data store")
+                    logger.info(
+                        "[database config %r]: Starting 'state' database", db_name
+                    )
 
                     # Sanity check we don't try and configure the state store on
                     # multiple databases.
@@ -85,7 +94,7 @@ class Databases(object):
 
                 self.databases.append(database)
 
-                logger.info("Database %r prepared", db_name)
+                logger.info("[database config %r]: prepared", db_name)
 
             # Closing the context manager doesn't close the connection.
             # psycopg will close the connection when the object gets GCed, but *only*
@@ -98,10 +107,10 @@ class Databases(object):
 
         # Sanity check that we have actually configured all the required stores.
         if not main:
-            raise Exception("No 'main' data store configured")
+            raise Exception("No 'main' database configured")
 
         if not state:
-            raise Exception("No 'state' data store configured")
+            raise Exception("No 'state' database configured")
 
         # We use local variables here to ensure that the databases do not have
         # optional types.

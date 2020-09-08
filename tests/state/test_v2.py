@@ -49,7 +49,7 @@ class FakeClock:
         return defer.succeed(None)
 
 
-class FakeEvent(object):
+class FakeEvent:
     """A fake event we use as a convenience.
 
     NOTE: Again as a convenience we use "node_ids" rather than event_ids to
@@ -595,7 +595,7 @@ def pairwise(iterable):
 
 
 @attr.s
-class TestStateResolutionStore(object):
+class TestStateResolutionStore:
     event_map = attr.ib()
 
     def get_events(self, event_ids, allow_rejected=False):

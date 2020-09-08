@@ -27,7 +27,7 @@ from tests.unittest import HomeserverTestCase
 
 
 @attr.s
-class _User(object):
+class _User:
     "Helper wrapper for user ID and access token"
     id = attr.ib()
     token = attr.ib()

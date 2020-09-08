@@ -37,7 +37,7 @@ from synapse.storage.state import StateGroupStorage
 __all__ = ["DataStores", "DataStore"]
 
 
-class Storage(object):
+class Storage:
     """The high level interfaces for talking to various storage layers.
     """
 

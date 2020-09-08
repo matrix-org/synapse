@@ -149,7 +149,7 @@ class RoomDirectoryConfig(Config):
         return False
 
 
-class _RoomDirectoryRule(object):
+class _RoomDirectoryRule:
     """Helper class to test whether a room directory action is allowed, like
     creating an alias or publishing a room.
     """

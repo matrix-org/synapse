@@ -123,7 +123,7 @@ class ReceiptsHandler(BaseHandler):
         await self.federation.send_read_receipt(receipt)
 
 
-class ReceiptEventSource(object):
+class ReceiptEventSource:
     def __init__(self, hs):
         self.store = hs.get_datastore()
 

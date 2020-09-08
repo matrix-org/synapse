@@ -1,1 +1,0 @@
-Fixes a longstanding bug where user directory updates could break when unexpected profile data was included in events.

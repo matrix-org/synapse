@@ -36,7 +36,7 @@ from tests import unittest
 from tests.utils import mock_getRawHeaders, setup_test_homeserver
 
 
-class TestHandlers(object):
+class TestHandlers:
     def __init__(self, hs):
         self.auth_handler = synapse.handlers.auth.AuthHandler(hs)
 

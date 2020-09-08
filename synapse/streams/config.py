@@ -30,7 +30,7 @@ MAX_LIMIT = 1000
 
 
 @attr.s(slots=True)
-class PaginationConfig(object):
+class PaginationConfig:
     """A configuration object which stores pagination parameters."""
 
     from_token = attr.ib(type=Optional[StreamToken])

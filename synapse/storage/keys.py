@@ -22,6 +22,6 @@ logger = logging.getLogger(__name__)
 
 
 @attr.s(slots=True, frozen=True)
-class FetchKeyResult(object):
+class FetchKeyResult:
     verify_key = attr.ib()  # VerifyKey: the key itself
     valid_until_ts = attr.ib()  # int: how long we can use this key for

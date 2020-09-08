@@ -1010,7 +1010,7 @@ def format_user_presence_state(state, now, include_user_id=True):
     return content
 
 
-class PresenceEventSource(object):
+class PresenceEventSource:
     def __init__(self, hs):
         # We can't call get_presence_handler here because there's a cycle:
         #

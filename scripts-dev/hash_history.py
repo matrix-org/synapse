@@ -15,7 +15,7 @@ from synapse.storage.pdu import PduStore
 from synapse.storage.signatures import SignatureStore
 
 
-class Store(object):
+class Store:
     _get_pdu_tuples = PduStore.__dict__["_get_pdu_tuples"]
     _get_pdu_content_hashes_txn = SignatureStore.__dict__["_get_pdu_content_hashes_txn"]
     _get_prev_pdu_hashes_txn = SignatureStore.__dict__["_get_prev_pdu_hashes_txn"]
