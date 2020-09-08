@@ -1,0 +1,1 @@
+Fix slow start times for large servers by removing a table scan of the `users` table from startup code.

@@ -219,7 +219,12 @@ class BulkPushRuleEvaluator:
                 if event.type == EventTypes.Member and event.state_key == uid:
                     display_name = event.content.get("displayname", None)
 
-            actions_by_user[uid] = []
+            if count_as_unread:
+                # Add an element for the current user if the event needs to be marked as
+                # unread, so that add_push_actions_to_staging iterates over it.
+                # If the event shouldn't be marked as unread but should notify the
+                # current user, it'll be added to the dict later.
+                actions_by_user[uid] = []
 
             for rule in rules:
                 if "enabled" in rule and not rule["enabled"]:
