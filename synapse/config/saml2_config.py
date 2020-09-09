@@ -226,7 +226,7 @@ class SAML2Config(Config):
         #   * enable_registration
         #   * password_config.enabled
         #
-        # You will also want to investigate the settings under the sso configuration
+        # You will also want to investigate the settings under the "sso" configuration
         # section below.
         #
         # Once SAML support is enabled, a metadata file will be exposed at
