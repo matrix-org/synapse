@@ -159,6 +159,8 @@ class PerDestinationQueue:
             # only enqueue the PDU if we are not catching up (False) or do not
             # yet know if we are to catch up (None)
             self._pending_pdus.append(pdu)
+        else:
+            self._catchup_last_skipped = pdu.internal_metadata.stream_ordering
 
         self.attempt_new_transaction()
 
