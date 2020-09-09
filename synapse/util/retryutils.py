@@ -114,7 +114,7 @@ async def get_retry_limiter(destination, clock, store, ignore_backoff=False, **k
     )
 
 
-class RetryDestinationLimiter(object):
+class RetryDestinationLimiter:
     def __init__(
         self,
         destination,

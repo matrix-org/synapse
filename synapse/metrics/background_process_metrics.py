@@ -105,7 +105,7 @@ _background_processes_active_since_last_scrape = set()  # type: Set[_BackgroundP
 _bg_metrics_lock = threading.Lock()
 
 
-class _Collector(object):
+class _Collector:
     """A custom metrics collector for the background process metrics.
 
     Ensures that all of the metrics are up-to-date with any in-flight processes
@@ -140,7 +140,7 @@ class _Collector(object):
 REGISTRY.register(_Collector())
 
 
-class _BackgroundProcess(object):
+class _BackgroundProcess:
     def __init__(self, desc, ctx):
         self.desc = desc
         self._context = ctx

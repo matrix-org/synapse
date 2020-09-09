@@ -22,7 +22,7 @@ from synapse.config.server import is_threepid_reserved
 logger = logging.getLogger(__name__)
 
 
-class AuthBlocking(object):
+class AuthBlocking:
     def __init__(self, hs):
         self.store = hs.get_datastore()
 

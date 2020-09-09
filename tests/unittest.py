@@ -618,7 +618,7 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
     """
 
     def prepare(self, reactor, clock, homeserver):
-        class Authenticator(object):
+        class Authenticator:
             def authenticate_request(self, request, content):
                 return succeed("other.example.com")
 

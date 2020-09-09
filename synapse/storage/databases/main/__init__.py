@@ -29,6 +29,7 @@ from synapse.storage.util.id_generators import (
     MultiWriterIdGenerator,
     StreamIdGenerator,
 )
+from synapse.types import get_domain_from_id
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from .account_data import AccountDataStore
@@ -591,21 +592,24 @@ def check_database_before_upgrade(cur, database_engine, config: HomeServerConfig
     """Called before upgrading an existing database to check that it is broadly sane
     compared with the configuration.
     """
-    domain = config.server_name
+    logger.info("Checking database for consistency with configuration...")
 
-    sql = database_engine.convert_param_style(
-        "SELECT COUNT(*) FROM users WHERE name NOT LIKE ?"
-    )
-    pat = "%:" + domain
-    cur.execute(sql, (pat,))
-    num_not_matching = cur.fetchall()[0][0]
-    if num_not_matching == 0:
+    # if there are any users in the database, check that the username matches our
+    # configured server name.
+
+    cur.execute("SELECT name FROM users LIMIT 1")
+    rows = cur.fetchall()
+    if not rows:
+        return
+
+    user_domain = get_domain_from_id(rows[0][0])
+    if user_domain == config.server_name:
         return
 
     raise Exception(
         "Found users in database not native to %s!\n"
-        "You cannot changed a synapse server_name after it's been configured"
-        % (domain,)
+        "You cannot change a synapse server_name after it's been configured"
+        % (config.server_name,)
     )
 
 

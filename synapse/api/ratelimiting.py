@@ -21,7 +21,7 @@ from synapse.types import Requester
 from synapse.util import Clock
 
 
-class Ratelimiter(object):
+class Ratelimiter:
     """
     Ratelimit actions marked by arbitrary keys.
 

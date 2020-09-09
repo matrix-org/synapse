@@ -174,7 +174,7 @@ def wrap_async_request_handler(h):
     return preserve_fn(wrapped_async_request_handler)
 
 
-class HttpServer(object):
+class HttpServer:
     """ Interface for registering callbacks on a HTTP server
     """
 

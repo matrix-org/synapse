@@ -154,7 +154,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         user_id = "@user:server"
 
         self.store.get_monthly_active_count = Mock(
-            side_effect=lambda: make_awaitable(lots_of_users)
+            return_value=make_awaitable(lots_of_users)
         )
         self.get_success(
             self.store.insert_client_ip(

@@ -19,7 +19,7 @@ from synapse.rest.client.v1 import login, room
 from tests import unittest
 
 
-class ThirdPartyRulesTestModule(object):
+class ThirdPartyRulesTestModule:
     def __init__(self, config):
         pass
 

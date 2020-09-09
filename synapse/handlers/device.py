@@ -497,7 +497,7 @@ def _update_device_from_client_ips(device, client_ips):
     device.update({"last_seen_ts": ip.get("last_seen"), "last_seen_ip": ip.get("ip")})
 
 
-class DeviceListUpdater(object):
+class DeviceListUpdater:
     "Handles incoming device list updates from federation and updates the DB"
 
     def __init__(self, hs, device_handler):

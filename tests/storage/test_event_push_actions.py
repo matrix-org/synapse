@@ -67,7 +67,11 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
             )
             self.assertEquals(
                 counts,
-                {"notify_count": noitf_count, "highlight_count": highlight_count},
+                {
+                    "notify_count": noitf_count,
+                    "unread_count": 0,  # Unread counts are tested in the sync tests.
+                    "highlight_count": highlight_count,
+                },
             )
 
         @defer.inlineCallbacks
@@ -80,7 +84,7 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
 
             yield defer.ensureDeferred(
                 self.store.add_push_actions_to_staging(
-                    event.event_id, {user_id: action}
+                    event.event_id, {user_id: action}, False,
                 )
             )
             yield defer.ensureDeferred(

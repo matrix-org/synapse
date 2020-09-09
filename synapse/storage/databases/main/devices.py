@@ -255,9 +255,7 @@ class DeviceWorkerStore(SQLBaseStore):
             List of objects representing an device update EDU
         """
         devices = (
-            await self.db_pool.runInteraction(
-                "get_e2e_device_keys_and_signatures_txn",
-                self._get_e2e_device_keys_and_signatures_txn,
+            await self.get_e2e_device_keys_and_signatures(
                 query_map.keys(),
                 include_all_devices=True,
                 include_deleted_devices=True,
@@ -293,17 +291,11 @@ class DeviceWorkerStore(SQLBaseStore):
                 prev_id = stream_id
 
                 if device is not None:
-                    key_json = device.get("key_json", None)
-                    if key_json:
-                        result["keys"] = db_to_json(key_json)
+                    keys = device.keys
+                    if keys:
+                        result["keys"] = keys
 
-                        if "signatures" in device:
-                            for sig_user_id, sigs in device["signatures"].items():
-                                result["keys"].setdefault("signatures", {}).setdefault(
-                                    sig_user_id, {}
-                                ).update(sigs)
-
-                    device_display_name = device.get("device_display_name", None)
+                    device_display_name = device.display_name
                     if device_display_name:
                         result["device_display_name"] = device_display_name
                 else:
@@ -489,7 +481,7 @@ class DeviceWorkerStore(SQLBaseStore):
         }
 
     async def get_users_whose_devices_changed(
-        self, from_key: str, user_ids: Iterable[str]
+        self, from_key: int, user_ids: Iterable[str]
     ) -> Set[str]:
         """Get set of users whose devices have changed since `from_key` that
         are in the given list of user_ids.
@@ -501,7 +493,6 @@ class DeviceWorkerStore(SQLBaseStore):
         Returns:
             The set of user_ids whose devices have changed since `from_key`
         """
-        from_key = int(from_key)
 
         # Get set of users who *may* have changed. Users not in the returned
         # list have definitely not changed.
@@ -535,7 +526,7 @@ class DeviceWorkerStore(SQLBaseStore):
         )
 
     async def get_users_whose_signatures_changed(
-        self, user_id: str, from_key: str
+        self, user_id: str, from_key: int
     ) -> Set[str]:
         """Get the users who have new cross-signing signatures made by `user_id` since
         `from_key`.
@@ -547,7 +538,7 @@ class DeviceWorkerStore(SQLBaseStore):
         Returns:
             A set of user IDs with updated signatures.
         """
-        from_key = int(from_key)
+
         if self._user_signature_stream_cache.has_entity_changed(user_id, from_key):
             sql = """
                 SELECT DISTINCT user_ids FROM user_signature_stream

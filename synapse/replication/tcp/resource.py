@@ -58,7 +58,7 @@ class ReplicationStreamProtocolFactory(Factory):
         )
 
 
-class ReplicationStreamer(object):
+class ReplicationStreamer:
     """Handles replication connections.
 
     This needs to be poked when new replication data may be available. When new

@@ -1,8 +1,13 @@
 [Unit]
 Description=Synapse %i
 AssertPathExists=/etc/matrix-synapse/workers/%i.yaml
+
 # This service should be restarted when the synapse target is restarted.
 PartOf=matrix-synapse.target
+
+# if this is started at the same time as the main, let the main process start
+# first, to initialise the database schema.
+After=matrix-synapse.service
 
 [Service]
 Type=notify

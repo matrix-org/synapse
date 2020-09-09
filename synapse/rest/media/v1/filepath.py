@@ -33,7 +33,7 @@ def _wrap_in_base_path(func):
     return _wrapped
 
 
-class MediaFilePaths(object):
+class MediaFilePaths:
     """Describes where files are stored on disk.
 
     Most of the functions have a `*_rel` variant which returns a file path that
@@ -80,7 +80,7 @@ class MediaFilePaths(object):
         self, server_name, file_id, width, height, content_type, method
     ):
         top_level_type, sub_type = content_type.split("/")
-        file_name = "%i-%i-%s-%s" % (width, height, top_level_type, sub_type)
+        file_name = "%i-%i-%s-%s-%s" % (width, height, top_level_type, sub_type, method)
         return os.path.join(
             "remote_thumbnail",
             server_name,
@@ -91,6 +91,23 @@ class MediaFilePaths(object):
         )
 
     remote_media_thumbnail = _wrap_in_base_path(remote_media_thumbnail_rel)
+
+    # Legacy path that was used to store thumbnails previously.
+    # Should be removed after some time, when most of the thumbnails are stored
+    # using the new path.
+    def remote_media_thumbnail_rel_legacy(
+        self, server_name, file_id, width, height, content_type
+    ):
+        top_level_type, sub_type = content_type.split("/")
+        file_name = "%i-%i-%s-%s" % (width, height, top_level_type, sub_type)
+        return os.path.join(
+            "remote_thumbnail",
+            server_name,
+            file_id[0:2],
+            file_id[2:4],
+            file_id[4:],
+            file_name,
+        )
 
     def remote_media_thumbnail_dir(self, server_name, file_id):
         return os.path.join(

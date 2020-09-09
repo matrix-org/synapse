@@ -3,7 +3,7 @@ from typing import Dict
 SENTINEL = object()
 
 
-class TreeCache(object):
+class TreeCache:
     """
     Tree-based backing store for LruCache. Allows subtrees of data to be deleted
     efficiently.
@@ -89,7 +89,7 @@ def iterate_tree_cache_entry(d):
             yield d
 
 
-class _Entry(object):
+class _Entry:
     __slots__ = ["value"]
 
     def __init__(self, value):

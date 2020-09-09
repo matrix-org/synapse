@@ -22,7 +22,7 @@ from ._base import Config, ConfigError
 logger = logging.Logger(__name__)
 
 
-class RoomDefaultEncryptionTypes(object):
+class RoomDefaultEncryptionTypes:
     """Possible values for the encryption_enabled_by_default_for_room_type config option"""
 
     ALL = "all"

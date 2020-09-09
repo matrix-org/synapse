@@ -440,11 +440,11 @@ class FederationHandler(BaseHandler):
         if not prevs - seen:
             return
 
-        latest = await self.store.get_latest_event_ids_in_room(room_id)
+        latest_list = await self.store.get_latest_event_ids_in_room(room_id)
 
         # We add the prev events that we have seen to the latest
         # list to ensure the remote server doesn't give them to us
-        latest = set(latest)
+        latest = set(latest_list)
         latest |= seen
 
         logger.info(
@@ -781,7 +781,7 @@ class FederationHandler(BaseHandler):
                     # keys across all devices.
                     current_keys = [
                         key
-                        for device in cached_devices
+                        for device in cached_devices.values()
                         for key in device.get("keys", {}).get("keys", {}).values()
                     ]
 
@@ -2109,8 +2109,8 @@ class FederationHandler(BaseHandler):
         if backfilled or event.internal_metadata.is_outlier():
             return
 
-        extrem_ids = await self.store.get_latest_event_ids_in_room(event.room_id)
-        extrem_ids = set(extrem_ids)
+        extrem_ids_list = await self.store.get_latest_event_ids_in_room(event.room_id)
+        extrem_ids = set(extrem_ids_list)
         prev_event_ids = set(event.prev_event_ids())
 
         if extrem_ids == prev_event_ids:

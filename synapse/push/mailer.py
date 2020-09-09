@@ -92,7 +92,7 @@ ALLOWED_ATTRS = {
 # ALLOWED_SCHEMES = ["http", "https", "ftp", "mailto"]
 
 
-class Mailer(object):
+class Mailer:
     def __init__(self, hs, app_name, template_html, template_text):
         self.hs = hs
         self.template_html = template_html

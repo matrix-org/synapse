@@ -29,7 +29,7 @@ from synapse.types import JsonDict
 logger = logging.getLogger(__name__)
 
 
-class TransactionActions(object):
+class TransactionActions:
     """ Defines persistence actions that relate to handling Transactions.
     """
 
