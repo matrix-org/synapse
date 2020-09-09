@@ -211,7 +211,7 @@ class SynapseHomeServer(HomeServer):
                 resources["/_matrix/saml2"] = SAML2Resource(self)
 
             if self.get_config().threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-                from synapse.rest.internal.client.password_reset import (
+                from synapse.rest.synapse.client.password_reset import (
                     PasswordResetSubmitTokenResource,
                 )
 
