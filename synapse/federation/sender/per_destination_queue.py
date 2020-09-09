@@ -100,8 +100,8 @@ class PerDestinationQueue:
         self._catching_up = True  # type: bool
 
         # The stream_ordering of the most recent PDU that was discarded due to
-        # being in catch-up mode, or None if not applicable.
-        self._catchup_last_skipped = None  # type: Optional[int]
+        # being in catch-up mode.
+        self._catchup_last_skipped = 0  # type: int
 
         # Cache of the last successfully-transmitted stream ordering for this
         # destination (we are the only updater so this is safe)
@@ -462,11 +462,7 @@ class PerDestinationQueue:
                 # of a race condition, so we check that no new events have been
                 # skipped due to us being in catch-up mode
 
-                if (
-                    self._catchup_last_skipped is not None
-                    and self._catchup_last_skipped
-                    > self._last_successful_stream_ordering
-                ):
+                if self._catchup_last_skipped > self._last_successful_stream_ordering:
                     # another event has been skipped because we were in catch-up mode
                     continue
 
