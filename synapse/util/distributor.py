@@ -15,7 +15,9 @@
 import inspect
 import logging
 
-from synapse.logging.context import run_in_background
+from twisted.internet import defer
+
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 
 logger = logging.getLogger(__name__)
@@ -97,7 +99,9 @@ class Signal:
         """Invokes every callable in the observer list, passing in the args and
         kwargs. Exceptions thrown by observers are logged but ignored. It is
         not an error to fire a signal with no observers.
-        """
+
+        Returns a Deferred that will complete when all the observers have
+        completed."""
 
         async def do(observer):
             try:
@@ -110,8 +114,11 @@ class Signal:
                     "%s signal observer %s failed: %r", self.name, observer, e,
                 )
 
-        for observer in self.observers:
-            run_in_background(do, observer)
+        deferreds = [run_in_background(do, o) for o in self.observers]
+
+        return make_deferred_yieldable(
+            defer.gatherResults(deferreds, consumeErrors=True)
+        )
 
     def __repr__(self):
         return "<Signal name=%r>" % (self.name,)
