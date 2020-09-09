@@ -13,15 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple
+
+from twisted.web.http import Request
 
 from synapse.api.errors import SynapseError, ThreepidValidationError
 from synapse.config.emailconfig import ThreepidBehaviour
-from synapse.http.server import (
-    DirectServeHtmlResource,
-    finish_request,
-    respond_with_html,
-)
+from synapse.http.server import DirectServeHtmlResource
 from synapse.http.servlet import parse_string
 from synapse.util.stringutils import assert_valid_client_secret
 
@@ -64,9 +62,8 @@ class PasswordResetSubmitTokenResource(DirectServeHtmlResource):
                 hs.config.email_password_reset_template_failure_html
             )
 
-    async def _async_render_GET(self, request):
+    async def _async_render_GET(self, request: Request) -> Tuple[int, bytes]:
         self._check_threepid_behaviour()
-
         sid = parse_string(request, "sid", required=True)
         token = parse_string(request, "token", required=True)
         client_secret = parse_string(request, "client_secret", required=True)
@@ -79,13 +76,13 @@ class PasswordResetSubmitTokenResource(DirectServeHtmlResource):
             "token": token,
             "client_secret": client_secret,
         }
-        respond_with_html(
-            request, 200, self._confirmation_email_template.render(**template_vars)
+        return (
+            200,
+            self._confirmation_email_template.render(**template_vars).encode("utf-8"),
         )
 
-    async def _async_render_POST(self, request):
+    async def _async_render_POST(self, request: Request) -> Tuple[int, bytes]:
         self._check_threepid_behaviour()
-
         sid = parse_string(request, "sid", required=True)
         token = parse_string(request, "token", required=True)
         client_secret = parse_string(request, "client_secret", required=True)
@@ -104,22 +101,29 @@ class PasswordResetSubmitTokenResource(DirectServeHtmlResource):
                         "Not redirecting to next_link as it is a local file: address"
                     )
                 else:
-                    request.setResponseCode(302)
-                    request.setHeader("Location", next_link)
-                    finish_request(request)
-                    return None
+                    next_link_bytes = next_link.encode("utf-8")
+                    request.setHeader("Location", next_link_bytes)
+                    return (
+                        302,
+                        (
+                            b'You are being redirected to <a src="%s">%s</a>.'
+                            % (next_link_bytes, next_link_bytes)
+                        ),
+                    )
 
             # Otherwise show the success template
-            html = self._email_password_reset_template_success_html
+            html_bytes = self._email_password_reset_template_success_html.encode("utf-8")
             status_code = 200
         except ThreepidValidationError as e:
             status_code = e.code
 
             # Show a failure page with a reason
             template_vars = {"failure_reason": e.msg}
-            html = self._failure_email_template.render(**template_vars)
+            html_bytes = self._failure_email_template.render(**template_vars).encode(
+                "utf-8"
+            )
 
-        respond_with_html(request, status_code, html)
+        return status_code, html_bytes
 
     def _check_threepid_behaviour(self):
         """
