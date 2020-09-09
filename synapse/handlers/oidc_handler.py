@@ -96,7 +96,6 @@ class OidcHandler:
         self.hs = hs
         self._callback_url = hs.config.oidc_callback_url  # type: str
         self._scopes = hs.config.oidc_scopes  # type: List[str]
-        self._uses_userinfo_config = hs.config.oidc_uses_userinfo  # type: bool
         self._client_auth = ClientAuth(
             hs.config.oidc_client_id,
             hs.config.oidc_client_secret,
@@ -223,7 +222,8 @@ class OidcHandler:
         ``access_token`` with the ``userinfo_endpoint``.
         """
 
-        return self._uses_userinfo_config or "openid" not in self._scopes
+        # Maybe that should be user-configurable and not inferred?
+        return "openid" not in self._scopes
 
     async def load_metadata(self) -> OpenIDProviderMetadata:
         """Load and validate the provider metadata.

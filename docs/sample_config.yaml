@@ -1671,11 +1671,6 @@ oidc_config:
   #
   #authorization_endpoint: "https://accounts.example.com/oauth2/auth"
 
-  # always use userinfo endpoint. This is required for providers that don't include user
-  # information in the token response, e.g. Gitlab.
-  #
-  #uses_userinfo: false
-
   # the oauth2 token endpoint. Required if provider discovery is disabled.
   #
   #token_endpoint: "https://accounts.example.com/oauth2/token"
