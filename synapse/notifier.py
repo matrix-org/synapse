@@ -280,33 +280,41 @@ class Notifier:
                     (room_stream_id, event, extra_users)
                 )
             else:
-                self._on_new_room_event(event, room_stream_id, extra_users)
+                self._on_new_room_event(event, max_room_stream_id, extra_users)
+
+        self._on_updated_room_token(max_room_stream_id)
 
     def _on_new_room_event(
         self,
         event: EventBase,
-        room_stream_id: int,
+        max_room_stream_id: int,
         extra_users: Collection[Union[str, UserID]] = [],
     ):
         """Notify any user streams that are interested in this room event"""
-        # poke any interested application service.
-        run_as_background_process(
-            "notify_app_services", self._notify_app_services, room_stream_id
-        )
-
-        if self.federation_sender:
-            self.federation_sender.notify_new_events(room_stream_id)
 
         if event.type == EventTypes.Member and event.membership == Membership.JOIN:
             self._user_joined_room(event.state_key, event.room_id)
 
         self.on_new_event(
-            "room_key", room_stream_id, users=extra_users, rooms=[event.room_id]
+            "room_key", max_room_stream_id, users=extra_users, rooms=[event.room_id]
         )
 
-    async def _notify_app_services(self, room_stream_id: int):
+    def _on_updated_room_token(self, max_room_stream_id: int):
+        """Poke services that might care that the room position has been
+        updated.
+        """
+
+        # poke any interested application service.
+        run_as_background_process(
+            "notify_app_services", self._notify_app_services, max_room_stream_id
+        )
+
+        if self.federation_sender:
+            self.federation_sender.notify_new_events(max_room_stream_id)
+
+    async def _notify_app_services(self, max_room_stream_id: int):
         try:
-            await self.appservice_handler.notify_interested_services(room_stream_id)
+            await self.appservice_handler.notify_interested_services(max_room_stream_id)
         except Exception:
             logger.exception("Error notifying application services of event")
 
