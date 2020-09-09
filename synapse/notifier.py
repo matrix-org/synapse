@@ -198,6 +198,7 @@ class Notifier:
 
         self.clock = hs.get_clock()
         self.appservice_handler = hs.get_application_service_handler()
+        self._pusher_pool = hs.get_pusherpool()
 
         self.federation_sender = None
         if hs.should_send_federation():
@@ -309,6 +310,10 @@ class Notifier:
             "notify_app_services", self._notify_app_services, max_room_stream_id
         )
 
+        run_as_background_process(
+            "_notify_pusher_pool", self._notify_pusher_pool, max_room_stream_id
+        )
+
         if self.federation_sender:
             self.federation_sender.notify_new_events(max_room_stream_id)
 
@@ -317,6 +322,12 @@ class Notifier:
             await self.appservice_handler.notify_interested_services(max_room_stream_id)
         except Exception:
             logger.exception("Error notifying application services of event")
+
+    async def _notify_pusher_pool(self, max_room_stream_id: int):
+        try:
+            await self._pusher_pool.on_new_notifications(max_room_stream_id)
+        except Exception:
+            logger.exception("Error pusher pool of event")
 
     def on_new_event(
         self,
