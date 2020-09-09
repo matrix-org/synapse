@@ -1,1 +1,1 @@
-Add push rule for jitsi conferences
+Add push rule for jitsi conferences.
