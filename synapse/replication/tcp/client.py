@@ -154,8 +154,7 @@ class ReplicationDataHandler:
                 max_token = self.store.get_room_max_stream_ordering()
                 self.notifier.on_new_room_event(event, token, max_token, extra_users)
 
-            max_token = self.store.get_room_max_stream_ordering()
-            await self.pusher_pool.on_new_notifications(max_token)
+            await self.pusher_pool.on_new_notifications(token, token)
 
         # Notify any waiting deferreds. The list is ordered by position so we
         # just iterate through the list until we reach a position that is
