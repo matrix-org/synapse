@@ -93,13 +93,11 @@ class PerDestinationQueue:
         self.transmission_loop_running = False
 
         # True whilst we are sending events that the remote homeserver missed
-        # because it was unreachable.
-        # False whilst we are known to not be catching up.
-        # None when it has not been determined if we are catching-up yet (we
-        # do so lazily).
+        # because it was unreachable. We start in this state so we can perform
+        # catch-up at startup.
         # New events will only be sent once this is finished, at which point
         # _catching_up is flipped to False.
-        self._catching_up = None  # type: Optional[bool]
+        self._catching_up = True  # type: bool
 
         # The stream_ordering of the most recent PDU that was discarded due to
         # being in catch-up mode, or None if not applicable.
@@ -155,9 +153,9 @@ class PerDestinationQueue:
         Args:
             pdu: pdu to send
         """
-        if not self._catching_up:
+        if not self._catching_up or self._last_successful_stream_ordering is None:
             # only enqueue the PDU if we are not catching up (False) or do not
-            # yet know if we are to catch up (None)
+            # yet know if we have anything to catch up (None)
             self._pending_pdus.append(pdu)
         else:
             self._catchup_last_skipped = pdu.internal_metadata.stream_ordering
@@ -241,7 +239,7 @@ class PerDestinationQueue:
             # hence why we throw the result away.
             await get_retry_limiter(self._destination, self._clock, self._store)
 
-            if self._catching_up is None or self._catching_up is True:
+            if self._catching_up:
                 # we potentially need to catch-up first
                 await self._catch_up_transmission_loop()
                 if self._catching_up:
@@ -436,8 +434,10 @@ class PerDestinationQueue:
             self.transmission_loop_running = False
 
     async def _catch_up_transmission_loop(self) -> None:
-        if self._last_successful_stream_ordering is None:
-            # first catch-up, so get from database
+        first_catch_up_check = self._last_successful_stream_ordering is None
+
+        if first_catch_up_check:
+            # first catchup so get last_successful_stream_ordering from database
             self._last_successful_stream_ordering = await self._store.get_destination_last_successful_stream_ordering(
                 self._destination
             )
@@ -474,9 +474,10 @@ class PerDestinationQueue:
                 self._catching_up = False
                 break
 
-            if self._catching_up is None:
-                # we didn't know if we're in catch-up mode yet but now we know
-                # we are — so mark us as in catch-up mode and drop the queue.
+            if first_catch_up_check:
+                # as this is our check for needing catch-up, we may have PDUs in
+                # the queue from before we *knew* we had to do catch-up, so
+                # clear those out now.
                 self._start_catching_up()
 
             # fetch the relevant events from the event store
