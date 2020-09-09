@@ -88,7 +88,7 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
-Upgrading to v1.20.0
+Upgrading to v1.21.0
 ====================
 
 New HTML templates
