@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Tuple
 
 from twisted.web.http import Request
 
-from synapse.api.errors import SynapseError, ThreepidValidationError
+from synapse.api.errors import ThreepidValidationError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.server import DirectServeHtmlResource
 from synapse.http.servlet import parse_string
@@ -50,20 +50,20 @@ class PasswordResetSubmitTokenResource(DirectServeHtmlResource):
         self._local_threepid_handling_disabled_due_to_email_config = (
             hs.config.local_threepid_handling_disabled_due_to_email_config
         )
-        self._threepid_behaviour_email = hs.config.threepid_behaviour_email
-        if self._threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            self._confirmation_email_template = (
-                hs.config.email_password_reset_template_confirmation_html
-            )
-            self._email_password_reset_template_success_html = (
-                hs.config.email_password_reset_template_success_html_content
-            )
-            self._failure_email_template = (
-                hs.config.email_password_reset_template_failure_html
-            )
+        self._confirmation_email_template = (
+            hs.config.email_password_reset_template_confirmation_html
+        )
+        self._email_password_reset_template_success_html = (
+            hs.config.email_password_reset_template_success_html_content
+        )
+        self._failure_email_template = (
+            hs.config.email_password_reset_template_failure_html
+        )
+
+        # This resource should not be mounted if threepid behaviour is not LOCAL
+        assert hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL
 
     async def _async_render_GET(self, request: Request) -> Tuple[int, bytes]:
-        self._check_threepid_behaviour()
         sid = parse_string(request, "sid", required=True)
         token = parse_string(request, "token", required=True)
         client_secret = parse_string(request, "client_secret", required=True)
@@ -82,7 +82,6 @@ class PasswordResetSubmitTokenResource(DirectServeHtmlResource):
         )
 
     async def _async_render_POST(self, request: Request) -> Tuple[int, bytes]:
-        self._check_threepid_behaviour()
         sid = parse_string(request, "sid", required=True)
         token = parse_string(request, "token", required=True)
         client_secret = parse_string(request, "client_secret", required=True)
@@ -112,7 +111,9 @@ class PasswordResetSubmitTokenResource(DirectServeHtmlResource):
                     )
 
             # Otherwise show the success template
-            html_bytes = self._email_password_reset_template_success_html.encode("utf-8")
+            html_bytes = self._email_password_reset_template_success_html.encode(
+                "utf-8"
+            )
             status_code = 200
         except ThreepidValidationError as e:
             status_code = e.code
@@ -124,25 +125,3 @@ class PasswordResetSubmitTokenResource(DirectServeHtmlResource):
             )
 
         return status_code, html_bytes
-
-    def _check_threepid_behaviour(self):
-        """
-        Ensure that ThreepidBehaviour is set to LOCAL, and handle cases where it is not
-
-        Raises:
-            SynapseError: if threepid_behaviour_email is not set to LOCAL
-        """
-        # We currently only handle threepid token submissions for email
-        if self._threepid_behaviour_email == ThreepidBehaviour.OFF:
-            if self._local_threepid_handling_disabled_due_to_email_config:
-                logger.warning(
-                    "Password reset emails have been disabled due to lack of an email config"
-                )
-            raise SynapseError(
-                400, "Email-based password resets are disabled on this server"
-            )
-        elif self._threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-            raise SynapseError(
-                400,
-                "Password resets for this homeserver are handled by a separate program",
-            )
