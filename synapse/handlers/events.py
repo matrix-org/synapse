@@ -39,10 +39,6 @@ class EventStreamHandler(BaseHandler):
     def __init__(self, hs: "HomeServer"):
         super(EventStreamHandler, self).__init__(hs)
 
-        self.distributor = hs.get_distributor()
-        self.distributor.declare("started_user_eventstream")
-        self.distributor.declare("stopped_user_eventstream")
-
         self.clock = hs.get_clock()
 
         self.notifier = hs.get_notifier()
