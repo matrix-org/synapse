@@ -474,12 +474,13 @@ class MediaRepository:
 
         try:
             thumbnailer = Thumbnailer(input_path)
-        except ThumbnailError:
+        except ThumbnailError as e:
             logger.warning(
-                "Unable to generate a thumbnail for local media %s using a method of %s and type of %s",
+                "Unable to generate a thumbnail for local media %s using a method of %s and type of %s: %s",
                 media_id,
                 t_method,
                 t_type,
+                e,
             )
             return None
 
@@ -541,13 +542,14 @@ class MediaRepository:
 
         try:
             thumbnailer = Thumbnailer(input_path)
-        except ThumbnailError:
+        except ThumbnailError as e:
             logger.warning(
-                "Unable to generate a thumbnail for remote media %s from %s using a method of %s and type of %s",
+                "Unable to generate a thumbnail for remote media %s from %s using a method of %s and type of %s: %s",
                 media_id,
                 server_name,
                 t_method,
                 t_type,
+                e,
             )
             return None
 
@@ -632,12 +634,13 @@ class MediaRepository:
 
         try:
             thumbnailer = Thumbnailer(input_path)
-        except ThumbnailError:
+        except ThumbnailError as e:
             logger.warning(
-                "Unable to generate thumbnails for remote media %s from %s using a method of %s and type of %s",
+                "Unable to generate thumbnails for remote media %s from %s using a method of %s and type of %s: %s",
                 media_id,
                 server_name,
                 media_type,
+                e,
             )
             return None
 
