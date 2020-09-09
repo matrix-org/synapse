@@ -275,30 +275,30 @@ class Notifier:
         """
         pending = self.pending_new_room_events
         self.pending_new_room_events = []
+
+        users = set()  # type: Set[Union[str, UserID]]
+        rooms = set()  # type: Set[str]
+
         for room_stream_id, event, extra_users in pending:
             if room_stream_id > max_room_stream_id:
                 self.pending_new_room_events.append(
                     (room_stream_id, event, extra_users)
                 )
             else:
-                self._on_new_room_event(event, max_room_stream_id, extra_users)
+                if (
+                    event.type == EventTypes.Member
+                    and event.membership == Membership.JOIN
+                ):
+                    self._user_joined_room(event.state_key, event.room_id)
 
-        self._on_updated_room_token(max_room_stream_id)
+                users.update(extra_users)
+                rooms.add(event.room_id)
 
-    def _on_new_room_event(
-        self,
-        event: EventBase,
-        max_room_stream_id: int,
-        extra_users: Collection[Union[str, UserID]] = [],
-    ):
-        """Notify any user streams that are interested in this room event"""
-
-        if event.type == EventTypes.Member and event.membership == Membership.JOIN:
-            self._user_joined_room(event.state_key, event.room_id)
-
-        self.on_new_event(
-            "room_key", max_room_stream_id, users=extra_users, rooms=[event.room_id]
-        )
+        if users or rooms:
+            self.on_new_event(
+                "room_key", max_room_stream_id, users=extra_users, rooms=[event.room_id]
+            )
+            self._on_updated_room_token(max_room_stream_id)
 
     def _on_updated_room_token(self, max_room_stream_id: int):
         """Poke services that might care that the room position has been
