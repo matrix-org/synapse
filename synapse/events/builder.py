@@ -36,7 +36,7 @@ from synapse.util.stringutils import random_string
 
 
 @attr.s(slots=True, cmp=False, frozen=True)
-class EventBuilder(object):
+class EventBuilder:
     """A format independent event builder used to build up the event content
     before signing the event.
 
@@ -164,7 +164,7 @@ class EventBuilder(object):
         )
 
 
-class EventBuilderFactory(object):
+class EventBuilderFactory:
     def __init__(self, hs):
         self.clock = hs.get_clock()
         self.hostname = hs.hostname

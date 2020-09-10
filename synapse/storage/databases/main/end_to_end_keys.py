@@ -17,13 +17,15 @@
 import abc
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
 
+import attr
 from canonicaljson import encode_canonical_json
 
 from twisted.enterprise.adbapi import Connection
 
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.database import LoggingTransaction, make_in_list_sql_clause
+from synapse.storage.database import make_in_list_sql_clause
+from synapse.storage.types import Cursor
 from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
@@ -31,6 +33,18 @@ from synapse.util.iterutils import batch_iter
 
 if TYPE_CHECKING:
     from synapse.handlers.e2e_keys import SignatureListItem
+
+
+@attr.s
+class DeviceKeyLookupResult:
+    """The type returned by get_e2e_device_keys_and_signatures"""
+
+    display_name = attr.ib(type=Optional[str])
+
+    # the key data from e2e_device_keys_json. Typically includes fields like
+    # "algorithm", "keys" (including the curve25519 identity key and the ed25519 signing
+    # key) and "signatures" (a map from (user id) to (key id/device_id) to signature.)
+    keys = attr.ib(type=Optional[JsonDict])
 
 
 class EndToEndKeyWorkerStore(SQLBaseStore):
@@ -42,18 +56,9 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         Returns:
             (stream_id, devices)
         """
-        return await self.db_pool.runInteraction(
-            "get_e2e_device_keys_for_federation_query",
-            self._get_e2e_device_keys_for_federation_query_txn,
-            user_id,
-        )
-
-    def _get_e2e_device_keys_for_federation_query_txn(
-        self, txn: LoggingTransaction, user_id: str
-    ) -> Tuple[int, List[JsonDict]]:
         now_stream_id = self.get_device_stream_token()
 
-        devices = self._get_e2e_device_keys_and_signatures_txn(txn, [(user_id, None)])
+        devices = await self.get_e2e_device_keys_and_signatures([(user_id, None)])
 
         if devices:
             user_devices = devices[user_id]
@@ -61,17 +66,11 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             for device_id, device in user_devices.items():
                 result = {"device_id": device_id}
 
-                key_json = device.get("key_json", None)
-                if key_json:
-                    result["keys"] = db_to_json(key_json)
+                keys = device.keys
+                if keys:
+                    result["keys"] = keys
 
-                    if "signatures" in device:
-                        for sig_user_id, sigs in device["signatures"].items():
-                            result["keys"].setdefault("signatures", {}).setdefault(
-                                sig_user_id, {}
-                            ).update(sigs)
-
-                device_display_name = device.get("device_display_name", None)
+                device_display_name = device.display_name
                 if device_display_name:
                     result["device_display_name"] = device_display_name
 
@@ -97,11 +96,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         if not query_list:
             return {}
 
-        results = await self.db_pool.runInteraction(
-            "get_e2e_device_keys_and_signatures_txn",
-            self._get_e2e_device_keys_and_signatures_txn,
-            query_list,
-        )
+        results = await self.get_e2e_device_keys_and_signatures(query_list)
 
         # Build the result structure, un-jsonify the results, and add the
         # "unsigned" section
@@ -109,31 +104,95 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         for user_id, device_keys in results.items():
             rv[user_id] = {}
             for device_id, device_info in device_keys.items():
-                r = db_to_json(device_info.pop("key_json"))
+                r = device_info.keys
                 r["unsigned"] = {}
-                display_name = device_info["device_display_name"]
+                display_name = device_info.display_name
                 if display_name is not None:
                     r["unsigned"]["device_display_name"] = display_name
-                if "signatures" in device_info:
-                    for sig_user_id, sigs in device_info["signatures"].items():
-                        r.setdefault("signatures", {}).setdefault(
-                            sig_user_id, {}
-                        ).update(sigs)
                 rv[user_id][device_id] = r
 
         return rv
 
     @trace
-    def _get_e2e_device_keys_and_signatures_txn(
-        self, txn, query_list, include_all_devices=False, include_deleted_devices=False
-    ) -> Dict[str, Dict[str, Optional[Dict]]]:
+    async def get_e2e_device_keys_and_signatures(
+        self,
+        query_list: List[Tuple[str, Optional[str]]],
+        include_all_devices: bool = False,
+        include_deleted_devices: bool = False,
+    ) -> Dict[str, Dict[str, Optional[DeviceKeyLookupResult]]]:
+        """Fetch a list of device keys
+
+        Any cross-signatures made on the keys by the owner of the device are also
+        included.
+
+        The cross-signatures are added to the `signatures` field within the `keys`
+        object in the response.
+
+        Args:
+            query_list: List of pairs of user_ids and device_ids. Device id can be None
+                to indicate "all devices for this user"
+
+            include_all_devices: whether to return devices without device keys
+
+            include_deleted_devices: whether to include null entries for
+                devices which no longer exist (but were in the query_list).
+                This option only takes effect if include_all_devices is true.
+
+        Returns:
+            Dict mapping from user-id to dict mapping from device_id to
+            key data.
+        """
         set_tag("include_all_devices", include_all_devices)
         set_tag("include_deleted_devices", include_deleted_devices)
 
+        result = await self.db_pool.runInteraction(
+            "get_e2e_device_keys",
+            self._get_e2e_device_keys_txn,
+            query_list,
+            include_all_devices,
+            include_deleted_devices,
+        )
+
+        # get the (user_id, device_id) tuples to look up cross-signatures for
+        signature_query = (
+            (user_id, device_id)
+            for user_id, dev in result.items()
+            for device_id, d in dev.items()
+            if d is not None and d.keys is not None
+        )
+
+        for batch in batch_iter(signature_query, 50):
+            cross_sigs_result = await self.db_pool.runInteraction(
+                "get_e2e_cross_signing_signatures",
+                self._get_e2e_cross_signing_signatures_for_devices_txn,
+                batch,
+            )
+
+            # add each cross-signing signature to the correct device in the result dict.
+            for (user_id, key_id, device_id, signature) in cross_sigs_result:
+                target_device_result = result[user_id][device_id]
+                target_device_signatures = target_device_result.keys.setdefault(
+                    "signatures", {}
+                )
+                signing_user_signatures = target_device_signatures.setdefault(
+                    user_id, {}
+                )
+                signing_user_signatures[key_id] = signature
+
+        log_kv(result)
+        return result
+
+    def _get_e2e_device_keys_txn(
+        self, txn, query_list, include_all_devices=False, include_deleted_devices=False
+    ) -> Dict[str, Dict[str, Optional[DeviceKeyLookupResult]]]:
+        """Get information on devices from the database
+
+        The results include the device's keys and self-signatures, but *not* any
+        cross-signing signatures which have been added subsequently (for which, see
+        get_e2e_device_keys_and_signatures)
+        """
         query_clauses = []
         query_params = []
-        signature_query_clauses = []
-        signature_query_params = []
 
         if include_all_devices is False:
             include_deleted_devices = False
@@ -144,24 +203,16 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         for (user_id, device_id) in query_list:
             query_clause = "user_id = ?"
             query_params.append(user_id)
-            signature_query_clause = "target_user_id = ?"
-            signature_query_params.append(user_id)
 
             if device_id is not None:
                 query_clause += " AND device_id = ?"
                 query_params.append(device_id)
-                signature_query_clause += " AND target_device_id = ?"
-                signature_query_params.append(device_id)
-
-            signature_query_clause += " AND user_id = ?"
-            signature_query_params.append(user_id)
 
             query_clauses.append(query_clause)
-            signature_query_clauses.append(signature_query_clause)
 
         sql = (
             "SELECT user_id, device_id, "
-            "    d.display_name AS device_display_name, "
+            "    d.display_name, "
             "    k.key_json"
             " FROM devices d"
             "    %s JOIN e2e_device_keys_json k USING (user_id, device_id)"
@@ -172,51 +223,49 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         )
 
         txn.execute(sql, query_params)
-        rows = self.db_pool.cursor_to_dict(txn)
 
-        result = {}
-        for row in rows:
+        result = {}  # type: Dict[str, Dict[str, Optional[DeviceKeyLookupResult]]]
+        for (user_id, device_id, display_name, key_json) in txn:
             if include_deleted_devices:
-                deleted_devices.remove((row["user_id"], row["device_id"]))
-            result.setdefault(row["user_id"], {})[row["device_id"]] = row
+                deleted_devices.remove((user_id, device_id))
+            result.setdefault(user_id, {})[device_id] = DeviceKeyLookupResult(
+                display_name, db_to_json(key_json) if key_json else None
+            )
 
         if include_deleted_devices:
             for user_id, device_id in deleted_devices:
                 result.setdefault(user_id, {})[device_id] = None
 
-        # get signatures on the device
-        signature_sql = ("SELECT *  FROM e2e_cross_signing_signatures WHERE %s") % (
+        return result
+
+    def _get_e2e_cross_signing_signatures_for_devices_txn(
+        self, txn: Cursor, device_query: Iterable[Tuple[str, str]]
+    ) -> List[Tuple[str, str, str, str]]:
+        """Get cross-signing signatures for a given list of devices
+
+        Returns signatures made by the owners of the devices.
+
+        Returns: a list of results; each entry in the list is a tuple of
+            (user_id, key_id, target_device_id, signature).
+        """
+        signature_query_clauses = []
+        signature_query_params = []
+
+        for (user_id, device_id) in device_query:
+            signature_query_clauses.append(
+                "target_user_id = ? AND target_device_id = ? AND user_id = ?"
+            )
+            signature_query_params.extend([user_id, device_id, user_id])
+
+        signature_sql = """
+            SELECT user_id, key_id, target_device_id, signature
+            FROM e2e_cross_signing_signatures WHERE %s
+            """ % (
             " OR ".join("(" + q + ")" for q in signature_query_clauses)
         )
 
         txn.execute(signature_sql, signature_query_params)
-        rows = self.db_pool.cursor_to_dict(txn)
-
-        # add each cross-signing signature to the correct device in the result dict.
-        for row in rows:
-            signing_user_id = row["user_id"]
-            signing_key_id = row["key_id"]
-            target_user_id = row["target_user_id"]
-            target_device_id = row["target_device_id"]
-            signature = row["signature"]
-
-            target_user_result = result.get(target_user_id)
-            if not target_user_result:
-                continue
-
-            target_device_result = target_user_result.get(target_device_id)
-            if not target_device_result:
-                # note that target_device_result will be None for deleted devices.
-                continue
-
-            target_device_signatures = target_device_result.setdefault("signatures", {})
-            signing_user_signatures = target_device_signatures.setdefault(
-                signing_user_id, {}
-            )
-            signing_user_signatures[signing_key_id] = signature
-
-        log_kv(result)
-        return result
+        return txn.fetchall()
 
     async def get_e2e_one_time_keys(
         self, user_id: str, device_id: str, key_ids: List[str]

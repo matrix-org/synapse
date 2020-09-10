@@ -28,6 +28,7 @@ from typing import (
     Optional,
     Tuple,
     TypeVar,
+    cast,
     overload,
 )
 
@@ -35,7 +36,6 @@ from prometheus_client import Histogram
 from typing_extensions import Literal
 
 from twisted.enterprise import adbapi
-from twisted.internet import defer
 
 from synapse.api.errors import StoreError
 from synapse.config.database import DatabaseConnectionConfig
@@ -248,7 +248,7 @@ class LoggingTransaction:
         self.txn.close()
 
 
-class PerformanceCounters(object):
+class PerformanceCounters:
     def __init__(self):
         self.current_counters = {}
         self.previous_counters = {}
@@ -286,7 +286,7 @@ class PerformanceCounters(object):
 R = TypeVar("R")
 
 
-class DatabasePool(object):
+class DatabasePool:
     """Wraps a single physical database and connection pool.
 
     A single database may be used by multiple data stores.
@@ -507,8 +507,9 @@ class DatabasePool(object):
             self._txn_perf_counters.update(desc, duration)
             sql_txn_timer.labels(desc).observe(duration)
 
-    @defer.inlineCallbacks
-    def runInteraction(self, desc: str, func: Callable, *args: Any, **kwargs: Any):
+    async def runInteraction(
+        self, desc: str, func: "Callable[..., R]", *args: Any, **kwargs: Any
+    ) -> R:
         """Starts a transaction on the database and runs a given function
 
         Arguments:
@@ -521,7 +522,7 @@ class DatabasePool(object):
             kwargs: named args to pass to `func`
 
         Returns:
-            Deferred: The result of func
+            The result of func
         """
         after_callbacks = []  # type: List[_CallbackListEntry]
         exception_callbacks = []  # type: List[_CallbackListEntry]
@@ -530,16 +531,14 @@ class DatabasePool(object):
             logger.warning("Starting db txn '%s' from sentinel context", desc)
 
         try:
-            result = yield defer.ensureDeferred(
-                self.runWithConnection(
-                    self.new_transaction,
-                    desc,
-                    after_callbacks,
-                    exception_callbacks,
-                    func,
-                    *args,
-                    **kwargs
-                )
+            result = await self.runWithConnection(
+                self.new_transaction,
+                desc,
+                after_callbacks,
+                exception_callbacks,
+                func,
+                *args,
+                **kwargs
             )
 
             for after_callback, after_args, after_kwargs in after_callbacks:
@@ -549,7 +548,7 @@ class DatabasePool(object):
                 after_callback(*after_args, **after_kwargs)
             raise
 
-        return result
+        return cast(R, result)
 
     async def runWithConnection(
         self, func: "Callable[..., R]", *args: Any, **kwargs: Any
@@ -603,6 +602,18 @@ class DatabasePool(object):
         col_headers = [intern(str(column[0])) for column in cursor.description]
         results = [dict(zip(col_headers, row)) for row in cursor]
         return results
+
+    @overload
+    async def execute(
+        self, desc: str, decoder: Literal[None], query: str, *args: Any
+    ) -> List[Tuple[Any, ...]]:
+        ...
+
+    @overload
+    async def execute(
+        self, desc: str, decoder: Callable[[Cursor], R], query: str, *args: Any
+    ) -> R:
+        ...
 
     async def execute(
         self,
@@ -941,7 +952,7 @@ class DatabasePool(object):
         key_names: Collection[str],
         key_values: Collection[Iterable[Any]],
         value_names: Collection[str],
-        value_values: Iterable[Iterable[str]],
+        value_values: Iterable[Iterable[Any]],
     ) -> None:
         """
         Upsert, many times.
@@ -970,7 +981,7 @@ class DatabasePool(object):
         key_names: Iterable[str],
         key_values: Collection[Iterable[Any]],
         value_names: Collection[str],
-        value_values: Iterable[Iterable[str]],
+        value_values: Iterable[Iterable[Any]],
     ) -> None:
         """
         Upsert, many times, but without native UPSERT support or batching.
@@ -1088,11 +1099,33 @@ class DatabasePool(object):
             desc, self.simple_select_one_txn, table, keyvalues, retcols, allow_none
         )
 
+    @overload
     async def simple_select_one_onecol(
         self,
         table: str,
         keyvalues: Dict[str, Any],
-        retcol: Iterable[str],
+        retcol: str,
+        allow_none: Literal[False] = False,
+        desc: str = "simple_select_one_onecol",
+    ) -> Any:
+        ...
+
+    @overload
+    async def simple_select_one_onecol(
+        self,
+        table: str,
+        keyvalues: Dict[str, Any],
+        retcol: str,
+        allow_none: Literal[True] = True,
+        desc: str = "simple_select_one_onecol",
+    ) -> Optional[Any]:
+        ...
+
+    async def simple_select_one_onecol(
+        self,
+        table: str,
+        keyvalues: Dict[str, Any],
+        retcol: str,
         allow_none: bool = False,
         desc: str = "simple_select_one_onecol",
     ) -> Optional[Any]:
@@ -1116,13 +1149,37 @@ class DatabasePool(object):
             allow_none=allow_none,
         )
 
+    @overload
     @classmethod
     def simple_select_one_onecol_txn(
         cls,
         txn: LoggingTransaction,
         table: str,
         keyvalues: Dict[str, Any],
-        retcol: Iterable[str],
+        retcol: str,
+        allow_none: Literal[False] = False,
+    ) -> Any:
+        ...
+
+    @overload
+    @classmethod
+    def simple_select_one_onecol_txn(
+        cls,
+        txn: LoggingTransaction,
+        table: str,
+        keyvalues: Dict[str, Any],
+        retcol: str,
+        allow_none: Literal[True] = True,
+    ) -> Optional[Any]:
+        ...
+
+    @classmethod
+    def simple_select_one_onecol_txn(
+        cls,
+        txn: LoggingTransaction,
+        table: str,
+        keyvalues: Dict[str, Any],
+        retcol: str,
         allow_none: bool = False,
     ) -> Optional[Any]:
         ret = cls.simple_select_onecol_txn(
@@ -1139,10 +1196,7 @@ class DatabasePool(object):
 
     @staticmethod
     def simple_select_onecol_txn(
-        txn: LoggingTransaction,
-        table: str,
-        keyvalues: Dict[str, Any],
-        retcol: Iterable[str],
+        txn: LoggingTransaction, table: str, keyvalues: Dict[str, Any], retcol: str,
     ) -> List[Any]:
         sql = ("SELECT %(retcol)s FROM %(table)s") % {"retcol": retcol, "table": table}
 

@@ -1,1 +1,0 @@
-Make `MultiWriterIDGenerator` work for streams that use negative values.

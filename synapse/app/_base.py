@@ -349,7 +349,7 @@ def install_dns_limiter(reactor, max_dns_requests_in_flight=100):
     reactor.installNameResolver(new_resolver)
 
 
-class _LimitedHostnameResolver(object):
+class _LimitedHostnameResolver:
     """Wraps a IHostnameResolver, limiting the number of in-flight DNS lookups.
     """
 
@@ -409,7 +409,7 @@ class _LimitedHostnameResolver(object):
             yield deferred
 
 
-class _DeferredResolutionReceiver(object):
+class _DeferredResolutionReceiver:
     """Wraps a IResolutionReceiver and simply resolves the given deferred when
     resolution is complete
     """

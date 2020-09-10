@@ -43,7 +43,7 @@ from synapse.util.retryutils import NotRetryingDestination
 logger = logging.getLogger(__name__)
 
 
-class E2eKeysHandler(object):
+class E2eKeysHandler:
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.federation = hs.get_federation_client()
@@ -1212,7 +1212,7 @@ class SignatureListItem:
     signature = attr.ib()
 
 
-class SigningKeyEduUpdater(object):
+class SigningKeyEduUpdater:
     """Handles incoming signing key updates from federation and updates the DB"""
 
     def __init__(self, hs, e2e_keys_handler):

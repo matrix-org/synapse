@@ -68,7 +68,7 @@ def count(func: Callable[[T], bool], it: Iterable[T]) -> int:
     return n
 
 
-class _NotificationListener(object):
+class _NotificationListener:
     """ This represents a single client connection to the events stream.
     The events stream handler will have yielded to the deferred, so to
     notify the handler it is sufficient to resolve the deferred.
@@ -80,7 +80,7 @@ class _NotificationListener(object):
         self.deferred = deferred
 
 
-class _NotifierUserStream(object):
+class _NotifierUserStream:
     """This represents a user connected to the event stream.
     It tracks the most recent stream token for that user.
     At a given point a user may have a number of streams listening for
@@ -168,7 +168,7 @@ class EventStreamResult(namedtuple("EventStreamResult", ("events", "tokens"))):
     __bool__ = __nonzero__  # python3
 
 
-class Notifier(object):
+class Notifier:
     """ This class is responsible for notifying any listeners when there are
     new events available for it.
 
@@ -432,8 +432,9 @@ class Notifier(object):
         If explicit_room_id is set, that room will be polled for events only if
         it is world readable or the user has joined the room.
         """
-        from_token = pagination_config.from_token
-        if not from_token:
+        if pagination_config.from_token:
+            from_token = pagination_config.from_token
+        else:
             from_token = self.event_sources.get_current_token()
 
         limit = pagination_config.limit

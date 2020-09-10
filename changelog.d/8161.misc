@@ -1,1 +1,0 @@
-Refactor `StreamIdGenerator` and `MultiWriterIdGenerator` to have the same interface.

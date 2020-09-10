@@ -13,11 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import logging
 import re
 
 import attr
-from canonicaljson import json
 
 from twisted.internet import defer, task
 
@@ -46,7 +46,7 @@ def unwrapFirstError(failure):
 
 
 @attr.s
-class Clock(object):
+class Clock:
     """
     A Clock wraps a Twisted reactor and provides utilities on top of it.
 

@@ -1,3 +1,16 @@
+Upgrading to v1.20.0
+====================
+
+Shared rooms endpoint (MSC2666)
+-------------------------------
+
+This release contains a new unstable endpoint `/_matrix/client/unstable/uk.half-shot.msc2666/user/shared_rooms/.*`
+for fetching rooms one user has in common with another. This feature requires the
+`update_user_directory` config flag to be `True`. If you are you are using a `synapse.app.user_dir`
+worker, requests to this endpoint must be handled by that worker.
+See `docs/workers.md <docs/workers.md>`_ for more details.
+
+
 Upgrading Synapse
 =================
 
@@ -92,6 +105,27 @@ Additionally, note that the `Synapse worker documentation
  state that the ``/_synapse/client/password_reset/email/submit_token`` endpoint can be handled
 by all workers. If you make use of Synapse's worker feature, please update your reverse proxy
 configuration to reflect this change.
+
+New HTML templates
+------------------
+
+A new HTML template,
+`password_reset_confirmation.html <https://github.com/matrix-org/synapse/blob/develop/synapse/res/templates/password_reset_confirmation.html>`_,
+has been added to the ``synapse/res/templates`` directory. If you are using a
+custom template directory, you may want to copy the template over and modify it.
+
+Note that as of v1.20.0, templates do not need to be included in custom template
+directories for Synapse to start. The default templates will be used if a custom
+template cannot be found.
+
+This page will appear to the user after clicking a password reset link that has
+been emailed to them.
+
+To complete password reset, the page must include a way to make a `POST`
+request to
+``/_synapse/client/password_reset/{medium}/submit_token``
+with the query parameters from the original link, presented as a URL-encoded form. See the file
+itself for more details.
 
 Upgrading to v1.18.0
 ====================

@@ -49,14 +49,14 @@ data part are:
 
 
 @attr.s(slots=True, frozen=True)
-class EventsStreamRow(object):
+class EventsStreamRow:
     """A parsed row from the events replication stream"""
 
     type = attr.ib()  # str: the TypeId of one of the *EventsStreamRows
     data = attr.ib()  # BaseEventsStreamRow
 
 
-class BaseEventsStreamRow(object):
+class BaseEventsStreamRow:
     """Base class for rows to be sent in the events stream.
 
     Specifies how to identify, serialize and deserialize the different types.
