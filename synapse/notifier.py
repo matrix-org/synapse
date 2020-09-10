@@ -294,9 +294,7 @@ class Notifier:
                 rooms.add(event.room_id)
 
         if users or rooms:
-            self.on_new_event(
-                "room_key", max_room_stream_id, users=extra_users, rooms=[event.room_id]
-            )
+            self.on_new_event("room_key", max_room_stream_id, users=users, rooms=rooms)
             self._on_updated_room_token(max_room_stream_id)
 
     def _on_updated_room_token(self, max_room_stream_id: int):
