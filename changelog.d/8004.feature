@@ -1,0 +1,1 @@
+Require the user to confirm that their password should be reset after clicking the email confirmation link.
