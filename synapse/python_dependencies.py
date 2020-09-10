@@ -53,8 +53,7 @@ REQUIREMENTS = [
     # Twisted 18.9 introduces some logger improvements that the structured
     # logger utilises
     "Twisted>=18.9.0",
-    # treq 18.6.0 allows customization of the json decoder.
-    "treq>=18.6.0",
+    "treq>=15.1",
     # Twisted has required pyopenssl 16.0 since about Twisted 16.6.
     "pyopenssl>=16.0.0",
     "pyyaml>=3.11",
