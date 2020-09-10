@@ -25,7 +25,6 @@ from typing import (
     Set,
     Tuple,
     TypeVar,
-    Union,
 )
 
 from prometheus_client import Counter
@@ -187,7 +186,7 @@ class Notifier:
         self.store = hs.get_datastore()
         self.pending_new_room_events = (
             []
-        )  # type: List[Tuple[int, EventBase, Collection[Union[str, UserID]]]]
+        )  # type: List[Tuple[int, EventBase, Collection[UserID]]]
 
         # Called when there are new things to stream over replication
         self.replication_callbacks = []  # type: List[Callable[[], None]]
@@ -248,7 +247,7 @@ class Notifier:
         event: EventBase,
         room_stream_id: int,
         max_room_stream_id: int,
-        extra_users: Collection[Union[str, UserID]] = [],
+        extra_users: Collection[UserID] = [],
     ):
         """ Used by handlers to inform the notifier something has happened
         in the room, room event wise.
@@ -276,7 +275,7 @@ class Notifier:
         pending = self.pending_new_room_events
         self.pending_new_room_events = []
 
-        users = set()  # type: Set[Union[str, UserID]]
+        users = set()  # type: Set[UserID]
         rooms = set()  # type: Set[str]
 
         for room_stream_id, event, extra_users in pending:
@@ -333,7 +332,7 @@ class Notifier:
         self,
         stream_key: str,
         new_token: int,
-        users: Collection[Union[str, UserID]] = [],
+        users: Collection[UserID] = [],
         rooms: Collection[str] = [],
     ):
         """ Used to inform listeners that something has happened event wise.
