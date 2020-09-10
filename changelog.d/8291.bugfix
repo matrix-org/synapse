@@ -1,0 +1,1 @@
+Fix a bug introduced in v1.20.0rc1 that the wrong exception was raised when invalid JSON data is encountered.

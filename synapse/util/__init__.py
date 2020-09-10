@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 def _reject_invalid_json(val):
     """Do not allow Infinity, -Infinity, or NaN values in JSON."""
-    raise json.JSONDecodeError("Invalid JSON value: '%s'" % val)
+    raise ValueError("Invalid JSON value: '%s'" % val)
 
 
 # Create a custom encoder to reduce the whitespace produced by JSON encoding and
