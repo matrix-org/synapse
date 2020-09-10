@@ -495,6 +495,21 @@ class StreamToken:
 StreamToken.START = StreamToken.from_string("s0_0")
 
 
+@attr.s(slots=True, frozen=True)
+class PersistedEventPosition:
+    """Position of a newly persisted event with instance that persisted it.
+
+    This can be used to test whether the event is persisted before or after a
+    RoomStreamToken.
+    """
+
+    instance_name = attr.ib(type=str)
+    stream = attr.ib(type=int)
+
+    def persisted_after(self, token: RoomStreamToken) -> bool:
+        return token.stream < self.stream
+
+
 class ThirdPartyInstanceID(
     namedtuple("ThirdPartyInstanceID", ("appservice_id", "network_id"))
 ):
