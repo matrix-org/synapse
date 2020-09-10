@@ -133,6 +133,25 @@ class RoomWorkerStore(SQLBaseStore):
             desc="get_public_room_ids",
         )
 
+    async def get_room_is_public(self, room_id: str) -> bool:
+        """Returns whether a given room is public.
+
+        Args:
+            room_id: The ID of the room.
+
+        Returns:
+            Whether the room is public.
+        """
+        row = await self.db_pool.simple_select_onecol(
+            table="rooms",
+            keyvalues={"room_id": room_id},
+            retcol="is_public",
+            desc="get_room_is_public",
+        )
+        if row:
+            return bool(row[0])
+        return False
+
     async def count_public_rooms(
         self,
         network_tuple: Optional[ThirdPartyInstanceID],
