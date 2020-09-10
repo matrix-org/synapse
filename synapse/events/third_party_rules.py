@@ -12,10 +12,43 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Dict, Tuple
 
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.types import Requester
+
+
+class PublicRoomsManager:
+    def __init__(self, hs):
+        self._store = hs.get_datastore()
+
+    async def room_is_in_public_directory(self, room_id: str) -> bool:
+        """Checks whether a room is in the public rooms directory.
+
+        Args:
+            room_id: The ID of the room.
+
+        Returns:
+            Whether the room is in the public rooms directory.
+        """
+        return await self._store.get_room_is_public(room_id)
+
+    async def add_room_to_public_directory(self, room_id: str) -> None:
+        """Publishes a room to the public rooms directory.
+
+        Args:
+            room_id: The ID of the room.
+        """
+        await self._store.set_room_is_public(room_id, True)
+
+    async def remove_room_from_public_directory(self, room_id: str) -> None:
+        """Removes a room from the public rooms directory.
+
+        Args:
+            room_id: The ID of the room.
+        """
+        await self._store.set_room_is_public(room_id, False)
 
 
 class ThirdPartyEventRules:
@@ -38,7 +71,9 @@ class ThirdPartyEventRules:
 
         if module is not None:
             self.third_party_rules = module(
-                config=config, http_client=hs.get_simple_http_client()
+                config=config,
+                http_client=hs.get_simple_http_client(),
+                public_room_manager=PublicRoomsManager(hs),
             )
 
     async def check_event_allowed(
@@ -106,6 +141,44 @@ class ThirdPartyEventRules:
         if self.third_party_rules is None:
             return True
 
+        state_events = await self._get_state_events_dict_for_room(room_id)
+
+        ret = await self.third_party_rules.check_threepid_can_be_invited(
+            medium, address, state_events
+        )
+        return ret
+
+    async def check_room_can_be_added_to_public_rooms_directory(
+        self, room_id: str
+    ) -> bool:
+        """Check if a room is allowed to be published to the public rooms directory.
+
+        Args:
+            room_id: The ID of the room.
+
+        Returns:
+            Whether the room is allowed to be published to the public rooms directory.
+        """
+        if self.third_party_rules is None:
+            return True
+
+        state_events = await self._get_state_events_dict_for_room(room_id)
+
+        return await self.third_party_rules.check_room_can_be_added_to_public_rooms_directory(
+            room_id, state_events
+        )
+
+    async def _get_state_events_dict_for_room(
+        self, room_id: str
+    ) -> Dict[Tuple[str, str], EventBase]:
+        """Given a room ID, return the state events of that room.
+
+        Args:
+            room_id: The ID of the room.
+
+        Returns:
+            A dict mapping (event type, state key) to state event.
+        """
         state_ids = await self.store.get_filtered_current_state_ids(room_id)
         room_state_events = await self.store.get_events(state_ids.values())
 
@@ -113,7 +186,4 @@ class ThirdPartyEventRules:
         for key, event_id in state_ids.items():
             state_events[key] = room_state_events[event_id]
 
-        ret = await self.third_party_rules.check_threepid_can_be_invited(
-            medium, address, state_events
-        )
-        return ret
+        return state_events
