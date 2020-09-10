@@ -1,3 +1,20 @@
+Upgrading to v1.21.0
+====================
+
+Updated Single Sign-on HTML Templates
+-------------------------------------
+
+The ``saml_error.html`` template was removed from Synapse and replaced with the
+``sso_error.html`` template. If your Synapse is configured to use SAML and a
+custom ``sso_redirect_confirm_template_dir`` configuration then the
+``saml_error.html`` template will need to be renamed to ``sso_error.html`` and
+updated:
+
+* The ``msg`` parameter should be renamed to ``error_description``.
+* There is no longer a ``code`` parameter for the response code.
+* A string ``error`` parameter is available that includes a short hint of why a
+  user is seeing the error page.
+
 Upgrading to v1.20.0
 ====================
 
