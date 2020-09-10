@@ -683,13 +683,20 @@ class RoomCreationHandler(BaseHandler):
 
         directory_handler = self.hs.get_handlers().directory_handler
         if room_alias:
-            await directory_handler.create_association(
-                requester=requester,
-                room_id=room_id,
-                room_alias=room_alias,
-                servers=[self.hs.hostname],
-                check_membership=False,
+            # Check if publishing is blocked by a third party module
+            allowed_by_third_party_rules = await (
+                self.third_party_event_rules.check_room_can_be_added_to_public_rooms_directory(
+                    room_id
+                )
             )
+            if allowed_by_third_party_rules:
+                await directory_handler.create_association(
+                    requester=requester,
+                    room_id=room_id,
+                    room_alias=room_alias,
+                    servers=[self.hs.hostname],
+                    check_membership=False,
+                )
 
         if is_public:
             if not self.config.is_publishing_room_allowed(user_id, room_id, room_alias):
