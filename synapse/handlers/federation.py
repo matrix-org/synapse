@@ -128,7 +128,6 @@ class FederationHandler(BaseHandler):
         self.keyring = hs.get_keyring()
         self.action_generator = hs.get_action_generator()
         self.is_mine_id = hs.is_mine_id
-        self.pusher_pool = hs.get_pusherpool()
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
         self._message_handler = hs.get_message_handler()
@@ -2938,8 +2937,6 @@ class FederationHandler(BaseHandler):
         self.notifier.on_new_room_event(
             event, event_stream_id, max_stream_id, extra_users=extra_users
         )
-
-        await self.pusher_pool.on_new_notifications(max_stream_id)
 
     async def _clean_room_for_join(self, room_id: str) -> None:
         """Called to clean up any data in DB for a given room, ready for the

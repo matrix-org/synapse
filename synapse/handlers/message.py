@@ -387,8 +387,6 @@ class EventCreationHandler:
         # This is only used to get at ratelimit function, and maybe_kick_guest_users
         self.base_handler = BaseHandler(hs)
 
-        self.pusher_pool = hs.get_pusherpool()
-
         # We arbitrarily limit concurrent event creation for a room to 5.
         # This is to stop us from diverging history *too* much.
         self.limiter = Linearizer(max_count=5, name="room_event_creation_limit")
@@ -1144,8 +1142,6 @@ class EventCreationHandler:
         if self._ephemeral_events_enabled:
             # If there's an expiry timestamp on the event, schedule its expiry.
             self._message_handler.maybe_schedule_expiry(event)
-
-        await self.pusher_pool.on_new_notifications(max_stream_id)
 
         def _notify():
             try:
