@@ -307,7 +307,7 @@ class Notifier:
 
         # poke any interested application service.
         run_as_background_process(
-            "notify_app_services", self._notify_app_services, max_room_stream_id
+            "_notify_app_services", self._notify_app_services, max_room_stream_id
         )
 
         run_as_background_process(
