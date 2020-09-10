@@ -7,7 +7,7 @@ Shared rooms endpoint (MSC2666)
 This release contains a new unstable endpoint `/_matrix/client/unstable/uk.half-shot.msc2666/user/shared_rooms/.*`
 for fetching rooms one user has in common with another. This feature requires the
 `update_user_directory` config flag to be `True`. If you are you are using a `synapse.app.user_dir`
-worker, requests to this endpoint must be handled by that worker. 
+worker, requests to this endpoint must be handled by that worker.
 See `docs/workers.md <docs/workers.md>`_ for more details.
 
 
@@ -90,6 +90,21 @@ for example:
 
 Upgrading to v1.21.0
 ====================
+
+Forwarding ``/_synapse/client`` through your reverse proxy
+----------------------------------------------------------
+
+The `reverse proxy documentation
+<https://github.com/matrix-org/synapse/blob/develop/docs/reverse_proxy.md>`_ has been updated
+to include reverse proxy directives for ``/_synapse/client/*`` endpoints. As the user password
+reset flow now uses endpoints under this prefix, **you must update your reverse proxy
+configurations for user password reset to work**.
+
+Additionally, note that the `Synapse worker documentation
+<https://github.com/matrix-org/synapse/blob/develop/docs/workers.md>`_ has been updated to
+ state that the ``/_synapse/client/password_reset/email/submit_token`` endpoint can be handled
+by all workers. If you make use of Synapse's worker feature, please update your reverse proxy
+configuration to reflect this change.
 
 New HTML templates
 ------------------
