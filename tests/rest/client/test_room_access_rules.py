@@ -23,7 +23,11 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
-from synapse.third_party_rules.access_rules import ACCESS_RULES_TYPE, AccessRules
+from synapse.third_party_rules.access_rules import (
+    ACCESS_RULES_TYPE,
+    AccessRules,
+    RoomAccessRules,
+)
 
 from tests import unittest
 
@@ -148,6 +152,52 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         """Tests that creating a direct room with an invalid rule will fail.
         """
         self.create_room(direct=True, rule=AccessRules.RESTRICTED, expected_code=400)
+
+    def test_create_room_default_power_level_rules(self):
+        """Tests that a room created with no power level overrides instead uses the dinum
+        defaults
+        """
+        room_id = self.create_room(direct=True, rule=AccessRules.DIRECT)
+        power_levels = self.helper.get_state(room_id, "m.room.power_levels", self.tok)
+
+        # Inviting another user should require PL50, even in private rooms
+        self.assertEqual(power_levels["invite"], 50)
+        # Sending arbitrary state events should require PL100
+        self.assertEqual(power_levels["state_default"], 100)
+
+    def test_create_room_fails_on_incorrect_power_level_rules(self):
+        """Tests that a room created with power levels lower than that required are rejected"""
+        modified_power_levels = RoomAccessRules._get_default_power_levels(self.user_id)
+        modified_power_levels["invite"] = 0
+        modified_power_levels["state_default"] = 50
+
+        self.create_room(
+            direct=True,
+            rule=AccessRules.DIRECT,
+            initial_state=[
+                {"type": "m.room.power_levels", "content": modified_power_levels}
+            ],
+            expected_code=400,
+        )
+
+    def test_existing_room_can_change_power_levels(self):
+        """Tests that a room created with default power levels can have their power levels
+        dropped after room creation
+        """
+        # Creates a room with the default power levels
+        room_id = self.create_room(
+            direct=True, rule=AccessRules.DIRECT, expected_code=200,
+        )
+
+        # Attempt to drop invite and state_default power levels after the fact
+        room_power_levels = self.helper.get_state(
+            room_id, "m.room.power_levels", self.tok
+        )
+        room_power_levels["invite"] = 0
+        room_power_levels["state_default"] = 50
+        self.helper.send_state(
+            room_id, "m.room.power_levels", room_power_levels, self.tok
+        )
 
     def test_public_room(self):
         """Tests that it's not possible to have a room with the public join rule and an
@@ -642,10 +692,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             content["initial_state"] += initial_state
 
         request, channel = self.make_request(
-            "POST",
-            "/_matrix/client/r0/createRoom",
-            json.dumps(content),
-            access_token=self.tok,
+            "POST", "/_matrix/client/r0/createRoom", content, access_token=self.tok,
         )
         self.render(request)
 

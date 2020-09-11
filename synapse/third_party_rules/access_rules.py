@@ -110,6 +110,10 @@ class RoomAccessRules(object):
         If yes, make sure the event is correct. Otherwise, append an event with the
         default rule to the initial state.
 
+        Checks if a m.rooms.power_levels event is being set during room creation.
+        If yes, make sure the event is allowed. Otherwise, set power_level_content_override
+        in the config dict to our modified version of the default room power levels.
+
         Args:
             requester: The user who is making the createRoom request.
             config: The createRoom config dict provided by the user.
@@ -187,6 +191,10 @@ class RoomAccessRules(object):
         if not allowed:
             raise SynapseError(400, "Invalid power levels content override")
 
+        use_default_power_levels = True
+        if config.get("power_level_content_override"):
+            use_default_power_levels = False
+
         # Second loop for events we need to know the current rule to process.
         for event in config.get("initial_state", []):
             if event["type"] == EventTypes.PowerLevels:
@@ -196,7 +204,43 @@ class RoomAccessRules(object):
                 if not allowed:
                     raise SynapseError(400, "Invalid power levels content")
 
+                use_default_power_levels = False
+
+        # If power levels were not overridden by the user, override with DINUM's preferred
+        # defaults instead
+        if use_default_power_levels:
+            config["power_level_content_override"] = self._get_default_power_levels(
+                requester.user.to_string()
+            )
+
         return True
+
+    # If power levels are not overridden by the user during room creation, the following
+    # rules are used instead. Changes from Synapse's default power levels are noted.
+    #
+    # The same power levels are currently applied regardless of room preset.
+    @staticmethod
+    def _get_default_power_levels(user_id: str) -> Dict:
+        return {
+            "users": {user_id: 100},
+            "users_default": 0,
+            "events": {
+                EventTypes.Name: 50,
+                EventTypes.PowerLevels: 100,
+                EventTypes.RoomHistoryVisibility: 100,
+                EventTypes.CanonicalAlias: 50,
+                EventTypes.RoomAvatar: 50,
+                EventTypes.Tombstone: 100,
+                EventTypes.ServerACL: 100,
+                EventTypes.RoomEncryption: 100,
+            },
+            "events_default": 0,
+            "state_default": 100,  # Admins should be the only ones to perform other tasks
+            "ban": 50,
+            "kick": 50,
+            "redact": 50,
+            "invite": 50,  # All rooms should require mod to invite, even private
+        }
 
     @defer.inlineCallbacks
     def check_threepid_can_be_invited(
@@ -272,7 +316,9 @@ class RoomAccessRules(object):
         rule = self._get_rule_from_state(state_events)
 
         if event.type == EventTypes.PowerLevels:
-            return self._is_power_level_content_allowed(event.content, rule)
+            return self._is_power_level_content_allowed(
+                event.content, rule, on_room_creation=False
+            )
 
         if event.type == EventTypes.Member or event.type == EventTypes.ThirdPartyInvite:
             return self._on_membership_or_invite(event, rule, state_events)
@@ -468,7 +514,9 @@ class RoomAccessRules(object):
 
         return True
 
-    def _is_power_level_content_allowed(self, content: Dict, access_rule: str) -> bool:
+    def _is_power_level_content_allowed(
+        self, content: Dict, access_rule: str, on_room_creation: bool = True
+    ) -> bool:
         """Check if a given power levels event is permitted under the given access rule.
 
         It shouldn't be allowed if it either changes the default PL to a non-0 value or
@@ -478,10 +526,26 @@ class RoomAccessRules(object):
         Args:
             content: The content of the m.room.power_levels event to check.
             access_rule: The access rule in place in this room.
+            on_room_creation: True if this call is happening during a room's
+                creation, False otherwise.
 
         Returns:
             Whether the content of the power levels event is valid.
         """
+        # Only enforce these rules during room creation
+        #
+        # We want to allow admins to modify or fix the power levels in a room if they
+        # have a special circumstance, but still want to encourage a certain pattern during
+        # room creation.
+        if on_room_creation:
+            # If invite requirements are <PL50
+            if content.get("invite", 50) < 50:
+                return False
+
+            # If "other" state requirements are <PL100
+            if content.get("state_default", 100) < 100:
+                return False
+
         # Check if we need to apply the restrictions with the current rule.
         if access_rule not in RULES_WITH_RESTRICTED_POWER_LEVELS:
             return True
