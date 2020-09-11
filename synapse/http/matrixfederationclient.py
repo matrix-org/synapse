@@ -76,7 +76,7 @@ MAXINT = sys.maxsize
 _next_id = 1
 
 
-@attr.s(frozen=True)
+@attr.s(slots=True, frozen=True)
 class MatrixFederationRequest:
     method = attr.ib()
     """HTTP method
