@@ -56,8 +56,8 @@ class OIDCConfig(Config):
         self.oidc_userinfo_endpoint = oidc_config.get("userinfo_endpoint")
         self.oidc_jwks_uri = oidc_config.get("jwks_uri")
         self.oidc_skip_verification = oidc_config.get("skip_verification", False)
-        self.oidc_merge_with_existing_users = oidc_config.get(
-            "merge_with_existing_users", False
+        self.oidc_allow_existing_users = oidc_config.get(
+            "allow_existing_users", False
         )
 
         ump_config = oidc_config.get("user_mapping_provider", {})
@@ -161,9 +161,9 @@ class OIDCConfig(Config):
           #
           #skip_verification: true
 
-          # if user already exists, add oidc token to that account instead of failing. Defaults to false.
+          # Uncomment to add oidc token to the account instead of failing when user already exists. Defaults to false.
           #
-          #merge_with_existing_users: false
+          #allow_existing_users: true
 
           # An external module can be provided here as a custom solution to mapping
           # attributes returned from a OIDC provider onto a matrix user.

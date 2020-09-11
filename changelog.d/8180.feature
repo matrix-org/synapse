@@ -1,1 +1,1 @@
-This adds config option that allows merging OpenID Connect users with existing users. 
+Add a configuration option that allows existing users to log in with OpenID Connect. Contributed by @BBBSnowball and @OmmyZhang.

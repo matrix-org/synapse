@@ -114,8 +114,8 @@ class OidcHandler:
             hs.config.oidc_user_mapping_provider_config
         )  # type: OidcMappingProvider
         self._skip_verification = hs.config.oidc_skip_verification  # type: bool
-        self._merge_with_existing_users = (
-            hs.config.oidc_merge_with_existing_users
+        self._allow_existing_users = (
+            hs.config.oidc_allow_existing_users
         )  # type: bool
 
         self._http_client = hs.get_proxied_http_client()
@@ -852,7 +852,8 @@ class OidcHandler:
         If we don't find the user that way, we should register the user,
         mapping the localpart and the display name from the UserInfo.
 
-        If a user already exists with the mxid we've mapped, raise an exception.
+        If a user already exists with the mxid we've mapped and allow_existing_users
+        is disabled , raise an exception.
 
         Args:
             userinfo: an object representing the user
@@ -906,9 +907,10 @@ class OidcHandler:
         localpart = map_username_to_mxid_localpart(attributes["localpart"])
 
         user_id = UserID(localpart, self._hostname)
-        if await self._datastore.get_users_by_id_case_insensitive(user_id.to_string()):
-            if self._merge_with_existing_users:
-                registered_user_id = user_id.to_string()
+        matches = await self._datastore.get_users_by_id_case_insensitive(user_id.to_string())
+        if matches:
+            if self._allow_existing_users:
+                registered_user_id = next(iter(matches))
             else:
                 # This mxid is taken
                 raise MappingException(
