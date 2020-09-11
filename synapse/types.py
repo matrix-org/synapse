@@ -449,8 +449,7 @@ class StreamToken:
                 keys.append("0")
             return cls(RoomStreamToken.parse(keys[0]), *(int(k) for k in keys[1:]))
         except Exception:
-            # raise SynapseError(400, "Invalid Token")
-            raise
+            raise SynapseError(400, "Invalid Token")
 
     def to_string(self):
         return self._SEPARATOR.join([str(k) for k in attr.astuple(self, recurse=False)])

@@ -620,7 +620,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         Raises:
             StoreError if the event wasn't in the database.
         Returns:
-            A "s%d" stream token.
+            A stream token.
         """
         stream_id = await self.get_stream_id_for_event(event_id)
         return RoomStreamToken(None, stream_id)
