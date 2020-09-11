@@ -12,11 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Dict, Tuple
-
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
-from synapse.types import Requester
+from synapse.types import Requester, StateMap
 
 
 class PublicRoomsManager:
@@ -170,7 +168,7 @@ class ThirdPartyEventRules:
 
     async def _get_state_events_dict_for_room(
         self, room_id: str
-    ) -> Dict[Tuple[str, str], EventBase]:
+    ) -> StateMap[EventBase]:
         """Given a room ID, return the state events of that room.
 
         Args:
