@@ -1,0 +1,1 @@
+Change `StreamToken.room_key` to be a `RoomStreamToken` instance.
