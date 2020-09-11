@@ -164,10 +164,8 @@ class _NotifierUserStream:
 
 
 class EventStreamResult(namedtuple("EventStreamResult", ("events", "tokens"))):
-    def __nonzero__(self):
+    def __bool__(self):
         return bool(self.events)
-
-    __bool__ = __nonzero__  # python3
 
 
 class Notifier:
