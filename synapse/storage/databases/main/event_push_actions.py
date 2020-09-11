@@ -196,7 +196,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         def f(txn):
             sql = (
                 "SELECT DISTINCT(user_id) FROM event_push_actions WHERE"
-                " stream_ordering >= ? AND stream_ordering <= ?"
+                " stream_ordering >= ? AND stream_ordering <= ? AND notif = 1"
             )
             txn.execute(sql, (min_stream_ordering, max_stream_ordering))
             return [r[0] for r in txn]
@@ -644,7 +644,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 "SELECT e.received_ts"
                 " FROM event_push_actions AS ep"
                 " JOIN events e ON ep.room_id = e.room_id AND ep.event_id = e.event_id"
-                " WHERE ep.stream_ordering > ?"
+                " WHERE ep.stream_ordering > ? AND notif = 1"
                 " ORDER BY ep.stream_ordering ASC"
                 " LIMIT 1"
             )
@@ -708,6 +708,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
                 " FROM event_push_actions epa, events e"
                 " WHERE epa.event_id = e.event_id"
                 " AND epa.user_id = ? %s"
+                " AND epa.notif = 1"
                 " ORDER BY epa.stream_ordering DESC"
                 " LIMIT ?" % (before_clause,)
             )

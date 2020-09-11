@@ -344,7 +344,7 @@ class PaginationHandler:
             # gets called.
             raise Exception("limit not set")
 
-        room_token = RoomStreamToken.parse(from_token.room_key)
+        room_token = from_token.room_key
 
         with await self.pagination_lock.read(room_id):
             (
@@ -381,7 +381,7 @@ class PaginationHandler:
 
                     if leave_token.topological < max_topo:
                         from_token = from_token.copy_and_replace(
-                            "room_key", leave_token_str
+                            "room_key", leave_token
                         )
 
                 await self.hs.get_handlers().federation_handler.maybe_backfill(
