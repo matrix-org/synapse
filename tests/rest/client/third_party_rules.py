@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.events.third_party_rules import PublicRoomsManager
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 from synapse.types import Requester
@@ -85,37 +84,3 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
         self.assertEquals(channel.result["code"], b"403", channel.result)
-
-    def test_public_rooms_manager(self):
-        """Tests that a room can be added and removed from the public rooms list,
-        as well as have its public rooms directory state queried.
-        """
-        public_rooms_manager = PublicRoomsManager(self.hs)
-
-        # The room should not currently be in the public rooms directory
-        is_in_public_rooms = self.get_success(
-            public_rooms_manager.room_is_in_public_directory(self.room_id)
-        )
-        self.assertFalse(is_in_public_rooms)
-
-        # Let's try adding it to the public rooms directory
-        self.get_success(
-            public_rooms_manager.add_room_to_public_directory(self.room_id)
-        )
-
-        # And checking whether it's in there...
-        is_in_public_rooms = self.get_success(
-            public_rooms_manager.room_is_in_public_directory(self.room_id)
-        )
-        self.assertTrue(is_in_public_rooms)
-
-        # Let's remove it again
-        self.get_success(
-            public_rooms_manager.remove_room_from_public_directory(self.room_id)
-        )
-
-        # Should be gone
-        is_in_public_rooms = self.get_success(
-            public_rooms_manager.room_is_in_public_directory(self.room_id)
-        )
-        self.assertFalse(is_in_public_rooms)
