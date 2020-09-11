@@ -28,9 +28,14 @@ class PublicRoomsManager:
             room_id: The ID of the room.
 
         Returns:
-            Whether the room is in the public rooms directory.
+            Whether the room is in the public rooms directory. Additionally returns False
+            if the room does not exist.
         """
-        return await self._store.get_room_is_public(room_id)
+        room = await self._store.get_room(room_id)
+        if not room:
+            return False
+
+        return room.get("is_public", False)
 
     async def add_room_to_public_directory(self, room_id: str) -> None:
         """Publishes a room to the public rooms directory.
