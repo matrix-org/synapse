@@ -114,9 +114,7 @@ class OidcHandler:
             hs.config.oidc_user_mapping_provider_config
         )  # type: OidcMappingProvider
         self._skip_verification = hs.config.oidc_skip_verification  # type: bool
-        self._allow_existing_users = (
-            hs.config.oidc_allow_existing_users
-        )  # type: bool
+        self._allow_existing_users = hs.config.oidc_allow_existing_users  # type: bool
 
         self._http_client = hs.get_proxied_http_client()
         self._auth_handler = hs.get_auth_handler()
@@ -907,7 +905,9 @@ class OidcHandler:
         localpart = map_username_to_mxid_localpart(attributes["localpart"])
 
         user_id = UserID(localpart, self._hostname)
-        matches = await self._datastore.get_users_by_id_case_insensitive(user_id.to_string())
+        matches = await self._datastore.get_users_by_id_case_insensitive(
+            user_id.to_string()
+        )
         if matches:
             if self._allow_existing_users:
                 registered_user_id = next(iter(matches))
