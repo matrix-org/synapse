@@ -681,22 +681,24 @@ class RoomCreationHandler(BaseHandler):
             creator_id=user_id, is_public=is_public, room_version=room_version,
         )
 
+        # Check whether this visibility value is blocked by a third party module
+        allowed_by_third_party_rules = await (
+            self.third_party_event_rules.check_visibility_can_be_modified(
+                room_id, visibility
+            )
+        )
+        if not allowed_by_third_party_rules:
+            raise SynapseError(403, "Room visibility value not allowed.")
+
         directory_handler = self.hs.get_handlers().directory_handler
         if room_alias:
-            # Check if publishing is blocked by a third party module
-            allowed_by_third_party_rules = await (
-                self.third_party_event_rules.check_room_can_be_added_to_public_rooms_directory(
-                    room_id
-                )
+            await directory_handler.create_association(
+                requester=requester,
+                room_id=room_id,
+                room_alias=room_alias,
+                servers=[self.hs.hostname],
+                check_membership=False,
             )
-            if allowed_by_third_party_rules:
-                await directory_handler.create_association(
-                    requester=requester,
-                    room_id=room_id,
-                    room_alias=room_alias,
-                    servers=[self.hs.hostname],
-                    check_membership=False,
-                )
 
         if is_public:
             if not self.config.is_publishing_room_allowed(user_id, room_id, room_alias):

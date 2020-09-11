@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Callable
+
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.types import Requester, StateMap
@@ -151,25 +153,29 @@ class ThirdPartyEventRules:
         )
         return ret
 
-    async def check_room_can_be_added_to_public_rooms_directory(
-        self, room_id: str
+    async def check_visibility_can_be_modified(
+        self, room_id: str, new_visibility: str
     ) -> bool:
-        """Check if a room is allowed to be published to the public rooms directory.
+        """Check if a room is allowed to be published to, or removed from, the public rooms
+        directory.
 
         Args:
             room_id: The ID of the room.
+            new_visibility: The new visibility state. Either "public" or "private".
 
         Returns:
-            Whether the room is allowed to be published to the public rooms directory.
+            True if the room's visibility can be modified, False if not.
         """
         if self.third_party_rules is None:
             return True
 
+        check_func = getattr(self.third_party_rules, "check_visibility_can_be_modified")
+        if not check_func or not isinstance(check_func, Callable):
+            return True
+
         state_events = await self._get_state_events_dict_for_room(room_id)
 
-        return await self.third_party_rules.check_room_can_be_added_to_public_rooms_directory(
-            room_id, state_events
-        )
+        return await check_func(room_id, state_events, new_visibility)
 
     async def _get_state_events_dict_for_room(
         self, room_id: str
