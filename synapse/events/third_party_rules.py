@@ -16,44 +16,8 @@ from typing import Callable
 
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
+from synapse.module_api import ModuleApi
 from synapse.types import Requester, StateMap
-
-
-class PublicRoomsManager:
-    def __init__(self, hs):
-        self._store = hs.get_datastore()
-
-    async def room_is_in_public_directory(self, room_id: str) -> bool:
-        """Checks whether a room is in the public rooms directory.
-
-        Args:
-            room_id: The ID of the room.
-
-        Returns:
-            Whether the room is in the public rooms directory. Additionally returns False
-            if the room does not exist.
-        """
-        room = await self._store.get_room(room_id)
-        if not room:
-            return False
-
-        return room.get("is_public", False)
-
-    async def add_room_to_public_directory(self, room_id: str) -> None:
-        """Publishes a room to the public rooms directory.
-
-        Args:
-            room_id: The ID of the room.
-        """
-        await self._store.set_room_is_public(room_id, True)
-
-    async def remove_room_from_public_directory(self, room_id: str) -> None:
-        """Removes a room from the public rooms directory.
-
-        Args:
-            room_id: The ID of the room.
-        """
-        await self._store.set_room_is_public(room_id, False)
 
 
 class ThirdPartyEventRules:
@@ -76,9 +40,7 @@ class ThirdPartyEventRules:
 
         if module is not None:
             self.third_party_rules = module(
-                config=config,
-                http_client=hs.get_simple_http_client(),
-                public_room_manager=PublicRoomsManager(hs),
+                config=config, module_api=ModuleApi(hs, hs.get_auth_handler()),
             )
 
     async def check_event_allowed(

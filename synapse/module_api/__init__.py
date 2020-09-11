@@ -17,6 +17,7 @@ import logging
 
 from twisted.internet import defer
 
+from synapse.http.client import SimpleHttpClient
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.types import UserID
@@ -42,6 +43,8 @@ class ModuleApi:
         self._store = hs.get_datastore()
         self._auth = hs.get_auth()
         self._auth_handler = auth_handler
+
+        self.http_client = hs.get_simple_http_client()  # type: SimpleHttpClient
 
     def get_user_by_req(self, req, allow_guest=False):
         """Check the access_token provided for a request
@@ -266,3 +269,35 @@ class ModuleApi:
         await self._auth_handler.complete_sso_login(
             registered_user_id, request, client_redirect_url,
         )
+
+    async def room_is_in_public_directory(self, room_id: str) -> bool:
+        """Checks whether a room is in the public rooms directory.
+
+        Args:
+            room_id: The ID of the room.
+
+        Returns:
+            Whether the room is in the public rooms directory. Returns False
+            if the room does not exist.
+        """
+        room = await self._store.get_room(room_id)
+        if not room:
+            return False
+
+        return room.get("is_public", False)
+
+    async def add_room_to_public_directory(self, room_id: str) -> None:
+        """Publishes a room to the public rooms directory.
+
+        Args:
+            room_id: The ID of the room.
+        """
+        await self._store.set_room_is_public(room_id, True)
+
+    async def remove_room_from_public_directory(self, room_id: str) -> None:
+        """Removes a room from the public rooms directory.
+
+        Args:
+            room_id: The ID of the room.
+        """
+        await self._store.set_room_is_public(room_id, False)
