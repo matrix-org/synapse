@@ -1347,10 +1347,10 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             args = []
 
             if user_id:
-                filters.append("user_id LIKE ?")
+                filters.append("er.user_id LIKE ?")
                 args.extend(["%" + user_id + "%"])
             if room_id:
-                filters.append("room_id LIKE ?")
+                filters.append("er.room_id LIKE ?")
                 args.extend(["%" + room_id + "%"])
 
             if direction == "b":
@@ -1360,29 +1360,55 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
 
             where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
 
-            sql_base = """
-                FROM event_reports
+            sql = """
+                SELECT COUNT(*) as total_event_reports
+                FROM event_reports AS er
                 {}
                 """.format(
                 where_clause
             )
-
-            sql = "SELECT COUNT(*) as total_event_reports " + sql_base
             txn.execute(sql, args)
             count = txn.fetchone()[0]
 
             sql = """
-                SELECT id, received_ts, room_id, event_id, user_id, reason, content
-                {sql_base}
-                ORDER BY received_ts {order}
-                LIMIT ? OFFSET ?
+                SELECT
+                    er.id,
+                    er.received_ts,
+                    er.room_id,
+                    er.event_id,
+                    er.user_id,
+                    er.reason,
+                    er.content,
+                    events.sender,
+                    room_aliases.room_alias,
+                    event_json.json AS event_json
+                FROM event_reports AS er
+                LEFT JOIN room_aliases
+                    ON room_aliases.room_id = er.room_id
+                JOIN events
+                    ON events.event_id = er.event_id
+                JOIN event_json
+                    ON event_json.event_id = er.event_id
+                {where_clause}
+                ORDER BY er.received_ts {order}
+                LIMIT ?
+                OFFSET ?
             """.format(
-                sql_base=sql_base, order=order,
+                where_clause=where_clause, order=order,
             )
 
             args += [limit, start]
             txn.execute(sql, args)
             event_reports = self.db_pool.cursor_to_dict(txn)
+
+            if count > 0:
+                for row in event_reports:
+                    try:
+                        row["content"] = db_to_json(row["content"])
+                        row["event_json"] = db_to_json(row["event_json"])
+                    except Exception:
+                        continue
+
             return event_reports, count
 
         return await self.db_pool.runInteraction(
