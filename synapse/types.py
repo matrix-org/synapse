@@ -18,7 +18,7 @@ import re
 import string
 import sys
 from collections import namedtuple
-from typing import Any, Dict, Tuple, Type, TypeVar
+from typing import Any, Dict, Mapping, MutableMapping, Optional, Tuple, Type, TypeVar
 
 import attr
 from signedjson.key import decode_verify_key_bytes
@@ -41,8 +41,9 @@ else:
 # Define a state map type from type/state_key to T (usually an event ID or
 # event)
 T = TypeVar("T")
-StateMap = Dict[Tuple[str, str], T]
-
+StateKey = Tuple[str, str]
+StateMap = Mapping[StateKey, T]
+MutableStateMap = MutableMapping[StateKey, T]
 
 # the type of a JSON-serialisable dict. This could be made stronger, but it will
 # do for now.
@@ -361,86 +362,8 @@ def map_username_to_mxid_localpart(username, case_sensitive=False):
     return username.decode("ascii")
 
 
-class StreamToken(
-    namedtuple(
-        "Token",
-        (
-            "room_key",
-            "presence_key",
-            "typing_key",
-            "receipt_key",
-            "account_data_key",
-            "push_rules_key",
-            "to_device_key",
-            "device_list_key",
-            "groups_key",
-        ),
-    )
-):
-    _SEPARATOR = "_"
-    START = None  # type: StreamToken
-
-    @classmethod
-    def from_string(cls, string):
-        try:
-            keys = string.split(cls._SEPARATOR)
-            while len(keys) < len(cls._fields):
-                # i.e. old token from before receipt_key
-                keys.append("0")
-            return cls(*keys)
-        except Exception:
-            raise SynapseError(400, "Invalid Token")
-
-    def to_string(self):
-        return self._SEPARATOR.join([str(k) for k in self])
-
-    @property
-    def room_stream_id(self):
-        # TODO(markjh): Awful hack to work around hacks in the presence tests
-        # which assume that the keys are integers.
-        if type(self.room_key) is int:
-            return self.room_key
-        else:
-            return int(self.room_key[1:].split("-")[-1])
-
-    def is_after(self, other):
-        """Does this token contain events that the other doesn't?"""
-        return (
-            (other.room_stream_id < self.room_stream_id)
-            or (int(other.presence_key) < int(self.presence_key))
-            or (int(other.typing_key) < int(self.typing_key))
-            or (int(other.receipt_key) < int(self.receipt_key))
-            or (int(other.account_data_key) < int(self.account_data_key))
-            or (int(other.push_rules_key) < int(self.push_rules_key))
-            or (int(other.to_device_key) < int(self.to_device_key))
-            or (int(other.device_list_key) < int(self.device_list_key))
-            or (int(other.groups_key) < int(self.groups_key))
-        )
-
-    def copy_and_advance(self, key, new_value):
-        """Advance the given key in the token to a new value if and only if the
-        new value is after the old value.
-        """
-        new_token = self.copy_and_replace(key, new_value)
-        if key == "room_key":
-            new_id = new_token.room_stream_id
-            old_id = self.room_stream_id
-        else:
-            new_id = int(getattr(new_token, key))
-            old_id = int(getattr(self, key))
-        if old_id < new_id:
-            return new_token
-        else:
-            return self
-
-    def copy_and_replace(self, key, new_value):
-        return self._replace(**{key: new_value})
-
-
-StreamToken.START = StreamToken(*(["s0"] + ["0"] * (len(StreamToken._fields) - 1)))
-
-
-class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
+@attr.s(frozen=True, slots=True)
+class RoomStreamToken:
     """Tokens are positions between events. The token "s1" comes after event 1.
 
             s0    s1
@@ -463,10 +386,14 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
     followed by the "stream_ordering" id of the event it comes after.
     """
 
-    __slots__ = []  # type: list
+    topological = attr.ib(
+        type=Optional[int],
+        validator=attr.validators.optional(attr.validators.instance_of(int)),
+    )
+    stream = attr.ib(type=int, validator=attr.validators.instance_of(int))
 
     @classmethod
-    def parse(cls, string):
+    def parse(cls, string: str) -> "RoomStreamToken":
         try:
             if string[0] == "s":
                 return cls(topological=None, stream=int(string[1:]))
@@ -478,7 +405,7 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
         raise SynapseError(400, "Invalid token %r" % (string,))
 
     @classmethod
-    def parse_stream_token(cls, string):
+    def parse_stream_token(cls, string: str) -> "RoomStreamToken":
         try:
             if string[0] == "s":
                 return cls(topological=None, stream=int(string[1:]))
@@ -486,11 +413,86 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
 
-    def __str__(self):
+    def as_tuple(self) -> Tuple[Optional[int], int]:
+        return (self.topological, self.stream)
+
+    def __str__(self) -> str:
         if self.topological is not None:
             return "t%d-%d" % (self.topological, self.stream)
         else:
             return "s%d" % (self.stream,)
+
+
+@attr.s(slots=True, frozen=True)
+class StreamToken:
+    room_key = attr.ib(
+        type=RoomStreamToken, validator=attr.validators.instance_of(RoomStreamToken)
+    )
+    presence_key = attr.ib(type=int)
+    typing_key = attr.ib(type=int)
+    receipt_key = attr.ib(type=int)
+    account_data_key = attr.ib(type=int)
+    push_rules_key = attr.ib(type=int)
+    to_device_key = attr.ib(type=int)
+    device_list_key = attr.ib(type=int)
+    groups_key = attr.ib(type=int)
+
+    _SEPARATOR = "_"
+    START = None  # type: StreamToken
+
+    @classmethod
+    def from_string(cls, string):
+        try:
+            keys = string.split(cls._SEPARATOR)
+            while len(keys) < len(attr.fields(cls)):
+                # i.e. old token from before receipt_key
+                keys.append("0")
+            return cls(RoomStreamToken.parse(keys[0]), *(int(k) for k in keys[1:]))
+        except Exception:
+            raise SynapseError(400, "Invalid Token")
+
+    def to_string(self):
+        return self._SEPARATOR.join([str(k) for k in attr.astuple(self, recurse=False)])
+
+    @property
+    def room_stream_id(self):
+        return self.room_key.stream
+
+    def is_after(self, other):
+        """Does this token contain events that the other doesn't?"""
+        return (
+            (other.room_stream_id < self.room_stream_id)
+            or (int(other.presence_key) < int(self.presence_key))
+            or (int(other.typing_key) < int(self.typing_key))
+            or (int(other.receipt_key) < int(self.receipt_key))
+            or (int(other.account_data_key) < int(self.account_data_key))
+            or (int(other.push_rules_key) < int(self.push_rules_key))
+            or (int(other.to_device_key) < int(self.to_device_key))
+            or (int(other.device_list_key) < int(self.device_list_key))
+            or (int(other.groups_key) < int(self.groups_key))
+        )
+
+    def copy_and_advance(self, key, new_value) -> "StreamToken":
+        """Advance the given key in the token to a new value if and only if the
+        new value is after the old value.
+        """
+        new_token = self.copy_and_replace(key, new_value)
+        if key == "room_key":
+            new_id = new_token.room_stream_id
+            old_id = self.room_stream_id
+        else:
+            new_id = int(getattr(new_token, key))
+            old_id = int(getattr(self, key))
+        if old_id < new_id:
+            return new_token
+        else:
+            return self
+
+    def copy_and_replace(self, key, new_value) -> "StreamToken":
+        return attr.evolve(self, **{key: new_value})
+
+
+StreamToken.START = StreamToken.from_string("s0_0")
 
 
 class ThirdPartyInstanceID(
@@ -528,7 +530,7 @@ class ThirdPartyInstanceID(
 
 
 @attr.s(slots=True)
-class ReadReceipt(object):
+class ReadReceipt:
     """Information about a read-receipt"""
 
     room_id = attr.ib()

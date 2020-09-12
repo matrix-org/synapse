@@ -43,7 +43,7 @@ from tests import unittest
 from tests.test_utils import make_awaitable
 
 
-class MockPerspectiveServer(object):
+class MockPerspectiveServer:
     def __init__(self):
         self.server_name = "mock_server"
         self.key = signedjson.key.generate_signing_key(0)
@@ -190,7 +190,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
 
         # should fail immediately on an unsigned object
         d = _verify_json_for_server(kr, "server9", {}, 0, "test unsigned")
-        self.failureResultOf(d, SynapseError)
+        self.get_failure(d, SynapseError)
 
         # should succeed on a signed object
         d = _verify_json_for_server(kr, "server9", json1, 500, "test signed")
@@ -221,7 +221,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
 
         # should fail immediately on an unsigned object
         d = _verify_json_for_server(kr, "server9", {}, 0, "test unsigned")
-        self.failureResultOf(d, SynapseError)
+        self.get_failure(d, SynapseError)
 
         # should fail on a signed object with a non-zero minimum_valid_until_ms,
         # as it tries to refetch the keys and fails.

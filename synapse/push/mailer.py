@@ -92,7 +92,7 @@ ALLOWED_ATTRS = {
 # ALLOWED_SCHEMES = ["http", "https", "ftp", "mailto"]
 
 
-class Mailer(object):
+class Mailer:
     def __init__(self, hs, app_name, template_html, template_text):
         self.hs = hs
         self.template_html = template_html
@@ -123,7 +123,7 @@ class Mailer(object):
         params = {"token": token, "client_secret": client_secret, "sid": sid}
         link = (
             self.hs.config.public_baseurl
-            + "_matrix/client/unstable/password_reset/email/submit_token?%s"
+            + "_synapse/client/password_reset/email/submit_token?%s"
             % urllib.parse.urlencode(params)
         )
 

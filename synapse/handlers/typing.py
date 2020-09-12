@@ -412,7 +412,7 @@ class TypingWriterHandler(FollowerTypingHandler):
         raise Exception("Typing writer instance got typing info over replication")
 
 
-class TypingNotificationEventSource(object):
+class TypingNotificationEventSource:
     def __init__(self, hs):
         self.hs = hs
         self.clock = hs.get_clock()

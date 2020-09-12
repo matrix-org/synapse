@@ -93,7 +93,7 @@ def measure_func(name: Optional[str] = None) -> Callable[[T], T]:
     return wrapper
 
 
-class Measure(object):
+class Measure:
     __slots__ = [
         "clock",
         "name",

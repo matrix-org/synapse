@@ -190,15 +190,15 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         )
 
     @trace
-    def delete_device_msgs_for_remote(self, destination, up_to_stream_id):
+    async def delete_device_msgs_for_remote(
+        self, destination: str, up_to_stream_id: int
+    ) -> None:
         """Used to delete messages when the remote destination acknowledges
         their receipt.
 
         Args:
-            destination(str): The destination server_name
-            up_to_stream_id(int): Where to delete messages up to.
-        Returns:
-            A deferred that resolves when the messages have been deleted.
+            destination: The destination server_name
+            up_to_stream_id: Where to delete messages up to.
         """
 
         def delete_messages_for_remote_destination_txn(txn):
@@ -209,7 +209,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             )
             txn.execute(sql, (destination, up_to_stream_id))
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "delete_device_msgs_for_remote", delete_messages_for_remote_destination_txn
         )
 

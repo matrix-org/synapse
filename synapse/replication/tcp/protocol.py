@@ -113,7 +113,7 @@ PING_TIMEOUT_MULTIPLIER = 5
 PING_TIMEOUT_MS = PING_TIME * PING_TIMEOUT_MULTIPLIER
 
 
-class ConnectionStates(object):
+class ConnectionStates:
     CONNECTING = "connecting"
     ESTABLISHED = "established"
     PAUSED = "paused"

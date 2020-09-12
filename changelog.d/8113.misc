@@ -1,1 +1,0 @@
-Separate `get_current_token` into two since there are two different use cases for it.

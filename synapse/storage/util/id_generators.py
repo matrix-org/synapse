@@ -15,6 +15,7 @@
 
 import contextlib
 import heapq
+import logging
 import threading
 from collections import deque
 from typing import Dict, List, Set
@@ -24,8 +25,10 @@ from typing_extensions import Deque
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.util.sequence import PostgresSequenceGenerator
 
+logger = logging.getLogger(__name__)
 
-class IdGenerator(object):
+
+class IdGenerator:
     def __init__(self, db_conn, table, column):
         self._lock = threading.Lock()
         self._next_id = _load_current_id(db_conn, table, column)
@@ -48,6 +51,8 @@ def _load_current_id(db_conn, table, column, step=1):
     Returns:
         int
     """
+    # debug logging for https://github.com/matrix-org/synapse/issues/7968
+    logger.info("initialising stream generator for %s(%s)", table, column)
     cur = db_conn.cursor()
     if step == 1:
         cur.execute("SELECT MAX(%s) FROM %s" % (column, table))
@@ -59,7 +64,7 @@ def _load_current_id(db_conn, table, column, step=1):
     return (max if step > 0 else min)(current_id, step)
 
 
-class StreamIdGenerator(object):
+class StreamIdGenerator:
     """Used to generate new stream ids when persisting events while keeping
     track of which transactions have been completed.
 
@@ -185,6 +190,8 @@ class MultiWriterIdGenerator:
         id_column: Column that stores the stream ID.
         sequence_name: The name of the postgres sequence used to generate new
             IDs.
+        positive: Whether the IDs are positive (true) or negative (false).
+            When using negative IDs we go backwards from -1 to -2, -3, etc.
     """
 
     def __init__(
@@ -196,13 +203,19 @@ class MultiWriterIdGenerator:
         instance_column: str,
         id_column: str,
         sequence_name: str,
+        positive: bool = True,
     ):
         self._db = db
         self._instance_name = instance_name
+        self._positive = positive
+        self._return_factor = 1 if positive else -1
 
         # We lock as some functions may be called from DB threads.
         self._lock = threading.Lock()
 
+        # Note: If we are a negative stream then we still store all the IDs as
+        # positive to make life easier for us, and simply negate the IDs when we
+        # return them.
         self._current_positions = self._load_current_ids(
             db_conn, table, instance_column, id_column
         )
@@ -210,6 +223,10 @@ class MultiWriterIdGenerator:
         # Set of local IDs that we're still processing. The current position
         # should be less than the minimum of this set (if not empty).
         self._unfinished_ids = set()  # type: Set[int]
+
+        # Set of local IDs that we've processed that are larger than the current
+        # position, due to there being smaller unpersisted IDs.
+        self._finished_ids = set()  # type: Set[int]
 
         # We track the max position where we know everything before has been
         # persisted. This is done by a) looking at the min across all instances
@@ -233,13 +250,16 @@ class MultiWriterIdGenerator:
     def _load_current_ids(
         self, db_conn, table: str, instance_column: str, id_column: str
     ) -> Dict[str, int]:
+        # If positive stream aggregate via MAX. For negative stream use MIN
+        # *and* negate the result to get a positive number.
         sql = """
-            SELECT %(instance)s, MAX(%(id)s) FROM %(table)s
+            SELECT %(instance)s, %(agg)s(%(id)s) FROM %(table)s
             GROUP BY %(instance)s
         """ % {
             "instance": instance_column,
             "id": id_column,
             "table": table,
+            "agg": "MAX" if self._positive else "-MIN",
         }
 
         cur = db_conn.cursor()
@@ -269,15 +289,16 @@ class MultiWriterIdGenerator:
         # Assert the fetched ID is actually greater than what we currently
         # believe the ID to be. If not, then the sequence and table have got
         # out of sync somehow.
-        assert self.get_current_token_for_writer(self._instance_name) < next_id
-
         with self._lock:
+            assert self._current_positions.get(self._instance_name, 0) < next_id
+
             self._unfinished_ids.add(next_id)
 
         @contextlib.contextmanager
         def manager():
             try:
-                yield next_id
+                # Multiply by the return factor so that the ID has correct sign.
+                yield self._return_factor * next_id
             finally:
                 self._mark_id_as_finished(next_id)
 
@@ -296,15 +317,15 @@ class MultiWriterIdGenerator:
         # Assert the fetched ID is actually greater than any ID we've already
         # seen. If not, then the sequence and table have got out of sync
         # somehow.
-        assert max(self.get_positions().values(), default=0) < min(next_ids)
-
         with self._lock:
+            assert max(self._current_positions.values(), default=0) < min(next_ids)
+
             self._unfinished_ids.update(next_ids)
 
         @contextlib.contextmanager
         def manager():
             try:
-                yield next_ids
+                yield [self._return_factor * i for i in next_ids]
             finally:
                 for i in next_ids:
                     self._mark_id_as_finished(i)
@@ -327,21 +348,50 @@ class MultiWriterIdGenerator:
         txn.call_after(self._mark_id_as_finished, next_id)
         txn.call_on_exception(self._mark_id_as_finished, next_id)
 
-        return next_id
+        return self._return_factor * next_id
 
     def _mark_id_as_finished(self, next_id: int):
         """The ID has finished being processed so we should advance the
-        current poistion if possible.
+        current position if possible.
         """
 
         with self._lock:
             self._unfinished_ids.discard(next_id)
+            self._finished_ids.add(next_id)
 
-            # Figure out if its safe to advance the position by checking there
-            # aren't any lower allocated IDs that are yet to finish.
-            if all(c > next_id for c in self._unfinished_ids):
+            new_cur = None
+
+            if self._unfinished_ids:
+                # If there are unfinished IDs then the new position will be the
+                # largest finished ID less than the minimum unfinished ID.
+
+                finished = set()
+
+                min_unfinshed = min(self._unfinished_ids)
+                for s in self._finished_ids:
+                    if s < min_unfinshed:
+                        if new_cur is None or new_cur < s:
+                            new_cur = s
+                    else:
+                        finished.add(s)
+
+                # We clear these out since they're now all less than the new
+                # position.
+                self._finished_ids = finished
+            else:
+                # There are no unfinished IDs so the new position is simply the
+                # largest finished one.
+                new_cur = max(self._finished_ids)
+
+                # We clear these out since they're now all less than the new
+                # position.
+                self._finished_ids.clear()
+
+            if new_cur:
                 curr = self._current_positions.get(self._instance_name, 0)
-                self._current_positions[self._instance_name] = max(curr, next_id)
+                self._current_positions[self._instance_name] = max(curr, new_cur)
+
+            self._add_persisted_position(next_id)
 
     def get_current_token(self) -> int:
         """Returns the maximum stream id such that all stream ids less than or
@@ -357,19 +407,24 @@ class MultiWriterIdGenerator:
         """
 
         with self._lock:
-            return self._current_positions.get(instance_name, 0)
+            return self._return_factor * self._current_positions.get(instance_name, 0)
 
     def get_positions(self) -> Dict[str, int]:
         """Get a copy of the current positon map.
         """
 
         with self._lock:
-            return dict(self._current_positions)
+            return {
+                name: self._return_factor * i
+                for name, i in self._current_positions.items()
+            }
 
     def advance(self, instance_name: str, new_id: int):
         """Advance the postion of the named writer to the given ID, if greater
         than existing entry.
         """
+
+        new_id *= self._return_factor
 
         with self._lock:
             self._current_positions[instance_name] = max(
@@ -388,7 +443,7 @@ class MultiWriterIdGenerator:
         """
 
         with self._lock:
-            return self._persisted_upto_position
+            return self._return_factor * self._persisted_upto_position
 
     def _add_persisted_position(self, new_id: int):
         """Record that we have persisted a position.
@@ -404,7 +459,7 @@ class MultiWriterIdGenerator:
         # We move the current min position up if the minimum current positions
         # of all instances is higher (since by definition all positions less
         # that that have been persisted).
-        min_curr = min(self._current_positions.values())
+        min_curr = min(self._current_positions.values(), default=0)
         self._persisted_upto_position = max(min_curr, self._persisted_upto_position)
 
         # We now iterate through the seen positions, discarding those that are

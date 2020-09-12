@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Tuple
+from typing import Any, List, Set, Tuple
 
 from synapse.api.errors import SynapseError
 from synapse.storage._base import SQLBaseStore
@@ -25,25 +25,24 @@ logger = logging.getLogger(__name__)
 
 
 class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
-    def purge_history(self, room_id, token, delete_local_events):
+    async def purge_history(
+        self, room_id: str, token: str, delete_local_events: bool
+    ) -> Set[int]:
         """Deletes room history before a certain point
 
         Args:
-            room_id (str):
-
-            token (str): A topological token to delete events before
-
-            delete_local_events (bool):
+            room_id:
+            token: A topological token to delete events before
+            delete_local_events:
                 if True, we will delete local events as well as remote ones
                 (instead of just marking them as outliers and deleting their
                 state groups).
 
         Returns:
-            Deferred[set[int]]: The set of state groups that are referenced by
-            deleted events.
+            The set of state groups that are referenced by deleted events.
         """
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "purge_history",
             self._purge_history_txn,
             room_id,
@@ -70,6 +69,7 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
         #     room_depth
         #     state_groups
         #     state_groups_state
+        #     destination_rooms
 
         # we will build a temporary table listing the events so that we don't
         # have to keep shovelling the list back and forth across the
@@ -283,17 +283,18 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
 
         return referenced_state_groups
 
-    def purge_room(self, room_id):
+    async def purge_room(self, room_id: str) -> List[int]:
         """Deletes all record of a room
 
         Args:
-            room_id (str)
+            room_id
 
         Returns:
-            Deferred[List[int]]: The list of state groups to delete.
+            The list of state groups to delete.
         """
-
-        return self.db_pool.runInteraction("purge_room", self._purge_room_txn, room_id)
+        return await self.db_pool.runInteraction(
+            "purge_room", self._purge_room_txn, room_id
+        )
 
     def _purge_room_txn(self, txn, room_id):
         # First we fetch all the state groups that should be deleted, before
@@ -336,6 +337,7 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
         # and finally, the tables with an index on room_id (or no useful index)
         for table in (
             "current_state_events",
+            "destination_rooms",
             "event_backward_extremities",
             "event_forward_extremities",
             "event_json",

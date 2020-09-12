@@ -20,7 +20,7 @@ from typing import Set
 logger = logging.getLogger(__name__)
 
 
-class PurgeEventsStorage(object):
+class PurgeEventsStorage:
     """High level interface for purging rooms and event history.
     """
 

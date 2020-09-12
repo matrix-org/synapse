@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from canonicaljson import json
+import json
+
 from frozendict import frozendict
 
 
@@ -66,5 +67,5 @@ def _handle_frozendict(obj):
 # A JSONEncoder which is capable of encoding frozendicts without barfing.
 # Additionally reduce the whitespace produced by JSON encoding.
 frozendict_json_encoder = json.JSONEncoder(
-    default=_handle_frozendict, separators=(",", ":"),
+    allow_nan=False, separators=(",", ":"), default=_handle_frozendict,
 )

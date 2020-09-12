@@ -14,20 +14,25 @@
 # limitations under the License.
 import logging
 import re
+from typing import TYPE_CHECKING
 
 from synapse.api.constants import EventTypes
+from synapse.appservice.api import ApplicationServiceApi
 from synapse.types import GroupID, get_domain_from_id
 from synapse.util.caches.descriptors import cached
+
+if TYPE_CHECKING:
+    from synapse.storage.databases.main import DataStore
 
 logger = logging.getLogger(__name__)
 
 
-class ApplicationServiceState(object):
+class ApplicationServiceState:
     DOWN = "down"
     UP = "up"
 
 
-class AppServiceTransaction(object):
+class AppServiceTransaction:
     """Represents an application service transaction."""
 
     def __init__(self, service, id, events):
@@ -35,19 +40,19 @@ class AppServiceTransaction(object):
         self.id = id
         self.events = events
 
-    def send(self, as_api):
+    async def send(self, as_api: ApplicationServiceApi) -> bool:
         """Sends this transaction using the provided AS API interface.
 
         Args:
-            as_api(ApplicationServiceApi): The API to use to send.
+            as_api: The API to use to send.
         Returns:
-            An Awaitable which resolves to True if the transaction was sent.
+            True if the transaction was sent.
         """
-        return as_api.push_bulk(
+        return await as_api.push_bulk(
             service=self.service, events=self.events, txn_id=self.id
         )
 
-    def complete(self, store):
+    async def complete(self, store: "DataStore") -> None:
         """Completes this transaction as successful.
 
         Marks this transaction ID on the application service and removes the
@@ -55,13 +60,11 @@ class AppServiceTransaction(object):
 
         Args:
             store: The database store to operate on.
-        Returns:
-            A Deferred which resolves to True if the transaction was completed.
         """
-        return store.complete_appservice_txn(service=self.service, txn_id=self.id)
+        await store.complete_appservice_txn(service=self.service, txn_id=self.id)
 
 
-class ApplicationService(object):
+class ApplicationService:
     """Defines an application service. This definition is mostly what is
     provided to the /register AS API.
 

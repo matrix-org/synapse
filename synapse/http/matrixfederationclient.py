@@ -54,6 +54,7 @@ from synapse.logging.opentracing import (
     start_active_span,
     tags,
 )
+from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.metrics import Measure
 
@@ -76,7 +77,7 @@ _next_id = 1
 
 
 @attr.s(frozen=True)
-class MatrixFederationRequest(object):
+class MatrixFederationRequest:
     method = attr.ib()
     """HTTP method
     :type: str
@@ -164,7 +165,9 @@ async def _handle_json_response(
     try:
         check_content_type_is_json(response.headers)
 
-        d = treq.json_content(response)
+        # Use the custom JSON decoder (partially re-implements treq.json_content).
+        d = treq.text_content(response, encoding="utf-8")
+        d.addCallback(json_decoder.decode)
         d = timeout_deferred(d, timeout=timeout_sec, reactor=reactor)
 
         body = await make_deferred_yieldable(d)
@@ -203,7 +206,7 @@ async def _handle_json_response(
     return body
 
 
-class MatrixFederationHttpClient(object):
+class MatrixFederationHttpClient:
     """HTTP client used to talk to other homeservers over the federation
     protocol. Send client certificates and signs requests.
 
@@ -226,7 +229,7 @@ class MatrixFederationHttpClient(object):
         )
 
         @implementer(IReactorPluggableNameResolver)
-        class Reactor(object):
+        class Reactor:
             def __getattr__(_self, attr):
                 if attr == "nameResolver":
                     return nameResolver

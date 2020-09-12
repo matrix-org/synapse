@@ -74,7 +74,7 @@ except Exception:
 get_thread_id = threading.get_ident
 
 
-class ContextResourceUsage(object):
+class ContextResourceUsage:
     """Object for tracking the resources used by a log context
 
     Attributes:
@@ -179,7 +179,7 @@ class ContextResourceUsage(object):
 LoggingContextOrSentinel = Union["LoggingContext", "_Sentinel"]
 
 
-class _Sentinel(object):
+class _Sentinel:
     """Sentinel to represent the root context"""
 
     __slots__ = ["previous_context", "finished", "request", "scope", "tag"]
@@ -226,7 +226,7 @@ class _Sentinel(object):
 SENTINEL_CONTEXT = _Sentinel()
 
 
-class LoggingContext(object):
+class LoggingContext:
     """Additional context for log formatting. Contexts are scoped within a
     "with" block.
 
