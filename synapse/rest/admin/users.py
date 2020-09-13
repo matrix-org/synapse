@@ -29,6 +29,7 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.rest.admin._base import (
+    admin_patterns,
     assert_requester_is_admin,
     assert_user_is_admin,
     historical_admin_path_patterns,
@@ -683,3 +684,29 @@ class UserAdminServlet(RestServlet):
         await self.store.set_server_admin(target_user, set_admin_to)
 
         return 200, {}
+
+
+class UserMembershipRestServlet(RestServlet):
+    """
+    Get room list of an user.
+    """
+
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]+)/rooms$")
+
+    def __init__(self, hs):
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+
+    async def on_GET(self, request, user_id):
+        await assert_requester_is_admin(self.auth, request)
+
+        if not self.hs.is_mine(UserID.from_string(user_id)):
+            raise SynapseError(400, "Can only lookup local users")
+
+        room_ids = await self.store.get_rooms_for_user(user_id)
+        if not room_ids:
+            raise NotFoundError("User not found")
+
+        ret = {"rooms": list(room_ids), "total": len(room_ids)}
+        return 200, ret
