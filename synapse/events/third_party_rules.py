@@ -118,8 +118,8 @@ class ThirdPartyEventRules:
     async def check_visibility_can_be_modified(
         self, room_id: str, new_visibility: str
     ) -> bool:
-        """Check if a room is allowed to be published to, or removed from, the public rooms
-        directory.
+        """Check if a room is allowed to be published to, or removed from, the public room
+        list.
 
         Args:
             room_id: The ID of the room.
