@@ -1,1 +1,1 @@
-Add topic and avatar to room details admin API.
+Add the room topic and avatar to the room details admin API.
