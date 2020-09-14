@@ -127,6 +127,20 @@ request to
 with the query parameters from the original link, presented as a URL-encoded form. See the file
 itself for more details.
 
+Updated Single Sign-on HTML Templates
+-------------------------------------
+
+The ``saml_error.html`` template was removed from Synapse and replaced with the
+``sso_error.html`` template. If your Synapse is configured to use SAML and a
+custom ``sso_redirect_confirm_template_dir`` configuration then any customisations
+of the ``saml_error.html`` template will need to be merged into the ``sso_error.html``
+template. These templates are similar, but the parameters are slightly different:
+
+* The ``msg`` parameter should be renamed to ``error_description``.
+* There is no longer a ``code`` parameter for the response code.
+* A string ``error`` parameter is available that includes a short hint of why a
+  user is seeing the error page.
+
 ThirdPartyEventRules breaking changes
 -------------------------------------
 
