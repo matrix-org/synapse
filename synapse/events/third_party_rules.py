@@ -108,7 +108,7 @@ class ThirdPartyEventRules:
         if self.third_party_rules is None:
             return True
 
-        state_events = await self._get_state_events_dict_for_room(room_id)
+        state_events = await self._get_state_map_for_room(room_id)
 
         ret = await self.third_party_rules.check_threepid_can_be_invited(
             medium, address, state_events
@@ -135,13 +135,11 @@ class ThirdPartyEventRules:
         if not check_func or not isinstance(check_func, Callable):
             return True
 
-        state_events = await self._get_state_events_dict_for_room(room_id)
+        state_events = await self._get_state_map_for_room(room_id)
 
         return await check_func(room_id, state_events, new_visibility)
 
-    async def _get_state_events_dict_for_room(
-        self, room_id: str
-    ) -> StateMap[EventBase]:
+    async def _get_state_map_for_room(self, room_id: str) -> StateMap[EventBase]:
         """Given a room ID, return the state events of that room.
 
         Args:
