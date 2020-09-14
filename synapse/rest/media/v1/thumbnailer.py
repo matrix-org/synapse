@@ -83,7 +83,7 @@ class Thumbnailer:
 
         Args:
             max_width: The largest possible width.
-            max_height: The larget possible height.
+            max_height: The largest possible height.
         """
 
         if max_width * self.height < max_height * self.width:
@@ -117,7 +117,7 @@ class Thumbnailer:
 
         Args:
             max_width: The largest possible width.
-            max_height: The larget possible height.
+            max_height: The largest possible height.
 
         Returns:
             BytesIO: the bytes of the encoded image ready to be written to disk
