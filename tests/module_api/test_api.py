@@ -71,24 +71,38 @@ class ModuleApiTestCase(HomeserverTestCase):
 
         # The room should not currently be in the public rooms directory
         is_in_public_rooms = self.get_success(
-            self.module_api.room_is_in_public_directory(room_id)
+            self.module_api.public_room_list_manager.room_is_in_public_room_list(
+                room_id
+            )
         )
         self.assertFalse(is_in_public_rooms)
 
         # Let's try adding it to the public rooms directory
-        self.get_success(self.module_api.add_room_to_public_directory(room_id))
+        self.get_success(
+            self.module_api.public_room_list_manager.add_room_to_public_room_list(
+                room_id
+            )
+        )
 
         # And checking whether it's in there...
         is_in_public_rooms = self.get_success(
-            self.module_api.room_is_in_public_directory(room_id)
+            self.module_api.public_room_list_manager.room_is_in_public_room_list(
+                room_id
+            )
         )
         self.assertTrue(is_in_public_rooms)
 
         # Let's remove it again
-        self.get_success(self.module_api.remove_room_from_public_directory(room_id))
+        self.get_success(
+            self.module_api.public_room_list_manager.remove_room_from_public_room_list(
+                room_id
+            )
+        )
 
         # Should be gone
         is_in_public_rooms = self.get_success(
-            self.module_api.room_is_in_public_directory(room_id)
+            self.module_api.public_room_list_manager.room_is_in_public_room_list(
+                room_id
+            )
         )
         self.assertFalse(is_in_public_rooms)
