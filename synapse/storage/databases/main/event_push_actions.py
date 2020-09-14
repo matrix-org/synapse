@@ -969,7 +969,7 @@ def _action_has_highlight(actions):
     return False
 
 
-@attr.s
+@attr.s(slots=True)
 class _EventPushSummary:
     """Summary of pending event push actions for a given user in a given room.
     Used in _rotate_notifs_before_txn to manipulate results from event_push_actions.

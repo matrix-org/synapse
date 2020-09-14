@@ -89,13 +89,11 @@ class TimelineBatch:
     events = attr.ib(type=List[EventBase])
     limited = attr.ib(bool)
 
-    def __nonzero__(self) -> bool:
+    def __bool__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
         to tell if room needs to be part of the sync result.
         """
         return bool(self.events)
-
-    __bool__ = __nonzero__  # python3
 
 
 # We can't freeze this class, because we need to update it after it's instantiated to
@@ -114,7 +112,7 @@ class JoinedSyncResult:
     summary = attr.ib(type=Optional[JsonDict])
     unread_count = attr.ib(type=int)
 
-    def __nonzero__(self) -> bool:
+    def __bool__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
         to tell if room needs to be part of the sync result.
         """
@@ -127,8 +125,6 @@ class JoinedSyncResult:
             # else in the result, we don't need to send it.
         )
 
-    __bool__ = __nonzero__  # python3
-
 
 @attr.s(slots=True, frozen=True)
 class ArchivedSyncResult:
@@ -137,13 +133,11 @@ class ArchivedSyncResult:
     state = attr.ib(type=StateMap[EventBase])
     account_data = attr.ib(type=List[JsonDict])
 
-    def __nonzero__(self) -> bool:
+    def __bool__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
         to tell if room needs to be part of the sync result.
         """
         return bool(self.timeline or self.state or self.account_data)
-
-    __bool__ = __nonzero__  # python3
 
 
 @attr.s(slots=True, frozen=True)
@@ -151,11 +145,9 @@ class InvitedSyncResult:
     room_id = attr.ib(type=str)
     invite = attr.ib(type=EventBase)
 
-    def __nonzero__(self) -> bool:
+    def __bool__(self) -> bool:
         """Invited rooms should always be reported to the client"""
         return True
-
-    __bool__ = __nonzero__  # python3
 
 
 @attr.s(slots=True, frozen=True)
@@ -164,10 +156,8 @@ class GroupsSyncResult:
     invite = attr.ib(type=JsonDict)
     leave = attr.ib(type=JsonDict)
 
-    def __nonzero__(self) -> bool:
+    def __bool__(self) -> bool:
         return bool(self.join or self.invite or self.leave)
-
-    __bool__ = __nonzero__  # python3
 
 
 @attr.s(slots=True, frozen=True)
@@ -181,13 +171,11 @@ class DeviceLists:
     changed = attr.ib(type=Collection[str])
     left = attr.ib(type=Collection[str])
 
-    def __nonzero__(self) -> bool:
+    def __bool__(self) -> bool:
         return bool(self.changed or self.left)
 
-    __bool__ = __nonzero__  # python3
 
-
-@attr.s
+@attr.s(slots=True)
 class _RoomChanges:
     """The set of room entries to include in the sync, plus the set of joined
     and left room IDs since last sync.
@@ -227,7 +215,7 @@ class SyncResult:
     device_one_time_keys_count = attr.ib(type=JsonDict)
     groups = attr.ib(type=Optional[GroupsSyncResult])
 
-    def __nonzero__(self) -> bool:
+    def __bool__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
         to tell if the notifier needs to wait for more events when polling for
         events.
@@ -242,8 +230,6 @@ class SyncResult:
             or self.device_lists
             or self.groups
         )
-
-    __bool__ = __nonzero__  # python3
 
 
 class SyncHandler:
@@ -2038,7 +2024,7 @@ def _calculate_state(
     return {event_id_to_key[e]: e for e in state_ids}
 
 
-@attr.s
+@attr.s(slots=True)
 class SyncResultBuilder:
     """Used to help build up a new SyncResult for a user
 
@@ -2074,7 +2060,7 @@ class SyncResultBuilder:
     to_device = attr.ib(type=List[JsonDict], default=attr.Factory(list))
 
 
-@attr.s
+@attr.s(slots=True)
 class RoomSyncResultBuilder:
     """Stores information needed to create either a `JoinedSyncResult` or
     `ArchivedSyncResult`.

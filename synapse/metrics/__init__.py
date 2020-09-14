@@ -59,7 +59,7 @@ class RegistryProxy:
                 yield metric
 
 
-@attr.s(hash=True)
+@attr.s(slots=True, hash=True)
 class LaterGauge:
 
     name = attr.ib(type=str)
@@ -205,7 +205,7 @@ class InFlightGauge:
         all_gauges[self.name] = self
 
 
-@attr.s(hash=True)
+@attr.s(slots=True, hash=True)
 class BucketCollector:
     """
     Like a Histogram, but allows buckets to be point-in-time instead of

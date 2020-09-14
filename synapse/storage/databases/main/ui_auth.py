@@ -23,7 +23,7 @@ from synapse.types import JsonDict
 from synapse.util import json_encoder, stringutils
 
 
-@attr.s
+@attr.s(slots=True)
 class UIAuthSessionData:
     session_id = attr.ib(type=str)
     # The dictionary from the client root level, not the 'auth' key.

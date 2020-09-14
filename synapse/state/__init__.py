@@ -678,7 +678,7 @@ def resolve_events_with_store(
         )
 
 
-@attr.s
+@attr.s(slots=True)
 class StateResolutionStore:
     """Interface that allows state resolution algorithms to access the database
     in well defined way.

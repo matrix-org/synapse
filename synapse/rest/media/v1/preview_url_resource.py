@@ -102,7 +102,7 @@ for endpoint, globs in _oembed_globs.items():
         _oembed_patterns[re.compile(pattern)] = endpoint
 
 
-@attr.s
+@attr.s(slots=True)
 class OEmbedResult:
     # Either HTML content or URL must be provided.
     html = attr.ib(type=Optional[str])
