@@ -505,9 +505,7 @@ class E2eKeysHandler:
                     "device_id": device_id,
                 }
             )
-            await self.store.set_e2e_fallback_keys(
-                user_id, device_id, fallback_keys
-            )
+            await self.store.set_e2e_fallback_keys(user_id, device_id, fallback_keys)
         else:
             log_kv(
                 {"message": "Did not update fallback_keys", "reason": "no keys given"}
