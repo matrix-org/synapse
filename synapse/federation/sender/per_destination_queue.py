@@ -444,10 +444,11 @@ class PerDestinationQueue:
 
         if self._last_successful_stream_ordering is None:
             # if it's still None, then this means we don't have the information
-            # in our database (oh, the perils of being a new feature).
-            # So we can't actually do anything here, and in this case, we don't
-            # know what to catch up, sadly.
-            # Trying to catch up right now is futile, so let's stop.
+            # in our database ­ we haven't successfully sent a PDU to this server
+            # (at least since the introduction of the feature tracking
+            # last_successful_stream_ordering).
+            # Sadly, this means we can't do anything here as we don't know what
+            # needs catching up — so catching up is futile; let's stop.
             self._catching_up = False
             return
 
