@@ -57,6 +57,7 @@ class JoinRules:
 
 class LoginType:
     PASSWORD = "m.login.password"
+    APPSERVICE = "uk.half-shot.unstable.login.appservice"
     EMAIL_IDENTITY = "m.login.email.identity"
     MSISDN = "m.login.msisdn"
     RECAPTCHA = "m.login.recaptcha"
