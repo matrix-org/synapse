@@ -399,7 +399,9 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             )
 
     @cached(max_entries=10000)
-    async def get_e2e_unused_fallback_keys(self, user_id: str, device_id: str) -> List[str]:
+    async def get_e2e_unused_fallback_keys(
+        self, user_id: str, device_id: str
+    ) -> List[str]:
         """Returns the fallback key types that have an unused key.
 
         Args:
