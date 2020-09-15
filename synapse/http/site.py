@@ -161,7 +161,9 @@ class SynapseRequest(Request):
             yield
         except Exception:
             # this should already have been caught, and sent back to the client as a 500.
-            logger.exception("Asynchronous messge handler raised an uncaught exception")
+            logger.exception(
+                "Asynchronous message handler raised an uncaught exception"
+            )
         finally:
             # the request handler has finished its work and either sent the whole response
             # back, or handed over responsibility to a Producer.
