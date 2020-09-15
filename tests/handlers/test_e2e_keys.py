@@ -177,7 +177,7 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         device_id = "xyz"
         keys = {"alg1:k1": "key1"}
 
-        res = yield defer.ensureDeferred(
+        yield defer.ensureDeferred(
             self.handler.upload_keys_for_user(
                 local_user, device_id, {"fallback_keys": keys}
             )
