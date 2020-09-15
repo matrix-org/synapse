@@ -489,9 +489,9 @@ class PerDestinationQueue:
                     "This should not happen." % event_ids
                 )
 
-            if logger.isEnabledFor(logging.DEBUG):
+            if logger.isEnabledFor(logging.INFO):
                 rooms = (p.room_id for p in catchup_pdus)
-                logger.debug("Catching up rooms to %s: %r", self._destination, rooms)
+                logger.info("Catching up rooms to %s: %r", self._destination, rooms)
 
             success = await self._transaction_manager.send_new_transaction(
                 self._destination, catchup_pdus, []
