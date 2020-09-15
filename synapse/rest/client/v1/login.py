@@ -144,7 +144,7 @@ class LoginRestServlet(RestServlet):
         return 200, result
 
     async def _do_other_login(
-        self, login_submission: JsonDict, appservice: ApplicationService
+        self, login_submission: JsonDict, appservice: Optional[ApplicationService]
     ) -> Dict[str, str]:
         """Handle non-token/saml/jwt logins
 
