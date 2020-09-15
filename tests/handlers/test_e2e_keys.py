@@ -172,6 +172,47 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
+    def test_fallback_key(self):
+        local_user = "@boris:" + self.hs.hostname
+        device_id = "xyz"
+        keys = {"alg1:k1": "key1"}
+
+        res = yield defer.ensureDeferred(
+            self.handler.upload_keys_for_user(
+                local_user, device_id, {"fallback_keys": keys}
+            )
+        )
+
+        # claiming an OTK when no OTKs are available should return the fallback
+        # key
+        res2 = yield defer.ensureDeferred(
+            self.handler.claim_one_time_keys(
+                {"one_time_keys": {local_user: {device_id: "alg1"}}}, timeout=None
+            )
+        )
+        self.assertEqual(
+            res2,
+            {
+                "failures": {},
+                "one_time_keys": {local_user: {device_id: {"alg1:k1": "key1"}}},
+            },
+        )
+
+        # claiming an OTK again should return the same fallback key
+        res3 = yield defer.ensureDeferred(
+            self.handler.claim_one_time_keys(
+                {"one_time_keys": {local_user: {device_id: "alg1"}}}, timeout=None
+            )
+        )
+        self.assertEqual(
+            res3,
+            {
+                "failures": {},
+                "one_time_keys": {local_user: {device_id: {"alg1:k1": "key1"}}},
+            },
+        )
+
+    @defer.inlineCallbacks
     def test_replace_master_key(self):
         """uploading a new signing key should make the old signing key unavailable"""
         local_user = "@boris:" + self.hs.hostname

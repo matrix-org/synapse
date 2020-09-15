@@ -369,7 +369,15 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
 
     async def set_e2e_fallback_keys(
         self, user_id: str, device_id: str, fallback_keys: dict
-    ):
+    ) -> None:
+        """Set the user's e2e fallback keys.
+
+        Args:
+            user_id: the user whose keys are being set
+            device_id: the device whose keys are being set
+            fallback_keys: the keys to set.  This is a map from key ID (which is
+                of the form "algorithm:id") to key data.
+        """
         # fallback_keys will usually only have one item in it, so using a for
         # loop (as opposed to calling simple_upsert_many_txn) won't be too bad
         # FIXME: make sure that only one key per algorithm is uploaded
@@ -391,7 +399,16 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             )
 
     @cached(max_entries=10000)
-    async def get_e2e_unused_fallback_keys(self, user_id: str, device_id: str):
+    async def get_e2e_unused_fallback_keys(self, user_id: str, device_id: str) -> List[str]:
+        """Returns the fallback key types that have an unused key.
+
+        Args:
+            user_id: the user whose keys are being queried
+            device_id: the device whose keys are being queried
+
+        Returns:
+            a list of key types
+        """
         return await self.db_pool.simple_select_onecol(
             "e2e_fallback_keys_json",
             keyvalues={"user_id": user_id, "device_id": device_id, "used": 0},
@@ -751,6 +768,8 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                     device_result[algorithm + ":" + key_id] = key_json
                     delete.append((user_id, device_id, algorithm, key_id))
                 if not found:
+                    # no one-time key available, so see if there's a fallback
+                    # key
                     txn.execute(fallback_sql, (user_id, device_id, algorithm))
                     for key_id, key_json, used in txn:
                         device_result[algorithm + ":" + key_id] = key_json
@@ -758,6 +777,8 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                             used_fallbacks.append(
                                 (user_id, device_id, algorithm, key_id)
                             )
+
+            # drop any one-time keys that were claimed
             sql = (
                 "DELETE FROM e2e_one_time_keys_json"
                 " WHERE user_id = ? AND device_id = ? AND algorithm = ?"
@@ -774,6 +795,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 self._invalidate_cache_and_stream(
                     txn, self.count_e2e_one_time_keys, (user_id, device_id)
                 )
+            # mark fallback keys as used
             for user_id, device_id, algorithm, key_id in used_fallbacks:
                 self.db_pool.simple_update_txn(
                     txn,
@@ -789,6 +811,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 self._invalidate_cache_and_stream(
                     txn, self.get_e2e_unused_fallback_keys, (user_id, device_id)
                 )
+
             return result
 
         return await self.db_pool.runInteraction(
