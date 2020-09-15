@@ -36,7 +36,7 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
         self.registration_handler = hs.get_registration_handler()
 
     @staticmethod
-    def _serialize_payload(user_id, device_id, initial_display_name, is_guest):
+    async def _serialize_payload(user_id, device_id, initial_display_name, is_guest):
         """
         Args:
             device_id (str|None): Device ID to use, if None a new one is

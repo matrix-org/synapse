@@ -16,8 +16,6 @@
 import itertools
 import logging
 
-from canonicaljson import json
-
 from synapse.api.constants import PresenceState
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.api.filtering import DEFAULT_FILTER_COLLECTION, FilterCollection
@@ -29,6 +27,7 @@ from synapse.handlers.presence import format_user_presence_state
 from synapse.handlers.sync import SyncConfig
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.types import StreamToken
+from synapse.util import json_decoder
 
 from ._base import client_patterns, set_timeline_upper_limit
 
@@ -125,7 +124,7 @@ class SyncRestServlet(RestServlet):
             filter_collection = DEFAULT_FILTER_COLLECTION
         elif filter_id.startswith("{"):
             try:
-                filter_object = json.loads(filter_id)
+                filter_object = json_decoder.decode(filter_id)
                 set_timeline_upper_limit(
                     filter_object, self.hs.config.filter_timeline_limit
                 )
@@ -178,14 +177,22 @@ class SyncRestServlet(RestServlet):
                 full_state=full_state,
             )
 
+        # the client may have disconnected by now; don't bother to serialize the
+        # response if so.
+        if request._disconnected:
+            logger.info("Client has disconnected; not serializing response.")
+            return 200, {}
+
         time_now = self.clock.time_msec()
         response_content = await self.encode_response(
             time_now, sync_result, requester.access_token_id, filter_collection
         )
 
+        logger.debug("Event formatting complete")
         return 200, response_content
 
     async def encode_response(self, time_now, sync_result, access_token_id, filter):
+        logger.debug("Formatting events in sync response")
         if filter.event_format == "client":
             event_formatter = format_event_for_client_v2_without_room_id
         elif filter.event_format == "federation":
@@ -213,6 +220,7 @@ class SyncRestServlet(RestServlet):
             event_formatter,
         )
 
+        logger.debug("building sync response dict")
         return {
             "account_data": {"events": sync_result.account_data},
             "to_device": {"events": sync_result.to_device},
@@ -417,6 +425,7 @@ class SyncRestServlet(RestServlet):
             result["ephemeral"] = {"events": ephemeral_events}
             result["unread_notifications"] = room.unread_notifications
             result["summary"] = room.summary
+            result["org.matrix.msc2654.unread_count"] = room.unread_count
 
         return result
 

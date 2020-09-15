@@ -133,7 +133,7 @@ def create_test_cert_file(sanlist):
 
 
 @implementer(IOpenSSLServerConnectionCreator)
-class TestServerTLSConnectionFactory(object):
+class TestServerTLSConnectionFactory:
     """An SSL connection creator which returns connections which present a certificate
     signed by our test CA."""
 

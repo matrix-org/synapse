@@ -26,7 +26,7 @@ from tests.unittest import override_config
 
 class RoomDirectoryFederationTests(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
-        class Authenticator(object):
+        class Authenticator:
             def authenticate_request(self, request, content):
                 return defer.succeed("otherserver.nottld")
 

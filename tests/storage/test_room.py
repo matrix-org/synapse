@@ -37,11 +37,13 @@ class RoomStoreTestCase(unittest.TestCase):
         self.alias = RoomAlias.from_string("#a-room-name:test")
         self.u_creator = UserID.from_string("@creator:test")
 
-        yield self.store.store_room(
-            self.room.to_string(),
-            room_creator_user_id=self.u_creator.to_string(),
-            is_public=True,
-            room_version=RoomVersions.V1,
+        yield defer.ensureDeferred(
+            self.store.store_room(
+                self.room.to_string(),
+                room_creator_user_id=self.u_creator.to_string(),
+                is_public=True,
+                room_version=RoomVersions.V1,
+            )
         )
 
     @defer.inlineCallbacks
@@ -52,7 +54,13 @@ class RoomStoreTestCase(unittest.TestCase):
                 "creator": self.u_creator.to_string(),
                 "is_public": True,
             },
-            (yield self.store.get_room(self.room.to_string())),
+            (yield defer.ensureDeferred(self.store.get_room(self.room.to_string()))),
+        )
+
+    @defer.inlineCallbacks
+    def test_get_room_unknown_room(self):
+        self.assertIsNone(
+            (yield defer.ensureDeferred(self.store.get_room("!uknown:test")))
         )
 
     @defer.inlineCallbacks
@@ -63,7 +71,21 @@ class RoomStoreTestCase(unittest.TestCase):
                 "creator": self.u_creator.to_string(),
                 "public": True,
             },
-            (yield self.store.get_room_with_stats(self.room.to_string())),
+            (
+                yield defer.ensureDeferred(
+                    self.store.get_room_with_stats(self.room.to_string())
+                )
+            ),
+        )
+
+    @defer.inlineCallbacks
+    def test_get_room_with_stats_unknown_room(self):
+        self.assertIsNone(
+            (
+                yield defer.ensureDeferred(
+                    self.store.get_room_with_stats("!uknown:test")
+                )
+            ),
         )
 
 
@@ -80,17 +102,21 @@ class RoomEventsStoreTestCase(unittest.TestCase):
 
         self.room = RoomID.from_string("!abcde:test")
 
-        yield self.store.store_room(
-            self.room.to_string(),
-            room_creator_user_id="@creator:text",
-            is_public=True,
-            room_version=RoomVersions.V1,
+        yield defer.ensureDeferred(
+            self.store.store_room(
+                self.room.to_string(),
+                room_creator_user_id="@creator:text",
+                is_public=True,
+                room_version=RoomVersions.V1,
+            )
         )
 
     @defer.inlineCallbacks
     def inject_room_event(self, **kwargs):
-        yield self.storage.persistence.persist_event(
-            self.event_factory.create_event(room_id=self.room.to_string(), **kwargs)
+        yield defer.ensureDeferred(
+            self.storage.persistence.persist_event(
+                self.event_factory.create_event(room_id=self.room.to_string(), **kwargs)
+            )
         )
 
     @defer.inlineCallbacks
@@ -101,7 +127,9 @@ class RoomEventsStoreTestCase(unittest.TestCase):
             etype=EventTypes.Name, name=name, content={"name": name}, depth=1
         )
 
-        state = yield self.store.get_current_state(room_id=self.room.to_string())
+        state = yield defer.ensureDeferred(
+            self.store.get_current_state(room_id=self.room.to_string())
+        )
 
         self.assertEquals(1, len(state))
         self.assertObjectHasAttributes(
@@ -117,7 +145,9 @@ class RoomEventsStoreTestCase(unittest.TestCase):
             etype=EventTypes.Topic, topic=topic, content={"topic": topic}, depth=1
         )
 
-        state = yield self.store.get_current_state(room_id=self.room.to_string())
+        state = yield defer.ensureDeferred(
+            self.store.get_current_state(room_id=self.room.to_string())
+        )
 
         self.assertEquals(1, len(state))
         self.assertObjectHasAttributes(

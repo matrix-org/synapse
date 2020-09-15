@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import gc
 import logging
 import os
@@ -20,8 +19,8 @@ import signal
 import socket
 import sys
 import traceback
+from typing import Iterable
 
-from daemonize import Daemonize
 from typing_extensions import NoReturn
 
 from twisted.internet import defer, error, reactor
@@ -29,9 +28,11 @@ from twisted.protocols.tls import TLSMemoryBIOFactory
 
 import synapse
 from synapse.app import check_bind_error
+from synapse.config.server import ListenerConfig
 from synapse.crypto import context_factory
 from synapse.logging.context import PreserveLoggingContext
 from synapse.util.async_helpers import Linearizer
+from synapse.util.daemonize import daemonize_process
 from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
 
@@ -127,17 +128,8 @@ def start_reactor(
             if print_pidfile:
                 print(pid_file)
 
-            daemon = Daemonize(
-                app=appname,
-                pid=pid_file,
-                action=run,
-                auto_close_fds=False,
-                verbose=True,
-                logger=logger,
-            )
-            daemon.start()
-        else:
-            run()
+            daemonize_process(pid_file, logger)
+        run()
 
 
 def quit_with_error(error_string: str) -> NoReturn:
@@ -234,7 +226,7 @@ def refresh_certificate(hs):
         logger.info("Context factories updated.")
 
 
-def start(hs, listeners=None):
+def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerConfig]):
     """
     Start a Synapse server or worker.
 
@@ -245,8 +237,8 @@ def start(hs, listeners=None):
     notify systemd.
 
     Args:
-        hs (synapse.server.HomeServer)
-        listeners (list[dict]): Listener configuration ('listeners' in homeserver.yaml)
+        hs: homeserver instance
+        listeners: Listener configuration ('listeners' in homeserver.yaml)
     """
     try:
         # Set up the SIGHUP machinery.
@@ -276,7 +268,7 @@ def start(hs, listeners=None):
 
         # It is now safe to start your Synapse.
         hs.start_listening(listeners)
-        hs.get_datastore().db.start_profiling()
+        hs.get_datastore().db_pool.start_profiling()
         hs.get_pusherpool().start()
 
         setup_sentry(hs)
@@ -342,6 +334,13 @@ def install_dns_limiter(reactor, max_dns_requests_in_flight=100):
     This is to workaround https://twistedmatrix.com/trac/ticket/9620, where we
     can run out of file descriptors and infinite loop if we attempt to do too
     many DNS queries at once
+
+    XXX: I'm confused by this. reactor.nameResolver does not use twisted.names unless
+    you explicitly install twisted.names as the resolver; rather it uses a GAIResolver
+    backed by the reactor's default threadpool (which is limited to 10 threads). So
+    (a) I don't understand why twisted ticket 9620 is relevant, and (b) I don't
+    understand why we would run out of FDs if we did too many lookups at once.
+    -- richvdh 2020/08/29
     """
     new_resolver = _LimitedHostnameResolver(
         reactor.nameResolver, max_dns_requests_in_flight
@@ -350,7 +349,7 @@ def install_dns_limiter(reactor, max_dns_requests_in_flight=100):
     reactor.installNameResolver(new_resolver)
 
 
-class _LimitedHostnameResolver(object):
+class _LimitedHostnameResolver:
     """Wraps a IHostnameResolver, limiting the number of in-flight DNS lookups.
     """
 
@@ -410,7 +409,7 @@ class _LimitedHostnameResolver(object):
             yield deferred
 
 
-class _DeferredResolutionReceiver(object):
+class _DeferredResolutionReceiver:
     """Wraps a IResolutionReceiver and simply resolves the given deferred when
     resolution is complete
     """

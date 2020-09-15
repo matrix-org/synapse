@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-
-from six import iteritems, string_types
+from typing import Any
 
 from synapse.api.errors import SynapseError
 from synapse.api.urls import ConsentURIBuilder
@@ -24,7 +23,7 @@ from synapse.types import get_localpart_from_id
 logger = logging.getLogger(__name__)
 
 
-class ConsentServerNotices(object):
+class ConsentServerNotices:
     """Keeps track of whether we need to send users server_notices about
     privacy policy consent, and sends one if we do.
     """
@@ -57,14 +56,11 @@ class ConsentServerNotices(object):
 
             self._consent_uri_builder = ConsentURIBuilder(hs.config)
 
-    async def maybe_send_server_notice_to_user(self, user_id):
+    async def maybe_send_server_notice_to_user(self, user_id: str) -> None:
         """Check if we need to send a notice to this user, and does so if so
 
         Args:
-            user_id (str): user to check
-
-        Returns:
-            Deferred
+            user_id: user to check
         """
         if self._server_notice_content is None:
             # not enabled
@@ -107,7 +103,7 @@ class ConsentServerNotices(object):
             self._users_in_progress.remove(user_id)
 
 
-def copy_with_str_subst(x, substitutions):
+def copy_with_str_subst(x: Any, substitutions: Any) -> Any:
     """Deep-copy a structure, carrying out string substitions on any strings
 
     Args:
@@ -118,12 +114,12 @@ def copy_with_str_subst(x, substitutions):
     Returns:
         copy of x
     """
-    if isinstance(x, string_types):
+    if isinstance(x, str):
         return x % substitutions
     if isinstance(x, dict):
-        return {k: copy_with_str_subst(v, substitutions) for (k, v) in iteritems(x)}
+        return {k: copy_with_str_subst(v, substitutions) for (k, v) in x.items()}
     if isinstance(x, (list, tuple)):
-        return [copy_with_str_subst(y) for y in x]
+        return [copy_with_str_subst(y, substitutions) for y in x]
 
     # assume it's uninterested and can be shallow-copied.
     return x

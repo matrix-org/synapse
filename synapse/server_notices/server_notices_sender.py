@@ -12,13 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Iterable, Union
+
 from synapse.server_notices.consent_server_notices import ConsentServerNotices
 from synapse.server_notices.resource_limits_server_notices import (
     ResourceLimitsServerNotices,
 )
 
 
-class ServerNoticesSender(object):
+class ServerNoticesSender:
     """A centralised place which sends server notices automatically when
     Certain Events take place
     """
@@ -32,22 +34,22 @@ class ServerNoticesSender(object):
         self._server_notices = (
             ConsentServerNotices(hs),
             ResourceLimitsServerNotices(hs),
-        )
+        )  # type: Iterable[Union[ConsentServerNotices, ResourceLimitsServerNotices]]
 
-    async def on_user_syncing(self, user_id):
+    async def on_user_syncing(self, user_id: str) -> None:
         """Called when the user performs a sync operation.
 
         Args:
-            user_id (str): mxid of user who synced
+            user_id: mxid of user who synced
         """
         for sn in self._server_notices:
             await sn.maybe_send_server_notice_to_user(user_id)
 
-    async def on_user_ip(self, user_id):
+    async def on_user_ip(self, user_id: str) -> None:
         """Called on the master when a worker process saw a client request.
 
         Args:
-            user_id (str): mxid
+            user_id: mxid
         """
         # The synchrotrons use a stubbed version of ServerNoticesSender, so
         # we check for notices to send to the user in on_user_ip as well as

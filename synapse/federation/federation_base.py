@@ -17,8 +17,6 @@ import logging
 from collections import namedtuple
 from typing import Iterable, List
 
-import six
-
 from twisted.internet import defer
 from twisted.internet.defer import Deferred, DeferredList
 from twisted.python.failure import Failure
@@ -41,7 +39,7 @@ from synapse.types import JsonDict, get_domain_from_id
 logger = logging.getLogger(__name__)
 
 
-class FederationBase(object):
+class FederationBase:
     def __init__(self, hs):
         self.hs = hs
 
@@ -93,8 +91,8 @@ class FederationBase(object):
                     # *actual* redacted copy to be on the safe side.)
                     redacted_event = prune_event(pdu)
                     if set(redacted_event.keys()) == set(pdu.keys()) and set(
-                        six.iterkeys(redacted_event.content)
-                    ) == set(six.iterkeys(pdu.content)):
+                        redacted_event.content.keys()
+                    ) == set(pdu.content.keys()):
                         logger.info(
                             "Event %s seems to have been redacted; using our redacted "
                             "copy",
@@ -294,7 +292,7 @@ def event_from_pdu_json(
     assert_params_in_dict(pdu_json, ("type", "depth"))
 
     depth = pdu_json["depth"]
-    if not isinstance(depth, six.integer_types):
+    if not isinstance(depth, int):
         raise SynapseError(400, "Depth %r not an intger" % (depth,), Codes.BAD_JSON)
 
     if depth < 0:

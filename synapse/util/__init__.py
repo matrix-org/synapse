@@ -17,12 +17,26 @@ import logging
 import re
 
 import attr
+from canonicaljson import json
 
 from twisted.internet import defer, task
 
 from synapse.logging import context
 
 logger = logging.getLogger(__name__)
+
+
+def _reject_invalid_json(val):
+    """Do not allow Infinity, -Infinity, or NaN values in JSON."""
+    raise ValueError("Invalid JSON value: '%s'" % val)
+
+
+# Create a custom encoder to reduce the whitespace produced by JSON encoding and
+# ensure that valid JSON is produced.
+json_encoder = json.JSONEncoder(allow_nan=False, separators=(",", ":"))
+
+# Create a custom decoder to reject Python extensions to JSON.
+json_decoder = json.JSONDecoder(parse_constant=_reject_invalid_json)
 
 
 def unwrapFirstError(failure):
@@ -32,7 +46,7 @@ def unwrapFirstError(failure):
 
 
 @attr.s
-class Clock(object):
+class Clock:
     """
     A Clock wraps a Twisted reactor and provides utilities on top of it.
 
@@ -55,7 +69,7 @@ class Clock(object):
         return self._reactor.seconds()
 
     def time_msec(self):
-        """Returns the current system time in miliseconds since epoch."""
+        """Returns the current system time in milliseconds since epoch."""
         return int(self.time() * 1000)
 
     def looping_call(self, f, msec, *args, **kwargs):

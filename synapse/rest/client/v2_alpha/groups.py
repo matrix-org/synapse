@@ -16,6 +16,7 @@
 
 import logging
 
+from synapse.api.errors import SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import GroupID
 
@@ -324,6 +325,9 @@ class GroupRoomServlet(RestServlet):
     async def on_GET(self, request, group_id):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         requester_user_id = requester.user.to_string()
+
+        if not GroupID.is_valid(group_id):
+            raise SynapseError(400, "%s was not legal group ID" % (group_id,))
 
         result = await self.groups_handler.get_rooms_in_group(
             group_id, requester_user_id

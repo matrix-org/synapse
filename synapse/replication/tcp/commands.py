@@ -19,17 +19,9 @@ allowed to be sent by which side.
 """
 import abc
 import logging
-import platform
 from typing import Tuple, Type
 
-if platform.python_implementation() == "PyPy":
-    import json
-
-    _json_encoder = json.JSONEncoder()
-else:
-    import simplejson as json  # type: ignore[no-redef]  # noqa: F821
-
-    _json_encoder = json.JSONEncoder(namedtuple_as_object=False)  # type: ignore[call-arg]  # noqa: F821
+from synapse.util import json_decoder, json_encoder
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +46,7 @@ class Command(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def to_line(self) -> str:
-        """Serialises the comamnd for the wire. Does not include the command
+        """Serialises the command for the wire. Does not include the command
         prefix.
         """
 
@@ -131,7 +123,7 @@ class RdataCommand(Command):
             stream_name,
             instance_name,
             None if token == "batch" else int(token),
-            json.loads(row_json),
+            json_decoder.decode(row_json),
         )
 
     def to_line(self):
@@ -140,7 +132,7 @@ class RdataCommand(Command):
                 self.stream_name,
                 self.instance_name,
                 str(self.token) if self.token is not None else "batch",
-                _json_encoder.encode(self.row),
+                json_encoder.encode(self.row),
             )
         )
 
@@ -149,7 +141,7 @@ class RdataCommand(Command):
 
 
 class PositionCommand(Command):
-    """Sent by the server to tell the client the stream postition without
+    """Sent by the server to tell the client the stream position without
     needing to send an RDATA.
 
     Format::
@@ -188,7 +180,7 @@ class ErrorCommand(_SimpleCommand):
 
 
 class PingCommand(_SimpleCommand):
-    """Sent by either side as a keep alive. The data is arbitary (often timestamp)
+    """Sent by either side as a keep alive. The data is arbitrary (often timestamp)
     """
 
     NAME = "PING"
@@ -300,20 +292,22 @@ class FederationAckCommand(Command):
 
     Format::
 
-        FEDERATION_ACK <token>
+        FEDERATION_ACK <instance_name> <token>
     """
 
     NAME = "FEDERATION_ACK"
 
-    def __init__(self, token):
+    def __init__(self, instance_name, token):
+        self.instance_name = instance_name
         self.token = token
 
     @classmethod
     def from_line(cls, line):
-        return cls(int(line))
+        instance_name, token = line.split(" ")
+        return cls(instance_name, int(token))
 
     def to_line(self):
-        return str(self.token)
+        return "%s %s" % (self.instance_name, self.token)
 
 
 class RemovePusherCommand(Command):
@@ -363,7 +357,7 @@ class UserIpCommand(Command):
     def from_line(cls, line):
         user_id, jsn = line.split(" ", 1)
 
-        access_token, ip, user_agent, device_id, last_seen = json.loads(jsn)
+        access_token, ip, user_agent, device_id, last_seen = json_decoder.decode(jsn)
 
         return cls(user_id, access_token, ip, user_agent, device_id, last_seen)
 
@@ -371,7 +365,7 @@ class UserIpCommand(Command):
         return (
             self.user_id
             + " "
-            + _json_encoder.encode(
+            + json_encoder.encode(
                 (
                     self.access_token,
                     self.ip,

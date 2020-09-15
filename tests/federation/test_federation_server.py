@@ -15,12 +15,45 @@
 # limitations under the License.
 import logging
 
+from parameterized import parameterized
+
 from synapse.events import make_event_from_dict
 from synapse.federation.federation_server import server_matches_acl_event
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 
 from tests import unittest
+
+
+class FederationServerTests(unittest.FederatingHomeserverTestCase):
+
+    servlets = [
+        admin.register_servlets,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    @parameterized.expand([(b"",), (b"foo",), (b'{"limit": Infinity}',)])
+    def test_bad_request(self, query_content):
+        """
+        Querying with bad data returns a reasonable error code.
+        """
+        u1 = self.register_user("u1", "pass")
+        u1_token = self.login("u1", "pass")
+
+        room_1 = self.helper.create_room_as(u1, tok=u1_token)
+        self.inject_room_member(room_1, "@user:other.example.com", "join")
+
+        "/get_missing_events/(?P<room_id>[^/]*)/?"
+
+        request, channel = self.make_request(
+            "POST",
+            "/_matrix/federation/v1/get_missing_events/%s" % (room_1,),
+            query_content,
+        )
+        self.render(request)
+        self.assertEquals(400, channel.code, channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_NOT_JSON")
 
 
 class ServerACLsTestCase(unittest.TestCase):

@@ -43,7 +43,7 @@ response_cache_total = Gauge("synapse_util_caches_response_cache:total", "", ["n
 
 
 @attr.s
-class CacheMetric(object):
+class CacheMetric:
 
     _cache = attr.ib()
     _cache_type = attr.ib(type=str)

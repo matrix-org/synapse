@@ -12,11 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 from io import BytesIO
 
-import PIL.Image as Image
+from PIL import Image as Image
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,7 @@ EXIF_TRANSPOSE_MAPPINGS = {
 }
 
 
-class Thumbnailer(object):
+class Thumbnailer:
 
     FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG"}
 

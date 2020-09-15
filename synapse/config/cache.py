@@ -15,6 +15,7 @@
 
 import os
 import re
+import threading
 from typing import Callable, Dict
 
 from ._base import Config, ConfigError
@@ -25,11 +26,14 @@ _CACHE_PREFIX = "SYNAPSE_CACHE_FACTOR"
 # Map from canonicalised cache name to cache.
 _CACHES = {}
 
+# a lock on the contents of _CACHES
+_CACHES_LOCK = threading.Lock()
+
 _DEFAULT_FACTOR_SIZE = 0.5
 _DEFAULT_EVENT_CACHE_SIZE = "10K"
 
 
-class CacheProperties(object):
+class CacheProperties:
     def __init__(self):
         # The default factor size for all caches
         self.default_factor_size = float(
@@ -66,7 +70,10 @@ def add_resizable_cache(cache_name: str, cache_resize_callback: Callable):
     # Some caches have '*' in them which we strip out.
     cache_name = _canonicalise_cache_name(cache_name)
 
-    _CACHES[cache_name] = cache_resize_callback
+    # sometimes caches are initialised from background threads, so we need to make
+    # sure we don't conflict with another thread running a resize operation
+    with _CACHES_LOCK:
+        _CACHES[cache_name] = cache_resize_callback
 
     # Ensure all loaded caches are sized appropriately
     #
@@ -87,7 +94,8 @@ class CacheConfig(Config):
             os.environ.get(_CACHE_PREFIX, _DEFAULT_FACTOR_SIZE)
         )
         properties.resize_all_caches_func = None
-        _CACHES.clear()
+        with _CACHES_LOCK:
+            _CACHES.clear()
 
     def generate_config_section(self, **kwargs):
         return """\
@@ -193,6 +201,8 @@ class CacheConfig(Config):
         For each cache, run the mapped callback function with either
         a specific cache factor or the default, global one.
         """
-        for cache_name, callback in _CACHES.items():
-            new_factor = self.cache_factors.get(cache_name, self.global_factor)
-            callback(new_factor)
+        # block other threads from modifying _CACHES while we iterate it.
+        with _CACHES_LOCK:
+            for cache_name, callback in _CACHES.items():
+                new_factor = self.cache_factors.get(cache_name, self.global_factor)
+                callback(new_factor)

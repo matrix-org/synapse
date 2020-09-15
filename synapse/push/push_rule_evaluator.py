@@ -16,9 +16,7 @@
 
 import logging
 import re
-from typing import Pattern
-
-from six import string_types
+from typing import Any, Dict, List, Pattern, Union
 
 from synapse.events import EventBase
 from synapse.types import UserID
@@ -74,17 +72,40 @@ def _test_ineq_condition(condition, number):
         return False
 
 
-def tweaks_for_actions(actions):
+def tweaks_for_actions(actions: List[Union[str, Dict]]) -> Dict[str, Any]:
+    """
+    Converts a list of actions into a `tweaks` dict (which can then be passed to
+        the push gateway).
+
+    This function ignores all actions other than `set_tweak` actions, and treats
+    absent `value`s as `True`, which agrees with the only spec-defined treatment
+    of absent `value`s (namely, for `highlight` tweaks).
+
+    Args:
+        actions: list of actions
+            e.g. [
+                {"set_tweak": "a", "value": "AAA"},
+                {"set_tweak": "b", "value": "BBB"},
+                {"set_tweak": "highlight"},
+                "notify"
+            ]
+
+    Returns:
+        dictionary of tweaks for those actions
+            e.g. {"a": "AAA", "b": "BBB", "highlight": True}
+    """
     tweaks = {}
     for a in actions:
         if not isinstance(a, dict):
             continue
-        if "set_tweak" in a and "value" in a:
-            tweaks[a["set_tweak"]] = a["value"]
+        if "set_tweak" in a:
+            # value is allowed to be absent in which case the value assumed
+            # should be True.
+            tweaks[a["set_tweak"]] = a.get("value", True)
     return tweaks
 
 
-class PushRuleEvaluatorForEvent(object):
+class PushRuleEvaluatorForEvent:
     def __init__(
         self,
         event: EventBase,
@@ -131,7 +152,7 @@ class PushRuleEvaluatorForEvent(object):
         # XXX: optimisation: cache our pattern regexps
         if condition["key"] == "content.body":
             body = self._event.content.get("body", None)
-            if not body:
+            if not body or not isinstance(body, str):
                 return False
 
             return _glob_matches(pattern, body, word_boundary=True)
@@ -147,7 +168,7 @@ class PushRuleEvaluatorForEvent(object):
             return False
 
         body = self._event.content.get("body", None)
-        if not body:
+        if not body or not isinstance(body, str):
             return False
 
         # Similar to _glob_matches, but do not treat display_name as a glob.
@@ -244,7 +265,7 @@ def _flatten_dict(d, prefix=[], result=None):
     if result is None:
         result = {}
     for key, value in d.items():
-        if isinstance(value, string_types):
+        if isinstance(value, str):
             result[".".join(prefix + [key])] = value.lower()
         elif hasattr(value, "items"):
             _flatten_dict(value, prefix=(prefix + [key]), result=result)

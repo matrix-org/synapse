@@ -22,8 +22,6 @@ import threading
 import time
 from typing import Callable, Dict, Iterable, Optional, Tuple, Union
 
-import six
-
 import attr
 from prometheus_client import Counter, Gauge, Histogram
 from prometheus_client.core import (
@@ -53,7 +51,7 @@ all_gauges = {}  # type: Dict[str, Union[LaterGauge, InFlightGauge, BucketCollec
 HAVE_PROC_SELF_STAT = os.path.exists("/proc/self/stat")
 
 
-class RegistryProxy(object):
+class RegistryProxy:
     @staticmethod
     def collect():
         for metric in REGISTRY.collect():
@@ -62,7 +60,7 @@ class RegistryProxy(object):
 
 
 @attr.s(hash=True)
-class LaterGauge(object):
+class LaterGauge:
 
     name = attr.ib(type=str)
     desc = attr.ib(type=str)
@@ -83,7 +81,7 @@ class LaterGauge(object):
             return
 
         if isinstance(calls, dict):
-            for k, v in six.iteritems(calls):
+            for k, v in calls.items():
                 g.add_metric(k, v)
         else:
             g.add_metric([], calls)
@@ -102,7 +100,7 @@ class LaterGauge(object):
         all_gauges[self.name] = self
 
 
-class InFlightGauge(object):
+class InFlightGauge:
     """Tracks number of things (e.g. requests, Measure blocks, etc) in flight
     at any given time.
 
@@ -194,7 +192,7 @@ class InFlightGauge(object):
             gauge = GaugeMetricFamily(
                 "_".join([self.name, name]), "", labels=self.labels
             )
-            for key, metrics in six.iteritems(metrics_by_key):
+            for key, metrics in metrics_by_key.items():
                 gauge.add_metric(key, getattr(metrics, name))
             yield gauge
 
@@ -208,7 +206,7 @@ class InFlightGauge(object):
 
 
 @attr.s(hash=True)
-class BucketCollector(object):
+class BucketCollector:
     """
     Like a Histogram, but allows buckets to be point-in-time instead of
     incrementally added to.
@@ -271,7 +269,7 @@ class BucketCollector(object):
 #
 
 
-class CPUMetrics(object):
+class CPUMetrics:
     def __init__(self):
         ticks_per_sec = 100
         try:
@@ -331,7 +329,7 @@ gc_time = Histogram(
 )
 
 
-class GCCounts(object):
+class GCCounts:
     def collect(self):
         cm = GaugeMetricFamily("python_gc_counts", "GC object counts", labels=["gen"])
         for n, m in enumerate(gc.get_count()):
@@ -349,7 +347,7 @@ if not running_on_pypy:
 #
 
 
-class PyPyGCStats(object):
+class PyPyGCStats:
     def collect(self):
 
         # @stats is a pretty-printer object with __str__() returning a nice table,
@@ -465,6 +463,12 @@ event_processing_last_ts = Gauge("synapse_event_processing_last_ts", "", ["name"
 # finished being processed.
 event_processing_lag = Gauge("synapse_event_processing_lag", "", ["name"])
 
+event_processing_lag_by_event = Histogram(
+    "synapse_event_processing_lag_by_event",
+    "Time between an event being persisted and it being queued up to be sent to the relevant remote servers",
+    ["name"],
+)
+
 # Build info of the running server.
 build_info = Gauge(
     "synapse_build_info", "Build information", ["pythonversion", "version", "osversion"]
@@ -478,7 +482,7 @@ build_info.labels(
 last_ticked = time.time()
 
 
-class ReactorLastSeenMetric(object):
+class ReactorLastSeenMetric:
     def collect(self):
         cm = GaugeMetricFamily(
             "python_twisted_reactor_last_seen",

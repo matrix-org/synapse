@@ -13,15 +13,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import heapq
-from collections import Iterable
+from collections.abc import Iterable
 from typing import List, Tuple, Type
 
 import attr
 
 from ._base import Stream, StreamUpdateResult, Token, current_token_without_instance
-
 
 """Handling of the 'events' replication stream
 
@@ -51,20 +49,20 @@ data part are:
 
 
 @attr.s(slots=True, frozen=True)
-class EventsStreamRow(object):
+class EventsStreamRow:
     """A parsed row from the events replication stream"""
 
     type = attr.ib()  # str: the TypeId of one of the *EventsStreamRows
     data = attr.ib()  # BaseEventsStreamRow
 
 
-class BaseEventsStreamRow(object):
+class BaseEventsStreamRow:
     """Base class for rows to be sent in the events stream.
 
     Specifies how to identify, serialize and deserialize the different types.
     """
 
-    # Unique string that ids the type. Must be overriden in sub classes.
+    # Unique string that ids the type. Must be overridden in sub classes.
     TypeId = None  # type: str
 
     @classmethod

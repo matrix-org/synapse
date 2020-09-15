@@ -28,7 +28,7 @@ MAX_ALIAS_LENGTH = 255
 MAX_USERID_LENGTH = 255
 
 
-class Membership(object):
+class Membership:
 
     """Represents the membership states of a user in a room."""
 
@@ -40,7 +40,7 @@ class Membership(object):
     LIST = (INVITE, JOIN, KNOCK, LEAVE, BAN)
 
 
-class PresenceState(object):
+class PresenceState:
     """Represents the presence state of a user."""
 
     OFFLINE = "offline"
@@ -48,14 +48,14 @@ class PresenceState(object):
     ONLINE = "online"
 
 
-class JoinRules(object):
+class JoinRules:
     PUBLIC = "public"
     KNOCK = "knock"
     INVITE = "invite"
     PRIVATE = "private"
 
 
-class LoginType(object):
+class LoginType:
     PASSWORD = "m.login.password"
     EMAIL_IDENTITY = "m.login.email.identity"
     MSISDN = "m.login.msisdn"
@@ -65,7 +65,7 @@ class LoginType(object):
     DUMMY = "m.login.dummy"
 
 
-class EventTypes(object):
+class EventTypes:
     Member = "m.room.member"
     Create = "m.room.create"
     Tombstone = "m.room.tombstone"
@@ -96,17 +96,17 @@ class EventTypes(object):
     Presence = "m.presence"
 
 
-class RejectedReason(object):
+class RejectedReason:
     AUTH_ERROR = "auth_error"
 
 
-class RoomCreationPreset(object):
+class RoomCreationPreset:
     PRIVATE_CHAT = "private_chat"
     PUBLIC_CHAT = "public_chat"
     TRUSTED_PRIVATE_CHAT = "trusted_private_chat"
 
 
-class ThirdPartyEntityKind(object):
+class ThirdPartyEntityKind:
     USER = "user"
     LOCATION = "location"
 
@@ -115,7 +115,7 @@ ServerNoticeMsgType = "m.server_notice"
 ServerNoticeLimitReached = "m.server_notice.usage_limit_reached"
 
 
-class UserTypes(object):
+class UserTypes:
     """Allows for user type specific behaviour. With the benefit of hindsight
     'admin' and 'guest' users should also be UserTypes. Normal users are type None
     """
@@ -125,7 +125,7 @@ class UserTypes(object):
     ALL_USER_TYPES = (SUPPORT, BOT)
 
 
-class RelationTypes(object):
+class RelationTypes:
     """The types of relations known to this server.
     """
 
@@ -134,14 +134,14 @@ class RelationTypes(object):
     REFERENCE = "m.reference"
 
 
-class LimitBlockingTypes(object):
+class LimitBlockingTypes:
     """Reasons that a server may be blocked"""
 
     MONTHLY_ACTIVE_USER = "monthly_active_user"
     HS_DISABLED = "hs_disabled"
 
 
-class EventContentFields(object):
+class EventContentFields:
     """Fields found in events' content, regardless of type."""
 
     # Labels for the event, cf https://github.com/matrix-org/matrix-doc/pull/2326
@@ -150,3 +150,8 @@ class EventContentFields(object):
     # Timestamp to delete the event after
     # cf https://github.com/matrix-org/matrix-doc/pull/2228
     SELF_DESTRUCT_AFTER = "org.matrix.self_destruct_after"
+
+
+class RoomEncryptionAlgorithms:
+    MEGOLM_V1_AES_SHA2 = "m.megolm.v1.aes-sha2"
+    DEFAULT = MEGOLM_V1_AES_SHA2

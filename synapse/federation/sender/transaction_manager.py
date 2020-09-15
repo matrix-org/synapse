@@ -15,8 +15,6 @@
 import logging
 from typing import TYPE_CHECKING, List
 
-from canonicaljson import json
-
 from synapse.api.errors import HttpResponseException
 from synapse.events import EventBase
 from synapse.federation.persistence import TransactionActions
@@ -28,6 +26,7 @@ from synapse.logging.opentracing import (
     tags,
     whitelisted_homeserver,
 )
+from synapse.util import json_decoder
 from synapse.util.metrics import measure_func
 
 if TYPE_CHECKING:
@@ -36,7 +35,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class TransactionManager(object):
+class TransactionManager:
     """Helper class which handles building and sending transactions
 
     shared between PerDestinationQueue objects
@@ -54,33 +53,34 @@ class TransactionManager(object):
 
     @measure_func("_send_new_transaction")
     async def send_new_transaction(
-        self, destination: str, pending_pdus: List[EventBase], pending_edus: List[Edu]
-    ):
+        self, destination: str, pdus: List[EventBase], edus: List[Edu],
+    ) -> bool:
+        """
+        Args:
+            destination: The destination to send to (e.g. 'example.org')
+            pdus: In-order list of PDUs to send
+            edus: List of EDUs to send
+
+        Returns:
+            True iff the transaction was successful
+        """
 
         # Make a transaction-sending opentracing span. This span follows on from
         # all the edus in that transaction. This needs to be done since there is
         # no active span here, so if the edus were not received by the remote the
         # span would have no causality and it would be forgotten.
-        # The span_contexts is a generator so that it won't be evaluated if
-        # opentracing is disabled. (Yay speed!)
 
         span_contexts = []
         keep_destination = whitelisted_homeserver(destination)
 
-        for edu in pending_edus:
+        for edu in edus:
             context = edu.get_context()
             if context:
-                span_contexts.append(extract_text_map(json.loads(context)))
+                span_contexts.append(extract_text_map(json_decoder.decode(context)))
             if keep_destination:
                 edu.strip_context()
 
         with start_active_span_follows_from("send_transaction", span_contexts):
-
-            # Sort based on the order field
-            pending_pdus.sort(key=lambda t: t[1])
-            pdus = [x[0] for x in pending_pdus]
-            edus = pending_edus
-
             success = True
 
             logger.debug("TX [%s] _attempt_new_transaction", destination)

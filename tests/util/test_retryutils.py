@@ -26,9 +26,7 @@ class RetryLimiterTestCase(HomeserverTestCase):
     def test_new_destination(self):
         """A happy-path case with a new destination and a successful operation"""
         store = self.hs.get_datastore()
-        d = get_retry_limiter("test_dest", self.clock, store)
-        self.pump()
-        limiter = self.successResultOf(d)
+        limiter = self.get_success(get_retry_limiter("test_dest", self.clock, store))
 
         # advance the clock a bit before making the request
         self.pump(1)
@@ -36,18 +34,14 @@ class RetryLimiterTestCase(HomeserverTestCase):
         with limiter:
             pass
 
-        d = store.get_destination_retry_timings("test_dest")
-        self.pump()
-        new_timings = self.successResultOf(d)
+        new_timings = self.get_success(store.get_destination_retry_timings("test_dest"))
         self.assertIsNone(new_timings)
 
     def test_limiter(self):
         """General test case which walks through the process of a failing request"""
         store = self.hs.get_datastore()
 
-        d = get_retry_limiter("test_dest", self.clock, store)
-        self.pump()
-        limiter = self.successResultOf(d)
+        limiter = self.get_success(get_retry_limiter("test_dest", self.clock, store))
 
         self.pump(1)
         try:
@@ -58,29 +52,22 @@ class RetryLimiterTestCase(HomeserverTestCase):
         except AssertionError:
             pass
 
-        # wait for the update to land
-        self.pump()
-
-        d = store.get_destination_retry_timings("test_dest")
-        self.pump()
-        new_timings = self.successResultOf(d)
+        new_timings = self.get_success(store.get_destination_retry_timings("test_dest"))
         self.assertEqual(new_timings["failure_ts"], failure_ts)
         self.assertEqual(new_timings["retry_last_ts"], failure_ts)
         self.assertEqual(new_timings["retry_interval"], MIN_RETRY_INTERVAL)
 
         # now if we try again we should get a failure
-        d = get_retry_limiter("test_dest", self.clock, store)
-        self.pump()
-        self.failureResultOf(d, NotRetryingDestination)
+        self.get_failure(
+            get_retry_limiter("test_dest", self.clock, store), NotRetryingDestination
+        )
 
         #
         # advance the clock and try again
         #
 
         self.pump(MIN_RETRY_INTERVAL)
-        d = get_retry_limiter("test_dest", self.clock, store)
-        self.pump()
-        limiter = self.successResultOf(d)
+        limiter = self.get_success(get_retry_limiter("test_dest", self.clock, store))
 
         self.pump(1)
         try:
@@ -91,12 +78,7 @@ class RetryLimiterTestCase(HomeserverTestCase):
         except AssertionError:
             pass
 
-        # wait for the update to land
-        self.pump()
-
-        d = store.get_destination_retry_timings("test_dest")
-        self.pump()
-        new_timings = self.successResultOf(d)
+        new_timings = self.get_success(store.get_destination_retry_timings("test_dest"))
         self.assertEqual(new_timings["failure_ts"], failure_ts)
         self.assertEqual(new_timings["retry_last_ts"], retry_ts)
         self.assertGreaterEqual(
@@ -109,10 +91,8 @@ class RetryLimiterTestCase(HomeserverTestCase):
         #
         # one more go, with success
         #
-        self.pump(MIN_RETRY_INTERVAL * RETRY_MULTIPLIER * 2.0)
-        d = get_retry_limiter("test_dest", self.clock, store)
-        self.pump()
-        limiter = self.successResultOf(d)
+        self.reactor.advance(MIN_RETRY_INTERVAL * RETRY_MULTIPLIER * 2.0)
+        limiter = self.get_success(get_retry_limiter("test_dest", self.clock, store))
 
         self.pump(1)
         with limiter:
@@ -121,7 +101,5 @@ class RetryLimiterTestCase(HomeserverTestCase):
         # wait for the update to land
         self.pump()
 
-        d = store.get_destination_retry_timings("test_dest")
-        self.pump()
-        new_timings = self.successResultOf(d)
+        new_timings = self.get_success(store.get_destination_retry_timings("test_dest"))
         self.assertIsNone(new_timings)

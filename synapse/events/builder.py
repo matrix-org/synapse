@@ -12,13 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Optional
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import attr
 from nacl.signing import SigningKey
 
-from twisted.internet import defer
-
+from synapse.api.auth import Auth
 from synapse.api.constants import MAX_DEPTH
 from synapse.api.errors import UnsupportedRoomVersionError
 from synapse.api.room_versions import (
@@ -29,13 +28,15 @@ from synapse.api.room_versions import (
 )
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.events import EventBase, _EventInternalMetadata, make_event_from_dict
+from synapse.state import StateHandler
+from synapse.storage.databases.main import DataStore
 from synapse.types import EventID, JsonDict
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
 
 @attr.s(slots=True, cmp=False, frozen=True)
-class EventBuilder(object):
+class EventBuilder:
     """A format independent event builder used to build up the event content
     before signing the event.
 
@@ -44,45 +45,46 @@ class EventBuilder(object):
 
     Attributes:
         room_version: Version of the target room
-        room_id (str)
-        type (str)
-        sender (str)
-        content (dict)
-        unsigned (dict)
-        internal_metadata (_EventInternalMetadata)
+        room_id
+        type
+        sender
+        content
+        unsigned
+        internal_metadata
 
-        _state (StateHandler)
-        _auth (synapse.api.Auth)
-        _store (DataStore)
-        _clock (Clock)
-        _hostname (str): The hostname of the server creating the event
+        _state
+        _auth
+        _store
+        _clock
+        _hostname: The hostname of the server creating the event
         _signing_key: The signing key to use to sign the event as the server
     """
 
-    _state = attr.ib()
-    _auth = attr.ib()
-    _store = attr.ib()
-    _clock = attr.ib()
-    _hostname = attr.ib()
-    _signing_key = attr.ib()
+    _state = attr.ib(type=StateHandler)
+    _auth = attr.ib(type=Auth)
+    _store = attr.ib(type=DataStore)
+    _clock = attr.ib(type=Clock)
+    _hostname = attr.ib(type=str)
+    _signing_key = attr.ib(type=SigningKey)
 
     room_version = attr.ib(type=RoomVersion)
 
-    room_id = attr.ib()
-    type = attr.ib()
-    sender = attr.ib()
+    room_id = attr.ib(type=str)
+    type = attr.ib(type=str)
+    sender = attr.ib(type=str)
 
-    content = attr.ib(default=attr.Factory(dict))
-    unsigned = attr.ib(default=attr.Factory(dict))
+    content = attr.ib(default=attr.Factory(dict), type=JsonDict)
+    unsigned = attr.ib(default=attr.Factory(dict), type=JsonDict)
 
     # These only exist on a subset of events, so they raise AttributeError if
     # someone tries to get them when they don't exist.
-    _state_key = attr.ib(default=None)
-    _redacts = attr.ib(default=None)
-    _origin_server_ts = attr.ib(default=None)
+    _state_key = attr.ib(default=None, type=Optional[str])
+    _redacts = attr.ib(default=None, type=Optional[str])
+    _origin_server_ts = attr.ib(default=None, type=Optional[int])
 
     internal_metadata = attr.ib(
-        default=attr.Factory(lambda: _EventInternalMetadata({}))
+        default=attr.Factory(lambda: _EventInternalMetadata({})),
+        type=_EventInternalMetadata,
     )
 
     @property
@@ -95,31 +97,35 @@ class EventBuilder(object):
     def is_state(self):
         return self._state_key is not None
 
-    @defer.inlineCallbacks
-    def build(self, prev_event_ids):
+    async def build(self, prev_event_ids: List[str]) -> EventBase:
         """Transform into a fully signed and hashed event
 
         Args:
-            prev_event_ids (list[str]): The event IDs to use as the prev events
+            prev_event_ids: The event IDs to use as the prev events
 
         Returns:
-            Deferred[FrozenEvent]
+            The signed and hashed event.
         """
 
-        state_ids = yield self._state.get_current_state_ids(
+        state_ids = await self._state.get_current_state_ids(
             self.room_id, prev_event_ids
         )
-        auth_ids = yield self._auth.compute_auth_events(self, state_ids)
+        auth_ids = self._auth.compute_auth_events(self, state_ids)
 
         format_version = self.room_version.event_format
         if format_version == EventFormatVersions.V1:
-            auth_events = yield self._store.add_event_hashes(auth_ids)
-            prev_events = yield self._store.add_event_hashes(prev_event_ids)
+            # The types of auth/prev events changes between event versions.
+            auth_events = await self._store.add_event_hashes(
+                auth_ids
+            )  # type: Union[List[str], List[Tuple[str, Dict[str, str]]]]
+            prev_events = await self._store.add_event_hashes(
+                prev_event_ids
+            )  # type: Union[List[str], List[Tuple[str, Dict[str, str]]]]
         else:
             auth_events = auth_ids
             prev_events = prev_event_ids
 
-        old_depth = yield self._store.get_max_depth_of(prev_event_ids)
+        old_depth = await self._store.get_max_depth_of(prev_event_ids)
         depth = old_depth + 1
 
         # we cap depth of generated events, to ensure that they are not
@@ -137,7 +143,7 @@ class EventBuilder(object):
             "unsigned": self.unsigned,
             "depth": depth,
             "prev_state": [],
-        }
+        }  # type: Dict[str, Any]
 
         if self.is_state():
             event_dict["state_key"] = self._state_key
@@ -158,11 +164,11 @@ class EventBuilder(object):
         )
 
 
-class EventBuilderFactory(object):
+class EventBuilderFactory:
     def __init__(self, hs):
         self.clock = hs.get_clock()
         self.hostname = hs.hostname
-        self.signing_key = hs.config.signing_key[0]
+        self.signing_key = hs.signing_key
 
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()

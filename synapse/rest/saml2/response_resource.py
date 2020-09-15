@@ -16,10 +16,10 @@
 from twisted.python import failure
 
 from synapse.api.errors import SynapseError
-from synapse.http.server import DirectServeResource, return_html_error
+from synapse.http.server import DirectServeHtmlResource, return_html_error
 
 
-class SAML2ResponseResource(DirectServeResource):
+class SAML2ResponseResource(DirectServeHtmlResource):
     """A Twisted web resource which handles the SAML response"""
 
     isLeaf = 1

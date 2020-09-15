@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from synapse.replication.slave.storage._base import BaseSlavedStore
-from synapse.storage.data_stores.main.profile import ProfileWorkerStore
+from synapse.storage.databases.main.profile import ProfileWorkerStore
 
 
 class SlavedProfileStore(ProfileWorkerStore, BaseSlavedStore):

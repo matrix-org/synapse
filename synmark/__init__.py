@@ -47,9 +47,9 @@ async def make_homeserver(reactor, config=None):
     stor = hs.get_datastore()
 
     # Run the database background updates.
-    if hasattr(stor.db.updates, "do_next_background_update"):
-        while not await stor.db.updates.has_completed_background_updates():
-            await stor.db.updates.do_next_background_update(1)
+    if hasattr(stor.db_pool.updates, "do_next_background_update"):
+        while not await stor.db_pool.updates.has_completed_background_updates():
+            await stor.db_pool.updates.do_next_background_update(1)
 
     def cleanup():
         for i in cleanup_tasks:

@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import inspect
 import logging
 import time
 import unicodedata
@@ -24,7 +24,6 @@ import attr
 import bcrypt  # type: ignore[import]
 import pymacaroons
 
-import synapse.util.stringutils as stringutils
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
     AuthError,
@@ -38,17 +37,104 @@ from synapse.api.errors import (
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.handlers.ui_auth import INTERACTIVE_AUTH_CHECKERS
 from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
-from synapse.http.server import finish_request
+from synapse.http.server import finish_request, respond_with_html
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.module_api import ModuleApi
-from synapse.push.mailer import load_jinja2_templates
-from synapse.types import Requester, UserID
+from synapse.types import JsonDict, Requester, UserID
+from synapse.util import stringutils as stringutils
+from synapse.util.msisdn import phone_number_to_msisdn
+from synapse.util.threepids import canonicalise_email
 
 from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
+
+
+def convert_client_dict_legacy_fields_to_identifier(
+    submission: JsonDict,
+) -> Dict[str, str]:
+    """
+    Convert a legacy-formatted login submission to an identifier dict.
+
+    Legacy login submissions (used in both login and user-interactive authentication)
+    provide user-identifying information at the top-level instead.
+
+    These are now deprecated and replaced with identifiers:
+    https://matrix.org/docs/spec/client_server/r0.6.1#identifier-types
+
+    Args:
+        submission: The client dict to convert
+
+    Returns:
+        The matching identifier dict
+
+    Raises:
+        SynapseError: If the format of the client dict is invalid
+    """
+    identifier = submission.get("identifier", {})
+
+    # Generate an m.id.user identifier if "user" parameter is present
+    user = submission.get("user")
+    if user:
+        identifier = {"type": "m.id.user", "user": user}
+
+    # Generate an m.id.thirdparty identifier if "medium" and "address" parameters are present
+    medium = submission.get("medium")
+    address = submission.get("address")
+    if medium and address:
+        identifier = {
+            "type": "m.id.thirdparty",
+            "medium": medium,
+            "address": address,
+        }
+
+    # We've converted valid, legacy login submissions to an identifier. If the
+    # submission still doesn't have an identifier, it's invalid
+    if not identifier:
+        raise SynapseError(400, "Invalid login submission", Codes.INVALID_PARAM)
+
+    # Ensure the identifier has a type
+    if "type" not in identifier:
+        raise SynapseError(
+            400, "'identifier' dict has no key 'type'", errcode=Codes.MISSING_PARAM,
+        )
+
+    return identifier
+
+
+def login_id_phone_to_thirdparty(identifier: JsonDict) -> Dict[str, str]:
+    """
+    Convert a phone login identifier type to a generic threepid identifier.
+
+    Args:
+        identifier: Login identifier dict of type 'm.id.phone'
+
+    Returns:
+        An equivalent m.id.thirdparty identifier dict
+    """
+    if "country" not in identifier or (
+        # The specification requires a "phone" field, while Synapse used to require a "number"
+        # field. Accept both for backwards compatibility.
+        "phone" not in identifier
+        and "number" not in identifier
+    ):
+        raise SynapseError(
+            400, "Invalid phone-type identifier", errcode=Codes.INVALID_PARAM
+        )
+
+    # Accept both "phone" and "number" as valid keys in m.id.phone
+    phone_number = identifier.get("phone", identifier["number"])
+
+    # Convert user-provided phone number to a consistent representation
+    msisdn = phone_number_to_msisdn(identifier["country"], phone_number)
+
+    return {
+        "type": "m.id.thirdparty",
+        "medium": "msisdn",
+        "address": msisdn,
+    }
 
 
 class AuthHandler(BaseHandler):
@@ -131,18 +217,17 @@ class AuthHandler(BaseHandler):
         # after the SSO completes and before redirecting them back to their client.
         # It notifies the user they are about to give access to their matrix account
         # to the client.
-        self._sso_redirect_confirm_template = load_jinja2_templates(
-            hs.config.sso_template_dir, ["sso_redirect_confirm.html"],
-        )[0]
+        self._sso_redirect_confirm_template = hs.config.sso_redirect_confirm_template
+
         # The following template is shown during user interactive authentication
         # in the fallback auth scenario. It notifies the user that they are
         # authenticating for an operation to occur on their account.
-        self._sso_auth_confirm_template = load_jinja2_templates(
-            hs.config.sso_template_dir, ["sso_auth_confirm.html"],
-        )[0]
+        self._sso_auth_confirm_template = hs.config.sso_auth_confirm_template
+
         # The following template is shown after a successful user interactive
         # authentication session. It tells the user they can close the window.
         self._sso_auth_success_template = hs.config.sso_auth_success_template
+
         # The following template is shown during the SSO authentication process if
         # the account is deactivated.
         self._sso_account_deactivated_template = (
@@ -161,7 +246,7 @@ class AuthHandler(BaseHandler):
         request_body: Dict[str, Any],
         clientip: str,
         description: str,
-    ) -> dict:
+    ) -> Tuple[dict, str]:
         """
         Checks that the user is who they claim to be, via a UI auth.
 
@@ -182,8 +267,13 @@ class AuthHandler(BaseHandler):
                          describes the operation happening on their account.
 
         Returns:
-            The parameters for this request (which may
+            A tuple of (params, session_id).
+
+                'params' contains the parameters for this request (which may
                 have been given only in a previous call).
+
+                'session_id' is the ID of this session, either passed in by the
+                client or assigned by this call
 
         Raises:
             InteractiveAuthIncompleteError if the client has not yet completed
@@ -206,7 +296,7 @@ class AuthHandler(BaseHandler):
         flows = [[login_type] for login_type in self._supported_ui_auth_types]
 
         try:
-            result, params, _ = await self.check_auth(
+            result, params, session_id = await self.check_ui_auth(
                 flows, request, request_body, clientip, description
             )
         except LoginError:
@@ -229,7 +319,7 @@ class AuthHandler(BaseHandler):
         if user_id != requester.user.to_string():
             raise AuthError(403, "Invalid auth")
 
-        return params
+        return params, session_id
 
     def get_enabled_auth_types(self):
         """Return the enabled user-interactive authentication types
@@ -239,7 +329,7 @@ class AuthHandler(BaseHandler):
         """
         return self.checkers.keys()
 
-    async def check_auth(
+    async def check_ui_auth(
         self,
         flows: List[List[str]],
         request: SynapseRequest,
@@ -297,7 +387,7 @@ class AuthHandler(BaseHandler):
 
         # Convert the URI and method to strings.
         uri = request.uri.decode("utf-8")
-        method = request.uri.decode("utf-8")
+        method = request.method.decode("utf-8")
 
         # If there's no session ID, create a new session.
         if not sid:
@@ -360,9 +450,17 @@ class AuthHandler(BaseHandler):
             # authentication flow.
             await self.store.set_ui_auth_clientdict(sid, clientdict)
 
+        user_agent = request.requestHeaders.getRawHeaders(b"User-Agent", default=[b""])[
+            0
+        ].decode("ascii", "surrogateescape")
+
+        await self.store.add_user_agent_ip_to_ui_auth_session(
+            session.session_id, user_agent, clientip
+        )
+
         if not authdict:
             raise InteractiveAuthIncompleteError(
-                self._auth_dict_for_flows(flows, session.session_id)
+                session.session_id, self._auth_dict_for_flows(flows, session.session_id)
             )
 
         # check auth type currently being presented
@@ -409,7 +507,7 @@ class AuthHandler(BaseHandler):
         ret = self._auth_dict_for_flows(flows, session.session_id)
         ret["completed"] = list(creds)
         ret.update(errordict)
-        raise InteractiveAuthIncompleteError(ret)
+        raise InteractiveAuthIncompleteError(session.session_id, ret)
 
     async def add_oob_auth(
         self, stagetype: str, authdict: Dict[str, Any], clientip: str
@@ -863,11 +961,15 @@ class AuthHandler(BaseHandler):
         # see if any of our auth providers want to know about this
         for provider in self.password_providers:
             if hasattr(provider, "on_logged_out"):
-                await provider.on_logged_out(
+                # This might return an awaitable, if it does block the log out
+                # until it completes.
+                result = provider.on_logged_out(
                     user_id=str(user_info["user"]),
                     device_id=user_info["device_id"],
                     access_token=access_token,
                 )
+                if inspect.isawaitable(result):
+                    await result
 
         # delete pushers associated with this access token
         if user_info["token_id"] is not None:
@@ -928,7 +1030,7 @@ class AuthHandler(BaseHandler):
         # for the presence of an email address during password reset was
         # case sensitive).
         if medium == "email":
-            address = address.lower()
+            address = canonicalise_email(address)
 
         await self.store.user_add_threepid(
             user_id, medium, address, validated_at, self.hs.get_clock().time_msec()
@@ -956,7 +1058,7 @@ class AuthHandler(BaseHandler):
 
         # 'Canonicalise' email addresses as per above
         if medium == "email":
-            address = address.lower()
+            address = canonicalise_email(address)
 
         identity_handler = self.hs.get_handlers().identity_handler
         result = await identity_handler.try_unbind_threepid(
@@ -1055,13 +1157,8 @@ class AuthHandler(BaseHandler):
         )
 
         # Render the HTML and return.
-        html_bytes = self._sso_auth_success_template.encode("utf-8")
-        request.setResponseCode(200)
-        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
-
-        request.write(html_bytes)
-        finish_request(request)
+        html = self._sso_auth_success_template
+        respond_with_html(request, 200, html)
 
     async def complete_sso_login(
         self,
@@ -1081,13 +1178,7 @@ class AuthHandler(BaseHandler):
         # flow.
         deactivated = await self.store.get_user_deactivated_status(registered_user_id)
         if deactivated:
-            html_bytes = self._sso_account_deactivated_template.encode("utf-8")
-
-            request.setResponseCode(403)
-            request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-            request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
-            request.write(html_bytes)
-            finish_request(request)
+            respond_with_html(request, 403, self._sso_account_deactivated_template)
             return
 
         self._complete_sso_login(registered_user_id, request, client_redirect_url)
@@ -1128,17 +1219,12 @@ class AuthHandler(BaseHandler):
         # URL we redirect users to.
         redirect_url_no_params = client_redirect_url.split("?")[0]
 
-        html_bytes = self._sso_redirect_confirm_template.render(
+        html = self._sso_redirect_confirm_template.render(
             display_url=redirect_url_no_params,
             redirect_url=redirect_url,
             server_name=self._server_name,
-        ).encode("utf-8")
-
-        request.setResponseCode(200)
-        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
-        request.write(html_bytes)
-        finish_request(request)
+        )
+        respond_with_html(request, 200, html)
 
     @staticmethod
     def add_query_param_to_url(url: str, param_name: str, param: Any):
@@ -1150,7 +1236,7 @@ class AuthHandler(BaseHandler):
 
 
 @attr.s
-class MacaroonGenerator(object):
+class MacaroonGenerator:
 
     hs = attr.ib()
 

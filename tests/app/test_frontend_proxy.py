@@ -30,6 +30,16 @@ class FrontendProxyTests(HomeserverTestCase):
     def default_config(self):
         c = super().default_config()
         c["worker_app"] = "synapse.app.frontend_proxy"
+
+        c["worker_listeners"] = [
+            {
+                "type": "http",
+                "port": 8080,
+                "bind_addresses": ["0.0.0.0"],
+                "resources": [{"names": ["client"]}],
+            }
+        ]
+
         return c
 
     def test_listen_http_with_presence_enabled(self):
@@ -39,14 +49,8 @@ class FrontendProxyTests(HomeserverTestCase):
         # Presence is on
         self.hs.config.use_presence = True
 
-        config = {
-            "port": 8080,
-            "bind_addresses": ["0.0.0.0"],
-            "resources": [{"names": ["client"]}],
-        }
-
         # Listen with the config
-        self.hs._listen_http(config)
+        self.hs._listen_http(self.hs.config.worker.worker_listeners[0])
 
         # Grab the resource from the site that was told to listen
         self.assertEqual(len(self.reactor.tcpServers), 1)
@@ -67,14 +71,8 @@ class FrontendProxyTests(HomeserverTestCase):
         # Presence is off
         self.hs.config.use_presence = False
 
-        config = {
-            "port": 8080,
-            "bind_addresses": ["0.0.0.0"],
-            "resources": [{"names": ["client"]}],
-        }
-
         # Listen with the config
-        self.hs._listen_http(config)
+        self.hs._listen_http(self.hs.config.worker.worker_listeners[0])
 
         # Grab the resource from the site that was told to listen
         self.assertEqual(len(self.reactor.tcpServers), 1)

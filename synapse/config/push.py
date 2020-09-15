@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
+from ._base import Config, ShardedWorkerHandlingConfig
 
 
 class PushConfig(Config):
@@ -23,6 +23,9 @@ class PushConfig(Config):
     def read_config(self, config, **kwargs):
         push_config = config.get("push", {})
         self.push_include_content = push_config.get("include_content", True)
+
+        pusher_instances = config.get("pusher_instances") or []
+        self.pusher_shard_config = ShardedWorkerHandlingConfig(pusher_instances)
 
         # There was a a 'redact_content' setting but mistakenly read from the
         # 'email'section'. Check for the flag in the 'push' section, and log,

@@ -24,10 +24,11 @@ from synapse.handlers.profile import MasterProfileHandler
 from synapse.types import UserID
 
 from tests import unittest
+from tests.test_utils import make_awaitable
 from tests.utils import setup_test_homeserver
 
 
-class ProfileHandlers(object):
+class ProfileHandlers:
     def __init__(self, hs):
         self.profile_handler = MasterProfileHandler(hs)
 
@@ -63,16 +64,20 @@ class ProfileTestCase(unittest.TestCase):
         self.bob = UserID.from_string("@4567:test")
         self.alice = UserID.from_string("@alice:remote")
 
-        yield self.store.create_profile(self.frank.localpart)
+        yield defer.ensureDeferred(self.store.create_profile(self.frank.localpart))
 
         self.handler = hs.get_profile_handler()
         self.hs = hs
 
     @defer.inlineCallbacks
     def test_get_my_name(self):
-        yield self.store.set_profile_displayname(self.frank.localpart, "Frank")
+        yield defer.ensureDeferred(
+            self.store.set_profile_displayname(self.frank.localpart, "Frank")
+        )
 
-        displayname = yield self.handler.get_displayname(self.frank)
+        displayname = yield defer.ensureDeferred(
+            self.handler.get_displayname(self.frank)
+        )
 
         self.assertEquals("Frank", displayname)
 
@@ -101,7 +106,12 @@ class ProfileTestCase(unittest.TestCase):
         )
 
         self.assertEquals(
-            (yield self.store.get_profile_displayname(self.frank.localpart)), "Frank",
+            (
+                yield defer.ensureDeferred(
+                    self.store.get_profile_displayname(self.frank.localpart)
+                )
+            ),
+            "Frank",
         )
 
     @defer.inlineCallbacks
@@ -109,10 +119,17 @@ class ProfileTestCase(unittest.TestCase):
         self.hs.config.enable_set_displayname = False
 
         # Setting displayname for the first time is allowed
-        yield self.store.set_profile_displayname(self.frank.localpart, "Frank")
+        yield defer.ensureDeferred(
+            self.store.set_profile_displayname(self.frank.localpart, "Frank")
+        )
 
         self.assertEquals(
-            (yield self.store.get_profile_displayname(self.frank.localpart)), "Frank",
+            (
+                yield defer.ensureDeferred(
+                    self.store.get_profile_displayname(self.frank.localpart)
+                )
+            ),
+            "Frank",
         )
 
         # Setting displayname a second time is forbidden
@@ -136,11 +153,13 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_other_name(self):
-        self.mock_federation.make_query.return_value = defer.succeed(
+        self.mock_federation.make_query.return_value = make_awaitable(
             {"displayname": "Alice"}
         )
 
-        displayname = yield self.handler.get_displayname(self.alice)
+        displayname = yield defer.ensureDeferred(
+            self.handler.get_displayname(self.alice)
+        )
 
         self.assertEquals(displayname, "Alice")
         self.mock_federation.make_query.assert_called_with(
@@ -152,22 +171,27 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_incoming_fed_query(self):
-        yield self.store.create_profile("caroline")
-        yield self.store.set_profile_displayname("caroline", "Caroline")
+        yield defer.ensureDeferred(self.store.create_profile("caroline"))
+        yield defer.ensureDeferred(
+            self.store.set_profile_displayname("caroline", "Caroline")
+        )
 
-        response = yield self.query_handlers["profile"](
-            {"user_id": "@caroline:test", "field": "displayname"}
+        response = yield defer.ensureDeferred(
+            self.query_handlers["profile"](
+                {"user_id": "@caroline:test", "field": "displayname"}
+            )
         )
 
         self.assertEquals({"displayname": "Caroline"}, response)
 
     @defer.inlineCallbacks
     def test_get_my_avatar(self):
-        yield self.store.set_profile_avatar_url(
-            self.frank.localpart, "http://my.server/me.png"
+        yield defer.ensureDeferred(
+            self.store.set_profile_avatar_url(
+                self.frank.localpart, "http://my.server/me.png"
+            )
         )
-
-        avatar_url = yield self.handler.get_avatar_url(self.frank)
+        avatar_url = yield defer.ensureDeferred(self.handler.get_avatar_url(self.frank))
 
         self.assertEquals("http://my.server/me.png", avatar_url)
 
@@ -182,7 +206,11 @@ class ProfileTestCase(unittest.TestCase):
         )
 
         self.assertEquals(
-            (yield self.store.get_profile_avatar_url(self.frank.localpart)),
+            (
+                yield defer.ensureDeferred(
+                    self.store.get_profile_avatar_url(self.frank.localpart)
+                )
+            ),
             "http://my.server/pic.gif",
         )
 
@@ -196,7 +224,11 @@ class ProfileTestCase(unittest.TestCase):
         )
 
         self.assertEquals(
-            (yield self.store.get_profile_avatar_url(self.frank.localpart)),
+            (
+                yield defer.ensureDeferred(
+                    self.store.get_profile_avatar_url(self.frank.localpart)
+                )
+            ),
             "http://my.server/me.png",
         )
 
@@ -205,12 +237,18 @@ class ProfileTestCase(unittest.TestCase):
         self.hs.config.enable_set_avatar_url = False
 
         # Setting displayname for the first time is allowed
-        yield self.store.set_profile_avatar_url(
-            self.frank.localpart, "http://my.server/me.png"
+        yield defer.ensureDeferred(
+            self.store.set_profile_avatar_url(
+                self.frank.localpart, "http://my.server/me.png"
+            )
         )
 
         self.assertEquals(
-            (yield self.store.get_profile_avatar_url(self.frank.localpart)),
+            (
+                yield defer.ensureDeferred(
+                    self.store.get_profile_avatar_url(self.frank.localpart)
+                )
+            ),
             "http://my.server/me.png",
         )
 
