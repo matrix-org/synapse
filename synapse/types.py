@@ -21,8 +21,9 @@ from collections import namedtuple
 from typing import Any, Dict, Mapping, MutableMapping, Optional, Tuple, Type, TypeVar
 
 import attr
+import cbor2
 from signedjson.key import decode_verify_key_bytes
-from unpaddedbase64 import decode_base64
+from unpaddedbase64 import decode_base64, encode_base64
 
 from synapse.api.errors import Codes, SynapseError
 
@@ -362,7 +363,7 @@ def map_username_to_mxid_localpart(username, case_sensitive=False):
     return username.decode("ascii")
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, cmp=False)
 class RoomStreamToken:
     """Tokens are positions between events. The token "s1" comes after event 1.
 
@@ -392,6 +393,8 @@ class RoomStreamToken:
     )
     stream = attr.ib(type=int, validator=attr.validators.instance_of(int))
 
+    instance_map = attr.ib(type=Dict[str, int], factory=dict)
+
     @classmethod
     def parse(cls, string: str) -> "RoomStreamToken":
         try:
@@ -400,6 +403,11 @@ class RoomStreamToken:
             if string[0] == "t":
                 parts = string[1:].split("-", 1)
                 return cls(topological=int(parts[0]), stream=int(parts[1]))
+            if string[0] == "m":
+                payload = cbor2.loads(decode_base64(string[1:]))
+                return cls(
+                    topological=None, stream=payload["s"], instance_map=payload["p"],
+                )
         except Exception:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
@@ -413,14 +421,48 @@ class RoomStreamToken:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
 
+    def copy_and_advance(self, other: "RoomStreamToken") -> "RoomStreamToken":
+        if self.topological or other.topological:
+            raise Exception("Can't advance topological tokens")
+
+        max_stream = max(self.stream, other.stream)
+
+        instance_map = {
+            instance: max(
+                self.instance_map.get(instance, self.stream),
+                other.instance_map.get(instance, other.stream),
+            )
+            for instance in set(self.instance_map).union(other.instance_map)
+        }
+
+        return RoomStreamToken(None, max_stream, instance_map)
+
     def as_tuple(self) -> Tuple[Optional[int], int]:
         return (self.topological, self.stream)
 
     def __str__(self) -> str:
         if self.topological is not None:
             return "t%d-%d" % (self.topological, self.stream)
+        elif self.instance_map:
+            return "m" + encode_base64(
+                cbor2.dumps({"s": self.stream, "p": self.instance_map}),
+            )
         else:
             return "s%d" % (self.stream,)
+
+    def __lt__(self, other: "RoomStreamToken"):
+        if self.stream != other.stream:
+            return self.stream < other.stream
+
+        for instance in set(self.instance_map).union(other.instance_map):
+            if self.instance_map.get(instance, self.stream) != other.instance_map.get(
+                instance, other.stream
+            ):
+                return self.instance_map.get(
+                    instance, self.stream
+                ) < other.instance_map.get(instance, other.stream)
+
+        return False
 
 
 @attr.s(slots=True, frozen=True)
@@ -461,7 +503,7 @@ class StreamToken:
     def is_after(self, other):
         """Does this token contain events that the other doesn't?"""
         return (
-            (other.room_stream_id < self.room_stream_id)
+            (other.room_key < self.room_key)
             or (int(other.presence_key) < int(self.presence_key))
             or (int(other.typing_key) < int(self.typing_key))
             or (int(other.receipt_key) < int(self.receipt_key))
@@ -476,13 +518,16 @@ class StreamToken:
         """Advance the given key in the token to a new value if and only if the
         new value is after the old value.
         """
-        new_token = self.copy_and_replace(key, new_value)
         if key == "room_key":
-            new_id = new_token.room_stream_id
-            old_id = self.room_stream_id
-        else:
-            new_id = int(getattr(new_token, key))
-            old_id = int(getattr(self, key))
+            new_token = self.copy_and_replace(
+                "room_key", self.room_key.copy_and_advance(new_value)
+            )
+            return new_token
+
+        new_token = self.copy_and_replace(key, new_value)
+        new_id = int(getattr(new_token, key))
+        old_id = int(getattr(self, key))
+
         if old_id < new_id:
             return new_token
         else:
@@ -507,7 +552,7 @@ class PersistedEventPosition:
     stream = attr.ib(type=int)
 
     def persisted_after(self, token: RoomStreamToken) -> bool:
-        return token.stream < self.stream
+        return token.instance_map.get(self.instance_name, token.stream) < self.stream
 
 
 class ThirdPartyInstanceID(

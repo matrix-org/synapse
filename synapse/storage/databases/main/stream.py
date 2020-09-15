@@ -35,11 +35,10 @@ what sort order was used:
     - topological tokems: "t%d-%d", where the integers map to the topological
       and stream ordering columns respectively.
 """
-
 import abc
 import logging
 from collections import namedtuple
-from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
 from twisted.internet import defer
 
@@ -54,6 +53,7 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
+from synapse.storage.util.id_generators import MultiWriterIdGenerator
 from synapse.types import Collection, RoomStreamToken
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
@@ -74,6 +74,18 @@ _TOPOLOGICAL_TOKEN = "topological"
 _EventDictReturn = namedtuple(
     "_EventDictReturn", ("event_id", "topological_ordering", "stream_ordering")
 )
+
+
+def _filter_result(
+    instance_name: str,
+    stream_id: int,
+    from_token: RoomStreamToken,
+    to_token: RoomStreamToken,
+) -> bool:
+    from_id = from_token.instance_map.get(instance_name, from_token.stream)
+    to_id = to_token.instance_map.get(instance_name, to_token.stream)
+
+    return from_id < stream_id <= to_id
 
 
 def generate_pagination_where_clause(
@@ -209,6 +221,71 @@ def _make_generic_sql_bound(
     )
 
 
+def _make_instance_filter_clause(
+    direction: str,
+    from_token: Optional[RoomStreamToken],
+    to_token: Optional[RoomStreamToken],
+) -> Tuple[str, List[Any]]:
+    if from_token and from_token.topological:
+        from_token = None
+    if to_token and to_token.topological:
+        to_token = None
+
+    if not from_token and not to_token:
+        return "", []
+
+    from_bound = ">=" if direction == "b" else "<"
+    to_bound = "<" if direction == "b" else ">="
+
+    filter_clauses = []
+    filter_args = []  # type: List[Any]
+
+    from_map = from_token.instance_map if from_token else {}
+    to_map = to_token.instance_map if to_token else {}
+
+    default_from = from_token.stream if from_token else None
+    default_to = to_token.stream if to_token else None
+
+    if default_from and default_to:
+        filter_clauses.append(
+            "(? %s stream_ordering AND ? %s stream_ordering)" % (from_bound, to_bound)
+        )
+        filter_args.extend((default_from, default_to,))
+    elif default_from:
+        filter_clauses.append("(? %s stream_ordering)" % (from_bound,))
+        filter_args.extend((default_from,))
+    elif default_to:
+        filter_clauses.append("(? %s stream_ordering)" % (to_bound,))
+        filter_args.extend((default_to,))
+
+    for instance in set(from_map).union(to_map):
+        from_id = from_map.get(instance, default_from)
+        to_id = to_map.get(instance, default_to)
+
+        if from_id and to_id:
+            filter_clauses.append(
+                "(instance_name = ? AND ? %s stream_ordering AND ? %s stream_ordering)"
+                % (from_bound, to_bound)
+            )
+            filter_args.extend((instance, from_id, to_id,))
+        elif from_id:
+            filter_clauses.append(
+                "(instance_name = ? AND ? %s stream_ordering)" % (from_bound,)
+            )
+            filter_args.extend((instance, from_id,))
+        elif to_id:
+            filter_clauses.append(
+                "(instance_name = ? AND ? %s stream_ordering)" % (to_bound,)
+            )
+            filter_args.extend((instance, to_id,))
+
+    filter_clause = ""
+    if filter_clauses:
+        filter_clause = "(%s)" % (" OR ".join(filter_clauses),)
+
+    return filter_clause, filter_args
+
+
 def filter_to_clause(event_filter: Optional[Filter]) -> Tuple[str, List[str]]:
     # NB: This may create SQL clauses that don't optimise well (and we don't
     # have indices on all possible clauses). E.g. it may create
@@ -306,7 +383,20 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     def get_room_max_token(self) -> RoomStreamToken:
-        return RoomStreamToken(None, self.get_room_max_stream_ordering())
+        min_pos = self._stream_id_gen.get_current_token()
+
+        positions = {}
+        if isinstance(self._stream_id_gen, MultiWriterIdGenerator):
+            positions = {
+                i: p
+                for i, p in self._stream_id_gen.get_positions().items()
+                if p >= min_pos
+            }
+
+            if set(positions.values()) == {min_pos}:
+                positions = {}
+
+        return RoomStreamToken(None, min_pos, positions)
 
     async def get_room_events_stream_for_rooms(
         self,
@@ -405,25 +495,50 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
         if from_key == to_key:
             return [], from_key
 
-        from_id = from_key.stream
-        to_id = to_key.stream
-
-        has_changed = self._events_stream_cache.has_entity_changed(room_id, from_id)
+        has_changed = self._events_stream_cache.has_entity_changed(
+            room_id, from_key.stream
+        )
 
         if not has_changed:
             return [], from_key
 
         def f(txn):
-            sql = (
-                "SELECT event_id, stream_ordering FROM events WHERE"
-                " room_id = ?"
-                " AND not outlier"
-                " AND stream_ordering > ? AND stream_ordering <= ?"
-                " ORDER BY stream_ordering %s LIMIT ?"
-            ) % (order,)
-            txn.execute(sql, (room_id, from_id, to_id, limit))
+            filter_clause, filter_args = _make_instance_filter_clause(
+                "f", from_key, to_key
+            )
+            if filter_clause:
+                filter_clause = " AND " + filter_clause
 
-            rows = [_EventDictReturn(row[0], None, row[1]) for row in txn]
+            min_from_id = min(from_key.instance_map.values(), default=from_key.stream)
+            max_to_id = max(to_key.instance_map.values(), default=to_key.stream)
+
+            sql = """
+                SELECT event_id, instance_name, stream_ordering
+                FROM events
+                WHERE
+                    room_id = ?
+                    AND not outlier
+                    AND stream_ordering > ? AND stream_ordering <= ?
+                    %s
+                ORDER BY stream_ordering %s LIMIT ?
+            """ % (
+                filter_clause,
+                order,
+            )
+            args = [room_id, min_from_id, max_to_id]
+            args.extend(filter_args)
+            args.append(limit)
+            txn.execute(sql, args)
+
+            # rows = [
+            #     _EventDictReturn(event_id, None, stream_ordering)
+            #     for event_id, instance_name, stream_ordering in txn
+            #     if _filter_result(instance_name, stream_ordering, from_key, to_key)
+            # ]
+            rows = [
+                _EventDictReturn(event_id, None, stream_ordering)
+                for event_id, instance_name, stream_ordering in txn
+            ]
             return rows
 
         rows = await self.db_pool.runInteraction("get_room_events_stream_for_room", f)
@@ -432,7 +547,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
             [r.event_id for r in rows], get_prev_content=True
         )
 
-        self._set_before_and_after(ret, rows, topo_order=from_id is None)
+        self._set_before_and_after(ret, rows, topo_order=from_key.stream is None)
 
         if order.lower() == "desc":
             ret.reverse()
@@ -449,29 +564,40 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
     async def get_membership_changes_for_user(
         self, user_id: str, from_key: RoomStreamToken, to_key: RoomStreamToken
     ) -> List[EventBase]:
-        from_id = from_key.stream
-        to_id = to_key.stream
-
         if from_key == to_key:
             return []
 
-        if from_id:
+        if from_key:
             has_changed = self._membership_stream_cache.has_entity_changed(
-                user_id, int(from_id)
+                user_id, int(from_key.stream)
             )
             if not has_changed:
                 return []
 
         def f(txn):
-            sql = (
-                "SELECT m.event_id, stream_ordering FROM events AS e,"
-                " room_memberships AS m"
-                " WHERE e.event_id = m.event_id"
-                " AND m.user_id = ?"
-                " AND e.stream_ordering > ? AND e.stream_ordering <= ?"
-                " ORDER BY e.stream_ordering ASC"
+            filter_clause, filter_args = _make_instance_filter_clause(
+                "f", from_key, to_key
             )
-            txn.execute(sql, (user_id, from_id, to_id))
+            if filter_clause:
+                filter_clause = " AND " + filter_clause
+
+            min_from_id = min(from_key.instance_map.values(), default=from_key.stream)
+            max_to_id = max(to_key.instance_map.values(), default=to_key.stream)
+
+            sql = """
+                SELECT m.event_id, stream_ordering
+                FROM events AS e, room_memberships AS m
+                WHERE e.event_id = m.event_id
+                    AND m.user_id = ?
+                    AND e.stream_ordering > ? AND e.stream_ordering <= ?
+                    %s
+                ORDER BY e.stream_ordering ASC
+            """ % (
+                filter_clause,
+            )
+            args = [user_id, min_from_id, max_to_id]
+            args.extend(filter_args)
+            txn.execute(sql, args)
 
             rows = [_EventDictReturn(row[0], None, row[1]) for row in txn]
 
@@ -978,11 +1104,39 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
         else:
             order = "ASC"
 
+        if from_token.topological is not None:
+            from_bound = from_token.as_tuple()
+        elif direction == "b":
+            from_bound = (
+                None,
+                max(from_token.instance_map.values(), default=from_token.stream),
+            )
+        else:
+            from_bound = (
+                None,
+                min(from_token.instance_map.values(), default=from_token.stream),
+            )
+
+        to_bound = None
+        if to_token:
+            if to_token.topological is not None:
+                to_bound = to_token.as_tuple()
+            elif direction == "b":
+                to_bound = (
+                    None,
+                    min(to_token.instance_map.values(), default=to_token.stream),
+                )
+            else:
+                to_bound = (
+                    None,
+                    max(to_token.instance_map.values(), default=to_token.stream),
+                )
+
         bounds = generate_pagination_where_clause(
             direction=direction,
             column_names=("topological_ordering", "stream_ordering"),
-            from_token=from_token.as_tuple(),
-            to_token=to_token.as_tuple() if to_token else None,
+            from_token=from_bound,
+            to_token=to_bound,
             engine=self.database_engine,
         )
 
@@ -991,6 +1145,13 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
         if filter_clause:
             bounds += " AND " + filter_clause
             args.extend(filter_args)
+
+        stream_filter_clause, stream_filter_args = _make_instance_filter_clause(
+            direction, from_token, to_token
+        )
+        if stream_filter_clause:
+            bounds += " AND " + stream_filter_clause
+            args.extend(stream_filter_args)
 
         args.append(int(limit))
 
