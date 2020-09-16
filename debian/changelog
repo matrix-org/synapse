@@ -1,3 +1,9 @@
+matrix-synapse-py3 (1.19.2) stable; urgency=medium
+
+  * New synapse release 1.19.2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 16 Sep 2020 12:50:30 +0100
+
 matrix-synapse-py3 (1.19.1) stable; urgency=medium
 
   * New synapse release 1.19.1.
