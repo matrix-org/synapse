@@ -104,7 +104,13 @@ CONDITIONAL_REQUIREMENTS = {
     # hiredis is not a *strict* dependency, but it makes things much faster.
     # (if it is not installed, we fall back to slow code.)
     "redis": ["txredisapi>=1.4.7", "hiredis"],
-    "lint": ["isort==5.0.3", "black==19.10b0", "flake8-comprehensions", "flake8"],
+    # We pin black so that our tests don't start failing on new releases.
+    "lint": [
+        "isort<=5.0.3",
+        'black==19.10b0;python_version>"3.5"',
+        "flake8-comprehensions",
+        "flake8",
+    ],
 }
 
 ALL_OPTIONAL_REQUIREMENTS = set()  # type: Set[str]
