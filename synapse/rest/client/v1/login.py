@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 
 class LoginRestServlet(RestServlet):
     PATTERNS = client_patterns("/login$", v1=True)
+    APPSERVICE_TYPE = "uk.half-shot.msc2778.login.application_service"
     CAS_TYPE = "m.login.cas"
     SSO_TYPE = "m.login.sso"
     TOKEN_TYPE = "m.login.token"
@@ -240,7 +241,7 @@ class LoginRestServlet(RestServlet):
         else:
             qualified_user_id = UserID(identifier["user"], self.hs.hostname).to_string()
 
-        if login_submission["type"] == LoginType.APPSERVICE:
+        if login_submission["type"] == LoginRestServlet.APPSERVICE_TYPE:
             if appservice is None or not appservice.is_interested_in_user(
                 qualified_user_id
             ):
