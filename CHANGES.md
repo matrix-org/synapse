@@ -1,3 +1,13 @@
+Synapse 1.19.2 (2020-09-16)
+===========================
+
+Due to the issue below server admins are encouraged to upgrade as soon as possible.
+
+Bugfixes
+--------
+
+- Fix joining rooms over federation that include malformed events. ([\#8324](https://github.com/matrix-org/synapse/issues/8324))
+
 Synapse 1.20.0rc3 (2020-09-11)
 ==============================
 
