@@ -1,3 +1,9 @@
+Synapse 1.20.0rc4 (2020-09-16)
+==============================
+
+Synapse 1.20.0rc4 is identical to 1.20.0rc3, with the addition of the security fix that was included in 1.19.2.
+
+
 Synapse 1.19.2 (2020-09-16)
 ===========================
 
@@ -7,6 +13,7 @@ Bugfixes
 --------
 
 - Fix joining rooms over federation that include malformed events. ([\#8324](https://github.com/matrix-org/synapse/issues/8324))
+
 
 Synapse 1.20.0rc3 (2020-09-11)
 ==============================
