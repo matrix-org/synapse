@@ -218,6 +218,7 @@ class TransactionStore(SQLBaseStore):
                         retry_interval = EXCLUDED.retry_interval
                     WHERE
                         EXCLUDED.retry_interval = 0
+                        OR destinations.retry_interval IS NULL
                         OR destinations.retry_interval < EXCLUDED.retry_interval
             """
 
@@ -249,7 +250,7 @@ class TransactionStore(SQLBaseStore):
                     "retry_interval": retry_interval,
                 },
             )
-        elif retry_interval == 0 or prev_row["retry_interval"] < retry_interval:
+        elif not retry_interval or prev_row["retry_interval"] < retry_interval:
             self.db_pool.simple_update_one_txn(
                 txn,
                 "destinations",
