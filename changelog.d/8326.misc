@@ -1,0 +1,1 @@
+Moves every instance of `__metaclass__ = Y` to be `class X(metaclass=Y)`-based.

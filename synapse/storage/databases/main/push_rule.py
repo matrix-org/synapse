@@ -60,6 +60,7 @@ def _load_rules(rawrules, enabled_map, use_new_defaults=False):
 
     return rules
 
+
 # The ABCMeta metaclass ensures that it cannot be instantiated without
 # the abstract methods being implemented.
 class PushRulesWorkerStore(

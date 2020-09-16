@@ -30,6 +30,7 @@ from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 logger = logging.getLogger(__name__)
 
+
 # The ABCMeta metaclass ensures that it cannot be instantiated without
 # the abstract methods being implemented.
 class ReceiptsWorkerStore(SQLBaseStore, metaclass=abc.ABCMeta):
