@@ -135,7 +135,7 @@ class FederationSender:
         )
 
         # wake up destinations that have outstanding PDUs to be caught up
-        self.clock.call_later(
+        self._catchup_after_startup_timer = self.clock.call_later(
             CATCH_UP_WAKE_AFTER_SYNAPSE_STARTUP_DELAY_SEC,
             run_as_background_process,
             "wake_destinations_needing_catchup",
