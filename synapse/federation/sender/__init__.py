@@ -55,6 +55,15 @@ sent_pdus_destination_dist_total = Counter(
     "Total number of PDUs queued for sending across all destinations",
 )
 
+# Time (in s) after Synapse's startup that we will begin to wake up destinations
+# that have catch-up outstanding.
+CATCH_UP_WAKE_AFTER_SYNAPSE_STARTUP_DELAY_SEC = 15
+
+# Time (in s) waited in between waking up each destination, i.e. one destination
+# will be woken up every <x> seconds after Synapse's startup until we have woken
+# every destination has outstanding catch-up.
+CATCH_UP_WAKE_AFTER_SYNAPSE_STARTUP_INTERVAL_SEC = 5
+
 
 class FederationSender:
     def __init__(self, hs: "synapse.server.HomeServer"):
@@ -123,6 +132,13 @@ class FederationSender:
 
         self._rr_txn_interval_per_room_ms = (
             1000.0 / hs.config.federation_rr_transactions_per_room_per_second
+        )
+
+        self.clock.call_later(
+            CATCH_UP_WAKE_AFTER_SYNAPSE_STARTUP_DELAY_SEC,
+            run_as_background_process,
+            "wake_destinations_needing_catchup",
+            self._wake_destinations_needing_catchup,
         )
 
     def _get_per_destination_queue(self, destination: str) -> PerDestinationQueue:
@@ -560,3 +576,30 @@ class FederationSender:
         # Dummy implementation for case where federation sender isn't offloaded
         # to a worker.
         return [], 0, False
+
+    async def _wake_destinations_needing_catchup(self):
+        """
+        Wakes up destinations that need catch-up and are not currently being
+        backed off from.
+        Does so in a slow way (one every 5 seconds) to reduce load spikes.
+        """
+
+        last_processed = None  # type: Optional[str]
+
+        while True:
+            destinations_to_wake = await self.store.get_catch_up_outstanding_destinations(
+                last_processed
+            )
+
+            if not destinations_to_wake:
+                # finished waking all destinations!
+                break
+
+            for destination in destinations_to_wake:
+                if self._federation_shard_config.should_handle(
+                    self._instance_name, destination
+                ):
+                    last_processed = destination
+                    logger.info("Destination %s has outstanding catch-up, waking up.", destination)
+                    self.wake_destination(destination)
+                    await self.clock.sleep(CATCH_UP_WAKE_AFTER_SYNAPSE_STARTUP_INTERVAL_SEC)
