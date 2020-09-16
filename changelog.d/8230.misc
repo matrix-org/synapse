@@ -1,1 +1,1 @@
-Track the latest event for every destination and room for catch-up after federation outage.
+Fix messages over federation being lost until an event is sent into the same room.
