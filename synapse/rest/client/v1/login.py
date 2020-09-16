@@ -240,7 +240,12 @@ class LoginRestServlet(RestServlet):
         else:
             qualified_user_id = UserID(identifier["user"], self.hs.hostname).to_string()
 
-        if login_submission["type"] == LoginType.APPSERVICE and appservice is not None:
+        if login_submission["type"] == LoginType.APPSERVICE:
+            if appservice is None or not appservice.is_interested_in_user(
+                qualified_user_id
+            ):
+                raise LoginError(403, "Invalid access_token", errcode=Codes.FORBIDDEN)
+
             result = await self._complete_login(qualified_user_id, login_submission)
             return result
 
