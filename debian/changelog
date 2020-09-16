@@ -1,8 +1,14 @@
-matrix-synapse-py3 (1.19.0ubuntu1) UNRELEASED; urgency=medium
+matrix-synapse-py3 (1.20.0ubuntu1) UNRELEASED; urgency=medium
 
   * Use Type=notify in systemd service
 
  -- Dexter Chua <dec41@srcf.net>  Wed, 26 Aug 2020 12:41:36 +0000
+
+matrix-synapse-py3 (1.19.2) stable; urgency=medium
+
+  * New synapse release 1.19.2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 16 Sep 2020 12:50:30 +0100
 
 matrix-synapse-py3 (1.19.1) stable; urgency=medium
 
