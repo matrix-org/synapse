@@ -134,6 +134,7 @@ class FederationSender:
             1000.0 / hs.config.federation_rr_transactions_per_room_per_second
         )
 
+        # wake up destinations that have outstanding PDUs to be caught up
         self.clock.call_later(
             CATCH_UP_WAKE_AFTER_SYNAPSE_STARTUP_DELAY_SEC,
             run_as_background_process,
