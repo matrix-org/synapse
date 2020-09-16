@@ -12,16 +12,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import struct
 import threading
+import typing
+
+from synapse.storage.engines import BaseDatabaseEngine
+
+if typing.TYPE_CHECKING:
+    import sqlite3  # noqa: F401
 
 
-class Sqlite3Engine(object):
-    single_threaded = True
-
+class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
     def __init__(self, database_module, database_config):
-        self.module = database_module
+        super().__init__(database_module, database_config)
 
         database = database_config.get("args", {}).get("database")
         self._is_in_memory = database in (None, ":memory:",)
@@ -30,6 +33,10 @@ class Sqlite3Engine(object):
         # in the DB yet.
         self._current_state_group_id = None
         self._current_state_group_id_lock = threading.Lock()
+
+    @property
+    def single_threaded(self) -> bool:
+        return True
 
     @property
     def can_native_upsert(self):
@@ -59,11 +66,15 @@ class Sqlite3Engine(object):
             if version < (3, 11, 0):
                 raise RuntimeError("Synapse requires sqlite 3.11 or above.")
 
+    def check_new_database(self, txn):
+        """Gets called when setting up a brand new database. This allows us to
+        apply stricter checks on new databases versus existing database.
+        """
+
     def convert_param_style(self, sql):
         return sql
 
     def on_new_connection(self, db_conn):
-
         # We need to import here to avoid an import loop.
         from synapse.storage.prepare_database import prepare_database
 
@@ -74,6 +85,7 @@ class Sqlite3Engine(object):
             prepare_database(db_conn, self, config=None)
 
         db_conn.create_function("rank", 1, _rank)
+        db_conn.execute("PRAGMA foreign_keys = ON;")
 
     def is_deadlock(self, error):
         return False
@@ -83,19 +95,6 @@ class Sqlite3Engine(object):
 
     def lock_table(self, txn, table):
         return
-
-    def get_next_state_group_id(self, txn):
-        """Returns an int that can be used as a new state_group ID
-        """
-        # We do application locking here since if we're using sqlite then
-        # we are a single process synapse.
-        with self._current_state_group_id_lock:
-            if self._current_state_group_id is None:
-                txn.execute("SELECT COALESCE(max(id), 0) FROM state_groups")
-                self._current_state_group_id = txn.fetchone()[0]
-
-            self._current_state_group_id += 1
-            return self._current_state_group_id
 
     @property
     def server_version(self):

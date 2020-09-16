@@ -19,8 +19,7 @@
 import functools
 import logging
 import re
-
-from twisted.internet.defer import maybeDeferred
+from typing import Optional, Tuple, Type
 
 import synapse
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
@@ -102,14 +101,14 @@ class NoAuthenticationError(AuthenticationError):
     pass
 
 
-class Authenticator(object):
+class Authenticator:
     def __init__(self, hs: HomeServer):
         self._clock = hs.get_clock()
         self.keyring = hs.get_keyring()
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
         self.federation_domain_whitelist = hs.config.federation_domain_whitelist
-        self.notifer = hs.get_notifier()
+        self.notifier = hs.get_notifier()
 
         self.replication_client = None
         if hs.config.worker.worker_app:
@@ -158,7 +157,7 @@ class Authenticator(object):
             origin, json_request, now, "Incoming request"
         )
 
-        logger.info("Request from %s", origin)
+        logger.debug("Request from %s", origin)
         request.authenticated_entity = origin
 
         # If we get a valid signed request from the other side, its probably
@@ -175,7 +174,7 @@ class Authenticator(object):
             await self.store.set_destination_retry_timings(origin, None, 0, 0)
 
             # Inform the relevant places that the remote server is back up.
-            self.notifer.notify_remote_server_up(origin)
+            self.notifier.notify_remote_server_up(origin)
             if self.replication_client:
                 # If we're on a worker we try and inform master about this. The
                 # replication client doesn't hook into the notifier to avoid
@@ -230,7 +229,7 @@ def _parse_auth_header(header_bytes):
         )
 
 
-class BaseFederationServlet(object):
+class BaseFederationServlet:
     """Abstract base class for federation servlet classes.
 
     The servlet object should have a PATH attribute which takes the form of a regexp to
@@ -267,6 +266,8 @@ class BaseFederationServlet(object):
             Exception: other exceptions will be caught, logged, and a 500 will be
                 returned.
     """
+
+    PATH = ""  # Overridden in subclasses, the regex to match against the path.
 
     REQUIRE_AUTH = True
 
@@ -338,6 +339,12 @@ class BaseFederationServlet(object):
                 if origin:
                     with ratelimiter.ratelimit(origin) as d:
                         await d
+                        if request._disconnected:
+                            logger.warning(
+                                "client disconnected before we started processing "
+                                "request"
+                            )
+                            return -1, None
                         response = await func(
                             origin, content, request.args, *args, **kwargs
                         )
@@ -347,9 +354,6 @@ class BaseFederationServlet(object):
                     )
 
             return response
-
-        # Extra logic that functools.wraps() doesn't finish
-        new_func.__self__ = func.__self__
 
         return new_func
 
@@ -362,11 +366,7 @@ class BaseFederationServlet(object):
                 continue
 
             server.register_paths(
-                method,
-                (pattern,),
-                self._wrap(code),
-                self.__class__.__name__,
-                trace=False,
+                method, (pattern,), self._wrap(code), self.__class__.__name__,
             )
 
 
@@ -596,7 +596,7 @@ class FederationV1InviteServlet(BaseFederationServlet):
         # state resolution algorithm, and we don't use that for processing
         # invites
         content = await self.handler.on_invite_request(
-            origin, content, room_version=RoomVersions.V1.identifier
+            origin, content, room_version_id=RoomVersions.V1.identifier
         )
 
         # V1 federation API is defined to return a content of `[200, {...}]`
@@ -623,7 +623,7 @@ class FederationV2InviteServlet(BaseFederationServlet):
         event.setdefault("unsigned", {})["invite_room_state"] = invite_room_state
 
         content = await self.handler.on_invite_request(
-            origin, event, room_version=room_version
+            origin, event, room_version_id=room_version
         )
         return 200, content
 
@@ -658,17 +658,6 @@ class FederationClientKeysClaimServlet(BaseFederationServlet):
     async def on_POST(self, origin, content, query):
         response = await self.handler.on_claim_client_keys(origin, content)
         return 200, response
-
-
-class FederationQueryAuthServlet(BaseFederationServlet):
-    PATH = "/query_auth/(?P<context>[^/]*)/(?P<event_id>[^/]*)"
-
-    async def on_POST(self, origin, content, query, context, event_id):
-        new_content = await self.handler.on_query_auth_request(
-            origin, content, context, event_id
-        )
-
-        return 200, new_content
 
 
 class FederationGetMissingEventsServlet(BaseFederationServlet):
@@ -827,12 +816,8 @@ class PublicRoomList(BaseFederationServlet):
             # zero is a special value which corresponds to no limit.
             limit = None
 
-        data = await maybeDeferred(
-            self.handler.get_local_public_room_list,
-            limit,
-            since_token,
-            network_tuple=network_tuple,
-            from_federation=True,
+        data = await self.handler.get_local_public_room_list(
+            limit, since_token, network_tuple=network_tuple, from_federation=True
         )
         return 200, data
 
@@ -841,7 +826,7 @@ class PublicRoomList(BaseFederationServlet):
         if not self.allow_access:
             raise FederationDeniedError(origin)
 
-        limit = int(content.get("limit", 100))
+        limit = int(content.get("limit", 100))  # type: Optional[int]
         since_token = content.get("since", None)
         search_filter = content.get("filter", None)
 
@@ -988,7 +973,7 @@ class FederationGroupsAddRoomsConfigServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        result = await self.groups_handler.update_room_in_group(
+        result = await self.handler.update_room_in_group(
             group_id, requester_user_id, room_id, config_key, content
         )
 
@@ -1431,7 +1416,6 @@ FEDERATION_SERVLET_CLASSES = (
     FederationV1MakeKnockServlet,
     FederationV1InviteServlet,
     FederationV2InviteServlet,
-    FederationQueryAuthServlet,
     FederationGetMissingEventsServlet,
     FederationEventAuthServlet,
     FederationClientKeysQueryServlet,
@@ -1441,11 +1425,13 @@ FEDERATION_SERVLET_CLASSES = (
     On3pidBindServlet,
     FederationVersionServlet,
     RoomComplexityServlet,
-)
+)  # type: Tuple[Type[BaseFederationServlet], ...]
 
-OPENID_SERVLET_CLASSES = (OpenIdUserInfo,)
+OPENID_SERVLET_CLASSES = (
+    OpenIdUserInfo,
+)  # type: Tuple[Type[BaseFederationServlet], ...]
 
-ROOM_LIST_CLASSES = (PublicRoomList,)
+ROOM_LIST_CLASSES = (PublicRoomList,)  # type: Tuple[Type[PublicRoomList], ...]
 
 GROUP_SERVER_SERVLET_CLASSES = (
     FederationGroupsProfileServlet,
@@ -1466,17 +1452,19 @@ GROUP_SERVER_SERVLET_CLASSES = (
     FederationGroupsAddRoomsServlet,
     FederationGroupsAddRoomsConfigServlet,
     FederationGroupsSettingJoinPolicyServlet,
-)
+)  # type: Tuple[Type[BaseFederationServlet], ...]
 
 
 GROUP_LOCAL_SERVLET_CLASSES = (
     FederationGroupsLocalInviteServlet,
     FederationGroupsRemoveLocalUserServlet,
     FederationGroupsBulkPublicisedServlet,
-)
+)  # type: Tuple[Type[BaseFederationServlet], ...]
 
 
-GROUP_ATTESTATION_SERVLET_CLASSES = (FederationGroupsRenewAttestaionServlet,)
+GROUP_ATTESTATION_SERVLET_CLASSES = (
+    FederationGroupsRenewAttestaionServlet,
+)  # type: Tuple[Type[BaseFederationServlet], ...]
 
 DEFAULT_SERVLET_GROUPS = (
     "federation",

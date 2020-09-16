@@ -8,11 +8,15 @@ Depending on the amount of history being purged a call to the API may take
 several minutes or longer. During this period users will not be able to
 paginate further back in the room from the point being purged from.
 
+Note that Synapse requires at least one message in each room, so it will never
+delete the last message in a room.
+
 The API is:
 
 ``POST /_synapse/admin/v1/purge_history/<room_id>[/<event_id>]``
 
-including an ``access_token`` of a server admin.
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
 
 By default, events sent by local users are not deleted, as they may represent
 the only copies of this content in existence. (Events sent by remote users are
@@ -51,8 +55,10 @@ It is possible to poll for updates on recent purges with a second API;
 
 ``GET /_synapse/admin/v1/purge_history_status/<purge_id>``
 
-(again, with a suitable ``access_token``). This API returns a JSON body like
-the following:
+Again, you will need to authenticate by providing an ``access_token`` for a
+server admin.
+
+This API returns a JSON body like the following:
 
 .. code:: json
 

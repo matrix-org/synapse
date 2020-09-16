@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 SENTINEL = object()
 
 
-class TTLCache(object):
+class TTLCache:
     """A key/value cache implementation where each entry has its own TTL"""
 
     def __init__(self, cache_name, timer=time.time):
@@ -38,7 +38,7 @@ class TTLCache(object):
 
         self._timer = timer
 
-        self._metrics = register_cache("ttl", cache_name, self)
+        self._metrics = register_cache("ttl", cache_name, self, resizable=False)
 
     def set(self, key, value, ttl):
         """Add/update an entry in the cache
@@ -154,7 +154,7 @@ class TTLCache(object):
 
 
 @attr.s(frozen=True, slots=True)
-class _CacheEntry(object):
+class _CacheEntry:
     """TTLCache entry"""
 
     # expiry_time is the first attribute, so that entries are sorted by expiry.

@@ -13,6 +13,7 @@ from synapse.config import (
     key,
     logger,
     metrics,
+    oidc_config,
     password,
     password_auth_providers,
     push,
@@ -24,6 +25,7 @@ from synapse.config import (
     server,
     server_notices_config,
     spam_checker,
+    sso,
     stats,
     third_party_event_rules,
     tls,
@@ -57,6 +59,8 @@ class RootConfig:
     key: key.KeyConfig
     saml2: saml2_config.SAML2Config
     cas: cas.CasConfig
+    sso: sso.SSOConfig
+    oidc: oidc_config.OIDCConfig
     jwt: jwt_config.JWTConfig
     password: password.PasswordConfig
     email: emailconfig.EmailConfig
@@ -133,3 +137,9 @@ class Config:
 
 def read_config_files(config_files: List[str]): ...
 def find_config_files(search_paths: List[str]): ...
+
+class ShardedWorkerHandlingConfig:
+    instances: List[str]
+    def __init__(self, instances: List[str]) -> None: ...
+    def should_handle(self, instance_name: str, key: str) -> bool: ...
+    def get_instance(self, key: str) -> str: ...

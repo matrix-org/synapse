@@ -18,12 +18,16 @@
 import argparse
 import errno
 import os
+import time
+import urllib.parse
 from collections import OrderedDict
+from hashlib import sha256
 from textwrap import dedent
-from typing import Any, MutableMapping, Optional
+from typing import Any, Callable, List, MutableMapping, Optional
 
-from six import integer_types
-
+import attr
+import jinja2
+import pkg_resources
 import yaml
 
 
@@ -53,6 +57,18 @@ Missing mandatory `server_name` config option.
 """
 
 
+CONFIG_FILE_HEADER = """\
+# Configuration file for Synapse.
+#
+# This is a YAML file: see [1] for a quick introduction. Note in particular
+# that *indentation is important*: all the elements of a list or dictionary
+# should have the same indentation.
+#
+# [1] https://docs.ansible.com/ansible/latest/reference_appendices/YAMLSyntax.html
+
+"""
+
+
 def path_exists(file_path):
     """Check if a file exists
 
@@ -72,7 +88,7 @@ def path_exists(file_path):
         return False
 
 
-class Config(object):
+class Config:
     """
     A configuration section, containing configuration keys and values.
 
@@ -87,6 +103,11 @@ class Config(object):
 
     def __init__(self, root_config=None):
         self.root = root_config
+
+        # Get the path to the default Synapse template directory
+        self.default_template_dir = pkg_resources.resource_filename(
+            "synapse", "res/templates"
+        )
 
     def __getattr__(self, item: str) -> Any:
         """
@@ -105,7 +126,7 @@ class Config(object):
 
     @staticmethod
     def parse_size(value):
-        if isinstance(value, integer_types):
+        if isinstance(value, int):
             return value
         sizes = {"K": 1024, "M": 1024 * 1024}
         size = 1
@@ -117,7 +138,7 @@ class Config(object):
 
     @staticmethod
     def parse_duration(value):
-        if isinstance(value, integer_types):
+        if isinstance(value, int):
             return value
         second = 1000
         minute = 60 * second
@@ -172,8 +193,97 @@ class Config(object):
         with open(file_path) as file_stream:
             return file_stream.read()
 
+    def read_templates(
+        self, filenames: List[str], custom_template_directory: Optional[str] = None,
+    ) -> List[jinja2.Template]:
+        """Load a list of template files from disk using the given variables.
 
-class RootConfig(object):
+        This function will attempt to load the given templates from the default Synapse
+        template directory. If `custom_template_directory` is supplied, that directory
+        is tried first.
+
+        Files read are treated as Jinja templates. These templates are not rendered yet.
+
+        Args:
+            filenames: A list of template filenames to read.
+
+            custom_template_directory: A directory to try to look for the templates
+                before using the default Synapse template directory instead.
+
+        Raises:
+            ConfigError: if the file's path is incorrect or otherwise cannot be read.
+
+        Returns:
+            A list of jinja2 templates.
+        """
+        templates = []
+        search_directories = [self.default_template_dir]
+
+        # The loader will first look in the custom template directory (if specified) for the
+        # given filename. If it doesn't find it, it will use the default template dir instead
+        if custom_template_directory:
+            # Check that the given template directory exists
+            if not self.path_exists(custom_template_directory):
+                raise ConfigError(
+                    "Configured template directory does not exist: %s"
+                    % (custom_template_directory,)
+                )
+
+            # Search the custom template directory as well
+            search_directories.insert(0, custom_template_directory)
+
+        loader = jinja2.FileSystemLoader(search_directories)
+        env = jinja2.Environment(loader=loader, autoescape=True)
+
+        # Update the environment with our custom filters
+        env.filters.update(
+            {
+                "format_ts": _format_ts_filter,
+                "mxc_to_http": _create_mxc_to_http_filter(self.public_baseurl),
+            }
+        )
+
+        for filename in filenames:
+            # Load the template
+            template = env.get_template(filename)
+            templates.append(template)
+
+        return templates
+
+
+def _format_ts_filter(value: int, format: str):
+    return time.strftime(format, time.localtime(value / 1000))
+
+
+def _create_mxc_to_http_filter(public_baseurl: str) -> Callable:
+    """Create and return a jinja2 filter that converts MXC urls to HTTP
+
+    Args:
+        public_baseurl: The public, accessible base URL of the homeserver
+    """
+
+    def mxc_to_http_filter(value, width, height, resize_method="crop"):
+        if value[0:6] != "mxc://":
+            return ""
+
+        server_and_media_id = value[6:]
+        fragment = None
+        if "#" in server_and_media_id:
+            server_and_media_id, fragment = server_and_media_id.split("#", 1)
+            fragment = "#" + fragment
+
+        params = {"width": width, "height": height, "method": resize_method}
+        return "%s_matrix/media/v1/thumbnail/%s?%s%s" % (
+            public_baseurl,
+            server_and_media_id,
+            urllib.parse.urlencode(params),
+            fragment or "",
+        )
+
+    return mxc_to_http_filter
+
+
+class RootConfig:
     """
     Holder of an application's configuration.
 
@@ -282,7 +392,6 @@ class RootConfig(object):
         report_stats=None,
         open_private_ports=False,
         listeners=None,
-        database_conf=None,
         tls_certificate_path=None,
         tls_private_key_path=None,
         acme_domain=None,
@@ -344,7 +453,7 @@ class RootConfig(object):
             str: the yaml config file
         """
 
-        return "\n\n".join(
+        return CONFIG_FILE_HEADER + "\n\n".join(
             dedent(conf)
             for conf in self.invoke_all(
                 "generate_config_section",
@@ -355,7 +464,6 @@ class RootConfig(object):
                 report_stats=report_stats,
                 open_private_ports=open_private_ports,
                 listeners=listeners,
-                database_conf=database_conf,
                 tls_certificate_path=tls_certificate_path,
                 tls_private_key_path=tls_private_key_path,
                 acme_domain=acme_domain,
@@ -458,8 +566,8 @@ class RootConfig(object):
 
         Returns: Config object, or None if --generate-config or --generate-keys was set
         """
-        config_parser = argparse.ArgumentParser(add_help=False)
-        config_parser.add_argument(
+        parser = argparse.ArgumentParser(description=description)
+        parser.add_argument(
             "-c",
             "--config-path",
             action="append",
@@ -468,7 +576,7 @@ class RootConfig(object):
             " may specify directories containing *.yaml files.",
         )
 
-        generate_group = config_parser.add_argument_group("Config generation")
+        generate_group = parser.add_argument_group("Config generation")
         generate_group.add_argument(
             "--generate-config",
             action="store_true",
@@ -516,12 +624,13 @@ class RootConfig(object):
             ),
         )
 
-        config_args, remaining_args = config_parser.parse_known_args(argv)
+        cls.invoke_all_static("add_arguments", parser)
+        config_args = parser.parse_args(argv)
 
         config_files = find_config_files(search_paths=config_args.config_path)
 
         if not config_files:
-            config_parser.error(
+            parser.error(
                 "Must supply a config file.\nA config file can be automatically"
                 ' generated using "--generate-config -H SERVER_NAME'
                 ' -c CONFIG-FILE"'
@@ -540,7 +649,7 @@ class RootConfig(object):
 
         if config_args.generate_config:
             if config_args.report_stats is None:
-                config_parser.error(
+                parser.error(
                     "Please specify either --report-stats=yes or --report-stats=no\n\n"
                     + MISSING_REPORT_STATS_SPIEL
                 )
@@ -574,8 +683,8 @@ class RootConfig(object):
                 if not path_exists(config_dir_path):
                     os.makedirs(config_dir_path)
                 with open(config_path, "w") as config_file:
-                    config_file.write("# vim:ft=yaml\n\n")
                     config_file.write(config_str)
+                    config_file.write("\n\n# vim:ft=yaml")
 
                 config_dict = yaml.safe_load(config_str)
                 obj.generate_missing_files(config_dict, config_dir_path)
@@ -599,15 +708,6 @@ class RootConfig(object):
                 )
                 generate_missing_configs = True
 
-        parser = argparse.ArgumentParser(
-            parents=[config_parser],
-            description=description,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-        )
-
-        obj.invoke_all_static("add_arguments", parser)
-        args = parser.parse_args(remaining_args)
-
         config_dict = read_config_files(config_files)
         if generate_missing_configs:
             obj.generate_missing_files(config_dict, config_dir_path)
@@ -616,7 +716,7 @@ class RootConfig(object):
         obj.parse_config_dict(
             config_dict, config_dir_path=config_dir_path, data_dir_path=data_dir_path
         )
-        obj.invoke_all("read_arguments", args)
+        obj.invoke_all("read_arguments", config_args)
 
         return obj
 
@@ -655,6 +755,12 @@ def read_config_files(config_files):
     for config_file in config_files:
         with open(config_file) as file_stream:
             yaml_config = yaml.safe_load(file_stream)
+
+        if not isinstance(yaml_config, dict):
+            err = "File %r is empty or doesn't parse into a key-value map. IGNORING."
+            print(err % (config_file,))
+            continue
+
         specified_config.update(yaml_config)
 
     if "server_name" not in specified_config:
@@ -711,4 +817,51 @@ def find_config_files(search_paths):
     return config_files
 
 
-__all__ = ["Config", "RootConfig"]
+@attr.s
+class ShardedWorkerHandlingConfig:
+    """Algorithm for choosing which instance is responsible for handling some
+    sharded work.
+
+    For example, the federation senders use this to determine which instances
+    handles sending stuff to a given destination (which is used as the `key`
+    below).
+    """
+
+    instances = attr.ib(type=List[str])
+
+    def should_handle(self, instance_name: str, key: str) -> bool:
+        """Whether this instance is responsible for handling the given key.
+        """
+        # If multiple instances are not defined we always return true
+        if not self.instances or len(self.instances) == 1:
+            return True
+
+        return self.get_instance(key) == instance_name
+
+    def get_instance(self, key: str) -> str:
+        """Get the instance responsible for handling the given key.
+
+        Note: For things like federation sending the config for which instance
+        is sending is known only to the sender instance if there is only one.
+        Therefore `should_handle` should be used where possible.
+        """
+
+        if not self.instances:
+            return "master"
+
+        if len(self.instances) == 1:
+            return self.instances[0]
+
+        # We shard by taking the hash, modulo it by the number of instances and
+        # then checking whether this instance matches the instance at that
+        # index.
+        #
+        # (Technically this introduces some bias and is not entirely uniform,
+        # but since the hash is so large the bias is ridiculously small).
+        dest_hash = sha256(key.encode("utf8")).digest()
+        dest_int = int.from_bytes(dest_hash, byteorder="little")
+        remainder = dest_int % (len(self.instances))
+        return self.instances[remainder]
+
+
+__all__ = ["Config", "RootConfig", "ShardedWorkerHandlingConfig"]

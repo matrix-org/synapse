@@ -142,10 +142,8 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         self.get_success(self.handler.delete_device(user1, "abc"))
 
         # check the device was deleted
-        res = self.handler.get_device(user1, "abc")
-        self.pump()
-        self.assertIsInstance(
-            self.failureResultOf(res).value, synapse.api.errors.NotFoundError
+        self.get_failure(
+            self.handler.get_device(user1, "abc"), synapse.api.errors.NotFoundError
         )
 
         # we'd like to check the access token was invalidated, but that's a
@@ -160,12 +158,29 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         res = self.get_success(self.handler.get_device(user1, "abc"))
         self.assertEqual(res["display_name"], "new display")
 
+    def test_update_device_too_long_display_name(self):
+        """Update a device with a display name that is invalid (too long)."""
+        self._record_users()
+
+        # Request to update a device display name with a new value that is longer than allowed.
+        update = {
+            "display_name": "a"
+            * (synapse.handlers.device.MAX_DEVICE_DISPLAY_NAME_LEN + 1)
+        }
+        self.get_failure(
+            self.handler.update_device(user1, "abc", update),
+            synapse.api.errors.SynapseError,
+        )
+
+        # Ensure the display name was not updated.
+        res = self.get_success(self.handler.get_device(user1, "abc"))
+        self.assertEqual(res["display_name"], "display 2")
+
     def test_update_unknown_device(self):
         update = {"display_name": "new_display"}
-        res = self.handler.update_device("user_id", "unknown_device_id", update)
-        self.pump()
-        self.assertIsInstance(
-            self.failureResultOf(res).value, synapse.api.errors.NotFoundError
+        self.get_failure(
+            self.handler.update_device("user_id", "unknown_device_id", update),
+            synapse.api.errors.NotFoundError,
         )
 
     def _record_users(self):

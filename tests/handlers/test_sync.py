@@ -30,28 +30,31 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         self.sync_handler = self.hs.get_sync_handler()
         self.store = self.hs.get_datastore()
 
-    def test_wait_for_sync_for_user_auth_blocking(self):
+        # AuthBlocking reads from the hs' config on initialization. We need to
+        # modify its config instead of the hs'
+        self.auth_blocking = self.hs.get_auth()._auth_blocking
 
+    def test_wait_for_sync_for_user_auth_blocking(self):
         user_id1 = "@user1:test"
         user_id2 = "@user2:test"
         sync_config = self._generate_sync_config(user_id1)
 
         self.reactor.advance(100)  # So we get not 0 time
-        self.hs.config.limit_usage_by_mau = True
-        self.hs.config.max_mau_value = 1
+        self.auth_blocking._limit_usage_by_mau = True
+        self.auth_blocking._max_mau_value = 1
 
         # Check that the happy case does not throw errors
         self.get_success(self.store.upsert_monthly_active_user(user_id1))
         self.get_success(self.sync_handler.wait_for_sync_for_user(sync_config))
 
         # Test that global lock works
-        self.hs.config.hs_disabled = True
+        self.auth_blocking._hs_disabled = True
         e = self.get_failure(
             self.sync_handler.wait_for_sync_for_user(sync_config), ResourceLimitError
         )
         self.assertEquals(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
-        self.hs.config.hs_disabled = False
+        self.auth_blocking._hs_disabled = False
 
         sync_config = self._generate_sync_config(user_id2)
 

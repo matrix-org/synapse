@@ -1,1 +1,0 @@
-Don't block processing of incoming EDUs behind processing PDUs in the same transaction.

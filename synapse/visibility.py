@@ -16,11 +16,6 @@
 import logging
 import operator
 
-from six import iteritems, itervalues
-from six.moves import map
-
-from twisted.internet import defer
-
 from synapse.api.constants import EventTypes, Membership
 from synapse.events.utils import prune_event
 from synapse.storage import Storage
@@ -42,14 +37,13 @@ MEMBERSHIP_PRIORITY = (
 )
 
 
-@defer.inlineCallbacks
-def filter_events_for_client(
+async def filter_events_for_client(
     storage: Storage,
     user_id,
     events,
     is_peeking=False,
     always_include_ids=frozenset(),
-    apply_retention_policies=True,
+    filter_send_to_client=True,
 ):
     """
     Check which events a user is allowed to see. If the user can see the event but its
@@ -65,25 +59,24 @@ def filter_events_for_client(
             events
         always_include_ids (set(event_id)): set of event ids to specifically
             include (unless sender is ignored)
-        apply_retention_policies (bool): Whether to filter out events that's older than
-            allowed by the room's retention policy. Useful when this function is called
-            to e.g. check whether a user should be allowed to see the state at a given
-            event rather than to know if it should send an event to a user's client(s).
+        filter_send_to_client (bool): Whether we're checking an event that's going to be
+            sent to a client. This might not always be the case since this function can
+            also be called to check whether a user can see the state at a given point.
 
     Returns:
-        Deferred[list[synapse.events.EventBase]]
+        list[synapse.events.EventBase]
     """
     # Filter out events that have been soft failed so that we don't relay them
     # to clients.
-    events = list(e for e in events if not e.internal_metadata.is_soft_failed())
+    events = [e for e in events if not e.internal_metadata.is_soft_failed()]
 
     types = ((EventTypes.RoomHistoryVisibility, ""), (EventTypes.Member, user_id))
-    event_id_to_state = yield storage.state.get_state_for_events(
+    event_id_to_state = await storage.state.get_state_for_events(
         frozenset(e.event_id for e in events),
         state_filter=StateFilter.from_types(types),
     )
 
-    ignore_dict_content = yield storage.main.get_global_account_data_by_type_for_user(
+    ignore_dict_content = await storage.main.get_global_account_data_by_type_for_user(
         "m.ignored_user_list", user_id
     )
 
@@ -94,16 +87,16 @@ def filter_events_for_client(
         else []
     )
 
-    erased_senders = yield storage.main.are_users_erased((e.sender for e in events))
+    erased_senders = await storage.main.are_users_erased((e.sender for e in events))
 
-    if apply_retention_policies:
-        room_ids = set(e.room_id for e in events)
+    if filter_send_to_client:
+        room_ids = {e.room_id for e in events}
         retention_policies = {}
 
         for room_id in room_ids:
             retention_policies[
                 room_id
-            ] = yield storage.main.get_retention_policy_for_room(room_id)
+            ] = await storage.main.get_retention_policy_for_room(room_id)
 
     def allowed(event):
         """
@@ -119,20 +112,36 @@ def filter_events_for_client(
 
                the original event if they can see it as normal.
         """
-        if not event.is_state() and event.sender in ignore_list:
-            return None
+        # Only run some checks if these events aren't about to be sent to clients. This is
+        # because, if this is not the case, we're probably only checking if the users can
+        # see events in the room at that point in the DAG, and that shouldn't be decided
+        # on those checks.
+        if filter_send_to_client:
+            if event.type == "org.matrix.dummy_event":
+                return None
 
-        # Don't try to apply the room's retention policy if the event is a state event, as
-        # MSC1763 states that retention is only considered for non-state events.
-        if apply_retention_policies and not event.is_state():
-            retention_policy = retention_policies[event.room_id]
-            max_lifetime = retention_policy.get("max_lifetime")
+            if not event.is_state() and event.sender in ignore_list:
+                return None
 
-            if max_lifetime is not None:
-                oldest_allowed_ts = storage.main.clock.time_msec() - max_lifetime
+            # Until MSC2261 has landed we can't redact malicious alias events, so for
+            # now we temporarily filter out m.room.aliases entirely to mitigate
+            # abuse, while we spec a better solution to advertising aliases
+            # on rooms.
+            if event.type == EventTypes.Aliases:
+                return None
 
-                if event.origin_server_ts < oldest_allowed_ts:
-                    return None
+            # Don't try to apply the room's retention policy if the event is a state
+            # event, as MSC1763 states that retention is only considered for non-state
+            # events.
+            if not event.is_state():
+                retention_policy = retention_policies[event.room_id]
+                max_lifetime = retention_policy.get("max_lifetime")
+
+                if max_lifetime is not None:
+                    oldest_allowed_ts = storage.main.clock.time_msec() - max_lifetime
+
+                    if event.origin_server_ts < oldest_allowed_ts:
+                        return None
 
         if event.event_id in always_include_ids:
             return event
@@ -242,8 +251,7 @@ def filter_events_for_client(
     return list(filtered_events)
 
 
-@defer.inlineCallbacks
-def filter_events_for_server(
+async def filter_events_for_server(
     storage: Storage,
     server_name,
     events,
@@ -265,7 +273,7 @@ def filter_events_for_server(
             backfill or not.
 
     Returns
-        Deferred[list[FrozenEvent]]
+        list[FrozenEvent]
     """
 
     def is_sender_erased(event, erased_senders):
@@ -283,7 +291,7 @@ def filter_events_for_server(
                 # membership states for the requesting server to determine
                 # if the server is either in the room or has been invited
                 # into the room.
-                for ev in itervalues(state):
+                for ev in state.values():
                     if ev.type != EventTypes.Member:
                         continue
                     try:
@@ -307,9 +315,9 @@ def filter_events_for_server(
         return True
 
     # Lets check to see if all the events have a history visibility
-    # of "shared" or "world_readable". If thats the case then we don't
+    # of "shared" or "world_readable". If that's the case then we don't
     # need to check membership (as we know the server is in the room).
-    event_to_state_ids = yield storage.state.get_state_ids_for_events(
+    event_to_state_ids = await storage.state.get_state_ids_for_events(
         frozenset(e.event_id for e in events),
         state_filter=StateFilter.from_types(
             types=((EventTypes.RoomHistoryVisibility, ""),)
@@ -317,24 +325,24 @@ def filter_events_for_server(
     )
 
     visibility_ids = set()
-    for sids in itervalues(event_to_state_ids):
+    for sids in event_to_state_ids.values():
         hist = sids.get((EventTypes.RoomHistoryVisibility, ""))
         if hist:
             visibility_ids.add(hist)
 
     # If we failed to find any history visibility events then the default
-    # is "shared" visiblity.
+    # is "shared" visibility.
     if not visibility_ids:
         all_open = True
     else:
-        event_map = yield storage.main.get_events(visibility_ids)
+        event_map = await storage.main.get_events(visibility_ids)
         all_open = all(
             e.content.get("history_visibility") in (None, "shared", "world_readable")
-            for e in itervalues(event_map)
+            for e in event_map.values()
         )
 
     if not check_history_visibility_only:
-        erased_senders = yield storage.main.are_users_erased((e.sender for e in events))
+        erased_senders = await storage.main.are_users_erased((e.sender for e in events))
     else:
         # We don't want to check whether users are erased, which is equivalent
         # to no users having been erased.
@@ -363,7 +371,7 @@ def filter_events_for_server(
 
     # first, for each event we're wanting to return, get the event_ids
     # of the history vis and membership state at those events.
-    event_to_state_ids = yield storage.state.get_state_ids_for_events(
+    event_to_state_ids = await storage.state.get_state_ids_for_events(
         frozenset(e.event_id for e in events),
         state_filter=StateFilter.from_types(
             types=((EventTypes.RoomHistoryVisibility, ""), (EventTypes.Member, None))
@@ -379,8 +387,8 @@ def filter_events_for_server(
     #
     event_id_to_state_key = {
         event_id: key
-        for key_to_eid in itervalues(event_to_state_ids)
-        for key, event_id in iteritems(key_to_eid)
+        for key_to_eid in event_to_state_ids.values()
+        for key, event_id in key_to_eid.items()
     }
 
     def include(typ, state_key):
@@ -393,21 +401,17 @@ def filter_events_for_server(
             return False
         return state_key[idx + 1 :] == server_name
 
-    event_map = yield storage.main.get_events(
-        [
-            e_id
-            for e_id, key in iteritems(event_id_to_state_key)
-            if include(key[0], key[1])
-        ]
+    event_map = await storage.main.get_events(
+        [e_id for e_id, key in event_id_to_state_key.items() if include(key[0], key[1])]
     )
 
     event_to_state = {
         e_id: {
             key: event_map[inner_e_id]
-            for key, inner_e_id in iteritems(key_to_eid)
+            for key, inner_e_id in key_to_eid.items()
             if inner_e_id in event_map
         }
-        for e_id, key_to_eid in iteritems(event_to_state_ids)
+        for e_id, key_to_eid in event_to_state_ids.items()
     }
 
     to_return = []

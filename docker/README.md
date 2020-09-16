@@ -94,6 +94,21 @@ The following environment variables are supported in run mode:
 * `UID`, `GID`: the user and group id to run Synapse as. Defaults to `991`, `991`.
 * `TZ`: the [timezone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) the container will run with. Defaults to `UTC`.
 
+## Generating an (admin) user
+
+After synapse is running, you may wish to create a user via `register_new_matrix_user`.
+
+This requires a `registration_shared_secret` to be set in your config file. Synapse
+must be restarted to pick up this change.
+
+You can then call the script:
+
+```
+docker exec -it synapse register_new_matrix_user http://localhost:8008 -c /data/homeserver.yaml --help
+```
+
+Remember to remove the `registration_shared_secret` and restart if you no-longer need it.
+
 ## TLS support
 
 The default configuration exposes a single HTTP port: http://localhost:8008. It
@@ -110,12 +125,12 @@ argument to `docker run`.
 
 ## Legacy dynamic configuration file support
 
-For backwards-compatibility only, the docker image supports creating a dynamic
-configuration file based on environment variables. This is now deprecated, but
-is enabled when the `SYNAPSE_SERVER_NAME` variable is set (and `generate` is
-not given).
+The docker image used to support creating a dynamic configuration file based
+on environment variables. This is no longer supported, and an error will be
+raised if you try to run synapse without a config file.
 
-To migrate from a dynamic configuration file to a static one, run the docker
+It is, however, possible to generate a static configuration file based on
+the environment variables that were previously used. To do this, run the docker
 container once with the environment variables set, and `migrate_config`
 command line option. For example:
 
@@ -127,18 +142,52 @@ docker run -it --rm \
     matrixdotorg/synapse:latest migrate_config
 ```
 
-This will generate the same configuration file as the legacy mode used, but
-will store it in `/data/homeserver.yaml` instead of a temporary location. You
-can then use it as shown above at [Running synapse](#running-synapse).
+This will generate the same configuration file as the legacy mode used, and
+will store it in `/data/homeserver.yaml`. You can then use it as shown above at
+[Running synapse](#running-synapse).
+
+Note that the defaults used in this configuration file may be different to
+those when generating a new config file with `generate`: for example, TLS is
+enabled by default in this mode. You are encouraged to inspect the generated
+configuration file and edit it to ensure it meets your needs.
 
 ## Building the image
 
 If you need to build the image from a Synapse checkout, use the following `docker
  build` command from the repo's root:
- 
+
 ```
 docker build -t matrixdotorg/synapse -f docker/Dockerfile .
 ```
 
 You can choose to build a different docker image by changing the value of the `-f` flag to
 point to another Dockerfile.
+
+## Disabling the healthcheck
+
+If you are using a non-standard port or tls inside docker you can disable the healthcheck
+whilst running the above `docker run` commands. 
+
+```
+   --no-healthcheck
+```
+## Setting custom healthcheck on docker run
+
+If you wish to point the healthcheck at a different port with docker command, add the following
+
+```
+  --health-cmd 'curl -fSs http://localhost:1234/health'
+```
+
+## Setting the healthcheck in docker-compose file
+
+You can add the following to set a custom healthcheck in a docker compose file.
+You will need version >2.1 for this to work. 
+
+```
+healthcheck:
+  test: ["CMD", "curl", "-fSs", "http://localhost:8008/health"]
+  interval: 1m
+  timeout: 10s
+  retries: 3
+```

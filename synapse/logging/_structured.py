@@ -42,7 +42,7 @@ from synapse.logging._terse_json import (
     TerseJSONToConsoleLogObserver,
     TerseJSONToTCPLogObserver,
 )
-from synapse.logging.context import LoggingContext
+from synapse.logging.context import current_context
 
 
 def stdlib_log_level_to_twisted(level: str) -> LogLevel:
@@ -55,7 +55,7 @@ def stdlib_log_level_to_twisted(level: str) -> LogLevel:
 
 @attr.s
 @implementer(ILogObserver)
-class LogContextObserver(object):
+class LogContextObserver:
     """
     An ILogObserver which adds Synapse-specific log context information.
 
@@ -86,7 +86,7 @@ class LogContextObserver(object):
             ].startswith("Timing out client"):
                 return
 
-        context = LoggingContext.current_context()
+        context = current_context()
 
         # Copy the context information to the log event.
         if context is not None:
@@ -169,7 +169,7 @@ class OutputPipeType(Values):
 
 
 @attr.s
-class DrainConfiguration(object):
+class DrainConfiguration:
     name = attr.ib()
     type = attr.ib()
     location = attr.ib()
@@ -177,7 +177,7 @@ class DrainConfiguration(object):
 
 
 @attr.s
-class NetworkJSONTerseOptions(object):
+class NetworkJSONTerseOptions:
     maximum_buffer = attr.ib(type=int)
 
 

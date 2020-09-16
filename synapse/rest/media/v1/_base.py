@@ -16,11 +16,10 @@
 
 import logging
 import os
+import urllib
+from typing import Awaitable
 
-from six import PY3
-from six.moves import urllib
-
-from twisted.internet import defer
+from twisted.internet.interfaces import IConsumer
 from twisted.protocols.basic import FileSender
 
 from synapse.api.errors import Codes, SynapseError, cs_error
@@ -29,6 +28,22 @@ from synapse.logging.context import make_deferred_yieldable
 from synapse.util.stringutils import is_ascii
 
 logger = logging.getLogger(__name__)
+
+# list all text content types that will have the charset default to UTF-8 when
+# none is given
+TEXT_CONTENT_TYPES = [
+    "text/css",
+    "text/csv",
+    "text/html",
+    "text/calendar",
+    "text/plain",
+    "text/javascript",
+    "application/json",
+    "application/ld+json",
+    "application/rtf",
+    "image/svg+xml",
+    "text/xml",
+]
 
 
 def parse_media_id(request):
@@ -63,8 +78,9 @@ def respond_404(request):
     )
 
 
-@defer.inlineCallbacks
-def respond_with_file(request, media_type, file_path, file_size=None, upload_name=None):
+async def respond_with_file(
+    request, media_type, file_path, file_size=None, upload_name=None
+):
     logger.debug("Responding with %r", file_path)
 
     if os.path.isfile(file_path):
@@ -75,7 +91,7 @@ def respond_with_file(request, media_type, file_path, file_size=None, upload_nam
         add_file_headers(request, media_type, file_size, upload_name)
 
         with open(file_path, "rb") as f:
-            yield make_deferred_yieldable(FileSender().beginFileTransfer(f, request))
+            await make_deferred_yieldable(FileSender().beginFileTransfer(f, request))
 
         finish_request(request)
     else:
@@ -96,7 +112,14 @@ def add_file_headers(request, media_type, file_size, upload_name):
     def _quote(x):
         return urllib.parse.quote(x.encode("utf-8"))
 
-    request.setHeader(b"Content-Type", media_type.encode("UTF-8"))
+    # Default to a UTF-8 charset for text content types.
+    # ex, uses UTF-8 for 'text/css' but not 'text/css; charset=UTF-16'
+    if media_type.lower() in TEXT_CONTENT_TYPES:
+        content_type = media_type + "; charset=UTF-8"
+    else:
+        content_type = media_type
+
+    request.setHeader(b"Content-Type", content_type.encode("UTF-8"))
     if upload_name:
         # RFC6266 section 4.1 [1] defines both `filename` and `filename*`.
         #
@@ -135,27 +158,25 @@ def add_file_headers(request, media_type, file_size, upload_name):
 
 # separators as defined in RFC2616. SP and HT are handled separately.
 # see _can_encode_filename_as_token.
-_FILENAME_SEPARATOR_CHARS = set(
-    (
-        "(",
-        ")",
-        "<",
-        ">",
-        "@",
-        ",",
-        ";",
-        ":",
-        "\\",
-        '"',
-        "/",
-        "[",
-        "]",
-        "?",
-        "=",
-        "{",
-        "}",
-    )
-)
+_FILENAME_SEPARATOR_CHARS = {
+    "(",
+    ")",
+    "<",
+    ">",
+    "@",
+    ",",
+    ";",
+    ":",
+    "\\",
+    '"',
+    "/",
+    "[",
+    "]",
+    "?",
+    "=",
+    "{",
+    "}",
+}
 
 
 def _can_encode_filename_as_token(x):
@@ -179,8 +200,9 @@ def _can_encode_filename_as_token(x):
     return True
 
 
-@defer.inlineCallbacks
-def respond_with_responder(request, responder, media_type, file_size, upload_name=None):
+async def respond_with_responder(
+    request, responder, media_type, file_size, upload_name=None
+):
     """Responds to the request with given responder. If responder is None then
     returns 404.
 
@@ -199,7 +221,7 @@ def respond_with_responder(request, responder, media_type, file_size, upload_nam
     add_file_headers(request, media_type, file_size, upload_name)
     try:
         with responder:
-            yield responder.write_to_consumer(request)
+            await responder.write_to_consumer(request)
     except Exception as e:
         # The majority of the time this will be due to the client having gone
         # away. Unfortunately, Twisted simply throws a generic exception at us
@@ -213,21 +235,21 @@ def respond_with_responder(request, responder, media_type, file_size, upload_nam
     finish_request(request)
 
 
-class Responder(object):
+class Responder:
     """Represents a response that can be streamed to the requester.
 
     Responder is a context manager which *must* be used, so that any resources
     held can be cleaned up.
     """
 
-    def write_to_consumer(self, consumer):
+    def write_to_consumer(self, consumer: IConsumer) -> Awaitable:
         """Stream response into consumer
 
         Args:
-            consumer (IConsumer)
+            consumer: The consumer to stream into.
 
         Returns:
-            Deferred: Resolves once the response has finished being written
+            Resolves once the response has finished being written
         """
         pass
 
@@ -238,7 +260,7 @@ class Responder(object):
         pass
 
 
-class FileInfo(object):
+class FileInfo:
     """Details about a requested/uploaded file.
 
     Attributes:
@@ -303,23 +325,15 @@ def get_filename_from_headers(headers):
             upload_name_utf8 = upload_name_utf8[7:]
             # We have a filename*= section. This MUST be ASCII, and any UTF-8
             # bytes are %-quoted.
-            if PY3:
-                try:
-                    # Once it is decoded, we can then unquote the %-encoded
-                    # parts strictly into a unicode string.
-                    upload_name = urllib.parse.unquote(
-                        upload_name_utf8.decode("ascii"), errors="strict"
-                    )
-                except UnicodeDecodeError:
-                    # Incorrect UTF-8.
-                    pass
-            else:
-                # On Python 2, we first unquote the %-encoded parts and then
-                # decode it strictly using UTF-8.
-                try:
-                    upload_name = urllib.parse.unquote(upload_name_utf8).decode("utf8")
-                except UnicodeDecodeError:
-                    pass
+            try:
+                # Once it is decoded, we can then unquote the %-encoded
+                # parts strictly into a unicode string.
+                upload_name = urllib.parse.unquote(
+                    upload_name_utf8.decode("ascii"), errors="strict"
+                )
+            except UnicodeDecodeError:
+                # Incorrect UTF-8.
+                pass
 
     # If there isn't check for an ascii name.
     if not upload_name:

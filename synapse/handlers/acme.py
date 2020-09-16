@@ -17,7 +17,6 @@ import logging
 
 import twisted
 import twisted.internet.error
-from twisted.internet import defer
 from twisted.web import server, static
 from twisted.web.resource import Resource
 
@@ -25,15 +24,23 @@ from synapse.app import check_bind_error
 
 logger = logging.getLogger(__name__)
 
+ACME_REGISTER_FAIL_ERROR = """
+--------------------------------------------------------------------------------
+Failed to register with the ACME provider. This is likely happening because the installation
+is new, and ACME v1 has been deprecated by Let's Encrypt and disabled for
+new installations since November 2019.
+At the moment, Synapse doesn't support ACME v2. For more information and alternative
+solutions, please read https://github.com/matrix-org/synapse/blob/master/docs/ACME.md#deprecation-of-acme-v1
+--------------------------------------------------------------------------------"""
 
-class AcmeHandler(object):
+
+class AcmeHandler:
     def __init__(self, hs):
         self.hs = hs
         self.reactor = hs.get_reactor()
         self._acme_domain = hs.config.acme_domain
 
-    @defer.inlineCallbacks
-    def start_listening(self):
+    async def start_listening(self):
         from synapse.handlers import acme_issuing_service
 
         # Configure logging for txacme, if you need to debug
@@ -71,15 +78,19 @@ class AcmeHandler(object):
         # want it to control where we save the certificates, we have to reach in
         # and trigger the registration machinery ourselves.
         self._issuer._registered = False
-        yield self._issuer._ensure_registered()
 
-    @defer.inlineCallbacks
-    def provision_certificate(self):
+        try:
+            await self._issuer._ensure_registered()
+        except Exception:
+            logger.error(ACME_REGISTER_FAIL_ERROR)
+            raise
+
+    async def provision_certificate(self):
 
         logger.warning("Reprovisioning %s", self._acme_domain)
 
         try:
-            yield self._issuer.issue_cert(self._acme_domain)
+            await self._issuer.issue_cert(self._acme_domain)
         except Exception:
             logger.exception("Fail!")
             raise

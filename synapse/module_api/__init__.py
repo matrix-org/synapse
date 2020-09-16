@@ -17,6 +17,7 @@ import logging
 
 from twisted.internet import defer
 
+from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.types import UserID
 
@@ -30,7 +31,7 @@ __all__ = ["errors", "make_deferred_yieldable", "run_in_background", "ModuleApi"
 logger = logging.getLogger(__name__)
 
 
-class ModuleApi(object):
+class ModuleApi:
     """A proxy object that gets passed to various plugin modules so they
     can register new users etc if necessary.
     """
@@ -85,7 +86,7 @@ class ModuleApi(object):
             Deferred[str|None]: Canonical (case-corrected) user_id, or None
                if the user is not registered.
         """
-        return self._auth_handler.check_user_exists(user_id)
+        return defer.ensureDeferred(self._auth_handler.check_user_exists(user_id))
 
     @defer.inlineCallbacks
     def register(self, localpart, displayname=None, emails=[]):
@@ -125,10 +126,14 @@ class ModuleApi(object):
                 'errcode' property for more information on the reason for failure
 
         Returns:
-            Deferred[str]: user_id
+            defer.Deferred[str]: user_id
         """
-        return self._hs.get_registration_handler().register_user(
-            localpart=localpart, default_display_name=displayname, bind_emails=emails
+        return defer.ensureDeferred(
+            self._hs.get_registration_handler().register_user(
+                localpart=localpart,
+                default_display_name=displayname,
+                bind_emails=emails,
+            )
         )
 
     def register_device(self, user_id, device_id=None, initial_display_name=None):
@@ -144,10 +149,12 @@ class ModuleApi(object):
         Returns:
             defer.Deferred[tuple[str, str]]: Tuple of device ID and access token
         """
-        return self._hs.get_registration_handler().register_device(
-            user_id=user_id,
-            device_id=device_id,
-            initial_display_name=initial_display_name,
+        return defer.ensureDeferred(
+            self._hs.get_registration_handler().register_device(
+                user_id=user_id,
+                device_id=device_id,
+                initial_display_name=initial_display_name,
+            )
         )
 
     def record_user_external_id(
@@ -160,8 +167,10 @@ class ModuleApi(object):
             external_id: id on that system
             user_id: complete mxid that it is mapped to
         """
-        return self._store.record_user_external_id(
-            auth_provider_id, remote_user_id, registered_user_id
+        return defer.ensureDeferred(
+            self._store.record_user_external_id(
+                auth_provider_id, remote_user_id, registered_user_id
+            )
         )
 
     def generate_short_term_login_token(
@@ -187,15 +196,21 @@ class ModuleApi(object):
             synapse.api.errors.AuthError: the access token is invalid
         """
         # see if the access token corresponds to a device
-        user_info = yield self._auth.get_user_by_access_token(access_token)
+        user_info = yield defer.ensureDeferred(
+            self._auth.get_user_by_access_token(access_token)
+        )
         device_id = user_info.get("device_id")
         user_id = user_info["user"].to_string()
         if device_id:
             # delete the device, which will also delete its access tokens
-            yield self._hs.get_device_handler().delete_device(user_id, device_id)
+            yield defer.ensureDeferred(
+                self._hs.get_device_handler().delete_device(user_id, device_id)
+            )
         else:
             # no associated device. Just delete the access token.
-            yield self._auth_handler.delete_access_token(access_token)
+            yield defer.ensureDeferred(
+                self._auth_handler.delete_access_token(access_token)
+            )
 
     def run_db_interaction(self, desc, func, *args, **kwargs):
         """Run a function with a database connection
@@ -210,4 +225,44 @@ class ModuleApi(object):
         Returns:
             Deferred[object]: result of func
         """
-        return self._store.db.runInteraction(desc, func, *args, **kwargs)
+        return defer.ensureDeferred(
+            self._store.db_pool.runInteraction(desc, func, *args, **kwargs)
+        )
+
+    def complete_sso_login(
+        self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str
+    ):
+        """Complete a SSO login by redirecting the user to a page to confirm whether they
+        want their access token sent to `client_redirect_url`, or redirect them to that
+        URL with a token directly if the URL matches with one of the whitelisted clients.
+
+        This is deprecated in favor of complete_sso_login_async.
+
+        Args:
+            registered_user_id: The MXID that has been registered as a previous step of
+                of this SSO login.
+            request: The request to respond to.
+            client_redirect_url: The URL to which to offer to redirect the user (or to
+                redirect them directly if whitelisted).
+        """
+        self._auth_handler._complete_sso_login(
+            registered_user_id, request, client_redirect_url,
+        )
+
+    async def complete_sso_login_async(
+        self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str
+    ):
+        """Complete a SSO login by redirecting the user to a page to confirm whether they
+        want their access token sent to `client_redirect_url`, or redirect them to that
+        URL with a token directly if the URL matches with one of the whitelisted clients.
+
+        Args:
+            registered_user_id: The MXID that has been registered as a previous step of
+                of this SSO login.
+            request: The request to respond to.
+            client_redirect_url: The URL to which to offer to redirect the user (or to
+                redirect them directly if whitelisted).
+        """
+        await self._auth_handler.complete_sso_login(
+            registered_user_id, request, client_redirect_url,
+        )

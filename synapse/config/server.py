@@ -19,15 +19,13 @@ import logging
 import os.path
 import re
 from textwrap import indent
-from typing import Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Set
 
 import attr
 import yaml
-from netaddr import IPSet
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.endpoint import parse_and_validate_server_name
-from synapse.python_dependencies import DependencyException, check_requirements
 
 from ._base import Config, ConfigError
 
@@ -57,6 +55,64 @@ on how to configure the new listener.
 --------------------------------------------------------------------------------"""
 
 
+KNOWN_LISTENER_TYPES = {
+    "http",
+    "metrics",
+    "manhole",
+    "replication",
+}
+
+KNOWN_RESOURCES = {
+    "client",
+    "consent",
+    "federation",
+    "keys",
+    "media",
+    "metrics",
+    "openid",
+    "replication",
+    "static",
+    "webclient",
+}
+
+
+@attr.s(frozen=True)
+class HttpResourceConfig:
+    names = attr.ib(
+        type=List[str],
+        factory=list,
+        validator=attr.validators.deep_iterable(attr.validators.in_(KNOWN_RESOURCES)),  # type: ignore
+    )
+    compress = attr.ib(
+        type=bool,
+        default=False,
+        validator=attr.validators.optional(attr.validators.instance_of(bool)),  # type: ignore[arg-type]
+    )
+
+
+@attr.s(frozen=True)
+class HttpListenerConfig:
+    """Object describing the http-specific parts of the config of a listener"""
+
+    x_forwarded = attr.ib(type=bool, default=False)
+    resources = attr.ib(type=List[HttpResourceConfig], factory=list)
+    additional_resources = attr.ib(type=Dict[str, dict], factory=dict)
+    tag = attr.ib(type=str, default=None)
+
+
+@attr.s(frozen=True)
+class ListenerConfig:
+    """Object describing the configuration of a single listener."""
+
+    port = attr.ib(type=int, validator=attr.validators.instance_of(int))
+    bind_addresses = attr.ib(type=List[str])
+    type = attr.ib(type=str, validator=attr.validators.in_(KNOWN_LISTENER_TYPES))
+    tls = attr.ib(type=bool, default=False)
+
+    # http_options is only populated if type=http
+    http_options = attr.ib(type=Optional[HttpListenerConfig], default=None)
+
+
 class ServerConfig(Config):
     section = "server"
 
@@ -77,11 +133,6 @@ class ServerConfig(Config):
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
         self.public_baseurl = config.get("public_baseurl")
-
-        # Whether to send federation traffic out in this process. This only
-        # applies to some federation traffic, and so shouldn't be used to
-        # "disable" federation
-        self.send_federation = config.get("send_federation", True)
 
         # Whether to enable user presence.
         self.use_presence = config.get("use_presence", True)
@@ -155,7 +206,7 @@ class ServerConfig(Config):
         # errors when attempting to search for messages.
         self.enable_search = config.get("enable_search", True)
 
-        self.filter_timeline_limit = config.get("filter_timeline_limit", -1)
+        self.filter_timeline_limit = config.get("filter_timeline_limit", 100)
 
         # Whether we should block invites sent to users on this server
         # (other than those sent by local server admins)
@@ -204,34 +255,6 @@ class ServerConfig(Config):
         # Admin uri to direct users at should their instance become blocked
         # due to resource constraints
         self.admin_contact = config.get("admin_contact", None)
-
-        # FIXME: federation_domain_whitelist needs sytests
-        self.federation_domain_whitelist = None  # type: Optional[dict]
-        federation_domain_whitelist = config.get("federation_domain_whitelist", None)
-
-        if federation_domain_whitelist is not None:
-            # turn the whitelist into a hash for speed of lookup
-            self.federation_domain_whitelist = {}
-
-            for domain in federation_domain_whitelist:
-                self.federation_domain_whitelist[domain] = True
-
-        self.federation_ip_range_blacklist = config.get(
-            "federation_ip_range_blacklist", []
-        )
-
-        # Attempt to create an IPSet from the given ranges
-        try:
-            self.federation_ip_range_blacklist = IPSet(
-                self.federation_ip_range_blacklist
-            )
-
-            # Always blacklist 0.0.0.0, ::
-            self.federation_ip_range_blacklist.update(["0.0.0.0", "::"])
-        except Exception as e:
-            raise ConfigError(
-                "Invalid range(s) provided in federation_ip_range_blacklist: %s" % e
-            )
 
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != "/":
@@ -379,38 +402,21 @@ class ServerConfig(Config):
                 }
             ]
 
-        self.listeners = []  # type: List[dict]
-        for listener in config.get("listeners", []):
-            if not isinstance(listener.get("port", None), int):
-                raise ConfigError(
-                    "Listener configuration is lacking a valid 'port' option"
-                )
+        self.listeners = [parse_listener_def(x) for x in config.get("listeners", [])]
 
-            if listener.setdefault("tls", False):
-                # no_tls is not really supported any more, but let's grandfather it in
-                # here.
-                if config.get("no_tls", False):
+        # no_tls is not really supported any more, but let's grandfather it in
+        # here.
+        if config.get("no_tls", False):
+            l2 = []
+            for listener in self.listeners:
+                if listener.tls:
                     logger.info(
-                        "Ignoring TLS-enabled listener on port %i due to no_tls"
+                        "Ignoring TLS-enabled listener on port %i due to no_tls",
+                        listener.port,
                     )
-                    continue
-
-            bind_address = listener.pop("bind_address", None)
-            bind_addresses = listener.setdefault("bind_addresses", [])
-
-            # if bind_address was specified, add it to the list of addresses
-            if bind_address:
-                bind_addresses.append(bind_address)
-
-            # if we still have an empty list of addresses, use the default list
-            if not bind_addresses:
-                if listener["type"] == "metrics":
-                    # the metrics listener doesn't support IPv6
-                    bind_addresses.append("0.0.0.0")
                 else:
-                    bind_addresses.extend(DEFAULT_BIND_ADDRESSES)
-
-            self.listeners.append(listener)
+                    l2.append(listener)
+            self.listeners = l2
 
         if not self.web_client_location:
             _warn_if_webclient_configured(self.listeners)
@@ -418,7 +424,7 @@ class ServerConfig(Config):
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
 
         @attr.s
-        class LimitRemoteRoomsConfig(object):
+        class LimitRemoteRoomsConfig:
             enabled = attr.ib(
                 validator=attr.validators.instance_of(bool), default=False
             )
@@ -432,9 +438,12 @@ class ServerConfig(Config):
                 validator=attr.validators.instance_of(str),
                 default=ROOM_COMPLEXITY_TOO_GREAT,
             )
+            admins_can_join = attr.ib(
+                validator=attr.validators.instance_of(bool), default=False
+            )
 
         self.limit_remote_rooms = LimitRemoteRoomsConfig(
-            **config.get("limit_remote_rooms", {})
+            **(config.get("limit_remote_rooms") or {})
         )
 
         bind_port = config.get("bind_port")
@@ -446,43 +455,41 @@ class ServerConfig(Config):
             bind_host = config.get("bind_host", "")
             gzip_responses = config.get("gzip_responses", True)
 
+            http_options = HttpListenerConfig(
+                resources=[
+                    HttpResourceConfig(names=["client"], compress=gzip_responses),
+                    HttpResourceConfig(names=["federation"]),
+                ],
+            )
+
             self.listeners.append(
-                {
-                    "port": bind_port,
-                    "bind_addresses": [bind_host],
-                    "tls": True,
-                    "type": "http",
-                    "resources": [
-                        {"names": ["client"], "compress": gzip_responses},
-                        {"names": ["federation"], "compress": False},
-                    ],
-                }
+                ListenerConfig(
+                    port=bind_port,
+                    bind_addresses=[bind_host],
+                    tls=True,
+                    type="http",
+                    http_options=http_options,
+                )
             )
 
             unsecure_port = config.get("unsecure_port", bind_port - 400)
             if unsecure_port:
                 self.listeners.append(
-                    {
-                        "port": unsecure_port,
-                        "bind_addresses": [bind_host],
-                        "tls": False,
-                        "type": "http",
-                        "resources": [
-                            {"names": ["client"], "compress": gzip_responses},
-                            {"names": ["federation"], "compress": False},
-                        ],
-                    }
+                    ListenerConfig(
+                        port=unsecure_port,
+                        bind_addresses=[bind_host],
+                        tls=False,
+                        type="http",
+                        http_options=http_options,
+                    )
                 )
 
         manhole = config.get("manhole")
         if manhole:
             self.listeners.append(
-                {
-                    "port": manhole,
-                    "bind_addresses": ["127.0.0.1"],
-                    "type": "manhole",
-                    "tls": False,
-                }
+                ListenerConfig(
+                    port=manhole, bind_addresses=["127.0.0.1"], type="manhole",
+                )
             )
 
         metrics_port = config.get("metrics_port")
@@ -490,25 +497,66 @@ class ServerConfig(Config):
             logger.warning(METRICS_PORT_WARNING)
 
             self.listeners.append(
-                {
-                    "port": metrics_port,
-                    "bind_addresses": [config.get("metrics_bind_host", "127.0.0.1")],
-                    "tls": False,
-                    "type": "http",
-                    "resources": [{"names": ["metrics"], "compress": False}],
-                }
+                ListenerConfig(
+                    port=metrics_port,
+                    bind_addresses=[config.get("metrics_bind_host", "127.0.0.1")],
+                    type="http",
+                    http_options=HttpListenerConfig(
+                        resources=[HttpResourceConfig(names=["metrics"])]
+                    ),
+                )
             )
-
-        _check_resource_config(self.listeners)
 
         self.cleanup_extremities_with_dummy_events = config.get(
             "cleanup_extremities_with_dummy_events", True
         )
 
+        # The number of forward extremities in a room needed to send a dummy event.
+        self.dummy_events_threshold = config.get("dummy_events_threshold", 10)
+
         self.enable_ephemeral_messages = config.get("enable_ephemeral_messages", False)
 
+        # Inhibits the /requestToken endpoints from returning an error that might leak
+        # information about whether an e-mail address is in use or not on this
+        # homeserver, and instead return a 200 with a fake sid if this kind of error is
+        # met, without sending anything.
+        # This is a compromise between sending an email, which could be a spam vector,
+        # and letting the client know which email address is bound to an account and
+        # which one isn't.
+        self.request_token_inhibit_3pid_errors = config.get(
+            "request_token_inhibit_3pid_errors", False,
+        )
+
+        # List of users trialing the new experimental default push rules. This setting is
+        # not included in the sample configuration file on purpose as it's a temporary
+        # hack, so that some users can trial the new defaults without impacting every
+        # user on the homeserver.
+        users_new_default_push_rules = (
+            config.get("users_new_default_push_rules") or []
+        )  # type: list
+        if not isinstance(users_new_default_push_rules, list):
+            raise ConfigError("'users_new_default_push_rules' must be a list")
+
+        # Turn the list into a set to improve lookup speed.
+        self.users_new_default_push_rules = set(
+            users_new_default_push_rules
+        )  # type: set
+
+        # Whitelist of domain names that given next_link parameters must have
+        next_link_domain_whitelist = config.get(
+            "next_link_domain_whitelist"
+        )  # type: Optional[List[str]]
+
+        self.next_link_domain_whitelist = None  # type: Optional[Set[str]]
+        if next_link_domain_whitelist is not None:
+            if not isinstance(next_link_domain_whitelist, list):
+                raise ConfigError("'next_link_domain_whitelist' must be a list")
+
+            # Turn the list into a set to improve lookup speed.
+            self.next_link_domain_whitelist = set(next_link_domain_whitelist)
+
     def has_tls_listener(self) -> bool:
-        return any(l["tls"] for l in self.listeners)
+        return any(listener.tls for listener in self.listeners)
 
     def generate_config_section(
         self, server_name, data_dir_path, open_private_ports, listeners, **kwargs
@@ -604,10 +652,15 @@ class ServerConfig(Config):
         #
         pid_file: %(pid_file)s
 
-        # The path to the web client which will be served at /_matrix/client/
-        # if 'webclient' is configured under the 'listeners' configuration.
+        # The absolute URL to the web client which /_matrix/client will redirect
+        # to if 'webclient' is configured under the 'listeners' configuration.
         #
-        #web_client_location: "/path/to/web/root"
+        # This option can be also set to the filesystem path to the web client
+        # which will be served at /_matrix/client/ if 'webclient' is configured
+        # under the 'listeners' configuration, however this is a security risk:
+        # https://github.com/matrix-org/synapse#security-note
+        #
+        #web_client_location: https://riot.example.com/
 
         # The public-facing base URL that clients use to access this HS
         # (not including _matrix/...). This is the same URL a user would
@@ -668,7 +721,9 @@ class ServerConfig(Config):
         #gc_thresholds: [700, 10, 10]
 
         # Set the limit on the returned events in the timeline in the get
-        # and sync operations. The default value is -1, means no upper limit.
+        # and sync operations. The default value is 100. -1 means no upper limit.
+        #
+        # Uncomment the following to increase the limit to 5000.
         #
         #filter_timeline_limit: 5000
 
@@ -683,38 +738,6 @@ class ServerConfig(Config):
         # will receive errors when searching for messages. Defaults to enabled.
         #
         #enable_search: false
-
-        # Restrict federation to the following whitelist of domains.
-        # N.B. we recommend also firewalling your federation listener to limit
-        # inbound federation traffic as early as possible, rather than relying
-        # purely on this application-layer restriction.  If not specified, the
-        # default is to whitelist everything.
-        #
-        #federation_domain_whitelist:
-        #  - lon.example.com
-        #  - nyc.example.com
-        #  - syd.example.com
-
-        # Prevent federation requests from being sent to the following
-        # blacklist IP address CIDR ranges. If this option is not specified, or
-        # specified with an empty list, no ip range blacklist will be enforced.
-        #
-        # As of Synapse v1.4.0 this option also affects any outbound requests to identity
-        # servers provided by user input.
-        #
-        # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
-        # listed here, since they correspond to unroutable addresses.)
-        #
-        federation_ip_range_blacklist:
-          - '127.0.0.0/8'
-          - '10.0.0.0/8'
-          - '172.16.0.0/12'
-          - '192.168.0.0/16'
-          - '100.64.0.0/10'
-          - '169.254.0.0/16'
-          - '::1/128'
-          - 'fe80::/64'
-          - 'fc00::/7'
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.
@@ -744,7 +767,7 @@ class ServerConfig(Config):
         #       names: a list of names of HTTP resources. See below for a list of
         #           valid resource names.
         #
-        #       compress: set to true to enable HTTP comression for this resource.
+        #       compress: set to true to enable HTTP compression for this resource.
         #
         #   additional_resources: Only valid for an 'http' listener. A map of
         #        additional endpoints which should be loaded via dynamic modules.
@@ -807,6 +830,18 @@ class ServerConfig(Config):
           #  bind_addresses: ['::1', '127.0.0.1']
           #  type: manhole
 
+        # Forward extremities can build up in a room due to networking delays between
+        # homeservers. Once this happens in a large room, calculation of the state of
+        # that room can become quite expensive. To mitigate this, once the number of
+        # forward extremities reaches a given threshold, Synapse will send an
+        # org.matrix.dummy_event event, which will reduce the forward extremities
+        # in the room.
+        #
+        # This setting defines the threshold (i.e. number of forward extremities in the
+        # room) at which dummy events are sent. The default value is 10.
+        #
+        #dummy_events_threshold: 5
+
 
         ## Homeserver blocking ##
 
@@ -825,7 +860,7 @@ class ServerConfig(Config):
         # number of monthly active users.
         #
         # 'limit_usage_by_mau' disables/enables monthly active user blocking. When
-        # anabled and a limit is reached the server returns a 'ResourceLimitError'
+        # enabled and a limit is reached the server returns a 'ResourceLimitError'
         # with error type Codes.RESOURCE_LIMIT_EXCEEDED
         #
         # 'max_mau_value' is the hard limit of monthly active users above which
@@ -864,22 +899,31 @@ class ServerConfig(Config):
         # Used by phonehome stats to group together related servers.
         #server_context: context
 
-        # Resource-constrained homeserver Settings
+        # Resource-constrained homeserver settings
         #
-        # If limit_remote_rooms.enabled is True, the room complexity will be
-        # checked before a user joins a new remote room. If it is above
-        # limit_remote_rooms.complexity, it will disallow joining or
-        # instantly leave.
+        # When this is enabled, the room "complexity" will be checked before a user
+        # joins a new remote room. If it is above the complexity limit, the server will
+        # disallow joining, or will instantly leave.
         #
-        # limit_remote_rooms.complexity_error can be set to customise the text
-        # displayed to the user when a room above the complexity threshold has
-        # its join cancelled.
+        # Room complexity is an arbitrary measure based on factors such as the number of
+        # users in the room.
         #
-        # Uncomment the below lines to enable:
-        #limit_remote_rooms:
-        #  enabled: true
-        #  complexity: 1.0
-        #  complexity_error: "This room is too complex."
+        limit_remote_rooms:
+          # Uncomment to enable room complexity checking.
+          #
+          #enabled: true
+
+          # the limit above which rooms cannot be joined. The default is 1.0.
+          #
+          #complexity: 0.5
+
+          # override the error which is returned when the room is too complex.
+          #
+          #complexity_error: "This room is too complex."
+
+          # allow server admins to join complex rooms. Default is false.
+          #
+          #admins_can_join: true
 
         # Whether to require a user to be in the room to add an alias to it.
         # Defaults to 'true'.
@@ -930,11 +974,10 @@ class ServerConfig(Config):
           #  min_lifetime: 1d
           #  max_lifetime: 1y
 
-          # Retention policy limits. If set, a user won't be able to send a
-          # 'm.room.retention' event which features a 'min_lifetime' or a 'max_lifetime'
-          # that's not within this range. This is especially useful in closed federations,
-          # in which server admins can make sure every federating server applies the same
-          # rules.
+          # Retention policy limits. If set, and the state of a room contains a
+          # 'm.room.retention' event in its state which contains a 'min_lifetime' or a
+          # 'max_lifetime' that's out of these bounds, Synapse will cap the room's policy
+          # to these limits when running purge jobs.
           #
           #allowed_lifetime_min: 1d
           #allowed_lifetime_max: 1y
@@ -960,13 +1003,48 @@ class ServerConfig(Config):
           # (e.g. every 12h), but not want that purge to be performed by a job that's
           # iterating over every room it knows, which could be heavy on the server.
           #
+          # If any purge job is configured, it is strongly recommended to have at least
+          # a single job with neither 'shortest_max_lifetime' nor 'longest_max_lifetime'
+          # set, or one job without 'shortest_max_lifetime' and one job without
+          # 'longest_max_lifetime' set. Otherwise some rooms might be ignored, even if
+          # 'allowed_lifetime_min' and 'allowed_lifetime_max' are set, because capping a
+          # room's policy to these values is done after the policies are retrieved from
+          # Synapse's database (which is done using the range specified in a purge job's
+          # configuration).
+          #
           #purge_jobs:
-          #  - shortest_max_lifetime: 1d
-          #    longest_max_lifetime: 3d
+          #  - longest_max_lifetime: 3d
           #    interval: 12h
           #  - shortest_max_lifetime: 3d
-          #    longest_max_lifetime: 1y
           #    interval: 1d
+
+        # Inhibits the /requestToken endpoints from returning an error that might leak
+        # information about whether an e-mail address is in use or not on this
+        # homeserver.
+        # Note that for some endpoints the error situation is the e-mail already being
+        # used, and for others the error is entering the e-mail being unused.
+        # If this option is enabled, instead of returning an error, these endpoints will
+        # act as if no error happened and return a fake session ID ('sid') to clients.
+        #
+        #request_token_inhibit_3pid_errors: true
+
+        # A list of domains that the domain portion of 'next_link' parameters
+        # must match.
+        #
+        # This parameter is optionally provided by clients while requesting
+        # validation of an email or phone number, and maps to a link that
+        # users will be automatically redirected to after validation
+        # succeeds. Clients can make use this parameter to aid the validation
+        # process.
+        #
+        # The whitelist is applied whether the homeserver or an
+        # identity server is handling validation.
+        #
+        # The default value is no whitelist functionality; all domains are
+        # allowed. Setting this value to an empty list will instead disallow
+        # all domains.
+        #
+        #next_link_domain_whitelist: ["matrix.org"]
         """
             % locals()
         )
@@ -1035,6 +1113,44 @@ def read_gc_thresholds(thresholds):
         )
 
 
+def parse_listener_def(listener: Any) -> ListenerConfig:
+    """parse a listener config from the config file"""
+    listener_type = listener["type"]
+
+    port = listener.get("port")
+    if not isinstance(port, int):
+        raise ConfigError("Listener configuration is lacking a valid 'port' option")
+
+    tls = listener.get("tls", False)
+
+    bind_addresses = listener.get("bind_addresses", [])
+    bind_address = listener.get("bind_address")
+    # if bind_address was specified, add it to the list of addresses
+    if bind_address:
+        bind_addresses.append(bind_address)
+
+    # if we still have an empty list of addresses, use the default list
+    if not bind_addresses:
+        if listener_type == "metrics":
+            # the metrics listener doesn't support IPv6
+            bind_addresses.append("0.0.0.0")
+        else:
+            bind_addresses.extend(DEFAULT_BIND_ADDRESSES)
+
+    http_config = None
+    if listener_type == "http":
+        http_config = HttpListenerConfig(
+            x_forwarded=listener.get("x_forwarded", False),
+            resources=[
+                HttpResourceConfig(**res) for res in listener.get("resources", [])
+            ],
+            additional_resources=listener.get("additional_resources", {}),
+            tag=listener.get("tag"),
+        )
+
+    return ListenerConfig(port, bind_addresses, listener_type, tls, http_config)
+
+
 NO_MORE_WEB_CLIENT_WARNING = """
 Synapse no longer includes a web client. To enable a web client, configure
 web_client_location. To remove this warning, remove 'webclient' from the 'listeners'
@@ -1042,42 +1158,12 @@ configuration.
 """
 
 
-def _warn_if_webclient_configured(listeners):
+def _warn_if_webclient_configured(listeners: Iterable[ListenerConfig]) -> None:
     for listener in listeners:
-        for res in listener.get("resources", []):
-            for name in res.get("names", []):
+        if not listener.http_options:
+            continue
+        for res in listener.http_options.resources:
+            for name in res.names:
                 if name == "webclient":
                     logger.warning(NO_MORE_WEB_CLIENT_WARNING)
                     return
-
-
-KNOWN_RESOURCES = (
-    "client",
-    "consent",
-    "federation",
-    "keys",
-    "media",
-    "metrics",
-    "openid",
-    "replication",
-    "static",
-    "webclient",
-)
-
-
-def _check_resource_config(listeners):
-    resource_names = set(
-        res_name
-        for listener in listeners
-        for res in listener.get("resources", [])
-        for res_name in res.get("names", [])
-    )
-
-    for resource in resource_names:
-        if resource not in KNOWN_RESOURCES:
-            raise ConfigError("Unknown listener resource '%s'" % (resource,))
-        if resource == "consent":
-            try:
-                check_requirements("resources.consent")
-            except DependencyException as e:
-                raise ConfigError(e.message)

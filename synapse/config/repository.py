@@ -70,6 +70,7 @@ def parse_thumbnail_requirements(thumbnail_sizes):
         jpeg_thumbnail = ThumbnailRequirement(width, height, method, "image/jpeg")
         png_thumbnail = ThumbnailRequirement(width, height, method, "image/png")
         requirements.setdefault("image/jpeg", []).append(jpeg_thumbnail)
+        requirements.setdefault("image/webp", []).append(jpeg_thumbnail)
         requirements.setdefault("image/gif", []).append(png_thumbnail)
         requirements.setdefault("image/png", []).append(png_thumbnail)
     return {
@@ -92,6 +93,12 @@ class ContentRepositoryConfig(Config):
             return
         else:
             self.can_load_media_repo = True
+
+        # Whether this instance should be the one to run the background jobs to
+        # e.g clean up old URL previews.
+        self.media_instance_running_background_jobs = config.get(
+            "media_instance_running_background_jobs",
+        )
 
         self.max_upload_size = self.parse_size(config.get("max_upload_size", "10M"))
         self.max_image_pixels = self.parse_size(config.get("max_image_pixels", "32M"))
@@ -192,6 +199,10 @@ class ContentRepositoryConfig(Config):
 
             self.url_preview_url_blacklist = config.get("url_preview_url_blacklist", ())
 
+            self.url_preview_accept_language = config.get(
+                "url_preview_accept_language"
+            ) or ["en"]
+
     def generate_config_section(self, data_dir_path, **kwargs):
         media_store = os.path.join(data_dir_path, "media_store")
         uploads_path = os.path.join(data_dir_path, "uploads")
@@ -220,12 +231,11 @@ class ContentRepositoryConfig(Config):
         #
         #media_storage_providers:
         #  - module: file_system
-        #    # Whether to write new local files.
+        #    # Whether to store newly uploaded local files
         #    store_local: false
-        #    # Whether to write new remote media
+        #    # Whether to store newly downloaded remote files
         #    store_remote: false
-        #    # Whether to block upload requests waiting for write to this
-        #    # provider to complete
+        #    # Whether to wait for successful storage for local uploads
         #    store_synchronous: false
         #    config:
         #       directory: /mnt/some/other/directory
@@ -329,6 +339,31 @@ class ContentRepositoryConfig(Config):
         # The largest allowed URL preview spidering size in bytes
         #
         #max_spider_size: 10M
+
+        # A list of values for the Accept-Language HTTP header used when
+        # downloading webpages during URL preview generation. This allows
+        # Synapse to specify the preferred languages that URL previews should
+        # be in when communicating with remote servers.
+        #
+        # Each value is a IETF language tag; a 2-3 letter identifier for a
+        # language, optionally followed by subtags separated by '-', specifying
+        # a country or region variant.
+        #
+        # Multiple values can be provided, and a weight can be added to each by
+        # using quality value syntax (;q=). '*' translates to any language.
+        #
+        # Defaults to "en".
+        #
+        # Example:
+        #
+        # url_preview_accept_language:
+        #   - en-UK
+        #   - en-US;q=0.9
+        #   - fr;q=0.8
+        #   - *;q=0.7
+        #
+        url_preview_accept_language:
+        #   - en
         """
             % locals()
         )

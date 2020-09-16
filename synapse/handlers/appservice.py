@@ -15,8 +15,6 @@
 
 import logging
 
-from six import itervalues
-
 from prometheus_client import Counter
 
 from twisted.internet import defer
@@ -29,7 +27,6 @@ from synapse.metrics import (
     event_processing_loop_room_count,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.util import log_failure
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
@@ -37,7 +34,7 @@ logger = logging.getLogger(__name__)
 events_processed_counter = Counter("synapse_handlers_appservice_events_processed", "")
 
 
-class ApplicationServicesHandler(object):
+class ApplicationServicesHandler:
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.is_mine_id = hs.is_mine_id
@@ -50,8 +47,7 @@ class ApplicationServicesHandler(object):
         self.current_max = 0
         self.is_processing = False
 
-    @defer.inlineCallbacks
-    def notify_interested_services(self, current_id):
+    async def notify_interested_services(self, current_id):
         """Notifies (pushes) all application services interested in this event.
 
         Pushing is done asynchronously, so this method won't block for any
@@ -76,7 +72,7 @@ class ApplicationServicesHandler(object):
                     (
                         upper_bound,
                         events,
-                    ) = yield self.store.get_new_events_for_appservice(
+                    ) = await self.store.get_new_events_for_appservice(
                         self.current_max, limit
                     )
 
@@ -87,10 +83,9 @@ class ApplicationServicesHandler(object):
                     for event in events:
                         events_by_room.setdefault(event.room_id, []).append(event)
 
-                    @defer.inlineCallbacks
-                    def handle_event(event):
+                    async def handle_event(event):
                         # Gather interested services
-                        services = yield self._get_services_for_event(event)
+                        services = await self._get_services_for_event(event)
                         if len(services) == 0:
                             return  # no services need notifying
 
@@ -98,16 +93,17 @@ class ApplicationServicesHandler(object):
                         # query API for all services which match that user regex.
                         # This needs to block as these user queries need to be
                         # made BEFORE pushing the event.
-                        yield self._check_user_exists(event.sender)
+                        await self._check_user_exists(event.sender)
                         if event.type == EventTypes.Member:
-                            yield self._check_user_exists(event.state_key)
+                            await self._check_user_exists(event.state_key)
 
                         if not self.started_scheduler:
 
-                            def start_scheduler():
-                                return self.scheduler.start().addErrback(
-                                    log_failure, "Application Services Failure"
-                                )
+                            async def start_scheduler():
+                                try:
+                                    return await self.scheduler.start()
+                                except Exception:
+                                    logger.error("Application Services Failure")
 
                             run_as_background_process("as_scheduler", start_scheduler)
                             self.started_scheduler = True
@@ -116,25 +112,30 @@ class ApplicationServicesHandler(object):
                         for service in services:
                             self.scheduler.submit_event_for_as(service, event)
 
-                    @defer.inlineCallbacks
-                    def handle_room_events(events):
-                        for event in events:
-                            yield handle_event(event)
+                        now = self.clock.time_msec()
+                        ts = await self.store.get_received_ts(event.event_id)
+                        synapse.metrics.event_processing_lag_by_event.labels(
+                            "appservice_sender"
+                        ).observe((now - ts) / 1000)
 
-                    yield make_deferred_yieldable(
+                    async def handle_room_events(events):
+                        for event in events:
+                            await handle_event(event)
+
+                    await make_deferred_yieldable(
                         defer.gatherResults(
                             [
                                 run_in_background(handle_room_events, evs)
-                                for evs in itervalues(events_by_room)
+                                for evs in events_by_room.values()
                             ],
                             consumeErrors=True,
                         )
                     )
 
-                    yield self.store.set_appservice_last_pos(upper_bound)
+                    await self.store.set_appservice_last_pos(upper_bound)
 
                     now = self.clock.time_msec()
-                    ts = yield self.store.get_received_ts(events[-1].event_id)
+                    ts = await self.store.get_received_ts(events[-1].event_id)
 
                     synapse.metrics.event_processing_positions.labels(
                         "appservice_sender"
@@ -157,8 +158,7 @@ class ApplicationServicesHandler(object):
             finally:
                 self.is_processing = False
 
-    @defer.inlineCallbacks
-    def query_user_exists(self, user_id):
+    async def query_user_exists(self, user_id):
         """Check if any application service knows this user_id exists.
 
         Args:
@@ -166,15 +166,14 @@ class ApplicationServicesHandler(object):
         Returns:
             True if this user exists on at least one application service.
         """
-        user_query_services = yield self._get_services_for_user(user_id=user_id)
+        user_query_services = self._get_services_for_user(user_id=user_id)
         for user_service in user_query_services:
-            is_known_user = yield self.appservice_api.query_user(user_service, user_id)
+            is_known_user = await self.appservice_api.query_user(user_service, user_id)
             if is_known_user:
                 return True
         return False
 
-    @defer.inlineCallbacks
-    def query_room_alias_exists(self, room_alias):
+    async def query_room_alias_exists(self, room_alias):
         """Check if an application service knows this room alias exists.
 
         Args:
@@ -189,19 +188,18 @@ class ApplicationServicesHandler(object):
             s for s in services if (s.is_interested_in_alias(room_alias_str))
         ]
         for alias_service in alias_query_services:
-            is_known_alias = yield self.appservice_api.query_alias(
+            is_known_alias = await self.appservice_api.query_alias(
                 alias_service, room_alias_str
             )
             if is_known_alias:
                 # the alias exists now so don't query more ASes.
-                result = yield self.store.get_association_from_room_alias(room_alias)
+                result = await self.store.get_association_from_room_alias(room_alias)
                 return result
 
-    @defer.inlineCallbacks
-    def query_3pe(self, kind, protocol, fields):
-        services = yield self._get_services_for_3pn(protocol)
+    async def query_3pe(self, kind, protocol, fields):
+        services = self._get_services_for_3pn(protocol)
 
-        results = yield make_deferred_yieldable(
+        results = await make_deferred_yieldable(
             defer.DeferredList(
                 [
                     run_in_background(
@@ -220,8 +218,7 @@ class ApplicationServicesHandler(object):
 
         return ret
 
-    @defer.inlineCallbacks
-    def get_3pe_protocols(self, only_protocol=None):
+    async def get_3pe_protocols(self, only_protocol=None):
         services = self.store.get_app_services()
         protocols = {}
 
@@ -234,7 +231,7 @@ class ApplicationServicesHandler(object):
                 if p not in protocols:
                     protocols[p] = []
 
-                info = yield self.appservice_api.get_3pe_protocol(s, p)
+                info = await self.appservice_api.get_3pe_protocol(s, p)
 
                 if info is not None:
                     protocols[p].append(info)
@@ -259,8 +256,7 @@ class ApplicationServicesHandler(object):
 
         return protocols
 
-    @defer.inlineCallbacks
-    def _get_services_for_event(self, event):
+    async def _get_services_for_event(self, event):
         """Retrieve a list of application services interested in this event.
 
         Args:
@@ -276,7 +272,7 @@ class ApplicationServicesHandler(object):
         # inside of a list comprehension anymore.
         interested_list = []
         for s in services:
-            if (yield s.is_interested(event, self.store)):
+            if await s.is_interested(event, self.store):
                 interested_list.append(s)
 
         return interested_list
@@ -284,21 +280,20 @@ class ApplicationServicesHandler(object):
     def _get_services_for_user(self, user_id):
         services = self.store.get_app_services()
         interested_list = [s for s in services if (s.is_interested_in_user(user_id))]
-        return defer.succeed(interested_list)
+        return interested_list
 
     def _get_services_for_3pn(self, protocol):
         services = self.store.get_app_services()
         interested_list = [s for s in services if s.is_interested_in_protocol(protocol)]
-        return defer.succeed(interested_list)
+        return interested_list
 
-    @defer.inlineCallbacks
-    def _is_unknown_user(self, user_id):
+    async def _is_unknown_user(self, user_id):
         if not self.is_mine_id(user_id):
             # we don't know if they are unknown or not since it isn't one of our
             # users. We can't poke ASes.
             return False
 
-        user_info = yield self.store.get_user_by_id(user_id)
+        user_info = await self.store.get_user_by_id(user_id)
         if user_info:
             return False
 
@@ -307,10 +302,9 @@ class ApplicationServicesHandler(object):
         service_list = [s for s in services if s.sender == user_id]
         return len(service_list) == 0
 
-    @defer.inlineCallbacks
-    def _check_user_exists(self, user_id):
-        unknown_user = yield self._is_unknown_user(user_id)
+    async def _check_user_exists(self, user_id):
+        unknown_user = await self._is_unknown_user(user_id)
         if unknown_user:
-            exists = yield self.query_user_exists(user_id)
+            exists = await self.query_user_exists(user_id)
             return exists
         return True

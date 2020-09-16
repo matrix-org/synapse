@@ -16,12 +16,11 @@
 # limitations under the License.
 
 import logging
-
-from six.moves import urllib
-
-from twisted.internet import defer
+import urllib
+from typing import Any, Dict, Optional
 
 from synapse.api.constants import Membership
+from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.api.urls import (
     FEDERATION_UNSTABLE_PREFIX,
     FEDERATION_V1_PREFIX,
@@ -32,7 +31,7 @@ from synapse.logging.utils import log_function
 logger = logging.getLogger(__name__)
 
 
-class TransportLayerClient(object):
+class TransportLayerClient:
     """Sends federation HTTP requests to other servers"""
 
     def __init__(self, hs):
@@ -51,7 +50,7 @@ class TransportLayerClient(object):
             event_id (str): The event we want the context at.
 
         Returns:
-            Deferred: Results in a dict received from the remote homeserver.
+            Awaitable: Results in a dict received from the remote homeserver.
         """
         logger.debug("get_room_state_ids dest=%s, room=%s", destination, room_id)
 
@@ -75,7 +74,7 @@ class TransportLayerClient(object):
                 giving up. None indicates no timeout.
 
         Returns:
-            Deferred: Results in a dict received from the remote homeserver.
+            Awaitable: Results in a dict received from the remote homeserver.
         """
         logger.debug("get_pdu dest=%s, event_id=%s", destination, event_id)
 
@@ -96,7 +95,7 @@ class TransportLayerClient(object):
             limit (int)
 
         Returns:
-            Deferred: Results in a dict received from the remote homeserver.
+            Awaitable: Results in a dict received from the remote homeserver.
         """
         logger.debug(
             "backfill dest=%s, room_id=%s, event_tuples=%r, limit=%s",
@@ -118,16 +117,15 @@ class TransportLayerClient(object):
             destination, path=path, args=args, try_trailing_slash_on_400=True
         )
 
-    @defer.inlineCallbacks
     @log_function
-    def send_transaction(self, transaction, json_data_callback=None):
+    async def send_transaction(self, transaction, json_data_callback=None):
         """ Sends the given Transaction to its destination
 
         Args:
             transaction (Transaction)
 
         Returns:
-            Deferred: Succeeds when we get a 2xx HTTP response. The result
+            Succeeds when we get a 2xx HTTP response. The result
             will be the decoded JSON body.
 
             Fails with ``HTTPRequestException`` if we get an HTTP response
@@ -154,7 +152,7 @@ class TransportLayerClient(object):
 
         path = _create_v1_path("/send/%s", transaction.transaction_id)
 
-        response = yield self.client.put_json(
+        response = await self.client.put_json(
             transaction.destination,
             path=path,
             data=json_data,
@@ -166,14 +164,13 @@ class TransportLayerClient(object):
 
         return response
 
-    @defer.inlineCallbacks
     @log_function
-    def make_query(
+    async def make_query(
         self, destination, query_type, args, retry_on_dns_fail, ignore_backoff=False
     ):
         path = _create_v1_path("/query/%s", query_type)
 
-        content = yield self.client.get_json(
+        content = await self.client.get_json(
             destination=destination,
             path=path,
             args=args,
@@ -184,9 +181,10 @@ class TransportLayerClient(object):
 
         return content
 
-    @defer.inlineCallbacks
     @log_function
-    def make_membership_event(self, destination, room_id, user_id, membership, params):
+    async def make_membership_event(
+        self, destination, room_id, user_id, membership, params
+    ):
         """Asks a remote server to build and sign us a membership event
 
         Note that this does not append any events to any graphs.
@@ -200,7 +198,7 @@ class TransportLayerClient(object):
                 request.
 
         Returns:
-            Deferred: Succeeds when we get a 2xx HTTP response. The result
+            Succeeds when we get a 2xx HTTP response. The result
             will be the decoded JSON body (ie, the new event).
 
             Fails with ``HTTPRequestException`` if we get an HTTP response
@@ -231,7 +229,7 @@ class TransportLayerClient(object):
             ignore_backoff = True
             retry_on_dns_fail = True
 
-        content = yield self.client.get_json(
+        content = await self.client.get_json(
             destination=destination,
             path=path,
             args=params,
@@ -242,34 +240,31 @@ class TransportLayerClient(object):
 
         return content
 
-    @defer.inlineCallbacks
     @log_function
-    def send_join_v1(self, destination, room_id, event_id, content):
+    async def send_join_v1(self, destination, room_id, event_id, content):
         path = _create_v1_path("/send_join/%s/%s", room_id, event_id)
 
-        response = yield self.client.put_json(
+        response = await self.client.put_json(
             destination=destination, path=path, data=content
         )
 
         return response
 
-    @defer.inlineCallbacks
     @log_function
-    def send_join_v2(self, destination, room_id, event_id, content):
+    async def send_join_v2(self, destination, room_id, event_id, content):
         path = _create_v2_path("/send_join/%s/%s", room_id, event_id)
 
-        response = yield self.client.put_json(
+        response = await self.client.put_json(
             destination=destination, path=path, data=content
         )
 
         return response
 
-    @defer.inlineCallbacks
     @log_function
-    def send_leave_v1(self, destination, room_id, event_id, content):
+    async def send_leave_v1(self, destination, room_id, event_id, content):
         path = _create_v1_path("/send_leave/%s/%s", room_id, event_id)
 
-        response = yield self.client.put_json(
+        response = await self.client.put_json(
             destination=destination,
             path=path,
             data=content,
@@ -282,12 +277,11 @@ class TransportLayerClient(object):
 
         return response
 
-    @defer.inlineCallbacks
     @log_function
-    def send_leave_v2(self, destination, room_id, event_id, content):
+    async def send_leave_v2(self, destination, room_id, event_id, content):
         path = _create_v2_path("/send_leave/%s/%s", room_id, event_id)
 
-        response = yield self.client.put_json(
+        response = await self.client.put_json(
             destination=destination,
             path=path,
             data=content,
@@ -300,55 +294,58 @@ class TransportLayerClient(object):
 
         return response
 
-    @defer.inlineCallbacks
     @log_function
-    def send_knock_v1(self, destination, room_id, event_id, content):
+    async def send_knock_v1(self, destination, room_id, event_id, content):
         path = _create_v1_path("/send_knock/%s/%s", room_id, event_id)
 
-        response = yield self.client.put_json(
+        response = await self.client.put_json(
             destination=destination, path=path, data=content
         )
 
         return response
 
-    @defer.inlineCallbacks
     @log_function
-    def send_invite_v1(self, destination, room_id, event_id, content):
+    async def send_invite_v1(self, destination, room_id, event_id, content):
         path = _create_v1_path("/invite/%s/%s", room_id, event_id)
 
-        response = yield self.client.put_json(
+        response = await self.client.put_json(
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
         return response
 
-    @defer.inlineCallbacks
     @log_function
-    def send_invite_v2(self, destination, room_id, event_id, content):
+    async def send_invite_v2(self, destination, room_id, event_id, content):
         path = _create_v2_path("/invite/%s/%s", room_id, event_id)
 
-        response = yield self.client.put_json(
+        response = await self.client.put_json(
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
         return response
 
-    @defer.inlineCallbacks
     @log_function
-    def get_public_rooms(
+    async def get_public_rooms(
         self,
-        remote_server,
-        limit,
-        since_token,
-        search_filter=None,
-        include_all_networks=False,
-        third_party_instance_id=None,
+        remote_server: str,
+        limit: Optional[int] = None,
+        since_token: Optional[str] = None,
+        search_filter: Optional[Dict] = None,
+        include_all_networks: bool = False,
+        third_party_instance_id: Optional[str] = None,
     ):
+        """Get the list of public rooms from a remote homeserver
+
+        See synapse.federation.federation_client.FederationClient.get_public_rooms for
+        more information.
+        """
         if search_filter:
             # this uses MSC2197 (Search Filtering over Federation)
             path = _create_v1_path("/publicRooms")
 
-            data = {"include_all_networks": "true" if include_all_networks else "false"}
+            data = {
+                "include_all_networks": "true" if include_all_networks else "false"
+            }  # type: Dict[str, Any]
             if third_party_instance_id:
                 data["third_party_instance_id"] = third_party_instance_id
             if limit:
@@ -358,13 +355,25 @@ class TransportLayerClient(object):
 
             data["filter"] = search_filter
 
-            response = yield self.client.post_json(
-                destination=remote_server, path=path, data=data, ignore_backoff=True
-            )
+            try:
+                response = await self.client.post_json(
+                    destination=remote_server, path=path, data=data, ignore_backoff=True
+                )
+            except HttpResponseException as e:
+                if e.code == 403:
+                    raise SynapseError(
+                        403,
+                        "You are not allowed to view the public rooms list of %s"
+                        % (remote_server,),
+                        errcode=Codes.FORBIDDEN,
+                    )
+                raise
         else:
             path = _create_v1_path("/publicRooms")
 
-            args = {"include_all_networks": "true" if include_all_networks else "false"}
+            args = {
+                "include_all_networks": "true" if include_all_networks else "false"
+            }  # type: Dict[str, Any]
             if third_party_instance_id:
                 args["third_party_instance_id"] = (third_party_instance_id,)
             if limit:
@@ -372,35 +381,42 @@ class TransportLayerClient(object):
             if since_token:
                 args["since"] = [since_token]
 
-            response = yield self.client.get_json(
-                destination=remote_server, path=path, args=args, ignore_backoff=True
-            )
+            try:
+                response = await self.client.get_json(
+                    destination=remote_server, path=path, args=args, ignore_backoff=True
+                )
+            except HttpResponseException as e:
+                if e.code == 403:
+                    raise SynapseError(
+                        403,
+                        "You are not allowed to view the public rooms list of %s"
+                        % (remote_server,),
+                        errcode=Codes.FORBIDDEN,
+                    )
+                raise
 
         return response
 
-    @defer.inlineCallbacks
     @log_function
-    def exchange_third_party_invite(self, destination, room_id, event_dict):
+    async def exchange_third_party_invite(self, destination, room_id, event_dict):
         path = _create_v1_path("/exchange_third_party_invite/%s", room_id)
 
-        response = yield self.client.put_json(
+        response = await self.client.put_json(
             destination=destination, path=path, data=event_dict
         )
 
         return response
 
-    @defer.inlineCallbacks
     @log_function
-    def get_event_auth(self, destination, room_id, event_id):
+    async def get_event_auth(self, destination, room_id, event_id):
         path = _create_v1_path("/event_auth/%s/%s", room_id, event_id)
 
-        content = yield self.client.get_json(destination=destination, path=path)
+        content = await self.client.get_json(destination=destination, path=path)
 
         return content
 
-    @defer.inlineCallbacks
     @log_function
-    def query_client_keys(self, destination, query_content, timeout):
+    async def query_client_keys(self, destination, query_content, timeout):
         """Query the device keys for a list of user ids hosted on a remote
         server.
 
@@ -408,63 +424,89 @@ class TransportLayerClient(object):
             {
               "device_keys": {
                 "<user_id>": ["<device_id>"]
-            } }
+              }
+            }
 
         Response:
             {
               "device_keys": {
                 "<user_id>": {
                   "<device_id>": {...}
-            } } }
-
-        Args:
-            destination(str): The server to query.
-            query_content(dict): The user ids to query.
-        Returns:
-            A dict containg the device keys.
-        """
-        path = _create_v1_path("/user/keys/query")
-
-        content = yield self.client.post_json(
-            destination=destination, path=path, data=query_content, timeout=timeout
-        )
-        return content
-
-    @defer.inlineCallbacks
-    @log_function
-    def query_user_devices(self, destination, user_id, timeout):
-        """Query the devices for a user id hosted on a remote server.
-
-        Response:
-            {
-              "stream_id": "...",
-              "devices": [ { ... } ]
+                }
+              },
+              "master_key": {
+                "<user_id>": {...}
+                }
+              },
+              "self_signing_key": {
+                "<user_id>": {...}
+              }
             }
 
         Args:
             destination(str): The server to query.
             query_content(dict): The user ids to query.
         Returns:
-            A dict containg the device keys.
+            A dict containing device and cross-signing keys.
+        """
+        path = _create_v1_path("/user/keys/query")
+
+        content = await self.client.post_json(
+            destination=destination, path=path, data=query_content, timeout=timeout
+        )
+        return content
+
+    @log_function
+    async def query_user_devices(self, destination, user_id, timeout):
+        """Query the devices for a user id hosted on a remote server.
+
+        Response:
+            {
+              "stream_id": "...",
+              "devices": [ { ... } ],
+              "master_key": {
+                "user_id": "<user_id>",
+                "usage": [...],
+                "keys": {...},
+                "signatures": {
+                  "<user_id>": {...}
+                }
+              },
+              "self_signing_key": {
+                "user_id": "<user_id>",
+                "usage": [...],
+                "keys": {...},
+                "signatures": {
+                  "<user_id>": {...}
+                }
+              }
+            }
+
+        Args:
+            destination(str): The server to query.
+            query_content(dict): The user ids to query.
+        Returns:
+            A dict containing device and cross-signing keys.
         """
         path = _create_v1_path("/user/devices/%s", user_id)
 
-        content = yield self.client.get_json(
+        content = await self.client.get_json(
             destination=destination, path=path, timeout=timeout
         )
         return content
 
-    @defer.inlineCallbacks
     @log_function
-    def claim_client_keys(self, destination, query_content, timeout):
+    async def claim_client_keys(self, destination, query_content, timeout):
         """Claim one-time keys for a list of devices hosted on a remote server.
 
         Request:
             {
               "one_time_keys": {
                 "<user_id>": {
-                    "<device_id>": "<algorithm>"
-            } } }
+                  "<device_id>": "<algorithm>"
+                }
+              }
+            }
 
         Response:
             {
@@ -472,25 +514,27 @@ class TransportLayerClient(object):
                 "<user_id>": {
                   "<device_id>": {
                     "<algorithm>:<key_id>": "<key_base64>"
-            } } } }
+                  }
+                }
+              }
+            }
 
         Args:
             destination(str): The server to query.
             query_content(dict): The user ids to query.
         Returns:
-            A dict containg the one-time keys.
+            A dict containing the one-time keys.
         """
 
         path = _create_v1_path("/user/keys/claim")
 
-        content = yield self.client.post_json(
+        content = await self.client.post_json(
             destination=destination, path=path, data=query_content, timeout=timeout
         )
         return content
 
-    @defer.inlineCallbacks
     @log_function
-    def get_missing_events(
+    async def get_missing_events(
         self,
         destination,
         room_id,
@@ -502,7 +546,7 @@ class TransportLayerClient(object):
     ):
         path = _create_v1_path("/get_missing_events/%s", room_id)
 
-        content = yield self.client.post_json(
+        content = await self.client.post_json(
             destination=destination,
             path=path,
             data={
@@ -697,7 +741,7 @@ class TransportLayerClient(object):
     def remove_user_from_group(
         self, destination, group_id, requester_user_id, user_id, content
     ):
-        """Remove a user fron a group
+        """Remove a user from a group
         """
         path = _create_v1_path("/groups/%s/users/%s/remove", group_id, user_id)
 

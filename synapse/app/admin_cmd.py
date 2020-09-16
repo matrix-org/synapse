@@ -14,12 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
+import json
 import logging
 import os
 import sys
 import tempfile
-
-from canonicaljson import json
 
 from twisted.internet import defer, task
 
@@ -43,7 +42,6 @@ from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.slave.storage.room import RoomStore
-from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.server import HomeServer
 from synapse.util.logcontext import LoggingContext
 from synapse.util.versionstring import get_version_string
@@ -79,20 +77,8 @@ class AdminCmdServer(HomeServer):
     def start_listening(self, listeners):
         pass
 
-    def build_tcp_replication(self):
-        return AdminCmdReplicationHandler(self)
 
-
-class AdminCmdReplicationHandler(ReplicationClientHandler):
-    async def on_rdata(self, stream_name, token, rows):
-        pass
-
-    def get_streams_to_replicate(self):
-        return {}
-
-
-@defer.inlineCallbacks
-def export_data_command(hs, args):
+async def export_data_command(hs, args):
     """Export data for a user.
 
     Args:
@@ -103,10 +89,8 @@ def export_data_command(hs, args):
     user_id = args.user_id
     directory = args.output_directory
 
-    res = yield defer.ensureDeferred(
-        hs.get_handlers().admin_handler.export_user_data(
-            user_id, FileExfiltrationWriter(user_id, directory=directory)
-        )
+    res = await hs.get_handlers().admin_handler.export_user_data(
+        user_id, FileExfiltrationWriter(user_id, directory=directory)
     )
     print(res)
 
@@ -244,14 +228,15 @@ def start(config_options):
     # We also make sure that `_base.start` gets run before we actually run the
     # command.
 
-    @defer.inlineCallbacks
-    def run(_reactor):
+    async def run():
         with LoggingContext("command"):
-            yield _base.start(ss, [])
-            yield args.func(ss, args)
+            _base.start(ss, [])
+            await args.func(ss, args)
 
     _base.start_worker_reactor(
-        "synapse-admin-cmd", config, run_command=lambda: task.react(run)
+        "synapse-admin-cmd",
+        config,
+        run_command=lambda: task.react(lambda _reactor: defer.ensureDeferred(run())),
     )
 
 

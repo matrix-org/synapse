@@ -5,8 +5,6 @@ Message history can be paginated
 
 Can re-join room if re-invited
 
-/upgrade creates a new room
-
 The only membership state included in an initial sync is for all the senders in the timeline
 
 Local device key changes get to remote servers
@@ -39,3 +37,5 @@ Server correctly handles incoming m.device_list_update
 
 # this fails reliably with a torture level of 100 due to https://github.com/matrix-org/synapse/issues/6536
 Outbound federation requests missing prev_events and then asks for /state_ids and resolves the state
+
+Can get rooms/{roomId}/members at a given point

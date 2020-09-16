@@ -1,1 +1,0 @@
-Fix a bug where we would assign a numeric userid if somebody tried registering with an empty username.

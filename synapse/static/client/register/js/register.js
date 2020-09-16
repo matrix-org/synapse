@@ -33,7 +33,7 @@ var setupCaptcha = function() {
             callback: Recaptcha.focus_response_field
         });
         window.matrixRegistration.isUsingRecaptcha = true;
-    }).error(errorFunc);
+    }).fail(errorFunc);
     
 };
 
@@ -49,7 +49,7 @@ var submitCaptcha = function(user, pwd) {
     $.post(matrixRegistration.endpoint, JSON.stringify(data), function(response) {
         console.log("Success -> "+JSON.stringify(response));
         submitPassword(user, pwd, response.session);
-    }).error(function(err) {
+    }).fail(function(err) {
         Recaptcha.reload();
         errorFunc(err);
     });
@@ -67,7 +67,7 @@ var submitPassword = function(user, pwd, session) {
         matrixRegistration.onRegistered(
             response.home_server, response.user_id, response.access_token
         );
-    }).error(errorFunc);
+    }).fail(errorFunc);
 };
 
 var errorFunc = function(err) {
@@ -113,5 +113,5 @@ matrixRegistration.signUp = function() {
 
 matrixRegistration.onRegistered = function(hs_url, user_id, access_token) {
     // clobber this function
-    console.log("onRegistered - This function should be replaced to proceed.");
+    console.warn("onRegistered - This function should be replaced to proceed.");
 };

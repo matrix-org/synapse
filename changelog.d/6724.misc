@@ -1,1 +1,0 @@
-When processing a SAML response, log the assertions for easier configuration.

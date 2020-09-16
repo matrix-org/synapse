@@ -13,11 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.api.room_versions import RoomVersions
+from synapse.events import make_event_from_dict
+from synapse.events.utils import (
+    copy_power_levels_contents,
+    prune_event,
+    serialize_event,
+)
+from synapse.util.frozenutils import freeze
 
-from synapse.events import FrozenEvent
-from synapse.events.utils import prune_event, serialize_event
-
-from .. import unittest
+from tests import unittest
 
 
 def MockEvent(**kwargs):
@@ -25,15 +30,17 @@ def MockEvent(**kwargs):
         kwargs["event_id"] = "fake_event_id"
     if "type" not in kwargs:
         kwargs["type"] = "fake_type"
-    return FrozenEvent(kwargs)
+    return make_event_from_dict(kwargs)
 
 
 class PruneEventTestCase(unittest.TestCase):
     """ Asserts that a new event constructed with `evdict` will look like
     `matchdict` when it is redacted. """
 
-    def run_test(self, evdict, matchdict):
-        self.assertEquals(prune_event(FrozenEvent(evdict)).get_dict(), matchdict)
+    def run_test(self, evdict, matchdict, **kwargs):
+        self.assertEquals(
+            prune_event(make_event_from_dict(evdict, **kwargs)).get_dict(), matchdict
+        )
 
     def test_minimal(self):
         self.run_test(
@@ -120,6 +127,36 @@ class PruneEventTestCase(unittest.TestCase):
                 "signatures": {},
                 "unsigned": {},
             },
+        )
+
+    def test_alias_event(self):
+        """Alias events have special behavior up through room version 6."""
+        self.run_test(
+            {
+                "type": "m.room.aliases",
+                "event_id": "$test:domain",
+                "content": {"aliases": ["test"]},
+            },
+            {
+                "type": "m.room.aliases",
+                "event_id": "$test:domain",
+                "content": {"aliases": ["test"]},
+                "signatures": {},
+                "unsigned": {},
+            },
+        )
+
+    def test_msc2432_alias_event(self):
+        """After MSC2432, alias events have no special behavior."""
+        self.run_test(
+            {"type": "m.room.aliases", "content": {"aliases": ["test"]}},
+            {
+                "type": "m.room.aliases",
+                "content": {},
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=RoomVersions.V6,
         )
 
 
@@ -241,3 +278,39 @@ class SerializeEventTestCase(unittest.TestCase):
             self.serialize(
                 MockEvent(room_id="!foo:bar", content={"foo": "bar"}), ["room_id", 4]
             )
+
+
+class CopyPowerLevelsContentTestCase(unittest.TestCase):
+    def setUp(self) -> None:
+        self.test_content = {
+            "ban": 50,
+            "events": {"m.room.name": 100, "m.room.power_levels": 100},
+            "events_default": 0,
+            "invite": 50,
+            "kick": 50,
+            "notifications": {"room": 20},
+            "redact": 50,
+            "state_default": 50,
+            "users": {"@example:localhost": 100},
+            "users_default": 0,
+        }
+
+    def _test(self, input):
+        a = copy_power_levels_contents(input)
+
+        self.assertEqual(a["ban"], 50)
+        self.assertEqual(a["events"]["m.room.name"], 100)
+
+        # make sure that changing the copy changes the copy and not the orig
+        a["ban"] = 10
+        a["events"]["m.room.power_levels"] = 20
+
+        self.assertEqual(input["ban"], 50)
+        self.assertEqual(input["events"]["m.room.power_levels"], 100)
+
+    def test_unfrozen(self):
+        self._test(self.test_content)
+
+    def test_frozen(self):
+        input = freeze(self.test_content)
+        self._test(input)

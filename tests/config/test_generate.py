@@ -48,7 +48,7 @@ class ConfigGenerationTestCase(unittest.TestCase):
             )
 
         self.assertSetEqual(
-            set(["homeserver.yaml", "lemurs.win.log.config", "lemurs.win.signing.key"]),
+            {"homeserver.yaml", "lemurs.win.log.config", "lemurs.win.signing.key"},
             set(os.listdir(self.dir)),
         )
 

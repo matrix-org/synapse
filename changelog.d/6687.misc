@@ -1,1 +1,0 @@
-Allow REST endpoint implementations to raise a RedirectException, which will redirect the user's browser to a given location.

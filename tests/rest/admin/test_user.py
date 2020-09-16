@@ -16,14 +16,19 @@
 import hashlib
 import hmac
 import json
+import urllib.parse
 
 from mock import Mock
 
 import synapse.rest.admin
 from synapse.api.constants import UserTypes
+from synapse.api.errors import HttpResponseException, ResourceLimitError
 from synapse.rest.client.v1 import login
+from synapse.rest.client.v2_alpha import sync
 
 from tests import unittest
+from tests.test_utils import make_awaitable
+from tests.unittest import override_config
 
 
 class UserRegisterTestCase(unittest.HomeserverTestCase):
@@ -319,6 +324,54 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("Invalid user type", channel.json_body["error"])
 
+    @override_config(
+        {"limit_usage_by_mau": True, "max_mau_value": 2, "mau_trial_days": 0}
+    )
+    def test_register_mau_limit_reached(self):
+        """
+        Check we can register a user via the shared secret registration API
+        even if the MAU limit is reached.
+        """
+        handler = self.hs.get_registration_handler()
+        store = self.hs.get_datastore()
+
+        # Set monthly active users to the limit
+        store.get_monthly_active_count = Mock(
+            return_value=make_awaitable(self.hs.config.max_mau_value)
+        )
+        # Check that the blocking of monthly active users is working as expected
+        # The registration of a new user fails due to the limit
+        self.get_failure(
+            handler.register_user(localpart="local_part"), ResourceLimitError
+        )
+
+        # Register new user with admin API
+        request, channel = self.make_request("GET", self.url)
+        self.render(request)
+        nonce = channel.json_body["nonce"]
+
+        want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
+        want_mac.update(
+            nonce.encode("ascii") + b"\x00bob\x00abc123\x00admin\x00support"
+        )
+        want_mac = want_mac.hexdigest()
+
+        body = json.dumps(
+            {
+                "nonce": nonce,
+                "username": "bob",
+                "password": "abc123",
+                "admin": True,
+                "user_type": UserTypes.SUPPORT,
+                "mac": want_mac,
+            }
+        )
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob:test", channel.json_body["user_id"])
+
 
 class UsersListTestCase(unittest.HomeserverTestCase):
 
@@ -359,6 +412,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(3, len(channel.json_body["users"]))
+        self.assertEqual(3, channel.json_body["total"])
 
 
 class UserRestTestCase(unittest.HomeserverTestCase):
@@ -366,27 +420,29 @@ class UserRestTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
+        sync.register_servlets,
     ]
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
-
-        self.url = "/_synapse/admin/v2/users/@bob:test"
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
         self.other_user = self.register_user("user", "pass")
         self.other_user_token = self.login("user", "pass")
+        self.url_other_user = "/_synapse/admin/v2/users/%s" % urllib.parse.quote(
+            self.other_user
+        )
 
     def test_requester_is_no_admin(self):
         """
         If the user is not a server admin, an error is returned.
         """
-        self.hs.config.registration_shared_secret = None
+        url = "/_synapse/admin/v2/users/@bob:test"
 
         request, channel = self.make_request(
-            "GET", self.url, access_token=self.other_user_token,
+            "GET", url, access_token=self.other_user_token,
         )
         self.render(request)
 
@@ -394,25 +450,506 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("You are not a server admin", channel.json_body["error"])
 
         request, channel = self.make_request(
-            "PUT", self.url, access_token=self.other_user_token, content=b"{}",
+            "PUT", url, access_token=self.other_user_token, content=b"{}",
         )
         self.render(request)
 
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("You are not a server admin", channel.json_body["error"])
 
-    def test_requester_is_admin(self):
+    def test_user_does_not_exist(self):
         """
-        If the user is a server admin, a new user is created.
+        Tests that a lookup for a user that does not exist returns a 404
         """
-        self.hs.config.registration_shared_secret = None
 
-        body = json.dumps({"password": "abc123", "admin": True})
+        request, channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v2/users/@unknown_person:test",
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
 
-        # Create user
+        self.assertEqual(404, channel.code, msg=channel.json_body)
+        self.assertEqual("M_NOT_FOUND", channel.json_body["errcode"])
+
+    def test_create_server_admin(self):
+        """
+        Check that a new admin user is created successfully.
+        """
+        url = "/_synapse/admin/v2/users/@bob:test"
+
+        # Create user (server admin)
+        body = json.dumps(
+            {
+                "password": "abc123",
+                "admin": True,
+                "displayname": "Bob's name",
+                "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
+                "avatar_url": None,
+            }
+        )
+
         request, channel = self.make_request(
             "PUT",
-            self.url,
+            url,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob:test", channel.json_body["name"])
+        self.assertEqual("Bob's name", channel.json_body["displayname"])
+        self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
+        self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
+        self.assertEqual(True, channel.json_body["admin"])
+
+        # Get user
+        request, channel = self.make_request(
+            "GET", url, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob:test", channel.json_body["name"])
+        self.assertEqual("Bob's name", channel.json_body["displayname"])
+        self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
+        self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
+        self.assertEqual(True, channel.json_body["admin"])
+        self.assertEqual(False, channel.json_body["is_guest"])
+        self.assertEqual(False, channel.json_body["deactivated"])
+
+    def test_create_user(self):
+        """
+        Check that a new regular user is created successfully.
+        """
+        url = "/_synapse/admin/v2/users/@bob:test"
+
+        # Create user
+        body = json.dumps(
+            {
+                "password": "abc123",
+                "admin": False,
+                "displayname": "Bob's name",
+                "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
+            }
+        )
+
+        request, channel = self.make_request(
+            "PUT",
+            url,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob:test", channel.json_body["name"])
+        self.assertEqual("Bob's name", channel.json_body["displayname"])
+        self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
+        self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
+        self.assertEqual(False, channel.json_body["admin"])
+
+        # Get user
+        request, channel = self.make_request(
+            "GET", url, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob:test", channel.json_body["name"])
+        self.assertEqual("Bob's name", channel.json_body["displayname"])
+        self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
+        self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
+        self.assertEqual(False, channel.json_body["admin"])
+        self.assertEqual(False, channel.json_body["is_guest"])
+        self.assertEqual(False, channel.json_body["deactivated"])
+
+    @override_config(
+        {"limit_usage_by_mau": True, "max_mau_value": 2, "mau_trial_days": 0}
+    )
+    def test_create_user_mau_limit_reached_active_admin(self):
+        """
+        Check that an admin can register a new user via the admin API
+        even if the MAU limit is reached.
+        Admin user was active before creating user.
+        """
+
+        handler = self.hs.get_registration_handler()
+
+        # Sync to set admin user to active
+        # before limit of monthly active users is reached
+        request, channel = self.make_request(
+            "GET", "/sync", access_token=self.admin_user_tok
+        )
+        self.render(request)
+
+        if channel.code != 200:
+            raise HttpResponseException(
+                channel.code, channel.result["reason"], channel.result["body"]
+            )
+
+        # Set monthly active users to the limit
+        self.store.get_monthly_active_count = Mock(
+            return_value=make_awaitable(self.hs.config.max_mau_value)
+        )
+        # Check that the blocking of monthly active users is working as expected
+        # The registration of a new user fails due to the limit
+        self.get_failure(
+            handler.register_user(localpart="local_part"), ResourceLimitError
+        )
+
+        # Register new user with admin API
+        url = "/_synapse/admin/v2/users/@bob:test"
+
+        # Create user
+        body = json.dumps({"password": "abc123", "admin": False})
+
+        request, channel = self.make_request(
+            "PUT",
+            url,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob:test", channel.json_body["name"])
+        self.assertEqual(False, channel.json_body["admin"])
+
+    @override_config(
+        {"limit_usage_by_mau": True, "max_mau_value": 2, "mau_trial_days": 0}
+    )
+    def test_create_user_mau_limit_reached_passive_admin(self):
+        """
+        Check that an admin can register a new user via the admin API
+        even if the MAU limit is reached.
+        Admin user was not active before creating user.
+        """
+
+        handler = self.hs.get_registration_handler()
+
+        # Set monthly active users to the limit
+        self.store.get_monthly_active_count = Mock(
+            return_value=make_awaitable(self.hs.config.max_mau_value)
+        )
+        # Check that the blocking of monthly active users is working as expected
+        # The registration of a new user fails due to the limit
+        self.get_failure(
+            handler.register_user(localpart="local_part"), ResourceLimitError
+        )
+
+        # Register new user with admin API
+        url = "/_synapse/admin/v2/users/@bob:test"
+
+        # Create user
+        body = json.dumps({"password": "abc123", "admin": False})
+
+        request, channel = self.make_request(
+            "PUT",
+            url,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        # Admin user is not blocked by mau anymore
+        self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob:test", channel.json_body["name"])
+        self.assertEqual(False, channel.json_body["admin"])
+
+    @override_config(
+        {
+            "email": {
+                "enable_notifs": True,
+                "notif_for_new_users": True,
+                "notif_from": "test@example.com",
+            },
+            "public_baseurl": "https://example.com",
+        }
+    )
+    def test_create_user_email_notif_for_new_users(self):
+        """
+        Check that a new regular user is created successfully and
+        got an email pusher.
+        """
+        url = "/_synapse/admin/v2/users/@bob:test"
+
+        # Create user
+        body = json.dumps(
+            {
+                "password": "abc123",
+                "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
+            }
+        )
+
+        request, channel = self.make_request(
+            "PUT",
+            url,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob:test", channel.json_body["name"])
+        self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
+        self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
+
+        pushers = self.get_success(
+            self.store.get_pushers_by({"user_name": "@bob:test"})
+        )
+        pushers = list(pushers)
+        self.assertEqual(len(pushers), 1)
+        self.assertEqual("@bob:test", pushers[0]["user_name"])
+
+    @override_config(
+        {
+            "email": {
+                "enable_notifs": False,
+                "notif_for_new_users": False,
+                "notif_from": "test@example.com",
+            },
+            "public_baseurl": "https://example.com",
+        }
+    )
+    def test_create_user_email_no_notif_for_new_users(self):
+        """
+        Check that a new regular user is created successfully and
+        got not an email pusher.
+        """
+        url = "/_synapse/admin/v2/users/@bob:test"
+
+        # Create user
+        body = json.dumps(
+            {
+                "password": "abc123",
+                "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
+            }
+        )
+
+        request, channel = self.make_request(
+            "PUT",
+            url,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob:test", channel.json_body["name"])
+        self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
+        self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
+
+        pushers = self.get_success(
+            self.store.get_pushers_by({"user_name": "@bob:test"})
+        )
+        pushers = list(pushers)
+        self.assertEqual(len(pushers), 0)
+
+    def test_set_password(self):
+        """
+        Test setting a new password for another user.
+        """
+
+        # Change password
+        body = json.dumps({"password": "hahaha"})
+
+        request, channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+    def test_set_displayname(self):
+        """
+        Test setting the displayname of another user.
+        """
+
+        # Modify user
+        body = json.dumps({"displayname": "foobar"})
+
+        request, channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual("foobar", channel.json_body["displayname"])
+
+        # Get user
+        request, channel = self.make_request(
+            "GET", self.url_other_user, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual("foobar", channel.json_body["displayname"])
+
+    def test_set_threepid(self):
+        """
+        Test setting threepid for an other user.
+        """
+
+        # Delete old and add new threepid to user
+        body = json.dumps(
+            {"threepids": [{"medium": "email", "address": "bob3@bob.bob"}]}
+        )
+
+        request, channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
+        self.assertEqual("bob3@bob.bob", channel.json_body["threepids"][0]["address"])
+
+        # Get user
+        request, channel = self.make_request(
+            "GET", self.url_other_user, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
+        self.assertEqual("bob3@bob.bob", channel.json_body["threepids"][0]["address"])
+
+    def test_deactivate_user(self):
+        """
+        Test deactivating another user.
+        """
+
+        # Deactivate user
+        body = json.dumps({"deactivated": True})
+
+        request, channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual(True, channel.json_body["deactivated"])
+        # the user is deactivated, the threepid will be deleted
+
+        # Get user
+        request, channel = self.make_request(
+            "GET", self.url_other_user, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual(True, channel.json_body["deactivated"])
+
+    def test_reactivate_user(self):
+        """
+        Test reactivating another user.
+        """
+
+        # Deactivate the user.
+        request, channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content=json.dumps({"deactivated": True}).encode(encoding="utf_8"),
+        )
+        self.render(request)
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # Attempt to reactivate the user (without a password).
+        request, channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content=json.dumps({"deactivated": False}).encode(encoding="utf_8"),
+        )
+        self.render(request)
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+
+        # Reactivate the user.
+        request, channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content=json.dumps({"deactivated": False, "password": "foo"}).encode(
+                encoding="utf_8"
+            ),
+        )
+        self.render(request)
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # Get user
+        request, channel = self.make_request(
+            "GET", self.url_other_user, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual(False, channel.json_body["deactivated"])
+
+    def test_set_user_as_admin(self):
+        """
+        Test setting the admin flag on a user.
+        """
+
+        # Set a user as an admin
+        body = json.dumps({"admin": True})
+
+        request, channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual(True, channel.json_body["admin"])
+
+        # Get user
+        request, channel = self.make_request(
+            "GET", self.url_other_user, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual(True, channel.json_body["admin"])
+
+    def test_accidental_deactivation_prevention(self):
+        """
+        Ensure an account can't accidentally be deactivated by using a str value
+        for the deactivated body parameter
+        """
+        url = "/_synapse/admin/v2/users/@bob:test"
+
+        # Create user
+        body = json.dumps({"password": "abc123"})
+
+        request, channel = self.make_request(
+            "PUT",
+            url,
             access_token=self.admin_user_tok,
             content=body.encode(encoding="utf_8"),
         )
@@ -424,42 +961,37 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         # Get user
         request, channel = self.make_request(
-            "GET", self.url, access_token=self.admin_user_tok,
+            "GET", url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("bob", channel.json_body["displayname"])
-        self.assertEqual(1, channel.json_body["admin"])
-        self.assertEqual(0, channel.json_body["is_guest"])
         self.assertEqual(0, channel.json_body["deactivated"])
 
-        # Modify user
-        body = json.dumps({"displayname": "foobar", "deactivated": True})
+        # Change password (and use a str for deactivate instead of a bool)
+        body = json.dumps({"password": "abc123", "deactivated": "false"})  # oops!
 
         request, channel = self.make_request(
             "PUT",
-            self.url,
+            url,
             access_token=self.admin_user_tok,
             content=body.encode(encoding="utf_8"),
         )
         self.render(request)
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("@bob:test", channel.json_body["name"])
-        self.assertEqual("foobar", channel.json_body["displayname"])
-        self.assertEqual(True, channel.json_body["deactivated"])
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
 
-        # Get user
+        # Check user is not deactivated
         request, channel = self.make_request(
-            "GET", self.url, access_token=self.admin_user_tok,
+            "GET", url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@bob:test", channel.json_body["name"])
-        self.assertEqual("foobar", channel.json_body["displayname"])
-        self.assertEqual(1, channel.json_body["admin"])
-        self.assertEqual(0, channel.json_body["is_guest"])
-        self.assertEqual(1, channel.json_body["deactivated"])
+        self.assertEqual("bob", channel.json_body["displayname"])
+
+        # Ensure they're still alive
+        self.assertEqual(0, channel.json_body["deactivated"])

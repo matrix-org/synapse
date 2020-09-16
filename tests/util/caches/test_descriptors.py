@@ -22,8 +22,10 @@ from twisted.internet import defer, reactor
 
 from synapse.api.errors import SynapseError
 from synapse.logging.context import (
+    SENTINEL_CONTEXT,
     LoggingContext,
     PreserveLoggingContext,
+    current_context,
     make_deferred_yieldable,
 )
 from synapse.util.caches import descriptors
@@ -86,7 +88,7 @@ class CacheTestCase(unittest.TestCase):
 class DescriptorTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_cache(self):
-        class Cls(object):
+        class Cls:
             def __init__(self):
                 self.mock = mock.Mock()
 
@@ -120,7 +122,7 @@ class DescriptorTestCase(unittest.TestCase):
     def test_cache_num_args(self):
         """Only the first num_args arguments should matter to the cache"""
 
-        class Cls(object):
+        class Cls:
             def __init__(self):
                 self.mock = mock.Mock()
 
@@ -154,7 +156,7 @@ class DescriptorTestCase(unittest.TestCase):
         """If the wrapped function throws synchronously, things should continue to work
         """
 
-        class Cls(object):
+        class Cls:
             @cached()
             def fn(self, arg1):
                 raise SynapseError(100, "mai spoon iz too big!!1")
@@ -178,7 +180,7 @@ class DescriptorTestCase(unittest.TestCase):
 
         complete_lookup = defer.Deferred()
 
-        class Cls(object):
+        class Cls:
             @descriptors.cached()
             def fn(self, arg1):
                 @defer.inlineCallbacks
@@ -194,7 +196,7 @@ class DescriptorTestCase(unittest.TestCase):
             with LoggingContext() as c1:
                 c1.name = "c1"
                 r = yield obj.fn(1)
-                self.assertEqual(LoggingContext.current_context(), c1)
+                self.assertEqual(current_context(), c1)
             return r
 
         def check_result(r):
@@ -204,12 +206,12 @@ class DescriptorTestCase(unittest.TestCase):
 
         # set off a deferred which will do a cache lookup
         d1 = do_lookup()
-        self.assertEqual(LoggingContext.current_context(), LoggingContext.sentinel)
+        self.assertEqual(current_context(), SENTINEL_CONTEXT)
         d1.addCallback(check_result)
 
         # and another
         d2 = do_lookup()
-        self.assertEqual(LoggingContext.current_context(), LoggingContext.sentinel)
+        self.assertEqual(current_context(), SENTINEL_CONTEXT)
         d2.addCallback(check_result)
 
         # let the lookup complete
@@ -221,7 +223,7 @@ class DescriptorTestCase(unittest.TestCase):
         """Check that the cache sets and restores logcontexts correctly when
         the lookup function throws an exception"""
 
-        class Cls(object):
+        class Cls:
             @descriptors.cached()
             def fn(self, arg1):
                 @defer.inlineCallbacks
@@ -239,14 +241,14 @@ class DescriptorTestCase(unittest.TestCase):
                 try:
                     d = obj.fn(1)
                     self.assertEqual(
-                        LoggingContext.current_context(), LoggingContext.sentinel
+                        current_context(), SENTINEL_CONTEXT,
                     )
                     yield d
                     self.fail("No exception thrown")
                 except SynapseError:
                     pass
 
-                self.assertEqual(LoggingContext.current_context(), c1)
+                self.assertEqual(current_context(), c1)
 
             # the cache should now be empty
             self.assertEqual(len(obj.fn.cache.cache), 0)
@@ -255,13 +257,13 @@ class DescriptorTestCase(unittest.TestCase):
 
         # set off a deferred which will do a cache lookup
         d1 = do_lookup()
-        self.assertEqual(LoggingContext.current_context(), LoggingContext.sentinel)
+        self.assertEqual(current_context(), SENTINEL_CONTEXT)
 
         return d1
 
     @defer.inlineCallbacks
     def test_cache_default_args(self):
-        class Cls(object):
+        class Cls:
             def __init__(self):
                 self.mock = mock.Mock()
 
@@ -298,7 +300,7 @@ class DescriptorTestCase(unittest.TestCase):
         obj.mock.assert_not_called()
 
     def test_cache_iterable(self):
-        class Cls(object):
+        class Cls:
             def __init__(self):
                 self.mock = mock.Mock()
 
@@ -334,7 +336,7 @@ class DescriptorTestCase(unittest.TestCase):
         """If the wrapped function throws synchronously, things should continue to work
         """
 
-        class Cls(object):
+        class Cls:
             @descriptors.cached(iterable=True)
             def fn(self, arg1):
                 raise SynapseError(100, "mai spoon iz too big!!1")
@@ -356,7 +358,7 @@ class DescriptorTestCase(unittest.TestCase):
 class CachedListDescriptorTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_cache(self):
-        class Cls(object):
+        class Cls:
             def __init__(self):
                 self.mock = mock.Mock()
 
@@ -364,12 +366,12 @@ class CachedListDescriptorTestCase(unittest.TestCase):
             def fn(self, arg1, arg2):
                 pass
 
-            @descriptors.cachedList("fn", "args1", inlineCallbacks=True)
-            def list_fn(self, args1, arg2):
-                assert LoggingContext.current_context().request == "c1"
+            @descriptors.cachedList("fn", "args1")
+            async def list_fn(self, args1, arg2):
+                assert current_context().request == "c1"
                 # we want this to behave like an asynchronous function
-                yield run_on_reactor()
-                assert LoggingContext.current_context().request == "c1"
+                await run_on_reactor()
+                assert current_context().request == "c1"
                 return self.mock(args1, arg2)
 
         with LoggingContext() as c1:
@@ -377,9 +379,9 @@ class CachedListDescriptorTestCase(unittest.TestCase):
             obj = Cls()
             obj.mock.return_value = {10: "fish", 20: "chips"}
             d1 = obj.list_fn([10, 20], 2)
-            self.assertEqual(LoggingContext.current_context(), LoggingContext.sentinel)
+            self.assertEqual(current_context(), SENTINEL_CONTEXT)
             r = yield d1
-            self.assertEqual(LoggingContext.current_context(), c1)
+            self.assertEqual(current_context(), c1)
             obj.mock.assert_called_once_with([10, 20], 2)
             self.assertEqual(r, {10: "fish", 20: "chips"})
             obj.mock.reset_mock()
@@ -406,7 +408,7 @@ class CachedListDescriptorTestCase(unittest.TestCase):
     def test_invalidate(self):
         """Make sure that invalidation callbacks are called."""
 
-        class Cls(object):
+        class Cls:
             def __init__(self):
                 self.mock = mock.Mock()
 
@@ -414,10 +416,10 @@ class CachedListDescriptorTestCase(unittest.TestCase):
             def fn(self, arg1, arg2):
                 pass
 
-            @descriptors.cachedList("fn", "args1", inlineCallbacks=True)
-            def list_fn(self, args1, arg2):
+            @descriptors.cachedList("fn", "args1")
+            async def list_fn(self, args1, arg2):
                 # we want this to behave like an asynchronous function
-                yield run_on_reactor()
+                await run_on_reactor()
                 return self.mock(args1, arg2)
 
         obj = Cls()

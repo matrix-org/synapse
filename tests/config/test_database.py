@@ -21,9 +21,9 @@ from tests import unittest
 
 
 class DatabaseConfigTestCase(unittest.TestCase):
-    def test_database_configured_correctly_no_database_conf_param(self):
+    def test_database_configured_correctly(self):
         conf = yaml.safe_load(
-            DatabaseConfig().generate_config_section("/data_dir_path", None)
+            DatabaseConfig().generate_config_section(data_dir_path="/data_dir_path")
         )
 
         expected_database_conf = {
@@ -32,21 +32,3 @@ class DatabaseConfigTestCase(unittest.TestCase):
         }
 
         self.assertEqual(conf["database"], expected_database_conf)
-
-    def test_database_configured_correctly_database_conf_param(self):
-
-        database_conf = {
-            "name": "my super fast datastore",
-            "args": {
-                "user": "matrix",
-                "password": "synapse_database_password",
-                "host": "synapse_database_host",
-                "database": "matrix",
-            },
-        }
-
-        conf = yaml.safe_load(
-            DatabaseConfig().generate_config_section("/data_dir_path", database_conf)
-        )
-
-        self.assertEqual(conf["database"], database_conf)

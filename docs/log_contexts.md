@@ -29,14 +29,13 @@ from synapse.logging import context         # omitted from future snippets
 def handle_request(request_id):
     request_context = context.LoggingContext()
 
-    calling_context = context.LoggingContext.current_context()
-    context.LoggingContext.set_current_context(request_context)
+    calling_context = context.set_current_context(request_context)
     try:
         request_context.request = request_id
         do_request_handling()
         logger.debug("finished")
     finally:
-        context.LoggingContext.set_current_context(calling_context)
+        context.set_current_context(calling_context)
 
 def do_request_handling():
     logger.debug("phew")  # this will be logged against request_id

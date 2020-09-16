@@ -18,6 +18,7 @@
 
 import json
 import time
+from typing import Any, Dict, Optional
 
 import attr
 
@@ -29,7 +30,7 @@ from tests.server import make_request, render
 
 
 @attr.s
-class RestHelper(object):
+class RestHelper:
     """Contains extra helper functions to quickly and clearly perform a given
     REST action, which isn't the focus of the test.
     """
@@ -38,7 +39,9 @@ class RestHelper(object):
     resource = attr.ib()
     auth_user_id = attr.ib()
 
-    def create_room_as(self, room_creator, is_public=True, tok=None):
+    def create_room_as(
+        self, room_creator=None, is_public=True, tok=None, expect_code=200,
+    ):
         temp_id = self.auth_user_id
         self.auth_user_id = room_creator
         path = "/_matrix/client/r0/createRoom"
@@ -53,9 +56,11 @@ class RestHelper(object):
         )
         render(request, self.resource, self.hs.get_reactor())
 
-        assert channel.result["code"] == b"200", channel.result
+        assert channel.result["code"] == b"%d" % expect_code, channel.result
         self.auth_user_id = temp_id
-        return channel.json_body["room_id"]
+
+        if expect_code == 200:
+            return channel.json_body["room_id"]
 
     def invite(self, room=None, src=None, targ=None, expect_code=200, tok=None):
         self.change_membership(
@@ -87,7 +92,28 @@ class RestHelper(object):
             expect_code=expect_code,
         )
 
-    def change_membership(self, room, src, targ, membership, tok=None, expect_code=200):
+    def change_membership(
+        self,
+        room: str,
+        src: str,
+        targ: str,
+        membership: str,
+        extra_data: dict = {},
+        tok: Optional[str] = None,
+        expect_code: int = 200,
+    ) -> None:
+        """
+        Send a membership state event into a room.
+
+        Args:
+            room: The ID of the room to send to
+            src: The mxid of the event sender
+            targ: The mxid of the event's target. The state key
+            membership: The type of membership event
+            extra_data: Extra information to include in the content of the event
+            tok: The user access token to use
+            expect_code: The expected HTTP response code
+        """
         temp_id = self.auth_user_id
         self.auth_user_id = src
 
@@ -96,6 +122,7 @@ class RestHelper(object):
             path = path + "?access_token=%s" % tok
 
         data = {"membership": membership}
+        data.update(extra_data)
 
         request, channel = make_request(
             self.hs.get_reactor(), "PUT", path, json.dumps(data).encode("utf8")
@@ -142,7 +169,34 @@ class RestHelper(object):
 
         return channel.json_body
 
-    def send_state(self, room_id, event_type, body, tok, expect_code=200, state_key=""):
+    def _read_write_state(
+        self,
+        room_id: str,
+        event_type: str,
+        body: Optional[Dict[str, Any]],
+        tok: str,
+        expect_code: int = 200,
+        state_key: str = "",
+        method: str = "GET",
+    ) -> Dict:
+        """Read or write some state from a given room
+
+        Args:
+            room_id:
+            event_type: The type of state event
+            body: Body that is sent when making the request. The content of the state event.
+                If None, the request to the server will have an empty body
+            tok: The access token to use
+            expect_code: The HTTP code to expect in the response
+            state_key:
+            method: "GET" or "PUT" for reading or writing state, respectively
+
+        Returns:
+            The response body from the server
+
+        Raises:
+            AssertionError: if expect_code doesn't match the HTTP code we received
+        """
         path = "/_matrix/client/r0/rooms/%s/state/%s/%s" % (
             room_id,
             event_type,
@@ -151,9 +205,13 @@ class RestHelper(object):
         if tok:
             path = path + "?access_token=%s" % tok
 
-        request, channel = make_request(
-            self.hs.get_reactor(), "PUT", path, json.dumps(body).encode("utf8")
-        )
+        # Set request body if provided
+        content = b""
+        if body is not None:
+            content = json.dumps(body).encode("utf8")
+
+        request, channel = make_request(self.hs.get_reactor(), method, path, content)
+
         render(request, self.resource, self.hs.get_reactor())
 
         assert int(channel.result["code"]) == expect_code, (
@@ -162,6 +220,62 @@ class RestHelper(object):
         )
 
         return channel.json_body
+
+    def get_state(
+        self,
+        room_id: str,
+        event_type: str,
+        tok: str,
+        expect_code: int = 200,
+        state_key: str = "",
+    ):
+        """Gets some state from a room
+
+        Args:
+            room_id:
+            event_type: The type of state event
+            tok: The access token to use
+            expect_code: The HTTP code to expect in the response
+            state_key:
+
+        Returns:
+            The response body from the server
+
+        Raises:
+            AssertionError: if expect_code doesn't match the HTTP code we received
+        """
+        return self._read_write_state(
+            room_id, event_type, None, tok, expect_code, state_key, method="GET"
+        )
+
+    def send_state(
+        self,
+        room_id: str,
+        event_type: str,
+        body: Dict[str, Any],
+        tok: str,
+        expect_code: int = 200,
+        state_key: str = "",
+    ):
+        """Set some state in a room
+
+        Args:
+            room_id:
+            event_type: The type of state event
+            body: Body that is sent when making the request. The content of the state event.
+            tok: The access token to use
+            expect_code: The HTTP code to expect in the response
+            state_key:
+
+        Returns:
+            The response body from the server
+
+        Raises:
+            AssertionError: if expect_code doesn't match the HTTP code we received
+        """
+        return self._read_write_state(
+            room_id, event_type, body, tok, expect_code, state_key, method="PUT"
+        )
 
     def upload_media(
         self,

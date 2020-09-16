@@ -14,10 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.http.server import DirectServeResource, wrap_html_request_handler
+from synapse.http.server import DirectServeHtmlResource
 
 
-class SAML2ResponseResource(DirectServeResource):
+class SAML2ResponseResource(DirectServeHtmlResource):
     """A Twisted web resource which handles the SAML response"""
 
     isLeaf = 1
@@ -26,6 +26,14 @@ class SAML2ResponseResource(DirectServeResource):
         super().__init__()
         self._saml_handler = hs.get_saml_handler()
 
-    @wrap_html_request_handler
+    async def _async_render_GET(self, request):
+        # We're not expecting any GET request on that resource if everything goes right,
+        # but some IdPs sometimes end up responding with a 302 redirect on this endpoint.
+        # In this case, just tell the user that something went wrong and they should
+        # try to authenticate again.
+        self._saml_handler._render_error(
+            request, "unexpected_get", "Unexpected GET request on /saml2/authn_response"
+        )
+
     async def _async_render_POST(self, request):
-        return await self._saml_handler.handle_saml_response(request)
+        await self._saml_handler.handle_saml_response(request)

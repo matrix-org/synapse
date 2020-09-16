@@ -20,8 +20,6 @@ from datetime import datetime
 from hashlib import sha256
 from typing import List
 
-import six
-
 from unpaddedbase64 import encode_base64
 
 from OpenSSL import SSL, crypto
@@ -31,6 +29,17 @@ from synapse.config._base import Config, ConfigError
 from synapse.util import glob_to_regex
 
 logger = logging.getLogger(__name__)
+
+ACME_SUPPORT_ENABLED_WARN = """\
+This server uses Synapse's built-in ACME support. Note that ACME v1 has been
+deprecated by Let's Encrypt, and that Synapse doesn't currently support ACME v2,
+which means that this feature will not work with Synapse installs set up after
+November 2019, and that it may stop working on June 2020 for installs set up
+before that date.
+
+For more info and alternative solutions, see
+https://github.com/matrix-org/synapse/blob/master/docs/ACME.md#deprecation-of-acme-v1
+--------------------------------------------------------------------------------"""
 
 
 class TlsConfig(Config):
@@ -44,8 +53,11 @@ class TlsConfig(Config):
 
         self.acme_enabled = acme_config.get("enabled", False)
 
+        if self.acme_enabled:
+            logger.warning(ACME_SUPPORT_ENABLED_WARN)
+
         # hyperlink complains on py2 if this is not a Unicode
-        self.acme_url = six.text_type(
+        self.acme_url = str(
             acme_config.get("url", "https://acme-v01.api.letsencrypt.org/directory")
         )
         self.acme_port = acme_config.get("port", 80)
@@ -109,6 +121,8 @@ class TlsConfig(Config):
         fed_whitelist_entries = config.get(
             "federation_certificate_verification_whitelist", []
         )
+        if fed_whitelist_entries is None:
+            fed_whitelist_entries = []
 
         # Support globs (*) in whitelist values
         self.federation_certificate_verification_whitelist = []  # type: List[str]
@@ -244,7 +258,7 @@ class TlsConfig(Config):
                 crypto.FILETYPE_ASN1, self.tls_certificate
             )
             sha256_fingerprint = encode_base64(sha256(x509_certificate_bytes).digest())
-            sha256_fingerprints = set(f["sha256"] for f in self.tls_fingerprints)
+            sha256_fingerprints = {f["sha256"] for f in self.tls_fingerprints}
             if sha256_fingerprint not in sha256_fingerprints:
                 self.tls_fingerprints.append({"sha256": sha256_fingerprint})
 
@@ -359,6 +373,11 @@ class TlsConfig(Config):
 
         # ACME support: This will configure Synapse to request a valid TLS certificate
         # for your configured `server_name` via Let's Encrypt.
+        #
+        # Note that ACME v1 is now deprecated, and Synapse currently doesn't support
+        # ACME v2. This means that this feature currently won't work with installs set
+        # up after November 2019. For more info, and alternative solutions, see
+        # https://github.com/matrix-org/synapse/blob/master/docs/ACME.md#deprecation-of-acme-v1
         #
         # Note that provisioning a certificate in this way requires port 80 to be
         # routed to Synapse so that it can complete the http-01 ACME challenge.

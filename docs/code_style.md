@@ -30,7 +30,7 @@ The necessary tools are detailed below.
 
     Install `flake8` with:
 
-        pip install --upgrade flake8
+        pip install --upgrade flake8 flake8-comprehensions
 
     Check all application and test code with:
 

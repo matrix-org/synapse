@@ -19,17 +19,22 @@ import logging
 import os
 import re
 from collections import Counter
+from typing import Optional, TextIO
 
 import attr
 
+from synapse.config.homeserver import HomeServerConfig
+from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.engines.postgres import PostgresEngine
+from synapse.storage.types import Connection, Cursor
+from synapse.types import Collection
 
 logger = logging.getLogger(__name__)
 
 
 # Remember to update this number every time a change is made to database
 # schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 58
+SCHEMA_VERSION = 57
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
 
@@ -42,8 +47,29 @@ class UpgradeDatabaseException(PrepareDatabaseException):
     pass
 
 
-def prepare_database(db_conn, database_engine, config, data_stores=["main", "state"]):
-    """Prepares a database for usage. Will either create all necessary tables
+OUTDATED_SCHEMA_ON_WORKER_ERROR = (
+    "Expected database schema version %i but got %i: run the main synapse process to "
+    "upgrade the database schema before starting worker processes."
+)
+
+EMPTY_DATABASE_ON_WORKER_ERROR = (
+    "Uninitialised database: run the main synapse process to prepare the database "
+    "schema before starting worker processes."
+)
+
+UNAPPLIED_DELTA_ON_WORKER_ERROR = (
+    "Database schema delta %s has not been applied: run the main synapse process to "
+    "upgrade the database schema before starting worker processes."
+)
+
+
+def prepare_database(
+    db_conn: Connection,
+    database_engine: BaseDatabaseEngine,
+    config: Optional[HomeServerConfig],
+    databases: Collection[str] = ["main", "state"],
+):
+    """Prepares a physical database for usage. Will either create all necessary tables
     or upgrade from an older schema version.
 
     If `config` is None then prepare_database will assert that no upgrade is
@@ -52,40 +78,68 @@ def prepare_database(db_conn, database_engine, config, data_stores=["main", "sta
     Args:
         db_conn:
         database_engine:
-        config (synapse.config.homeserver.HomeServerConfig|None):
+        config :
             application config, or None if we are connecting to an existing
             database which we expect to be configured already
-        data_stores (list[str]): The name of the data stores that will be used
-            with this database. Defaults to all data stores.
+        databases: The name of the databases that will be used
+            with this physical database. Defaults to all databases.
     """
 
     try:
         cur = db_conn.cursor()
+
+        # sqlite does not automatically start transactions for DDL / SELECT statements,
+        # so we start one before running anything. This ensures that any upgrades
+        # are either applied completely, or not at all.
+        #
+        # (psycopg2 automatically starts a transaction as soon as we run any statements
+        # at all, so this is redundant but harmless there.)
+        cur.execute("BEGIN TRANSACTION")
+
+        logger.info("%r: Checking existing schema version", databases)
         version_info = _get_or_create_schema_state(cur, database_engine)
 
         if version_info:
             user_version, delta_files, upgraded = version_info
+            logger.info(
+                "%r: Existing schema is %i (+%i deltas)",
+                databases,
+                user_version,
+                len(delta_files),
+            )
 
+            # config should only be None when we are preparing an in-memory SQLite db,
+            # which should be empty.
             if config is None:
-                if user_version != SCHEMA_VERSION:
-                    # If we don't pass in a config file then we are expecting to
-                    # have already upgraded the DB.
-                    raise UpgradeDatabaseException(
-                        "Expected database schema version %i but got %i"
-                        % (SCHEMA_VERSION, user_version)
-                    )
-            else:
-                _upgrade_existing_database(
-                    cur,
-                    user_version,
-                    delta_files,
-                    upgraded,
-                    database_engine,
-                    config,
-                    data_stores=data_stores,
+                raise ValueError(
+                    "config==None in prepare_database, but databse is not empty"
                 )
+
+            # if it's a worker app, refuse to upgrade the database, to avoid multiple
+            # workers doing it at once.
+            if config.worker_app is not None and user_version != SCHEMA_VERSION:
+                raise UpgradeDatabaseException(
+                    OUTDATED_SCHEMA_ON_WORKER_ERROR % (SCHEMA_VERSION, user_version)
+                )
+
+            _upgrade_existing_database(
+                cur,
+                user_version,
+                delta_files,
+                upgraded,
+                database_engine,
+                config,
+                databases=databases,
+            )
         else:
-            _setup_new_database(cur, database_engine, data_stores=data_stores)
+            logger.info("%r: Initialising new database", databases)
+
+            # if it's a worker app, refuse to upgrade the database, to avoid multiple
+            # workers doing it at once.
+            if config and config.worker_app is not None:
+                raise UpgradeDatabaseException(EMPTY_DATABASE_ON_WORKER_ERROR)
+
+            _setup_new_database(cur, database_engine, databases=databases)
 
         # check if any of our configured dynamic modules want a database
         if config is not None:
@@ -98,9 +152,9 @@ def prepare_database(db_conn, database_engine, config, data_stores=["main", "sta
         raise
 
 
-def _setup_new_database(cur, database_engine, data_stores):
-    """Sets up the database by finding a base set of "full schemas" and then
-    applying any necessary deltas, including schemas from the given data
+def _setup_new_database(cur, database_engine, databases):
+    """Sets up the physical database by finding a base set of "full schemas" and
+    then applying any necessary deltas, including schemas from the given data
     stores.
 
     The "full_schemas" directory has subdirectories named after versions. This
@@ -133,9 +187,14 @@ def _setup_new_database(cur, database_engine, data_stores):
     Args:
         cur (Cursor): a database cursor
         database_engine (DatabaseEngine)
-        data_stores (list[str]): The names of the data stores to instantiate
-            on the given database.
+        databases (list[str]): The names of the databases to instantiate
+            on the given physical database.
     """
+
+    # We're about to set up a brand new database so we check that its
+    # configured to our liking.
+    database_engine.check_new_database(cur)
+
     current_dir = os.path.join(dir_path, "schema", "full_schemas")
     directory_entries = os.listdir(current_dir)
 
@@ -166,13 +225,13 @@ def _setup_new_database(cur, database_engine, data_stores):
     directories.extend(
         os.path.join(
             dir_path,
-            "data_stores",
-            data_store,
+            "databases",
+            database,
             "schema",
             "full_schemas",
             str(max_current_ver),
         )
-        for data_store in data_stores
+        for database in databases
     )
 
     directory_entries = []
@@ -209,7 +268,7 @@ def _setup_new_database(cur, database_engine, data_stores):
         upgraded=False,
         database_engine=database_engine,
         config=None,
-        data_stores=data_stores,
+        databases=databases,
         is_empty=True,
     )
 
@@ -221,10 +280,10 @@ def _upgrade_existing_database(
     upgraded,
     database_engine,
     config,
-    data_stores,
+    databases,
     is_empty=False,
 ):
-    """Upgrades an existing database.
+    """Upgrades an existing physical database.
 
     Delta files can either be SQL stored in *.sql files, or python modules
     in *.py.
@@ -273,19 +332,32 @@ def _upgrade_existing_database(
             the current_version wasn't generated by applying those delta files.
         database_engine (DatabaseEngine)
         config (synapse.config.homeserver.HomeServerConfig|None):
-            application config, or None if we are connecting to an existing
-            database which we expect to be configured already
-        data_stores (list[str]): The names of the data stores to instantiate
-            on the given database.
+            None if we are initialising a blank database, otherwise the application
+            config
+        databases (list[str]): The names of the databases to instantiate
+            on the given physical database.
         is_empty (bool): Is this a blank database? I.e. do we need to run the
             upgrade portions of the delta scripts.
     """
+    if is_empty:
+        assert not applied_delta_files
+    else:
+        assert config
+
+    is_worker = config and config.worker_app is not None
 
     if current_version > SCHEMA_VERSION:
         raise ValueError(
             "Cannot use this database as it is too "
             + "new for the server to understand"
         )
+
+    # some of the deltas assume that config.server_name is set correctly, so now
+    # is a good time to run the sanity check.
+    if not is_empty and "main" in databases:
+        from synapse.storage.databases.main import check_database_before_upgrade
+
+        check_database_before_upgrade(cur, database_engine, config)
 
     start_ver = current_version
     if not upgraded:
@@ -301,7 +373,7 @@ def _upgrade_existing_database(
     specific_engine_extensions = (".sqlite", ".postgres")
 
     for v in range(start_ver, SCHEMA_VERSION + 1):
-        logger.info("Upgrading schema to v%d", v)
+        logger.info("Applying schema deltas for v%d", v)
 
         # We need to search both the global and per data store schema
         # directories for schema updates.
@@ -309,11 +381,9 @@ def _upgrade_existing_database(
         # First we find the directories to search in
         delta_dir = os.path.join(dir_path, "schema", "delta", str(v))
         directories = [delta_dir]
-        for data_store in data_stores:
+        for database in databases:
             directories.append(
-                os.path.join(
-                    dir_path, "data_stores", data_store, "schema", "delta", str(v)
-                )
+                os.path.join(dir_path, "databases", database, "schema", "delta", str(v))
             )
 
         # Used to check if we have any duplicate file names
@@ -340,15 +410,14 @@ def _upgrade_existing_database(
                     "Could not open delta dir for version %d: %s" % (v, directory)
                 )
 
-        duplicates = set(
+        duplicates = {
             file_name for file_name, count in file_name_counter.items() if count > 1
-        )
+        }
         if duplicates:
             # We don't support using the same file name in the same delta version.
             raise PrepareDatabaseException(
-                "Found multiple delta files with the same name in v%d: %s",
-                v,
-                duplicates,
+                "Found multiple delta files with the same name in v%d: %s"
+                % (v, duplicates,)
             )
 
         # We sort to ensure that we apply the delta files in a consistent
@@ -364,9 +433,15 @@ def _upgrade_existing_database(
                 continue
 
             root_name, ext = os.path.splitext(file_name)
+
             if ext == ".py":
                 # This is a python upgrade module. We need to import into some
                 # package and then execute its `run_upgrade` function.
+                if is_worker:
+                    raise PrepareDatabaseException(
+                        UNAPPLIED_DELTA_ON_WORKER_ERROR % relative_path
+                    )
+
                 module_name = "synapse.storage.v%d_%s" % (v, root_name)
                 with open(absolute_path) as python_file:
                     module = imp.load_source(module_name, absolute_path, python_file)
@@ -381,10 +456,18 @@ def _upgrade_existing_database(
                 continue
             elif ext == ".sql":
                 # A plain old .sql file, just read and execute it
+                if is_worker:
+                    raise PrepareDatabaseException(
+                        UNAPPLIED_DELTA_ON_WORKER_ERROR % relative_path
+                    )
                 logger.info("Applying schema %s", relative_path)
                 executescript(cur, absolute_path)
             elif ext == specific_engine_extension and root_name.endswith(".sql"):
                 # A .sql file specific to our engine; just read and execute it
+                if is_worker:
+                    raise PrepareDatabaseException(
+                        UNAPPLIED_DELTA_ON_WORKER_ERROR % relative_path
+                    )
                 logger.info("Applying engine-specific schema %s", relative_path)
                 executescript(cur, absolute_path)
             elif ext in specific_engine_extensions and root_name.endswith(".sql"):
@@ -413,6 +496,8 @@ def _upgrade_existing_database(
                 ),
                 (v, True),
             )
+
+    logger.info("Schema now up to date")
 
 
 def _apply_module_schemas(txn, database_engine, config):
@@ -449,7 +534,7 @@ def _apply_module_schema_files(cur, database_engine, modname, names_and_streams)
         ),
         (modname,),
     )
-    applied_deltas = set(d for d, in cur)
+    applied_deltas = {d for d, in cur}
     for (name, stream) in names_and_streams:
         if name in applied_deltas:
             continue
@@ -461,8 +546,7 @@ def _apply_module_schema_files(cur, database_engine, modname, names_and_streams)
             )
 
         logger.info("applying schema %s for %s", name, modname)
-        for statement in get_statements(stream):
-            cur.execute(statement)
+        execute_statements_from_stream(cur, stream)
 
         # Mark as done.
         cur.execute(
@@ -520,8 +604,12 @@ def get_statements(f):
 
 def executescript(txn, schema_path):
     with open(schema_path, "r") as f:
-        for statement in get_statements(f):
-            txn.execute(statement)
+        execute_statements_from_stream(txn, f)
+
+
+def execute_statements_from_stream(cur: Cursor, f: TextIO):
+    for statement in get_statements(f):
+        cur.execute(statement)
 
 
 def _get_or_create_schema_state(txn, database_engine):
@@ -547,8 +635,8 @@ def _get_or_create_schema_state(txn, database_engine):
     return None
 
 
-@attr.s()
-class _DirectoryListing(object):
+@attr.s(slots=True)
+class _DirectoryListing:
     """Helper class to store schema file name and the
     absolute path to it.
 

@@ -13,14 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from six.moves import queue
+import queue
 
 from twisted.internet import threads
 
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 
 
-class BackgroundFileConsumer(object):
+class BackgroundFileConsumer:
     """A consumer that writes to a file like object. Supports both push
     and pull producers
 

@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+from typing import Tuple
 
 from synapse.http import servlet
 from synapse.http.servlet import parse_json_object_from_request
@@ -60,7 +61,7 @@ class SendToDeviceRestServlet(servlet.RestServlet):
             sender_user_id, message_type, content["messages"]
         )
 
-        response = (200, {})
+        response = (200, {})  # type: Tuple[int, dict]
         return response
 
 

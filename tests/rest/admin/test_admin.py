@@ -26,7 +26,7 @@ import synapse.rest.admin
 from synapse.http.server import JsonResource
 from synapse.logging.context import make_deferred_yieldable
 from synapse.rest.admin import VersionServlet
-from synapse.rest.client.v1 import events, login, room
+from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import groups
 
 from tests import unittest
@@ -47,129 +47,6 @@ class VersionTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(
             {"server_version", "python_version"}, set(channel.json_body.keys())
-        )
-
-
-class ShutdownRoomTestCase(unittest.HomeserverTestCase):
-    servlets = [
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
-        login.register_servlets,
-        events.register_servlets,
-        room.register_servlets,
-        room.register_deprecated_servlets,
-    ]
-
-    def prepare(self, reactor, clock, hs):
-        self.event_creation_handler = hs.get_event_creation_handler()
-        hs.config.user_consent_version = "1"
-
-        consent_uri_builder = Mock()
-        consent_uri_builder.build_user_consent_uri.return_value = "http://example.com"
-        self.event_creation_handler._consent_uri_builder = consent_uri_builder
-
-        self.store = hs.get_datastore()
-
-        self.admin_user = self.register_user("admin", "pass", admin=True)
-        self.admin_user_tok = self.login("admin", "pass")
-
-        self.other_user = self.register_user("user", "pass")
-        self.other_user_token = self.login("user", "pass")
-
-        # Mark the admin user as having consented
-        self.get_success(self.store.user_set_consent_version(self.admin_user, "1"))
-
-    def test_shutdown_room_consent(self):
-        """Test that we can shutdown rooms with local users who have not
-        yet accepted the privacy policy. This used to fail when we tried to
-        force part the user from the old room.
-        """
-        self.event_creation_handler._block_events_without_consent_error = None
-
-        room_id = self.helper.create_room_as(self.other_user, tok=self.other_user_token)
-
-        # Assert one user in room
-        users_in_room = self.get_success(self.store.get_users_in_room(room_id))
-        self.assertEqual([self.other_user], users_in_room)
-
-        # Enable require consent to send events
-        self.event_creation_handler._block_events_without_consent_error = "Error"
-
-        # Assert that the user is getting consent error
-        self.helper.send(
-            room_id, body="foo", tok=self.other_user_token, expect_code=403
-        )
-
-        # Test that the admin can still send shutdown
-        url = "admin/shutdown_room/" + room_id
-        request, channel = self.make_request(
-            "POST",
-            url.encode("ascii"),
-            json.dumps({"new_room_user_id": self.admin_user}),
-            access_token=self.admin_user_tok,
-        )
-        self.render(request)
-
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-
-        # Assert there is now no longer anyone in the room
-        users_in_room = self.get_success(self.store.get_users_in_room(room_id))
-        self.assertEqual([], users_in_room)
-
-    def test_shutdown_room_block_peek(self):
-        """Test that a world_readable room can no longer be peeked into after
-        it has been shut down.
-        """
-
-        self.event_creation_handler._block_events_without_consent_error = None
-
-        room_id = self.helper.create_room_as(self.other_user, tok=self.other_user_token)
-
-        # Enable world readable
-        url = "rooms/%s/state/m.room.history_visibility" % (room_id,)
-        request, channel = self.make_request(
-            "PUT",
-            url.encode("ascii"),
-            json.dumps({"history_visibility": "world_readable"}),
-            access_token=self.other_user_token,
-        )
-        self.render(request)
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-
-        # Test that the admin can still send shutdown
-        url = "admin/shutdown_room/" + room_id
-        request, channel = self.make_request(
-            "POST",
-            url.encode("ascii"),
-            json.dumps({"new_room_user_id": self.admin_user}),
-            access_token=self.admin_user_tok,
-        )
-        self.render(request)
-
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-
-        # Assert we can no longer peek into the room
-        self._assert_peek(room_id, expect_code=403)
-
-    def _assert_peek(self, room_id, expect_code):
-        """Assert that the admin user can (or cannot) peek into the room.
-        """
-
-        url = "rooms/%s/initialSync" % (room_id,)
-        request, channel = self.make_request(
-            "GET", url.encode("ascii"), access_token=self.admin_user_tok
-        )
-        self.render(request)
-        self.assertEqual(
-            expect_code, int(channel.result["code"]), msg=channel.result["body"]
-        )
-
-        url = "events?timeout=0&room_id=" + room_id
-        request, channel = self.make_request(
-            "GET", url.encode("ascii"), access_token=self.admin_user_tok
-        )
-        self.render(request)
-        self.assertEqual(
-            expect_code, int(channel.result["code"]), msg=channel.result["body"]
         )
 
 
@@ -272,86 +149,6 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
         return channel.json_body["groups"]
 
 
-class PurgeRoomTestCase(unittest.HomeserverTestCase):
-    """Test /purge_room admin API.
-    """
-
-    servlets = [
-        synapse.rest.admin.register_servlets,
-        login.register_servlets,
-        room.register_servlets,
-    ]
-
-    def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
-
-        self.admin_user = self.register_user("admin", "pass", admin=True)
-        self.admin_user_tok = self.login("admin", "pass")
-
-    def test_purge_room(self):
-        room_id = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
-
-        # All users have to have left the room.
-        self.helper.leave(room_id, user=self.admin_user, tok=self.admin_user_tok)
-
-        url = "/_synapse/admin/v1/purge_room"
-        request, channel = self.make_request(
-            "POST",
-            url.encode("ascii"),
-            {"room_id": room_id},
-            access_token=self.admin_user_tok,
-        )
-        self.render(request)
-
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-
-        # Test that the following tables have been purged of all rows related to the room.
-        for table in (
-            "current_state_events",
-            "event_backward_extremities",
-            "event_forward_extremities",
-            "event_json",
-            "event_push_actions",
-            "event_search",
-            "events",
-            "group_rooms",
-            "public_room_list_stream",
-            "receipts_graph",
-            "receipts_linearized",
-            "room_aliases",
-            "room_depth",
-            "room_memberships",
-            "room_stats_state",
-            "room_stats_current",
-            "room_stats_historical",
-            "room_stats_earliest_token",
-            "rooms",
-            "stream_ordering_to_exterm",
-            "users_in_public_rooms",
-            "users_who_share_private_rooms",
-            "appservice_room_list",
-            "e2e_room_keys",
-            "event_push_summary",
-            "pusher_throttle",
-            "group_summary_rooms",
-            "local_invites",
-            "room_account_data",
-            "room_tags",
-            # "state_groups",  # Current impl leaves orphaned state groups around.
-            "state_groups_state",
-        ):
-            count = self.get_success(
-                self.store.db.simple_select_one_onecol(
-                    table=table,
-                    keyvalues={"room_id": room_id},
-                    retcol="COUNT(*)",
-                    desc="test_purge_room",
-                )
-            )
-
-            self.assertEqual(count, 0, msg="Rows not purged in {}".format(table))
-
-
 class QuarantineMediaTestCase(unittest.HomeserverTestCase):
     """Test /quarantine_media admin API.
     """
@@ -381,7 +178,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         self.fetches = []
 
-        def get_file(destination, path, output_stream, args=None, max_size=None):
+        async def get_file(destination, path, output_stream, args=None, max_size=None):
             """
             Returns tuple[int,dict,str,int] of file length, response headers,
             absolute URI, and response code.
@@ -395,7 +192,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             d = Deferred()
             d.addCallback(write_to)
             self.fetches.append((d, destination, path, args))
-            return make_deferred_yieldable(d)
+            return await make_deferred_yieldable(d)
 
         client = Mock()
         client.get_file = get_file
@@ -422,6 +219,24 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         hs = self.setup_test_homeserver(config=config, http_client=client)
 
         return hs
+
+    def _ensure_quarantined(self, admin_user_tok, server_and_media_id):
+        """Ensure a piece of media is quarantined when trying to access it."""
+        request, channel = self.make_request(
+            "GET", server_and_media_id, shorthand=False, access_token=admin_user_tok,
+        )
+        request.render(self.download_resource)
+        self.pump(1.0)
+
+        # Should be quarantined
+        self.assertEqual(
+            404,
+            int(channel.code),
+            msg=(
+                "Expected to receive a 404 on accessing quarantined media: %s"
+                % server_and_media_id
+            ),
+        )
 
     def test_quarantine_media_requires_admin(self):
         self.register_user("nonadmin", "pass", admin=False)
@@ -468,9 +283,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         )
 
         # Extract media ID from the response
-        server_name_and_media_id = response["content_uri"][
-            6:
-        ]  # Cut off the 'mxc://' bit
+        server_name_and_media_id = response["content_uri"][6:]  # Cut off 'mxc://'
         server_name, media_id = server_name_and_media_id.split("/")
 
         # Attempt to access the media
@@ -497,26 +310,9 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.code), msg=channel.result["body"])
 
         # Attempt to access the media
-        request, channel = self.make_request(
-            "GET",
-            server_name_and_media_id,
-            shorthand=False,
-            access_token=admin_user_tok,
-        )
-        request.render(self.download_resource)
-        self.pump(1.0)
+        self._ensure_quarantined(admin_user_tok, server_name_and_media_id)
 
-        # Should be quarantined
-        self.assertEqual(
-            404,
-            int(channel.code),
-            msg=(
-                "Expected to receive a 404 on accessing quarantined media: %s"
-                % server_name_and_media_id
-            ),
-        )
-
-    def test_quarantine_all_media_in_room(self):
+    def test_quarantine_all_media_in_room(self, override_url_template=None):
         self.register_user("room_admin", "pass", admin=True)
         admin_user_tok = self.login("room_admin", "pass")
 
@@ -555,9 +351,12 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         )
 
         # Quarantine all media in the room
-        url = "/_synapse/admin/v1/room/%s/media/quarantine" % urllib.parse.quote(
-            room_id
-        )
+        if override_url_template:
+            url = override_url_template % urllib.parse.quote(room_id)
+        else:
+            url = "/_synapse/admin/v1/room/%s/media/quarantine" % urllib.parse.quote(
+                room_id
+            )
         request, channel = self.make_request("POST", url, access_token=admin_user_tok,)
         self.render(request)
         self.pump(1.0)
@@ -573,43 +372,12 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         server_and_media_id_2 = mxc_2[6:]
 
         # Test that we cannot download any of the media anymore
-        request, channel = self.make_request(
-            "GET",
-            server_and_media_id_1,
-            shorthand=False,
-            access_token=non_admin_user_tok,
-        )
-        request.render(self.download_resource)
-        self.pump(1.0)
+        self._ensure_quarantined(admin_user_tok, server_and_media_id_1)
+        self._ensure_quarantined(admin_user_tok, server_and_media_id_2)
 
-        # Should be quarantined
-        self.assertEqual(
-            404,
-            int(channel.code),
-            msg=(
-                "Expected to receive a 404 on accessing quarantined media: %s"
-                % server_and_media_id_1
-            ),
-        )
-
-        request, channel = self.make_request(
-            "GET",
-            server_and_media_id_2,
-            shorthand=False,
-            access_token=non_admin_user_tok,
-        )
-        request.render(self.download_resource)
-        self.pump(1.0)
-
-        # Should be quarantined
-        self.assertEqual(
-            404,
-            int(channel.code),
-            msg=(
-                "Expected to receive a 404 on accessing quarantined media: %s"
-                % server_and_media_id_2
-            ),
-        )
+    def test_quarantine_all_media_in_room_deprecated_api_path(self):
+        # Perform the above test with the deprecated API path
+        self.test_quarantine_all_media_in_room("/_synapse/admin/v1/quarantine_media/%s")
 
     def test_quarantine_all_media_by_user(self):
         self.register_user("user_admin", "pass", admin=True)
@@ -647,24 +415,51 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         )
 
         # Attempt to access each piece of media
-        request, channel = self.make_request(
-            "GET",
-            server_and_media_id_1,
-            shorthand=False,
-            access_token=non_admin_user_tok,
-        )
-        request.render(self.download_resource)
-        self.pump(1.0)
+        self._ensure_quarantined(admin_user_tok, server_and_media_id_1)
+        self._ensure_quarantined(admin_user_tok, server_and_media_id_2)
 
-        # Should be quarantined
-        self.assertEqual(
-            404,
-            int(channel.code),
-            msg=(
-                "Expected to receive a 404 on accessing quarantined media: %s"
-                % server_and_media_id_1,
-            ),
+    def test_cannot_quarantine_safe_media(self):
+        self.register_user("user_admin", "pass", admin=True)
+        admin_user_tok = self.login("user_admin", "pass")
+
+        non_admin_user = self.register_user("user_nonadmin", "pass", admin=False)
+        non_admin_user_tok = self.login("user_nonadmin", "pass")
+
+        # Upload some media
+        response_1 = self.helper.upload_media(
+            self.upload_resource, self.image_data, tok=non_admin_user_tok
         )
+        response_2 = self.helper.upload_media(
+            self.upload_resource, self.image_data, tok=non_admin_user_tok
+        )
+
+        # Extract media IDs
+        server_and_media_id_1 = response_1["content_uri"][6:]
+        server_and_media_id_2 = response_2["content_uri"][6:]
+
+        # Mark the second item as safe from quarantine.
+        _, media_id_2 = server_and_media_id_2.split("/")
+        self.get_success(self.store.mark_local_media_as_safe(media_id_2))
+
+        # Quarantine all media by this user
+        url = "/_synapse/admin/v1/user/%s/media/quarantine" % urllib.parse.quote(
+            non_admin_user
+        )
+        request, channel = self.make_request(
+            "POST", url.encode("ascii"), access_token=admin_user_tok,
+        )
+        self.render(request)
+        self.pump(1.0)
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(
+            json.loads(channel.result["body"].decode("utf-8")),
+            {"num_quarantined": 1},
+            "Expected 1 quarantined item",
+        )
+
+        # Attempt to access each piece of media, the first should fail, the
+        # second should succeed.
+        self._ensure_quarantined(admin_user_tok, server_and_media_id_1)
 
         # Attempt to access each piece of media
         request, channel = self.make_request(
@@ -676,12 +471,12 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         request.render(self.download_resource)
         self.pump(1.0)
 
-        # Should be quarantined
+        # Shouldn't be quarantined
         self.assertEqual(
-            404,
+            200,
             int(channel.code),
             msg=(
-                "Expected to receive a 404 on accessing quarantined media: %s"
+                "Expected to receive a 200 on accessing not-quarantined media: %s"
                 % server_and_media_id_2
             ),
         )

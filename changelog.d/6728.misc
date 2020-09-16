@@ -1,1 +1,0 @@
-Add `local_current_membership` table for tracking local user membership state in rooms.

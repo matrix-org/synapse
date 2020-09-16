@@ -14,10 +14,7 @@
 # limitations under the License.
 
 import logging
-
-from six import raise_from
-
-from twisted.internet import defer
+import random
 
 from synapse.api.errors import (
     AuthError,
@@ -28,7 +25,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import UserID, get_domain_from_id
+from synapse.types import UserID, create_requester, get_domain_from_id
 
 from ._base import BaseHandler
 
@@ -56,16 +53,15 @@ class BaseProfileHandler(BaseHandler):
 
         self.user_directory_handler = hs.get_user_directory_handler()
 
-    @defer.inlineCallbacks
-    def get_profile(self, user_id):
+    async def get_profile(self, user_id):
         target_user = UserID.from_string(user_id)
 
         if self.hs.is_mine(target_user):
             try:
-                displayname = yield self.store.get_profile_displayname(
+                displayname = await self.store.get_profile_displayname(
                     target_user.localpart
                 )
-                avatar_url = yield self.store.get_profile_avatar_url(
+                avatar_url = await self.store.get_profile_avatar_url(
                     target_user.localpart
                 )
             except StoreError as e:
@@ -76,7 +72,7 @@ class BaseProfileHandler(BaseHandler):
             return {"displayname": displayname, "avatar_url": avatar_url}
         else:
             try:
-                result = yield self.federation.make_query(
+                result = await self.federation.make_query(
                     destination=target_user.domain,
                     query_type="profile",
                     args={"user_id": user_id},
@@ -84,12 +80,11 @@ class BaseProfileHandler(BaseHandler):
                 )
                 return result
             except RequestSendFailed as e:
-                raise_from(SynapseError(502, "Failed to fetch profile"), e)
+                raise SynapseError(502, "Failed to fetch profile") from e
             except HttpResponseException as e:
                 raise e.to_synapse_error()
 
-    @defer.inlineCallbacks
-    def get_profile_from_cache(self, user_id):
+    async def get_profile_from_cache(self, user_id):
         """Get the profile information from our local cache. If the user is
         ours then the profile information will always be corect. Otherwise,
         it may be out of date/missing.
@@ -97,10 +92,10 @@ class BaseProfileHandler(BaseHandler):
         target_user = UserID.from_string(user_id)
         if self.hs.is_mine(target_user):
             try:
-                displayname = yield self.store.get_profile_displayname(
+                displayname = await self.store.get_profile_displayname(
                     target_user.localpart
                 )
-                avatar_url = yield self.store.get_profile_avatar_url(
+                avatar_url = await self.store.get_profile_avatar_url(
                     target_user.localpart
                 )
             except StoreError as e:
@@ -110,14 +105,13 @@ class BaseProfileHandler(BaseHandler):
 
             return {"displayname": displayname, "avatar_url": avatar_url}
         else:
-            profile = yield self.store.get_from_remote_profile_cache(user_id)
+            profile = await self.store.get_from_remote_profile_cache(user_id)
             return profile or {}
 
-    @defer.inlineCallbacks
-    def get_displayname(self, target_user):
+    async def get_displayname(self, target_user):
         if self.hs.is_mine(target_user):
             try:
-                displayname = yield self.store.get_profile_displayname(
+                displayname = await self.store.get_profile_displayname(
                     target_user.localpart
                 )
             except StoreError as e:
@@ -128,21 +122,22 @@ class BaseProfileHandler(BaseHandler):
             return displayname
         else:
             try:
-                result = yield self.federation.make_query(
+                result = await self.federation.make_query(
                     destination=target_user.domain,
                     query_type="profile",
                     args={"user_id": target_user.to_string(), "field": "displayname"},
                     ignore_backoff=True,
                 )
             except RequestSendFailed as e:
-                raise_from(SynapseError(502, "Failed to fetch profile"), e)
+                raise SynapseError(502, "Failed to fetch profile") from e
             except HttpResponseException as e:
                 raise e.to_synapse_error()
 
             return result["displayname"]
 
-    @defer.inlineCallbacks
-    def set_displayname(self, target_user, requester, new_displayname, by_admin=False):
+    async def set_displayname(
+        self, target_user, requester, new_displayname, by_admin=False
+    ):
         """Set the displayname of a user
 
         Args:
@@ -157,6 +152,18 @@ class BaseProfileHandler(BaseHandler):
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's displayname")
 
+        if not by_admin and not self.hs.config.enable_set_displayname:
+            profile = await self.store.get_profileinfo(target_user.localpart)
+            if profile.display_name:
+                raise SynapseError(
+                    400,
+                    "Changing display name is disabled on this server",
+                    Codes.FORBIDDEN,
+                )
+
+        if not isinstance(new_displayname, str):
+            raise SynapseError(400, "Invalid displayname")
+
         if len(new_displayname) > MAX_DISPLAYNAME_LEN:
             raise SynapseError(
                 400, "Displayname is too long (max %i)" % (MAX_DISPLAYNAME_LEN,)
@@ -165,21 +172,26 @@ class BaseProfileHandler(BaseHandler):
         if new_displayname == "":
             new_displayname = None
 
-        yield self.store.set_profile_displayname(target_user.localpart, new_displayname)
+        # If the admin changes the display name of a user, the requesting user cannot send
+        # the join event to update the displayname in the rooms.
+        # This must be done by the target user himself.
+        if by_admin:
+            requester = create_requester(target_user)
+
+        await self.store.set_profile_displayname(target_user.localpart, new_displayname)
 
         if self.hs.config.user_directory_search_all_users:
-            profile = yield self.store.get_profileinfo(target_user.localpart)
-            yield self.user_directory_handler.handle_local_profile_change(
+            profile = await self.store.get_profileinfo(target_user.localpart)
+            await self.user_directory_handler.handle_local_profile_change(
                 target_user.to_string(), profile
             )
 
-        yield self._update_join_states(requester, target_user)
+        await self._update_join_states(requester, target_user)
 
-    @defer.inlineCallbacks
-    def get_avatar_url(self, target_user):
+    async def get_avatar_url(self, target_user):
         if self.hs.is_mine(target_user):
             try:
-                avatar_url = yield self.store.get_profile_avatar_url(
+                avatar_url = await self.store.get_profile_avatar_url(
                     target_user.localpart
                 )
             except StoreError as e:
@@ -189,46 +201,66 @@ class BaseProfileHandler(BaseHandler):
             return avatar_url
         else:
             try:
-                result = yield self.federation.make_query(
+                result = await self.federation.make_query(
                     destination=target_user.domain,
                     query_type="profile",
                     args={"user_id": target_user.to_string(), "field": "avatar_url"},
                     ignore_backoff=True,
                 )
             except RequestSendFailed as e:
-                raise_from(SynapseError(502, "Failed to fetch profile"), e)
+                raise SynapseError(502, "Failed to fetch profile") from e
             except HttpResponseException as e:
                 raise e.to_synapse_error()
 
             return result["avatar_url"]
 
-    @defer.inlineCallbacks
-    def set_avatar_url(self, target_user, requester, new_avatar_url, by_admin=False):
-        """target_user is the user whose avatar_url is to be changed;
-        auth_user is the user attempting to make this change."""
+    async def set_avatar_url(
+        self, target_user, requester, new_avatar_url, by_admin=False
+    ):
+        """Set a new avatar URL for a user.
+
+        Args:
+            target_user (UserID): the user whose avatar URL is to be changed.
+            requester (Requester): The user attempting to make this change.
+            new_avatar_url (str): The avatar URL to give this user.
+            by_admin (bool): Whether this change was made by an administrator.
+        """
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this homeserver")
 
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's avatar_url")
 
+        if not by_admin and not self.hs.config.enable_set_avatar_url:
+            profile = await self.store.get_profileinfo(target_user.localpart)
+            if profile.avatar_url:
+                raise SynapseError(
+                    400, "Changing avatar is disabled on this server", Codes.FORBIDDEN
+                )
+
+        if not isinstance(new_avatar_url, str):
+            raise SynapseError(400, "Invalid displayname")
+
         if len(new_avatar_url) > MAX_AVATAR_URL_LEN:
             raise SynapseError(
                 400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN,)
             )
 
-        yield self.store.set_profile_avatar_url(target_user.localpart, new_avatar_url)
+        # Same like set_displayname
+        if by_admin:
+            requester = create_requester(target_user)
+
+        await self.store.set_profile_avatar_url(target_user.localpart, new_avatar_url)
 
         if self.hs.config.user_directory_search_all_users:
-            profile = yield self.store.get_profileinfo(target_user.localpart)
-            yield self.user_directory_handler.handle_local_profile_change(
+            profile = await self.store.get_profileinfo(target_user.localpart)
+            await self.user_directory_handler.handle_local_profile_change(
                 target_user.to_string(), profile
             )
 
-        yield self._update_join_states(requester, target_user)
+        await self._update_join_states(requester, target_user)
 
-    @defer.inlineCallbacks
-    def on_profile_query(self, args):
+    async def on_profile_query(self, args):
         user = UserID.from_string(args["user_id"])
         if not self.hs.is_mine(user):
             raise SynapseError(400, "User is not hosted on this homeserver")
@@ -238,12 +270,12 @@ class BaseProfileHandler(BaseHandler):
         response = {}
         try:
             if just_field is None or just_field == "displayname":
-                response["displayname"] = yield self.store.get_profile_displayname(
+                response["displayname"] = await self.store.get_profile_displayname(
                     user.localpart
                 )
 
             if just_field is None or just_field == "avatar_url":
-                response["avatar_url"] = yield self.store.get_profile_avatar_url(
+                response["avatar_url"] = await self.store.get_profile_avatar_url(
                     user.localpart
                 )
         except StoreError as e:
@@ -253,21 +285,26 @@ class BaseProfileHandler(BaseHandler):
 
         return response
 
-    @defer.inlineCallbacks
-    def _update_join_states(self, requester, target_user):
+    async def _update_join_states(self, requester, target_user):
         if not self.hs.is_mine(target_user):
             return
 
-        yield self.ratelimit(requester)
+        await self.ratelimit(requester)
 
-        room_ids = yield self.store.get_rooms_for_user(target_user.to_string())
+        # Do not actually update the room state for shadow-banned users.
+        if requester.shadow_banned:
+            # We randomly sleep a bit just to annoy the requester.
+            await self.clock.sleep(random.randint(1, 10))
+            return
+
+        room_ids = await self.store.get_rooms_for_user(target_user.to_string())
 
         for room_id in room_ids:
             handler = self.hs.get_room_member_handler()
             try:
                 # Assume the target_user isn't a guest,
                 # because we don't let guests set profile or avatar data.
-                yield handler.update_membership(
+                await handler.update_membership(
                     requester,
                     target_user,
                     room_id,
@@ -279,8 +316,7 @@ class BaseProfileHandler(BaseHandler):
                     "Failed to update join event for room %s - %s", room_id, str(e)
                 )
 
-    @defer.inlineCallbacks
-    def check_profile_query_allowed(self, target_user, requester=None):
+    async def check_profile_query_allowed(self, target_user, requester=None):
         """Checks whether a profile query is allowed. If the
         'require_auth_for_profile_requests' config flag is set to True and a
         'requester' is provided, the query is only allowed if the two users
@@ -312,8 +348,8 @@ class BaseProfileHandler(BaseHandler):
             return
 
         try:
-            requester_rooms = yield self.store.get_rooms_for_user(requester.to_string())
-            target_user_rooms = yield self.store.get_rooms_for_user(
+            requester_rooms = await self.store.get_rooms_for_user(requester.to_string())
+            target_user_rooms = await self.store.get_rooms_for_user(
                 target_user.to_string()
             )
 
@@ -346,25 +382,24 @@ class MasterProfileHandler(BaseProfileHandler):
             "Update remote profile", self._update_remote_profile_cache
         )
 
-    @defer.inlineCallbacks
-    def _update_remote_profile_cache(self):
+    async def _update_remote_profile_cache(self):
         """Called periodically to check profiles of remote users we haven't
         checked in a while.
         """
-        entries = yield self.store.get_remote_profile_cache_entries_that_expire(
+        entries = await self.store.get_remote_profile_cache_entries_that_expire(
             last_checked=self.clock.time_msec() - self.PROFILE_UPDATE_EVERY_MS
         )
 
         for user_id, displayname, avatar_url in entries:
-            is_subscribed = yield self.store.is_subscribed_remote_profile_for_user(
+            is_subscribed = await self.store.is_subscribed_remote_profile_for_user(
                 user_id
             )
             if not is_subscribed:
-                yield self.store.maybe_delete_remote_profile_cache(user_id)
+                await self.store.maybe_delete_remote_profile_cache(user_id)
                 continue
 
             try:
-                profile = yield self.federation.make_query(
+                profile = await self.federation.make_query(
                     destination=get_domain_from_id(user_id),
                     query_type="profile",
                     args={"user_id": user_id},
@@ -373,7 +408,7 @@ class MasterProfileHandler(BaseProfileHandler):
             except Exception:
                 logger.exception("Failed to get avatar_url")
 
-                yield self.store.update_remote_profile_cache(
+                await self.store.update_remote_profile_cache(
                     user_id, displayname, avatar_url
                 )
                 continue
@@ -382,4 +417,4 @@ class MasterProfileHandler(BaseProfileHandler):
             new_avatar = profile.get("avatar_url")
 
             # We always hit update to update the last_check timestamp
-            yield self.store.update_remote_profile_cache(user_id, new_name, new_avatar)
+            await self.store.update_remote_profile_cache(user_id, new_name, new_avatar)

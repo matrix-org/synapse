@@ -36,7 +36,6 @@ esac
 dh_virtualenv \
     --install-suffix "matrix-synapse" \
     --builtin-venv \
-    --setuptools \
     --python "$SNAKE" \
     --upgrade-pip \
     --preinstall="lxml" \

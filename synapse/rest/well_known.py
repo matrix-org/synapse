@@ -13,17 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import logging
 
 from twisted.web.resource import Resource
 
 from synapse.http.server import set_cors_headers
+from synapse.util import json_encoder
 
 logger = logging.getLogger(__name__)
 
 
-class WellKnownBuilder(object):
+class WellKnownBuilder:
     """Utility to construct the well-known response
 
     Args:
@@ -67,4 +67,4 @@ class WellKnownResource(Resource):
 
         logger.debug("returning: %s", r)
         request.setHeader(b"Content-Type", b"application/json")
-        return json.dumps(r).encode("utf-8")
+        return json_encoder.encode(r).encode("utf-8")

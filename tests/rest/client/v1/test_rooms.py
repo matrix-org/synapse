@@ -19,17 +19,16 @@
 """Tests REST events for /rooms paths."""
 
 import json
+from urllib import parse as urlparse
 
-from mock import Mock, NonCallableMock
-from six.moves.urllib import parse as urlparse
-
-from twisted.internet import defer
+from mock import Mock
 
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.handlers.pagination import PurgeStatus
-from synapse.rest.client.v1 import login, profile, room
+from synapse.rest.client.v1 import directory, login, profile, room
 from synapse.rest.client.v2_alpha import account
+from synapse.types import JsonDict, RoomAlias, UserID
 from synapse.util.stringutils import random_string
 
 from tests import unittest
@@ -45,18 +44,13 @@ class RoomBase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         self.hs = self.setup_test_homeserver(
-            "red",
-            http_client=None,
-            federation_client=Mock(),
-            ratelimiter=NonCallableMock(spec_set=["can_do_action"]),
+            "red", http_client=None, federation_client=Mock(),
         )
-        self.ratelimiter = self.hs.get_ratelimiter()
-        self.ratelimiter.can_do_action.return_value = (True, 0)
 
         self.hs.get_federation_handler = Mock(return_value=Mock())
 
-        def _insert_client_ip(*args, **kwargs):
-            return defer.succeed(None)
+        async def _insert_client_ip(*args, **kwargs):
+            return None
 
         self.hs.get_datastore().insert_client_ip = _insert_client_ip
 
@@ -679,6 +673,92 @@ class RoomMemberStateTestCase(RoomBase):
         self.render(request)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
         self.assertEquals(json.loads(content), channel.json_body)
+
+
+class RoomJoinRatelimitTestCase(RoomBase):
+    user_id = "@sid1:red"
+
+    servlets = [
+        profile.register_servlets,
+        room.register_servlets,
+    ]
+
+    @unittest.override_config(
+        {"rc_joins": {"local": {"per_second": 0.5, "burst_count": 3}}}
+    )
+    def test_join_local_ratelimit(self):
+        """Tests that local joins are actually rate-limited."""
+        for i in range(3):
+            self.helper.create_room_as(self.user_id)
+
+        self.helper.create_room_as(self.user_id, expect_code=429)
+
+    @unittest.override_config(
+        {"rc_joins": {"local": {"per_second": 0.5, "burst_count": 3}}}
+    )
+    def test_join_local_ratelimit_profile_change(self):
+        """Tests that sending a profile update into all of the user's joined rooms isn't
+        rate-limited by the rate-limiter on joins."""
+
+        # Create and join as many rooms as the rate-limiting config allows in a second.
+        room_ids = [
+            self.helper.create_room_as(self.user_id),
+            self.helper.create_room_as(self.user_id),
+            self.helper.create_room_as(self.user_id),
+        ]
+        # Let some time for the rate-limiter to forget about our multi-join.
+        self.reactor.advance(2)
+        # Add one to make sure we're joined to more rooms than the config allows us to
+        # join in a second.
+        room_ids.append(self.helper.create_room_as(self.user_id))
+
+        # Create a profile for the user, since it hasn't been done on registration.
+        store = self.hs.get_datastore()
+        self.get_success(
+            store.create_profile(UserID.from_string(self.user_id).localpart)
+        )
+
+        # Update the display name for the user.
+        path = "/_matrix/client/r0/profile/%s/displayname" % self.user_id
+        request, channel = self.make_request("PUT", path, {"displayname": "John Doe"})
+        self.render(request)
+        self.assertEquals(channel.code, 200, channel.json_body)
+
+        # Check that all the rooms have been sent a profile update into.
+        for room_id in room_ids:
+            path = "/_matrix/client/r0/rooms/%s/state/m.room.member/%s" % (
+                room_id,
+                self.user_id,
+            )
+
+            request, channel = self.make_request("GET", path)
+            self.render(request)
+            self.assertEquals(channel.code, 200)
+
+            self.assertIn("displayname", channel.json_body)
+            self.assertEquals(channel.json_body["displayname"], "John Doe")
+
+    @unittest.override_config(
+        {"rc_joins": {"local": {"per_second": 0.5, "burst_count": 3}}}
+    )
+    def test_join_local_ratelimit_idempotent(self):
+        """Tests that the room join endpoints remain idempotent despite rate-limiting
+        on room joins."""
+        room_id = self.helper.create_room_as(self.user_id)
+
+        # Let's test both paths to be sure.
+        paths_to_test = [
+            "/_matrix/client/r0/rooms/%s/join",
+            "/_matrix/client/r0/join/%s",
+        ]
+
+        for path in paths_to_test:
+            # Make sure we send more requests than the rate-limiting config would allow
+            # if all of these requests ended up joining the user to a room.
+            for i in range(4):
+                request, channel = self.make_request("POST", path % room_id, {})
+                self.render(request)
+                self.assertEquals(channel.code, 200)
 
 
 class RoomMessagesTestCase(RoomBase):
@@ -1612,7 +1692,9 @@ class ContextTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
         self.user_id = self.register_user("user", "password")
         self.tok = self.login("user", "password")
-        self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
+        self.room_id = self.helper.create_room_as(
+            self.user_id, tok=self.tok, is_public=False
+        )
 
         self.other_user_id = self.register_user("user2", "password")
         self.other_tok = self.login("user2", "password")
@@ -1724,3 +1806,257 @@ class ContextTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(events_after), 2, events_after)
         self.assertDictEqual(events_after[0].get("content"), {}, events_after[0])
         self.assertEqual(events_after[1].get("content"), {}, events_after[1])
+
+
+class RoomAliasListTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        directory.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, homeserver):
+        self.room_owner = self.register_user("room_owner", "test")
+        self.room_owner_tok = self.login("room_owner", "test")
+
+        self.room_id = self.helper.create_room_as(
+            self.room_owner, tok=self.room_owner_tok
+        )
+
+    def test_no_aliases(self):
+        res = self._get_aliases(self.room_owner_tok)
+        self.assertEqual(res["aliases"], [])
+
+    def test_not_in_room(self):
+        self.register_user("user", "test")
+        user_tok = self.login("user", "test")
+        res = self._get_aliases(user_tok, expected_code=403)
+        self.assertEqual(res["errcode"], "M_FORBIDDEN")
+
+    def test_admin_user(self):
+        alias1 = self._random_alias()
+        self._set_alias_via_directory(alias1)
+
+        self.register_user("user", "test", admin=True)
+        user_tok = self.login("user", "test")
+
+        res = self._get_aliases(user_tok)
+        self.assertEqual(res["aliases"], [alias1])
+
+    def test_with_aliases(self):
+        alias1 = self._random_alias()
+        alias2 = self._random_alias()
+
+        self._set_alias_via_directory(alias1)
+        self._set_alias_via_directory(alias2)
+
+        res = self._get_aliases(self.room_owner_tok)
+        self.assertEqual(set(res["aliases"]), {alias1, alias2})
+
+    def test_peekable_room(self):
+        alias1 = self._random_alias()
+        self._set_alias_via_directory(alias1)
+
+        self.helper.send_state(
+            self.room_id,
+            EventTypes.RoomHistoryVisibility,
+            body={"history_visibility": "world_readable"},
+            tok=self.room_owner_tok,
+        )
+
+        self.register_user("user", "test")
+        user_tok = self.login("user", "test")
+
+        res = self._get_aliases(user_tok)
+        self.assertEqual(res["aliases"], [alias1])
+
+    def _get_aliases(self, access_token: str, expected_code: int = 200) -> JsonDict:
+        """Calls the endpoint under test. returns the json response object."""
+        request, channel = self.make_request(
+            "GET",
+            "/_matrix/client/unstable/org.matrix.msc2432/rooms/%s/aliases"
+            % (self.room_id,),
+            access_token=access_token,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, expected_code, channel.result)
+        res = channel.json_body
+        self.assertIsInstance(res, dict)
+        if expected_code == 200:
+            self.assertIsInstance(res["aliases"], list)
+        return res
+
+    def _random_alias(self) -> str:
+        return RoomAlias(random_string(5), self.hs.hostname).to_string()
+
+    def _set_alias_via_directory(self, alias: str, expected_code: int = 200):
+        url = "/_matrix/client/r0/directory/room/" + alias
+        data = {"room_id": self.room_id}
+        request_data = json.dumps(data)
+
+        request, channel = self.make_request(
+            "PUT", url, request_data, access_token=self.room_owner_tok
+        )
+        self.render(request)
+        self.assertEqual(channel.code, expected_code, channel.result)
+
+
+class RoomCanonicalAliasTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        directory.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, homeserver):
+        self.room_owner = self.register_user("room_owner", "test")
+        self.room_owner_tok = self.login("room_owner", "test")
+
+        self.room_id = self.helper.create_room_as(
+            self.room_owner, tok=self.room_owner_tok
+        )
+
+        self.alias = "#alias:test"
+        self._set_alias_via_directory(self.alias)
+
+    def _set_alias_via_directory(self, alias: str, expected_code: int = 200):
+        url = "/_matrix/client/r0/directory/room/" + alias
+        data = {"room_id": self.room_id}
+        request_data = json.dumps(data)
+
+        request, channel = self.make_request(
+            "PUT", url, request_data, access_token=self.room_owner_tok
+        )
+        self.render(request)
+        self.assertEqual(channel.code, expected_code, channel.result)
+
+    def _get_canonical_alias(self, expected_code: int = 200) -> JsonDict:
+        """Calls the endpoint under test. returns the json response object."""
+        request, channel = self.make_request(
+            "GET",
+            "rooms/%s/state/m.room.canonical_alias" % (self.room_id,),
+            access_token=self.room_owner_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, expected_code, channel.result)
+        res = channel.json_body
+        self.assertIsInstance(res, dict)
+        return res
+
+    def _set_canonical_alias(self, content: str, expected_code: int = 200) -> JsonDict:
+        """Calls the endpoint under test. returns the json response object."""
+        request, channel = self.make_request(
+            "PUT",
+            "rooms/%s/state/m.room.canonical_alias" % (self.room_id,),
+            json.dumps(content),
+            access_token=self.room_owner_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, expected_code, channel.result)
+        res = channel.json_body
+        self.assertIsInstance(res, dict)
+        return res
+
+    def test_canonical_alias(self):
+        """Test a basic alias message."""
+        # There is no canonical alias to start with.
+        self._get_canonical_alias(expected_code=404)
+
+        # Create an alias.
+        self._set_canonical_alias({"alias": self.alias})
+
+        # Canonical alias now exists!
+        res = self._get_canonical_alias()
+        self.assertEqual(res, {"alias": self.alias})
+
+        # Now remove the alias.
+        self._set_canonical_alias({})
+
+        # There is an alias event, but it is empty.
+        res = self._get_canonical_alias()
+        self.assertEqual(res, {})
+
+    def test_alt_aliases(self):
+        """Test a canonical alias message with alt_aliases."""
+        # Create an alias.
+        self._set_canonical_alias({"alt_aliases": [self.alias]})
+
+        # Canonical alias now exists!
+        res = self._get_canonical_alias()
+        self.assertEqual(res, {"alt_aliases": [self.alias]})
+
+        # Now remove the alt_aliases.
+        self._set_canonical_alias({})
+
+        # There is an alias event, but it is empty.
+        res = self._get_canonical_alias()
+        self.assertEqual(res, {})
+
+    def test_alias_alt_aliases(self):
+        """Test a canonical alias message with an alias and alt_aliases."""
+        # Create an alias.
+        self._set_canonical_alias({"alias": self.alias, "alt_aliases": [self.alias]})
+
+        # Canonical alias now exists!
+        res = self._get_canonical_alias()
+        self.assertEqual(res, {"alias": self.alias, "alt_aliases": [self.alias]})
+
+        # Now remove the alias and alt_aliases.
+        self._set_canonical_alias({})
+
+        # There is an alias event, but it is empty.
+        res = self._get_canonical_alias()
+        self.assertEqual(res, {})
+
+    def test_partial_modify(self):
+        """Test removing only the alt_aliases."""
+        # Create an alias.
+        self._set_canonical_alias({"alias": self.alias, "alt_aliases": [self.alias]})
+
+        # Canonical alias now exists!
+        res = self._get_canonical_alias()
+        self.assertEqual(res, {"alias": self.alias, "alt_aliases": [self.alias]})
+
+        # Now remove the alt_aliases.
+        self._set_canonical_alias({"alias": self.alias})
+
+        # There is an alias event, but it is empty.
+        res = self._get_canonical_alias()
+        self.assertEqual(res, {"alias": self.alias})
+
+    def test_add_alias(self):
+        """Test removing only the alt_aliases."""
+        # Create an additional alias.
+        second_alias = "#second:test"
+        self._set_alias_via_directory(second_alias)
+
+        # Add the canonical alias.
+        self._set_canonical_alias({"alias": self.alias, "alt_aliases": [self.alias]})
+
+        # Then add the second alias.
+        self._set_canonical_alias(
+            {"alias": self.alias, "alt_aliases": [self.alias, second_alias]}
+        )
+
+        # Canonical alias now exists!
+        res = self._get_canonical_alias()
+        self.assertEqual(
+            res, {"alias": self.alias, "alt_aliases": [self.alias, second_alias]}
+        )
+
+    def test_bad_data(self):
+        """Invalid data for alt_aliases should cause errors."""
+        self._set_canonical_alias({"alt_aliases": "@bad:test"}, expected_code=400)
+        self._set_canonical_alias({"alt_aliases": None}, expected_code=400)
+        self._set_canonical_alias({"alt_aliases": 0}, expected_code=400)
+        self._set_canonical_alias({"alt_aliases": 1}, expected_code=400)
+        self._set_canonical_alias({"alt_aliases": False}, expected_code=400)
+        self._set_canonical_alias({"alt_aliases": True}, expected_code=400)
+        self._set_canonical_alias({"alt_aliases": {}}, expected_code=400)
+
+    def test_bad_alias(self):
+        """An alias which does not point to the room raises a SynapseError."""
+        self._set_canonical_alias({"alias": "@unknown:test"}, expected_code=400)
+        self._set_canonical_alias({"alt_aliases": ["@unknown:test"]}, expected_code=400)

@@ -14,7 +14,6 @@
 
 import json
 
-import six
 from mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactorClock
@@ -28,8 +27,8 @@ from tests import unittest
 class TermsTestCase(unittest.HomeserverTestCase):
     servlets = [register_servlets]
 
-    def default_config(self, name="test"):
-        config = super().default_config(name)
+    def default_config(self):
+        config = super().default_config()
         config.update(
             {
                 "public_baseurl": "https://example.org/",
@@ -53,13 +52,14 @@ class TermsTestCase(unittest.HomeserverTestCase):
 
     def test_ui_auth(self):
         # Do a UI auth request
-        request, channel = self.make_request(b"POST", self.url, b"{}")
+        request_data = json.dumps({"username": "kermit", "password": "monkey"})
+        request, channel = self.make_request(b"POST", self.url, request_data)
         self.render(request)
 
         self.assertEquals(channel.result["code"], b"401", channel.result)
 
         self.assertTrue(channel.json_body is not None)
-        self.assertIsInstance(channel.json_body["session"], six.text_type)
+        self.assertIsInstance(channel.json_body["session"], str)
 
         self.assertIsInstance(channel.json_body["flows"], list)
         for flow in channel.json_body["flows"]:
@@ -124,6 +124,6 @@ class TermsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         self.assertTrue(channel.json_body is not None)
-        self.assertIsInstance(channel.json_body["user_id"], six.text_type)
-        self.assertIsInstance(channel.json_body["access_token"], six.text_type)
-        self.assertIsInstance(channel.json_body["device_id"], six.text_type)
+        self.assertIsInstance(channel.json_body["user_id"], str)
+        self.assertIsInstance(channel.json_body["access_token"], str)
+        self.assertIsInstance(channel.json_body["device_id"], str)

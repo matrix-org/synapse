@@ -15,24 +15,26 @@
 # limitations under the License.
 import datetime
 import logging
+from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Tuple, cast
 
 from prometheus_client import Counter
-
-from twisted.internet import defer
 
 from synapse.api.errors import (
     FederationDeniedError,
     HttpResponseException,
     RequestSendFailed,
 )
+from synapse.api.presence import UserPresenceState
 from synapse.events import EventBase
 from synapse.federation.units import Edu
 from synapse.handlers.presence import format_user_presence_state
 from synapse.metrics import sent_transactions_counter
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.storage.presence import UserPresenceState
-from synapse.types import StateMap
+from synapse.types import ReadReceipt
 from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
+
+if TYPE_CHECKING:
+    import synapse.server
 
 # This is defined in the Matrix spec and enforced by the receiver.
 MAX_EDUS_PER_TRANSACTION = 100
@@ -51,41 +53,78 @@ sent_edus_by_type = Counter(
 )
 
 
-class PerDestinationQueue(object):
+class PerDestinationQueue:
     """
     Manages the per-destination transmission queues.
 
     Args:
-        hs (synapse.HomeServer):
-        transaction_sender (TransactionManager):
-        destination (str): the server_name of the destination that we are managing
+        hs
+        transaction_sender
+        destination: the server_name of the destination that we are managing
             transmission for.
     """
 
-    def __init__(self, hs, transaction_manager, destination):
+    def __init__(
+        self,
+        hs: "synapse.server.HomeServer",
+        transaction_manager: "synapse.federation.sender.TransactionManager",
+        destination: str,
+    ):
         self._server_name = hs.hostname
         self._clock = hs.get_clock()
         self._store = hs.get_datastore()
         self._transaction_manager = transaction_manager
+        self._instance_name = hs.get_instance_name()
+        self._federation_shard_config = hs.config.worker.federation_shard_config
+
+        self._should_send_on_this_instance = True
+        if not self._federation_shard_config.should_handle(
+            self._instance_name, destination
+        ):
+            # We don't raise an exception here to avoid taking out any other
+            # processing. We have a guard in `attempt_new_transaction` that
+            # ensure we don't start sending stuff.
+            logger.error(
+                "Create a per destination queue for %s on wrong worker", destination,
+            )
+            self._should_send_on_this_instance = False
 
         self._destination = destination
         self.transmission_loop_running = False
 
-        # a list of tuples of (pending pdu, order)
-        self._pending_pdus = []  # type: list[tuple[EventBase, int]]
-        self._pending_edus = []  # type: list[Edu]
+        # True whilst we are sending events that the remote homeserver missed
+        # because it was unreachable. We start in this state so we can perform
+        # catch-up at startup.
+        # New events will only be sent once this is finished, at which point
+        # _catching_up is flipped to False.
+        self._catching_up = True  # type: bool
+
+        # The stream_ordering of the most recent PDU that was discarded due to
+        # being in catch-up mode.
+        self._catchup_last_skipped = 0  # type: int
+
+        # Cache of the last successfully-transmitted stream ordering for this
+        # destination (we are the only updater so this is safe)
+        self._last_successful_stream_ordering = None  # type: Optional[int]
+
+        # a list of pending PDUs
+        self._pending_pdus = []  # type: List[EventBase]
+
+        # XXX this is never actually used: see
+        # https://github.com/matrix-org/synapse/issues/7549
+        self._pending_edus = []  # type: List[Edu]
 
         # Pending EDUs by their "key". Keyed EDUs are EDUs that get clobbered
         # based on their key (e.g. typing events by room_id)
         # Map of (edu_type, key) -> Edu
-        self._pending_edus_keyed = {}  # type: StateMap[Edu]
+        self._pending_edus_keyed = {}  # type: Dict[Tuple[str, Hashable], Edu]
 
         # Map of user_id -> UserPresenceState of pending presence to be sent to this
         # destination
-        self._pending_presence = {}  # type: dict[str, UserPresenceState]
+        self._pending_presence = {}  # type: Dict[str, UserPresenceState]
 
         # room_id -> receipt_type -> user_id -> receipt_dict
-        self._pending_rrs = {}
+        self._pending_rrs = {}  # type: Dict[str, Dict[str, Dict[str, dict]]]
         self._rrs_pending_flush = False
 
         # stream_id of last successfully sent to-device message.
@@ -95,50 +134,55 @@ class PerDestinationQueue(object):
         # stream_id of last successfully sent device list update.
         self._last_device_list_stream_id = 0
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "PerDestinationQueue[%s]" % self._destination
 
-    def pending_pdu_count(self):
+    def pending_pdu_count(self) -> int:
         return len(self._pending_pdus)
 
-    def pending_edu_count(self):
+    def pending_edu_count(self) -> int:
         return (
             len(self._pending_edus)
             + len(self._pending_presence)
             + len(self._pending_edus_keyed)
         )
 
-    def send_pdu(self, pdu, order):
-        """Add a PDU to the queue, and start the transmission loop if neccessary
+    def send_pdu(self, pdu: EventBase) -> None:
+        """Add a PDU to the queue, and start the transmission loop if necessary
 
         Args:
-            pdu (EventBase): pdu to send
-            order (int):
+            pdu: pdu to send
         """
-        self._pending_pdus.append((pdu, order))
+        if not self._catching_up or self._last_successful_stream_ordering is None:
+            # only enqueue the PDU if we are not catching up (False) or do not
+            # yet know if we have anything to catch up (None)
+            self._pending_pdus.append(pdu)
+        else:
+            self._catchup_last_skipped = pdu.internal_metadata.stream_ordering
+
         self.attempt_new_transaction()
 
-    def send_presence(self, states):
-        """Add presence updates to the queue. Start the transmission loop if neccessary.
+    def send_presence(self, states: Iterable[UserPresenceState]) -> None:
+        """Add presence updates to the queue. Start the transmission loop if necessary.
 
         Args:
-            states (iterable[UserPresenceState]): presence to send
+            states: presence to send
         """
         self._pending_presence.update({state.user_id: state for state in states})
         self.attempt_new_transaction()
 
-    def queue_read_receipt(self, receipt):
+    def queue_read_receipt(self, receipt: ReadReceipt) -> None:
         """Add a RR to the list to be sent. Doesn't start the transmission loop yet
         (see flush_read_receipts_for_room)
 
         Args:
-            receipt (synapse.api.receipt_info.ReceiptInfo): receipt to be queued
+            receipt: receipt to be queued
         """
         self._pending_rrs.setdefault(receipt.room_id, {}).setdefault(
             receipt.receipt_type, {}
         )[receipt.user_id] = {"event_ids": receipt.event_ids, "data": receipt.data}
 
-    def flush_read_receipts_for_room(self, room_id):
+    def flush_read_receipts_for_room(self, room_id: str) -> None:
         # if we don't have any read-receipts for this room, it may be that we've already
         # sent them out, so we don't need to flush.
         if room_id not in self._pending_rrs:
@@ -146,28 +190,36 @@ class PerDestinationQueue(object):
         self._rrs_pending_flush = True
         self.attempt_new_transaction()
 
-    def send_keyed_edu(self, edu, key):
+    def send_keyed_edu(self, edu: Edu, key: Hashable) -> None:
         self._pending_edus_keyed[(edu.edu_type, key)] = edu
         self.attempt_new_transaction()
 
-    def send_edu(self, edu):
+    def send_edu(self, edu) -> None:
         self._pending_edus.append(edu)
         self.attempt_new_transaction()
 
-    def attempt_new_transaction(self):
+    def attempt_new_transaction(self) -> None:
         """Try to start a new transaction to this destination
 
         If there is already a transaction in progress to this destination,
         returns immediately. Otherwise kicks off the process of sending a
         transaction in the background.
         """
-        # list of (pending_pdu, deferred, order)
+
         if self.transmission_loop_running:
             # XXX: this can get stuck on by a never-ending
             # request at which point pending_pdus just keeps growing.
             # we need application-layer timeouts of some flavour of these
             # requests
             logger.debug("TX [%s] Transaction already in progress", self._destination)
+            return
+
+        if not self._should_send_on_this_instance:
+            # We don't raise an exception here to avoid taking out any other
+            # processing.
+            logger.error(
+                "Trying to start a transaction to %s on wrong worker", self._destination
+            )
             return
 
         logger.debug("TX [%s] Starting transaction loop", self._destination)
@@ -177,23 +229,29 @@ class PerDestinationQueue(object):
             self._transaction_transmission_loop,
         )
 
-    @defer.inlineCallbacks
-    def _transaction_transmission_loop(self):
-        pending_pdus = []
+    async def _transaction_transmission_loop(self) -> None:
+        pending_pdus = []  # type: List[EventBase]
         try:
             self.transmission_loop_running = True
 
             # This will throw if we wouldn't retry. We do this here so we fail
             # quickly, but we will later check this again in the http client,
             # hence why we throw the result away.
-            yield get_retry_limiter(self._destination, self._clock, self._store)
+            await get_retry_limiter(self._destination, self._clock, self._store)
+
+            if self._catching_up:
+                # we potentially need to catch-up first
+                await self._catch_up_transmission_loop()
+                if self._catching_up:
+                    # not caught up yet
+                    return
 
             pending_pdus = []
             while True:
                 # We have to keep 2 free slots for presence and rr_edus
                 limit = MAX_EDUS_PER_TRANSACTION - 2
 
-                device_update_edus, dev_list_id = yield self._get_device_update_edus(
+                device_update_edus, dev_list_id = await self._get_device_update_edus(
                     limit
                 )
 
@@ -202,7 +260,7 @@ class PerDestinationQueue(object):
                 (
                     to_device_edus,
                     device_stream_id,
-                ) = yield self._get_to_device_message_edus(limit)
+                ) = await self._get_to_device_message_edus(limit)
 
                 pending_edus = device_update_edus + to_device_edus
 
@@ -269,7 +327,7 @@ class PerDestinationQueue(object):
 
                 # END CRITICAL SECTION
 
-                success = yield self._transaction_manager.send_new_transaction(
+                success = await self._transaction_manager.send_new_transaction(
                     self._destination, pending_pdus, pending_edus
                 )
                 if success:
@@ -280,7 +338,7 @@ class PerDestinationQueue(object):
                     # Remove the acknowledged device messages from the database
                     # Only bother if we actually sent some device messages
                     if to_device_edus:
-                        yield self._store.delete_device_msgs_for_remote(
+                        await self._store.delete_device_msgs_for_remote(
                             self._destination, device_stream_id
                         )
 
@@ -289,12 +347,23 @@ class PerDestinationQueue(object):
                         logger.info(
                             "Marking as sent %r %r", self._destination, dev_list_id
                         )
-                        yield self._store.mark_as_sent_devices_by_remote(
+                        await self._store.mark_as_sent_devices_by_remote(
                             self._destination, dev_list_id
                         )
 
                     self._last_device_stream_id = device_stream_id
                     self._last_device_list_stream_id = dev_list_id
+
+                    if pending_pdus:
+                        # we sent some PDUs and it was successful, so update our
+                        # last_successful_stream_ordering in the destinations table.
+                        final_pdu = pending_pdus[-1]
+                        last_successful_stream_ordering = (
+                            final_pdu.internal_metadata.stream_ordering
+                        )
+                        await self._store.set_destination_last_successful_stream_ordering(
+                            self._destination, last_successful_stream_ordering
+                        )
                 else:
                     break
         except NotRetryingDestination as e:
@@ -306,6 +375,30 @@ class PerDestinationQueue(object):
                     (e.retry_last_ts + e.retry_interval) / 1000.0
                 ),
             )
+
+            if e.retry_interval > 60 * 60 * 1000:
+                # we won't retry for another hour!
+                # (this suggests a significant outage)
+                # We drop pending EDUs because otherwise they will
+                # rack up indefinitely.
+                # (Dropping PDUs is already performed by `_start_catching_up`.)
+                # Note that:
+                # - the EDUs that are being dropped here are those that we can
+                #   afford to drop (specifically, only typing notifications,
+                #   read receipts and presence updates are being dropped here)
+                # - Other EDUs such as to_device messages are queued with a
+                #   different mechanism
+                # - this is all volatile state that would be lost if the
+                #   federation sender restarted anyway
+
+                # dropping read receipts is a bit sad but should be solved
+                # through another mechanism, because this is all volatile!
+                self._pending_edus = []
+                self._pending_edus_keyed = {}
+                self._pending_presence = {}
+                self._pending_rrs = {}
+
+            self._start_catching_up()
         except FederationDeniedError as e:
             logger.info(e)
         except HttpResponseException as e:
@@ -315,26 +408,108 @@ class PerDestinationQueue(object):
                 e.code,
                 e,
             )
+
+            self._start_catching_up()
         except RequestSendFailed as e:
             logger.warning(
                 "TX [%s] Failed to send transaction: %s", self._destination, e
             )
 
-            for p, _ in pending_pdus:
+            for p in pending_pdus:
                 logger.info(
                     "Failed to send event %s to %s", p.event_id, self._destination
                 )
+
+            self._start_catching_up()
         except Exception:
             logger.exception("TX [%s] Failed to send transaction", self._destination)
-            for p, _ in pending_pdus:
+            for p in pending_pdus:
                 logger.info(
                     "Failed to send event %s to %s", p.event_id, self._destination
                 )
+
+            self._start_catching_up()
         finally:
             # We want to be *very* sure we clear this after we stop processing
             self.transmission_loop_running = False
 
-    def _get_rr_edus(self, force_flush):
+    async def _catch_up_transmission_loop(self) -> None:
+        first_catch_up_check = self._last_successful_stream_ordering is None
+
+        if first_catch_up_check:
+            # first catchup so get last_successful_stream_ordering from database
+            self._last_successful_stream_ordering = await self._store.get_destination_last_successful_stream_ordering(
+                self._destination
+            )
+
+        if self._last_successful_stream_ordering is None:
+            # if it's still None, then this means we don't have the information
+            # in our database ­ we haven't successfully sent a PDU to this server
+            # (at least since the introduction of the feature tracking
+            # last_successful_stream_ordering).
+            # Sadly, this means we can't do anything here as we don't know what
+            # needs catching up — so catching up is futile; let's stop.
+            self._catching_up = False
+            return
+
+        # get at most 50 catchup room/PDUs
+        while True:
+            event_ids = await self._store.get_catch_up_room_event_ids(
+                self._destination, self._last_successful_stream_ordering,
+            )
+
+            if not event_ids:
+                # No more events to catch up on, but we can't ignore the chance
+                # of a race condition, so we check that no new events have been
+                # skipped due to us being in catch-up mode
+
+                if self._catchup_last_skipped > self._last_successful_stream_ordering:
+                    # another event has been skipped because we were in catch-up mode
+                    continue
+
+                # we are done catching up!
+                self._catching_up = False
+                break
+
+            if first_catch_up_check:
+                # as this is our check for needing catch-up, we may have PDUs in
+                # the queue from before we *knew* we had to do catch-up, so
+                # clear those out now.
+                self._start_catching_up()
+
+            # fetch the relevant events from the event store
+            # - redacted behaviour of REDACT is fine, since we only send metadata
+            #   of redacted events to the destination.
+            # - don't need to worry about rejected events as we do not actively
+            #   forward received events over federation.
+            catchup_pdus = await self._store.get_events_as_list(event_ids)
+            if not catchup_pdus:
+                raise AssertionError(
+                    "No events retrieved when we asked for %r. "
+                    "This should not happen." % event_ids
+                )
+
+            if logger.isEnabledFor(logging.INFO):
+                rooms = (p.room_id for p in catchup_pdus)
+                logger.info("Catching up rooms to %s: %r", self._destination, rooms)
+
+            success = await self._transaction_manager.send_new_transaction(
+                self._destination, catchup_pdus, []
+            )
+
+            if not success:
+                return
+
+            sent_transactions_counter.inc()
+            final_pdu = catchup_pdus[-1]
+            self._last_successful_stream_ordering = cast(
+                int, final_pdu.internal_metadata.stream_ordering
+            )
+            await self._store.set_destination_last_successful_stream_ordering(
+                self._destination, self._last_successful_stream_ordering
+            )
+
+    def _get_rr_edus(self, force_flush: bool) -> Iterable[Edu]:
         if not self._pending_rrs:
             return
         if not force_flush and not self._rrs_pending_flush:
@@ -351,17 +526,16 @@ class PerDestinationQueue(object):
         self._rrs_pending_flush = False
         yield edu
 
-    def _pop_pending_edus(self, limit):
+    def _pop_pending_edus(self, limit: int) -> List[Edu]:
         pending_edus = self._pending_edus
         pending_edus, self._pending_edus = pending_edus[:limit], pending_edus[limit:]
         return pending_edus
 
-    @defer.inlineCallbacks
-    def _get_device_update_edus(self, limit):
+    async def _get_device_update_edus(self, limit: int) -> Tuple[List[Edu], int]:
         last_device_list = self._last_device_list_stream_id
 
         # Retrieve list of new device updates to send to the destination
-        now_stream_id, results = yield self._store.get_device_updates_by_remote(
+        now_stream_id, results = await self._store.get_device_updates_by_remote(
             self._destination, last_device_list, limit=limit
         )
         edus = [
@@ -378,11 +552,10 @@ class PerDestinationQueue(object):
 
         return (edus, now_stream_id)
 
-    @defer.inlineCallbacks
-    def _get_to_device_message_edus(self, limit):
+    async def _get_to_device_message_edus(self, limit: int) -> Tuple[List[Edu], int]:
         last_device_stream_id = self._last_device_stream_id
         to_device_stream_id = self._store.get_to_device_stream_token()
-        contents, stream_id = yield self._store.get_new_device_msgs_for_remote(
+        contents, stream_id = await self._store.get_new_device_msgs_for_remote(
             self._destination, last_device_stream_id, to_device_stream_id, limit
         )
         edus = [
@@ -396,3 +569,12 @@ class PerDestinationQueue(object):
         ]
 
         return (edus, stream_id)
+
+    def _start_catching_up(self) -> None:
+        """
+        Marks this destination as being in catch-up mode.
+
+        This throws away the PDU queue.
+        """
+        self._catching_up = True
+        self._pending_pdus = []

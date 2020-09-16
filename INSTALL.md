@@ -1,15 +1,17 @@
 - [Choosing your server name](#choosing-your-server-name)
+- [Picking a database engine](#picking-a-database-engine)
 - [Installing Synapse](#installing-synapse)
   - [Installing from source](#installing-from-source)
     - [Platform-Specific Instructions](#platform-specific-instructions)
-    - [Troubleshooting Installation](#troubleshooting-installation)
   - [Prebuilt packages](#prebuilt-packages)
 - [Setting up Synapse](#setting-up-synapse)
   - [TLS certificates](#tls-certificates)
+  - [Client Well-Known URI](#client-well-known-uri)
   - [Email](#email)
   - [Registering a user](#registering-a-user)
   - [Setting up a TURN server](#setting-up-a-turn-server)
   - [URL previews](#url-previews)
+- [Troubleshooting Installation](#troubleshooting-installation)
 
 # Choosing your server name
 
@@ -27,6 +29,25 @@ that your email address is probably `user@example.com` rather than
 `user@email.example.com`) - but doing so may require more advanced setup: see
 [Setting up Federation](docs/federate.md).
 
+# Picking a database engine
+
+Synapse offers two database engines:
+ * [PostgreSQL](https://www.postgresql.org)
+ * [SQLite](https://sqlite.org/)
+
+Almost all installations should opt to use PostgreSQL. Advantages include:
+
+* significant performance improvements due to the superior threading and
+  caching model, smarter query optimiser
+* allowing the DB to be run on separate hardware
+
+For information on how to install and use PostgreSQL, please see
+[docs/postgres.md](docs/postgres.md)
+
+By default Synapse uses SQLite and in doing so trades performance for convenience.
+SQLite is only recommended in Synapse for testing purposes or for servers with
+light workloads.
+
 # Installing Synapse
 
 ## Installing from source
@@ -36,7 +57,7 @@ that your email address is probably `user@example.com` rather than
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 3.5, 3.6, 3.7 or 3.8.
+- Python 3.5.2 or later, up to Python 3.8.
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
 Synapse is written in Python but some of the libraries it uses are written in
@@ -70,7 +91,7 @@ pip install -U matrix-synapse
 ```
 
 Before you can start Synapse, you will need to generate a configuration
-file. To do this, run (in your virtualenv, as before)::
+file. To do this, run (in your virtualenv, as before):
 
 ```
 cd ~/synapse
@@ -84,22 +105,24 @@ python -m synapse.app.homeserver \
 ... substituting an appropriate value for `--server-name`.
 
 This command will generate you a config file that you can then customise, but it will
-also generate a set of keys for you. These keys will allow your Home Server to
-identify itself to other Home Servers, so don't lose or delete them. It would be
+also generate a set of keys for you. These keys will allow your homeserver to
+identify itself to other homeserver, so don't lose or delete them. It would be
 wise to back them up somewhere safe. (If, for whatever reason, you do need to
-change your Home Server's keys, you may find that other Home Servers have the
+change your homeserver's keys, you may find that other homeserver have the
 old key cached. If you update the signing key, you should change the name of the
 key in the `<server name>.signing.key` file (the second word) to something
 different. See the
 [spec](https://matrix.org/docs/spec/server_server/latest.html#retrieving-server-keys)
-for more information on key management.)
+for more information on key management).
 
 To actually run your new homeserver, pick a working directory for Synapse to
-run (e.g. `~/synapse`), and::
+run (e.g. `~/synapse`), and:
 
-    cd ~/synapse
-    source env/bin/activate
-    synctl start
+```
+cd ~/synapse
+source env/bin/activate
+synctl start
+```
 
 ### Platform-Specific Instructions
 
@@ -110,7 +133,7 @@ Installing prerequisites on Ubuntu or Debian:
 ```
 sudo apt-get install build-essential python3-dev libffi-dev \
                      python3-pip python3-setuptools sqlite3 \
-                     libssl-dev python3-virtualenv libjpeg-dev libxslt1-dev
+                     libssl-dev virtualenv libjpeg-dev libxslt1-dev
 ```
 
 #### ArchLinux
@@ -124,12 +147,21 @@ sudo pacman -S base-devel python python-pip \
 
 #### CentOS/Fedora
 
-Installing prerequisites on CentOS 7 or Fedora 25:
+Installing prerequisites on CentOS 8 or Fedora>26:
+
+```
+sudo dnf install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
+                 libwebp-devel tk-devel redhat-rpm-config \
+                 python3-virtualenv libffi-devel openssl-devel
+sudo dnf groupinstall "Development Tools"
+```
+
+Installing prerequisites on CentOS 7 or Fedora<=25:
 
 ```
 sudo yum install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
                  lcms2-devel libwebp-devel tcl-devel tk-devel redhat-rpm-config \
-                 python-virtualenv libffi-devel openssl-devel
+                 python3-virtualenv libffi-devel openssl-devel
 sudo yum groupinstall "Development Tools"
 ```
 
@@ -169,35 +201,41 @@ sudo zypper in python-pip python-setuptools sqlite3 python-virtualenv \
 
 #### OpenBSD
 
-Installing prerequisites on OpenBSD:
+A port of Synapse is available under `net/synapse`. The filesystem
+underlying the homeserver directory (defaults to `/var/synapse`) has to be
+mounted with `wxallowed` (cf. `mount(8)`), so creating a separate filesystem
+and mounting it to `/var/synapse` should be taken into consideration.
+
+To be able to build Synapse's dependency on python the `WRKOBJDIR`
+(cf. `bsd.port.mk(5)`) for building python, too, needs to be on a filesystem
+mounted with `wxallowed` (cf. `mount(8)`).
+
+Creating a `WRKOBJDIR` for building python under `/usr/local` (which on a
+default OpenBSD installation is mounted with `wxallowed`):
 
 ```
-doas pkg_add python libffi py-pip py-setuptools sqlite3 py-virtualenv \
-              libxslt jpeg
+doas mkdir /usr/local/pobj_wxallowed
 ```
 
-There is currently no port for OpenBSD. Additionally, OpenBSD's security
-settings require a slightly more difficult installation process.
+Assuming `PORTS_PRIVSEP=Yes` (cf. `bsd.port.mk(5)`) and `SUDO=doas` are
+configured in `/etc/mk.conf`:
 
-XXX: I suspect this is out of date.
+```
+doas chown _pbuild:_pbuild /usr/local/pobj_wxallowed
+```
 
-1. Create a new directory in `/usr/local` called `_synapse`. Also, create a
-   new user called `_synapse` and set that directory as the new user's home.
-   This is required because, by default, OpenBSD only allows binaries which need
-   write and execute permissions on the same memory space to be run from
-   `/usr/local`.
-2. `su` to the new `_synapse` user and change to their home directory.
-3. Create a new virtualenv: `virtualenv -p python2.7 ~/.synapse`
-4. Source the virtualenv configuration located at
-   `/usr/local/_synapse/.synapse/bin/activate`. This is done in `ksh` by
-   using the `.` command, rather than `bash`'s `source`.
-5. Optionally, use `pip` to install `lxml`, which Synapse needs to parse
-   webpages for their titles.
-6. Use `pip` to install this repository: `pip install matrix-synapse`
-7. Optionally, change `_synapse`'s shell to `/bin/false` to reduce the
-   chance of a compromised Synapse server being used to take over your box.
+Setting the `WRKOBJDIR` for building python:
 
-After this, you may proceed with the rest of the install directions.
+```
+echo WRKOBJDIR_lang/python/3.7=/usr/local/pobj_wxallowed  \\nWRKOBJDIR_lang/python/2.7=/usr/local/pobj_wxallowed >> /etc/mk.conf
+```
+
+Building Synapse:
+
+```
+cd /usr/ports/net/synapse
+make install
+```
 
 #### Windows
 
@@ -208,45 +246,6 @@ be found at https://docs.microsoft.com/en-us/windows/wsl/install-win10 for
 Windows 10 and https://docs.microsoft.com/en-us/windows/wsl/install-on-server
 for Windows Server.
 
-### Troubleshooting Installation
-
-XXX a bunch of this is no longer relevant.
-
-Synapse requires pip 8 or later, so if your OS provides too old a version you
-may need to manually upgrade it::
-
-    sudo pip install --upgrade pip
-
-Installing may fail with `Could not find any downloads that satisfy the requirement pymacaroons-pynacl (from matrix-synapse==0.12.0)`.
-You can fix this by manually upgrading pip and virtualenv::
-
-    sudo pip install --upgrade virtualenv
-
-You can next rerun `virtualenv -p python3 synapse` to update the virtual env.
-
-Installing may fail during installing virtualenv with `InsecurePlatformWarning: A true SSLContext object is not available. This prevents urllib3 from configuring SSL appropriately and may cause certain SSL connections to fail. For more information, see https://urllib3.readthedocs.org/en/latest/security.html#insecureplatformwarning.`
-You can fix this  by manually installing ndg-httpsclient::
-
-    pip install --upgrade ndg-httpsclient
-
-Installing may fail with `mock requires setuptools>=17.1. Aborting installation`.
-You can fix this by upgrading setuptools::
-
-    pip install --upgrade setuptools
-
-If pip crashes mid-installation for reason (e.g. lost terminal), pip may
-refuse to run until you remove the temporary installation directory it
-created. To reset the installation::
-
-    rm -rf /tmp/pip_install_matrix
-
-pip seems to leak *lots* of memory during installation.  For instance, a Linux
-host with 512MB of RAM may run out of memory whilst installing Twisted.  If this
-happens, you will have to individually install the dependencies which are
-failing, e.g.::
-
-    pip install twisted
-
 ## Prebuilt packages
 
 As an alternative to installing from source, prebuilt packages are available
@@ -256,9 +255,9 @@ for a number of platforms.
 
 There is an offical synapse image available at
 https://hub.docker.com/r/matrixdotorg/synapse which can be used with
-the docker-compose file available at [contrib/docker](contrib/docker). Further information on
-this including configuration options is available in the README on
-hub.docker.com.
+the docker-compose file available at [contrib/docker](contrib/docker). Further
+information on this including configuration options is available in the README
+on hub.docker.com.
 
 Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a
 Dockerfile to automate a synapse server in a single Docker image, at
@@ -266,7 +265,8 @@ https://hub.docker.com/r/avhost/docker-matrix/tags/
 
 Slavi Pantaleev has created an Ansible playbook,
 which installs the offical Docker image of Matrix Synapse
-along with many other Matrix-related services (Postgres database, riot-web, coturn, mxisd, SSL support, etc.).
+along with many other Matrix-related services (Postgres database, Element, coturn,
+ma1sd, SSL support, etc.).
 For more details, see
 https://github.com/spantaleev/matrix-docker-ansible-deploy
 
@@ -299,22 +299,27 @@ The fingerprint of the repository signing key (as shown by `gpg
 /usr/share/keyrings/matrix-org-archive-keyring.gpg`) is
 `AAF9AE843A7584B5A3E4CD2BCF45A512DE2DA058`.
 
-#### Downstream Debian/Ubuntu packages
+#### Downstream Debian packages
 
-For `buster` and `sid`, Synapse is available in the Debian repositories and
-it should be possible to install it with simply:
+We do not recommend using the packages from the default Debian `buster`
+repository at this time, as they are old and suffer from known security
+vulnerabilities. You can install the latest version of Synapse from
+[our repository](#matrixorg-packages) or from `buster-backports`. Please
+see the [Debian documentation](https://backports.debian.org/Instructions/)
+for information on how to use backports.
+
+If you are using Debian `sid` or testing, Synapse is available in the default
+repositories and it should be possible to install it simply with:
 
 ```
-    sudo apt install matrix-synapse
+sudo apt install matrix-synapse
 ```
 
-There is also a version of `matrix-synapse` in `stretch-backports`. Please see
-the [Debian documentation on
-backports](https://backports.debian.org/Instructions/) for information on how
-to use them.
+#### Downstream Ubuntu packages
 
-We do not recommend using the packages in downstream Ubuntu at this time, as
-they are old and suffer from known security vulnerabilities.
+We do not recommend using the packages in the default Ubuntu repository
+at this time, as they are old and suffer from known security vulnerabilities.
+The latest version of Synapse can be installed from [our repository](#matrixorg-packages).
 
 ### Fedora
 
@@ -366,16 +371,30 @@ sudo pip install py-bcrypt
 
 Synapse can be found in the void repositories as 'synapse':
 
-    xbps-install -Su
-    xbps-install -S synapse
+```
+xbps-install -Su
+xbps-install -S synapse
+```
 
 ### FreeBSD
 
 Synapse can be installed via FreeBSD Ports or Packages contributed by Brendan Molloy from:
 
  - Ports: `cd /usr/ports/net-im/py-matrix-synapse && make install clean`
- - Packages: `pkg install py27-matrix-synapse`
+ - Packages: `pkg install py37-matrix-synapse`
 
+### OpenBSD
+
+As of OpenBSD 6.7 Synapse is available as a pre-compiled binary. The filesystem
+underlying the homeserver directory (defaults to `/var/synapse`) has to be
+mounted with `wxallowed` (cf. `mount(8)`), so creating a separate filesystem
+and mounting it to `/var/synapse` should be taken into consideration.
+
+Installing Synapse:
+
+```
+doas pkg_add synapse
+```
 
 ### NixOS
 
@@ -388,15 +407,17 @@ Once you have installed synapse as above, you will need to configure it.
 
 ## TLS certificates
 
-The default configuration exposes a single HTTP port: http://localhost:8008. It
-is suitable for local testing, but for any practical use, you will either need
-to enable a reverse proxy, or configure Synapse to expose an HTTPS port.
+The default configuration exposes a single HTTP port on the local
+interface: `http://localhost:8008`. It is suitable for local testing,
+but for any practical use, you will need Synapse's APIs to be served
+over HTTPS.
 
-For information on using a reverse proxy, see
+The recommended way to do so is to set up a reverse proxy on port
+`8448`. You can find documentation on doing so in
 [docs/reverse_proxy.md](docs/reverse_proxy.md).
 
-To configure Synapse to expose an HTTPS port, you will need to edit
-`homeserver.yaml`, as follows:
+Alternatively, you can configure Synapse to expose an HTTPS port. To do
+so, you will need to edit `homeserver.yaml`, as follows:
 
 * First, under the `listeners` section, uncomment the configuration for the
   TLS-enabled listener. (Remove the hash sign (`#`) at the start of
@@ -409,20 +430,76 @@ To configure Synapse to expose an HTTPS port, you will need to edit
       resources:
         - names: [client, federation]
   ```
+
 * You will also need to uncomment the `tls_certificate_path` and
-  `tls_private_key_path` lines under the `TLS` section. You can either
-  point these settings at an existing certificate and key, or you can
-  enable Synapse's built-in ACME (Let's Encrypt) support. Instructions
-  for having Synapse automatically provision and renew federation
-  certificates through ACME can be found at [ACME.md](docs/ACME.md). If you
-  are using your own certificate, be sure to use a `.pem` file that includes
-  the full certificate chain including any intermediate certificates (for
-  instance, if using certbot, use `fullchain.pem` as your certificate, not
+  `tls_private_key_path` lines under the `TLS` section. You will need to manage
+  provisioning of these certificates yourself — Synapse had built-in ACME
+  support, but the ACMEv1 protocol Synapse implements is deprecated, not
+  allowed by LetsEncrypt for new sites, and will break for existing sites in
+  late 2020. See [ACME.md](docs/ACME.md).
+
+  If you are using your own certificate, be sure to use a `.pem` file that
+  includes the full certificate chain including any intermediate certificates
+  (for instance, if using certbot, use `fullchain.pem` as your certificate, not
   `cert.pem`).
 
 For a more detailed guide to configuring your server for federation, see
-[federate.md](docs/federate.md)
+[federate.md](docs/federate.md).
 
+## Client Well-Known URI
+
+Setting up the client Well-Known URI is optional but if you set it up, it will
+allow users to enter their full username (e.g. `@user:<server_name>`) into clients
+which support well-known lookup to automatically configure the homeserver and
+identity server URLs. This is useful so that users don't have to memorize or think
+about the actual homeserver URL you are using.
+
+The URL `https://<server_name>/.well-known/matrix/client` should return JSON in
+the following format.
+
+```
+{
+  "m.homeserver": {
+    "base_url": "https://<matrix.example.com>"
+  }
+}
+```
+
+It can optionally contain identity server information as well.
+
+```
+{
+  "m.homeserver": {
+    "base_url": "https://<matrix.example.com>"
+  },
+  "m.identity_server": {
+    "base_url": "https://<identity.example.com>"
+  }
+}
+```
+
+To work in browser based clients, the file must be served with the appropriate
+Cross-Origin Resource Sharing (CORS) headers. A recommended value would be
+`Access-Control-Allow-Origin: *` which would allow all browser based clients to
+view it.
+
+In nginx this would be something like:
+```
+location /.well-known/matrix/client {
+    return 200 '{"m.homeserver": {"base_url": "https://<matrix.example.com>"}}';
+    add_header Content-Type application/json;
+    add_header Access-Control-Allow-Origin *;
+}
+```
+
+You should also ensure the `public_baseurl` option in `homeserver.yaml` is set
+correctly. `public_baseurl` should be set to the URL that clients will use to
+connect to your server. This is the same URL you put for the `m.homeserver`
+`base_url` above.
+
+```
+public_baseurl: "https://<matrix.example.com>"
+```
 
 ## Email
 
@@ -441,7 +518,7 @@ email will be disabled.
 
 ## Registering a user
 
-The easiest way to create a new user is to do so from a client like [Riot](https://riot.im).
+The easiest way to create a new user is to do so from a client like [Element](https://element.io/).
 
 Alternatively you can do so from the command line if you have installed via pip.
 
@@ -468,7 +545,7 @@ on your server even if `enable_registration` is `false`.
 ## Setting up a TURN server
 
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
-a TURN server.  See [docs/turn-howto.md](docs/turn-howto.md) for details.
+a TURN server. See [docs/turn-howto.md](docs/turn-howto.md) for details.
 
 ## URL previews
 
@@ -477,10 +554,24 @@ turn it on you must enable the `url_preview_enabled: True` config parameter
 and explicitly specify the IP ranges that Synapse is not allowed to spider for
 previewing in the `url_preview_ip_range_blacklist` configuration parameter.
 This is critical from a security perspective to stop arbitrary Matrix users
-spidering 'internal' URLs on your network.  At the very least we recommend that
+spidering 'internal' URLs on your network. At the very least we recommend that
 your loopback and RFC1918 IP addresses are blacklisted.
 
-This also requires the optional lxml and netaddr python dependencies to be
-installed.  This in turn requires the libxml2 library to be available - on
+This also requires the optional `lxml` and `netaddr` python dependencies to be
+installed. This in turn requires the `libxml2` library to be available - on
 Debian/Ubuntu this means `apt-get install libxml2-dev`, or equivalent for
 your OS.
+
+# Troubleshooting Installation
+
+`pip` seems to leak *lots* of memory during installation. For instance, a Linux
+host with 512MB of RAM may run out of memory whilst installing Twisted. If this
+happens, you will have to individually install the dependencies which are
+failing, e.g.:
+
+```
+pip install twisted
+```
+
+If you have any other problems, feel free to ask in
+[#synapse:matrix.org](https://matrix.to/#/#synapse:matrix.org).

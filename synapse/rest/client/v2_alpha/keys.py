@@ -42,7 +42,7 @@ class KeyUploadServlet(RestServlet):
         "device_id": "<device_id>",
         "valid_until_ts": <millisecond_timestamp>,
         "algorithms": [
-          "m.olm.curve25519-aes-sha256",
+          "m.olm.curve25519-aes-sha2",
         ]
         "keys": {
           "<algorithm>:<device_id>": "<key_base64>",
@@ -124,7 +124,7 @@ class KeyQueryServlet(RestServlet):
             "device_id": "<device_id>", // Duplicated to be signed
             "valid_until_ts": <millisecond_timestamp>,
             "algorithms": [ // List of supported algorithms
-              "m.olm.curve25519-aes-sha256",
+              "m.olm.curve25519-aes-sha2",
             ],
             "keys": { // Must include a ed25519 signing key
               "<algorithm>:<key_id>": "<key_base64>",
@@ -263,7 +263,11 @@ class SigningKeyUploadServlet(RestServlet):
         body = parse_json_object_from_request(request)
 
         await self.auth_handler.validate_user_via_ui_auth(
-            requester, body, self.hs.get_ip_from_request(request)
+            requester,
+            request,
+            body,
+            self.hs.get_ip_from_request(request),
+            "add a device signing key to your account",
         )
 
         result = await self.e2e_keys_handler.upload_signing_keys_for_user(user_id, body)
@@ -281,8 +285,8 @@ class SignaturesUploadServlet(RestServlet):
           "user_id": "<user_id>",
           "device_id": "<device_id>",
           "algorithms": [
-            "m.olm.curve25519-aes-sha256",
-            "m.megolm.v1.aes-sha"
+            "m.olm.curve25519-aes-sha2",
+            "m.megolm.v1.aes-sha2"
           ],
           "keys": {
             "<algorithm>:<device_id>": "<key_base64>",

@@ -27,7 +27,7 @@ from tests.unittest import HomeserverTestCase
 
 
 @attr.s
-class _User(object):
+class _User:
     "Helper wrapper for user ID and access token"
     id = attr.ib()
     token = attr.ib()
@@ -163,18 +163,18 @@ class EmailPusherTests(HomeserverTestCase):
 
         # Get the stream ordering before it gets sent
         pushers = self.get_success(
-            self.hs.get_datastore().get_pushers_by(dict(user_name=self.user_id))
+            self.hs.get_datastore().get_pushers_by({"user_name": self.user_id})
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         last_stream_ordering = pushers[0]["last_stream_ordering"]
 
         # Advance time a bit, so the pusher will register something has happened
-        self.pump(100)
+        self.pump(10)
 
         # It hasn't succeeded yet, so the stream ordering shouldn't have moved
         pushers = self.get_success(
-            self.hs.get_datastore().get_pushers_by(dict(user_name=self.user_id))
+            self.hs.get_datastore().get_pushers_by({"user_name": self.user_id})
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
@@ -192,7 +192,7 @@ class EmailPusherTests(HomeserverTestCase):
 
         # The stream ordering has increased
         pushers = self.get_success(
-            self.hs.get_datastore().get_pushers_by(dict(user_name=self.user_id))
+            self.hs.get_datastore().get_pushers_by({"user_name": self.user_id})
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)

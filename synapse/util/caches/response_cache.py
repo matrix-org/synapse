@@ -23,7 +23,7 @@ from synapse.util.caches import register_cache
 logger = logging.getLogger(__name__)
 
 
-class ResponseCache(object):
+class ResponseCache:
     """
     This caches a deferred response. Until the deferred completes it will be
     returned from the cache. This means that if the client retries the request
@@ -38,7 +38,7 @@ class ResponseCache(object):
         self.timeout_sec = timeout_ms / 1000.0
 
         self._name = name
-        self._metrics = register_cache("response_cache", name, self)
+        self._metrics = register_cache("response_cache", name, self, resizable=False)
 
     def size(self):
         return len(self.pending_result_cache)
@@ -144,7 +144,7 @@ class ResponseCache(object):
         """
         result = self.get(key)
         if not result:
-            logger.info(
+            logger.debug(
                 "[%s]: no cached result for [%s], calculating new one", self._name, key
             )
             d = run_in_background(callback, *args, **kwargs)

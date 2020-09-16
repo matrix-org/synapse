@@ -1,7 +1,0 @@
-[Unit]
-Description=Contains matrix services like synapse, bridges and bots
-After=network.target
-AllowIsolate=no
-
-[Install]
-WantedBy=multi-user.target
