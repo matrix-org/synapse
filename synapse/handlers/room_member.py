@@ -120,6 +120,26 @@ class RoomMemberHandler:
         raise NotImplementedError()
 
     @abc.abstractmethod
+    async def _remote_knock(
+        self,
+        requester: Requester,
+        remote_room_hosts: List[str],
+        room_id: str,
+        user: UserID,
+        content: dict,
+    ) -> Tuple[str, int]:
+        """Try and join a room that this server is not in
+
+        Args:
+            requester
+            remote_room_hosts: List of servers that can be used to knock via.
+            room_id: Room that we are trying to knock on.
+            user: User who is trying to knock.
+            content: A dict that should be used as the content of the knock event.
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
     async def remote_reject_invite(
         self,
         invite_event_id: str,
@@ -563,11 +583,11 @@ class RoomMemberHandler:
 
                 profile = self.profile_handler
                 if "displayname" not in content:
-                    content["displayname"] = yield profile.get_displayname(target)
+                    content["displayname"] = await profile.get_displayname(target)
                 if "avatar_url" not in content:
-                    content["avatar_url"] = yield profile.get_avatar_url(target)
+                    content["avatar_url"] = await profile.get_avatar_url(target)
 
-                remote_knock_response = yield self._remote_knock(
+                remote_knock_response = await self._remote_knock(
                     requester, remote_room_hosts, room_id, target, content
                 )
 
@@ -1221,15 +1241,10 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         if len(remote_room_hosts) == 0:
             raise SynapseError(404, "No known servers")
 
-        fed_handler = self.federation_handler
-        ret = await fed_handler.do_knock(
+        ret = await self.federation_handler.do_knock(
             remote_room_hosts, room_id, user.to_string(), content=content,
         )
         return ret
-
-        await self.federation_handler.send_knock(
-            remote_room_hosts, room_id, user.to_string(), content
-        )
 
     async def _user_left_room(self, target: UserID, room_id: str) -> None:
         """Implements RoomMemberHandler._user_left_room
