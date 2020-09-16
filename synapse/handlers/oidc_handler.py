@@ -15,7 +15,7 @@
 import json
 import logging
 from typing import TYPE_CHECKING, Dict, Generic, List, Optional, Tuple, TypeVar
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse, urlunparse, parse_qsl
 
 import attr
 import pymacaroons
@@ -554,6 +554,24 @@ class OidcHandler:
 
         metadata = await self.load_metadata()
         authorization_endpoint = metadata.get("authorization_endpoint")
+
+        kc_idp_hint = request.args.get(b"kdp_hint", [None])[0]
+        if kc_idp_hint:
+            # Pass through the IDP hint parameter.
+            logger.info('Using kdp_hint: %s' % kc_idp_hint)
+
+            # Parse the URL and dump it into a list so it's mutable.
+            url_parts = list(urlparse(authorization_endpoint))
+
+            params = dict(parse_qsl(url_parts[4]))
+            params.update({
+                "kc_idp_hint": kc_idp_hint
+            })
+
+            url_parts[4] = urlencode(params)
+
+            authorization_endpoint = urlunparse(url_parts)
+
         return prepare_grant_uri(
             authorization_endpoint,
             client_id=self._client_auth.client_id,
