@@ -31,6 +31,7 @@ from typing import (
 import attr
 
 from synapse.replication.http.streams import ReplicationGetStreamUpdates
+from synapse.replication.tcp.commands import Command
 
 if TYPE_CHECKING:
     import synapse.server
@@ -186,6 +187,12 @@ class Stream:
             instance_name, from_token, upto_token, _STREAM_UPDATE_TARGET_ROW_COUNT,
         )
         return updates, upto_token, limited
+
+    def has_updates(self) -> bool:
+        return self.current_token(self.local_instance_name) != self.last_token
+
+    def extra_commands(self, sent_updates: bool) -> List[Command]:
+        return []
 
 
 def current_token_without_instance(

@@ -47,6 +47,7 @@ from synapse.replication.tcp.commands import (
     ReplicateCommand,
     UserIpCommand,
     UserSyncCommand,
+    PersistedToCommand,
 )
 from synapse.replication.tcp.protocol import AbstractConnection
 from synapse.replication.tcp.streams import (
@@ -386,6 +387,9 @@ class ReplicationCommandHandler:
 
         assert self._server_notices_sender is not None
         await self._server_notices_sender.on_user_ip(cmd.user_id)
+
+    def on_PERSISTED_TO(self, conn: AbstractConnection, cmd: PersistedToCommand):
+        pass
 
     def on_RDATA(self, conn: AbstractConnection, cmd: RdataCommand):
         if cmd.instance_name == self._instance_name:

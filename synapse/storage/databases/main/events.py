@@ -178,12 +178,16 @@ class PersistEventsStore:
             )
             persist_event_counter.inc(len(events_and_contexts))
 
+            logger.debug("Finished persisting 1")
+
             if not backfilled:
                 # backfilled events have negative stream orderings, so we don't
                 # want to set the event_persisted_position to that.
                 synapse.metrics.event_persisted_position.set(
                     events_and_contexts[-1][0].internal_metadata.stream_ordering
                 )
+
+            logger.debug("Finished persisting 2")
 
             for event, context in events_and_contexts:
                 if context.app_service:
@@ -198,6 +202,8 @@ class PersistEventsStore:
 
                 event_counter.labels(event.type, origin_type, origin_entity).inc()
 
+            logger.debug("Finished persisting 3")
+
             for room_id, new_state in current_state_for_room.items():
                 self.store.get_current_state_ids.prefill((room_id,), new_state)
 
@@ -205,6 +211,9 @@ class PersistEventsStore:
                 self.store.get_latest_event_ids_in_room.prefill(
                     (room_id,), list(latest_event_ids)
                 )
+
+            logger.debug("Finished persisting 4")
+        logger.debug("Finished persisting 5")
 
     async def _get_events_which_are_prevs(self, event_ids: Iterable[str]) -> List[str]:
         """Filter the supplied list of event_ids to get those which are prev_events of
