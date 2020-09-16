@@ -15,7 +15,6 @@
 import hashlib
 import hmac
 import logging
-import re
 from http import HTTPStatus
 
 from synapse.api.constants import UserTypes
@@ -29,6 +28,7 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.rest.admin._base import (
+    admin_patterns,
     assert_requester_is_admin,
     assert_user_is_admin,
     historical_admin_path_patterns,
@@ -60,7 +60,7 @@ class UsersRestServlet(RestServlet):
 
 
 class UsersRestServletV2(RestServlet):
-    PATTERNS = (re.compile("^/_synapse/admin/v2/users$"),)
+    PATTERNS = admin_patterns("/users$", "v2")
 
     """Get request to list all local users.
     This needs user to have administrator access in Synapse.
@@ -105,7 +105,7 @@ class UsersRestServletV2(RestServlet):
 
 
 class UserRestServletV2(RestServlet):
-    PATTERNS = (re.compile("^/_synapse/admin/v2/users/(?P<user_id>[^/]+)$"),)
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]+)$", "v2")
 
     """Get request to list user details.
     This needs user to have administrator access in Synapse.
@@ -642,7 +642,7 @@ class UserAdminServlet(RestServlet):
                 {}
     """
 
-    PATTERNS = (re.compile("^/_synapse/admin/v1/users/(?P<user_id>[^/]*)/admin$"),)
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/admin$")
 
     def __init__(self, hs):
         self.hs = hs
