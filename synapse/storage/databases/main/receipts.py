@@ -30,15 +30,12 @@ from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 logger = logging.getLogger(__name__)
 
-
-class ReceiptsWorkerStore(SQLBaseStore):
+# The ABCMeta metaclass ensures that it cannot be instantiated without
+# the abstract methods being implemented.
+class ReceiptsWorkerStore(SQLBaseStore, metaclass=abc.ABCMeta):
     """This is an abstract base class where subclasses must implement
     `get_max_receipt_stream_id` which can be called in the initializer.
     """
-
-    # This ABCMeta metaclass ensures that we cannot be instantiated without
-    # the abstract methods being implemented.
-    __metaclass__ = abc.ABCMeta
 
     def __init__(self, database: DatabasePool, db_conn, hs):
         super(ReceiptsWorkerStore, self).__init__(database, db_conn, hs)

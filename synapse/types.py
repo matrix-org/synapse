@@ -165,7 +165,7 @@ def get_localpart_from_id(string):
 DS = TypeVar("DS", bound="DomainSpecificString")
 
 
-class DomainSpecificString(namedtuple("DomainSpecificString", ("localpart", "domain"))):
+class DomainSpecificString(namedtuple("DomainSpecificString", ("localpart", "domain")), metaclass=abc.ABCMeta):
     """Common base class among ID/name strings that have a local part and a
     domain name, prefixed with a sigil.
 
@@ -174,8 +174,6 @@ class DomainSpecificString(namedtuple("DomainSpecificString", ("localpart", "dom
         'localpart' : The local part of the name (without the leading sigil)
         'domain' : The domain part of the name
     """
-
-    __metaclass__ = abc.ABCMeta
 
     SIGIL = abc.abstractproperty()  # type: str  # type: ignore
 
