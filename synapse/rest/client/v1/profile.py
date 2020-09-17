@@ -24,6 +24,14 @@ from synapse.types import UserID
 class ProfileDisplaynameRestServlet(RestServlet):
     PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/displayname", v1=True)
 
+    PUT_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "displayname": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+            "required": ["displayname"],
+        },
+    }
+
     def __init__(self, hs):
         super(ProfileDisplaynameRestServlet, self).__init__()
         self.hs = hs
@@ -54,12 +62,8 @@ class ProfileDisplaynameRestServlet(RestServlet):
         user = UserID.from_string(user_id)
         is_admin = await self.auth.is_server_admin(requester.user)
 
-        content = parse_json_object_from_request(request)
-
-        try:
-            new_name = content["displayname"]
-        except Exception:
-            return 400, "Unable to parse name"
+        content = parse_json_object_from_request(request, validator=self.PUT_VALIDATOR)
+        new_name = content["displayname"]
 
         await self.profile_handler.set_displayname(user, requester, new_name, is_admin)
 
