@@ -24,9 +24,7 @@ BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD = (
 
 class MediaRepositoryBackgroundUpdateStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super().__init__(
-            database, db_conn, hs
-        )
+        super().__init__(database, db_conn, hs)
 
         self.db_pool.updates.register_background_index_update(
             update_name="local_media_repository_url_idx",

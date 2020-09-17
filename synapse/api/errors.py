@@ -244,9 +244,7 @@ class InteractiveAuthIncompleteError(Exception):
     """
 
     def __init__(self, session_id: str, result: "JsonDict"):
-        super().__init__(
-            "Interactive auth not yet complete"
-        )
+        super().__init__("Interactive auth not yet complete")
         self.session_id = session_id
         self.result = result
 
@@ -418,9 +416,7 @@ class RoomKeysVersionError(SynapseError):
         Args:
             current_version: the current version of the store they should have used
         """
-        super().__init__(
-            403, "Wrong room_keys version", Codes.WRONG_ROOM_KEYS_VERSION
-        )
+        super().__init__(403, "Wrong room_keys version", Codes.WRONG_ROOM_KEYS_VERSION)
         self.current_version = current_version
 
 
