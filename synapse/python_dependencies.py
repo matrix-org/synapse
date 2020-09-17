@@ -105,7 +105,7 @@ CONDITIONAL_REQUIREMENTS = {
     # (if it is not installed, we fall back to slow code.)
     "redis": ["txredisapi>=1.4.7", "hiredis"],
     # We pin black so that our tests don't start failing on new releases.
-    "lint": ["isort<=5.0.3", "black==19.10b0", "flake8-comprehensions", "flake8"],
+    "lint": ["isort==5.0.3", "black==19.10b0", "flake8-comprehensions", "flake8"],
 }
 
 ALL_OPTIONAL_REQUIREMENTS = set()  # type: Set[str]
