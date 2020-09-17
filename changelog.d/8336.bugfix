@@ -1,0 +1,1 @@
+Remove optional keys from `/sync` response according to spec.
