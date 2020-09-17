@@ -16,7 +16,6 @@
 import logging
 from typing import Awaitable, Callable, Dict, Optional
 
-from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.appservice import ApplicationService
