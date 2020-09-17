@@ -19,6 +19,7 @@
 import logging
 import re
 
+from synapse.api.constants import RoomCreationPreset
 from synapse.http.servlet import RestServlet
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,18 @@ class VersionsRestServlet(RestServlet):
     def __init__(self, hs):
         super(VersionsRestServlet, self).__init__()
         self.config = hs.config
+
+        # Calculate these once since they shouldn't change after start-up.
+        self.e2ee_forced_public = (
+            RoomCreationPreset.PUBLIC_CHAT
+            in self.config.encryption_enabled_by_default_for_room_presets
+        )
+        self.e2ee_forced_private = (
+            RoomCreationPreset.PRIVATE_CHAT
+            in self.config.encryption_enabled_by_default_for_room_presets
+            or RoomCreationPreset.TRUSTED_PRIVATE_CHAT
+            in self.config.encryption_enabled_by_default_for_room_presets
+        )
 
     def on_GET(self, request):
         return (
@@ -62,6 +75,9 @@ class VersionsRestServlet(RestServlet):
                     "org.matrix.msc2432": True,
                     # Implements additional endpoints as described in MSC2666
                     "uk.half-shot.msc2666": True,
+                    # Whether the new rooms will be set to encrypted or not.
+                    "io.element.e2ee_forced.public": self.e2ee_forced_public,
+                    "io.element.e2ee_forced.private": self.e2ee_forced_private,
                 },
             },
         )
