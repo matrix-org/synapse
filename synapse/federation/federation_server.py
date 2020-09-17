@@ -166,6 +166,13 @@ class FederationServer(FederationBase):
         with await self._transaction_linearizer.queue(origin):
             # We rate limit here *after* we've queued up the incoming requests,
             # so that we don't fill up the ratelimiter with blocked requests.
+            #
+            # This is important as the ratelimiter allows N concurrent requests
+            # at a time, and only starts ratelimiting if there are more requests
+            # than that being processed at a time. If we queued up requests in
+            # the linearizer/response cache *after* the ratelimiting then those
+            # queued up requests would count as part of the allowed limit of N
+            # concurrent requests.
             with self._federation_ratelimiter.ratelimit(origin) as d:
                 await d
 
