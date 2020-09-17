@@ -163,11 +163,7 @@ class FederationServer(FederationBase):
     ) -> Tuple[int, Dict[str, Any]]:
         # Use a linearizer to ensure that transactions from a remote are
         # processed in order.
-        with (
-            await self._transaction_linearizer.queue(
-                (origin, transaction.transaction_id)  # type: ignore
-            )
-        ):
+        with await self._transaction_linearizer.queue(origin):
             # We rate limit here *after* we've queued up the incoming requests,
             # so that we don't fill up the ratelimiter with blocked requests.
             with self._federation_ratelimiter.ratelimit(origin) as d:
