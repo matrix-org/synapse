@@ -103,7 +103,7 @@ class FederationServer(FederationBase):
         self._transaction_linearizer = Linearizer("fed_txn_handler")
 
         # We cache results for transaction with the same ID
-        self._transaciton_resp_cache = ResponseCache(
+        self._transaction_resp_cache = ResponseCache(
             hs, "fed_txn_handler", timeout_ms=30000
         )
 
@@ -150,7 +150,7 @@ class FederationServer(FederationBase):
 
         # We wrap in a ResponseCache so that we de-duplicate retried
         # transactions.
-        return await self._transaciton_resp_cache.wrap(
+        return await self._transaction_resp_cache.wrap(
             (origin, transaction_id),
             self._on_incoming_transaction_inner,
             origin,
@@ -161,8 +161,8 @@ class FederationServer(FederationBase):
     async def _on_incoming_transaction_inner(
         self, origin: str, transaction: Transaction, request_time: int
     ) -> Tuple[int, Dict[str, Any]]:
-        # Use a linearizer to ensure that process transactions from a remote in
-        # order.
+        # Use a linearizer to ensure that transactions from a remote are
+        # processed in order.
         with (
             await self._transaction_linearizer.queue(
                 (origin, transaction.transaction_id)  # type: ignore
