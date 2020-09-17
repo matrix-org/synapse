@@ -76,8 +76,11 @@ class ConsentNoticesTests(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEqual(channel.code, 200)
 
+        invite_keys = list(channel.json_body.get("rooms", {}).get("invite", {}).keys())
+        self.assertTrue(len(invite_keys) > 0, channel.json_body)
+
         # Get the Room ID to join
-        room_id = list(channel.json_body["rooms"]["invite"].keys())[0]
+        room_id = invite_keys[0]
 
         # Join the room
         request, channel = self.make_request(

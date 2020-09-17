@@ -15,6 +15,7 @@
 
 import itertools
 import logging
+from typing import Dict
 
 from synapse.api.constants import PresenceState
 from synapse.api.errors import Codes, StoreError, SynapseError
@@ -72,6 +73,15 @@ class SyncRestServlet(RestServlet):
 
     PATTERNS = client_patterns("/sync$")
     ALLOWED_PRESENCE = {"online", "offline", "unavailable"}
+    SYNC_RESPONSE_PRUNE_KEYS = {
+        "account_data": True,
+        "to_device": True,
+        "device_lists": True,
+        "presence": True,
+        "rooms": True,
+        "groups": True,  # todo verify, not in spec
+        "device_one_time_keys_count": False,
+    }
 
     def __init__(self, hs):
         super(SyncRestServlet, self).__init__()
@@ -221,23 +231,54 @@ class SyncRestServlet(RestServlet):
         )
 
         logger.debug("building sync response dict")
-        return {
-            "account_data": {"events": sync_result.account_data},
-            "to_device": {"events": sync_result.to_device},
-            "device_lists": {
-                "changed": list(sync_result.device_lists.changed),
-                "left": list(sync_result.device_lists.left),
+        return self.prune_response(
+            {
+                "account_data": {"events": sync_result.account_data},
+                "to_device": {"events": sync_result.to_device},
+                "device_lists": {
+                    "changed": list(sync_result.device_lists.changed),
+                    "left": list(sync_result.device_lists.left),
+                },
+                "presence": SyncRestServlet.encode_presence(
+                    sync_result.presence, time_now
+                ),
+                "rooms": {"join": joined, "invite": invited, "leave": archived},
+                "groups": {
+                    "join": sync_result.groups.join,
+                    "invite": sync_result.groups.invite,
+                    "leave": sync_result.groups.leave,
+                },
+                "device_one_time_keys_count": sync_result.device_one_time_keys_count,
+                "next_batch": sync_result.next_batch.to_string(),
             },
-            "presence": SyncRestServlet.encode_presence(sync_result.presence, time_now),
-            "rooms": {"join": joined, "invite": invited, "leave": archived},
-            "groups": {
-                "join": sync_result.groups.join,
-                "invite": sync_result.groups.invite,
-                "leave": sync_result.groups.leave,
-            },
-            "device_one_time_keys_count": sync_result.device_one_time_keys_count,
-            "next_batch": sync_result.next_batch.to_string(),
-        }
+            self.SYNC_RESPONSE_PRUNE_KEYS,
+        )
+
+    @staticmethod
+    def prune_response(
+        obj: dict, keys_with_subkey_prune_allowed: Dict[str, bool]
+    ) -> dict:
+        def prunable(o: object) -> bool:
+            return isinstance(o, (list, dict, set))
+
+        for key, subkey_prune_allowed in keys_with_subkey_prune_allowed.items():
+            if key in obj:
+
+                if prunable(obj[key]):
+
+                    if not obj[key]:
+                        del obj[key]
+
+                    elif subkey_prune_allowed and isinstance(obj[key], dict):
+
+                        for subkey in list(obj[key].keys()):
+                            if prunable(obj[key][subkey]) and not obj[key][subkey]:
+                                del obj[key][subkey]
+
+                        if not obj[key]:
+                            del obj[key]
+
+        return obj
 
     @staticmethod
     def encode_presence(events, time_now):

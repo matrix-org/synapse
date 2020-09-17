@@ -308,7 +308,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
         request, channel = self.make_request("GET", "/sync?timeout=0", access_token=tok)
         self.render(request)
 
-        invites = channel.json_body["rooms"]["invite"]
+        invites = channel.json_body.get("rooms", {}).get("invite", [])
         self.assertEqual(len(invites), 0, invites)
 
     def test_invite_with_notice(self):
@@ -366,7 +366,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
             # We could also pick another user and sync with it, which would return an
             # invite to a system notices room, but it doesn't matter which user we're
             # using so we use the last one because it saves us an extra sync.
-            invites = channel.json_body["rooms"]["invite"]
+            invites = channel.json_body.get("rooms", {}).get("invite", [])
 
         # Make sure we have an invite to process.
         self.assertEqual(len(invites), 1, invites)

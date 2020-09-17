@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+import logging
 
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
@@ -22,6 +23,8 @@ from synapse.rest.client.v2_alpha import read_marker, sync
 
 from tests import unittest
 from tests.server import TimedOutException
+
+logger = logging.getLogger(__name__)
 
 
 class FilterTestCase(unittest.HomeserverTestCase):
@@ -38,18 +41,18 @@ class FilterTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request("GET", "/sync")
         self.render(request)
 
-        self.assertEqual(channel.code, 200)
-        self.assertTrue(
-            {
-                "next_batch",
-                "rooms",
-                "presence",
-                "account_data",
-                "to_device",
-                "device_lists",
-            }.issubset(set(channel.json_body.keys()))
-        )
+        logger.info("test_sync_argless: json_body type: %s", type(channel.json_body))
+        logger.info("test_sync_argless: json_body: %s", repr(channel.json_body))
+        logger.info("test_sync_argless: json_body test: {}")
 
+        self.assertEqual(channel.code, 200)
+        self.assertTrue({"next_batch"}.issubset(set(channel.json_body.keys())))
+
+    # fixme: the above test already checks for the minimal presence of "next_batch"
+    # in a /sync test, the spec allows /sync to be a JSON object with only next_batch
+    # as a key, should this following test exist? if not, how should it be rewritten?
+    # Explicit non-existence of "presence" key in /sync batch? Should the homeserver
+    # be poked with a presence-inducing event to be sure it does not propagate it?
     def test_sync_presence_disabled(self):
         """
         When presence is disabled, the key does not appear in /sync.
@@ -60,15 +63,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(channel.code, 200)
-        self.assertTrue(
-            {
-                "next_batch",
-                "rooms",
-                "account_data",
-                "to_device",
-                "device_lists",
-            }.issubset(set(channel.json_body.keys()))
-        )
+        self.assertTrue({"next_batch"}.issubset(set(channel.json_body.keys())))
 
 
 class SyncFilterTestCase(unittest.HomeserverTestCase):
