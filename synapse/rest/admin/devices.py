@@ -36,7 +36,7 @@ class DeviceRestServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(DeviceRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()

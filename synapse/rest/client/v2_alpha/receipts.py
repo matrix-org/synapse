@@ -31,7 +31,7 @@ class ReceiptRestServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(ReceiptRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.receipts_handler = hs.get_receipts_handler()

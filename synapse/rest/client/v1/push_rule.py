@@ -38,7 +38,7 @@ class PushRuleRestServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(PushRuleRestServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.notifier = hs.get_notifier()

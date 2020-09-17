@@ -52,7 +52,7 @@ class ApplicationServiceWorkerStore(SQLBaseStore):
         )
         self.exclusive_user_regex = _make_exclusive_regex(self.services_cache)
 
-        super(ApplicationServiceWorkerStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
     def get_app_services(self):
         return self.services_cache

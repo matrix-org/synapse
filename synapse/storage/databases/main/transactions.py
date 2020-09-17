@@ -48,7 +48,7 @@ class TransactionStore(SQLBaseStore):
     """
 
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(TransactionStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self._clock.looping_call(self._start_cleanup_transactions, 30 * 60 * 1000)
 

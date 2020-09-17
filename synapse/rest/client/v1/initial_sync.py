@@ -24,7 +24,7 @@ class InitialSyncRestServlet(RestServlet):
     PATTERNS = client_patterns("/initialSync$", v1=True)
 
     def __init__(self, hs):
-        super(InitialSyncRestServlet, self).__init__()
+        super().__init__()
         self.initial_sync_handler = hs.get_initial_sync_handler()
         self.auth = hs.get_auth()
 

@@ -42,7 +42,7 @@ class AccountDataWorkerStore(SQLBaseStore, metaclass=abc.ABCMeta):
             "AccountDataAndTagsChangeCache", account_max
         )
 
-        super(AccountDataWorkerStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
     @abc.abstractmethod
     def get_max_account_data_stream_id(self):
@@ -313,7 +313,7 @@ class AccountDataStore(AccountDataWorkerStore):
             ],
         )
 
-        super(AccountDataStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
     def get_max_account_data_stream_id(self) -> int:
         """Get the current max stream id for the private user data stream

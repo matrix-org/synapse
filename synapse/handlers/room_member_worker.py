@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 class RoomMemberWorkerHandler(RoomMemberHandler):
     def __init__(self, hs):
-        super(RoomMemberWorkerHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self._remote_join_client = ReplRemoteJoin.make_client(hs)
         self._remote_reject_client = ReplRejectInvite.make_client(hs)

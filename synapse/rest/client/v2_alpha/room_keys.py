@@ -37,7 +37,7 @@ class RoomKeysServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(RoomKeysServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.e2e_room_keys_handler = hs.get_e2e_room_keys_handler()
 
@@ -248,7 +248,7 @@ class RoomKeysNewVersionServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(RoomKeysNewVersionServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.e2e_room_keys_handler = hs.get_e2e_room_keys_handler()
 
@@ -301,7 +301,7 @@ class RoomKeysVersionServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(RoomKeysVersionServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.e2e_room_keys_handler = hs.get_e2e_room_keys_handler()
 
