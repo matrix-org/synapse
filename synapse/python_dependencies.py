@@ -107,7 +107,7 @@ CONDITIONAL_REQUIREMENTS = {
     # We pin black so that our tests don't start failing on new releases.
     "lint": [
         "isort<=5.0.3",
-        'black==19.10b0;python_version>"3.5"',
+        "black==19.10b0",
         "flake8-comprehensions",
         "flake8",
     ],
@@ -117,7 +117,7 @@ ALL_OPTIONAL_REQUIREMENTS = set()  # type: Set[str]
 
 for name, optional_deps in CONDITIONAL_REQUIREMENTS.items():
     # Exclude systemd as it's a system-based requirement.
-    if name not in ["systemd"]:
+    if name not in ["systemd", "lint"]:
         ALL_OPTIONAL_REQUIREMENTS = set(optional_deps) | ALL_OPTIONAL_REQUIREMENTS
 
 
