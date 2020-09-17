@@ -104,13 +104,16 @@ CONDITIONAL_REQUIREMENTS = {
     # hiredis is not a *strict* dependency, but it makes things much faster.
     # (if it is not installed, we fall back to slow code.)
     "redis": ["txredisapi>=1.4.7", "hiredis"],
+    # We pin black so that our tests don't start failing on new releases.
+    "lint": ["isort==5.0.3", "black==19.10b0", "flake8-comprehensions", "flake8"],
 }
 
 ALL_OPTIONAL_REQUIREMENTS = set()  # type: Set[str]
 
 for name, optional_deps in CONDITIONAL_REQUIREMENTS.items():
     # Exclude systemd as it's a system-based requirement.
-    if name not in ["systemd"]:
+    # Exclude lint as it's a dev-based requirement.
+    if name not in ["systemd", "lint"]:
         ALL_OPTIONAL_REQUIREMENTS = set(optional_deps) | ALL_OPTIONAL_REQUIREMENTS
 
 
