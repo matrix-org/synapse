@@ -764,7 +764,7 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
     def register_as_user(self, username):
         request, channel = self.make_request(
             b"POST",
-            f"/_matrix/client/r0/register?access_token={self.service.token}",
+            "/_matrix/client/r0/register?access_token=%s" % (self.service.token,),
             {"username": username},
         )
         self.render(request)
