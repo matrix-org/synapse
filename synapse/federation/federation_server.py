@@ -97,6 +97,7 @@ class FederationServer(FederationBase):
         self.state = hs.get_state_handler()
 
         self.device_handler = hs.get_device_handler()
+        self._federation_ratelimiter = hs.get_federation_ratelimiter()
 
         self._server_linearizer = Linearizer("fed_server")
         self._transaction_linearizer = Linearizer("fed_txn_handler")
@@ -167,9 +168,14 @@ class FederationServer(FederationBase):
                 (origin, transaction.transaction_id)  # type: ignore
             )
         ):
-            result = await self._handle_incoming_transaction(
-                origin, transaction, request_time
-            )
+            # We rate limit here *after* we've queued up the incoming requests,
+            # so that we don't fill up the ratelimiter with blocked requests.
+            with self._federation_ratelimiter.ratelimit(origin) as d:
+                await d
+
+                result = await self._handle_incoming_transaction(
+                    origin, transaction, request_time
+                )
 
         return result
 
