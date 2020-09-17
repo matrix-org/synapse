@@ -40,7 +40,9 @@ class VersionsRestServlet(RestServlet):
         self.e2ee_forced_private = (
             RoomCreationPreset.PRIVATE_CHAT
             in self.config.encryption_enabled_by_default_for_room_presets
-            or RoomCreationPreset.TRUSTED_PRIVATE_CHAT
+        )
+        self.e2ee_forced_trusted_private = (
+            RoomCreationPreset.TRUSTED_PRIVATE_CHAT
             in self.config.encryption_enabled_by_default_for_room_presets
         )
 
@@ -75,9 +77,10 @@ class VersionsRestServlet(RestServlet):
                     "org.matrix.msc2432": True,
                     # Implements additional endpoints as described in MSC2666
                     "uk.half-shot.msc2666": True,
-                    # Whether the new rooms will be set to encrypted or not.
+                    # Whether new rooms will be set to encrypted or not (based on presets).
                     "io.element.e2ee_forced.public": self.e2ee_forced_public,
                     "io.element.e2ee_forced.private": self.e2ee_forced_private,
+                    "io.element.e2ee_forced.trusted_private": self.e2ee_forced_trusted_private,
                 },
             },
         )
