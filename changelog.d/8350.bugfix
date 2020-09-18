@@ -1,0 +1,1 @@
+Partially mitigate bug where newly joined servers couldn't get past events in a room when there is a malformed event.
