@@ -121,12 +121,11 @@ class LoginRestServlet(RestServlet):
 
         login_submission = parse_json_object_from_request(request)
 
-        appservice = None
-        if self.auth.has_access_token(request):
-            appservice = self.auth.get_appservice_by_req(request)
-
         try:
-            if self.jwt_enabled and (
+            if login_submission["type"] == LoginRestServlet.APPSERVICE_TYPE:
+                appservice = self.auth.get_appservice_by_req(request)
+                result = await self._do_appservice_login(login_submission, appservice)
+            elif self.jwt_enabled and (
                 login_submission["type"] == LoginRestServlet.JWT_TYPE
                 or login_submission["type"] == LoginRestServlet.JWT_TYPE_DEPRECATED
             ):
@@ -134,7 +133,7 @@ class LoginRestServlet(RestServlet):
             elif login_submission["type"] == LoginRestServlet.TOKEN_TYPE:
                 result = await self._do_token_login(login_submission)
             else:
-                result = await self._do_other_login(login_submission, appservice)
+                result = await self._do_other_login(login_submission)
         except KeyError:
             raise SynapseError(400, "Missing JSON keys.")
 
@@ -143,9 +142,25 @@ class LoginRestServlet(RestServlet):
             result["well_known"] = well_known_data
         return 200, result
 
-    async def _do_other_login(
-        self, login_submission: JsonDict, appservice: Optional[ApplicationService]
-    ) -> Dict[str, str]:
+    async def _do_appservice_login(
+        self, login_submission: JsonDict, appservice: ApplicationService
+    ):
+        logger.info(
+            "Got appservice login request with identifier: %r",
+            login_submission.get("identifier"),
+        )
+        identifier = convert_client_dict_legacy_fields_to_identifier(login_submission)
+        if identifier["user"].startswith("@"):
+            qualified_user_id = identifier["user"]
+        else:
+            qualified_user_id = UserID(identifier["user"], self.hs.hostname).to_string()
+
+        if not appservice.is_interested_in_user(qualified_user_id):
+            raise LoginError(403, "Invalid access_token", errcode=Codes.FORBIDDEN)
+
+        return await self._complete_login(qualified_user_id, login_submission)
+
+    async def _do_other_login(self, login_submission: JsonDict) -> Dict[str, str]:
         """Handle non-token/saml/jwt logins
 
         Args:
@@ -239,15 +254,6 @@ class LoginRestServlet(RestServlet):
             qualified_user_id = identifier["user"]
         else:
             qualified_user_id = UserID(identifier["user"], self.hs.hostname).to_string()
-
-        if login_submission["type"] == LoginRestServlet.APPSERVICE_TYPE:
-            if appservice is None or not appservice.is_interested_in_user(
-                qualified_user_id
-            ):
-                raise LoginError(403, "Invalid access_token", errcode=Codes.FORBIDDEN)
-
-            result = await self._complete_login(qualified_user_id, login_submission)
-            return result
 
         # Check if we've hit the failed ratelimit (but don't update it)
         self._failed_attempts_ratelimiter.ratelimit(
