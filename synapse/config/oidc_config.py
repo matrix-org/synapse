@@ -159,7 +159,8 @@ class OIDCConfig(Config):
           #
           #skip_verification: true
 
-          # Uncomment to add oidc token to the account instead of failing when user already exists. Defaults to false.
+          # Uncomment to allow a user logging in via OIDC to match a pre-existing account instead
+          # of failing. This could be used if switching from password logins to OIDC. Defaults to false.
           #
           #allow_existing_users: true
 

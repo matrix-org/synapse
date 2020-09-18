@@ -851,7 +851,7 @@ class OidcHandler:
         mapping the localpart and the display name from the UserInfo.
 
         If a user already exists with the mxid we've mapped and allow_existing_users
-        is disabled , raise an exception.
+        is disabled, raise an exception.
 
         Args:
             userinfo: an object representing the user
