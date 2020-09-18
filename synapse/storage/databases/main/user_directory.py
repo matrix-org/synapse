@@ -707,43 +707,61 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         if isinstance(self.database_engine, PostgresEngine):
             full_query, exact_query, prefix_query = _parse_query_postgres(search_term)
 
-            # We order by rank and then if they have profile info
-            # The ranking algorithm is hand tweaked for "best" results. Broadly
-            # the idea is we give a higher weight to exact matches.
-            # The array of numbers are the weights for the various part of the
-            # search: (domain, _, display name, localpart)
-            sql = """
-                SELECT d.user_id AS user_id, display_name, avatar_url
-                FROM user_directory_search as t
-                INNER JOIN user_directory AS d USING (user_id)
-                WHERE
-                    %s
-                    AND vector @@ to_tsquery('english', ?)
-                ORDER BY
-                    (CASE WHEN d.user_id IS NOT NULL THEN 4.0 ELSE 1.0 END)
-                    * (CASE WHEN display_name IS NOT NULL THEN 1.2 ELSE 1.0 END)
-                    * (CASE WHEN avatar_url IS NOT NULL THEN 1.2 ELSE 1.0 END)
-                    * (
-                        3 * ts_rank_cd(
-                            '{0.1, 0.1, 0.9, 1.0}',
-                            vector,
-                            to_tsquery('english', ?),
-                            8
+            if not search_term:
+                logger.debug(
+                    "search_user_dir() No search term provided to user_directory, doing plain list"
+                )
+                sql = """
+                    SELECT d.user_id AS user_id, display_name, avatar_url
+                    FROM user_directory_search as t
+                    INNER JOIN user_directory AS d USING (user_id)
+                    WHERE
+                        %s
+                    LIMIT ?
+                """ % (
+                    where_clause,
+                )
+            else:
+                logger.debug(
+                    "search_user_dir() Search term was provided '%s'" % (search_term)
+                )
+                # We order by rank and then if they have profile info
+                # The ranking algorithm is hand tweaked for "best" results. Broadly
+                # the idea is we give a higher weight to exact matches.
+                # The array of numbers are the weights for the various part of the
+                # search: (domain, _, display name, localpart)
+                sql = """
+                    SELECT d.user_id AS user_id, display_name, avatar_url
+                    FROM user_directory_search as t
+                    INNER JOIN user_directory AS d USING (user_id)
+                    WHERE
+                        %s
+                        AND vector @@ to_tsquery('english', ?)
+                    ORDER BY
+                        (CASE WHEN d.user_id IS NOT NULL THEN 4.0 ELSE 1.0 END)
+                        * (CASE WHEN display_name IS NOT NULL THEN 1.2 ELSE 1.0 END)
+                        * (CASE WHEN avatar_url IS NOT NULL THEN 1.2 ELSE 1.0 END)
+                        * (
+                            3 * ts_rank_cd(
+                                '{0.1, 0.1, 0.9, 1.0}',
+                                vector,
+                                to_tsquery('english', ?),
+                                8
+                            )
+                            + ts_rank_cd(
+                                '{0.1, 0.1, 0.9, 1.0}',
+                                vector,
+                                to_tsquery('english', ?),
+                                8
+                            )
                         )
-                        + ts_rank_cd(
-                            '{0.1, 0.1, 0.9, 1.0}',
-                            vector,
-                            to_tsquery('english', ?),
-                            8
-                        )
-                    )
-                    DESC,
-                    display_name IS NULL,
-                    avatar_url IS NULL
-                LIMIT ?
-            """ % (
-                where_clause,
-            )
+                        DESC,
+                        display_name IS NULL,
+                        avatar_url IS NULL
+                    LIMIT ?
+                """ % (
+                    where_clause,
+                )
             args = join_args + (full_query, exact_query, prefix_query, limit + 1)
         elif isinstance(self.database_engine, Sqlite3Engine):
             search_query = _parse_query_sqlite(search_term)
