@@ -321,3 +321,102 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
             per_dest_queue._last_successful_stream_ordering,
             event_5.internal_metadata.stream_ordering,
         )
+
+    @override_config({"send_federation": True})
+    def test_catch_up_on_synapse_startup(self):
+        """
+        Tests the behaviour of get_catch_up_outstanding_destinations and
+            _wake_destinations_needing_catchup.
+        """
+
+        # list of sorted server names (note that there are more servers than the batch
+        # size used in get_catch_up_outstanding_destinations).
+        server_names = ["server%02d" % number for number in range(42)] + ["zzzerver"]
+
+        # ARRANGE:
+        #  - a local user (u1)
+        #  - a room which u1 is joined to (and remote users @user:serverXX are
+        #    joined to)
+
+        # mark the remotes as online
+        self.is_online = True
+
+        self.register_user("u1", "you the one")
+        u1_token = self.login("u1", "you the one")
+        room_id = self.helper.create_room_as("u1", tok=u1_token)
+
+        for server_name in server_names:
+            self.get_success(
+                event_injection.inject_member_event(
+                    self.hs, room_id, "@user:%s" % server_name, "join"
+                )
+            )
+
+        # create an event
+        self.helper.send(room_id, "deary me!", tok=u1_token)
+
+        # ASSERT:
+        # - All servers are up to date so none should have outstanding catch-up
+        outstanding_when_successful = self.get_success(
+            self.hs.get_datastore().get_catch_up_outstanding_destinations(None)
+        )
+        self.assertEqual(outstanding_when_successful, [])
+
+        # ACT:
+        # - Make the remote servers unreachable
+        self.is_online = False
+
+        # - Mark zzzerver as being backed-off from
+        now = self.clock.time_msec()
+        self.get_success(
+            self.hs.get_datastore().set_destination_retry_timings(
+                "zzzerver", now, now, 24 * 60 * 60 * 1000  # retry in 1 day
+            )
+        )
+
+        # - Send an event
+        self.helper.send(room_id, "can anyone hear me?", tok=u1_token)
+
+        # ASSERT (get_catch_up_outstanding_destinations):
+        # - all remotes are outstanding
+        # - they are returned in batches of 25, in order
+        outstanding_1 = self.get_success(
+            self.hs.get_datastore().get_catch_up_outstanding_destinations(None)
+        )
+
+        self.assertEqual(len(outstanding_1), 25)
+        self.assertEqual(outstanding_1, server_names[0:25])
+
+        outstanding_2 = self.get_success(
+            self.hs.get_datastore().get_catch_up_outstanding_destinations(
+                outstanding_1[-1]
+            )
+        )
+        self.assertNotIn("zzzerver", outstanding_2)
+        self.assertEqual(len(outstanding_2), 17)
+        self.assertEqual(outstanding_2, server_names[25:-1])
+
+        # ACT: call _wake_destinations_needing_catchup
+
+        # patch wake_destination to just count the destinations instead
+        woken = []
+
+        def wake_destination_track(destination):
+            woken.append(destination)
+
+        self.hs.get_federation_sender().wake_destination = wake_destination_track
+
+        # cancel the pre-existing timer for _wake_destinations_needing_catchup
+        # this is because we are calling it manually rather than waiting for it
+        # to be called automatically
+        self.hs.get_federation_sender()._catchup_after_startup_timer.cancel()
+
+        self.get_success(
+            self.hs.get_federation_sender()._wake_destinations_needing_catchup(), by=5.0
+        )
+
+        # ASSERT (_wake_destinations_needing_catchup):
+        # - all remotes are woken up, save for zzzerver
+        self.assertNotIn("zzzerver", woken)
+        # - all destinations are woken exactly once; they appear once in woken.
+        self.assertCountEqual(woken, server_names[:-1])
