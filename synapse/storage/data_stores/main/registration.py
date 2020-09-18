@@ -126,6 +126,23 @@ class RegistrationWorkerStore(SQLBaseStore):
         return res
 
     @defer.inlineCallbacks
+    def is_account_expired(self, user_id: str, current_ts: int):
+        """
+        Returns whether an user account is expired.
+
+        Args:
+            user_id: The user's ID
+            current_ts: The current timestamp
+
+        Returns:
+            Deferred[bool]: whether the user account has expired
+        """
+        expiration_ts = yield self.get_expiration_ts_for_user(user_id)
+        if expiration_ts is not None and current_ts >= expiration_ts:
+            return True
+        return False
+
+    @defer.inlineCallbacks
     def set_account_validity_for_user(
         self, user_id, expiration_ts, email_sent, renewal_token=None
     ):
