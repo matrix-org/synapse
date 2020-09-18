@@ -304,6 +304,43 @@ To use it, you will need to authenticate by providing an ``access_token`` for a
 server admin: see `README.rst <README.rst>`_.
 
 
+List room memberships of an user
+================================
+Gets a list of all ``room_id`` that a specific ``user_id`` is member.
+
+The API is::
+
+  GET /_synapse/admin/v1/users/<user_id>/joined_rooms
+
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
+
+A response body like the following is returned:
+
+.. code:: json
+
+    {
+        "joined_rooms": [
+            "!DuGcnbhHGaSZQoNQR:matrix.org",
+            "!ZtSaPCawyWtxfWiIy:matrix.org"
+        ],
+        "total": 2
+    }
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- ``user_id`` - fully qualified: for example, ``@user:server.com``.
+
+**Response**
+
+The following fields are returned in the JSON response body:
+
+- ``joined_rooms`` - An array of ``room_id``.
+- ``total`` - Number of rooms.
+
+
 User devices
 ============
 
