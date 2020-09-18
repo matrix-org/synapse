@@ -595,6 +595,7 @@ class FederationSender:
 
             if not destinations_to_wake:
                 # finished waking all destinations!
+                self._catchup_after_startup_timer = None
                 break
 
             destinations_to_wake = [
