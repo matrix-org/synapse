@@ -582,7 +582,8 @@ class FederationSender:
         """
         Wakes up destinations that need catch-up and are not currently being
         backed off from.
-        Does so in a slow way (one every 5 seconds) to reduce load spikes.
+        
+        In order to reduce load spikes, add a delay between each destination.
         """
 
         last_processed = None  # type: Optional[str]
