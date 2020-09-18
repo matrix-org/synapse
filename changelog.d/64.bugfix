@@ -1,0 +1,1 @@
+Ensure a `RoomAccessRules` test doesn't accidentally modify a room's access rule and then test that room assuming its access rule has not changed.

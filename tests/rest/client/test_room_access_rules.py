@@ -518,16 +518,17 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         """Tests that we can only change the current rule from restricted to
         unrestricted.
         """
+        # We can't change the rule from restricted to direct.
+        self.change_rule_in_room(
+            room_id=self.restricted_room, new_rule=AccessRules.DIRECT, expected_code=403
+        )
+
         # We can change the rule from restricted to unrestricted.
+        # Note that this changes self.restricted_room to an unrestricted room
         self.change_rule_in_room(
             room_id=self.restricted_room,
             new_rule=AccessRules.UNRESTRICTED,
             expected_code=200,
-        )
-
-        # We can't change the rule from restricted to direct.
-        self.change_rule_in_room(
-            room_id=self.restricted_room, new_rule=AccessRules.DIRECT, expected_code=403
         )
 
         # We can't change the rule from unrestricted to restricted.
