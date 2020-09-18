@@ -451,7 +451,8 @@ class TransactionStore(SQLBaseStore):
             SELECT destination FROM destinations
                 WHERE destination IN (
                     SELECT destination FROM destination_rooms
-                        WHERE stream_ordering > last_successful_stream_ordering
+                        WHERE destination_rooms.stream_ordering >
+                            destinations.last_successful_stream_ordering
                 )
                 AND destination > ?
                 AND (
