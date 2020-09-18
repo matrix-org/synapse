@@ -943,7 +943,9 @@ class FederationHandler(BaseHandler):
 
         return events
 
-    async def maybe_backfill(self, room_id: str, current_depth: int, limit: int) -> bool:
+    async def maybe_backfill(
+        self, room_id: str, current_depth: int, limit: int
+    ) -> bool:
         """Checks the database to see if we should backfill before paginating,
         and if so do.
 
@@ -960,7 +962,7 @@ class FederationHandler(BaseHandler):
 
         if not extremities:
             logger.debug("Not backfilling as no extremeties found.")
-            return
+            return False
 
         # We only want to paginate if we can actually see the events we'll get,
         # as otherwise we'll just spend a lot of resources to get redacted
@@ -1015,6 +1017,13 @@ class FederationHandler(BaseHandler):
 
         # If we're approaching an extremity we trigger a backfill, otherwise we
         # no-op.
+        #
+        # We chose twice the limit here as then clients paginating backwards
+        # will send pagination requests that trigger backfill at least twice
+        # using the most recent extremity before it gets removed (see below). We
+        # chose more than one times the limit in case of failure, but choosing a
+        # much larger factor will result in triggering a backfill request much
+        # earlier than necessary.
         if current_depth - 2 * limit > max_depth:
             logger.debug(
                 "Not backfilling as we don't need to. %d < %d - 2 * %d",
@@ -1022,7 +1031,7 @@ class FederationHandler(BaseHandler):
                 current_depth,
                 limit,
             )
-            return
+            return False
 
         logger.debug(
             "room_id: %s, backfill: current_depth: %s, max_depth: %s, extrems: %s",
