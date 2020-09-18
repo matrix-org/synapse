@@ -40,12 +40,12 @@ logger = logging.getLogger(__name__)
 
 class LoginRestServlet(RestServlet):
     PATTERNS = client_patterns("/login$", v1=True)
-    APPSERVICE_TYPE = "uk.half-shot.msc2778.login.application_service"
     CAS_TYPE = "m.login.cas"
     SSO_TYPE = "m.login.sso"
     TOKEN_TYPE = "m.login.token"
     JWT_TYPE = "org.matrix.login.jwt"
     JWT_TYPE_DEPRECATED = "m.login.jwt"
+    APPSERVICE_TYPE = "uk.half-shot.msc2778.login.application_service"
 
     def __init__(self, hs):
         super(LoginRestServlet, self).__init__()
