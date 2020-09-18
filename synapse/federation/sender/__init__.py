@@ -57,7 +57,7 @@ sent_pdus_destination_dist_total = Counter(
 
 # Time (in s) after Synapse's startup that we will begin to wake up destinations
 # that have catch-up outstanding.
-CATCH_UP_WAKE_AFTER_SYNAPSE_STARTUP_DELAY_SEC = 15
+CATCH_UP_STARTUP_DELAY_SEC = 15
 
 # Time (in s) to wait in between waking up each destination, i.e. one destination
 # will be woken up every <x> seconds after Synapse's startup until we have woken
