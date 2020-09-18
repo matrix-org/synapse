@@ -224,6 +224,8 @@ class FederationClient(FederationBase):
             ).addErrback(unwrapFirstError)
         )
 
+        logger.info("DDD pdus ended up as: %s", pdus)
+
         return pdus
 
     async def get_pdu(
