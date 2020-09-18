@@ -136,7 +136,7 @@ class FederationSender:
 
         # wake up destinations that have outstanding PDUs to be caught up
         self._catchup_after_startup_timer = self.clock.call_later(
-            CATCH_UP_WAKE_AFTER_SYNAPSE_STARTUP_DELAY_SEC,
+            CATCH_UP_STARTUP_DELAY_SEC,
             run_as_background_process,
             "wake_destinations_needing_catchup",
             self._wake_destinations_needing_catchup,
@@ -583,7 +583,7 @@ class FederationSender:
         Wakes up destinations that need catch-up and are not currently being
         backed off from.
         
-        In order to reduce load spikes, add a delay between each destination.
+        In order to reduce load spikes, adds a delay between each destination.
         """
 
         last_processed = None  # type: Optional[str]
@@ -597,16 +597,16 @@ class FederationSender:
                 # finished waking all destinations!
                 break
 
+            destinations_to_wake = [
+                d
+                for d in destinations_to_wake
+                if self._federation_shard_config.should_handle(self._instance_name, d)
+            ]
+
             for destination in destinations_to_wake:
-                if self._federation_shard_config.should_handle(
-                    self._instance_name, destination
-                ):
-                    last_processed = destination
-                    logger.info(
-                        "Destination %s has outstanding catch-up, waking up.",
-                        destination,
-                    )
-                    self.wake_destination(destination)
-                    await self.clock.sleep(
-                        CATCH_UP_WAKE_AFTER_SYNAPSE_STARTUP_INTERVAL_SEC
-                    )
+                last_processed = destination
+                logger.info(
+                    "Destination %s has outstanding catch-up, waking up.", destination,
+                )
+                self.wake_destination(destination)
+                await self.clock.sleep(CATCH_UP_STARTUP_INTERVAL_SEC)
