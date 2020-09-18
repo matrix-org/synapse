@@ -441,6 +441,7 @@ class MatrixFederationHttpClient(object):
 
                     headers_dict[b"Authorization"] = auth_headers
 
+                    """
                     logger.debug(
                         "{%s} [%s] Sending request: %s %s; timeout %fs",
                         request.txn_id,
@@ -449,6 +450,7 @@ class MatrixFederationHttpClient(object):
                         url_str,
                         _sec_timeout,
                     )
+                    """
 
                     outgoing_requests_counter.labels(request.method).inc()
 
