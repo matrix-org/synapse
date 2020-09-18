@@ -219,7 +219,7 @@ class FederationClient(FederationBase):
 
         # Check signatures and hash of pdus, removing any from the list that fail checks
         pdus[:] = await self._check_sigs_and_hash_and_fetch(
-            dest, pdus, outlier=True, room_version=room_version
+            dest, pdus, outlier=True, room_version=room_version, check_db=False
         )
 
         return pdus
@@ -348,6 +348,7 @@ class FederationClient(FederationBase):
         room_version: RoomVersion,
         outlier: bool = False,
         include_none: bool = False,
+        check_db: bool = True,
     ) -> List[EventBase]:
         """Takes a list of PDUs and checks the signatures and hashes of each
         one. If a PDU fails its signature check then we check if we have it in
