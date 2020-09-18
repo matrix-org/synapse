@@ -330,7 +330,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
             _wake_destinations_needing_catchup.
         """
 
-        # list of sorted server names
+        # list of sorted server names (note that there are more servers than the batch size used in get_catch_up_outstanding_destinations).
         server_names = ["server%02d" % number for number in range(42)] + ["zzzerver"]
 
         # ARRANGE:
