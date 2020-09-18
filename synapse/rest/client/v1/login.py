@@ -144,6 +144,17 @@ class LoginRestServlet(RestServlet):
             result["well_known"] = well_known_data
         return 200, result
 
+    def _get_qualified_user_id(self, identifier):
+        if identifier["type"] != "m.id.user":
+            raise SynapseError(400, "Unknown login identifier type")
+        if "user" not in identifier:
+            raise SynapseError(400, "User identifier is missing 'user' key")
+
+        if identifier["user"].startswith("@"):
+            return identifier["user"]
+        else:
+            return UserID(identifier["user"], self.hs.hostname).to_string()
+
     async def _do_appservice_login(
         self, login_submission: JsonDict, appservice: ApplicationService
     ):
@@ -151,11 +162,9 @@ class LoginRestServlet(RestServlet):
             "Got appservice login request with identifier: %r",
             login_submission.get("identifier"),
         )
+
         identifier = convert_client_dict_legacy_fields_to_identifier(login_submission)
-        if identifier["user"].startswith("@"):
-            qualified_user_id = identifier["user"]
-        else:
-            qualified_user_id = UserID(identifier["user"], self.hs.hostname).to_string()
+        qualified_user_id = self._get_qualified_user_id(identifier)
 
         if not appservice.is_interested_in_user(qualified_user_id):
             raise LoginError(403, "Invalid access_token", errcode=Codes.FORBIDDEN)
@@ -247,15 +256,7 @@ class LoginRestServlet(RestServlet):
 
         # by this point, the identifier should be an m.id.user: if it's anything
         # else, we haven't understood it.
-        if identifier["type"] != "m.id.user":
-            raise SynapseError(400, "Unknown login identifier type")
-        if "user" not in identifier:
-            raise SynapseError(400, "User identifier is missing 'user' key")
-
-        if identifier["user"].startswith("@"):
-            qualified_user_id = identifier["user"]
-        else:
-            qualified_user_id = UserID(identifier["user"], self.hs.hostname).to_string()
+        qualified_user_id = self._get_qualified_user_id(identifier)
 
         # Check if we've hit the failed ratelimit (but don't update it)
         self._failed_attempts_ratelimiter.ratelimit(
