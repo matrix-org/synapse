@@ -217,11 +217,11 @@ class FederationClient(FederationBase):
             for p in transaction_data["pdus"]
         ]
 
-        # FIXME: We should handle signature failures more gracefully.
-        pdus[:] = await make_deferred_yieldable(
-            defer.gatherResults(
-                self._check_sigs_and_hashes(room_version, pdus), consumeErrors=True,
-            ).addErrback(unwrapFirstError)
+        pdus[:] = await self._check_sigs_and_hash_and_fetch(
+            dest,
+            list(pdus),
+            outlier=True,
+            room_version=room_version,
         )
 
         logger.info("DDD pdus ended up as: %s", pdus)
