@@ -604,10 +604,9 @@ class FederationSender:
                 if self._federation_shard_config.should_handle(self._instance_name, d)
             ]
 
-            for destination in destinations_to_wake:
-                last_processed = destination
+            for last_processed in destinations_to_wake:
                 logger.info(
-                    "Destination %s has outstanding catch-up, waking up.", destination,
+                    "Destination %s has outstanding catch-up, waking up.", last_processed,
                 )
-                self.wake_destination(destination)
+                self.wake_destination(last_processed)
                 await self.clock.sleep(CATCH_UP_STARTUP_INTERVAL_SEC)
