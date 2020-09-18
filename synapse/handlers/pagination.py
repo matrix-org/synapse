@@ -364,7 +364,7 @@ class PaginationHandler:
                 if room_token.topological:
                     max_topo = room_token.topological
                 else:
-                    max_topo = await self.store.get_max_topological_token(
+                    max_topo = await self.store.get_current_topological_token(
                         room_id, room_token.stream
                     )
 
@@ -384,7 +384,7 @@ class PaginationHandler:
                         source_config.from_key = str(leave_token)
 
                 await self.hs.get_handlers().federation_handler.maybe_backfill(
-                    room_id, max_topo
+                    room_id, max_topo, limit=source_config.limit,
                 )
 
             events, next_key = await self.store.paginate_room_events(
