@@ -1,4 +1,3 @@
-from collections import defaultdict
 from typing import List, Tuple
 
 from mock import Mock

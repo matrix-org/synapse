@@ -582,7 +582,7 @@ class FederationSender:
         """
         Wakes up destinations that need catch-up and are not currently being
         backed off from.
-        
+
         In order to reduce load spikes, adds a delay between each destination.
         """
 
