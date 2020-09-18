@@ -943,7 +943,7 @@ class FederationHandler(BaseHandler):
 
         return events
 
-    async def maybe_backfill(self, room_id: str, current_depth: int, limit: int):
+    async def maybe_backfill(self, room_id: str, current_depth: int, limit: int) -> bool:
         """Checks the database to see if we should backfill before paginating,
         and if so do.
 
@@ -1034,7 +1034,7 @@ class FederationHandler(BaseHandler):
 
         # We ignore extremities that have a greater depth than our current depth
         # as:
-        #    1. we don't really care about getting events that has happened
+        #    1. we don't really care about getting events that have happened
         #       before our current position; and
         #    2. we have likely previously tried and failed to backfill from that
         #       extremity, so to avoid getting "stuck" requesting the same
