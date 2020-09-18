@@ -343,17 +343,17 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
 
         self.register_user("u1", "you the one")
         u1_token = self.login("u1", "you the one")
-        room_1 = self.helper.create_room_as("u1", tok=u1_token)
+        room_id = self.helper.create_room_as("u1", tok=u1_token)
 
         for server_name in server_names:
             self.get_success(
                 event_injection.inject_member_event(
-                    self.hs, room_1, "@user:%s" % server_name, "join"
+                    self.hs, room_id, "@user:%s" % server_name, "join"
                 )
             )
 
         # create an event
-        self.helper.send(room_1, "deary me!", tok=u1_token)
+        self.helper.send(room_id, "deary me!", tok=u1_token)
 
         # ASSERT:
         # - All servers are up to date so none should have outstanding catch-up
@@ -375,7 +375,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         )
 
         # - Send an event
-        self.helper.send(room_1, "can anyone hear me?", tok=u1_token)
+        self.helper.send(room_id, "can anyone hear me?", tok=u1_token)
 
         # ASSERT (get_catch_up_outstanding_destinations):
         # - all remotes are outstanding
@@ -389,7 +389,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
 
         outstanding_2 = self.get_success(
             self.hs.get_datastore().get_catch_up_outstanding_destinations(
-                server_names[24]
+                outstanding_1[-1]
             )
         )
         self.assertNotIn("zzzerver", outstanding_2)
@@ -399,14 +399,16 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # ACT: call _wake_destinations_needing_catchup
 
         # patch wake_destination to just count the destinations instead
-        woken = defaultdict(lambda: 0)
+        woken = []
 
         def wake_destination_track(destination):
-            woken[destination] += 1
+            woken.append(destination)
 
         self.hs.get_federation_sender().wake_destination = wake_destination_track
 
         # cancel the pre-existing timer for _wake_destinations_needing_catchup
+        # this is because we are calling it manually rather than waiting for it
+        # to be called automatically
         self.hs.get_federation_sender()._catchup_after_startup_timer.cancel()
 
         self.get_success(
@@ -416,6 +418,9 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # ASSERT (_wake_destinations_needing_catchup):
         # - all remotes are woken up, save for zzzerver
         self.assertNotIn("zzzerver", woken)
-        self.assertEqual(set(woken.keys()), set(server_names[:-1]))
-        # check that all destinations were woken exactly once
-        self.assertEqual([value for value in woken.values() if value != 1], [])
+        # - all destinations are woken exactly once
+        # (assertCountEqual has a misleading name — it checks that the counts
+        #  of each item in the collections are not the same.
+        #  It does not merely check the lengths of the collections are equal,
+        #  as the name implies.)
+        self.assertCountEqual(woken, server_names[:-1])
