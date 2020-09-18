@@ -346,8 +346,8 @@ class HTTPPusherTests(HomeserverTestCase):
         self.assertEqual(len(self.push_attempts), 2)
         self.assertEqual(self.push_attempts[1][1], "example.com")
 
-        # check that this is low-priority
-        self.assertEqual(self.push_attempts[1][2]["notification"]["prio"], "low")
+        # check that this is high-priority
+        self.assertEqual(self.push_attempts[1][2]["notification"]["prio"], "high")
 
     def test_sends_high_priority_for_mention(self):
         """
@@ -418,8 +418,8 @@ class HTTPPusherTests(HomeserverTestCase):
         self.assertEqual(len(self.push_attempts), 2)
         self.assertEqual(self.push_attempts[1][1], "example.com")
 
-        # check that this is low-priority
-        self.assertEqual(self.push_attempts[1][2]["notification"]["prio"], "low")
+        # check that this is high-priority
+        self.assertEqual(self.push_attempts[1][2]["notification"]["prio"], "high")
 
     def test_sends_high_priority_for_atroom(self):
         """
@@ -497,5 +497,5 @@ class HTTPPusherTests(HomeserverTestCase):
         self.assertEqual(len(self.push_attempts), 2)
         self.assertEqual(self.push_attempts[1][1], "example.com")
 
-        # check that this is low-priority
-        self.assertEqual(self.push_attempts[1][2]["notification"]["prio"], "low")
+        # check that this is high-priority
+        self.assertEqual(self.push_attempts[1][2]["notification"]["prio"], "high")

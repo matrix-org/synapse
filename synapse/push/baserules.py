@@ -335,7 +335,11 @@ BASE_APPEND_UNDERRIDE_RULES = [
                 "_id": "_message",
             }
         ],
-        "actions": ["notify", {"set_tweak": "highlight", "value": False}],
+        "actions": [
+            "notify",
+            {"set_tweak": "sound", "value": "default"},
+            {"set_tweak": "highlight", "value": False},
+        ],
     },
     # XXX: this is going to fire for events which aren't m.room.messages
     # but are encrypted (e.g. m.call.*)...
@@ -349,7 +353,11 @@ BASE_APPEND_UNDERRIDE_RULES = [
                 "_id": "_encrypted",
             }
         ],
-        "actions": ["notify", {"set_tweak": "highlight", "value": False}],
+        "actions": [
+            "notify",
+            {"set_tweak": "sound", "value": "default"},
+            {"set_tweak": "highlight", "value": False},
+        ],
     },
 ]
 
