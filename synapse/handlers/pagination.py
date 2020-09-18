@@ -385,7 +385,7 @@ class PaginationHandler:
                         )
 
                 await self.hs.get_handlers().federation_handler.maybe_backfill(
-                    room_id, curr_topo, limit=source_config.limit,
+                    room_id, curr_topo, limit=pagin_config.limit,
                 )
 
             to_room_key = None
