@@ -329,7 +329,8 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
             _wake_destinations_needing_catchup.
         """
 
-        # list of sorted server names (note that there are more servers than the batch size used in get_catch_up_outstanding_destinations).
+        # list of sorted server names (note that there are more servers than the batch
+        # size used in get_catch_up_outstanding_destinations).
         server_names = ["server%02d" % number for number in range(42)] + ["zzzerver"]
 
         # ARRANGE:
@@ -417,9 +418,5 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # ASSERT (_wake_destinations_needing_catchup):
         # - all remotes are woken up, save for zzzerver
         self.assertNotIn("zzzerver", woken)
-        # - all destinations are woken exactly once
-        # (assertCountEqual has a misleading name — it checks that the counts
-        #  of each item in the collections are not the same.
-        #  It does not merely check the lengths of the collections are equal,
-        #  as the name implies.)
+        # - all destinations are woken exactly once; they appear once in woken.
         self.assertCountEqual(woken, server_names[:-1])

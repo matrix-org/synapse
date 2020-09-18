@@ -606,7 +606,8 @@ class FederationSender:
 
             for last_processed in destinations_to_wake:
                 logger.info(
-                    "Destination %s has outstanding catch-up, waking up.", last_processed,
+                    "Destination %s has outstanding catch-up, waking up.",
+                    last_processed,
                 )
                 self.wake_destination(last_processed)
                 await self.clock.sleep(CATCH_UP_STARTUP_INTERVAL_SEC)
