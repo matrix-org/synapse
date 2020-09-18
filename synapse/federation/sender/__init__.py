@@ -59,10 +59,10 @@ sent_pdus_destination_dist_total = Counter(
 # that have catch-up outstanding.
 CATCH_UP_WAKE_AFTER_SYNAPSE_STARTUP_DELAY_SEC = 15
 
-# Time (in s) waited in between waking up each destination, i.e. one destination
+# Time (in s) to wait in between waking up each destination, i.e. one destination
 # will be woken up every <x> seconds after Synapse's startup until we have woken
 # every destination has outstanding catch-up.
-CATCH_UP_WAKE_AFTER_SYNAPSE_STARTUP_INTERVAL_SEC = 5
+CATCH_UP_STARTUP_INTERVAL_SEC = 5
 
 
 class FederationSender:
