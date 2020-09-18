@@ -1235,7 +1235,7 @@ class AuthHandler(BaseHandler):
         return urllib.parse.urlunparse(url_parts)
 
 
-@attr.s
+@attr.s(slots=True)
 class MacaroonGenerator:
 
     hs = attr.ib()

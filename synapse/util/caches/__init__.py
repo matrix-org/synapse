@@ -42,7 +42,7 @@ response_cache_evicted = Gauge(
 response_cache_total = Gauge("synapse_util_caches_response_cache:total", "", ["name"])
 
 
-@attr.s
+@attr.s(slots=True)
 class CacheMetric:
 
     _cache = attr.ib()

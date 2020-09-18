@@ -1174,6 +1174,8 @@ class RoomTestCase(unittest.HomeserverTestCase):
 
         self.assertIn("room_id", channel.json_body)
         self.assertIn("name", channel.json_body)
+        self.assertIn("topic", channel.json_body)
+        self.assertIn("avatar", channel.json_body)
         self.assertIn("canonical_alias", channel.json_body)
         self.assertIn("joined_members", channel.json_body)
         self.assertIn("joined_local_members", channel.json_body)

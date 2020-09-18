@@ -12,14 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import re
-
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
     parse_json_object_from_request,
 )
 from synapse.rest.admin import assert_requester_is_admin
+from synapse.rest.admin._base import admin_patterns
 
 
 class PurgeRoomServlet(RestServlet):
@@ -35,7 +34,7 @@ class PurgeRoomServlet(RestServlet):
     {}
     """
 
-    PATTERNS = (re.compile("^/_synapse/admin/v1/purge_room$"),)
+    PATTERNS = admin_patterns("/purge_room$")
 
     def __init__(self, hs):
         """

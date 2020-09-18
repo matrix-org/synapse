@@ -97,9 +97,15 @@ class FederationServer(FederationBase):
         self.state = hs.get_state_handler()
 
         self.device_handler = hs.get_device_handler()
+        self._federation_ratelimiter = hs.get_federation_ratelimiter()
 
         self._server_linearizer = Linearizer("fed_server")
         self._transaction_linearizer = Linearizer("fed_txn_handler")
+
+        # We cache results for transaction with the same ID
+        self._transaction_resp_cache = ResponseCache(
+            hs, "fed_txn_handler", timeout_ms=30000
+        )
 
         self.transaction_actions = TransactionActions(self.store)
 
@@ -135,22 +141,44 @@ class FederationServer(FederationBase):
         request_time = self._clock.time_msec()
 
         transaction = Transaction(**transaction_data)
+        transaction_id = transaction.transaction_id  # type: ignore
 
-        if not transaction.transaction_id:  # type: ignore
+        if not transaction_id:
             raise Exception("Transaction missing transaction_id")
 
-        logger.debug("[%s] Got transaction", transaction.transaction_id)  # type: ignore
+        logger.debug("[%s] Got transaction", transaction_id)
 
-        # use a linearizer to ensure that we don't process the same transaction
-        # multiple times in parallel.
-        with (
-            await self._transaction_linearizer.queue(
-                (origin, transaction.transaction_id)  # type: ignore
-            )
-        ):
-            result = await self._handle_incoming_transaction(
-                origin, transaction, request_time
-            )
+        # We wrap in a ResponseCache so that we de-duplicate retried
+        # transactions.
+        return await self._transaction_resp_cache.wrap(
+            (origin, transaction_id),
+            self._on_incoming_transaction_inner,
+            origin,
+            transaction,
+            request_time,
+        )
+
+    async def _on_incoming_transaction_inner(
+        self, origin: str, transaction: Transaction, request_time: int
+    ) -> Tuple[int, Dict[str, Any]]:
+        # Use a linearizer to ensure that transactions from a remote are
+        # processed in order.
+        with await self._transaction_linearizer.queue(origin):
+            # We rate limit here *after* we've queued up the incoming requests,
+            # so that we don't fill up the ratelimiter with blocked requests.
+            #
+            # This is important as the ratelimiter allows N concurrent requests
+            # at a time, and only starts ratelimiting if there are more requests
+            # than that being processed at a time. If we queued up requests in
+            # the linearizer/response cache *after* the ratelimiting then those
+            # queued up requests would count as part of the allowed limit of N
+            # concurrent requests.
+            with self._federation_ratelimiter.ratelimit(origin) as d:
+                await d
+
+                result = await self._handle_incoming_transaction(
+                    origin, transaction, request_time
+                )
 
         return result
 

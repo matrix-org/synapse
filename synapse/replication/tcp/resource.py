@@ -93,7 +93,7 @@ class ReplicationStreamer:
         """
         if not self.command_handler.connected():
             # Don't bother if nothing is listening. We still need to advance
-            # the stream tokens otherwise they'll fall beihind forever
+            # the stream tokens otherwise they'll fall behind forever
             for stream in self.streams:
                 stream.discard_updates_and_advance()
             return

@@ -54,7 +54,7 @@ from synapse.events import EventBase, builder
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.logging.context import make_deferred_yieldable, preserve_fn
 from synapse.logging.utils import log_function
-from synapse.types import JsonDict
+from synapse.types import JsonDict, get_domain_from_id
 from synapse.util import unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.retryutils import NotRetryingDestination
@@ -386,10 +386,11 @@ class FederationClient(FederationBase):
                     pdu.event_id, allow_rejected=True, allow_none=True
                 )
 
-            if not res and pdu.origin != origin:
+            pdu_origin = get_domain_from_id(pdu.sender)
+            if not res and pdu_origin != origin:
                 try:
                     res = await self.get_pdu(
-                        destinations=[pdu.origin],
+                        destinations=[pdu_origin],
                         event_id=pdu.event_id,
                         room_version=room_version,
                         outlier=outlier,
