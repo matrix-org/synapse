@@ -1086,4 +1086,4 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(number_rooms, channel.json_body["total"])
-        self.assertEqual(number_rooms, len(channel.json_body["rooms"]))
+        self.assertEqual(number_rooms, len(channel.json_body["joined_rooms"]))

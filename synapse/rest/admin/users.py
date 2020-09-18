@@ -708,5 +708,5 @@ class UserMembershipRestServlet(RestServlet):
         if not room_ids:
             raise NotFoundError("User not found")
 
-        ret = {"rooms": list(room_ids), "total": len(room_ids)}
+        ret = {"joined_rooms": list(room_ids), "total": len(room_ids)}
         return 200, ret
