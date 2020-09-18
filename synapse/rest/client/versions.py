@@ -28,7 +28,7 @@ class VersionsRestServlet(RestServlet):
     PATTERNS = [re.compile("^/_matrix/client/versions$")]
 
     def __init__(self, hs):
-        super(VersionsRestServlet, self).__init__()
+        super().__init__()
         self.config = hs.config
 
     def on_GET(self, request):

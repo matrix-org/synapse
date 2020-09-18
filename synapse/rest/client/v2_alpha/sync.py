@@ -74,7 +74,7 @@ class SyncRestServlet(RestServlet):
     ALLOWED_PRESENCE = {"online", "offline", "unavailable"}
 
     def __init__(self, hs):
-        super(SyncRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.sync_handler = hs.get_sync_handler()

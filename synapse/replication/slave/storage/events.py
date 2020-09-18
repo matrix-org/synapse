@@ -56,7 +56,7 @@ class SlavedEventStore(
     BaseSlavedStore,
 ):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(SlavedEventStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         events_max = self._stream_id_gen.get_current_token()
         curr_state_delta_prefill, min_curr_state_delta_id = self.db_pool.get_cache_dict(

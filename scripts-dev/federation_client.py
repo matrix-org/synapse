@@ -321,7 +321,7 @@ class MatrixConnectionAdapter(HTTPAdapter):
         url = urlparse.urlunparse(
             ("https", netloc, parsed.path, parsed.params, parsed.query, parsed.fragment)
         )
-        return super(MatrixConnectionAdapter, self).get_connection(url, proxies)
+        return super().get_connection(url, proxies)
 
 
 if __name__ == "__main__":

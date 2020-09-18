@@ -48,7 +48,7 @@ class LoginRestServlet(RestServlet):
     APPSERVICE_TYPE = "uk.half-shot.msc2778.login.application_service"
 
     def __init__(self, hs):
-        super(LoginRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
 
         # JWT configuration variables.
@@ -429,7 +429,7 @@ class CasTicketServlet(RestServlet):
     PATTERNS = client_patterns("/login/cas/ticket", v1=True)
 
     def __init__(self, hs):
-        super(CasTicketServlet, self).__init__()
+        super().__init__()
         self._cas_handler = hs.get_cas_handler()
 
     async def on_GET(self, request: SynapseRequest) -> None:
