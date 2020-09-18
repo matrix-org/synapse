@@ -32,6 +32,7 @@ json_encoder = json.JSONEncoder(separators=(",", ":"))
 def unwrapFirstError(failure):
     # defer.gatherResults and DeferredLists wrap failures.
     failure.trap(defer.FirstError)
+    logger.info("DDD failure.value.subFailure: %s", failure.value.subFailure)
     return failure.value.subFailure
 
 
