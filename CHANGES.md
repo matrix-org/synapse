@@ -1,6 +1,8 @@
 Synapse 1.20.0rc5 (2020-09-18)
 ==============================
 
+In addition to the below, Synapse 1.20.0rc5 also includes the bug fix that was included in 1.19.3.
+
 Features
 --------
 
