@@ -12,8 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Callable
 
-from twisted.internet import defer
+from synapse.events import EventBase
+from synapse.module_api import ModuleApi
+from synapse.types import StateMap
 
 
 class ThirdPartyEventRules(object):
@@ -36,11 +39,10 @@ class ThirdPartyEventRules(object):
 
         if module is not None:
             self.third_party_rules = module(
-                config=config, http_client=hs.get_simple_http_client()
+                config=config, module_api=ModuleApi(hs, hs.get_auth_handler()),
             )
 
-    @defer.inlineCallbacks
-    def check_event_allowed(self, event, context):
+    async def check_event_allowed(self, event, context):
         """Check if a provided event should be allowed in the given context.
 
         Args:
@@ -53,18 +55,17 @@ class ThirdPartyEventRules(object):
         if self.third_party_rules is None:
             return True
 
-        prev_state_ids = yield context.get_prev_state_ids()
+        prev_state_ids = await context.get_prev_state_ids()
 
         # Retrieve the state events from the database.
         state_events = {}
         for key, event_id in prev_state_ids.items():
-            state_events[key] = yield self.store.get_event(event_id, allow_none=True)
+            state_events[key] = await self.store.get_event(event_id, allow_none=True)
 
-        ret = yield self.third_party_rules.check_event_allowed(event, state_events)
+        ret = await self.third_party_rules.check_event_allowed(event, state_events)
         return ret
 
-    @defer.inlineCallbacks
-    def on_create_room(self, requester, config, is_requester_admin):
+    async def on_create_room(self, requester, config, is_requester_admin):
         """Intercept requests to create room to allow, deny or update the
         request config.
 
@@ -80,13 +81,12 @@ class ThirdPartyEventRules(object):
         if self.third_party_rules is None:
             return True
 
-        ret = yield self.third_party_rules.on_create_room(
+        ret = await self.third_party_rules.on_create_room(
             requester, config, is_requester_admin
         )
         return ret
 
-    @defer.inlineCallbacks
-    def check_threepid_can_be_invited(self, medium, address, room_id):
+    async def check_threepid_can_be_invited(self, medium, address, room_id):
         """Check if a provided 3PID can be invited in the given room.
 
         Args:
@@ -101,14 +101,51 @@ class ThirdPartyEventRules(object):
         if self.third_party_rules is None:
             return True
 
-        state_ids = yield self.store.get_filtered_current_state_ids(room_id)
-        room_state_events = yield self.store.get_events(state_ids.values())
+        state_events = await self._get_state_map_for_room(room_id)
+
+        ret = await self.third_party_rules.check_threepid_can_be_invited(
+            medium, address, state_events
+        )
+        return ret
+
+    async def check_visibility_can_be_modified(
+        self, room_id: str, new_visibility: str
+    ) -> bool:
+        """Check if a room is allowed to be published to, or removed from, the public room
+        list.
+
+        Args:
+            room_id: The ID of the room.
+            new_visibility: The new visibility state. Either "public" or "private".
+
+        Returns:
+            True if the room's visibility can be modified, False if not.
+        """
+        if self.third_party_rules is None:
+            return True
+
+        check_func = getattr(self.third_party_rules, "check_visibility_can_be_modified")
+        if not check_func or not isinstance(check_func, Callable):
+            return True
+
+        state_events = await self._get_state_map_for_room(room_id)
+
+        return await check_func(room_id, state_events, new_visibility)
+
+    async def _get_state_map_for_room(self, room_id: str) -> StateMap[EventBase]:
+        """Given a room ID, return the state events of that room.
+
+        Args:
+            room_id: The ID of the room.
+
+        Returns:
+            A dict mapping (event type, state key) to state event.
+        """
+        state_ids = await self.store.get_filtered_current_state_ids(room_id)
+        room_state_events = await self.store.get_events(state_ids.values())
 
         state_events = {}
         for key, event_id in state_ids.items():
             state_events[key] = room_state_events[event_id]
 
-        ret = yield self.third_party_rules.check_threepid_can_be_invited(
-            medium, address, state_events
-        )
-        return ret
+        return state_events

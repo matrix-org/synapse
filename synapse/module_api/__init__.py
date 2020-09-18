@@ -14,12 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import TYPE_CHECKING
 
 from twisted.internet import defer
 
+from synapse.http.client import SimpleHttpClient
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.types import UserID
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 """
 This package defines the 'stable' API which can be used by extension modules which
@@ -29,6 +34,50 @@ are loaded into Synapse.
 __all__ = ["errors", "make_deferred_yieldable", "run_in_background", "ModuleApi"]
 
 logger = logging.getLogger(__name__)
+
+
+class PublicRoomListManager:
+    """Contains methods for adding to, removing from and querying whether a room
+    is in the public room list.
+
+    Args:
+        hs: The Homeserver object
+    """
+
+    def __init__(self, hs: "HomeServer"):
+        self._store = hs.get_datastore()
+
+    async def room_is_in_public_room_list(self, room_id: str) -> bool:
+        """Checks whether a room is in the public room list.
+
+        Args:
+            room_id: The ID of the room.
+
+        Returns:
+            Whether the room is in the public room list. Returns False if the room does
+            not exist.
+        """
+        room = await self._store.get_room(room_id)
+        if not room:
+            return False
+
+        return room.get("is_public", False)
+
+    async def add_room_to_public_room_list(self, room_id: str) -> None:
+        """Publishes a room to the public room list.
+
+        Args:
+            room_id: The ID of the room.
+        """
+        await self._store.set_room_is_public(room_id, True)
+
+    async def remove_room_from_public_room_list(self, room_id: str) -> None:
+        """Removes a room from the public room list.
+
+        Args:
+            room_id: The ID of the room.
+        """
+        await self._store.set_room_is_public(room_id, False)
 
 
 class ModuleApi(object):
@@ -42,6 +91,9 @@ class ModuleApi(object):
         self._store = hs.get_datastore()
         self._auth = hs.get_auth()
         self._auth_handler = auth_handler
+
+        self.http_client = hs.get_simple_http_client()  # type: SimpleHttpClient
+        self.public_room_list_manager = PublicRoomListManager(hs)
 
     def get_user_by_req(self, req, allow_guest=False):
         """Check the access_token provided for a request

@@ -12,18 +12,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
+from synapse.types import Requester
 
 from tests import unittest
 
 
 class ThirdPartyRulesTestModule(object):
-    def __init__(self, config):
+    def __init__(self, config, *args, **kwargs):
         pass
 
-    def check_event_allowed(self, event, context):
+    async def on_create_room(
+        self, requester: Requester, config: dict, is_requester_admin: bool
+    ):
+        return True
+
+    async def check_event_allowed(self, event, context):
         if event.type == "foo.bar.forbidden":
             return False
         else:
@@ -51,29 +56,31 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         self.hs = self.setup_test_homeserver(config=config)
         return self.hs
 
+    def prepare(self, reactor, clock, homeserver):
+        # Create a user and room to play with during the tests
+        self.user_id = self.register_user("kermit", "monkey")
+        self.tok = self.login("kermit", "monkey")
+
+        self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
+
     def test_third_party_rules(self):
         """Tests that a forbidden event is forbidden from being sent, but an allowed one
         can be sent.
         """
-        user_id = self.register_user("kermit", "monkey")
-        tok = self.login("kermit", "monkey")
-
-        room_id = self.helper.create_room_as(user_id, tok=tok)
-
         request, channel = self.make_request(
             "PUT",
-            "/_matrix/client/r0/rooms/%s/send/foo.bar.allowed/1" % room_id,
+            "/_matrix/client/r0/rooms/%s/send/foo.bar.allowed/1" % self.room_id,
             {},
-            access_token=tok,
+            access_token=self.tok,
         )
         self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         request, channel = self.make_request(
             "PUT",
-            "/_matrix/client/r0/rooms/%s/send/foo.bar.forbidden/1" % room_id,
+            "/_matrix/client/r0/rooms/%s/send/foo.bar.forbidden/1" % self.room_id,
             {},
-            access_token=tok,
+            access_token=self.tok,
         )
         self.render(request)
         self.assertEquals(channel.result["code"], b"403", channel.result)

@@ -21,7 +21,7 @@ from synapse.api.constants import EventTypes, JoinRules, Membership, RoomCreatio
 from synapse.api.errors import SynapseError
 from synapse.config._base import ConfigError
 from synapse.events import EventBase
-from synapse.http.client import SimpleHttpClient
+from synapse.module_api import ModuleApi
 from synapse.types import Requester, StateMap, get_domain_from_id
 
 ACCESS_RULES_TYPE = "im.vector.room.access_rules"
@@ -74,10 +74,11 @@ class RoomAccessRules(object):
     Don't forget to consider if you can invite users from your own domain.
     """
 
-    def __init__(self, config: Dict, http_client: SimpleHttpClient):
-        self.http_client = http_client
-
+    def __init__(
+        self, config: Dict, module_api: ModuleApi,
+    ):
         self.id_server = config["id_server"]
+        self.module_api = module_api
 
         self.domains_forbidden_when_restricted = config.get(
             "domains_forbidden_when_restricted", []
@@ -101,7 +102,7 @@ class RoomAccessRules(object):
 
         return config
 
-    def on_create_room(
+    async def on_create_room(
         self, requester: Requester, config: Dict, is_requester_admin: bool,
     ) -> bool:
         """Implements synapse.events.ThirdPartyEventRules.on_create_room.
@@ -176,12 +177,13 @@ class RoomAccessRules(object):
 
             access_rule = default_rule
 
-        # Check that the preset or the join rule in use is compatible with the access
-        # rule, whether it's a user-defined one or the default one (i.e. if it involves
-        # a "public" join rule, the access rule must be "restricted").
+        # Check that the preset in use is compatible with the access rule, whether it's
+        # user-defined or the default.
+        #
+        # Direct rooms may not have their join_rules set to JoinRules.PUBLIC.
         if (
             join_rule == JoinRules.PUBLIC or preset == RoomCreationPreset.PUBLIC_CHAT
-        ) and access_rule != AccessRules.RESTRICTED:
+        ) and access_rule == AccessRules.DIRECT:
             raise SynapseError(400, "Invalid access rule")
 
         # Check if the creator can override values for the power levels.
@@ -280,7 +282,7 @@ class RoomAccessRules(object):
             return False
 
         # Get the HS this address belongs to from the identity server.
-        res = yield self.http_client.get_json(
+        res = yield self.module_api.http_client.get_json(
             "https://%s/_matrix/identity/api/v1/info" % (self.id_server,),
             {"medium": medium, "address": address},
         )
@@ -293,7 +295,7 @@ class RoomAccessRules(object):
 
         return True
 
-    def check_event_allowed(
+    async def check_event_allowed(
         self, event: EventBase, state_events: StateMap[EventBase],
     ) -> bool:
         """Implements synapse.events.ThirdPartyEventRules.check_event_allowed.
@@ -310,7 +312,7 @@ class RoomAccessRules(object):
             True if the event can be allowed, False otherwise.
         """
         if event.type == ACCESS_RULES_TYPE:
-            return self._on_rules_change(event, state_events)
+            return await self._on_rules_change(event, state_events)
 
         # We need to know the rule to apply when processing the event types below.
         rule = self._get_rule_from_state(state_events)
@@ -337,17 +339,47 @@ class RoomAccessRules(object):
 
         return True
 
-    def _on_rules_change(
-        self, event: EventBase, state_events: StateMap[EventBase],
+    async def check_visibility_can_be_modified(
+        self, room_id: str, state_events: StateMap[EventBase], new_visibility: str
     ) -> bool:
-        """Implement the checks and behaviour specified on allowing or forbidding a new
-        im.vector.room.access_rules event.
+        """Implements
+        synapse.events.ThirdPartyEventRules.check_visibility_can_be_modified
+
+        Determines whether a room can be published, or removed from, the public room
+        list. A room is published if its visibility is set to "public". Otherwise,
+        its visibility is "private". A room with access rule other than "restricted"
+        may not be published.
 
         Args:
-            event: The event to check.
+            room_id: The ID of the room.
+            state_events: A dict mapping (event type, state key) to state event.
+                State events in the room.
+            new_visibility: The new visibility state. Either "public" or "private".
+
+        Returns:
+            Whether the room is allowed to be published to, or removed from, the public
+            rooms directory.
+        """
+        # We need to know the rule to apply when processing the event types below.
+        rule = self._get_rule_from_state(state_events)
+
+        # Allow adding a room to the public rooms list only if it is restricted
+        if new_visibility == "public":
+            return rule == AccessRules.RESTRICTED
+
+        # By default a room is created as "restricted", meaning it is allowed to be
+        # published to the public rooms directory.
+        return True
+
+    async def _on_rules_change(
+        self, event: EventBase, state_events: StateMap[EventBase]
+    ):
+        """Checks whether an im.vector.room.access_rules event is forbidden or allowed.
+
+        Args:
+            event: The im.vector.room.access_rules event.
             state_events: A dict mapping (event type, state key) to state event.
                 State events in the room before the event was sent.
-
         Returns:
             True if the event can be allowed, False otherwise.
         """
@@ -357,12 +389,6 @@ class RoomAccessRules(object):
         if new_rule not in VALID_ACCESS_RULES:
             return False
 
-        # We must not allow rooms with the "public" join rule to be given any other access
-        # rule than "restricted".
-        join_rule = self._get_join_rule_from_state(state_events)
-        if join_rule == JoinRules.PUBLIC and new_rule != AccessRules.RESTRICTED:
-            return False
-
         # Make sure we don't apply "direct" if the room has more than two members.
         if new_rule == AccessRules.DIRECT:
             existing_members, threepid_tokens = self._get_members_and_tokens_from_state(
@@ -370,6 +396,14 @@ class RoomAccessRules(object):
             )
 
             if len(existing_members) > 2 or len(threepid_tokens) > 1:
+                return False
+
+        if new_rule != AccessRules.RESTRICTED:
+            # Block this change if this room is currently listed in the public rooms
+            # directory
+            if await self.module_api.public_room_list_manager.room_is_in_public_room_list(
+                event.room_id
+            ):
                 return False
 
         prev_rules_event = state_events.get((ACCESS_RULES_TYPE, ""))
@@ -404,7 +438,7 @@ class RoomAccessRules(object):
         if rule == AccessRules.RESTRICTED:
             ret = self._on_membership_or_invite_restricted(event)
         elif rule == AccessRules.UNRESTRICTED:
-            ret = self._on_membership_or_invite_unrestricted()
+            ret = self._on_membership_or_invite_unrestricted(event, state_events)
         elif rule == AccessRules.DIRECT:
             ret = self._on_membership_or_invite_direct(event, state_events)
         else:
@@ -442,14 +476,26 @@ class RoomAccessRules(object):
         invitee_domain = get_domain_from_id(event.state_key)
         return invitee_domain not in self.domains_forbidden_when_restricted
 
-    def _on_membership_or_invite_unrestricted(self) -> bool:
+    def _on_membership_or_invite_unrestricted(
+        self, event: EventBase, state_events: StateMap[EventBase]
+    ) -> bool:
         """Implements the checks and behaviour specified for the "unrestricted" rule.
 
-        "unrestricted" currently means that every event is allowed.
+        "unrestricted" currently means that forbidden users cannot join without an invite.
 
         Returns:
             True if the event can be allowed, False otherwise.
         """
+        # If this is a join from a forbidden user and they don't have an invite to the
+        # room, then deny it
+        if event.type == EventTypes.Member and event.membership == Membership.JOIN:
+            # Check if this user is from a forbidden server
+            target_domain = get_domain_from_id(event.state_key)
+            if target_domain in self.domains_forbidden_when_restricted:
+                # If so, they'll need an invite to join this room. Check if one exists
+                if not self._user_is_invited_to_room(event.state_key, state_events):
+                    return False
+
         return True
 
     def _on_membership_or_invite_direct(
@@ -569,21 +615,10 @@ class RoomAccessRules(object):
         return True
 
     def _on_join_rule_change(self, event: EventBase, rule: str) -> bool:
-        """Check whether a join rule change is allowed. A join rule change is always
-        allowed unless the new join rule is "public" and the current access rule isn't
-        "restricted".
+        """Check whether a join rule change is allowed.
 
-        The rationale is that external users (those whose server would be denied access
-        to rooms enforcing the "restricted" access rule) should always rely on non-
-        external users for access to rooms, therefore they shouldn't be able to access
-        rooms that don't require an invite to be joined.
-
-        Note that we currently rely on the default access rule being "restricted": during
-        room creation, the m.room.join_rules event will be sent *before* the
-        im.vector.room.access_rules one, so the access rule that will be considered here
-        in this case will be the default "restricted" one. This is fine since the
-        "restricted" access rule allows any value for the join rule, but we should keep
-        that in mind if we need to change the default access rule in the future.
+        A join rule change is always allowed unless the new join rule is "public" and
+        the current access rule is "direct".
 
         Args:
             event: The event to check.
@@ -593,7 +628,7 @@ class RoomAccessRules(object):
             Whether the change is allowed.
         """
         if event.content.get("join_rule") == JoinRules.PUBLIC:
-            return rule == AccessRules.RESTRICTED
+            return rule != AccessRules.DIRECT
 
         return True
 
@@ -717,3 +752,28 @@ class RoomAccessRules(object):
         )
 
         return token == threepid_invite_token
+
+    def _user_is_invited_to_room(
+        self, user_id: str, state_events: StateMap[EventBase]
+    ) -> bool:
+        """Checks whether a given user has been invited to a room
+
+        A user has an invite for a room if its state contains a `m.room.member`
+        event with membership "invite" and their user ID as the state key.
+
+        Args:
+            user_id: The user to check.
+            state_events: The state events from the room.
+
+        Returns:
+            True if the user has been invited to the room, or False if they haven't.
+        """
+        for (event_type, state_key), state_event in state_events.items():
+            if (
+                event_type == EventTypes.Member
+                and state_key == user_id
+                and state_event.membership == Membership.INVITE
+            ):
+                return True
+
+        return False
