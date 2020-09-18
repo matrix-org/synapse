@@ -605,23 +605,20 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             lambda row: "t%d-%d" % (row["topological_ordering"], row["stream_ordering"])
         )
 
-    def get_max_topological_token(self, room_id, stream_key):
-        """Get the max topological token in a room before the given stream
+    def get_current_topological_token(self, room_id, stream_key):
+        """Gets the topological token in a room after or at the given stream
         ordering.
 
         Args:
-            room_id (str)
-            stream_key (int)
-
-        Returns:
-            Deferred[int]
+            room_id
+            stream_key
         """
         sql = (
-            "SELECT coalesce(max(topological_ordering), 0) FROM events"
-            " WHERE room_id = ? AND stream_ordering < ?"
+            "SELECT coalesce(MIN(topological_ordering), 0) FROM events"
+            " WHERE room_id = ? AND stream_ordering >= ?"
         )
         return self.db_pool.execute(
-            "get_max_topological_token", None, sql, room_id, stream_key
+            "get_current_topological_token", None, sql, room_id, stream_key
         ).addCallback(lambda r: r[0][0] if r else 0)
 
     def _get_max_topological_txn(self, txn, room_id):
