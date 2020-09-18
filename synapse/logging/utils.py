@@ -22,6 +22,7 @@ _TIME_FUNC_ID = 0
 
 
 def _log_debug_as_f(f, msg, msg_args):
+    return
     name = f.__module__
     logger = logging.getLogger(name)
 
