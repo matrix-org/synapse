@@ -4,6 +4,12 @@ matrix-synapse-py3 (1.20.0ubuntu1) UNRELEASED; urgency=medium
 
  -- Dexter Chua <dec41@srcf.net>  Wed, 26 Aug 2020 12:41:36 +0000
 
+matrix-synapse-py3 (1.19.3) stable; urgency=medium
+
+  * New synapse release 1.19.3.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 18 Sep 2020 14:59:30 +0100
+
 matrix-synapse-py3 (1.19.2) stable; urgency=medium
 
   * New synapse release 1.19.2.

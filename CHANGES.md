@@ -1,3 +1,36 @@
+Synapse 1.20.0rc5 (2020-09-18)
+==============================
+
+In addition to the below, Synapse 1.20.0rc5 also includes the bug fix that was included in 1.19.3.
+
+Features
+--------
+
+- Add flags to the `/versions` endpoint for whether new rooms default to using E2EE. ([\#8343](https://github.com/matrix-org/synapse/issues/8343))
+
+
+Bugfixes
+--------
+
+- Fix rate limiting of federation `/send` requests. ([\#8342](https://github.com/matrix-org/synapse/issues/8342))
+- Fix a longstanding bug where back pagination over federation could get stuck if it failed to handle a received event. ([\#8349](https://github.com/matrix-org/synapse/issues/8349))
+
+
+Internal Changes
+----------------
+
+- Blacklist [MSC2753](https://github.com/matrix-org/matrix-doc/pull/2753) SyTests until it is implemented. ([\#8285](https://github.com/matrix-org/synapse/issues/8285))
+
+
+Synapse 1.19.3 (2020-09-18)
+===========================
+
+Bugfixes
+--------
+
+- Partially mitigate bug where newly joined servers couldn't get past events in a room when there is a malformed event. ([\#8350](https://github.com/matrix-org/synapse/issues/8350))
+
+
 Synapse 1.20.0rc4 (2020-09-16)
 ==============================
 
