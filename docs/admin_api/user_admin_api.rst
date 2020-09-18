@@ -310,7 +310,7 @@ Gets a list of all ``room_id`` that a specific ``user_id`` is member.
 
 The API is::
 
-  GET /_synapse/admin/v1/users/<user_id>/rooms
+  GET /_synapse/admin/v1/users/<user_id>/joined_rooms
 
 To use it, you will need to authenticate by providing an ``access_token`` for a
 server admin: see `README.rst <README.rst>`_.
@@ -320,7 +320,7 @@ A response body like the following is returned:
 .. code:: json
 
     {
-        "rooms": [
+        "joined_rooms": [
             "!DuGcnbhHGaSZQoNQR:matrix.org",
             "!ZtSaPCawyWtxfWiIy:matrix.org"
         ],
@@ -337,7 +337,7 @@ The following parameters should be set in the URL:
 
 The following fields are returned in the JSON response body:
 
-- ``rooms`` - An array of ``room_id``.
+- ``joined_rooms`` - An array of ``room_id``.
 - ``total`` - Number of rooms.
 
 

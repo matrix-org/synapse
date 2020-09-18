@@ -1013,7 +1013,7 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
         self.admin_user_tok = self.login("admin", "pass")
 
         self.other_user = self.register_user("user", "pass")
-        self.url = "/_synapse/admin/v1/users/%s/rooms" % urllib.parse.quote(
+        self.url = "/_synapse/admin/v1/users/%s/joined_rooms" % urllib.parse.quote(
             self.other_user
         )
 
@@ -1045,7 +1045,7 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
         """
         Tests that a lookup for a user that does not exist returns a 404
         """
-        url = "/_synapse/admin/v1/users/@unknown_person:test/rooms"
+        url = "/_synapse/admin/v1/users/@unknown_person:test/joined_rooms"
         request, channel = self.make_request(
             "GET", url, access_token=self.admin_user_tok,
         )
@@ -1058,7 +1058,7 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
         """
         Tests that a lookup for a user that is not a local returns a 400
         """
-        url = "/_synapse/admin/v1/users/@unknown_person:unknown_domain/rooms"
+        url = "/_synapse/admin/v1/users/@unknown_person:unknown_domain/joined_rooms"
 
         request, channel = self.make_request(
             "GET", url, access_token=self.admin_user_tok,
