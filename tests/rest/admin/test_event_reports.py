@@ -112,7 +112,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(len(channel.json_body["event_reports"]), 5)
-        self.assertEqual(channel.json_body["next_token"], "5")
+        self.assertEqual(channel.json_body["next_token"], 5)
         self._check_fields(channel.json_body["event_reports"])
 
     def test_from(self):
@@ -143,7 +143,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 20)
-        self.assertEqual(channel.json_body["next_token"], "15")
+        self.assertEqual(channel.json_body["next_token"], 15)
         self.assertEqual(len(channel.json_body["event_reports"]), 10)
         self._check_fields(channel.json_body["event_reports"])
 
@@ -289,6 +289,60 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+
+    def test_next_token(self):
+        """
+        Testing that ``next_token`` appears at the right place
+        """
+
+        #  ``next_token`` does not appears
+        # Number of results is number of entries
+        request, channel = self.make_request(
+            "GET", self.url + "?limit=20", access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["total"], 20)
+        self.assertEqual(len(channel.json_body["event_reports"]), 20)
+        self.assertNotIn("next_token", channel.json_body)
+
+        #  ``next_token`` does not appears
+        # Number of max results is larger than number of entries
+        request, channel = self.make_request(
+            "GET", self.url + "?limit=21", access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["total"], 20)
+        self.assertEqual(len(channel.json_body["event_reports"]), 20)
+        self.assertNotIn("next_token", channel.json_body)
+
+        #  ``next_token`` does appears
+        # Number of max results is smaller than number of entries
+        request, channel = self.make_request(
+            "GET", self.url + "?limit=19", access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["total"], 20)
+        self.assertEqual(len(channel.json_body["event_reports"]), 19)
+        self.assertEqual(channel.json_body["next_token"], 19)
+
+        # Check
+        # Set ``from`` to value of ``next_token`` for request remaining entries
+        #  ``next_token`` does not appears
+        request, channel = self.make_request(
+            "GET", self.url + "?from=19", access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["total"], 20)
+        self.assertEqual(len(channel.json_body["event_reports"]), 1)
+        self.assertNotIn("next_token", channel.json_body)
 
     def _create_event_and_report(self, room_id, user_tok):
         """Create and report events

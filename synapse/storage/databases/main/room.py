@@ -1325,8 +1325,8 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         start: int,
         limit: int,
         direction: str = "b",
-        user_id: str = None,
-        room_id: str = None,
+        user_id: Optional[str] = None,
+        room_id: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], int]:
         """Retrieve a paginated list of event reports
 
@@ -1334,7 +1334,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             start: event offset to begin the query from
             limit: number of rows to retrieve
             direction: Whether to fetch the most recent first (`"b"`) or the
-                oldest first (`"f"`).
+                oldest first (`"f"`)
             user_id: search for user_id. Ignored if user_id is None
             room_id: search for room_id. Ignored if room_id is None
         Returns:

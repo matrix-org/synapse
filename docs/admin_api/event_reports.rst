@@ -12,7 +12,7 @@ server admin: see `README.rst <README.rst>`_.
 
 It returns a JSON body like the following:
 
-.. code:: json
+.. code:: jsonc
 
     {
         "event_reports": [
@@ -70,7 +70,8 @@ It returns a JSON body like the following:
                 },
                 "event_id": "$3IcdZsDaN_En-S1DF4EMCy3v4gNRKeOJs8W5qTOKj4I",
                 "event_json": {
-                    "_comment": "... (hidden items) ..."
+                    // hidden items
+                    // see above
                 },
                 "id": 3,
                 "reason": "bar",
@@ -81,7 +82,7 @@ It returns a JSON body like the following:
                 "user_id": "@bar:matrix.org"
             }
         ],
-        "next_token": "2",
+        "next_token": 2,
         "total": 4
     }
 
@@ -93,30 +94,36 @@ reports to paginate through.
 
 **URL parameters:**
 
-- ``limit``: Is optional but is used for pagination,
+- ``limit``: integer - Is optional but is used for pagination,
   denoting the maximum number of items to return in this call. Defaults to ``100``.
-- ``from``: Is optional but used for pagination,
+- ``from``: integer - Is optional but used for pagination,
   denoting the offset in the returned results. This should be treated as an opaque value and
   not explicitly set to anything other than the return value of ``next_token`` from a previous call.
   Defaults to ``0``.
-- ``dir`` - Direction of event report order. Whether to fetch the most recent first (``b``) or the
+- ``dir``: string - Direction of event report order. Whether to fetch the most recent first (``b``) or the
   oldest first (``f``). Defaults to ``b``.
-- ``user_id``: Is optional and filters to only return users with user IDs that contain this value.
+- ``user_id``: string - Is optional and filters to only return users with user IDs that contain this value.
   This is the user who reported the event and wrote the reason.
-- ``room_id``: Is optional and filters to only return rooms with room IDs that contain this value.
+- ``room_id``: string - Is optional and filters to only return rooms with room IDs that contain this value.
 
 **Response**
 
 The following fields are returned in the JSON response body:
 
-- ``id``: Id of event report.
-- ``received_ts``: The timestamp (in milliseconds since the unix epoch) when this report was sent.
-- ``room_id``: The ID of the room.
-- ``event_id``: The ID of the reported event.
-- ``user_id``: This is the user who reported the event and wrote the reason.
-- ``reason``: Comment made by the ``user_id`` in this report.
-- ``content``: Content of reported event.
-- ``sender``: This is the ID of the user who sent the original message/event that was reported.
-- ``room_alias``: The alias of the room.
-- ``event_json``: Details of the original event that was reported.
+- ``id``: integer - ID of event report.
+- ``received_ts``: integer - The timestamp (in milliseconds since the unix epoch) when this report was sent.
+- ``room_id``: string - The ID of the room in which the event being reported is located.
+- ``event_id``: string - The ID of the reported event.
+- ``user_id``: string - This is the user who reported the event and wrote the reason.
+- ``reason``: string - Comment made by the ``user_id`` in this report. May be blank.
+- ``content``: object - Content of reported event.
+
+  - ``reason``: string - Comment made by the ``user_id`` in this report. May be blank.
+  - ``score``: integer - Content is reported based upon a negative score, where -100 is "most offensive" and 0 is "inoffensive".
+
+- ``sender``: string - This is the ID of the user who sent the original message/event that was reported.
+- ``room_alias``: string - The alias of the room. ``null`` if the room does not have a canonical alias set.
+- ``event_json``: object - Details of the original event that was reported.
+- ``next_token``: integer - Indication for pagination. See above.
+- ``total``: integer - Total number of event reports related to the query (``user_id`` and ``room_id``).
 

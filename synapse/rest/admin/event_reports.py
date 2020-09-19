@@ -26,7 +26,7 @@ class EventReportsRestServlet(RestServlet):
     """
     List all reported events that are known to the homeserver. Results are returned
     in a dictionary containing report information. Supports pagination.
-    This needs user to have administrator access in Synapse.
+    The requester must have administrator access in Synapse.
 
     GET /_synapse/admin/v1/event_reports
     returns:
@@ -82,7 +82,7 @@ class EventReportsRestServlet(RestServlet):
             start, limit, direction, user_id, room_id
         )
         ret = {"event_reports": event_reports, "total": total}
-        if len(event_reports) >= limit:
-            ret["next_token"] = str(start + len(event_reports))
+        if (start + limit) < total:
+            ret["next_token"] = start + len(event_reports)
 
         return 200, ret
