@@ -316,9 +316,8 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_registration_ratelimiter(self) -> Ratelimiter:
         return self.registration_ratelimiter
 
-    @abc.abstractmethod
     def start_listening(self, listeners: Iterable[ListenerConfig]) -> None:
-        ...
+        raise NotImplementedError
 
     @cache_in_self
     def get_federation_client(self) -> FederationClient:

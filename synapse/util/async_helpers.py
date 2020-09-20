@@ -261,7 +261,7 @@ class Linearizer:
         # non-empty.
         return bool(entry.deferreds)
 
-    def queue(self, key: Optional[Hashable]) -> defer.Deferred[None]:
+    def queue(self, key: Optional[Hashable]) -> "defer.Deferred[None]":
         # we avoid doing defer.inlineCallbacks here, so that cancellation works correctly.
         # (https://twistedmatrix.com/trac/ticket/4632 meant that cancellations were not
         # propagated inside inlineCallbacks until Twisted 18.7)
