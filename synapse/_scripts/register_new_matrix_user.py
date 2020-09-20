@@ -20,6 +20,7 @@ import hashlib
 import hmac
 import logging
 import sys
+from typing import Optional
 
 import requests as _requests
 import yaml
@@ -53,20 +54,20 @@ def request_registration(
 
     nonce = r.json()["nonce"]
 
-    mac = hmac.new(key=shared_secret.encode("utf8"), digestmod=hashlib.sha1)
+    _mac = hmac.new(key=shared_secret.encode("utf8"), digestmod=hashlib.sha1)
 
-    mac.update(nonce.encode("utf8"))
-    mac.update(b"\x00")
-    mac.update(user.encode("utf8"))
-    mac.update(b"\x00")
-    mac.update(password.encode("utf8"))
-    mac.update(b"\x00")
-    mac.update(b"admin" if admin else b"notadmin")
+    _mac.update(nonce.encode("utf8"))
+    _mac.update(b"\x00")
+    _mac.update(user.encode("utf8"))
+    _mac.update(b"\x00")
+    _mac.update(password.encode("utf8"))
+    _mac.update(b"\x00")
+    _mac.update(b"admin" if admin else b"notadmin")
     if user_type:
-        mac.update(b"\x00")
-        mac.update(user_type.encode("utf8"))
+        _mac.update(b"\x00")
+        _mac.update(user_type.encode("utf8"))
 
-    mac = mac.hexdigest()
+    mac = _mac.hexdigest()
 
     data = {
         "nonce": nonce,
@@ -95,7 +96,7 @@ def request_registration(
 def register_new_user(user, password, server_location, shared_secret, admin, user_type):
     if not user:
         try:
-            default_user = getpass.getuser()
+            default_user = getpass.getuser()  # type: Optional[str]
         except Exception:
             default_user = None
 

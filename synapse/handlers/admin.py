@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import List
+from typing import List, Dict, Set
 
 from synapse.api.constants import Membership
 from synapse.events import FrozenEvent
@@ -134,14 +134,13 @@ class AdminHandler(BaseHandler):
             # write out the state at those events. We do this by keeping track
             # of events whose prev events we haven't seen.
 
-            # Map from event ID to prev events that haven't been processed,
-            # dict[str, set[str]].
-            event_to_unseen_prevs = {}
+            # Map from event ID to prev events that haven't been processed.
+            event_to_unseen_prevs = {}  # type: Dict[str, Set[str]]
 
             # The reverse mapping to above, i.e. map from unseen event to events
             # that have the unseen event in their prev_events, i.e. the unseen
-            # events "children". dict[str, set[str]]
-            unseen_to_child_events = {}
+            # events "children".
+            unseen_to_child_events = {}  # type: Dict[str, Set[str]]
 
             # We fetch events in the room the user could see by fetching *all*
             # events that we have and then filtering, this isn't the most

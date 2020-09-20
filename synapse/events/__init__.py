@@ -14,11 +14,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import abc
 import os
 from distutils.util import strtobool
-from typing import Dict, Optional, Tuple, Type
+from typing import Dict, Generic, Optional, Tuple, Type, TypeVar, Union
 
 from unpaddedbase64 import encode_base64
 
@@ -37,7 +36,10 @@ from synapse.util.frozenutils import freeze
 USE_FROZEN_DICTS = strtobool(os.environ.get("SYNAPSE_USE_FROZEN_DICTS", "0"))
 
 
-class DictProperty:
+T = TypeVar("T")
+
+
+class DictProperty(Generic[T]):
     """An object property which delegates to the `_dict` within its parent object."""
 
     __slots__ = ["key"]
@@ -45,11 +47,11 @@ class DictProperty:
     def __init__(self, key: str):
         self.key = key
 
-    def __get__(self, instance, owner=None):
+    def __get__(self, instance, owner=None) -> T:
         # if the property is accessed as a class property rather than an instance
         # property, return the property itself rather than the value
         if instance is None:
-            return self
+            return self  # type: ignore
         try:
             return instance._dict[self.key]
         except KeyError as e1:
@@ -65,7 +67,7 @@ class DictProperty:
                 "'%s' has no '%s' property" % (type(instance), self.key)
             ) from e1.__context__
 
-    def __set__(self, instance, v):
+    def __set__(self, instance, v: T):
         instance._dict[self.key] = v
 
     def __delete__(self, instance):
@@ -77,7 +79,7 @@ class DictProperty:
             ) from e1.__context__
 
 
-class DefaultDictProperty(DictProperty):
+class DefaultDictProperty(DictProperty[Optional[Generic[T]]]):
     """An extension of DictProperty which provides a default if the property is
     not present in the parent's _dict.
 
@@ -104,23 +106,23 @@ class _EventInternalMetadata:
         # reused. TODO: fix that
         self._dict = dict(internal_metadata_dict)
 
-    outlier = DictProperty("outlier")  # type: bool
-    out_of_band_membership = DictProperty("out_of_band_membership")  # type: bool
-    send_on_behalf_of = DictProperty("send_on_behalf_of")  # type: str
-    recheck_redaction = DictProperty("recheck_redaction")  # type: bool
-    soft_failed = DictProperty("soft_failed")  # type: bool
-    proactively_send = DictProperty("proactively_send")  # type: bool
-    redacted = DictProperty("redacted")  # type: bool
-    txn_id = DictProperty("txn_id")  # type: str
-    token_id = DictProperty("token_id")  # type: str
-    stream_ordering = DictProperty("stream_ordering")  # type: int
+    outlier = DictProperty("outlier")  # type: DictProperty[bool]
+    out_of_band_membership = DictProperty("out_of_band_membership")  # type: DictProperty[bool]
+    send_on_behalf_of = DictProperty("send_on_behalf_of")  # type: DictProperty[str]
+    recheck_redaction = DictProperty("recheck_redaction")  # type: DictProperty[bool]
+    soft_failed = DictProperty("soft_failed")  # type: DictProperty[bool]
+    proactively_send = DictProperty("proactively_send")  # type: DictProperty[bool]
+    redacted = DictProperty("redacted")  # type: DictProperty[bool]
+    txn_id = DictProperty("txn_id")  # type: DictProperty[str]
+    token_id = DictProperty("token_id")  # type: DictProperty[str]
+    stream_ordering = DictProperty("stream_ordering")  # type: DictProperty[int]
 
     # XXX: These are set by StreamWorkerStore._set_before_and_after.
     # I'm pretty sure that these are never persisted to the database, so shouldn't
     # be here
-    before = DictProperty("before")  # type: str
-    after = DictProperty("after")  # type: str
-    order = DictProperty("order")  # type: Tuple[int, int]
+    before = DictProperty("before")  # type: DictProperty[str]
+    after = DictProperty("after")  # type: DictProperty[str]
+    order = DictProperty("order")  # type: DictProperty[Tuple[int, int]]
 
     def get_dict(self) -> JsonDict:
         return dict(self._dict)
@@ -211,10 +213,10 @@ class EventBase(metaclass=abc.ABCMeta):
         self,
         event_dict: JsonDict,
         room_version: RoomVersion,
-        signatures: Dict[str, Dict[str, str]],
-        unsigned: JsonDict,
         internal_metadata_dict: JsonDict,
         rejected_reason: Optional[str],
+        signatures: Dict[str, Dict[str, str]],
+        unsigned: JsonDict,
     ):
         assert room_version.event_format == self.format_version
 
@@ -227,19 +229,22 @@ class EventBase(metaclass=abc.ABCMeta):
 
         self.internal_metadata = _EventInternalMetadata(internal_metadata_dict)
 
-    auth_events = DictProperty("auth_events")
-    depth = DictProperty("depth")
-    content = DictProperty("content")
-    hashes = DictProperty("hashes")
-    origin = DictProperty("origin")
-    origin_server_ts = DictProperty("origin_server_ts")
-    prev_events = DictProperty("prev_events")
-    redacts = DefaultDictProperty("redacts", None)
-    room_id = DictProperty("room_id")
-    sender = DictProperty("sender")
-    state_key = DictProperty("state_key")
-    type = DictProperty("type")
-    user_id = DictProperty("sender")
+    # jonathan: No idea what the types are for these variables are, mypy requires explicit typing, so just suppress
+    # them for now, and related methods down below as well.
+    # todo annotate properly
+    auth_events = DictProperty("auth_events")  # type: ignore
+    depth = DictProperty("depth")  # type: ignore
+    content = DictProperty("content")  # type: DictProperty[dict]
+    hashes = DictProperty("hashes")  # type: ignore
+    origin = DictProperty("origin")  # type: ignore
+    origin_server_ts = DictProperty("origin_server_ts")  # type: ignore
+    prev_events = DictProperty("prev_events")  # type: ignore
+    redacts = DefaultDictProperty("redacts", None)  # type: ignore
+    room_id = DictProperty("room_id")  # type: ignore
+    sender = DictProperty("sender")  # type: ignore
+    state_key = DictProperty("state_key")  # type: ignore
+    type = DictProperty("type")  # type: ignore
+    user_id = DictProperty("sender")  # type: ignore
 
     @property
     def event_id(self) -> str:
@@ -318,9 +323,10 @@ class FrozenEvent(EventBase):
         self,
         event_dict: JsonDict,
         room_version: RoomVersion,
-        internal_metadata_dict: JsonDict = {},
+        internal_metadata_dict: JsonDict = None,
         rejected_reason: Optional[str] = None,
     ):
+        internal_metadata_dict = internal_metadata_dict or {}
         event_dict = dict(event_dict)
 
         # Signatures is a dict of dicts, and this is faster than doing a
@@ -374,9 +380,10 @@ class FrozenEventV2(EventBase):
         self,
         event_dict: JsonDict,
         room_version: RoomVersion,
-        internal_metadata_dict: JsonDict = {},
+        internal_metadata_dict: JsonDict = None,
         rejected_reason: Optional[str] = None,
     ):
+        internal_metadata_dict = internal_metadata_dict or {}
         event_dict = dict(event_dict)
 
         # Signatures is a dict of dicts, and this is faster than doing a
@@ -470,7 +477,7 @@ class FrozenEventV3(FrozenEventV2):
         return self._event_id
 
 
-def _event_type_from_format_version(format_version: int) -> Type[EventBase]:
+def _event_type_from_format_version(format_version: int) -> Type[Union[FrozenEvent, FrozenEventV2, FrozenEventV3]]:
     """Returns the python type to use to construct an Event object for the
     given event format version.
 
@@ -495,9 +502,9 @@ def _event_type_from_format_version(format_version: int) -> Type[EventBase]:
 def make_event_from_dict(
     event_dict: JsonDict,
     room_version: RoomVersion = RoomVersions.V1,
-    internal_metadata_dict: JsonDict = {},
+    internal_metadata_dict: JsonDict = None,
     rejected_reason: Optional[str] = None,
 ) -> EventBase:
     """Construct an EventBase from the given event dict"""
     event_type = _event_type_from_format_version(room_version.event_format)
-    return event_type(event_dict, room_version, internal_metadata_dict, rejected_reason)
+    return event_type(event_dict, room_version, internal_metadata_dict or {}, rejected_reason)

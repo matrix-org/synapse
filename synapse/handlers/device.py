@@ -737,7 +737,7 @@ class DeviceListUpdater:
                 # it later.
                 await self.store.mark_remote_user_device_cache_as_stale(user_id)
 
-            return
+            return None
         except (RequestSendFailed, HttpResponseException) as e:
             logger.warning(
                 "Failed to handle device list update for %s: %s", user_id, e,
@@ -754,12 +754,12 @@ class DeviceListUpdater:
             # next time we get a device list update for this user_id.
             # This makes it more likely that the device lists will
             # eventually become consistent.
-            return
+            return None
         except FederationDeniedError as e:
             set_tag("error", True)
             log_kv({"reason": "FederationDeniedError"})
             logger.info(e)
-            return
+            return None
         except Exception as e:
             set_tag("error", True)
             log_kv(
@@ -772,7 +772,7 @@ class DeviceListUpdater:
                 # it later.
                 await self.store.mark_remote_user_device_cache_as_stale(user_id)
 
-            return
+            return None
         log_kv({"result": result})
         stream_id = result["stream_id"]
         devices = result["devices"]

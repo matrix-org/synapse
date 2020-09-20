@@ -281,7 +281,7 @@ def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerConfig]):
         # This only works on Python 3.7
         if sys.version_info >= (3, 7):
             gc.collect()
-            gc.freeze()
+            gc.freeze()  # type: ignore # for some reason mypy thinks that gc.freeze() does not exist
     except Exception:
         traceback.print_exc(file=sys.stderr)
         reactor = hs.get_reactor()

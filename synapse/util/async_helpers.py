@@ -247,9 +247,9 @@ class Linearizer:
         self.max_count = max_count
 
         # key_to_defer is a map from the key to a _LinearizerEntry.
-        self.key_to_defer = {}  # type: Dict[Hashable, _LinearizerEntry]
+        self.key_to_defer = {}  # type: Dict[Optional[Hashable], _LinearizerEntry]
 
-    def is_queued(self, key: Hashable) -> bool:
+    def is_queued(self, key: Optional[Hashable]) -> bool:
         """Checks whether there is a process queued up waiting
         """
         entry = self.key_to_defer.get(key)
@@ -261,7 +261,7 @@ class Linearizer:
         # non-empty.
         return bool(entry.deferreds)
 
-    def queue(self, key: Hashable) -> defer.Deferred:
+    def queue(self, key: Optional[Hashable]) -> defer.Deferred[None]:
         # we avoid doing defer.inlineCallbacks here, so that cancellation works correctly.
         # (https://twistedmatrix.com/trac/ticket/4632 meant that cancellations were not
         # propagated inside inlineCallbacks until Twisted 18.7)

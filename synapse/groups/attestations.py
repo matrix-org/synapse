@@ -37,7 +37,7 @@ An attestation is a signed blob of json that looks like:
 
 import logging
 import random
-from typing import Tuple
+from typing import Tuple, Union
 
 from signedjson.sign import sign_json
 
@@ -109,7 +109,7 @@ class GroupAttestationSigning:
         """Create an attestation for the group_id and user_id with default
         validity length.
         """
-        validity_period = DEFAULT_ATTESTATION_LENGTH_MS
+        validity_period = DEFAULT_ATTESTATION_LENGTH_MS  # type: Union[int, float]
         validity_period *= random.uniform(*DEFAULT_ATTESTATION_JITTER)
         valid_until_ms = int(self.clock.time_msec() + validity_period)
 

@@ -319,6 +319,8 @@ class _AsyncEventContextImpl(EventContext):
             self.state_group
         )
         if self._event_state_key is not None:
+            assert self._current_state_ids is not None
+
             self._prev_state_ids = dict(self._current_state_ids)
 
             key = (self._event_type, self._event_state_key)

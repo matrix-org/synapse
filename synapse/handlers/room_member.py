@@ -864,6 +864,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         inviter_avatar_url = ""
         member_event = room_state.get((EventTypes.Member, user.to_string()))
         if member_event:
+            assert member_event.content is not None
             inviter_display_name = member_event.content.get("displayname", "")
             inviter_avatar_url = member_event.content.get("avatar_url", "")
 

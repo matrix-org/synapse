@@ -14,7 +14,7 @@
 # limitations under the License.
 import collections.abc
 import re
-from typing import Any, Mapping, Union
+from typing import Any, Mapping, Union, Dict
 
 from frozendict import frozendict
 
@@ -116,7 +116,7 @@ def prune_event_dict(room_version: RoomVersion, event_dict: dict) -> dict:
 
     allowed_fields["content"] = new_content
 
-    unsigned = {}
+    unsigned = {}  # type: dict
     allowed_fields["unsigned"] = unsigned
 
     event_unsigned = event_dict.get("unsigned", {})
@@ -200,7 +200,7 @@ def only_fields(dictionary, fields):
         [f.replace(r"\.", r".") for f in field_array] for field_array in split_fields
     ]
 
-    output = {}
+    output = {}  # type: dict
     for field_array in split_fields:
         _copy_field(dictionary, output, field_array)
     return output
@@ -383,7 +383,9 @@ class EventClientSerializer:
                 # If there is an edit replace the content, preserving existing
                 # relations.
 
-                relations = event.content.get("m.relates_to")
+                # todo remove type-ignore in accordance with removing type-ignore on
+                #  synapse/events/__init__.py:234
+                relations = event.content.get("m.relates_to")  # type: ignore
                 serialized_event["content"] = edit.content.get("m.new_content", {})
                 if relations:
                     serialized_event["content"]["m.relates_to"] = relations
@@ -426,7 +428,7 @@ def copy_power_levels_contents(
     if not isinstance(old_power_levels, collections.abc.Mapping):
         raise TypeError("Not a valid power-levels content: %r" % (old_power_levels,))
 
-    power_levels = {}
+    power_levels = {}  # type: Dict[str, Union[int, Dict[str, int]]]
     for k, v in old_power_levels.items():
 
         if isinstance(v, int):
@@ -434,7 +436,8 @@ def copy_power_levels_contents(
             continue
 
         if isinstance(v, collections.abc.Mapping):
-            power_levels[k] = h = {}
+            h = {}  # type: Dict[str, int]
+
             for k1, v1 in v.items():
                 # we should only have one level of nesting
                 if not isinstance(v1, int):
@@ -442,6 +445,8 @@ def copy_power_levels_contents(
                         "Invalid power_levels value for %s.%s: %r" % (k, k1, v1)
                     )
                 h[k1] = v1
+
+            power_levels[k] = h
             continue
 
         raise TypeError("Invalid power_levels value for %s: %r" % (k, v))

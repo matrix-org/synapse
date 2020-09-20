@@ -485,6 +485,12 @@ class GenericWorkerSlavedStore(
 class GenericWorkerServer(HomeServer):
     DATASTORE_CLASS = GenericWorkerSlavedStore
 
+    def __init__(
+        self, hostname: str, config: HomeServerConfig, version_string: str, **kwargs
+    ):
+        super().__init__(hostname, config, **kwargs)
+        self.version_string = version_string
+
     def _listen_http(self, listener_config: ListenerConfig):
         port = listener_config.port
         bind_addresses = listener_config.bind_addresses
@@ -753,15 +759,14 @@ class FederationSenderHandler:
     the appropriate entries to the FederationSender class.
     """
 
+    # todo depr-35: replace with annotation
+    federation_position = -1  # type: int
+
     def __init__(self, hs: GenericWorkerServer):
         self.store = hs.get_datastore()
         self._is_mine_id = hs.is_mine_id
         self.federation_sender = hs.get_federation_sender()
         self._hs = hs
-
-        # Stores the latest position in the federation stream we've gotten up
-        # to. This is always set before we use it.
-        self.federation_position = None
 
         self._fed_position_linearizer = Linearizer(name="_fed_position_linearizer")
 

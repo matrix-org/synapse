@@ -393,8 +393,10 @@ class RoomStreamToken:
     stream = attr.ib(type=int, validator=attr.validators.instance_of(int))
 
     @classmethod
-    def parse(cls, string: str) -> "RoomStreamToken":
+    def parse(cls, string: Optional[str]) -> "RoomStreamToken":
         try:
+            if string is None:
+                raise
             if string[0] == "s":
                 return cls(topological=None, stream=int(string[1:]))
             if string[0] == "t":

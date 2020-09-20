@@ -14,14 +14,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import gc
 import logging
 import math
 import os
 import resource
 import sys
-from typing import Iterable
+from typing import Any, Iterable, List, Optional, Tuple
 
 from prometheus_client import Gauge
 
@@ -49,6 +48,7 @@ from synapse.config._base import ConfigError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import ListenerConfig
+from synapse.crypto.context_factory import ServerContextFactory
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.additional_resource import AdditionalResource
 from synapse.http.server import (
@@ -90,7 +90,21 @@ def gz_wrap(r):
 class SynapseHomeServer(HomeServer):
     DATASTORE_CLASS = DataStore
 
+    def __init__(
+        self,
+        hostname: str,
+        config: HomeServerConfig,
+        version_string: Optional[str],
+        **kwargs
+    ):
+        super().__init__(hostname, config, **kwargs)
+        self.version_string = version_string or "DEV"
+
+    tls_server_context_factory = None  # type: Optional[ServerContextFactory]
+
     def _listener_http(self, config: HomeServerConfig, listener_config: ListenerConfig):
+        assert listener_config.http_options is not None
+
         port = listener_config.port
         bind_addresses = listener_config.bind_addresses
         tls = listener_config.tls
@@ -137,6 +151,8 @@ class SynapseHomeServer(HomeServer):
         root_resource = create_resource_tree(resources, root_resource)
 
         if tls:
+            assert self.tls_server_context_factory is not None
+
             ports = listen_ssl(
                 bind_addresses,
                 port,
@@ -488,7 +504,7 @@ class SynapseService(service.Service):
 
 # Contains the list of processes we will be monitoring
 # currently either 0 or 1
-_stats_process = []
+_stats_process = []  # type: List[Tuple[int, Any]]
 
 
 async def phone_stats_home(hs, stats, stats_process=_stats_process):
@@ -586,8 +602,11 @@ def run(hs):
                 func(*args, **kargs)
                 profile.disable()
                 ident = current_thread().ident
+                assert ident is not None
                 profile.dump_stats(
-                    "/tmp/%s.%s.%i.pstat" % (hs.hostname, func.__name__, ident)
+                    "/tmp/{:s}.{:s}.{:d}.pstat".format(
+                        hs.hostname, func.__name__, ident
+                    )
                 )
 
             return profiled
@@ -599,7 +618,7 @@ def run(hs):
 
     clock = hs.get_clock()
 
-    stats = {}
+    stats = {}  # type: dict
 
     def performance_stats_init():
         _stats_process.clear()

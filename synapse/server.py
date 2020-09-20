@@ -25,7 +25,18 @@ import abc
 import functools
 import logging
 import os
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, TypeVar, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Type,
+    TypeVar,
+    cast,
+)
 
 import twisted
 from twisted.mail.smtp import sendmail
@@ -37,6 +48,7 @@ from synapse.api.ratelimiting import Ratelimiter
 from synapse.appservice.api import ApplicationServiceApi
 from synapse.appservice.scheduler import ApplicationServiceScheduler
 from synapse.config.homeserver import HomeServerConfig
+from synapse.config.server import ListenerConfig
 from synapse.crypto import context_factory
 from synapse.crypto.context_factory import RegularPolicyForHTTPS
 from synapse.crypto.keyring import Keyring
@@ -110,6 +122,7 @@ from synapse.server_notices.worker_server_notices_sender import (
 )
 from synapse.state import StateHandler, StateResolutionHandler
 from synapse.storage import Databases, DataStore, Storage
+from synapse.storage._base import SQLBaseStore
 from synapse.streams.events import EventSources
 from synapse.types import DomainSpecificString
 from synapse.util import Clock
@@ -190,7 +203,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     # This is overridden in derived application classes
     # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
     # instantiated during setup() for future return by get_datastore()
-    DATASTORE_CLASS = abc.abstractproperty()
+    @property
+    @abc.abstractmethod
+    def DATASTORE_CLASS(self) -> Type[SQLBaseStore]:
+        raise NotImplementedError
 
     def __init__(self, hostname: str, config: HomeServerConfig, reactor=None, **kwargs):
         """
@@ -299,6 +315,10 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     def get_registration_ratelimiter(self) -> Ratelimiter:
         return self.registration_ratelimiter
+
+    @abc.abstractmethod
+    def start_listening(self, listeners: Iterable[ListenerConfig]) -> None:
+        ...
 
     @cache_in_self
     def get_federation_client(self) -> FederationClient:

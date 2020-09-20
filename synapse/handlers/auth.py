@@ -1090,7 +1090,7 @@ class AuthHandler(BaseHandler):
         return await defer_to_thread(self.hs.get_reactor(), _do_hash)
 
     async def validate_hash(
-        self, password: str, stored_hash: Union[bytes, str]
+        self, password: str, _stored_hash: Union[bytes, str]
     ) -> bool:
         """Validates that self.hash(password) == stored_hash.
 
@@ -1102,7 +1102,7 @@ class AuthHandler(BaseHandler):
             Whether self.hash(password) == stored_hash.
         """
 
-        def _do_validate_hash():
+        def _do_validate_hash(stored_hash: bytes):
             # Normalise the Unicode in the password
             pw = unicodedata.normalize("NFKC", password)
 
@@ -1111,11 +1111,13 @@ class AuthHandler(BaseHandler):
                 stored_hash,
             )
 
-        if stored_hash:
-            if not isinstance(stored_hash, bytes):
-                stored_hash = stored_hash.encode("ascii")
+        if _stored_hash:
+            if isinstance(_stored_hash, str):
+                _stored_hash = _stored_hash.encode("ascii")
 
-            return await defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
+            return await defer_to_thread(
+                self.hs.get_reactor(), _do_validate_hash, _stored_hash
+            )
         else:
             return False
 

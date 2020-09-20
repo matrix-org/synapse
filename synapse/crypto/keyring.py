@@ -13,10 +13,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 import urllib
 from collections import defaultdict
+from typing import Dict, List, Optional, Tuple
 
 import attr
 from signedjson.key import (
@@ -236,7 +236,7 @@ class Keyring:
             ctx = current_context()
 
             # map from server name to a set of outstanding request ids
-            server_to_request_ids = {}
+            server_to_request_ids = {}  # type: Dict[str, set]
 
             for verify_request in verify_requests:
                 server_name = verify_request.server_name
@@ -369,9 +369,9 @@ class Keyring:
             remaining_requests (set[VerifyJsonRequest]): outstanding key requests.
                 Any successfully-completed requests will be removed from the list.
         """
-        # dict[str, dict[str, int]]: keys to fetch.
+        # keys to fetch
         # server_name -> key_id -> min_valid_ts
-        missing_keys = defaultdict(dict)
+        missing_keys = defaultdict(dict)  # type: Dict[str, Dict[str, int]]
 
         for verify_request in remaining_requests:
             # any completed requests should already have been removed
@@ -450,7 +450,7 @@ class StoreKeyFetcher(KeyFetcher):
         )
 
         res = await self.store.get_server_verify_keys(keys_to_fetch)
-        keys = {}
+        keys = {}  # type: Dict[str, Dict[str, Optional[FetchKeyResult]]]
         for (server_name, key_id), key in res.items():
             keys.setdefault(server_name, {})[key_id] = key
         return keys
@@ -593,7 +593,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
             ).addErrback(unwrapFirstError)
         )
 
-        union_of_keys = {}
+        union_of_keys = {}  # type: Dict[str, Dict[str, FetchKeyResult]]
         for result in results:
             for server_name, keys in result.items():
                 union_of_keys.setdefault(server_name, {}).update(keys)
@@ -644,8 +644,8 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         except HttpResponseException as e:
             raise KeyLookupError("Remote server returned an error: %s" % (e,))
 
-        keys = {}
-        added_keys = []
+        keys = {}  # type: Dict[str, Dict[str, FetchKeyResult]]
+        added_keys = []  # type: List[Tuple[str, str, FetchKeyResult]]
 
         time_now_ms = self.clock.time_msec()
 
@@ -773,7 +773,7 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
         Raises:
             KeyLookupError if there was a problem making the lookup
         """
-        keys = {}  # type: dict[str, FetchKeyResult]
+        keys = {}  # type: Dict[str, FetchKeyResult]
 
         for requested_key_id in key_ids:
             # we may have found this key as a side-effect of asking for another.
