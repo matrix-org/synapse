@@ -14,7 +14,7 @@
 # limitations under the License.
 import collections.abc
 import re
-from typing import Any, Mapping, Union, Dict
+from typing import Any, Dict, Mapping, Union
 
 from frozendict import frozendict
 

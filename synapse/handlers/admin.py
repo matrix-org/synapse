@@ -12,9 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
-from typing import List, Dict, Set
+from typing import Dict, List, Set
 
 from synapse.api.constants import Membership
 from synapse.events import FrozenEvent

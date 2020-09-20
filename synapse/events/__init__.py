@@ -107,7 +107,9 @@ class _EventInternalMetadata:
         self._dict = dict(internal_metadata_dict)
 
     outlier = DictProperty("outlier")  # type: DictProperty[bool]
-    out_of_band_membership = DictProperty("out_of_band_membership")  # type: DictProperty[bool]
+    out_of_band_membership = DictProperty(
+        "out_of_band_membership"
+    )  # type: DictProperty[bool]
     send_on_behalf_of = DictProperty("send_on_behalf_of")  # type: DictProperty[str]
     recheck_redaction = DictProperty("recheck_redaction")  # type: DictProperty[bool]
     soft_failed = DictProperty("soft_failed")  # type: DictProperty[bool]
@@ -477,7 +479,9 @@ class FrozenEventV3(FrozenEventV2):
         return self._event_id
 
 
-def _event_type_from_format_version(format_version: int) -> Type[Union[FrozenEvent, FrozenEventV2, FrozenEventV3]]:
+def _event_type_from_format_version(
+    format_version: int,
+) -> Type[Union[FrozenEvent, FrozenEventV2, FrozenEventV3]]:
     """Returns the python type to use to construct an Event object for the
     given event format version.
 
@@ -507,4 +511,6 @@ def make_event_from_dict(
 ) -> EventBase:
     """Construct an EventBase from the given event dict"""
     event_type = _event_type_from_format_version(room_version.event_format)
-    return event_type(event_dict, room_version, internal_metadata_dict or {}, rejected_reason)
+    return event_type(
+        event_dict, room_version, internal_metadata_dict or {}, rejected_reason
+    )
