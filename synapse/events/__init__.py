@@ -17,7 +17,7 @@
 import abc
 import os
 from distutils.util import strtobool
-from typing import Dict, Generic, Optional, Tuple, Type, TypeVar, Union
+from typing import Dict, Generic, Optional, Tuple, Type, TypeVar, Union, Any
 
 from unpaddedbase64 import encode_base64
 
@@ -79,7 +79,10 @@ class DictProperty(Generic[T]):
             ) from e1.__context__
 
 
-class DefaultDictProperty(DictProperty[Optional[Generic[T]]]):
+AltT = TypeVar("AltT")
+
+
+class DefaultDictProperty(DictProperty[Union[T, AltT]], Generic[T, AltT]):
     """An extension of DictProperty which provides a default if the property is
     not present in the parent's _dict.
 
@@ -88,13 +91,13 @@ class DefaultDictProperty(DictProperty[Optional[Generic[T]]]):
 
     __slots__ = ["default"]
 
-    def __init__(self, key, default):
+    def __init__(self, key, default: AltT):
         super().__init__(key)
         self.default = default
 
-    def __get__(self, instance, owner=None):
+    def __get__(self, instance, owner=None) -> Union[T, AltT]:
         if instance is None:
-            return self
+            return self  # type: ignore
         return instance._dict.get(self.key, self.default)
 
 
@@ -241,7 +244,9 @@ class EventBase(metaclass=abc.ABCMeta):
     origin = DictProperty("origin")  # type: ignore
     origin_server_ts = DictProperty("origin_server_ts")  # type: ignore
     prev_events = DictProperty("prev_events")  # type: ignore
-    redacts = DefaultDictProperty("redacts", None)  # type: ignore
+    redacts = DefaultDictProperty(
+        "redacts", None
+    )  # type: DefaultDictProperty[Any, None]
     room_id = DictProperty("room_id")  # type: ignore
     sender = DictProperty("sender")  # type: ignore
     state_key = DictProperty("state_key")  # type: ignore
