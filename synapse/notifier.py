@@ -326,6 +326,12 @@ class Notifier:
         except Exception:
             logger.exception("Error notifying application services of event")
 
+    async def _notify_app_services_ephemeral(self, stream_key: str, new_token: Union[int, RoomStreamToken]):
+        try:
+            await self.appservice_handler.notify_interested_services_ephemeral(stream_key, new_token)
+        except Exception:
+            logger.exception("Error notifying application services of event")
+
     async def _notify_pusher_pool(self, max_room_stream_id: int):
         try:
             await self._pusher_pool.on_new_notifications(max_room_stream_id)
@@ -363,6 +369,11 @@ class Notifier:
                         logger.exception("Failed to notify listener")
 
                 self.notify_replication()
+
+                # Notify appservices
+                run_as_background_process(
+                    "_notify_app_services_ephemeral", self._notify_app_services_ephemeral, stream_key, new_token,
+                )
 
     def on_new_replication_data(self) -> None:
         """Used to inform replication listeners that something has happend
