@@ -834,7 +834,10 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             name="device_id_exists", keylen=2, max_entries=10000
         )
 
-        self._clock.looping_call(self._prune_old_outbound_device_pokes, 60 * 60 * 1000)
+        if hs.config.run_background_tasks:
+            self._clock.looping_call(
+                self._prune_old_outbound_device_pokes, 60 * 60 * 1000
+            )
 
     async def store_device(
         self, user_id: str, device_id: str, initial_device_display_name: str

@@ -413,7 +413,7 @@ class EventCreationHandler:
             self._consent_uri_builder = ConsentURIBuilder(self.config)
 
         if (
-            not self.config.worker_app
+            self.config.run_background_tasks
             and self.config.cleanup_extremities_with_dummy_events
         ):
             self.clock.looping_call(

@@ -132,6 +132,16 @@ class WorkerConfig(Config):
 
         self.events_shard_config = ShardedWorkerHandlingConfig(self.writers.events)
 
+        # Whether this worker should run background tasks or not.
+        #
+        # As a note for developers, the background tasks guarded by this should
+        # be able to run on only a single instance (meaning that they don't
+        # depend on any in-memory state of a particular worker).
+        #
+        # Effort is not made to ensure only a single instance of these tasks is
+        # running.
+        self.run_background_tasks = config.get("run_background_tasks", True)
+
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
         ## Workers ##

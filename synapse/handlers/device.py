@@ -522,12 +522,13 @@ class DeviceListUpdater:
 
         # Attempt to resync out of sync device lists every 30s.
         self._resync_retry_in_progress = False
-        self.clock.looping_call(
-            run_as_background_process,
-            30 * 1000,
-            func=self._maybe_retry_device_resync,
-            desc="_maybe_retry_device_resync",
-        )
+        if hs.config.run_background_tasks:
+            self.clock.looping_call(
+                run_as_background_process,
+                30 * 1000,
+                func=self._maybe_retry_device_resync,
+                desc="_maybe_retry_device_resync",
+            )
 
     @trace
     async def incoming_device_list_update(self, origin, edu_content):

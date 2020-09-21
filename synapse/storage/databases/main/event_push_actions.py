@@ -679,9 +679,10 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         )
 
         self._doing_notif_rotation = False
-        self._rotate_notif_loop = self._clock.looping_call(
-            self._start_rotate_notifs, 30 * 60 * 1000
-        )
+        if hs.config.run_background_tasks:
+            self._rotate_notif_loop = self._clock.looping_call(
+                self._start_rotate_notifs, 30 * 60 * 1000
+            )
 
     async def get_push_actions_for_user(
         self, user_id, before=None, limit=50, only_highlight=False
@@ -741,7 +742,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         users can still get a list of recent highlights.
 
         Args:
-            txn: The transcation
+            txn: The transaction
             room_id: Room ID to delete from
             user_id: user ID to delete for
             stream_ordering: The lowest stream ordering which will

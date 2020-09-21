@@ -885,6 +885,7 @@ def start(config_options):
     # For backwards compatibility let any of the old app names.
     assert config.worker_app in (
         "synapse.app.appservice",
+        "synapse.app.background_worker",
         "synapse.app.client_reader",
         "synapse.app.event_creator",
         "synapse.app.federation_reader",
@@ -960,6 +961,22 @@ def start(config_options):
     else:
         # For other worker types we force this to off.
         config.worker.send_federation = False
+
+    if config.worker_app == "synapse.app.background_worker":
+        if config.worker.run_background_tasks:
+            sys.stderr.write(
+                "\nThe run_background_tasks must be disabled in the main synapse process"
+                "\nbefore they can be run in a separate worker."
+                "\nPlease add ``run_background_tasks: false`` to the main config"
+                "\n"
+            )
+            sys.exit(1)
+
+            # Force the background tasks to start since they will be disabled in the main config
+            config.worker.run_background_tasks = True
+        else:
+            # For other worker types we force this to off.
+            config.worker.run_background_tasks = False
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 

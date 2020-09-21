@@ -620,7 +620,8 @@ def run(hs):
     # Rather than update on per session basis, batch up the requests.
     # If you increase the loop period, the accuracy of user_daily_visits
     # table will decrease
-    clock.looping_call(generate_user_daily_visit_stats, 5 * 60 * 1000)
+    if hs.config.run_background_tasks:
+        clock.looping_call(generate_user_daily_visit_stats, 5 * 60 * 1000)
 
     # monthly active user limiting functionality
     def reap_monthly_active_users():
@@ -628,8 +629,9 @@ def run(hs):
             "reap_monthly_active_users", hs.get_datastore().reap_monthly_active_users
         )
 
-    clock.looping_call(reap_monthly_active_users, 1000 * 60 * 60)
-    reap_monthly_active_users()
+    if hs.config.run_background_tasks:
+        clock.looping_call(reap_monthly_active_users, 1000 * 60 * 60)
+        reap_monthly_active_users()
 
     async def generate_monthly_active_users():
         current_mau_count = 0
@@ -656,11 +658,13 @@ def run(hs):
         )
 
     start_generate_monthly_active_users()
-    if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
+    if hs.config.run_background_tasks and (
+        hs.config.limit_usage_by_mau or hs.config.mau_stats_only
+    ):
         clock.looping_call(start_generate_monthly_active_users, 5 * 60 * 1000)
     # End of monthly active user settings
 
-    if hs.config.report_stats:
+    if hs.config.run_background_tasks and hs.config.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")
         clock.looping_call(start_phone_stats_home, 3 * 60 * 60 * 1000)
 

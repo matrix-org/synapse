@@ -371,11 +371,10 @@ class MasterProfileHandler(BaseProfileHandler):
     def __init__(self, hs):
         super().__init__(hs)
 
-        assert hs.config.worker_app is None
-
-        self.clock.looping_call(
-            self._start_update_remote_profile_cache, self.PROFILE_UPDATE_MS
-        )
+        if hs.config.run_background_tasks:
+            self.clock.looping_call(
+                self._start_update_remote_profile_cache, self.PROFILE_UPDATE_MS
+            )
 
     def _start_update_remote_profile_cache(self):
         return run_as_background_process(

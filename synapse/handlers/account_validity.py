@@ -42,6 +42,7 @@ class AccountValidityHandler:
         if (
             self._account_validity.enabled
             and self._account_validity.renew_by_email_enabled
+            and hs.config.run_background_tasks
         ):
             # Don't do email-specific configuration if renewal by email is disabled.
             self._template_html = self.config.account_validity_template_html
