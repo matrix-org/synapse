@@ -908,12 +908,21 @@ class OidcHandler:
         localpart = map_username_to_mxid_localpart(attributes["localpart"])
 
         user_id = UserID(localpart, self._hostname)
-        matches = await self._datastore.get_users_by_id_case_insensitive(
+        users = await self._datastore.get_users_by_id_case_insensitive(
             user_id.to_string()
         )
-        if matches:
+        if users:
             if self._allow_existing_users:
-                registered_user_id = next(iter(matches))
+                if len(users) == 1:
+                    registered_user_id = next(iter(users))
+                elif user_id in users:
+                    registered_user_id = user_id
+                else:
+                    raise MappingException(
+                        "Attempted to login as '{}' but it matches more than one user inexactly: {}".format(
+                            user_id.to_string(), list(users.keys())
+                        )
+                    )
             else:
                 # This mxid is taken
                 raise MappingException(
