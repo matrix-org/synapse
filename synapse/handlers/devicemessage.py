@@ -17,8 +17,8 @@ import logging
 from typing import Any, Dict
 
 from synapse.api.errors import SynapseError
-from synapse.logging.context import run_in_background
-from synapse.logging.opentracing import (
+from synapse.log.context import run_in_background
+from synapse.log.opentracing import (
     get_active_span_text_map,
     log_kv,
     set_tag,

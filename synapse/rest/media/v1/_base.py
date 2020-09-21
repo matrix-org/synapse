@@ -24,7 +24,7 @@ from twisted.protocols.basic import FileSender
 
 from synapse.api.errors import Codes, SynapseError, cs_error
 from synapse.http.server import finish_request, respond_with_json
-from synapse.logging.context import make_deferred_yieldable
+from synapse.log.context import make_deferred_yieldable
 from synapse.util.stringutils import is_ascii
 
 logger = logging.getLogger(__name__)

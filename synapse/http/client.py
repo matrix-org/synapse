@@ -45,8 +45,8 @@ from synapse.http import (
     redact_uri,
 )
 from synapse.http.proxyagent import ProxyAgent
-from synapse.logging.context import make_deferred_yieldable
-from synapse.logging.opentracing import set_tag, start_active_span, tags
+from synapse.log.context import make_deferred_yieldable
+from synapse.log.opentracing import set_tag, start_active_span, tags
 from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
 

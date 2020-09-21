@@ -16,7 +16,7 @@ from twisted.internet import defer
 from twisted.internet.defer import CancelledError, Deferred
 from twisted.internet.task import Clock
 
-from synapse.logging.context import (
+from synapse.log.context import (
     SENTINEL_CONTEXT,
     LoggingContext,
     PreserveLoggingContext,

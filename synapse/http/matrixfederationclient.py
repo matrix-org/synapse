@@ -47,8 +47,8 @@ from synapse.api.errors import (
 from synapse.http import QuieterFileBodyProducer
 from synapse.http.client import BlacklistingAgentWrapper, IPBlacklistingResolver
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
-from synapse.logging.context import make_deferred_yieldable
-from synapse.logging.opentracing import (
+from synapse.log.context import make_deferred_yieldable
+from synapse.log.opentracing import (
     inject_active_span_byte_dict,
     set_tag,
     start_active_span,

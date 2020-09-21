@@ -37,8 +37,8 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError
 from synapse.events import EventBase
 from synapse.handlers.presence import format_user_presence_state
-from synapse.logging.context import PreserveLoggingContext
-from synapse.logging.utils import log_function
+from synapse.log.context import PreserveLoggingContext
+from synapse.log.utils import log_function
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.streams.config import PaginationConfig

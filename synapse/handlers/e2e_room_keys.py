@@ -23,7 +23,7 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
-from synapse.logging.opentracing import log_kv, trace
+from synapse.log.opentracing import log_kv, trace
 from synapse.util.async_helpers import Linearizer
 
 logger = logging.getLogger(__name__)

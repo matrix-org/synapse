@@ -1,7 +1,7 @@
 import twisted.python.failure
 from twisted.internet import defer, reactor
 
-from synapse.logging.context import (
+from synapse.log.context import (
     SENTINEL_CONTEXT,
     LoggingContext,
     PreserveLoggingContext,

@@ -16,6 +16,6 @@
 Backwards compatibility re-exports of ``synapse.logging.formatter`` functionality.
 """
 
-from synapse.logging.formatter import LogFormatter
+from synapse.log.formatter import LogFormatter
 
 __all__ = ["LogFormatter"]

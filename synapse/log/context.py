@@ -35,7 +35,7 @@ from typing_extensions import Literal
 from twisted.internet import defer, threads
 
 if TYPE_CHECKING:
-    from synapse.logging.scopecontextmanager import _LogContextScope
+    from synapse.log.scopecontextmanager import _LogContextScope
 
 logger = logging.getLogger(__name__)
 

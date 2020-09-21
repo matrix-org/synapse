@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 
 import txredisapi
 
-from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
+from synapse.log.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.metrics.background_process_metrics import (
     BackgroundProcessLoggingContext,
     run_as_background_process,

@@ -31,7 +31,7 @@ from synapse.crypto.keyring import (
     ServerKeyFetcher,
     StoreKeyFetcher,
 )
-from synapse.logging.context import (
+from synapse.log.context import (
     LoggingContext,
     PreserveLoggingContext,
     current_context,

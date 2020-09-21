@@ -27,7 +27,7 @@ import jinja2
 from synapse.api.constants import EventTypes
 from synapse.api.errors import StoreError
 from synapse.config.emailconfig import EmailSubjectConfig
-from synapse.logging.context import make_deferred_yieldable
+from synapse.log.context import make_deferred_yieldable
 from synapse.push.presentable_names import (
     calculate_room_name,
     descriptor_from_member_events,

@@ -23,8 +23,8 @@ import textwrap
 from twisted.logger import Logger, eventAsText, eventsFromJSONLogFile
 
 from synapse.config.logger import setup_logging
-from synapse.logging._structured import setup_structured_logging
-from synapse.logging.context import LoggingContext
+from synapse.log._structured import setup_structured_logging
+from synapse.log.context import LoggingContext
 
 from tests.unittest import DEBUG, HomeserverTestCase
 

@@ -21,7 +21,7 @@ import mock
 from twisted.internet import defer, reactor
 
 from synapse.api.errors import SynapseError
-from synapse.logging.context import (
+from synapse.log.context import (
     SENTINEL_CONTEXT,
     LoggingContext,
     PreserveLoggingContext,

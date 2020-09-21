@@ -52,8 +52,8 @@ from synapse.api.room_versions import (
 )
 from synapse.events import EventBase, builder
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
-from synapse.logging.context import make_deferred_yieldable, preserve_fn
-from synapse.logging.utils import log_function
+from synapse.log.context import make_deferred_yieldable, preserve_fn
+from synapse.log.utils import log_function
 from synapse.types import JsonDict, get_domain_from_id
 from synapse.util import unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache

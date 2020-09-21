@@ -25,7 +25,7 @@ from prometheus_client import Gauge
 
 from twisted.internet import defer
 
-from synapse.logging.context import make_deferred_yieldable, preserve_fn
+from synapse.log.context import make_deferred_yieldable, preserve_fn
 from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.lrucache import LruCache

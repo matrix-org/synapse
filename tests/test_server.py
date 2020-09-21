@@ -21,7 +21,7 @@ from synapse.api.errors import Codes, RedirectException, SynapseError
 from synapse.config.server import parse_listener_def
 from synapse.http.server import DirectServeHtmlResource, JsonResource, OptionsResource
 from synapse.http.site import SynapseSite
-from synapse.logging.context import make_deferred_yieldable
+from synapse.log.context import make_deferred_yieldable
 from synapse.util import Clock
 
 from tests import unittest

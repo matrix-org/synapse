@@ -36,8 +36,8 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string_from_args,
 )
-from synapse.logging.context import run_in_background
-from synapse.logging.opentracing import (
+from synapse.log.context import run_in_background
+from synapse.log.opentracing import (
     start_active_span,
     start_active_span_from_request,
     tags,

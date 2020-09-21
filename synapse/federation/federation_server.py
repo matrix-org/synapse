@@ -50,13 +50,13 @@ from synapse.federation.federation_base import FederationBase, event_from_pdu_js
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
 from synapse.http.endpoint import parse_server_name
-from synapse.logging.context import (
+from synapse.log.context import (
     make_deferred_yieldable,
     nested_logging_context,
     run_in_background,
 )
-from synapse.logging.opentracing import log_kv, start_active_span_from_edu, trace
-from synapse.logging.utils import log_function
+from synapse.log.opentracing import log_kv, start_active_span_from_edu, trace
+from synapse.log.utils import log_function
 from synapse.replication.http.federation import (
     ReplicationFederationSendEduRestServlet,
     ReplicationGetQueryRestServlet,

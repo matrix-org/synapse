@@ -58,7 +58,7 @@ from prometheus_client import Counter
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.python.failure import Failure
 
-from synapse.logging.context import PreserveLoggingContext
+from synapse.log.context import PreserveLoggingContext
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import (
     BackgroundProcessLoggingContext,

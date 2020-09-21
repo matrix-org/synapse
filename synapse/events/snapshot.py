@@ -19,7 +19,7 @@ from frozendict import frozendict
 
 from synapse.appservice import ApplicationService
 from synapse.events import EventBase
-from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.log.context import make_deferred_yieldable, run_in_background
 from synapse.types import StateMap
 
 if TYPE_CHECKING:

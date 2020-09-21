@@ -21,7 +21,7 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, SynapseError
 from synapse.events import EventBase
 from synapse.handlers.presence import format_user_presence_state
-from synapse.logging.utils import log_function
+from synapse.log.utils import log_function
 from synapse.streams.config import PaginationConfig
 from synapse.types import JsonDict, UserID
 from synapse.visibility import filter_events_for_client

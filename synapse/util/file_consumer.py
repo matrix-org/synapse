@@ -17,7 +17,7 @@ import queue
 
 from twisted.internet import threads
 
-from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.log.context import make_deferred_yieldable, run_in_background
 
 
 class BackgroundFileConsumer:

@@ -17,7 +17,7 @@ import os
 
 import twisted.logger
 
-from synapse.logging.context import LoggingContextFilter
+from synapse.log.context import LoggingContextFilter
 
 
 class ToTwistedHandler(logging.Handler):

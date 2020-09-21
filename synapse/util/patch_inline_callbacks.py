@@ -30,7 +30,7 @@ def do_patch():
     Patch defer.inlineCallbacks so that it checks the state of the logcontext on exit
     """
 
-    from synapse.logging.context import current_context
+    from synapse.log.context import current_context
 
     global _already_patched
 
@@ -125,7 +125,7 @@ def _check_yield_points(f: Callable, changes: List[str]):
         function
     """
 
-    from synapse.logging.context import current_context
+    from synapse.log.context import current_context
 
     @functools.wraps(f)
     def check_yield_points_inner(*args, **kwargs):

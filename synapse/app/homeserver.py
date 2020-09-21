@@ -58,7 +58,7 @@ from synapse.http.server import (
     StaticResource,
 )
 from synapse.http.site import SynapseSite
-from synapse.logging.context import LoggingContext
+from synapse.log.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.module_api import ModuleApi

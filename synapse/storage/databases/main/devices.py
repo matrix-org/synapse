@@ -19,7 +19,7 @@ import logging
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from synapse.api.errors import Codes, StoreError
-from synapse.logging.opentracing import (
+from synapse.log.opentracing import (
     get_active_span_text_map,
     set_tag,
     trace,

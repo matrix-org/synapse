@@ -19,7 +19,7 @@ from opentracing import Scope, ScopeManager
 
 import twisted
 
-from synapse.logging.context import current_context, nested_logging_context
+from synapse.log.context import current_context, nested_logging_context
 
 logger = logging.getLogger(__name__)
 

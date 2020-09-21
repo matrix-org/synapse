@@ -38,7 +38,7 @@ from synapse.http.federation.well_known_resolver import (
     WellKnownResolver,
     _cache_period_from_headers,
 )
-from synapse.logging.context import SENTINEL_CONTEXT, LoggingContext, current_context
+from synapse.log.context import SENTINEL_CONTEXT, LoggingContext, current_context
 from synapse.util.caches.ttlcache import TTLCache
 
 from tests import unittest

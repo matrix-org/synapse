@@ -21,7 +21,7 @@ from email.mime.text import MIMEText
 from typing import List
 
 from synapse.api.errors import StoreError
-from synapse.logging.context import make_deferred_yieldable
+from synapse.log.context import make_deferred_yieldable
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import UserID
 from synapse.util import stringutils

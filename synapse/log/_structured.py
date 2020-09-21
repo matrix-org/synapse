@@ -38,11 +38,11 @@ from twisted.logger import (
 )
 
 from synapse.config._base import ConfigError
-from synapse.logging._terse_json import (
+from synapse.log._terse_json import (
     TerseJSONToConsoleLogObserver,
     TerseJSONToTCPLogObserver,
 )
-from synapse.logging.context import current_context
+from synapse.log.context import current_context
 
 
 def stdlib_log_level_to_twisted(level: str) -> LogLevel:

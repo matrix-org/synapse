@@ -28,11 +28,7 @@ from synapse.federation.sender.per_destination_queue import PerDestinationQueue
 from synapse.federation.sender.transaction_manager import TransactionManager
 from synapse.federation.units import Edu
 from synapse.handlers.presence import get_interested_remotes
-from synapse.logging.context import (
-    make_deferred_yieldable,
-    preserve_fn,
-    run_in_background,
-)
+from synapse.log.context import make_deferred_yieldable, preserve_fn, run_in_background
 from synapse.metrics import (
     LaterGauge,
     event_processing_loop_counter,

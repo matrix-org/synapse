@@ -40,7 +40,7 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
-from synapse.logging.context import (
+from synapse.log.context import (
     PreserveLoggingContext,
     current_context,
     make_deferred_yieldable,

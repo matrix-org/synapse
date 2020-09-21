@@ -33,7 +33,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.config._base import ConfigError
-from synapse.logging.context import defer_to_thread
+from synapse.log.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.async_helpers import Linearizer
 from synapse.util.retryutils import NotRetryingDestination

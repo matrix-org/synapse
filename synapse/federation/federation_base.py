@@ -29,7 +29,7 @@ from synapse.crypto.keyring import Keyring
 from synapse.events import EventBase, make_event_from_dict
 from synapse.events.utils import prune_event, validate_canonicaljson
 from synapse.http.servlet import assert_params_in_dict
-from synapse.logging.context import (
+from synapse.log.context import (
     PreserveLoggingContext,
     current_context,
     make_deferred_yieldable,

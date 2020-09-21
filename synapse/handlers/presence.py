@@ -34,8 +34,8 @@ import synapse.metrics
 from synapse.api.constants import EventTypes, Membership, PresenceState
 from synapse.api.errors import SynapseError
 from synapse.api.presence import UserPresenceState
-from synapse.logging.context import run_in_background
-from synapse.logging.utils import log_function
+from synapse.log.context import run_in_background
+from synapse.log.utils import log_function
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.state import StateHandler

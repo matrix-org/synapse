@@ -29,7 +29,7 @@ from PIL import Image as Image
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
 
-from synapse.logging.context import make_deferred_yieldable
+from synapse.log.context import make_deferred_yieldable
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.filepath import MediaFilePaths
 from synapse.rest.media.v1.media_storage import MediaStorage

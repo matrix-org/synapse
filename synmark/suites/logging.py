@@ -26,7 +26,7 @@ from twisted.internet.protocol import ServerFactory
 from twisted.logger import LogBeginner, Logger, LogPublisher
 from twisted.protocols.basic import LineOnlyReceiver
 
-from synapse.logging._structured import setup_structured_logging
+from synapse.log._structured import setup_structured_logging
 
 
 class LineCounter(LineOnlyReceiver):

@@ -55,13 +55,13 @@ from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
 from synapse.handlers._base import BaseHandler
-from synapse.logging.context import (
+from synapse.log.context import (
     make_deferred_yieldable,
     nested_logging_context,
     preserve_fn,
     run_in_background,
 )
-from synapse.logging.utils import log_function
+from synapse.log.utils import log_function
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.replication.http.federation import (

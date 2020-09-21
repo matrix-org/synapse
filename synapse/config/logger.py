@@ -32,11 +32,8 @@ from twisted.logger import (
 
 import synapse
 from synapse.app import _base as appbase
-from synapse.logging._structured import (
-    reload_structured_logging,
-    setup_structured_logging,
-)
-from synapse.logging.context import LoggingContextFilter
+from synapse.log._structured import reload_structured_logging, setup_structured_logging
+from synapse.log.context import LoggingContextFilter
 from synapse.util.versionstring import get_version_string
 
 from ._base import Config, ConfigError

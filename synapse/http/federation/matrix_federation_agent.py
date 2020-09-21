@@ -29,7 +29,7 @@ from twisted.web.iweb import IAgent, IAgentEndpointFactory
 
 from synapse.http.federation.srv_resolver import Server, SrvResolver
 from synapse.http.federation.well_known_resolver import WellKnownResolver
-from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.log.context import make_deferred_yieldable, run_in_background
 from synapse.util import Clock
 
 logger = logging.getLogger(__name__)

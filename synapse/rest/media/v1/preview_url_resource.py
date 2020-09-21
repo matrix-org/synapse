@@ -38,7 +38,7 @@ from synapse.http.server import (
     respond_with_json_bytes,
 )
 from synapse.http.servlet import parse_integer, parse_string
-from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.log.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.media.v1._base import get_filename_from_headers
 from synapse.util import json_encoder

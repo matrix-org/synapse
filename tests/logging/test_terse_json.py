@@ -18,7 +18,7 @@ from collections import Counter
 
 from twisted.logger import Logger
 
-from synapse.logging._structured import setup_structured_logging
+from synapse.log._structured import setup_structured_logging
 
 from tests.server import connect_client
 from tests.unittest import HomeserverTestCase

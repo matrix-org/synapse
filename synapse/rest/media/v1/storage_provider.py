@@ -20,7 +20,7 @@ import shutil
 from typing import Optional
 
 from synapse.config._base import Config
-from synapse.logging.context import defer_to_thread, run_in_background
+from synapse.log.context import defer_to_thread, run_in_background
 
 from ._base import FileInfo, Responder
 from .media_storage import FileResponder

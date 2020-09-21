@@ -22,7 +22,7 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.events.validator import EventValidator
 from synapse.handlers.presence import format_user_presence_state
-from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.log.context import make_deferred_yieldable, run_in_background
 from synapse.storage.roommember import RoomsForUser
 from synapse.streams.config import PaginationConfig
 from synapse.types import JsonDict, Requester, RoomStreamToken, StreamToken, UserID

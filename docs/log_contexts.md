@@ -24,7 +24,7 @@ any code of this nature, the rule is that our function should leave
 things as it found them:
 
 ```python
-from synapse.logging import context         # omitted from future snippets
+from synapse.log import context         # omitted from future snippets
 
 def handle_request(request_id):
     request_context = context.LoggingContext()

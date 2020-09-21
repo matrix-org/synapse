@@ -39,7 +39,7 @@ from twisted.enterprise import adbapi
 
 from synapse.api.errors import StoreError
 from synapse.config.database import DatabaseConnectionConfig
-from synapse.logging.context import (
+from synapse.log.context import (
     LoggingContext,
     LoggingContextOrSentinel,
     current_context,

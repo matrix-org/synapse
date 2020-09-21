@@ -17,7 +17,7 @@
 to ensure idempotency when performing PUTs using the REST API."""
 import logging
 
-from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.log.context import make_deferred_yieldable, run_in_background
 from synapse.util.async_helpers import ObservableDeferred
 
 logger = logging.getLogger(__name__)

@@ -23,7 +23,7 @@ from prometheus_client.core import REGISTRY, Counter, Gauge
 
 from twisted.internet import defer
 
-from synapse.logging.context import LoggingContext, PreserveLoggingContext
+from synapse.log.context import LoggingContext, PreserveLoggingContext
 
 if TYPE_CHECKING:
     import resource

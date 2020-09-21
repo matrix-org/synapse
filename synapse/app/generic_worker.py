@@ -48,7 +48,7 @@ from synapse.handlers.presence import (
 from synapse.http.server import JsonResource, OptionsResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseSite
-from synapse.logging.context import LoggingContext
+from synapse.log.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource

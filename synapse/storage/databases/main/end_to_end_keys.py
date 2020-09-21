@@ -22,7 +22,7 @@ from canonicaljson import encode_canonical_json
 
 from twisted.enterprise.adbapi import Connection
 
-from synapse.logging.opentracing import log_kv, set_tag, trace
+from synapse.log.opentracing import log_kv, set_tag, trace
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import make_in_list_sql_clause
 from synapse.storage.types import Cursor

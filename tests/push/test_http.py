@@ -18,7 +18,7 @@ from mock import Mock
 from twisted.internet.defer import Deferred
 
 import synapse.rest.admin
-from synapse.logging.context import make_deferred_yieldable
+from synapse.log.context import make_deferred_yieldable
 from synapse.rest.client.v1 import login, room
 
 from tests.unittest import HomeserverTestCase

@@ -22,7 +22,7 @@ from twisted.internet.error import ConnectError
 from twisted.names import dns, error
 
 from synapse.http.federation.srv_resolver import SrvResolver
-from synapse.logging.context import LoggingContext, current_context
+from synapse.log.context import LoggingContext, current_context
 
 from tests import unittest
 from tests.utils import MockClock

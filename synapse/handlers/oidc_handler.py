@@ -36,7 +36,7 @@ from twisted.web.client import readBody
 from synapse.config import ConfigError
 from synapse.http.server import respond_with_html
 from synapse.http.site import SynapseRequest
-from synapse.logging.context import make_deferred_yieldable
+from synapse.log.context import make_deferred_yieldable
 from synapse.types import UserID, map_username_to_mxid_localpart
 from synapse.util import json_decoder
 

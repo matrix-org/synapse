@@ -32,7 +32,7 @@ from synapse.api.errors import (
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
-from synapse.logging import opentracing as opentracing
+from synapse.log import opentracing as opentracing
 from synapse.types import StateMap, UserID
 from synapse.util.caches import register_cache
 from synapse.util.caches.lrucache import LruCache

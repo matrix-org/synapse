@@ -16,7 +16,7 @@
 Backwards compatibility re-exports of ``synapse.logging.context`` functionality.
 """
 
-from synapse.logging.context import (
+from synapse.log.context import (
     LoggingContext,
     LoggingContextFilter,
     PreserveLoggingContext,

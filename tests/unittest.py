@@ -37,7 +37,7 @@ from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.federation.transport import server as federation_server
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseRequest, SynapseSite
-from synapse.logging.context import (
+from synapse.log.context import (
     SENTINEL_CONTEXT,
     LoggingContext,
     current_context,

@@ -23,7 +23,7 @@ import logging
 from typing import Optional, Tuple
 
 from synapse.federation.units import Transaction
-from synapse.logging.utils import log_function
+from synapse.log.utils import log_function
 from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)

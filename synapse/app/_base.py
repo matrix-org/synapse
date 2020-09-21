@@ -30,7 +30,7 @@ import synapse
 from synapse.app import check_bind_error
 from synapse.config.server import ListenerConfig
 from synapse.crypto import context_factory
-from synapse.logging.context import PreserveLoggingContext
+from synapse.log.context import PreserveLoggingContext
 from synapse.util.async_helpers import Linearizer
 from synapse.util.daemonize import daemonize_process
 from synapse.util.rlimit import change_resource_limit
@@ -262,7 +262,7 @@ def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerConfig]):
         refresh_certificate(hs)
 
         # Start the tracer
-        synapse.logging.opentracing.init_tracer(  # type: ignore[attr-defined] # noqa
+        synapse.log.opentracing.init_tracer(  # type: ignore[attr-defined] # noqa
             hs
         )
 

@@ -20,7 +20,7 @@ from typing import IO, TYPE_CHECKING, Any, Optional, Sequence
 
 from twisted.protocols.basic import FileSender
 
-from synapse.logging.context import defer_to_thread, make_deferred_yieldable
+from synapse.log.context import defer_to_thread, make_deferred_yieldable
 from synapse.util.file_consumer import BackgroundFileConsumer
 
 from ._base import FileInfo, Responder

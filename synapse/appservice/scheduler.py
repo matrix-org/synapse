@@ -51,7 +51,7 @@ components.
 import logging
 
 from synapse.appservice import ApplicationServiceState
-from synapse.logging.context import run_in_background
+from synapse.log.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 
 logger = logging.getLogger(__name__)

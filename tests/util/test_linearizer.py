@@ -17,7 +17,7 @@
 from twisted.internet import defer, reactor
 from twisted.internet.defer import CancelledError
 
-from synapse.logging.context import LoggingContext, current_context
+from synapse.log.context import LoggingContext, current_context
 from synapse.util import Clock
 from synapse.util.async_helpers import Linearizer
 

@@ -25,7 +25,7 @@ from synapse.api.urls import (
     FEDERATION_V1_PREFIX,
     FEDERATION_V2_PREFIX,
 )
-from synapse.logging.utils import log_function
+from synapse.log.utils import log_function
 
 logger = logging.getLogger(__name__)
 

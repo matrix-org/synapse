@@ -45,8 +45,8 @@ from synapse.api.errors import (
     UnrecognizedRequestError,
 )
 from synapse.http.site import SynapseRequest
-from synapse.logging.context import preserve_fn
-from synapse.logging.opentracing import trace_servlet
+from synapse.log.context import preserve_fn
+from synapse.log.opentracing import trace_servlet
 from synapse.util import json_encoder
 from synapse.util.caches import intern_dict
 

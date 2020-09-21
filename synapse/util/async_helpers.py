@@ -38,7 +38,7 @@ from twisted.internet.defer import CancelledError
 from twisted.internet.interfaces import IReactorTime
 from twisted.python import failure
 
-from synapse.logging.context import (
+from synapse.log.context import (
     PreserveLoggingContext,
     make_deferred_yieldable,
     run_in_background,

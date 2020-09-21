@@ -18,7 +18,7 @@ import logging
 from twisted.internet import defer
 
 from synapse.http.site import SynapseRequest
-from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.log.context import make_deferred_yieldable, run_in_background
 from synapse.types import UserID
 
 """

@@ -15,7 +15,7 @@
 import logging
 import random
 
-import synapse.logging.context
+import synapse.log.context
 from synapse.api.errors import CodeMessageException
 
 logger = logging.getLogger(__name__)
@@ -231,4 +231,4 @@ class RetryDestinationLimiter:
                 logger.exception("Failed to store destination_retry_timings")
 
         # we deliberately do this in the background.
-        synapse.logging.context.run_in_background(store_retry_timings)
+        synapse.log.context.run_in_background(store_retry_timings)

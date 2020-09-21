@@ -21,7 +21,7 @@ import attr
 
 from twisted.internet import defer, task
 
-from synapse.logging import context
+from synapse.log import context
 
 logger = logging.getLogger(__name__)
 

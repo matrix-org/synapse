@@ -39,7 +39,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
-from synapse.logging.opentracing import set_tag
+from synapse.log.opentracing import set_tag
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.state import StateFilter

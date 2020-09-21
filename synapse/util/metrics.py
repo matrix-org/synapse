@@ -19,7 +19,7 @@ from typing import Any, Callable, Optional, TypeVar, cast
 
 from prometheus_client import Counter
 
-from synapse.logging.context import LoggingContext, current_context
+from synapse.log.context import LoggingContext, current_context
 from synapse.metrics import InFlightGauge
 
 logger = logging.getLogger(__name__)

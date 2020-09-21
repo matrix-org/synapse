@@ -19,7 +19,7 @@ import threading
 
 from prometheus_client.core import Counter, Histogram
 
-from synapse.logging.context import current_context
+from synapse.log.context import current_context
 from synapse.metrics import LaterGauge
 
 logger = logging.getLogger(__name__)

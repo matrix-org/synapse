@@ -16,7 +16,7 @@
 import logging
 from typing import List, Tuple
 
-from synapse.logging.opentracing import log_kv, set_tag, trace
+from synapse.log.opentracing import log_kv, set_tag, trace
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool
 from synapse.util import json_encoder

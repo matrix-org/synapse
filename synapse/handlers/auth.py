@@ -39,7 +39,7 @@ from synapse.handlers.ui_auth import INTERACTIVE_AUTH_CHECKERS
 from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
 from synapse.http.server import finish_request, respond_with_html
 from synapse.http.site import SynapseRequest
-from synapse.logging.context import defer_to_thread
+from synapse.log.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.module_api import ModuleApi
 from synapse.types import JsonDict, Requester, UserID

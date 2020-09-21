@@ -19,7 +19,7 @@ from twisted.internet.defer import succeed
 
 from synapse.api.errors import FederationError
 from synapse.events import make_event_from_dict
-from synapse.logging.context import LoggingContext
+from synapse.log.context import LoggingContext
 from synapse.types import Requester, UserID
 from synapse.util import Clock
 from synapse.util.retryutils import NotRetryingDestination

@@ -21,7 +21,7 @@ from twisted.internet import defer
 
 import synapse
 from synapse.api.constants import EventTypes
-from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.log.context import make_deferred_yieldable, run_in_background
 from synapse.metrics import (
     event_processing_loop_counter,
     event_processing_loop_room_count,

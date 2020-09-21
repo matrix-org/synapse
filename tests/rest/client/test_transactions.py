@@ -2,7 +2,7 @@ from mock import Mock, call
 
 from twisted.internet import defer, reactor
 
-from synapse.logging.context import SENTINEL_CONTEXT, LoggingContext, current_context
+from synapse.log.context import SENTINEL_CONTEXT, LoggingContext, current_context
 from synapse.rest.client.transactions import CLEANUP_PERIOD_MS, HttpTransactionCache
 from synapse.util import Clock
 
