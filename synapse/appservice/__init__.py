@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 from synapse.api.constants import EventTypes
 from synapse.appservice.api import ApplicationServiceApi
 from synapse.types import GroupID, get_domain_from_id
-from synapse.util.caches.descriptors import cached
+from synapse.util.caches.descriptors import cached, cachedList
 
 if TYPE_CHECKING:
     from synapse.storage.databases.main import DataStore
@@ -239,6 +239,19 @@ class ApplicationService:
         if await self._matches_user(event, store):
             return True
 
+        return False
+
+    @cached(num_args=1, cache_context=True)
+    async def is_interested_in_presence(self, user_id, store, cache_context):
+        # Find all the rooms the sender is in
+        if self.is_interested_in_user(user_id.to_string()):
+            return True
+        room_ids = await store.get_rooms_for_user(user_id.to_string())
+
+        # Then find out if the appservice is interested in any of those rooms
+        for room_id in room_ids:
+            if await self.matches_user_in_member_list(room_id, store, cache_context):
+                return True
         return False
 
     def is_interested_in_user(self, user_id):
