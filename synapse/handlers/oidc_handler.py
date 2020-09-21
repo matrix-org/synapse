@@ -914,7 +914,7 @@ class OidcHandler:
         if users:
             if self._allow_existing_users:
                 if len(users) == 1:
-                    registered_user_id = next(iter(users))
+                    registered_user_id = UserID.from_string(next(iter(users)))
                 elif user_id in users:
                     registered_user_id = user_id
                 else:
