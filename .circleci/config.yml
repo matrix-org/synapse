@@ -28,7 +28,7 @@ jobs:
           platforms: linux/amd64
       - docker_build:
           tag: -t matrixdotorg/synapse:latest
-          platforms: linux/amd64,linux/arm64,linux/arm64/v8
+          platforms: linux/amd64,linux/arm/v7,linux/arm64,linux/arm64/v8
 
 workflows:
   build:
