@@ -25,7 +25,6 @@ from pkg_resources import (
     get_provider,
 )
 
-
 # REQUIREMENTS is a simple list of requirement specifiers[1], and must be
 # installed. It is passed to setup() as install_requires in setup.py.
 #

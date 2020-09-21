@@ -1,0 +1,1 @@
+Fixes the way synapse distinguishes between runtime and developer dependencies.
