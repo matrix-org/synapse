@@ -20,6 +20,20 @@ from prometheus_client import Counter
 from twisted.internet import defer
 
 import synapse
+from typing import (
+    Awaitable,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    TypeVar,
+    Union,
+)
+
+from synapse.types import RoomStreamToken
 from synapse.api.constants import EventTypes
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics import (
@@ -43,6 +57,7 @@ class ApplicationServicesHandler:
         self.started_scheduler = False
         self.clock = hs.get_clock()
         self.notify_appservices = hs.config.notify_appservices
+        self.event_sources = hs.get_event_sources()
 
         self.current_max = 0
         self.is_processing = False
@@ -157,6 +172,40 @@ class ApplicationServicesHandler:
                     ).set(ts)
             finally:
                 self.is_processing = False
+
+    async def notify_interested_services_ephemeral(self, stream_key: str, new_token: Union[int, RoomStreamToken]):
+        services = [service for service in self.store.get_app_services() if service.supports_ephemeral]
+        if not services or not self.notify_appservices:
+            return
+        logger.info("Checking interested services for %s" % (stream_key))
+        with Measure(self.clock, "notify_interested_services_ephemeral"):
+            for service in services:
+                events = []
+                if stream_key == "typing_key":
+                    from_key = new_token - 1
+                    typing_source = self.event_sources.sources["typing"]
+                    # Get the typing events from just before current
+                    typing, _typing_key = await typing_source.get_new_events_as(
+                        service=service,
+                        from_key=from_key
+                    )
+                    events = typing
+                elif stream_key == "receipt_key":
+                    from_key = new_token - 1
+                    receipts_source = self.event_sources.sources["receipt"]
+                    receipts, _receipts_key = await receipts_source.get_new_events_as(
+                        service=service,
+                        from_key=from_key
+                    )
+                    events = receipts
+                elif stream_key == "presence":
+                    # TODO: This. Presence means trying to determine all the
+                    # users the appservice cares about, which means checking
+                    # all the rooms the appservice is in.
+                if events:
+                    # TODO: Do in background?
+                    await self.scheduler.submit_ephemeral_events_for_as(service, events)
+        
 
     async def query_user_exists(self, user_id):
         """Check if any application service knows this user_id exists.

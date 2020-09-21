@@ -123,6 +123,15 @@ class ReceiptsWorkerStore(SQLBaseStore, metaclass=abc.ABCMeta):
             for row in rows
         }
 
+    async def get_linearized_receipts_for_all_rooms(
+        self, to_key: int, from_key: Optional[int] = None
+    ) -> List[dict]:
+        results = await self._get_linearized_receipts_for_all_rooms(
+            to_key, from_key=from_key
+        )
+
+        return results
+
     async def get_linearized_receipts_for_rooms(
         self, room_ids: List[str], to_key: int, from_key: Optional[int] = None
     ) -> List[dict]:
@@ -273,6 +282,50 @@ class ReceiptsWorkerStore(SQLBaseStore, metaclass=abc.ABCMeta):
             for room_id in room_ids
         }
         return results
+
+    @cached(
+        num_args=2,
+    )
+    async def _get_linearized_receipts_for_all_rooms(self, to_key, from_key=None):
+        def f(txn):
+            if from_key:
+                sql = """
+                    SELECT * FROM receipts_linearized WHERE
+                    stream_id > ? AND stream_id <= ?
+                """
+                txn.execute(sql, [from_key, to_key])
+            else:
+                sql = """
+                    SELECT * FROM receipts_linearized WHERE
+                    stream_id <= ?
+                """
+
+                txn.execute(sql, [to_key])
+
+            return self.db_pool.cursor_to_dict(txn)
+
+        txn_results = await self.db_pool.runInteraction(
+            "_get_linearized_receipts_for_all_rooms", f
+        )
+
+        results = {}
+        for row in txn_results:
+            # We want a single event per room, since we want to batch the
+            # receipts by room, event and type.
+            room_event = results.setdefault(
+                row["room_id"],
+                {"type": "m.receipt", "room_id": row["room_id"], "content": {}},
+            )
+
+            # The content is of the form:
+            # {"$foo:bar": { "read": { "@user:host": <receipt> }, .. }, .. }
+            event_entry = room_event["content"].setdefault(row["event_id"], {})
+            receipt_type = event_entry.setdefault(row["receipt_type"], {})
+
+            receipt_type[row["user_id"]] = db_to_json(row["data"])
+
+        return results
+
 
     async def get_users_sent_receipts_between(
         self, last_id: int, current_id: int
