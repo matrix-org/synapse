@@ -85,6 +85,10 @@ class ApplicationServiceScheduler:
     def submit_event_for_as(self, service, event):
         self.queuer.enqueue(service, event)
 
+    async def submit_ephemeral_events_for_as(self, service, events):
+        if self.txn_ctrl.is_service_up(service):
+            await self.as_api.push_ephemeral(service, events)
+
 
 class _ServiceQueuer:
     """Queue of events waiting to be sent to appservices.
@@ -161,7 +165,7 @@ class _TransactionController:
     async def send(self, service, events):
         try:
             txn = await self.store.create_appservice_txn(service=service, events=events)
-            service_is_up = await self._is_service_up(service)
+            service_is_up = await self.is_service_up(service)
             if service_is_up:
                 sent = await txn.send(self.as_api)
                 if sent:
@@ -204,7 +208,7 @@ class _TransactionController:
         recoverer.recover()
         logger.info("Now %i active recoverers", len(self.recoverers))
 
-    async def _is_service_up(self, service):
+    async def is_service_up(self, service):
         state = await self.store.get_appservice_state(service)
         return state == ApplicationServiceState.UP or state is None
 

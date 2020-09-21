@@ -91,6 +91,7 @@ class ApplicationService:
         protocols=None,
         rate_limited=True,
         ip_range_whitelist=None,
+        supports_ephemeral=False,
     ):
         self.token = token
         self.url = (
@@ -102,6 +103,7 @@ class ApplicationService:
         self.namespaces = self._check_namespaces(namespaces)
         self.id = id
         self.ip_range_whitelist = ip_range_whitelist
+        self.supports_ephemeral = supports_ephemeral
 
         if "|" in self.id:
             raise Exception("application service ID cannot contain '|' character")
@@ -188,11 +190,11 @@ class ApplicationService:
         if not store:
             return False
 
-        does_match = await self._matches_user_in_member_list(event.room_id, store)
+        does_match = await self.matches_user_in_member_list(event.room_id, store)
         return does_match
 
     @cached(num_args=1, cache_context=True)
-    async def _matches_user_in_member_list(self, room_id, store, cache_context):
+    async def matches_user_in_member_list(self, room_id, store, cache_context):
         member_list = await store.get_users_in_room(
             room_id, on_invalidate=cache_context.invalidate
         )
