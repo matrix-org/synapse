@@ -16,7 +16,7 @@
 # limitations under the License.
 
 import logging
-from typing import List, Set
+from typing import Set
 
 from pkg_resources import (
     DistributionNotFound,
@@ -24,8 +24,6 @@ from pkg_resources import (
     VersionConflict,
     get_provider,
 )
-
-logger = logging.getLogger(__name__)
 
 
 # REQUIREMENTS is a simple list of requirement specifiers[1], and must be
@@ -116,6 +114,12 @@ for name, optional_deps in CONDITIONAL_REQUIREMENTS.items():
     if name not in ["systemd", "lint"]:
         ALL_OPTIONAL_REQUIREMENTS = set(optional_deps) | ALL_OPTIONAL_REQUIREMENTS
 
+# We exclude lint and test as those are developer requirements
+ALL_RUNTIME_REQUIREMENT_COMPONENTS = set(CONDITIONAL_REQUIREMENTS.keys()) - {
+    "lint",
+    "test",
+}
+
 
 def list_requirements():
     return list(set(REQUIREMENTS) | ALL_OPTIONAL_REQUIREMENTS)
@@ -139,12 +143,12 @@ class DependencyException(Exception):
             yield "'" + i + "'"
 
 
-def check_requirements(for_feature=None):
+def check_requirements(for_feature=None, dev=False):
     deps_needed = []
     errors = []
 
     if for_feature:
-        reqs = CONDITIONAL_REQUIREMENTS[for_feature]
+        reqs = CONDITIONAL_REQUIREMENTS.get(for_feature, [])
     else:
         reqs = REQUIREMENTS
 
@@ -171,10 +175,16 @@ def check_requirements(for_feature=None):
             else:
                 errors.append("Needed %s but it was not installed" % (dependency,))
 
-    if not for_feature:
-        # Check the optional dependencies are up to date. We allow them to not be
+    if for_feature is None:
+        # Check if the optional runtime dependencies are up to date. We allow them to not be
         # installed.
-        OPTS = sum(CONDITIONAL_REQUIREMENTS.values(), [])  # type: List[str]
+        OPTS = set().union(
+            *(
+                set(reqs)
+                for key, reqs in CONDITIONAL_REQUIREMENTS.items()
+                if key in ALL_RUNTIME_REQUIREMENT_COMPONENTS or dev
+            )
+        )  # type: Set[str]
 
         for dependency in OPTS:
             try:
@@ -221,3 +231,5 @@ if __name__ == "__main__":
     import sys
 
     sys.stdout.writelines(req + "\n" for req in list_requirements())
+
+    check_requirements(dev=True)
