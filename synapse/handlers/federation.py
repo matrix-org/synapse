@@ -86,7 +86,7 @@ from synapse.visibility import filter_events_for_server
 logger = logging.getLogger(__name__)
 
 
-@attr.s
+@attr.s(slots=True)
 class _NewEventInfo:
     """Holds information about a received event, ready for passing to _handle_new_events
 
@@ -115,7 +115,7 @@ class FederationHandler(BaseHandler):
     """
 
     def __init__(self, hs):
-        super(FederationHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.hs = hs
 
@@ -896,7 +896,8 @@ class FederationHandler(BaseHandler):
                 )
             )
 
-        await self._handle_new_events(dest, ev_infos, backfilled=True)
+        if ev_infos:
+            await self._handle_new_events(dest, room_id, ev_infos, backfilled=True)
 
         # Step 2: Persist the rest of the events in the chunk one by one
         events.sort(key=lambda e: e.depth)
@@ -916,15 +917,26 @@ class FederationHandler(BaseHandler):
 
         return events
 
-    async def maybe_backfill(self, room_id, current_depth):
+    async def maybe_backfill(
+        self, room_id: str, current_depth: int, limit: int
+    ) -> bool:
         """Checks the database to see if we should backfill before paginating,
         and if so do.
+
+        Args:
+            room_id
+            current_depth: The depth from which we're paginating from. This is
+                used to decide if we should backfill and what extremities to
+                use.
+            limit: The number of events that the pagination request will
+                return. This is used as part of the heuristic to decide if we
+                should back paginate.
         """
         extremities = await self.store.get_oldest_events_with_depth_in_room(room_id)
 
         if not extremities:
             logger.debug("Not backfilling as no extremeties found.")
-            return
+            return False
 
         # We only want to paginate if we can actually see the events we'll get,
         # as otherwise we'll just spend a lot of resources to get redacted
@@ -977,15 +989,53 @@ class FederationHandler(BaseHandler):
         sorted_extremeties_tuple = sorted(extremities.items(), key=lambda e: -int(e[1]))
         max_depth = sorted_extremeties_tuple[0][1]
 
+        # If we're approaching an extremity we trigger a backfill, otherwise we
+        # no-op.
+        #
+        # We chose twice the limit here as then clients paginating backwards
+        # will send pagination requests that trigger backfill at least twice
+        # using the most recent extremity before it gets removed (see below). We
+        # chose more than one times the limit in case of failure, but choosing a
+        # much larger factor will result in triggering a backfill request much
+        # earlier than necessary.
+        if current_depth - 2 * limit > max_depth:
+            logger.debug(
+                "Not backfilling as we don't need to. %d < %d - 2 * %d",
+                max_depth,
+                current_depth,
+                limit,
+            )
+            return False
+
+        logger.debug(
+            "room_id: %s, backfill: current_depth: %s, max_depth: %s, extrems: %s",
+            room_id,
+            current_depth,
+            max_depth,
+            sorted_extremeties_tuple,
+        )
+
+        # We ignore extremities that have a greater depth than our current depth
+        # as:
+        #    1. we don't really care about getting events that have happened
+        #       before our current position; and
+        #    2. we have likely previously tried and failed to backfill from that
+        #       extremity, so to avoid getting "stuck" requesting the same
+        #       backfill repeatedly we drop those extremities.
+        filtered_sorted_extremeties_tuple = [
+            t for t in sorted_extremeties_tuple if int(t[1]) <= current_depth
+        ]
+
+        # However, we need to check that the filtered extremities are non-empty.
+        # If they are empty then either we can a) bail or b) still attempt to
+        # backill. We opt to try backfilling anyway just in case we do get
+        # relevant events.
+        if filtered_sorted_extremeties_tuple:
+            sorted_extremeties_tuple = filtered_sorted_extremeties_tuple
+
         # We don't want to specify too many extremities as it causes the backfill
         # request URI to be too long.
         extremities = dict(sorted_extremeties_tuple[:5])
-
-        if current_depth > max_depth:
-            logger.debug(
-                "Not backfilling as we don't need to. %d < %d", max_depth, current_depth
-            )
-            return
 
         # Now we need to decide which hosts to hit first.
 
@@ -1189,7 +1239,7 @@ class FederationHandler(BaseHandler):
             event_infos.append(_NewEventInfo(event, None, auth))
 
         await self._handle_new_events(
-            destination, event_infos,
+            destination, room_id, event_infos,
         )
 
     def _sanity_check_event(self, ev):
@@ -1336,15 +1386,15 @@ class FederationHandler(BaseHandler):
             )
 
             max_stream_id = await self._persist_auth_tree(
-                origin, auth_chain, state, event, room_version_obj
+                origin, room_id, auth_chain, state, event, room_version_obj
             )
 
             # We wait here until this instance has seen the events come down
             # replication (if we're using replication) as the below uses caches.
-            #
-            # TODO: Currently the events stream is written to from master
             await self._replication.wait_for_stream_position(
-                self.config.worker.writers.events, "events", max_stream_id
+                self.config.worker.events_shard_config.get_instance(room_id),
+                "events",
+                max_stream_id,
             )
 
             # Check whether this room is the result of an upgrade of a room we already know
@@ -1593,7 +1643,7 @@ class FederationHandler(BaseHandler):
         )
 
         context = await self.state_handler.compute_event_context(event)
-        await self.persist_events_and_notify([(event, context)])
+        await self.persist_events_and_notify(event.room_id, [(event, context)])
 
         return event
 
@@ -1620,7 +1670,9 @@ class FederationHandler(BaseHandler):
         await self.federation_client.send_leave(host_list, event)
 
         context = await self.state_handler.compute_event_context(event)
-        stream_id = await self.persist_events_and_notify([(event, context)])
+        stream_id = await self.persist_events_and_notify(
+            event.room_id, [(event, context)]
+        )
 
         return event, stream_id
 
@@ -1868,7 +1920,7 @@ class FederationHandler(BaseHandler):
                 )
 
             await self.persist_events_and_notify(
-                [(event, context)], backfilled=backfilled
+                event.room_id, [(event, context)], backfilled=backfilled
             )
         except Exception:
             run_in_background(
@@ -1881,6 +1933,7 @@ class FederationHandler(BaseHandler):
     async def _handle_new_events(
         self,
         origin: str,
+        room_id: str,
         event_infos: Iterable[_NewEventInfo],
         backfilled: bool = False,
     ) -> None:
@@ -1912,6 +1965,7 @@ class FederationHandler(BaseHandler):
         )
 
         await self.persist_events_and_notify(
+            room_id,
             [
                 (ev_info.event, context)
                 for ev_info, context in zip(event_infos, contexts)
@@ -1922,6 +1976,7 @@ class FederationHandler(BaseHandler):
     async def _persist_auth_tree(
         self,
         origin: str,
+        room_id: str,
         auth_events: List[EventBase],
         state: List[EventBase],
         event: EventBase,
@@ -1936,6 +1991,7 @@ class FederationHandler(BaseHandler):
 
         Args:
             origin: Where the events came from
+            room_id,
             auth_events
             state
             event
@@ -2010,17 +2066,20 @@ class FederationHandler(BaseHandler):
                 events_to_context[e.event_id].rejected = RejectedReason.AUTH_ERROR
 
         await self.persist_events_and_notify(
+            room_id,
             [
                 (e, events_to_context[e.event_id])
                 for e in itertools.chain(auth_events, state)
-            ]
+            ],
         )
 
         new_event_context = await self.state_handler.compute_event_context(
             event, old_state=state
         )
 
-        return await self.persist_events_and_notify([(event, new_event_context)])
+        return await self.persist_events_and_notify(
+            room_id, [(event, new_event_context)]
+        )
 
     async def _prep_event(
         self,
@@ -2871,6 +2930,7 @@ class FederationHandler(BaseHandler):
 
     async def persist_events_and_notify(
         self,
+        room_id: str,
         event_and_contexts: Sequence[Tuple[EventBase, EventContext]],
         backfilled: bool = False,
     ) -> int:
@@ -2878,14 +2938,19 @@ class FederationHandler(BaseHandler):
         necessary.
 
         Args:
-            event_and_contexts:
+            room_id: The room ID of events being persisted.
+            event_and_contexts: Sequence of events with their associated
+                context that should be persisted. All events must belong to
+                the same room.
             backfilled: Whether these events are a result of
                 backfilling or not
         """
-        if self.config.worker.writers.events != self._instance_name:
+        instance = self.config.worker.events_shard_config.get_instance(room_id)
+        if instance != self._instance_name:
             result = await self._send_events(
-                instance_name=self.config.worker.writers.events,
+                instance_name=instance,
                 store=self.store,
+                room_id=room_id,
                 event_and_contexts=event_and_contexts,
                 backfilled=backfilled,
             )

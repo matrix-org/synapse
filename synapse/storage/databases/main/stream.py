@@ -259,16 +259,14 @@ def filter_to_clause(event_filter: Optional[Filter]) -> Tuple[str, List[str]]:
     return " AND ".join(clauses), args
 
 
-class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
+class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
     """This is an abstract base class where subclasses must implement
     `get_room_max_stream_ordering` and `get_room_min_stream_ordering`
     which can be called in the initializer.
     """
 
-    __metaclass__ = abc.ABCMeta
-
     def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
-        super(StreamWorkerStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self._instance_name = hs.get_instance_name()
         self._send_federation = hs.should_send_federation()
@@ -642,23 +640,20 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
         return "t%d-%d" % (row["topological_ordering"], row["stream_ordering"])
 
-    async def get_max_topological_token(self, room_id: str, stream_key: int) -> int:
-        """Get the max topological token in a room before the given stream
+    async def get_current_topological_token(self, room_id: str, stream_key: int) -> int:
+        """Gets the topological token in a room after or at the given stream
         ordering.
 
         Args:
             room_id
             stream_key
-
-        Returns:
-            The maximum topological token.
         """
         sql = (
-            "SELECT coalesce(max(topological_ordering), 0) FROM events"
-            " WHERE room_id = ? AND stream_ordering < ?"
+            "SELECT coalesce(MIN(topological_ordering), 0) FROM events"
+            " WHERE room_id = ? AND stream_ordering >= ?"
         )
         row = await self.db_pool.execute(
-            "get_max_topological_token", None, sql, room_id, stream_key
+            "get_current_topological_token", None, sql, room_id, stream_key
         )
         return row[0][0] if row else 0
 

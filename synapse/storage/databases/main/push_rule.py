@@ -61,6 +61,8 @@ def _load_rules(rawrules, enabled_map, use_new_defaults=False):
     return rules
 
 
+# The ABCMeta metaclass ensures that it cannot be instantiated without
+# the abstract methods being implemented.
 class PushRulesWorkerStore(
     ApplicationServiceWorkerStore,
     ReceiptsWorkerStore,
@@ -68,17 +70,14 @@ class PushRulesWorkerStore(
     RoomMemberWorkerStore,
     EventsWorkerStore,
     SQLBaseStore,
+    metaclass=abc.ABCMeta,
 ):
     """This is an abstract base class where subclasses must implement
     `get_max_push_rules_stream_id` which can be called in the initializer.
     """
 
-    # This ABCMeta metaclass ensures that we cannot be instantiated without
-    # the abstract methods being implemented.
-    __metaclass__ = abc.ABCMeta
-
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(PushRulesWorkerStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         if hs.config.worker.worker_app is None:
             self._push_rules_stream_id_gen = StreamIdGenerator(

@@ -92,7 +92,7 @@ class TestCase(unittest.TestCase):
     root logger's logging level while that test (case|method) runs."""
 
     def __init__(self, methodName, *args, **kwargs):
-        super(TestCase, self).__init__(methodName, *args, **kwargs)
+        super().__init__(methodName, *args, **kwargs)
 
         method = getattr(self, methodName)
 

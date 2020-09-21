@@ -69,7 +69,7 @@ class RoomSortOrder(Enum):
 
 class RoomWorkerStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(RoomWorkerStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self.config = hs.config
 
@@ -104,7 +104,8 @@ class RoomWorkerStore(SQLBaseStore):
                   curr.local_users_in_room AS joined_local_members, rooms.room_version AS version,
                   rooms.creator, state.encryption, state.is_federatable AS federatable,
                   rooms.is_public AS public, state.join_rules, state.guest_access,
-                  state.history_visibility, curr.current_state_events AS state_events
+                  state.history_visibility, curr.current_state_events AS state_events,
+                  state.avatar, state.topic
                 FROM rooms
                 LEFT JOIN room_stats_state state USING (room_id)
                 LEFT JOIN room_stats_current curr USING (room_id)
@@ -862,7 +863,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
     ADD_ROOMS_ROOM_VERSION_COLUMN = "add_rooms_room_version_column"
 
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(RoomBackgroundUpdateStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self.config = hs.config
 
@@ -1073,7 +1074,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
 
 class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(RoomStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self.config = hs.config
 

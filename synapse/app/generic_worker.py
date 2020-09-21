@@ -152,7 +152,7 @@ class PresenceStatusStubServlet(RestServlet):
     PATTERNS = client_patterns("/presence/(?P<user_id>[^/]*)/status")
 
     def __init__(self, hs):
-        super(PresenceStatusStubServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
 
     async def on_GET(self, request, user_id):
@@ -176,7 +176,7 @@ class KeyUploadServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(KeyUploadServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.http_client = hs.get_simple_http_client()
@@ -646,7 +646,7 @@ class GenericWorkerServer(HomeServer):
 
 class GenericWorkerReplicationHandler(ReplicationDataHandler):
     def __init__(self, hs):
-        super(GenericWorkerReplicationHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.store = hs.get_datastore()
         self.presence_handler = hs.get_presence_handler()  # type: GenericWorkerPresence

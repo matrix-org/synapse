@@ -52,7 +52,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/password/email/requestToken$")
 
     def __init__(self, hs):
-        super(EmailPasswordRequestTokenRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.datastore = hs.get_datastore()
         self.config = hs.config
@@ -156,7 +156,7 @@ class PasswordRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/password$")
 
     def __init__(self, hs):
-        super(PasswordRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
@@ -282,7 +282,7 @@ class DeactivateAccountRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/deactivate$")
 
     def __init__(self, hs):
-        super(DeactivateAccountRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
@@ -301,7 +301,7 @@ class DeactivateAccountRestServlet(RestServlet):
 
         requester = await self.auth.get_user_by_req(request)
 
-        # allow ASes to dectivate their own users
+        # allow ASes to deactivate their own users
         if requester.app_service:
             await self._deactivate_account_handler.deactivate_account(
                 requester.user.to_string(), erase
@@ -330,7 +330,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid/email/requestToken$")
 
     def __init__(self, hs):
-        super(EmailThreepidRequestTokenRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.config = hs.config
         self.identity_handler = hs.get_handlers().identity_handler
@@ -427,7 +427,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
 
     def __init__(self, hs):
         self.hs = hs
-        super(MsisdnThreepidRequestTokenRestServlet, self).__init__()
+        super().__init__()
         self.store = self.hs.get_datastore()
         self.identity_handler = hs.get_handlers().identity_handler
 
@@ -606,7 +606,7 @@ class ThreepidRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid$")
 
     def __init__(self, hs):
-        super(ThreepidRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
         self.auth = hs.get_auth()
@@ -662,7 +662,7 @@ class ThreepidAddRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid/add$")
 
     def __init__(self, hs):
-        super(ThreepidAddRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
         self.auth = hs.get_auth()
@@ -713,7 +713,7 @@ class ThreepidBindRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid/bind$")
 
     def __init__(self, hs):
-        super(ThreepidBindRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
         self.auth = hs.get_auth()
@@ -742,7 +742,7 @@ class ThreepidUnbindRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid/unbind$")
 
     def __init__(self, hs):
-        super(ThreepidUnbindRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
         self.auth = hs.get_auth()
@@ -773,7 +773,7 @@ class ThreepidDeleteRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid/delete$")
 
     def __init__(self, hs):
-        super(ThreepidDeleteRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
@@ -852,7 +852,7 @@ class WhoamiRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/whoami$")
 
     def __init__(self, hs):
-        super(WhoamiRestServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
 
     async def on_GET(self, request):

@@ -16,13 +16,13 @@
 
 import logging
 import platform
-import re
 
 import synapse
 from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.server import JsonResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.rest.admin._base import (
+    admin_patterns,
     assert_requester_is_admin,
     historical_admin_path_patterns,
 )
@@ -49,6 +49,7 @@ from synapse.rest.admin.users import (
     ResetPasswordRestServlet,
     SearchUsersRestServlet,
     UserAdminServlet,
+    UserMembershipRestServlet,
     UserRegisterServlet,
     UserRestServletV2,
     UsersRestServlet,
@@ -61,7 +62,7 @@ logger = logging.getLogger(__name__)
 
 
 class VersionServlet(RestServlet):
-    PATTERNS = (re.compile("^/_synapse/admin/v1/server_version$"),)
+    PATTERNS = admin_patterns("/server_version$")
 
     def __init__(self, hs):
         self.res = {
@@ -209,6 +210,7 @@ def register_servlets(hs, http_server):
     SendServerNoticeServlet(hs).register(http_server)
     VersionServlet(hs).register(http_server)
     UserAdminServlet(hs).register(http_server)
+    UserMembershipRestServlet(hs).register(http_server)
     UserRestServletV2(hs).register(http_server)
     UsersRestServletV2(hs).register(http_server)
     DeviceRestServlet(hs).register(http_server)

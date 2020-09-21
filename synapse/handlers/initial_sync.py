@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 class InitialSyncHandler(BaseHandler):
     def __init__(self, hs: "HomeServer"):
-        super(InitialSyncHandler, self).__init__(hs)
+        super().__init__(hs)
         self.hs = hs
         self.state = hs.get_state_handler()
         self.clock = hs.get_clock()

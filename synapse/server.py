@@ -114,6 +114,7 @@ from synapse.streams.events import EventSources
 from synapse.types import DomainSpecificString
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
+from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import random_string
 
 logger = logging.getLogger(__name__)
@@ -641,6 +642,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_replication_streams(self) -> Dict[str, Stream]:
         return {stream.NAME: stream(self) for stream in STREAMS_MAP.values()}
+
+    @cache_in_self
+    def get_federation_ratelimiter(self) -> FederationRateLimiter:
+        return FederationRateLimiter(self.clock, config=self.config.rc_federation)
 
     async def remove_pusher(self, app_id: str, push_key: str, user_id: str):
         return await self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

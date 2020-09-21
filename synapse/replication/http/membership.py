@@ -45,7 +45,7 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
     PATH_ARGS = ("room_id", "user_id")
 
     def __init__(self, hs):
-        super(ReplicationRemoteJoinRestServlet, self).__init__(hs)
+        super().__init__(hs)
 
         self.federation_handler = hs.get_handlers().federation_handler
         self.store = hs.get_datastore()
@@ -107,7 +107,7 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
     PATH_ARGS = ("invite_event_id",)
 
     def __init__(self, hs: "HomeServer"):
-        super(ReplicationRemoteRejectInviteRestServlet, self).__init__(hs)
+        super().__init__(hs)
 
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
@@ -168,7 +168,7 @@ class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
     CACHE = False  # No point caching as should return instantly.
 
     def __init__(self, hs):
-        super(ReplicationUserJoinedLeftRoomRestServlet, self).__init__(hs)
+        super().__init__(hs)
 
         self.registeration_handler = hs.get_registration_handler()
         self.store = hs.get_datastore()

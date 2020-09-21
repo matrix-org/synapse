@@ -145,7 +145,7 @@ class AuthHandler(BaseHandler):
         Args:
             hs (synapse.server.HomeServer):
         """
-        super(AuthHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.checkers = {}  # type: Dict[str, UserInteractiveAuthChecker]
         for auth_checker_class in INTERACTIVE_AUTH_CHECKERS:
@@ -1235,7 +1235,7 @@ class AuthHandler(BaseHandler):
         return urllib.parse.urlunparse(url_parts)
 
 
-@attr.s
+@attr.s(slots=True)
 class MacaroonGenerator:
 
     hs = attr.ib()

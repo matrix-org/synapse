@@ -25,7 +25,7 @@ class LogoutRestServlet(RestServlet):
     PATTERNS = client_patterns("/logout$", v1=True)
 
     def __init__(self, hs):
-        super(LogoutRestServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
@@ -53,7 +53,7 @@ class LogoutAllRestServlet(RestServlet):
     PATTERNS = client_patterns("/logout/all$", v1=True)
 
     def __init__(self, hs):
-        super(LogoutAllRestServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()

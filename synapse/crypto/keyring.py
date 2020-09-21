@@ -558,7 +558,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
     """KeyFetcher impl which fetches keys from the "perspectives" servers"""
 
     def __init__(self, hs):
-        super(PerspectivesKeyFetcher, self).__init__(hs)
+        super().__init__(hs)
         self.clock = hs.get_clock()
         self.client = hs.get_http_client()
         self.key_servers = self.config.key_servers
@@ -728,7 +728,7 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
     """KeyFetcher impl which fetches keys from the origin servers"""
 
     def __init__(self, hs):
-        super(ServerKeyFetcher, self).__init__(hs)
+        super().__init__(hs)
         self.clock = hs.get_clock()
         self.client = hs.get_http_client()
 

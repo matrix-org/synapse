@@ -45,7 +45,7 @@ id_server_scheme = "https://"
 
 class IdentityHandler(BaseHandler):
     def __init__(self, hs):
-        super(IdentityHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.http_client = SimpleHttpClient(hs)
         # We create a blacklisting instance of SimpleHttpClient for contacting identity

@@ -27,7 +27,7 @@ class NotificationsServlet(RestServlet):
     PATTERNS = client_patterns("/notifications$")
 
     def __init__(self, hs):
-        super(NotificationsServlet, self).__init__()
+        super().__init__()
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()

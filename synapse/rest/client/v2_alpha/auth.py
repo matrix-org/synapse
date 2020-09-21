@@ -124,7 +124,7 @@ class AuthRestServlet(RestServlet):
     PATTERNS = client_patterns(r"/auth/(?P<stagetype>[\w\.]*)/fallback/web")
 
     def __init__(self, hs):
-        super(AuthRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()

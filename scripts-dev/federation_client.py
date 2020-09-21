@@ -15,8 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
-
 import argparse
 import base64
 import json
@@ -323,7 +321,7 @@ class MatrixConnectionAdapter(HTTPAdapter):
         url = urlparse.urlunparse(
             ("https", netloc, parsed.path, parsed.params, parsed.query, parsed.fragment)
         )
-        return super(MatrixConnectionAdapter, self).get_connection(url, proxies)
+        return super().get_connection(url, proxies)
 
 
 if __name__ == "__main__":

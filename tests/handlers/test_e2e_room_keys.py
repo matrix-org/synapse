@@ -47,7 +47,7 @@ room_keys = {
 
 class E2eRoomKeysHandlerTestCase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
-        super(E2eRoomKeysHandlerTestCase, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.hs = None  # type: synapse.server.HomeServer
         self.handler = None  # type: synapse.handlers.e2e_keys.E2eRoomKeysHandler
 
