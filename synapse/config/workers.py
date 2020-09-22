@@ -140,7 +140,15 @@ class WorkerConfig(Config):
         #
         # Effort is not made to ensure only a single instance of these tasks is
         # running.
-        self.run_background_tasks = config.get("run_background_tasks", True)
+        instance = config.get("run_background_tasks_on") or "master"
+        if instance != "master" and instance not in self.instance_map:
+            raise ConfigError(
+                "Instance %r is configured to run background tasks but does not appear in `instance_map` config."
+                % (instance,)
+            )
+        self.run_background_tasks = (
+            self.worker_name is None and instance == "master"
+        ) or self.worker_name == instance
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
@@ -177,6 +185,12 @@ class WorkerConfig(Config):
         #stream_writers:
         #  events: worker1
         #  typing: worker1
+
+        # The worker that is used to run background tasks (e.g. cleaning up expired
+        # data). This should be one of the workers from `instance_map`. If not
+        # provided this defaults to the main process.
+        #
+        #run_background_tasks: worker1
         """
 
     def read_arguments(self, args):
