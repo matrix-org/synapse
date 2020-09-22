@@ -128,9 +128,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             Whether the user account has expired
         """
         expiration_ts = await self.get_expiration_ts_for_user(user_id)
-        if expiration_ts is not None and current_ts >= expiration_ts:
-            return True
-        return False
+        return expiration_ts is not None and current_ts >= expiration_ts
 
     async def set_account_validity_for_user(
         self,
