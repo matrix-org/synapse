@@ -37,6 +37,9 @@ logger = logging.getLogger(__name__)
 # installed when that optional dependency requirement is specified. It is passed
 # to setup() as extras_require in setup.py
 #
+# Note that these both represent runtime dependencies (and the versions
+# installed are checked at runtime).
+#
 # [1] https://pip.pypa.io/en/stable/reference/pip_install/#requirement-specifiers.
 
 REQUIREMENTS = [
@@ -92,20 +95,12 @@ CONDITIONAL_REQUIREMENTS = {
     "oidc": ["authlib>=0.14.0"],
     "systemd": ["systemd-python>=231"],
     "url_preview": ["lxml>=3.5.0"],
-    # Dependencies which are exclusively required by unit test code. This is
-    # NOT a list of all modules that are necessary to run the unit tests.
-    # Tests assume that all optional dependencies are installed.
-    #
-    # parameterized_class decorator was introduced in parameterized 0.7.0
-    "test": ["mock>=2.0", "parameterized>=0.7.0"],
     "sentry": ["sentry-sdk>=0.7.2"],
     "opentracing": ["jaeger-client>=4.0.0", "opentracing>=2.2.0"],
     "jwt": ["pyjwt>=1.6.4"],
     # hiredis is not a *strict* dependency, but it makes things much faster.
     # (if it is not installed, we fall back to slow code.)
     "redis": ["txredisapi>=1.4.7", "hiredis"],
-    # We pin black so that our tests don't start failing on new releases.
-    "lint": ["isort==5.0.3", "black==19.10b0", "flake8-comprehensions", "flake8"],
 }
 
 ALL_OPTIONAL_REQUIREMENTS = set()  # type: Set[str]
@@ -113,7 +108,7 @@ ALL_OPTIONAL_REQUIREMENTS = set()  # type: Set[str]
 for name, optional_deps in CONDITIONAL_REQUIREMENTS.items():
     # Exclude systemd as it's a system-based requirement.
     # Exclude lint as it's a dev-based requirement.
-    if name not in ["systemd", "lint"]:
+    if name not in ["systemd"]:
         ALL_OPTIONAL_REQUIREMENTS = set(optional_deps) | ALL_OPTIONAL_REQUIREMENTS
 
 
