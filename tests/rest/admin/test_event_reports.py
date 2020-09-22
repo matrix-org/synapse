@@ -292,10 +292,10 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
     def test_next_token(self):
         """
-        Testing that ``next_token`` appears at the right place
+        Testing that `next_token` appears at the right place
         """
 
-        #  ``next_token`` does not appears
+        #  `next_token` does not appears
         # Number of results is number of entries
         request, channel = self.make_request(
             "GET", self.url + "?limit=20", access_token=self.admin_user_tok,
@@ -307,7 +307,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(channel.json_body["event_reports"]), 20)
         self.assertNotIn("next_token", channel.json_body)
 
-        #  ``next_token`` does not appears
+        #  `next_token` does not appears
         # Number of max results is larger than number of entries
         request, channel = self.make_request(
             "GET", self.url + "?limit=21", access_token=self.admin_user_tok,
@@ -319,7 +319,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(channel.json_body["event_reports"]), 20)
         self.assertNotIn("next_token", channel.json_body)
 
-        #  ``next_token`` does appears
+        #  `next_token` does appears
         # Number of max results is smaller than number of entries
         request, channel = self.make_request(
             "GET", self.url + "?limit=19", access_token=self.admin_user_tok,
@@ -332,8 +332,8 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.json_body["next_token"], 19)
 
         # Check
-        # Set ``from`` to value of ``next_token`` for request remaining entries
-        #  ``next_token`` does not appears
+        # Set `from` to value of `next_token` for request remaining entries
+        #  `next_token` does not appears
         request, channel = self.make_request(
             "GET", self.url + "?from=19", access_token=self.admin_user_tok,
         )
