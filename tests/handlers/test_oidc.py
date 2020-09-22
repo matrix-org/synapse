@@ -195,30 +195,29 @@ class OidcHandlerTestCase(HomeserverTestCase):
     @defer.inlineCallbacks
     def test_load_jwks(self):
         """JWKS loading is done once (then cached) if used."""
-        token = {"id_token": "dummy"}
-        jwks = yield defer.ensureDeferred(self.handler.load_jwks(token))
+        jwks = yield defer.ensureDeferred(self.handler.load_jwks())
         self.http_client.get_json.assert_called_once_with(JWKS_URI)
         self.assertEqual(jwks, {"keys": []})
 
         # subsequent calls should be cached…
         self.http_client.reset_mock()
-        yield defer.ensureDeferred(self.handler.load_jwks(token))
+        yield defer.ensureDeferred(self.handler.load_jwks())
         self.http_client.get_json.assert_not_called()
 
         # …unless forced
         self.http_client.reset_mock()
-        yield defer.ensureDeferred(self.handler.load_jwks(token, force=True))
+        yield defer.ensureDeferred(self.handler.load_jwks(force=True))
         self.http_client.get_json.assert_called_once_with(JWKS_URI)
 
         # Throw if the JWKS uri is missing
         with self.metadata_edit({"jwks_uri": None}):
             with self.assertRaises(RuntimeError):
-                yield defer.ensureDeferred(self.handler.load_jwks(token, force=True))
+                yield defer.ensureDeferred(self.handler.load_jwks(force=True))
 
         # Return empty key set if JWKS are not used
-        self.handler._user_profile_method = "userinfo_endpoint"
+        self.handler._scopes = []  # not asking the openid scope
         self.http_client.get_json.reset_mock()
-        jwks = yield defer.ensureDeferred(self.handler.load_jwks(token, force=True))
+        jwks = yield defer.ensureDeferred(self.handler.load_jwks(force=True))
         self.http_client.get_json.assert_not_called()
         self.assertEqual(jwks, {"keys": []})
 
@@ -282,25 +281,11 @@ class OidcHandlerTestCase(HomeserverTestCase):
             )
 
         # Tests for configs that the userinfo endpoint
-        token1 = {}
-        token2 = {"id_token": "dummy"}
-        self.assertTrue(h._uses_userinfo(token1))
-        self.assertFalse(h._uses_userinfo(token2))
-        h._validate_metadata()
-        h._user_profile_method = "userinfo_endpoint"
-        self.assertTrue(h._uses_userinfo(token1))
-        self.assertTrue(h._uses_userinfo(token2))
+        self.assertFalse(h._uses_userinfo)
+        h._scopes = []  # do not request the openid scope
+        self.assertTrue(h._uses_userinfo)
         self.assertRaisesRegex(ValueError, "userinfo_endpoint", h._validate_metadata)
-        h._user_profile_method = "id_token"
-        self.assertFalse(h._uses_userinfo(token1))
-        self.assertFalse(h._uses_userinfo(token2))
-        h._validate_metadata()
-        h._user_profile_method = "invalid"
-        self.assertRaisesRegex(
-            ValueError, "user_profile_method must be one of", h._uses_userinfo, token1
-        )
 
-        h._user_profile_method = "userinfo_endpoint"
         with self.metadata_edit(
             {"userinfo_endpoint": USERINFO_ENDPOINT, "jwks_uri": None}
         ):
@@ -458,7 +443,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.handler._fetch_userinfo.reset_mock()
 
         # With userinfo fetching
-        self.handler._user_profile_method = "userinfo_endpoint"
+        self.handler._scopes = []  # do not ask the "openid" scope
         yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
 
         self.handler._auth_handler.complete_sso_login.assert_called_once_with(

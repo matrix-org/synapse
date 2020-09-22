@@ -196,11 +196,11 @@ class OidcHandler:
                     % (m["response_types_supported"],)
                 )
 
-        # If the openid scope was not requested, we need a userinfo endpoint to fetch user infos
-        if self._user_profile_method == "userinfo_endpoint":
+        # Ensure there's a userinfo endpoint to fetch from if it is requred.
+        if self._uses_userinfo:
             if m.get("userinfo_endpoint") is None:
                 raise ValueError(
-                    'provider has no "userinfo_endpoint", even though it is required because user_profile_method requests it'
+                    'provider has no "userinfo_endpoint", even though it is required'
                 )
         else:
             # If we're not using userinfo, we need a valid jwks to validate the ID token
@@ -210,27 +210,20 @@ class OidcHandler:
                 else:
                     raise ValueError('"jwks_uri" must be set')
 
-    def _uses_userinfo(self, token) -> bool:
+    @property
+    def _uses_userinfo(self) -> bool:
         """Returns True if the ``userinfo_endpoint`` should be used.
 
-        This is based on user_profile_method: if it is ``id_token``,
-        the provider should use an ID token containing the
-        user informations. If it is ``userinfo_endpoint``, we should
-        fetch them using the ``access_token`` with the ``userinfo_endpoint``.
-        If it is ``auto``, we use the ``id_token`` if present in the token
-        response, and fallback to the ``userinfo_endpoint``.
+        This is based on the requested scopes: if the scopes include
+        ``openid``, the provider should give use an ID token containing the
+        user informations. If not, we should fetch them using the
+        ``access_token`` with the ``userinfo_endpoint``.
         """
 
-        if self._user_profile_method == "userinfo_endpoint":
-            return True
-        elif self._user_profile_method == "id_token":
-            return False
-        elif self._user_profile_method == "auto":
-            return "id_token" not in token
-        else:
-            raise ValueError(
-                'user_profile_method must be one of "userinfo_endpoint", "id_token", or "auto"'
-            )
+        return (
+            "openid" not in self._scopes
+            or self._user_profile_method == "userinfo_endpoint"
+        )
 
     async def load_metadata(self) -> OpenIDProviderMetadata:
         """Load and validate the provider metadata.
@@ -257,7 +250,7 @@ class OidcHandler:
 
         return self._provider_metadata
 
-    async def load_jwks(self, token=None, force: bool = False) -> JWKS:
+    async def load_jwks(self, force: bool = False) -> JWKS:
         """Load the JSON Web Key Set used to sign ID tokens.
 
         If we're not using the ``userinfo_endpoint``, user infos are extracted
@@ -285,7 +278,7 @@ class OidcHandler:
                     ]
                 }
         """
-        if token is not None and self._uses_userinfo(token):
+        if self._uses_userinfo:
             # We're not using jwt signing, return an empty jwk set
             return {"keys": []}
 
@@ -443,13 +436,6 @@ class OidcHandler:
         """
         metadata = await self.load_metadata()
 
-        # We do check this in load_metadata but we have to check again because
-        # load_metadata cannot handle the "auto" case.
-        if metadata.get("userinfo_endpoint") is None:
-            raise ValueError(
-                'provider has no "userinfo_endpoint", even though it is required because user_profile_method requests it'
-            )
-
         resp = await self._http_client.get_json(
             metadata["userinfo_endpoint"],
             headers={"Authorization": ["Bearer {}".format(token["access_token"])]},
@@ -490,7 +476,7 @@ class OidcHandler:
 
         # Try to decode the keys in cache first, then retry by forcing the keys
         # to be reloaded
-        jwk_set = await self.load_jwks(token)
+        jwk_set = await self.load_jwks()
         try:
             claims = jwt.decode(
                 token["id_token"],
@@ -501,7 +487,7 @@ class OidcHandler:
             )
         except ValueError:
             logger.info("Reloading JWKS after decode error")
-            jwk_set = await self.load_jwks(token, force=True)  # try reloading the jwks
+            jwk_set = await self.load_jwks(force=True)  # try reloading the jwks
             claims = jwt.decode(
                 token["id_token"],
                 key=jwk_set,
@@ -690,7 +676,7 @@ class OidcHandler:
 
         # Now that we have a token, get the userinfo, either by decoding the
         # `id_token` or by fetching the `userinfo_endpoint`.
-        if self._uses_userinfo(token):
+        if self._uses_userinfo:
             logger.debug("Fetching userinfo")
             try:
                 userinfo = await self._fetch_userinfo(token)
