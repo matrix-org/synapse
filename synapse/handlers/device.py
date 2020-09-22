@@ -528,99 +528,28 @@ class DeviceHandler(DeviceWorkerHandler):
         """
         return await self.store.get_dehydrated_device(user_id)
 
-    async def create_dehydration_token(
-        self, user_id: str, device_id: str, login_submission: JsonDict
-    ) -> str:
-        """Create a token for a client to fulfill a dehydration request.
-
-        Args:
-            user_id: the user that we are creating the token for
-            device_id: the device ID for the dehydrated device.  This is to
-                ensure that the device still exists when the user tells us
-                they want to use the dehydrated device.
-            login_submission: the contents of the login request.
-        Returns:
-            the dehydration token
-        """
-        return await self.store.create_dehydration_token(
-            user_id, device_id, login_submission
-        )
-
-    async def rehydrate_device(self, token: str) -> dict:
+    async def rehydrate_device(
+        self, user_id: str, access_token: str, device_id: str
+    ) -> dict:
         """Process a rehydration request from the user.
 
         Args:
-            token: the dehydration token
+            user_id: the user who is rehydrating the device
+            access_token: the access token used for the request
+            device_id: the ID of the device that will be rehydrated
         Returns:
-            the login result, including the user's access token and device ID
+            a dict containing {"success": True}
         """
-        # FIXME: if can't find token, return 404
-        token_info = await self.store.clear_dehydration_token(token, True)
+        success = await self.store.remove_dehydrated_device(user_id, device_id)
 
-        # normally, the constructor would do self.registration_handler =
-        # self.hs.get_registration_handler(), but doing that results in a
-        # circular dependency in the handlers.  So do this for now
-        registration_handler = self.hs.get_registration_handler()
-
-        if token_info["dehydrated"]:
-            # create access token for dehydrated device
-            initial_display_name = (
-                None  # FIXME: get display name from login submission?
-            )
-            device_id, access_token = await registration_handler.register_device(
-                token_info.get("user_id"),
-                token_info.get("device_id"),
-                initial_display_name,
-            )
-
-            return {
-                "user_id": token_info["user_id"],
-                "access_token": access_token,
-                "home_server": self.hs.hostname,
-                "device_id": device_id,
-            }
-
+        if success:
+            # If the dehydrated device was successfully deleted (the device ID
+            # matched the stored dehydrated device), then modify the access
+            # token to use the dehydrated device's ID
+            await self.store.set_device_for_access_token(access_token, device_id)
+            return {"success": True}
         else:
-            # create device and access token from original login submission
-            login_submission = token_info["login_submission"]
-            device_id = login_submission.get("device_id")
-            initial_display_name = login_submission.get("initial_device_display_name")
-            device_id, access_token = await registration_handler.register_device(
-                token_info.get("user_id"), device_id, initial_display_name
-            )
-
-            return {
-                "user_id": token.info["user_id"],
-                "access_token": access_token,
-                "home_server": self.hs.hostname,
-                "device_id": device_id,
-            }
-
-    async def cancel_rehydrate(self, token: str) -> dict:
-        """Cancel a rehydration request from the user and complete the user's login.
-
-        Args:
-            token: the dehydration token
-        Returns:
-            the login result, including the user's access token and device ID
-        """
-        # FIXME: if can't find token, return 404
-        token_info = await self.store.clear_dehydration_token(token, False)
-        # create device and access token from original login submission
-        login_submission = token_info["login_submission"]
-        device_id = login_submission.get("device_id")
-        initial_display_name = login_submission.get("initial_device_display_name")
-        registration_handler = self.hs.get_registration_handler()
-        device_id, access_token = await registration_handler.register_device(
-            token_info.get("user_id"), device_id, initial_display_name
-        )
-
-        return {
-            "user_id": token_info.get("user_id"),
-            "access_token": access_token,
-            "home_server": self.hs.hostname,
-            "device_id": device_id,
-        }
+            raise errors.NotFoundError()
 
 
 def _update_device_from_client_ips(device, client_ips):

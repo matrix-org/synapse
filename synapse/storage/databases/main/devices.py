@@ -744,7 +744,9 @@ class DeviceWorkerStore(SQLBaseStore):
             retcols=["device_id", "device_data"],
             allow_none=True,
         )
-        return (row["device_id"], json.loads(row["device_data"])) if row else (None, None)
+        return (
+            (row["device_id"], json.loads(row["device_data"])) if row else (None, None)
+        )
 
     def _store_dehydrated_device_txn(
         self, txn, user_id: str, device_id: str, device_data: str
@@ -795,100 +797,17 @@ class DeviceWorkerStore(SQLBaseStore):
             json.dumps(device_data),
         )
 
-    async def create_dehydration_token(
-        self, user_id: str, device_id: str, login_submission: JsonDict
-    ) -> str:
-        """Create a token for a client to fulfill a dehydration request.
+    async def remove_dehydrated_device(self, user_id: str, device_id: str) -> bool:
+        """Remove a dehydrated device.
 
         Args:
-            user_id: the user that we are creating the token for
-            device_id: the device ID for the dehydrated device.  This is to
-                ensure that the device still exists when the user tells us
-                they want to use the dehydrated device.
-            login_submission: the contents of the login request.
-        Returns:
-            the dehydration token
+            user_id: the user that the dehydrated device belongs to
+            device_id: the ID of the dehydrated device
         """
-        # FIXME: expire any old tokens
-
-        attempts = 0
-        while attempts < 5:
-            token = random_string(24)
-
-            try:
-                await self.db_pool.simple_insert(
-                    table="dehydration_token",
-                    values={
-                        "token": token,
-                        "user_id": user_id,
-                        "device_id": device_id,
-                        "login_submission": json.dumps(login_submission),
-                        "creation_time": self.hs.get_clock().time_msec(),
-                    },
-                    desc="create_dehydration_token",
-                )
-                return token
-            except self.db_pool.engine.module.IntegrityError:
-                attempts += 1
-        raise StoreError(500, "Couldn't generate a token.")
-
-    def _clear_dehydration_token_txn(self, txn, token: str, dehydrate: bool) -> dict:
-        token_info = self.db_pool.simple_select_one_txn(
-            txn,
-            "dehydration_token",
-            {"token": token},
-            ["user_id", "device_id", "login_submission"],
+        count = self.db_pool.simple_delete(
+            "dehydrated_devices", {"user_id": user_id, "device_id": device_id,},
         )
-        self.db_pool.simple_delete_one_txn(
-            txn, "dehydration_token", {"token": token},
-        )
-        token_info["login_submission"] = json.loads(token_info["login_submission"])
-
-        if dehydrate:
-            device_id = self.db_pool.simple_select_one_onecol_txn(
-                txn,
-                "dehydrated_devices",
-                keyvalues={"user_id": token_info["user_id"]},
-                retcol="device_id",
-                allow_none=True,
-            )
-            token_info["dehydrated"] = False
-            if device_id == token_info["device_id"]:
-                count = self.db_pool.simple_delete_txn(
-                    txn,
-                    "dehydrated_devices",
-                    {
-                        "user_id": token_info["user_id"],
-                        "device_id": token_info["device_id"],
-                    },
-                )
-                if count != 0:
-                    token_info["dehydrated"] = True
-
-        return token_info
-
-    async def clear_dehydration_token(self, token: str, dehydrate: bool) -> dict:
-        """Use a dehydration token.  If the client wishes to use the dehydrated
-        device, it will also remove the dehydrated device.
-
-        Args:
-            token: the dehydration token
-            dehydrate: whether the client wishes to use the dehydrated device
-        Returns:
-            A dict giving the information related to the token.  It will have
-            the following properties:
-            - user_id: the user associated from the token
-            - device_id: the ID of the dehydrated device
-            - login_submission: the original submission to /login
-            - dehydrated: (only present if the "dehydrate" parameter is True).
-              Whether the dehydrated device can be used by the client.
-        """
-        return await self.db_pool.runInteraction(
-            "get_users_whose_devices_changed",
-            self._clear_dehydration_token_txn,
-            token,
-            dehydrate,
-        )
+        return count >= 1
 
 
 class DeviceBackgroundUpdateStore(SQLBaseStore):

@@ -16,7 +16,7 @@
 import logging
 from typing import Awaitable, Callable, Dict, Optional
 
-from synapse.api.errors import Codes, LoginError, SynapseError
+from synapse.api.errors import Codes, LoginError, NotFoundError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
@@ -340,29 +340,6 @@ class LoginRestServlet(RestServlet):
                 )
             user_id = canonical_uid
 
-        if login_submission.get("org.matrix.msc2697.restore_device"):
-            # user requested to rehydrate a device, so check if there they have
-            # a dehydrated device, and if so, allow them to try to rehydrate it
-            (
-                device_id,
-                dehydrated_device,
-            ) = await self.device_handler.get_dehydrated_device(user_id)
-            if dehydrated_device:
-                token = await self.device_handler.create_dehydration_token(
-                    user_id, device_id, login_submission
-                )
-                result = {
-                    "user_id": user_id,
-                    "home_server": self.hs.hostname,
-                    "device_data": dehydrated_device,
-                    "device_id": device_id,
-                    "dehydration_token": token,
-                }
-
-                # FIXME: call callback?
-
-                return result
-
         device_id = login_submission.get("device_id")
         initial_display_name = login_submission.get("initial_device_display_name")
         device_id, access_token = await self.registration_handler.register_device(
@@ -426,50 +403,68 @@ class LoginRestServlet(RestServlet):
 
 
 class RestoreDeviceServlet(RestServlet):
-    """Complete a rehydration request, either by letting the client use the
-    dehydrated device, or by creating a new device for the user.
+    # FIXME: move this to v2_alpha/devices.py.  This is kept here for now to
+    # make it easier to compare with the other PR.
+    """Request or complete a rehydration request.
 
-    POST /org.matrix.msc2697/restore_device
+    GET /org.matrix.msc2697.v2/restore_device
+
+    HTTP/1.1 200 OK
     Content-Type: application/json
 
     {
-      "rehydrate": true,
-      "dehydration_token": "an_opaque_token"
+      "device_id": "dehydrated_device_id",
+      "device_data": {"device": "data"}
+    }
+
+    POST /org.matrix.msc2697.v2/restore_device
+    Content-Type: application/json
+
+    {
+      "device_id": "dehydrated_device_id"
     }
 
     HTTP/1.1 200 OK
     Content-Type: application/json
 
-    { // same format as the result from a /login request
-      "user_id": "@alice:example.org",
-      "device_id": "dehydrated_device",
-      "access_token": "another_opaque_token"
+    {
+      "success": true,
     }
 
     """
 
-    PATTERNS = client_patterns("/org.matrix.msc2697/restore_device")
+    PATTERNS = client_patterns("/org.matrix.msc2697.v2/restore_device")
 
     def __init__(self, hs):
         super(RestoreDeviceServlet, self).__init__()
         self.hs = hs
+        self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
         self._well_known_builder = WellKnownBuilder(hs)
 
+    async def on_GET(self, request: SynapseRequest):
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        (
+            device_id,
+            dehydrated_device,
+        ) = await self.device_handler.get_dehydrated_device(requester.user.to_string())
+        if dehydrated_device:
+            result = {"device_id": device_id, "device_data": dehydrated_device}
+            return (200, result)
+        else:
+            raise NotFoundError()
+
     async def on_POST(self, request: SynapseRequest):
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+
         submission = parse_json_object_from_request(request)
 
-        if submission.get("rehydrate"):
-            result = await self.device_handler.rehydrate_device(
-                submission["dehydration_token"]
-            )
-        else:
-            result = await self.device_handler.cancel_rehydrate(
-                submission["dehydration_token"]
-            )
-        well_known_data = self._well_known_builder.get_well_known()
-        if well_known_data:
-            result["well_known"] = well_known_data
+        result = await self.device_handler.rehydrate_device(
+            requester.user.to_string(),
+            self.auth.get_access_token_from_request(request),
+            submission["device_id"],
+        )
+
         return (200, result)
 
 
@@ -510,7 +505,7 @@ class StoreDeviceServlet(RestServlet):
         device_id = await self.device_handler.store_dehydrated_device(
             requester.user.to_string(),
             submission["device_data"],
-            submission.get("initial_device_display_name", None)
+            submission.get("initial_device_display_name", None),
         )
         return 200, {"device_id": device_id}
 
