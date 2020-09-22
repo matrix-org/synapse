@@ -1,1 +1,0 @@
-Fix a bug causing the cross-signing keys to be ignored when resyncing a device list.

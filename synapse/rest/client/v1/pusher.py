@@ -16,7 +16,7 @@
 import logging
 
 from synapse.api.errors import Codes, StoreError, SynapseError
-from synapse.http.server import finish_request
+from synapse.http.server import respond_with_html_bytes
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -44,7 +44,7 @@ class PushersRestServlet(RestServlet):
     PATTERNS = client_patterns("/pushers$", v1=True)
 
     def __init__(self, hs):
-        super(PushersRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
 
@@ -68,7 +68,7 @@ class PushersSetRestServlet(RestServlet):
     PATTERNS = client_patterns("/pushers/set$", v1=True)
 
     def __init__(self, hs):
-        super(PushersSetRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.notifier = hs.get_notifier()
@@ -153,7 +153,7 @@ class PushersRemoveRestServlet(RestServlet):
     SUCCESS_HTML = b"<html><body>You have been unsubscribed</body><html>"
 
     def __init__(self, hs):
-        super(PushersRemoveRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.notifier = hs.get_notifier()
         self.auth = hs.get_auth()
@@ -177,13 +177,9 @@ class PushersRemoveRestServlet(RestServlet):
 
         self.notifier.on_new_replication_data()
 
-        request.setResponseCode(200)
-        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(
-            b"Content-Length", b"%d" % (len(PushersRemoveRestServlet.SUCCESS_HTML),)
+        respond_with_html_bytes(
+            request, 200, PushersRemoveRestServlet.SUCCESS_HTML,
         )
-        request.write(PushersRemoveRestServlet.SUCCESS_HTML)
-        finish_request(request)
         return None
 
     def on_OPTIONS(self, _):

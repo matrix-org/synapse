@@ -77,7 +77,7 @@ class ConsentConfig(Config):
     section = "consent"
 
     def __init__(self, *args):
-        super(ConsentConfig, self).__init__(*args)
+        super().__init__(*args)
 
         self.user_consent_version = None
         self.user_consent_template_dir = None

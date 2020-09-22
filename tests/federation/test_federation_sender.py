@@ -21,35 +21,39 @@ from signedjson.types import BaseKey, SigningKey
 
 from twisted.internet import defer
 
+from synapse.api.constants import RoomEncryptionAlgorithms
 from synapse.rest import admin
 from synapse.rest.client.v1 import login
 from synapse.types import JsonDict, ReadReceipt
 
+from tests.test_utils import make_awaitable
 from tests.unittest import HomeserverTestCase, override_config
 
 
 class FederationSenderReceiptsTestCases(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
+        mock_state_handler = Mock(spec=["get_current_hosts_in_room"])
+        # Ensure a new Awaitable is created for each call.
+        mock_state_handler.get_current_hosts_in_room.return_value = make_awaitable(
+            ["test", "host2"]
+        )
         return self.setup_test_homeserver(
-            state_handler=Mock(spec=["get_current_hosts_in_room"]),
+            state_handler=mock_state_handler,
             federation_transport_client=Mock(spec=["send_transaction"]),
         )
 
     @override_config({"send_federation": True})
     def test_send_receipts(self):
-        mock_state_handler = self.hs.get_state_handler()
-        mock_state_handler.get_current_hosts_in_room.return_value = ["test", "host2"]
-
         mock_send_transaction = (
             self.hs.get_federation_transport_client().send_transaction
         )
-        mock_send_transaction.return_value = defer.succeed({})
+        mock_send_transaction.return_value = make_awaitable({})
 
         sender = self.hs.get_federation_sender()
         receipt = ReadReceipt(
             "room_id", "m.read", "user_id", ["event_id"], {"ts": 1234}
         )
-        self.successResultOf(sender.send_read_receipt(receipt))
+        self.successResultOf(defer.ensureDeferred(sender.send_read_receipt(receipt)))
 
         self.pump()
 
@@ -80,19 +84,16 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
     def test_send_receipts_with_backoff(self):
         """Send two receipts in quick succession; the second should be flushed, but
         only after 20ms"""
-        mock_state_handler = self.hs.get_state_handler()
-        mock_state_handler.get_current_hosts_in_room.return_value = ["test", "host2"]
-
         mock_send_transaction = (
             self.hs.get_federation_transport_client().send_transaction
         )
-        mock_send_transaction.return_value = defer.succeed({})
+        mock_send_transaction.return_value = make_awaitable({})
 
         sender = self.hs.get_federation_sender()
         receipt = ReadReceipt(
             "room_id", "m.read", "user_id", ["event_id"], {"ts": 1234}
         )
-        self.successResultOf(sender.send_read_receipt(receipt))
+        self.successResultOf(defer.ensureDeferred(sender.send_read_receipt(receipt)))
 
         self.pump()
 
@@ -124,7 +125,7 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
         receipt = ReadReceipt(
             "room_id", "m.read", "user_id", ["other_id"], {"ts": 1234}
         )
-        self.successResultOf(sender.send_read_receipt(receipt))
+        self.successResultOf(defer.ensureDeferred(sender.send_read_receipt(receipt)))
         self.pump()
         mock_send_transaction.assert_not_called()
 
@@ -163,7 +164,6 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         return self.setup_test_homeserver(
-            state_handler=Mock(spec=["get_current_hosts_in_room"]),
             federation_transport_client=Mock(spec=["send_transaction"]),
         )
 
@@ -173,10 +173,6 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         return c
 
     def prepare(self, reactor, clock, hs):
-        # stub out get_current_hosts_in_room
-        mock_state_handler = hs.get_state_handler()
-        mock_state_handler.get_current_hosts_in_room.return_value = ["test", "host2"]
-
         # stub out get_users_who_share_room_with_user so that it claims that
         # `@user2:host2` is in the room
         def get_users_who_share_room_with_user(user_id):
@@ -536,7 +532,10 @@ def build_device_dict(user_id: str, device_id: str, sk: SigningKey):
     return {
         "user_id": user_id,
         "device_id": device_id,
-        "algorithms": ["m.olm.curve25519-aes-sha256", "m.megolm.v1.aes-sha"],
+        "algorithms": [
+            "m.olm.curve25519-aes-sha2",
+            RoomEncryptionAlgorithms.MEGOLM_V1_AES_SHA2,
+        ],
         "keys": {
             "curve25519:" + device_id: "curve25519+key",
             key_id(sk): encode_pubkey(sk),

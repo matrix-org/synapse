@@ -17,11 +17,11 @@
 """Contains the URL paths to prefix various aspects of the server with. """
 import hmac
 from hashlib import sha256
-
-from six.moves.urllib.parse import urlencode
+from urllib.parse import urlencode
 
 from synapse.config import ConfigError
 
+SYNAPSE_CLIENT_API_PREFIX = "/_synapse/client"
 CLIENT_API_PREFIX = "/_matrix/client"
 FEDERATION_PREFIX = "/_matrix/federation"
 FEDERATION_V1_PREFIX = FEDERATION_PREFIX + "/v1"
@@ -34,7 +34,7 @@ MEDIA_PREFIX = "/_matrix/media/r0"
 LEGACY_MEDIA_PREFIX = "/_matrix/media/v1"
 
 
-class ConsentURIBuilder(object):
+class ConsentURIBuilder:
     def __init__(self, hs_config):
         """
         Args:

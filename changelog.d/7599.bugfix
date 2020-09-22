@@ -1,1 +1,0 @@
-Fix bug where returning rooms for a group would fail if it included a room that the server was not in.

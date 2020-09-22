@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import Optional
 
 from synapse.api.errors import SynapseError
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -28,7 +29,8 @@ class DeactivateAccountHandler(BaseHandler):
     """Handler which deals with deactivating user accounts."""
 
     def __init__(self, hs):
-        super(DeactivateAccountHandler, self).__init__(hs)
+        super().__init__(hs)
+        self.hs = hs
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
         self._room_member_handler = hs.get_room_member_handler()
@@ -40,23 +42,25 @@ class DeactivateAccountHandler(BaseHandler):
 
         # Start the user parter loop so it can resume parting users from rooms where
         # it left off (if it has work left to do).
-        hs.get_reactor().callWhenRunning(self._start_user_parting)
+        if hs.config.worker_app is None:
+            hs.get_reactor().callWhenRunning(self._start_user_parting)
 
         self._account_validity_enabled = hs.config.account_validity.enabled
 
-    async def deactivate_account(self, user_id, erase_data, id_server=None):
+    async def deactivate_account(
+        self, user_id: str, erase_data: bool, id_server: Optional[str] = None
+    ) -> bool:
         """Deactivate a user's account
 
         Args:
-            user_id (str): ID of user to be deactivated
-            erase_data (bool): whether to GDPR-erase the user's data
-            id_server (str|None): Use the given identity server when unbinding
+            user_id: ID of user to be deactivated
+            erase_data: whether to GDPR-erase the user's data
+            id_server: Use the given identity server when unbinding
                 any threepids. If None then will attempt to unbind using the
                 identity server specified when binding (if known).
 
         Returns:
-            Deferred[bool]: True if identity server supports removing
-            threepids, otherwise False.
+            True if identity server supports removing threepids, otherwise False.
         """
         # FIXME: Theoretically there is a race here wherein user resets
         # password using threepid.
@@ -133,11 +137,11 @@ class DeactivateAccountHandler(BaseHandler):
 
         return identity_server_supports_unbinding
 
-    async def _reject_pending_invites_for_user(self, user_id):
+    async def _reject_pending_invites_for_user(self, user_id: str):
         """Reject pending invites addressed to a given user ID.
 
         Args:
-            user_id (str): The user ID to reject pending invites for.
+            user_id: The user ID to reject pending invites for.
         """
         user = UserID.from_string(user_id)
         pending_invites = await self.store.get_invited_rooms_for_local_user(user_id)
@@ -165,22 +169,16 @@ class DeactivateAccountHandler(BaseHandler):
                     room.room_id,
                 )
 
-    def _start_user_parting(self):
+    def _start_user_parting(self) -> None:
         """
         Start the process that goes through the table of users
         pending deactivation, if it isn't already running.
-
-        Returns:
-            None
         """
         if not self._user_parter_running:
             run_as_background_process("user_parter_loop", self._user_parter_loop)
 
-    async def _user_parter_loop(self):
+    async def _user_parter_loop(self) -> None:
         """Loop that parts deactivated users from rooms
-
-        Returns:
-            None
         """
         self._user_parter_running = True
         logger.info("Starting user parter")
@@ -197,11 +195,8 @@ class DeactivateAccountHandler(BaseHandler):
         finally:
             self._user_parter_running = False
 
-    async def _part_user(self, user_id):
+    async def _part_user(self, user_id: str) -> None:
         """Causes the given user_id to leave all the rooms they're joined to
-
-        Returns:
-            None
         """
         user = UserID.from_string(user_id)
 
@@ -223,3 +218,31 @@ class DeactivateAccountHandler(BaseHandler):
                     user_id,
                     room_id,
                 )
+
+    async def activate_account(self, user_id: str) -> None:
+        """
+        Activate an account that was previously deactivated.
+
+        This marks the user as active and not erased in the database, but does
+        not attempt to rejoin rooms, re-add threepids, etc.
+
+        If enabled, the user will be re-added to the user directory.
+
+        The user will also need a password hash set to actually login.
+
+        Args:
+            user_id: ID of user to be re-activated
+        """
+        # Add the user to the directory, if necessary.
+        user = UserID.from_string(user_id)
+        if self.hs.config.user_directory_search_all_users:
+            profile = await self.store.get_profileinfo(user.localpart)
+            await self.user_directory_handler.handle_local_profile_change(
+                user_id, profile
+            )
+
+        # Ensure the user is not marked as erased.
+        await self.store.mark_user_not_erased(user_id)
+
+        # Mark the user as active.
+        await self.store.set_user_deactivated_status(user_id, False)

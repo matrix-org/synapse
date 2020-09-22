@@ -30,7 +30,7 @@ from tests.server import make_request, render
 
 
 @attr.s
-class RestHelper(object):
+class RestHelper:
     """Contains extra helper functions to quickly and clearly perform a given
     REST action, which isn't the focus of the test.
     """
@@ -39,7 +39,9 @@ class RestHelper(object):
     resource = attr.ib()
     auth_user_id = attr.ib()
 
-    def create_room_as(self, room_creator=None, is_public=True, tok=None):
+    def create_room_as(
+        self, room_creator=None, is_public=True, tok=None, expect_code=200,
+    ):
         temp_id = self.auth_user_id
         self.auth_user_id = room_creator
         path = "/_matrix/client/r0/createRoom"
@@ -54,9 +56,11 @@ class RestHelper(object):
         )
         render(request, self.resource, self.hs.get_reactor())
 
-        assert channel.result["code"] == b"200", channel.result
+        assert channel.result["code"] == b"%d" % expect_code, channel.result
         self.auth_user_id = temp_id
-        return channel.json_body["room_id"]
+
+        if expect_code == 200:
+            return channel.json_body["room_id"]
 
     def invite(self, room=None, src=None, targ=None, expect_code=200, tok=None):
         self.change_membership(
@@ -88,7 +92,28 @@ class RestHelper(object):
             expect_code=expect_code,
         )
 
-    def change_membership(self, room, src, targ, membership, tok=None, expect_code=200):
+    def change_membership(
+        self,
+        room: str,
+        src: str,
+        targ: str,
+        membership: str,
+        extra_data: dict = {},
+        tok: Optional[str] = None,
+        expect_code: int = 200,
+    ) -> None:
+        """
+        Send a membership state event into a room.
+
+        Args:
+            room: The ID of the room to send to
+            src: The mxid of the event sender
+            targ: The mxid of the event's target. The state key
+            membership: The type of membership event
+            extra_data: Extra information to include in the content of the event
+            tok: The user access token to use
+            expect_code: The expected HTTP response code
+        """
         temp_id = self.auth_user_id
         self.auth_user_id = src
 
@@ -97,6 +122,7 @@ class RestHelper(object):
             path = path + "?access_token=%s" % tok
 
         data = {"membership": membership}
+        data.update(extra_data)
 
         request, channel = make_request(
             self.hs.get_reactor(), "PUT", path, json.dumps(data).encode("utf8")

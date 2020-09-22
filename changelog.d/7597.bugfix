@@ -1,1 +1,0 @@
-Fix metrics failing when there is a large number of active background processes.

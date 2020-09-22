@@ -17,17 +17,13 @@ import logging
 from collections import namedtuple
 from typing import Any, Dict, Optional
 
-from six import iteritems
-
 import msgpack
 from unpaddedbase64 import decode_base64, encode_base64
-
-from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.api.errors import Codes, HttpResponseException
 from synapse.types import ThirdPartyInstanceID
-from synapse.util.caches.descriptors import cachedInlineCallbacks
+from synapse.util.caches.descriptors import cached
 from synapse.util.caches.response_cache import ResponseCache
 
 from ._base import BaseHandler
@@ -42,14 +38,14 @@ EMPTY_THIRD_PARTY_ID = ThirdPartyInstanceID(None, None)
 
 class RoomListHandler(BaseHandler):
     def __init__(self, hs):
-        super(RoomListHandler, self).__init__(hs)
+        super().__init__(hs)
         self.enable_room_list_search = hs.config.enable_room_list_search
         self.response_cache = ResponseCache(hs, "room_list")
         self.remote_response_cache = ResponseCache(
             hs, "remote_room_list", timeout_ms=30 * 1000
         )
 
-    def get_local_public_room_list(
+    async def get_local_public_room_list(
         self,
         limit=None,
         since_token=None,
@@ -74,7 +70,7 @@ class RoomListHandler(BaseHandler):
                 API
         """
         if not self.enable_room_list_search:
-            return defer.succeed({"chunk": [], "total_room_count_estimate": 0})
+            return {"chunk": [], "total_room_count_estimate": 0}
 
         logger.info(
             "Getting public room list: limit=%r, since=%r, search=%r, network=%r",
@@ -89,7 +85,7 @@ class RoomListHandler(BaseHandler):
             # appservice specific lists.
             logger.info("Bypassing cache as search request.")
 
-            return self._get_public_room_list(
+            return await self._get_public_room_list(
                 limit,
                 since_token,
                 search_filter,
@@ -98,7 +94,7 @@ class RoomListHandler(BaseHandler):
             )
 
         key = (limit, since_token, network_tuple)
-        return self.response_cache.wrap(
+        return await self.response_cache.wrap(
             key,
             self._get_public_room_list,
             limit,
@@ -107,8 +103,7 @@ class RoomListHandler(BaseHandler):
             from_federation=from_federation,
         )
 
-    @defer.inlineCallbacks
-    def _get_public_room_list(
+    async def _get_public_room_list(
         self,
         limit: Optional[int] = None,
         since_token: Optional[str] = None,
@@ -147,7 +142,7 @@ class RoomListHandler(BaseHandler):
         # we request one more than wanted to see if there are more pages to come
         probing_limit = limit + 1 if limit is not None else None
 
-        results = yield self.store.get_largest_public_rooms(
+        results = await self.store.get_largest_public_rooms(
             network_tuple,
             search_filter,
             probing_limit,
@@ -223,44 +218,44 @@ class RoomListHandler(BaseHandler):
 
         response["chunk"] = results
 
-        response["total_room_count_estimate"] = yield self.store.count_public_rooms(
+        response["total_room_count_estimate"] = await self.store.count_public_rooms(
             network_tuple, ignore_non_federatable=from_federation
         )
 
         return response
 
-    @cachedInlineCallbacks(num_args=1, cache_context=True)
-    def generate_room_entry(
+    @cached(num_args=1, cache_context=True)
+    async def generate_room_entry(
         self,
-        room_id,
-        num_joined_users,
+        room_id: str,
+        num_joined_users: int,
         cache_context,
-        with_alias=True,
-        allow_private=False,
-    ):
+        with_alias: bool = True,
+        allow_private: bool = False,
+    ) -> Optional[dict]:
         """Returns the entry for a room
 
         Args:
-            room_id (str): The room's ID.
-            num_joined_users (int): Number of users in the room.
+            room_id: The room's ID.
+            num_joined_users: Number of users in the room.
             cache_context: Information for cached responses.
-            with_alias (bool): Whether to return the room's aliases in the result.
-            allow_private (bool): Whether invite-only rooms should be shown.
+            with_alias: Whether to return the room's aliases in the result.
+            allow_private: Whether invite-only rooms should be shown.
 
         Returns:
-            Deferred[dict|None]: Returns a room entry as a dictionary, or None if this
+            Returns a room entry as a dictionary, or None if this
             room was determined not to be shown publicly.
         """
         result = {"room_id": room_id, "num_joined_members": num_joined_users}
 
         if with_alias:
-            aliases = yield self.store.get_aliases_for_room(
+            aliases = await self.store.get_aliases_for_room(
                 room_id, on_invalidate=cache_context.invalidate
             )
             if aliases:
                 result["aliases"] = aliases
 
-        current_state_ids = yield self.store.get_current_state_ids(
+        current_state_ids = await self.store.get_current_state_ids(
             room_id, on_invalidate=cache_context.invalidate
         )
 
@@ -268,10 +263,10 @@ class RoomListHandler(BaseHandler):
             # We're not in the room, so may as well bail out here.
             return result
 
-        event_map = yield self.store.get_events(
+        event_map = await self.store.get_events(
             [
                 event_id
-                for key, event_id in iteritems(current_state_ids)
+                for key, event_id in current_state_ids.items()
                 if key[0]
                 in (
                     EventTypes.Create,
@@ -338,8 +333,7 @@ class RoomListHandler(BaseHandler):
 
         return result
 
-    @defer.inlineCallbacks
-    def get_remote_public_room_list(
+    async def get_remote_public_room_list(
         self,
         server_name,
         limit=None,
@@ -358,7 +352,7 @@ class RoomListHandler(BaseHandler):
             # to a locally-filtered search if we must.
 
             try:
-                res = yield self._get_remote_list_cached(
+                res = await self._get_remote_list_cached(
                     server_name,
                     limit=limit,
                     since_token=since_token,
@@ -383,7 +377,7 @@ class RoomListHandler(BaseHandler):
             limit = None
             since_token = None
 
-        res = yield self._get_remote_list_cached(
+        res = await self._get_remote_list_cached(
             server_name,
             limit=limit,
             since_token=since_token,
@@ -402,7 +396,7 @@ class RoomListHandler(BaseHandler):
 
         return res
 
-    def _get_remote_list_cached(
+    async def _get_remote_list_cached(
         self,
         server_name,
         limit=None,
@@ -414,7 +408,7 @@ class RoomListHandler(BaseHandler):
         repl_layer = self.hs.get_federation_client()
         if search_filter:
             # We can't cache when asking for search
-            return repl_layer.get_public_rooms(
+            return await repl_layer.get_public_rooms(
                 server_name,
                 limit=limit,
                 since_token=since_token,
@@ -430,7 +424,7 @@ class RoomListHandler(BaseHandler):
             include_all_networks,
             third_party_instance_id,
         )
-        return self.remote_response_cache.wrap(
+        return await self.remote_response_cache.wrap(
             key,
             repl_layer.get_public_rooms,
             server_name,

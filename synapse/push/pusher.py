@@ -15,24 +15,15 @@
 
 import logging
 
+from synapse.push.emailpusher import EmailPusher
+from synapse.push.mailer import Mailer
+
 from .httppusher import HttpPusher
 
 logger = logging.getLogger(__name__)
 
-# We try importing this if we can (it will fail if we don't
-# have the optional email dependencies installed). We don't
-# yet have the config to know if we need the email pusher,
-# but importing this after daemonizing seems to fail
-# (even though a simple test of importing from a daemonized
-# process works fine)
-try:
-    from synapse.push.emailpusher import EmailPusher
-    from synapse.push.mailer import Mailer, load_jinja2_templates
-except Exception:
-    pass
 
-
-class PusherFactory(object):
+class PusherFactory:
     def __init__(self, hs):
         self.hs = hs
         self.config = hs.config
@@ -43,16 +34,8 @@ class PusherFactory(object):
         if hs.config.email_enable_notifs:
             self.mailers = {}  # app_name -> Mailer
 
-            self.notif_template_html, self.notif_template_text = load_jinja2_templates(
-                self.config.email_template_dir,
-                [
-                    self.config.email_notif_template_html,
-                    self.config.email_notif_template_text,
-                ],
-                apply_format_ts_filter=True,
-                apply_mxc_to_http_filter=True,
-                public_baseurl=self.config.public_baseurl,
-            )
+            self._notif_template_html = hs.config.email_notif_template_html
+            self._notif_template_text = hs.config.email_notif_template_text
 
             self.pusher_types["email"] = self._create_email_pusher
 
@@ -73,8 +56,8 @@ class PusherFactory(object):
             mailer = Mailer(
                 hs=self.hs,
                 app_name=app_name,
-                template_html=self.notif_template_html,
-                template_text=self.notif_template_text,
+                template_html=self._notif_template_html,
+                template_text=self._notif_template_text,
             )
             self.mailers[app_name] = mailer
         return EmailPusher(self.hs, pusherdict, mailer)

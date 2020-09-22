@@ -13,10 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from six.moves import range
 
-
-class _Entry(object):
+class _Entry:
     __slots__ = ["end_key", "queue"]
 
     def __init__(self, end_key):
@@ -24,7 +22,7 @@ class _Entry(object):
         self.queue = []
 
 
-class WheelTimer(object):
+class WheelTimer:
     """Stores arbitrary objects that will be returned after their timers have
     expired.
     """

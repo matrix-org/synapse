@@ -15,6 +15,7 @@
 
 import logging
 import urllib
+from typing import List
 
 from netaddr import AddrFormatError, IPAddress
 from zope.interface import implementer
@@ -35,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 @implementer(IAgent)
-class MatrixFederationAgent(object):
+class MatrixFederationAgent:
     """An Agent-like thing which provides a `request` method which correctly
     handles resolving matrix server names when using matrix://. Handles standard
     https URIs as normal.
@@ -47,6 +48,9 @@ class MatrixFederationAgent(object):
 
         tls_client_options_factory (FederationPolicyForHTTPS|None):
             factory to use for fetching client tls options, or none to disable TLS.
+
+        user_agent (bytes):
+            The user agent header to use for federation requests.
 
         _srv_resolver (SrvResolver|None):
             SRVResolver impl to use for looking up SRV records. None to use a default
@@ -61,6 +65,7 @@ class MatrixFederationAgent(object):
         self,
         reactor,
         tls_client_options_factory,
+        user_agent,
         _srv_resolver=None,
         _well_known_resolver=None,
     ):
@@ -78,6 +83,7 @@ class MatrixFederationAgent(object):
             ),
             pool=self._pool,
         )
+        self.user_agent = user_agent
 
         if _well_known_resolver is None:
             _well_known_resolver = WellKnownResolver(
@@ -87,6 +93,7 @@ class MatrixFederationAgent(object):
                     pool=self._pool,
                     contextFactory=tls_client_options_factory,
                 ),
+                user_agent=self.user_agent,
             )
 
         self._well_known_resolver = _well_known_resolver
@@ -127,8 +134,8 @@ class MatrixFederationAgent(object):
             and not _is_ip_literal(parsed_uri.hostname)
             and not parsed_uri.port
         ):
-            well_known_result = yield self._well_known_resolver.get_well_known(
-                parsed_uri.hostname
+            well_known_result = yield defer.ensureDeferred(
+                self._well_known_resolver.get_well_known(parsed_uri.hostname)
             )
             delegated_server = well_known_result.delegated_server
 
@@ -149,7 +156,7 @@ class MatrixFederationAgent(object):
             parsed_uri = urllib.parse.urlparse(uri)
 
         # We need to make sure the host header is set to the netloc of the
-        # server.
+        # server and that a user-agent is provided.
         if headers is None:
             headers = Headers()
         else:
@@ -157,6 +164,8 @@ class MatrixFederationAgent(object):
 
         if not headers.hasHeader(b"host"):
             headers.addRawHeader(b"host", parsed_uri.netloc)
+        if not headers.hasHeader(b"user-agent"):
+            headers.addRawHeader(b"user-agent", self.user_agent)
 
         res = yield make_deferred_yieldable(
             self._agent.request(method, uri, headers, bodyProducer)
@@ -166,7 +175,7 @@ class MatrixFederationAgent(object):
 
 
 @implementer(IAgentEndpointFactory)
-class MatrixHostnameEndpointFactory(object):
+class MatrixHostnameEndpointFactory:
     """Factory for MatrixHostnameEndpoint for parsing to an Agent.
     """
 
@@ -189,7 +198,7 @@ class MatrixHostnameEndpointFactory(object):
 
 
 @implementer(IStreamClientEndpoint)
-class MatrixHostnameEndpoint(object):
+class MatrixHostnameEndpoint:
     """An endpoint that resolves matrix:// URLs using Matrix server name
     resolution (i.e. via SRV). Does not check for well-known delegation.
 
@@ -228,22 +237,21 @@ class MatrixHostnameEndpoint(object):
 
         return run_in_background(self._do_connect, protocol_factory)
 
-    @defer.inlineCallbacks
-    def _do_connect(self, protocol_factory):
+    async def _do_connect(self, protocol_factory):
         first_exception = None
 
-        server_list = yield self._resolve_server()
+        server_list = await self._resolve_server()
 
         for server in server_list:
             host = server.host
             port = server.port
 
             try:
-                logger.info("Connecting to %s:%i", host.decode("ascii"), port)
+                logger.debug("Connecting to %s:%i", host.decode("ascii"), port)
                 endpoint = HostnameEndpoint(self._reactor, host, port)
                 if self._tls_options:
                     endpoint = wrapClientTLS(self._tls_options, endpoint)
-                result = yield make_deferred_yieldable(
+                result = await make_deferred_yieldable(
                     endpoint.connect(protocol_factory)
                 )
 
@@ -263,13 +271,9 @@ class MatrixHostnameEndpoint(object):
         # to try and if that doesn't work then we'll have an exception.
         raise Exception("Failed to resolve server %r" % (self._parsed_uri.netloc,))
 
-    @defer.inlineCallbacks
-    def _resolve_server(self):
+    async def _resolve_server(self) -> List[Server]:
         """Resolves the server name to a list of hosts and ports to attempt to
         connect to.
-
-        Returns:
-            Deferred[list[Server]]
         """
 
         if self._parsed_uri.scheme != b"matrix":
@@ -290,7 +294,7 @@ class MatrixHostnameEndpoint(object):
         if port or _is_ip_literal(host):
             return [Server(host, port or 8448)]
 
-        server_list = yield self._srv_resolver.resolve_service(b"_matrix._tcp." + host)
+        server_list = await self._srv_resolver.resolve_service(b"_matrix._tcp." + host)
 
         if server_list:
             return server_list

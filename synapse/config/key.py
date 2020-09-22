@@ -82,7 +82,7 @@ logger = logging.getLogger(__name__)
 
 
 @attr.s
-class TrustedKeyServer(object):
+class TrustedKeyServer:
     # string: name of the server.
     server_name = attr.ib()
 

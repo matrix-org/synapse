@@ -14,7 +14,6 @@
 # limitations under the License.
 """A replication client for use by synapse workers.
 """
-import heapq
 import logging
 from typing import TYPE_CHECKING, Dict, List, Tuple
 
@@ -24,17 +23,19 @@ from twisted.internet.protocol import ReconnectingClientFactory
 from synapse.api.constants import EventTypes
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.replication.tcp.protocol import ClientReplicationStreamProtocol
+from synapse.replication.tcp.streams import TypingStream
 from synapse.replication.tcp.streams.events import (
     EventsStream,
     EventsStreamEventRow,
     EventsStreamRow,
 )
+from synapse.types import UserID
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
-    from synapse.server import HomeServer
     from synapse.replication.tcp.handler import ReplicationCommandHandler
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -98,12 +99,12 @@ class ReplicationDataHandler:
 
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
-        self.pusher_pool = hs.get_pusherpool()
         self.notifier = hs.get_notifier()
         self._reactor = hs.get_reactor()
         self._clock = hs.get_clock()
         self._streams = hs.get_replication_streams()
         self._instance_name = hs.get_instance_name()
+        self._typing_handler = hs.get_typing_handler()
 
         # Map from stream to list of deferreds waiting for the stream to
         # arrive at a particular position. The lists are sorted by stream position.
@@ -127,6 +128,12 @@ class ReplicationDataHandler:
         """
         self.store.process_replication_rows(stream_name, instance_name, token, rows)
 
+        if stream_name == TypingStream.NAME:
+            self._typing_handler.process_replication_rows(token, rows)
+            self.notifier.on_new_event(
+                "typing_key", token, rooms=[row.room_id for row in rows]
+            )
+
         if stream_name == EventsStream.NAME:
             # We shouldn't get multiple rows per token for events stream, so
             # we don't need to optimise this for multiple rows.
@@ -141,13 +148,11 @@ class ReplicationDataHandler:
                 if event.rejected_reason:
                     continue
 
-                extra_users = ()  # type: Tuple[str, ...]
+                extra_users = ()  # type: Tuple[UserID, ...]
                 if event.type == EventTypes.Member:
-                    extra_users = (event.state_key,)
+                    extra_users = (UserID.from_string(event.state_key),)
                 max_token = self.store.get_room_max_stream_ordering()
                 self.notifier.on_new_room_event(event, token, max_token, extra_users)
-
-            await self.pusher_pool.on_new_notifications(token, token)
 
         # Notify any waiting deferreds. The list is ordered by position so we
         # just iterate through the list until we reach a position that is
@@ -171,7 +176,7 @@ class ReplicationDataHandler:
                     pass
             else:
                 # The list is sorted by position so we don't need to continue
-                # checking any futher entries in the list.
+                # checking any further entries in the list.
                 index_of_first_deferred_not_called = idx
                 break
 
@@ -211,9 +216,8 @@ class ReplicationDataHandler:
 
         waiting_list = self._streams_to_waiters.setdefault(stream_name, [])
 
-        # We insert into the list using heapq as it is more efficient than
-        # pushing then resorting each time.
-        heapq.heappush(waiting_list, (position, deferred))
+        waiting_list.append((position, deferred))
+        waiting_list.sort(key=lambda t: t[0])
 
         # We measure here to get in flight counts and average waiting time.
         with Measure(self._clock, "repl.wait_for_stream_position"):

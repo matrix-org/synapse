@@ -15,10 +15,7 @@
 import hashlib
 import hmac
 import logging
-import re
-
-from six import text_type
-from six.moves import http_client
+from http import HTTPStatus
 
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, NotFoundError, SynapseError
@@ -31,6 +28,7 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.rest.admin._base import (
+    admin_patterns,
     assert_requester_is_admin,
     assert_user_is_admin,
     historical_admin_path_patterns,
@@ -62,7 +60,7 @@ class UsersRestServlet(RestServlet):
 
 
 class UsersRestServletV2(RestServlet):
-    PATTERNS = (re.compile("^/_synapse/admin/v2/users$"),)
+    PATTERNS = admin_patterns("/users$", "v2")
 
     """Get request to list all local users.
     This needs user to have administrator access in Synapse.
@@ -75,6 +73,7 @@ class UsersRestServletV2(RestServlet):
     The parameters `from` and `limit` are required only for pagination.
     By default, a `limit` of 100 is used.
     The parameter `user_id` can be used to filter by user id.
+    The parameter `name` can be used to filter by user id or display name.
     The parameter `guests` can be used to exclude guest users.
     The parameter `deactivated` can be used to include deactivated users.
     """
@@ -91,11 +90,12 @@ class UsersRestServletV2(RestServlet):
         start = parse_integer(request, "from", default=0)
         limit = parse_integer(request, "limit", default=100)
         user_id = parse_string(request, "user_id", default=None)
+        name = parse_string(request, "name", default=None)
         guests = parse_boolean(request, "guests", default=True)
         deactivated = parse_boolean(request, "deactivated", default=False)
 
         users, total = await self.store.get_users_paginate(
-            start, limit, user_id, guests, deactivated
+            start, limit, user_id, name, guests, deactivated
         )
         ret = {"users": users, "total": total}
         if len(users) >= limit:
@@ -105,7 +105,7 @@ class UsersRestServletV2(RestServlet):
 
 
 class UserRestServletV2(RestServlet):
-    PATTERNS = (re.compile("^/_synapse/admin/v2/users/(?P<user_id>[^/]+)$"),)
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]+)$", "v2")
 
     """Get request to list user details.
     This needs user to have administrator access in Synapse.
@@ -215,10 +215,7 @@ class UserRestServletV2(RestServlet):
                     await self.store.set_server_admin(target_user, set_admin_to)
 
             if "password" in body:
-                if (
-                    not isinstance(body["password"], text_type)
-                    or len(body["password"]) > 512
-                ):
+                if not isinstance(body["password"], str) or len(body["password"]) > 512:
                     raise SynapseError(400, "Invalid password")
                 else:
                     new_password = body["password"]
@@ -244,6 +241,15 @@ class UserRestServletV2(RestServlet):
                     await self.deactivate_account_handler.deactivate_account(
                         target_user.to_string(), False
                     )
+                elif not deactivate and user["deactivated"]:
+                    if "password" not in body:
+                        raise SynapseError(
+                            400, "Must provide a password to re-activate an account."
+                        )
+
+                    await self.deactivate_account_handler.activate_account(
+                        target_user.to_string()
+                    )
 
             user = await self.admin_handler.get_user(target_user)
             return 200, user
@@ -252,14 +258,13 @@ class UserRestServletV2(RestServlet):
             password = body.get("password")
             password_hash = None
             if password is not None:
-                if not isinstance(password, text_type) or len(password) > 512:
+                if not isinstance(password, str) or len(password) > 512:
                     raise SynapseError(400, "Invalid password")
                 password_hash = await self.auth_handler.hash(password)
 
             admin = body.get("admin", None)
             user_type = body.get("user_type", None)
             displayname = body.get("displayname", None)
-            threepids = body.get("threepids", None)
 
             if user_type is not None and user_type not in UserTypes.ALL_USER_TYPES:
                 raise SynapseError(400, "Invalid user type")
@@ -270,6 +275,7 @@ class UserRestServletV2(RestServlet):
                 admin=bool(admin),
                 default_display_name=displayname,
                 user_type=user_type,
+                by_admin=True,
             )
 
             if "threepids" in body:
@@ -369,10 +375,7 @@ class UserRegisterServlet(RestServlet):
                 400, "username must be specified", errcode=Codes.BAD_JSON
             )
         else:
-            if (
-                not isinstance(body["username"], text_type)
-                or len(body["username"]) > 512
-            ):
+            if not isinstance(body["username"], str) or len(body["username"]) > 512:
                 raise SynapseError(400, "Invalid username")
 
             username = body["username"].encode("utf-8")
@@ -385,7 +388,7 @@ class UserRegisterServlet(RestServlet):
             )
         else:
             password = body["password"]
-            if not isinstance(password, text_type) or len(password) > 512:
+            if not isinstance(password, str) or len(password) > 512:
                 raise SynapseError(400, "Invalid password")
 
             password_bytes = password.encode("utf-8")
@@ -432,6 +435,7 @@ class UserRegisterServlet(RestServlet):
             password_hash=password_hash,
             admin=bool(admin),
             user_type=user_type,
+            by_admin=True,
         )
 
         result = await register._create_registration_details(user_id, body)
@@ -475,7 +479,7 @@ class DeactivateAccountRestServlet(RestServlet):
         erase = body.get("erase", False)
         if not isinstance(erase, bool):
             raise SynapseError(
-                http_client.BAD_REQUEST,
+                HTTPStatus.BAD_REQUEST,
                 "Param 'erase' must be a boolean, if given",
                 Codes.BAD_JSON,
             )
@@ -638,7 +642,7 @@ class UserAdminServlet(RestServlet):
                 {}
     """
 
-    PATTERNS = (re.compile("^/_synapse/admin/v1/users/(?P<user_id>[^/]*)/admin$"),)
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/admin$")
 
     def __init__(self, hs):
         self.hs = hs
@@ -679,3 +683,29 @@ class UserAdminServlet(RestServlet):
         await self.store.set_server_admin(target_user, set_admin_to)
 
         return 200, {}
+
+
+class UserMembershipRestServlet(RestServlet):
+    """
+    Get room list of an user.
+    """
+
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]+)/joined_rooms$")
+
+    def __init__(self, hs):
+        self.is_mine = hs.is_mine
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+
+    async def on_GET(self, request, user_id):
+        await assert_requester_is_admin(self.auth, request)
+
+        if not self.is_mine(UserID.from_string(user_id)):
+            raise SynapseError(400, "Can only lookup local users")
+
+        room_ids = await self.store.get_rooms_for_user(user_id)
+        if not room_ids:
+            raise NotFoundError("User not found")
+
+        ret = {"joined_rooms": list(room_ids), "total": len(room_ids)}
+        return 200, ret

@@ -47,7 +47,7 @@ room_keys = {
 
 class E2eRoomKeysHandlerTestCase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
-        super(E2eRoomKeysHandlerTestCase, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.hs = None  # type: synapse.server.HomeServer
         self.handler = None  # type: synapse.handlers.e2e_keys.E2eRoomKeysHandler
 
@@ -66,7 +66,7 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         """
         res = None
         try:
-            yield self.handler.get_version_info(self.local_user)
+            yield defer.ensureDeferred(self.handler.get_version_info(self.local_user))
         except errors.SynapseError as e:
             res = e.code
         self.assertEqual(res, 404)
@@ -78,7 +78,9 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         """
         res = None
         try:
-            yield self.handler.get_version_info(self.local_user, "bogus_version")
+            yield defer.ensureDeferred(
+                self.handler.get_version_info(self.local_user, "bogus_version")
+            )
         except errors.SynapseError as e:
             res = e.code
         self.assertEqual(res, 404)
@@ -87,15 +89,21 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
     def test_create_version(self):
         """Check that we can create and then retrieve versions.
         """
-        res = yield self.handler.create_version(
-            self.local_user,
-            {"algorithm": "m.megolm_backup.v1", "auth_data": "first_version_auth_data"},
+        res = yield defer.ensureDeferred(
+            self.handler.create_version(
+                self.local_user,
+                {
+                    "algorithm": "m.megolm_backup.v1",
+                    "auth_data": "first_version_auth_data",
+                },
+            )
         )
         self.assertEqual(res, "1")
 
         # check we can retrieve it as the current version
-        res = yield self.handler.get_version_info(self.local_user)
+        res = yield defer.ensureDeferred(self.handler.get_version_info(self.local_user))
         version_etag = res["etag"]
+        self.assertIsInstance(version_etag, str)
         del res["etag"]
         self.assertDictEqual(
             res,
@@ -108,7 +116,9 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         )
 
         # check we can retrieve it as a specific version
-        res = yield self.handler.get_version_info(self.local_user, "1")
+        res = yield defer.ensureDeferred(
+            self.handler.get_version_info(self.local_user, "1")
+        )
         self.assertEqual(res["etag"], version_etag)
         del res["etag"]
         self.assertDictEqual(
@@ -122,17 +132,19 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         )
 
         # upload a new one...
-        res = yield self.handler.create_version(
-            self.local_user,
-            {
-                "algorithm": "m.megolm_backup.v1",
-                "auth_data": "second_version_auth_data",
-            },
+        res = yield defer.ensureDeferred(
+            self.handler.create_version(
+                self.local_user,
+                {
+                    "algorithm": "m.megolm_backup.v1",
+                    "auth_data": "second_version_auth_data",
+                },
+            )
         )
         self.assertEqual(res, "2")
 
         # check we can retrieve it as the current version
-        res = yield self.handler.get_version_info(self.local_user)
+        res = yield defer.ensureDeferred(self.handler.get_version_info(self.local_user))
         del res["etag"]
         self.assertDictEqual(
             res,
@@ -148,25 +160,32 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
     def test_update_version(self):
         """Check that we can update versions.
         """
-        version = yield self.handler.create_version(
-            self.local_user,
-            {"algorithm": "m.megolm_backup.v1", "auth_data": "first_version_auth_data"},
+        version = yield defer.ensureDeferred(
+            self.handler.create_version(
+                self.local_user,
+                {
+                    "algorithm": "m.megolm_backup.v1",
+                    "auth_data": "first_version_auth_data",
+                },
+            )
         )
         self.assertEqual(version, "1")
 
-        res = yield self.handler.update_version(
-            self.local_user,
-            version,
-            {
-                "algorithm": "m.megolm_backup.v1",
-                "auth_data": "revised_first_version_auth_data",
-                "version": version,
-            },
+        res = yield defer.ensureDeferred(
+            self.handler.update_version(
+                self.local_user,
+                version,
+                {
+                    "algorithm": "m.megolm_backup.v1",
+                    "auth_data": "revised_first_version_auth_data",
+                    "version": version,
+                },
+            )
         )
         self.assertDictEqual(res, {})
 
         # check we can retrieve it as the current version
-        res = yield self.handler.get_version_info(self.local_user)
+        res = yield defer.ensureDeferred(self.handler.get_version_info(self.local_user))
         del res["etag"]
         self.assertDictEqual(
             res,
@@ -184,14 +203,16 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         """
         res = None
         try:
-            yield self.handler.update_version(
-                self.local_user,
-                "1",
-                {
-                    "algorithm": "m.megolm_backup.v1",
-                    "auth_data": "revised_first_version_auth_data",
-                    "version": "1",
-                },
+            yield defer.ensureDeferred(
+                self.handler.update_version(
+                    self.local_user,
+                    "1",
+                    {
+                        "algorithm": "m.megolm_backup.v1",
+                        "auth_data": "revised_first_version_auth_data",
+                        "version": "1",
+                    },
+                )
             )
         except errors.SynapseError as e:
             res = e.code
@@ -201,23 +222,30 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
     def test_update_omitted_version(self):
         """Check that the update succeeds if the version is missing from the body
         """
-        version = yield self.handler.create_version(
-            self.local_user,
-            {"algorithm": "m.megolm_backup.v1", "auth_data": "first_version_auth_data"},
+        version = yield defer.ensureDeferred(
+            self.handler.create_version(
+                self.local_user,
+                {
+                    "algorithm": "m.megolm_backup.v1",
+                    "auth_data": "first_version_auth_data",
+                },
+            )
         )
         self.assertEqual(version, "1")
 
-        yield self.handler.update_version(
-            self.local_user,
-            version,
-            {
-                "algorithm": "m.megolm_backup.v1",
-                "auth_data": "revised_first_version_auth_data",
-            },
+        yield defer.ensureDeferred(
+            self.handler.update_version(
+                self.local_user,
+                version,
+                {
+                    "algorithm": "m.megolm_backup.v1",
+                    "auth_data": "revised_first_version_auth_data",
+                },
+            )
         )
 
         # check we can retrieve it as the current version
-        res = yield self.handler.get_version_info(self.local_user)
+        res = yield defer.ensureDeferred(self.handler.get_version_info(self.local_user))
         del res["etag"]  # etag is opaque, so don't test its contents
         self.assertDictEqual(
             res,
@@ -233,22 +261,29 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
     def test_update_bad_version(self):
         """Check that we get a 400 if the version in the body doesn't match
         """
-        version = yield self.handler.create_version(
-            self.local_user,
-            {"algorithm": "m.megolm_backup.v1", "auth_data": "first_version_auth_data"},
+        version = yield defer.ensureDeferred(
+            self.handler.create_version(
+                self.local_user,
+                {
+                    "algorithm": "m.megolm_backup.v1",
+                    "auth_data": "first_version_auth_data",
+                },
+            )
         )
         self.assertEqual(version, "1")
 
         res = None
         try:
-            yield self.handler.update_version(
-                self.local_user,
-                version,
-                {
-                    "algorithm": "m.megolm_backup.v1",
-                    "auth_data": "revised_first_version_auth_data",
-                    "version": "incorrect",
-                },
+            yield defer.ensureDeferred(
+                self.handler.update_version(
+                    self.local_user,
+                    version,
+                    {
+                        "algorithm": "m.megolm_backup.v1",
+                        "auth_data": "revised_first_version_auth_data",
+                        "version": "incorrect",
+                    },
+                )
             )
         except errors.SynapseError as e:
             res = e.code
@@ -260,7 +295,9 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         """
         res = None
         try:
-            yield self.handler.delete_version(self.local_user, "1")
+            yield defer.ensureDeferred(
+                self.handler.delete_version(self.local_user, "1")
+            )
         except errors.SynapseError as e:
             res = e.code
         self.assertEqual(res, 404)
@@ -271,7 +308,7 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         """
         res = None
         try:
-            yield self.handler.delete_version(self.local_user)
+            yield defer.ensureDeferred(self.handler.delete_version(self.local_user))
         except errors.SynapseError as e:
             res = e.code
         self.assertEqual(res, 404)
@@ -280,19 +317,26 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
     def test_delete_version(self):
         """Check that we can create and then delete versions.
         """
-        res = yield self.handler.create_version(
-            self.local_user,
-            {"algorithm": "m.megolm_backup.v1", "auth_data": "first_version_auth_data"},
+        res = yield defer.ensureDeferred(
+            self.handler.create_version(
+                self.local_user,
+                {
+                    "algorithm": "m.megolm_backup.v1",
+                    "auth_data": "first_version_auth_data",
+                },
+            )
         )
         self.assertEqual(res, "1")
 
         # check we can delete it
-        yield self.handler.delete_version(self.local_user, "1")
+        yield defer.ensureDeferred(self.handler.delete_version(self.local_user, "1"))
 
         # check that it's gone
         res = None
         try:
-            yield self.handler.get_version_info(self.local_user, "1")
+            yield defer.ensureDeferred(
+                self.handler.get_version_info(self.local_user, "1")
+            )
         except errors.SynapseError as e:
             res = e.code
         self.assertEqual(res, 404)
@@ -303,7 +347,9 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         """
         res = None
         try:
-            yield self.handler.get_room_keys(self.local_user, "bogus_version")
+            yield defer.ensureDeferred(
+                self.handler.get_room_keys(self.local_user, "bogus_version")
+            )
         except errors.SynapseError as e:
             res = e.code
         self.assertEqual(res, 404)
@@ -312,13 +358,20 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
     def test_get_missing_room_keys(self):
         """Check we get an empty response from an empty backup
         """
-        version = yield self.handler.create_version(
-            self.local_user,
-            {"algorithm": "m.megolm_backup.v1", "auth_data": "first_version_auth_data"},
+        version = yield defer.ensureDeferred(
+            self.handler.create_version(
+                self.local_user,
+                {
+                    "algorithm": "m.megolm_backup.v1",
+                    "auth_data": "first_version_auth_data",
+                },
+            )
         )
         self.assertEqual(version, "1")
 
-        res = yield self.handler.get_room_keys(self.local_user, version)
+        res = yield defer.ensureDeferred(
+            self.handler.get_room_keys(self.local_user, version)
+        )
         self.assertDictEqual(res, {"rooms": {}})
 
     # TODO: test the locking semantics when uploading room_keys,
@@ -330,8 +383,8 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         """
         res = None
         try:
-            yield self.handler.upload_room_keys(
-                self.local_user, "no_version", room_keys
+            yield defer.ensureDeferred(
+                self.handler.upload_room_keys(self.local_user, "no_version", room_keys)
             )
         except errors.SynapseError as e:
             res = e.code
@@ -342,16 +395,23 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         """Check that we get a 404 on uploading keys when an nonexistent version
         is specified
         """
-        version = yield self.handler.create_version(
-            self.local_user,
-            {"algorithm": "m.megolm_backup.v1", "auth_data": "first_version_auth_data"},
+        version = yield defer.ensureDeferred(
+            self.handler.create_version(
+                self.local_user,
+                {
+                    "algorithm": "m.megolm_backup.v1",
+                    "auth_data": "first_version_auth_data",
+                },
+            )
         )
         self.assertEqual(version, "1")
 
         res = None
         try:
-            yield self.handler.upload_room_keys(
-                self.local_user, "bogus_version", room_keys
+            yield defer.ensureDeferred(
+                self.handler.upload_room_keys(
+                    self.local_user, "bogus_version", room_keys
+                )
             )
         except errors.SynapseError as e:
             res = e.code
@@ -361,24 +421,33 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
     def test_upload_room_keys_wrong_version(self):
         """Check that we get a 403 on uploading keys for an old version
         """
-        version = yield self.handler.create_version(
-            self.local_user,
-            {"algorithm": "m.megolm_backup.v1", "auth_data": "first_version_auth_data"},
+        version = yield defer.ensureDeferred(
+            self.handler.create_version(
+                self.local_user,
+                {
+                    "algorithm": "m.megolm_backup.v1",
+                    "auth_data": "first_version_auth_data",
+                },
+            )
         )
         self.assertEqual(version, "1")
 
-        version = yield self.handler.create_version(
-            self.local_user,
-            {
-                "algorithm": "m.megolm_backup.v1",
-                "auth_data": "second_version_auth_data",
-            },
+        version = yield defer.ensureDeferred(
+            self.handler.create_version(
+                self.local_user,
+                {
+                    "algorithm": "m.megolm_backup.v1",
+                    "auth_data": "second_version_auth_data",
+                },
+            )
         )
         self.assertEqual(version, "2")
 
         res = None
         try:
-            yield self.handler.upload_room_keys(self.local_user, "1", room_keys)
+            yield defer.ensureDeferred(
+                self.handler.upload_room_keys(self.local_user, "1", room_keys)
+            )
         except errors.SynapseError as e:
             res = e.code
         self.assertEqual(res, 403)
@@ -387,26 +456,39 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
     def test_upload_room_keys_insert(self):
         """Check that we can insert and retrieve keys for a session
         """
-        version = yield self.handler.create_version(
-            self.local_user,
-            {"algorithm": "m.megolm_backup.v1", "auth_data": "first_version_auth_data"},
+        version = yield defer.ensureDeferred(
+            self.handler.create_version(
+                self.local_user,
+                {
+                    "algorithm": "m.megolm_backup.v1",
+                    "auth_data": "first_version_auth_data",
+                },
+            )
         )
         self.assertEqual(version, "1")
 
-        yield self.handler.upload_room_keys(self.local_user, version, room_keys)
+        yield defer.ensureDeferred(
+            self.handler.upload_room_keys(self.local_user, version, room_keys)
+        )
 
-        res = yield self.handler.get_room_keys(self.local_user, version)
+        res = yield defer.ensureDeferred(
+            self.handler.get_room_keys(self.local_user, version)
+        )
         self.assertDictEqual(res, room_keys)
 
         # check getting room_keys for a given room
-        res = yield self.handler.get_room_keys(
-            self.local_user, version, room_id="!abc:matrix.org"
+        res = yield defer.ensureDeferred(
+            self.handler.get_room_keys(
+                self.local_user, version, room_id="!abc:matrix.org"
+            )
         )
         self.assertDictEqual(res, room_keys)
 
         # check getting room_keys for a given session_id
-        res = yield self.handler.get_room_keys(
-            self.local_user, version, room_id="!abc:matrix.org", session_id="c0ff33"
+        res = yield defer.ensureDeferred(
+            self.handler.get_room_keys(
+                self.local_user, version, room_id="!abc:matrix.org", session_id="c0ff33"
+            )
         )
         self.assertDictEqual(res, room_keys)
 
@@ -414,16 +496,23 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
     def test_upload_room_keys_merge(self):
         """Check that we can upload a new room_key for an existing session and
         have it correctly merged"""
-        version = yield self.handler.create_version(
-            self.local_user,
-            {"algorithm": "m.megolm_backup.v1", "auth_data": "first_version_auth_data"},
+        version = yield defer.ensureDeferred(
+            self.handler.create_version(
+                self.local_user,
+                {
+                    "algorithm": "m.megolm_backup.v1",
+                    "auth_data": "first_version_auth_data",
+                },
+            )
         )
         self.assertEqual(version, "1")
 
-        yield self.handler.upload_room_keys(self.local_user, version, room_keys)
+        yield defer.ensureDeferred(
+            self.handler.upload_room_keys(self.local_user, version, room_keys)
+        )
 
         # get the etag to compare to future versions
-        res = yield self.handler.get_version_info(self.local_user)
+        res = yield defer.ensureDeferred(self.handler.get_version_info(self.local_user))
         backup_etag = res["etag"]
         self.assertEqual(res["count"], 1)
 
@@ -433,29 +522,37 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         # test that increasing the message_index doesn't replace the existing session
         new_room_key["first_message_index"] = 2
         new_room_key["session_data"] = "new"
-        yield self.handler.upload_room_keys(self.local_user, version, new_room_keys)
+        yield defer.ensureDeferred(
+            self.handler.upload_room_keys(self.local_user, version, new_room_keys)
+        )
 
-        res = yield self.handler.get_room_keys(self.local_user, version)
+        res = yield defer.ensureDeferred(
+            self.handler.get_room_keys(self.local_user, version)
+        )
         self.assertEqual(
             res["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"],
             "SSBBTSBBIEZJU0gK",
         )
 
         # the etag should be the same since the session did not change
-        res = yield self.handler.get_version_info(self.local_user)
+        res = yield defer.ensureDeferred(self.handler.get_version_info(self.local_user))
         self.assertEqual(res["etag"], backup_etag)
 
         # test that marking the session as verified however /does/ replace it
         new_room_key["is_verified"] = True
-        yield self.handler.upload_room_keys(self.local_user, version, new_room_keys)
+        yield defer.ensureDeferred(
+            self.handler.upload_room_keys(self.local_user, version, new_room_keys)
+        )
 
-        res = yield self.handler.get_room_keys(self.local_user, version)
+        res = yield defer.ensureDeferred(
+            self.handler.get_room_keys(self.local_user, version)
+        )
         self.assertEqual(
             res["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"], "new"
         )
 
         # the etag should NOT be equal now, since the key changed
-        res = yield self.handler.get_version_info(self.local_user)
+        res = yield defer.ensureDeferred(self.handler.get_version_info(self.local_user))
         self.assertNotEqual(res["etag"], backup_etag)
         backup_etag = res["etag"]
 
@@ -463,15 +560,19 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         # with a lower forwarding count
         new_room_key["forwarded_count"] = 2
         new_room_key["session_data"] = "other"
-        yield self.handler.upload_room_keys(self.local_user, version, new_room_keys)
+        yield defer.ensureDeferred(
+            self.handler.upload_room_keys(self.local_user, version, new_room_keys)
+        )
 
-        res = yield self.handler.get_room_keys(self.local_user, version)
+        res = yield defer.ensureDeferred(
+            self.handler.get_room_keys(self.local_user, version)
+        )
         self.assertEqual(
             res["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"], "new"
         )
 
         # the etag should be the same since the session did not change
-        res = yield self.handler.get_version_info(self.local_user)
+        res = yield defer.ensureDeferred(self.handler.get_version_info(self.local_user))
         self.assertEqual(res["etag"], backup_etag)
 
         # TODO: check edge cases as well as the common variations here
@@ -480,36 +581,59 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
     def test_delete_room_keys(self):
         """Check that we can insert and delete keys for a session
         """
-        version = yield self.handler.create_version(
-            self.local_user,
-            {"algorithm": "m.megolm_backup.v1", "auth_data": "first_version_auth_data"},
+        version = yield defer.ensureDeferred(
+            self.handler.create_version(
+                self.local_user,
+                {
+                    "algorithm": "m.megolm_backup.v1",
+                    "auth_data": "first_version_auth_data",
+                },
+            )
         )
         self.assertEqual(version, "1")
 
         # check for bulk-delete
-        yield self.handler.upload_room_keys(self.local_user, version, room_keys)
-        yield self.handler.delete_room_keys(self.local_user, version)
-        res = yield self.handler.get_room_keys(
-            self.local_user, version, room_id="!abc:matrix.org", session_id="c0ff33"
+        yield defer.ensureDeferred(
+            self.handler.upload_room_keys(self.local_user, version, room_keys)
+        )
+        yield defer.ensureDeferred(
+            self.handler.delete_room_keys(self.local_user, version)
+        )
+        res = yield defer.ensureDeferred(
+            self.handler.get_room_keys(
+                self.local_user, version, room_id="!abc:matrix.org", session_id="c0ff33"
+            )
         )
         self.assertDictEqual(res, {"rooms": {}})
 
         # check for bulk-delete per room
-        yield self.handler.upload_room_keys(self.local_user, version, room_keys)
-        yield self.handler.delete_room_keys(
-            self.local_user, version, room_id="!abc:matrix.org"
+        yield defer.ensureDeferred(
+            self.handler.upload_room_keys(self.local_user, version, room_keys)
         )
-        res = yield self.handler.get_room_keys(
-            self.local_user, version, room_id="!abc:matrix.org", session_id="c0ff33"
+        yield defer.ensureDeferred(
+            self.handler.delete_room_keys(
+                self.local_user, version, room_id="!abc:matrix.org"
+            )
+        )
+        res = yield defer.ensureDeferred(
+            self.handler.get_room_keys(
+                self.local_user, version, room_id="!abc:matrix.org", session_id="c0ff33"
+            )
         )
         self.assertDictEqual(res, {"rooms": {}})
 
         # check for bulk-delete per session
-        yield self.handler.upload_room_keys(self.local_user, version, room_keys)
-        yield self.handler.delete_room_keys(
-            self.local_user, version, room_id="!abc:matrix.org", session_id="c0ff33"
+        yield defer.ensureDeferred(
+            self.handler.upload_room_keys(self.local_user, version, room_keys)
         )
-        res = yield self.handler.get_room_keys(
-            self.local_user, version, room_id="!abc:matrix.org", session_id="c0ff33"
+        yield defer.ensureDeferred(
+            self.handler.delete_room_keys(
+                self.local_user, version, room_id="!abc:matrix.org", session_id="c0ff33"
+            )
+        )
+        res = yield defer.ensureDeferred(
+            self.handler.get_room_keys(
+                self.local_user, version, room_id="!abc:matrix.org", session_id="c0ff33"
+            )
         )
         self.assertDictEqual(res, {"rooms": {}})

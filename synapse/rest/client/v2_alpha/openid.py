@@ -60,7 +60,7 @@ class IdTokenServlet(RestServlet):
     EXPIRES_MS = 3600 * 1000
 
     def __init__(self, hs):
-        super(IdTokenServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()

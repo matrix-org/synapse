@@ -7,8 +7,9 @@ from mock import Mock
 import jwt
 
 import synapse.rest.admin
+from synapse.appservice import ApplicationService
 from synapse.rest.client.v1 import login, logout
-from synapse.rest.client.v2_alpha import devices
+from synapse.rest.client.v2_alpha import devices, register
 from synapse.rest.client.v2_alpha.account import WhoamiRestServlet
 
 from tests import unittest
@@ -29,7 +30,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
     ]
 
     def make_homeserver(self, reactor, clock):
-
         self.hs = self.setup_test_homeserver()
         self.hs.config.enable_registration = True
         self.hs.config.registrations_require_3pid = []
@@ -38,10 +38,20 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
         return self.hs
 
+    @override_config(
+        {
+            "rc_login": {
+                "address": {"per_second": 0.17, "burst_count": 5},
+                # Prevent the account login ratelimiter from raising first
+                #
+                # This is normally covered by the default test homeserver config
+                # which sets these values to 10000, but as we're overriding the entire
+                # rc_login dict here, we need to set this manually as well
+                "account": {"per_second": 10000, "burst_count": 10000},
+            }
+        }
+    )
     def test_POST_ratelimiting_per_address(self):
-        self.hs.config.rc_login_address.burst_count = 5
-        self.hs.config.rc_login_address.per_second = 0.17
-
         # Create different users so we're sure not to be bothered by the per-user
         # ratelimiter.
         for i in range(0, 6):
@@ -53,8 +63,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
                 "identifier": {"type": "m.id.user", "user": "kermit" + str(i)},
                 "password": "monkey",
             }
-            request_data = json.dumps(params)
-            request, channel = self.make_request(b"POST", LOGIN_URL, request_data)
+            request, channel = self.make_request(b"POST", LOGIN_URL, params)
             self.render(request)
 
             if i == 5:
@@ -67,23 +76,32 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         # than 1min.
         self.assertTrue(retry_after_ms < 6000)
 
-        self.reactor.advance(retry_after_ms / 1000.0)
+        self.reactor.advance(retry_after_ms / 1000.0 + 1.0)
 
         params = {
             "type": "m.login.password",
             "identifier": {"type": "m.id.user", "user": "kermit" + str(i)},
             "password": "monkey",
         }
-        request_data = json.dumps(params)
         request, channel = self.make_request(b"POST", LOGIN_URL, params)
         self.render(request)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
+    @override_config(
+        {
+            "rc_login": {
+                "account": {"per_second": 0.17, "burst_count": 5},
+                # Prevent the address login ratelimiter from raising first
+                #
+                # This is normally covered by the default test homeserver config
+                # which sets these values to 10000, but as we're overriding the entire
+                # rc_login dict here, we need to set this manually as well
+                "address": {"per_second": 10000, "burst_count": 10000},
+            }
+        }
+    )
     def test_POST_ratelimiting_per_account(self):
-        self.hs.config.rc_login_account.burst_count = 5
-        self.hs.config.rc_login_account.per_second = 0.17
-
         self.register_user("kermit", "monkey")
 
         for i in range(0, 6):
@@ -92,8 +110,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
                 "identifier": {"type": "m.id.user", "user": "kermit"},
                 "password": "monkey",
             }
-            request_data = json.dumps(params)
-            request, channel = self.make_request(b"POST", LOGIN_URL, request_data)
+            request, channel = self.make_request(b"POST", LOGIN_URL, params)
             self.render(request)
 
             if i == 5:
@@ -113,16 +130,25 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             "identifier": {"type": "m.id.user", "user": "kermit"},
             "password": "monkey",
         }
-        request_data = json.dumps(params)
         request, channel = self.make_request(b"POST", LOGIN_URL, params)
         self.render(request)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
+    @override_config(
+        {
+            "rc_login": {
+                # Prevent the address login ratelimiter from raising first
+                #
+                # This is normally covered by the default test homeserver config
+                # which sets these values to 10000, but as we're overriding the entire
+                # rc_login dict here, we need to set this manually as well
+                "address": {"per_second": 10000, "burst_count": 10000},
+                "failed_attempts": {"per_second": 0.17, "burst_count": 5},
+            }
+        }
+    )
     def test_POST_ratelimiting_per_account_failed_attempts(self):
-        self.hs.config.rc_login_failed_attempts.burst_count = 5
-        self.hs.config.rc_login_failed_attempts.per_second = 0.17
-
         self.register_user("kermit", "monkey")
 
         for i in range(0, 6):
@@ -131,8 +157,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
                 "identifier": {"type": "m.id.user", "user": "kermit"},
                 "password": "notamonkey",
             }
-            request_data = json.dumps(params)
-            request, channel = self.make_request(b"POST", LOGIN_URL, request_data)
+            request, channel = self.make_request(b"POST", LOGIN_URL, params)
             self.render(request)
 
             if i == 5:
@@ -145,14 +170,13 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         # than 1min.
         self.assertTrue(retry_after_ms < 6000)
 
-        self.reactor.advance(retry_after_ms / 1000.0)
+        self.reactor.advance(retry_after_ms / 1000.0 + 1.0)
 
         params = {
             "type": "m.login.password",
             "identifier": {"type": "m.id.user", "user": "kermit"},
             "password": "notamonkey",
         }
-        request_data = json.dumps(params)
         request, channel = self.make_request(b"POST", LOGIN_URL, params)
         self.render(request)
 
@@ -369,7 +393,7 @@ class CASTestCase(unittest.HomeserverTestCase):
                 </cas:serviceResponse>
             """
                 % cas_user_id
-            )
+            ).encode("utf-8")
 
         mocked_http_client = Mock(spec=["get_raw"])
         mocked_http_client.get_raw.side_effect = get_raw
@@ -485,19 +509,22 @@ class JWTTestCase(unittest.HomeserverTestCase):
     ]
 
     jwt_secret = "secret"
+    jwt_algorithm = "HS256"
 
     def make_homeserver(self, reactor, clock):
         self.hs = self.setup_test_homeserver()
         self.hs.config.jwt_enabled = True
         self.hs.config.jwt_secret = self.jwt_secret
-        self.hs.config.jwt_algorithm = "HS256"
+        self.hs.config.jwt_algorithm = self.jwt_algorithm
         return self.hs
 
     def jwt_encode(self, token, secret=jwt_secret):
-        return jwt.encode(token, secret, "HS256").decode("ascii")
+        return jwt.encode(token, secret, self.jwt_algorithm).decode("ascii")
 
     def jwt_login(self, *args):
-        params = json.dumps({"type": "m.login.jwt", "token": self.jwt_encode(*args)})
+        params = json.dumps(
+            {"type": "org.matrix.login.jwt", "token": self.jwt_encode(*args)}
+        )
         request, channel = self.make_request(b"POST", LOGIN_URL, params)
         self.render(request)
         return channel
@@ -515,35 +542,126 @@ class JWTTestCase(unittest.HomeserverTestCase):
 
     def test_login_jwt_invalid_signature(self):
         channel = self.jwt_login({"sub": "frog"}, "notsecret")
-        self.assertEqual(channel.result["code"], b"401", channel.result)
-        self.assertEqual(channel.json_body["errcode"], "M_UNAUTHORIZED")
-        self.assertEqual(channel.json_body["error"], "Invalid JWT")
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
+        self.assertEqual(
+            channel.json_body["error"],
+            "JWT validation failed: Signature verification failed",
+        )
 
     def test_login_jwt_expired(self):
         channel = self.jwt_login({"sub": "frog", "exp": 864000})
-        self.assertEqual(channel.result["code"], b"401", channel.result)
-        self.assertEqual(channel.json_body["errcode"], "M_UNAUTHORIZED")
-        self.assertEqual(channel.json_body["error"], "JWT expired")
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
+        self.assertEqual(
+            channel.json_body["error"], "JWT validation failed: Signature has expired"
+        )
 
     def test_login_jwt_not_before(self):
         now = int(time.time())
         channel = self.jwt_login({"sub": "frog", "nbf": now + 3600})
-        self.assertEqual(channel.result["code"], b"401", channel.result)
-        self.assertEqual(channel.json_body["errcode"], "M_UNAUTHORIZED")
-        self.assertEqual(channel.json_body["error"], "Invalid JWT")
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
+        self.assertEqual(
+            channel.json_body["error"],
+            "JWT validation failed: The token is not yet valid (nbf)",
+        )
 
     def test_login_no_sub(self):
         channel = self.jwt_login({"username": "root"})
-        self.assertEqual(channel.result["code"], b"401", channel.result)
-        self.assertEqual(channel.json_body["errcode"], "M_UNAUTHORIZED")
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(channel.json_body["error"], "Invalid JWT")
 
+    @override_config(
+        {
+            "jwt_config": {
+                "jwt_enabled": True,
+                "secret": jwt_secret,
+                "algorithm": jwt_algorithm,
+                "issuer": "test-issuer",
+            }
+        }
+    )
+    def test_login_iss(self):
+        """Test validating the issuer claim."""
+        # A valid issuer.
+        channel = self.jwt_login({"sub": "kermit", "iss": "test-issuer"})
+        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.json_body["user_id"], "@kermit:test")
+
+        # An invalid issuer.
+        channel = self.jwt_login({"sub": "kermit", "iss": "invalid"})
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
+        self.assertEqual(
+            channel.json_body["error"], "JWT validation failed: Invalid issuer"
+        )
+
+        # Not providing an issuer.
+        channel = self.jwt_login({"sub": "kermit"})
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
+        self.assertEqual(
+            channel.json_body["error"],
+            'JWT validation failed: Token is missing the "iss" claim',
+        )
+
+    def test_login_iss_no_config(self):
+        """Test providing an issuer claim without requiring it in the configuration."""
+        channel = self.jwt_login({"sub": "kermit", "iss": "invalid"})
+        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.json_body["user_id"], "@kermit:test")
+
+    @override_config(
+        {
+            "jwt_config": {
+                "jwt_enabled": True,
+                "secret": jwt_secret,
+                "algorithm": jwt_algorithm,
+                "audiences": ["test-audience"],
+            }
+        }
+    )
+    def test_login_aud(self):
+        """Test validating the audience claim."""
+        # A valid audience.
+        channel = self.jwt_login({"sub": "kermit", "aud": "test-audience"})
+        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.json_body["user_id"], "@kermit:test")
+
+        # An invalid audience.
+        channel = self.jwt_login({"sub": "kermit", "aud": "invalid"})
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
+        self.assertEqual(
+            channel.json_body["error"], "JWT validation failed: Invalid audience"
+        )
+
+        # Not providing an audience.
+        channel = self.jwt_login({"sub": "kermit"})
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
+        self.assertEqual(
+            channel.json_body["error"],
+            'JWT validation failed: Token is missing the "aud" claim',
+        )
+
+    def test_login_aud_no_config(self):
+        """Test providing an audience without requiring it in the configuration."""
+        channel = self.jwt_login({"sub": "kermit", "aud": "invalid"})
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
+        self.assertEqual(
+            channel.json_body["error"], "JWT validation failed: Invalid audience"
+        )
+
     def test_login_no_token(self):
-        params = json.dumps({"type": "m.login.jwt"})
+        params = json.dumps({"type": "org.matrix.login.jwt"})
         request, channel = self.make_request(b"POST", LOGIN_URL, params)
         self.render(request)
-        self.assertEqual(channel.result["code"], b"401", channel.result)
-        self.assertEqual(channel.json_body["errcode"], "M_UNAUTHORIZED")
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(channel.json_body["error"], "Token field for JWT is missing")
 
 
@@ -611,7 +729,9 @@ class JWTPubKeyTestCase(unittest.HomeserverTestCase):
         return jwt.encode(token, secret, "RS256").decode("ascii")
 
     def jwt_login(self, *args):
-        params = json.dumps({"type": "m.login.jwt", "token": self.jwt_encode(*args)})
+        params = json.dumps(
+            {"type": "org.matrix.login.jwt", "token": self.jwt_encode(*args)}
+        )
         request, channel = self.make_request(b"POST", LOGIN_URL, params)
         self.render(request)
         return channel
@@ -623,6 +743,140 @@ class JWTPubKeyTestCase(unittest.HomeserverTestCase):
 
     def test_login_jwt_invalid_signature(self):
         channel = self.jwt_login({"sub": "frog"}, self.bad_privatekey)
-        self.assertEqual(channel.result["code"], b"401", channel.result)
-        self.assertEqual(channel.json_body["errcode"], "M_UNAUTHORIZED")
-        self.assertEqual(channel.json_body["error"], "Invalid JWT")
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
+        self.assertEqual(
+            channel.json_body["error"],
+            "JWT validation failed: Signature verification failed",
+        )
+
+
+AS_USER = "as_user_alice"
+
+
+class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        login.register_servlets,
+        register.register_servlets,
+    ]
+
+    def register_as_user(self, username):
+        request, channel = self.make_request(
+            b"POST",
+            "/_matrix/client/r0/register?access_token=%s" % (self.service.token,),
+            {"username": username},
+        )
+        self.render(request)
+
+    def make_homeserver(self, reactor, clock):
+        self.hs = self.setup_test_homeserver()
+
+        self.service = ApplicationService(
+            id="unique_identifier",
+            token="some_token",
+            hostname="example.com",
+            sender="@asbot:example.com",
+            namespaces={
+                ApplicationService.NS_USERS: [
+                    {"regex": r"@as_user.*", "exclusive": False}
+                ],
+                ApplicationService.NS_ROOMS: [],
+                ApplicationService.NS_ALIASES: [],
+            },
+        )
+        self.another_service = ApplicationService(
+            id="another__identifier",
+            token="another_token",
+            hostname="example.com",
+            sender="@as2bot:example.com",
+            namespaces={
+                ApplicationService.NS_USERS: [
+                    {"regex": r"@as2_user.*", "exclusive": False}
+                ],
+                ApplicationService.NS_ROOMS: [],
+                ApplicationService.NS_ALIASES: [],
+            },
+        )
+
+        self.hs.get_datastore().services_cache.append(self.service)
+        self.hs.get_datastore().services_cache.append(self.another_service)
+        return self.hs
+
+    def test_login_appservice_user(self):
+        """Test that an appservice user can use /login
+        """
+        self.register_as_user(AS_USER)
+
+        params = {
+            "type": login.LoginRestServlet.APPSERVICE_TYPE,
+            "identifier": {"type": "m.id.user", "user": AS_USER},
+        }
+        request, channel = self.make_request(
+            b"POST", LOGIN_URL, params, access_token=self.service.token
+        )
+
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+    def test_login_appservice_user_bot(self):
+        """Test that the appservice bot can use /login
+        """
+        self.register_as_user(AS_USER)
+
+        params = {
+            "type": login.LoginRestServlet.APPSERVICE_TYPE,
+            "identifier": {"type": "m.id.user", "user": self.service.sender},
+        }
+        request, channel = self.make_request(
+            b"POST", LOGIN_URL, params, access_token=self.service.token
+        )
+
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+    def test_login_appservice_wrong_user(self):
+        """Test that non-as users cannot login with the as token
+        """
+        self.register_as_user(AS_USER)
+
+        params = {
+            "type": login.LoginRestServlet.APPSERVICE_TYPE,
+            "identifier": {"type": "m.id.user", "user": "fibble_wibble"},
+        }
+        request, channel = self.make_request(
+            b"POST", LOGIN_URL, params, access_token=self.service.token
+        )
+
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"403", channel.result)
+
+    def test_login_appservice_wrong_as(self):
+        """Test that as users cannot login with wrong as token
+        """
+        self.register_as_user(AS_USER)
+
+        params = {
+            "type": login.LoginRestServlet.APPSERVICE_TYPE,
+            "identifier": {"type": "m.id.user", "user": AS_USER},
+        }
+        request, channel = self.make_request(
+            b"POST", LOGIN_URL, params, access_token=self.another_service.token
+        )
+
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"403", channel.result)
+
+    def test_login_appservice_no_token(self):
+        """Test that users must provide a token when using the appservice
+           login method
+        """
+        self.register_as_user(AS_USER)
+
+        params = {
+            "type": login.LoginRestServlet.APPSERVICE_TYPE,
+            "identifier": {"type": "m.id.user", "user": AS_USER},
+        }
+        request, channel = self.make_request(b"POST", LOGIN_URL, params)
+
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"401", channel.result)

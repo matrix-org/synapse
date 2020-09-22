@@ -74,7 +74,7 @@ except Exception:
 get_thread_id = threading.get_ident
 
 
-class ContextResourceUsage(object):
+class ContextResourceUsage:
     """Object for tracking the resources used by a log context
 
     Attributes:
@@ -179,7 +179,7 @@ class ContextResourceUsage(object):
 LoggingContextOrSentinel = Union["LoggingContext", "_Sentinel"]
 
 
-class _Sentinel(object):
+class _Sentinel:
     """Sentinel to represent the root context"""
 
     __slots__ = ["previous_context", "finished", "request", "scope", "tag"]
@@ -217,16 +217,14 @@ class _Sentinel(object):
     def record_event_fetch(self, event_count):
         pass
 
-    def __nonzero__(self):
+    def __bool__(self):
         return False
-
-    __bool__ = __nonzero__  # python3
 
 
 SENTINEL_CONTEXT = _Sentinel()
 
 
-class LoggingContext(object):
+class LoggingContext:
     """Additional context for log formatting. Contexts are scoped within a
     "with" block.
 
@@ -566,36 +564,33 @@ class LoggingContextFilter(logging.Filter):
         return True
 
 
-class PreserveLoggingContext(object):
-    """Captures the current logging context and restores it when the scope is
-    exited. Used to restore the context after a function using
-    @defer.inlineCallbacks is resumed by a callback from the reactor."""
+class PreserveLoggingContext:
+    """Context manager which replaces the logging context
 
-    __slots__ = ["current_context", "new_context", "has_parent"]
+     The previous logging context is restored on exit."""
+
+    __slots__ = ["_old_context", "_new_context"]
 
     def __init__(
         self, new_context: LoggingContextOrSentinel = SENTINEL_CONTEXT
     ) -> None:
-        self.new_context = new_context
+        self._new_context = new_context
 
     def __enter__(self) -> None:
-        """Captures the current logging context"""
-        self.current_context = set_current_context(self.new_context)
-
-        if self.current_context:
-            self.has_parent = self.current_context.previous_context is not None
+        self._old_context = set_current_context(self._new_context)
 
     def __exit__(self, type, value, traceback) -> None:
-        """Restores the current logging context"""
-        context = set_current_context(self.current_context)
+        context = set_current_context(self._old_context)
 
-        if context != self.new_context:
+        if context != self._new_context:
             if not context:
-                logger.warning("Expected logging context %s was lost", self.new_context)
+                logger.warning(
+                    "Expected logging context %s was lost", self._new_context
+                )
             else:
                 logger.warning(
                     "Expected logging context %s but found %s",
-                    self.new_context,
+                    self._new_context,
                     context,
                 )
 

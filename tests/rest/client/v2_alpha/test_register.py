@@ -29,6 +29,7 @@ from synapse.rest.client.v1 import login, logout
 from synapse.rest.client.v2_alpha import account, account_validity, register, sync
 
 from tests import unittest
+from tests.unittest import override_config
 
 
 class RegisterRestServletTestCase(unittest.HomeserverTestCase):
@@ -115,8 +116,8 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"200", channel.result)
         self.assertDictContainsSubset(det_data, channel.json_body)
 
+    @override_config({"enable_registration": False})
     def test_POST_disabled_registration(self):
-        self.hs.config.enable_registration = False
         request_data = json.dumps({"username": "kermit", "password": "monkey"})
         self.auth_result = (None, {"username": "kermit", "password": "monkey"}, None)
 
@@ -146,10 +147,8 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(channel.json_body["error"], "Guest access is disabled")
 
+    @override_config({"rc_registration": {"per_second": 0.17, "burst_count": 5}})
     def test_POST_ratelimiting_guest(self):
-        self.hs.config.rc_registration.burst_count = 5
-        self.hs.config.rc_registration.per_second = 0.17
-
         for i in range(0, 6):
             url = self.url + b"?kind=guest"
             request, channel = self.make_request(b"POST", url, b"{}")
@@ -161,17 +160,15 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             else:
                 self.assertEquals(channel.result["code"], b"200", channel.result)
 
-        self.reactor.advance(retry_after_ms / 1000.0)
+        self.reactor.advance(retry_after_ms / 1000.0 + 1.0)
 
         request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
         self.render(request)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
+    @override_config({"rc_registration": {"per_second": 0.17, "burst_count": 5}})
     def test_POST_ratelimiting(self):
-        self.hs.config.rc_registration.burst_count = 5
-        self.hs.config.rc_registration.per_second = 0.17
-
         for i in range(0, 6):
             params = {
                 "username": "kermit" + str(i),
@@ -189,7 +186,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             else:
                 self.assertEquals(channel.result["code"], b"200", channel.result)
 
-        self.reactor.advance(retry_after_ms / 1000.0)
+        self.reactor.advance(retry_after_ms / 1000.0 + 1.0)
 
         request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
         self.render(request)

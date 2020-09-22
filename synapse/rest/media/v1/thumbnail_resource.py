@@ -16,11 +16,8 @@
 
 import logging
 
-from synapse.http.server import (
-    DirectServeResource,
-    set_cors_headers,
-    wrap_json_request_handler,
-)
+from synapse.api.errors import SynapseError
+from synapse.http.server import DirectServeJsonResource, set_cors_headers
 from synapse.http.servlet import parse_integer, parse_string
 
 from ._base import (
@@ -34,7 +31,7 @@ from ._base import (
 logger = logging.getLogger(__name__)
 
 
-class ThumbnailResource(DirectServeResource):
+class ThumbnailResource(DirectServeJsonResource):
     isLeaf = True
 
     def __init__(self, hs, media_repo, media_storage):
@@ -45,9 +42,7 @@ class ThumbnailResource(DirectServeResource):
         self.media_storage = media_storage
         self.dynamic_thumbnails = hs.config.dynamic_thumbnails
         self.server_name = hs.hostname
-        self.clock = hs.get_clock()
 
-    @wrap_json_request_handler
     async def _async_render_GET(self, request):
         set_cors_headers(request)
         server_name, media_id, _ = parse_media_id(request)
@@ -179,7 +174,7 @@ class ThumbnailResource(DirectServeResource):
             await respond_with_file(request, desired_type, file_path)
         else:
             logger.warning("Failed to generate thumbnail")
-            respond_404(request)
+            raise SynapseError(400, "Failed to generate thumbnail.")
 
     async def _select_or_generate_remote_thumbnail(
         self,
@@ -241,7 +236,7 @@ class ThumbnailResource(DirectServeResource):
             await respond_with_file(request, desired_type, file_path)
         else:
             logger.warning("Failed to generate thumbnail")
-            respond_404(request)
+            raise SynapseError(400, "Failed to generate thumbnail.")
 
     async def _respond_remote_thumbnail(
         self, request, server_name, media_id, width, height, method, m_type

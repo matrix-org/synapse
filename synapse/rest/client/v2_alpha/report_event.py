@@ -14,9 +14,7 @@
 # limitations under the License.
 
 import logging
-
-from six import string_types
-from six.moves import http_client
+from http import HTTPStatus
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import (
@@ -34,7 +32,7 @@ class ReportEventRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/report/(?P<event_id>[^/]*)$")
 
     def __init__(self, hs):
-        super(ReportEventRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -47,15 +45,15 @@ class ReportEventRestServlet(RestServlet):
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ("reason", "score"))
 
-        if not isinstance(body["reason"], string_types):
+        if not isinstance(body["reason"], str):
             raise SynapseError(
-                http_client.BAD_REQUEST,
+                HTTPStatus.BAD_REQUEST,
                 "Param 'reason' must be a string",
                 Codes.BAD_JSON,
             )
         if not isinstance(body["score"], int):
             raise SynapseError(
-                http_client.BAD_REQUEST,
+                HTTPStatus.BAD_REQUEST,
                 "Param 'score' must be an integer",
                 Codes.BAD_JSON,
             )

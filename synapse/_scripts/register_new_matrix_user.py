@@ -14,16 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
-
 import argparse
 import getpass
 import hashlib
 import hmac
 import logging
 import sys
-
-from six.moves import input
 
 import requests as _requests
 import yaml

@@ -15,14 +15,15 @@
 # limitations under the License.
 
 import logging
+from typing import Any, List
 
-import jinja2
-import pkg_resources
+import attr
 
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module, load_python_module
 
 from ._base import Config, ConfigError
+from ._util import validate_config
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +80,11 @@ class SAML2Config(Config):
             raise ConfigError(e.message)
 
         self.saml2_enabled = True
+
+        attribute_requirements = saml2_config.get("attribute_requirements") or []
+        self.attribute_requirements = _parse_attribute_requirements_def(
+            attribute_requirements
+        )
 
         self.saml2_grandfathered_mxid_source_attribute = saml2_config.get(
             "grandfathered_mxid_source_attribute", "uid"
@@ -160,18 +166,8 @@ class SAML2Config(Config):
 
         # session lifetime: in milliseconds
         self.saml2_session_lifetime = self.parse_duration(
-            saml2_config.get("saml_session_lifetime", "5m")
+            saml2_config.get("saml_session_lifetime", "15m")
         )
-
-        template_dir = saml2_config.get("template_dir")
-        if not template_dir:
-            template_dir = pkg_resources.resource_filename("synapse", "res/templates",)
-
-        loader = jinja2.FileSystemLoader(template_dir)
-        # enable auto-escape here, to having to remember to escape manually in the
-        # template
-        env = jinja2.Environment(loader=loader, autoescape=True)
-        self.saml2_error_html_template = env.get_template("saml_error.html")
 
     def _default_saml_config_dict(
         self, required_attributes: set, optional_attributes: set
@@ -225,10 +221,13 @@ class SAML2Config(Config):
         # At least one of `sp_config` or `config_path` must be set in this section to
         # enable SAML login.
         #
-        # (You will probably also want to set the following options to `false` to
+        # You will probably also want to set the following options to `false` to
         # disable the regular login/registration flows:
         #   * enable_registration
         #   * password_config.enabled
+        #
+        # You will also want to investigate the settings under the "sso" configuration
+        # section below.
         #
         # Once SAML support is enabled, a metadata file will be exposed at
         # https://<server>:<port>/_matrix/saml2/metadata.xml, which you may be able to
@@ -286,7 +285,7 @@ class SAML2Config(Config):
 
           # The lifetime of a SAML session. This defines how long a user has to
           # complete the authentication process, if allow_unsolicited is unset.
-          # The default is 5 minutes.
+          # The default is 15 minutes.
           #
           #saml_session_lifetime: 5m
 
@@ -341,30 +340,47 @@ class SAML2Config(Config):
           #
           #grandfathered_mxid_source_attribute: upn
 
-          # Directory in which Synapse will try to find the template files below.
-          # If not set, default templates from within the Synapse package will be used.
+          # It is possible to configure Synapse to only allow logins if SAML attributes
+          # match particular values. The requirements can be listed under
+          # `attribute_requirements` as shown below. All of the listed attributes must
+          # match for the login to be permitted.
           #
-          # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
-          # If you *do* uncomment it, you will need to make sure that all the templates
-          # below are in the directory.
-          #
-          # Synapse will look for the following templates in this directory:
-          #
-          # * HTML page to display to users if something goes wrong during the
-          #   authentication process: 'saml_error.html'.
-          #
-          #   When rendering, this template is given the following variables:
-          #     * code: an HTML error code corresponding to the error that is being
-          #       returned (typically 400 or 500)
-          #
-          #     * msg: a textual message describing the error.
-          #
-          #   The variables will automatically be HTML-escaped.
-          #
-          # You can see the default templates at:
-          # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
-          #
-          #template_dir: "res/templates"
+          #attribute_requirements:
+          #  - attribute: userGroup
+          #    value: "staff"
+          #  - attribute: department
+          #    value: "sales"
         """ % {
             "config_dir_path": config_dir_path
         }
+
+
+@attr.s(frozen=True)
+class SamlAttributeRequirement:
+    """Object describing a single requirement for SAML attributes."""
+
+    attribute = attr.ib(type=str)
+    value = attr.ib(type=str)
+
+    JSON_SCHEMA = {
+        "type": "object",
+        "properties": {"attribute": {"type": "string"}, "value": {"type": "string"}},
+        "required": ["attribute", "value"],
+    }
+
+
+ATTRIBUTE_REQUIREMENTS_SCHEMA = {
+    "type": "array",
+    "items": SamlAttributeRequirement.JSON_SCHEMA,
+}
+
+
+def _parse_attribute_requirements_def(
+    attribute_requirements: Any,
+) -> List[SamlAttributeRequirement]:
+    validate_config(
+        ATTRIBUTE_REQUIREMENTS_SCHEMA,
+        attribute_requirements,
+        config_path=["saml2_config", "attribute_requirements"],
+    )
+    return [SamlAttributeRequirement(**x) for x in attribute_requirements]

@@ -42,7 +42,7 @@ class KeyUploadServlet(RestServlet):
         "device_id": "<device_id>",
         "valid_until_ts": <millisecond_timestamp>,
         "algorithms": [
-          "m.olm.curve25519-aes-sha256",
+          "m.olm.curve25519-aes-sha2",
         ]
         "keys": {
           "<algorithm>:<device_id>": "<key_base64>",
@@ -64,7 +64,7 @@ class KeyUploadServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(KeyUploadServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
 
@@ -124,7 +124,7 @@ class KeyQueryServlet(RestServlet):
             "device_id": "<device_id>", // Duplicated to be signed
             "valid_until_ts": <millisecond_timestamp>,
             "algorithms": [ // List of supported algorithms
-              "m.olm.curve25519-aes-sha256",
+              "m.olm.curve25519-aes-sha2",
             ],
             "keys": { // Must include a ed25519 signing key
               "<algorithm>:<key_id>": "<key_base64>",
@@ -147,7 +147,7 @@ class KeyQueryServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer):
         """
-        super(KeyQueryServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
 
@@ -177,7 +177,7 @@ class KeyChangesServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer):
         """
-        super(KeyChangesServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
 
@@ -222,7 +222,7 @@ class OneTimeKeyServlet(RestServlet):
     PATTERNS = client_patterns("/keys/claim$")
 
     def __init__(self, hs):
-        super(OneTimeKeyServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
 
@@ -250,7 +250,7 @@ class SigningKeyUploadServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(SigningKeyUploadServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
@@ -285,8 +285,8 @@ class SignaturesUploadServlet(RestServlet):
           "user_id": "<user_id>",
           "device_id": "<device_id>",
           "algorithms": [
-            "m.olm.curve25519-aes-sha256",
-            "m.megolm.v1.aes-sha"
+            "m.olm.curve25519-aes-sha2",
+            "m.megolm.v1.aes-sha2"
           ],
           "keys": {
             "<algorithm>:<device_id>": "<key_base64>",
@@ -308,7 +308,7 @@ class SignaturesUploadServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(SignaturesUploadServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
 

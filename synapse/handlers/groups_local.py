@@ -16,8 +16,6 @@
 
 import logging
 
-from six import iteritems
-
 from synapse.api.errors import HttpResponseException, RequestSendFailed, SynapseError
 from synapse.types import get_domain_from_id
 
@@ -25,43 +23,36 @@ logger = logging.getLogger(__name__)
 
 
 def _create_rerouter(func_name):
-    """Returns a function that looks at the group id and calls the function
+    """Returns an async function that looks at the group id and calls the function
     on federation or the local group server if the group is local
     """
 
-    def f(self, group_id, *args, **kwargs):
+    async def f(self, group_id, *args, **kwargs):
         if self.is_mine_id(group_id):
-            return getattr(self.groups_server_handler, func_name)(
+            return await getattr(self.groups_server_handler, func_name)(
                 group_id, *args, **kwargs
             )
         else:
             destination = get_domain_from_id(group_id)
-            d = getattr(self.transport_client, func_name)(
-                destination, group_id, *args, **kwargs
-            )
 
-            # Capture errors returned by the remote homeserver and
-            # re-throw specific errors as SynapseErrors. This is so
-            # when the remote end responds with things like 403 Not
-            # In Group, we can communicate that to the client instead
-            # of a 500.
-            def http_response_errback(failure):
-                failure.trap(HttpResponseException)
-                e = failure.value
+            try:
+                return await getattr(self.transport_client, func_name)(
+                    destination, group_id, *args, **kwargs
+                )
+            except HttpResponseException as e:
+                # Capture errors returned by the remote homeserver and
+                # re-throw specific errors as SynapseErrors. This is so
+                # when the remote end responds with things like 403 Not
+                # In Group, we can communicate that to the client instead
+                # of a 500.
                 raise e.to_synapse_error()
-
-            def request_failed_errback(failure):
-                failure.trap(RequestSendFailed)
+            except RequestSendFailed:
                 raise SynapseError(502, "Failed to contact group server")
-
-            d.addErrback(http_response_errback)
-            d.addErrback(request_failed_errback)
-            return d
 
     return f
 
 
-class GroupsLocalWorkerHandler(object):
+class GroupsLocalWorkerHandler:
     def __init__(self, hs):
         self.hs = hs
         self.store = hs.get_datastore()
@@ -72,7 +63,7 @@ class GroupsLocalWorkerHandler(object):
         self.clock = hs.get_clock()
         self.keyring = hs.get_keyring()
         self.is_mine_id = hs.is_mine_id
-        self.signing_key = hs.config.signing_key[0]
+        self.signing_key = hs.signing_key
         self.server_name = hs.hostname
         self.notifier = hs.get_notifier()
         self.attestations = hs.get_groups_attestation_signing()
@@ -227,7 +218,7 @@ class GroupsLocalWorkerHandler(object):
 
         results = {}
         failed_results = []
-        for destination, dest_user_ids in iteritems(destinations):
+        for destination, dest_user_ids in destinations.items():
             try:
                 r = await self.transport_client.bulk_get_publicised_groups(
                     destination, list(dest_user_ids)
@@ -249,7 +240,7 @@ class GroupsLocalWorkerHandler(object):
 
 class GroupsLocalHandler(GroupsLocalWorkerHandler):
     def __init__(self, hs):
-        super(GroupsLocalHandler, self).__init__(hs)
+        super().__init__(hs)
 
         # Ensure attestations get renewed
         hs.get_groups_attestation_renewer()

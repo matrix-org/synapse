@@ -75,6 +75,77 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+Upgrading to v1.21.0
+====================
+
+Forwarding ``/_synapse/client`` through your reverse proxy
+----------------------------------------------------------
+
+The `reverse proxy documentation
+<https://github.com/matrix-org/synapse/blob/develop/docs/reverse_proxy.md>`_ has been updated
+to include reverse proxy directives for ``/_synapse/client/*`` endpoints. As the user password
+reset flow now uses endpoints under this prefix, **you must update your reverse proxy
+configurations for user password reset to work**.
+
+Additionally, note that the `Synapse worker documentation
+<https://github.com/matrix-org/synapse/blob/develop/docs/workers.md>`_ has been updated to
+ state that the ``/_synapse/client/password_reset/email/submit_token`` endpoint can be handled
+by all workers. If you make use of Synapse's worker feature, please update your reverse proxy
+configuration to reflect this change.
+
+New HTML templates
+------------------
+
+A new HTML template,
+`password_reset_confirmation.html <https://github.com/matrix-org/synapse/blob/develop/synapse/res/templates/password_reset_confirmation.html>`_,
+has been added to the ``synapse/res/templates`` directory. If you are using a
+custom template directory, you may want to copy the template over and modify it.
+
+Note that as of v1.20.0, templates do not need to be included in custom template
+directories for Synapse to start. The default templates will be used if a custom
+template cannot be found.
+
+This page will appear to the user after clicking a password reset link that has
+been emailed to them.
+
+To complete password reset, the page must include a way to make a `POST`
+request to
+``/_synapse/client/password_reset/{medium}/submit_token``
+with the query parameters from the original link, presented as a URL-encoded form. See the file
+itself for more details.
+
+Updated Single Sign-on HTML Templates
+-------------------------------------
+
+The ``saml_error.html`` template was removed from Synapse and replaced with the
+``sso_error.html`` template. If your Synapse is configured to use SAML and a
+custom ``sso_redirect_confirm_template_dir`` configuration then any customisations
+of the ``saml_error.html`` template will need to be merged into the ``sso_error.html``
+template. These templates are similar, but the parameters are slightly different:
+
+* The ``msg`` parameter should be renamed to ``error_description``.
+* There is no longer a ``code`` parameter for the response code.
+* A string ``error`` parameter is available that includes a short hint of why a
+  user is seeing the error page.
+
+Upgrading to v1.18.0
+====================
+
+Docker `-py3` suffix will be removed in future versions
+-------------------------------------------------------
+
+From 10th August 2020, we will no longer publish Docker images with the `-py3` tag suffix. The images tagged with the `-py3` suffix have been identical to the non-suffixed tags since release 0.99.0, and the suffix is obsolete.
+
+On 10th August, we will remove the `latest-py3` tag. Existing per-release tags (such as `v1.18.0-py3`) will not be removed, but no new `-py3` tags will be added.
+
+Scripts relying on the `-py3` suffix will need to be updated.
+
+Redis replication is now recommended in lieu of TCP replication
+---------------------------------------------------------------
+
+When setting up worker processes, we now recommend the use of a Redis server for replication. **The old direct TCP connection method is deprecated and will be removed in a future release.**
+See `docs/workers.md <docs/workers.md>`_ for more details.
+
 Upgrading to v1.14.0
 ====================
 

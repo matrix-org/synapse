@@ -20,19 +20,28 @@
 import itertools
 import logging
 import math
+import random
 import string
 from collections import OrderedDict
-from typing import Tuple
+from typing import TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple
 
-from six import iteritems, string_types
-
-from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
+from synapse.api.constants import (
+    EventTypes,
+    JoinRules,
+    Membership,
+    RoomCreationPreset,
+    RoomEncryptionAlgorithms,
+)
 from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, SynapseError
+from synapse.api.filtering import Filter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
+from synapse.events import EventBase
 from synapse.events.utils import copy_power_levels_contents
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.storage.state import StateFilter
 from synapse.types import (
+    JsonDict,
+    MutableStateMap,
     Requester,
     RoomAlias,
     RoomID,
@@ -40,6 +49,7 @@ from synapse.types import (
     StateMap,
     StreamToken,
     UserID,
+    create_requester,
 )
 from synapse.util import stringutils
 from synapse.util.async_helpers import Linearizer
@@ -47,6 +57,9 @@ from synapse.util.caches.response_cache import ResponseCache
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -56,38 +69,46 @@ FIVE_MINUTES_IN_MS = 5 * 60 * 1000
 
 
 class RoomCreationHandler(BaseHandler):
-
-    PRESETS_DICT = {
-        RoomCreationPreset.PRIVATE_CHAT: {
-            "join_rules": JoinRules.INVITE,
-            "history_visibility": "shared",
-            "original_invitees_have_ops": False,
-            "guest_can_join": True,
-            "power_level_content_override": {"invite": 0},
-        },
-        RoomCreationPreset.TRUSTED_PRIVATE_CHAT: {
-            "join_rules": JoinRules.INVITE,
-            "history_visibility": "shared",
-            "original_invitees_have_ops": True,
-            "guest_can_join": True,
-            "power_level_content_override": {"invite": 0},
-        },
-        RoomCreationPreset.PUBLIC_CHAT: {
-            "join_rules": JoinRules.PUBLIC,
-            "history_visibility": "shared",
-            "original_invitees_have_ops": False,
-            "guest_can_join": False,
-            "power_level_content_override": {},
-        },
-    }
-
-    def __init__(self, hs):
-        super(RoomCreationHandler, self).__init__(hs)
+    def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
 
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.config = hs.config
+
+        # Room state based off defined presets
+        self._presets_dict = {
+            RoomCreationPreset.PRIVATE_CHAT: {
+                "join_rules": JoinRules.INVITE,
+                "history_visibility": "shared",
+                "original_invitees_have_ops": False,
+                "guest_can_join": True,
+                "power_level_content_override": {"invite": 0},
+            },
+            RoomCreationPreset.TRUSTED_PRIVATE_CHAT: {
+                "join_rules": JoinRules.INVITE,
+                "history_visibility": "shared",
+                "original_invitees_have_ops": True,
+                "guest_can_join": True,
+                "power_level_content_override": {"invite": 0},
+            },
+            RoomCreationPreset.PUBLIC_CHAT: {
+                "join_rules": JoinRules.PUBLIC,
+                "history_visibility": "shared",
+                "original_invitees_have_ops": False,
+                "guest_can_join": False,
+                "power_level_content_override": {},
+            },
+        }  # type: Dict[str, Dict[str, Any]]
+
+        # Modify presets to selectively enable encryption by default per homeserver config
+        for preset_name, preset_config in self._presets_dict.items():
+            encrypted = (
+                preset_name
+                in self.config.encryption_enabled_by_default_for_room_presets
+            )
+            preset_config["encrypted"] = encrypted
 
         self._replication = hs.get_replication_data_handler()
 
@@ -106,7 +127,7 @@ class RoomCreationHandler(BaseHandler):
 
     async def upgrade_room(
         self, requester: Requester, old_room_id: str, new_version: RoomVersion
-    ):
+    ) -> str:
         """Replace a room with a new room with a different version
 
         Args:
@@ -115,7 +136,10 @@ class RoomCreationHandler(BaseHandler):
             new_version: the new room version to use
 
         Returns:
-            Deferred[unicode]: the new room id
+            the new room id
+
+        Raises:
+            ShadowBanError if the requester is shadow-banned.
         """
         await self.ratelimit(requester)
 
@@ -151,6 +175,15 @@ class RoomCreationHandler(BaseHandler):
     async def _upgrade_room(
         self, requester: Requester, old_room_id: str, new_version: RoomVersion
     ):
+        """
+        Args:
+            requester: the user requesting the upgrade
+            old_room_id: the id of the room to be replaced
+            new_versions: the version to upgrade the room to
+
+        Raises:
+            ShadowBanError if the requester is shadow-banned.
+        """
         user_id = requester.user.to_string()
 
         # start by allocating a new room id
@@ -202,6 +235,9 @@ class RoomCreationHandler(BaseHandler):
 
         old_room_state = await tombstone_context.get_current_state_ids()
 
+        # We know the tombstone event isn't an outlier so it has current state.
+        assert old_room_state is not None
+
         # update any aliases
         await self._move_aliases_to_new_room(
             requester, old_room_id, new_room_id, old_room_state
@@ -226,7 +262,7 @@ class RoomCreationHandler(BaseHandler):
         old_room_id: str,
         new_room_id: str,
         old_room_state: StateMap[str],
-    ):
+    ) -> None:
         """Send updated power levels in both rooms after an upgrade
 
         Args:
@@ -235,8 +271,8 @@ class RoomCreationHandler(BaseHandler):
             new_room_id: the id of the replacement room
             old_room_state: the state map for the old room
 
-        Returns:
-            Deferred
+        Raises:
+            ShadowBanError if the requester is shadow-banned.
         """
         old_room_pl_event_id = old_room_state.get((EventTypes.PowerLevels, ""))
 
@@ -309,7 +345,7 @@ class RoomCreationHandler(BaseHandler):
         new_room_id: str,
         new_room_version: RoomVersion,
         tombstone_event_id: str,
-    ):
+    ) -> None:
         """Populate a new room based on an old room
 
         Args:
@@ -319,8 +355,6 @@ class RoomCreationHandler(BaseHandler):
                 created with _gemerate_room_id())
             new_room_version: the new room version to use
             tombstone_event_id: the ID of the tombstone event in the old room.
-        Returns:
-            Deferred
         """
         user_id = requester.user.to_string()
 
@@ -364,7 +398,7 @@ class RoomCreationHandler(BaseHandler):
         # map from event_id to BaseEvent
         old_room_state_events = await self.store.get_events(old_room_state_ids.values())
 
-        for k, old_event_id in iteritems(old_room_state_ids):
+        for k, old_event_id in old_room_state_ids.items():
             old_event = old_room_state_events.get(old_event_id)
             if old_event:
                 initial_state[k] = old_event.content
@@ -417,7 +451,7 @@ class RoomCreationHandler(BaseHandler):
         old_room_member_state_events = await self.store.get_events(
             old_room_member_state_ids.values()
         )
-        for k, old_event in iteritems(old_room_member_state_events):
+        for old_event in old_room_member_state_events.values():
             # Only transfer ban events
             if (
                 "membership" in old_event.content
@@ -520,17 +554,21 @@ class RoomCreationHandler(BaseHandler):
             logger.error("Unable to send updated alias events in new room: %s", e)
 
     async def create_room(
-        self, requester, config, ratelimit=True, creator_join_profile=None
+        self,
+        requester: Requester,
+        config: JsonDict,
+        ratelimit: bool = True,
+        creator_join_profile: Optional[JsonDict] = None,
     ) -> Tuple[dict, int]:
         """ Creates a new room.
 
         Args:
-            requester (synapse.types.Requester):
+            requester:
                 The user who requested the room creation.
-            config (dict) : A dict of configuration options.
-            ratelimit (bool): set to False to disable the rate limiter
+            config : A dict of configuration options.
+            ratelimit: set to False to disable the rate limiter
 
-            creator_join_profile (dict|None):
+            creator_join_profile:
                 Set to override the displayname and avatar for the creating
                 user in this room. If unset, displayname and avatar will be
                 derived from the user's profile. If set, should contain the
@@ -582,7 +620,7 @@ class RoomCreationHandler(BaseHandler):
             "room_version", self.config.default_room_version.identifier
         )
 
-        if not isinstance(room_version_id, string_types):
+        if not isinstance(room_version_id, str):
             raise SynapseError(400, "room_version must be a string", Codes.BAD_JSON)
 
         room_version = KNOWN_ROOM_VERSIONS.get(room_version_id)
@@ -593,6 +631,7 @@ class RoomCreationHandler(BaseHandler):
                 Codes.UNSUPPORTED_ROOM_VERSION,
             )
 
+        room_alias = None
         if "room_alias_name" in config:
             for wchar in string.whitespace:
                 if wchar in config["room_alias_name"]:
@@ -603,9 +642,8 @@ class RoomCreationHandler(BaseHandler):
 
             if mapping:
                 raise SynapseError(400, "Room alias already taken", Codes.ROOM_IN_USE)
-        else:
-            room_alias = None
 
+        invite_3pid_list = config.get("invite_3pid", [])
         invite_list = config.get("invite", [])
         for i in invite_list:
             try:
@@ -613,6 +651,14 @@ class RoomCreationHandler(BaseHandler):
                 parse_and_validate_server_name(uid.domain)
             except Exception:
                 raise SynapseError(400, "Invalid user_id: %s" % (i,))
+
+        if (invite_list or invite_3pid_list) and requester.shadow_banned:
+            # We randomly sleep a bit just to annoy the requester.
+            await self.clock.sleep(random.randint(1, 10))
+
+            # Allow the request to go through, but remove any associated invites.
+            invite_3pid_list = []
+            invite_list = []
 
         await self.event_creation_handler.assert_accepted_privacy_policy(requester)
 
@@ -627,8 +673,6 @@ class RoomCreationHandler(BaseHandler):
                 "Not a valid power_level_content_override: 'users' did not contain %s"
                 % (user_id,),
             )
-
-        invite_3pid_list = config.get("invite_3pid", [])
 
         visibility = config.get("visibility", None)
         is_public = visibility == "public"
@@ -724,6 +768,8 @@ class RoomCreationHandler(BaseHandler):
             if is_direct:
                 content["is_direct"] = is_direct
 
+            # Note that update_membership with an action of "invite" can raise a
+            # ShadowBanError, but this was handled above by emptying invite_list.
             _, last_stream_id = await self.room_member_handler.update_membership(
                 requester,
                 UserID.from_string(invitee),
@@ -738,6 +784,8 @@ class RoomCreationHandler(BaseHandler):
             id_access_token = invite_3pid.get("id_access_token")  # optional
             address = invite_3pid["address"]
             medium = invite_3pid["medium"]
+            # Note that do_3pid_invite can raise a  ShadowBanError, but this was
+            # handled above by emptying invite_3pid_list.
             last_stream_id = await self.hs.get_room_member_handler().do_3pid_invite(
                 room_id,
                 requester.user,
@@ -756,30 +804,39 @@ class RoomCreationHandler(BaseHandler):
 
         # Always wait for room creation to progate before returning
         await self._replication.wait_for_stream_position(
-            self.hs.config.worker.writers.events, "events", last_stream_id
+            self.hs.config.worker.events_shard_config.get_instance(room_id),
+            "events",
+            last_stream_id,
         )
 
         return result, last_stream_id
 
     async def _send_events_for_new_room(
         self,
-        creator,  # A Requester object.
-        room_id,
-        preset_config,
-        invite_list,
-        initial_state,
-        creation_content,
-        room_alias=None,
-        power_level_content_override=None,  # Doesn't apply when initial state has power level state event content
-        creator_join_profile=None,
+        creator: Requester,
+        room_id: str,
+        preset_config: str,
+        invite_list: List[str],
+        initial_state: MutableStateMap,
+        creation_content: JsonDict,
+        room_alias: Optional[RoomAlias] = None,
+        power_level_content_override: Optional[JsonDict] = None,
+        creator_join_profile: Optional[JsonDict] = None,
     ) -> int:
         """Sends the initial events into a new room.
+
+        `power_level_content_override` doesn't apply when initial state has
+        power level state event content.
 
         Returns:
             The stream_id of the last event persisted.
         """
 
-        def create(etype, content, **kwargs):
+        creator_id = creator.user.to_string()
+
+        event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
+
+        def create(etype: str, content: JsonDict, **kwargs) -> JsonDict:
             e = {"type": etype, "content": content}
 
             e.update(event_keys)
@@ -787,22 +844,20 @@ class RoomCreationHandler(BaseHandler):
 
             return e
 
-        async def send(etype, content, **kwargs) -> int:
+        async def send(etype: str, content: JsonDict, **kwargs) -> int:
             event = create(etype, content, **kwargs)
             logger.debug("Sending %s in new room", etype)
+            # Allow these events to be sent even if the user is shadow-banned to
+            # allow the room creation to complete.
             (
                 _,
                 last_stream_id,
             ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                creator, event, ratelimit=False
+                creator, event, ratelimit=False, ignore_shadow_ban=True,
             )
             return last_stream_id
 
-        config = RoomCreationHandler.PRESETS_DICT[preset_config]
-
-        creator_id = creator.user.to_string()
-
-        event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
+        config = self._presets_dict[preset_config]
 
         creation_content.update({"creator": creator_id})
         await send(etype=EventTypes.Create, content=creation_content)
@@ -844,7 +899,7 @@ class RoomCreationHandler(BaseHandler):
                 "kick": 50,
                 "redact": 50,
                 "invite": 50,
-            }
+            }  # type: JsonDict
 
             if config["original_invitees_have_ops"]:
                 for invitee in invite_list:
@@ -888,10 +943,17 @@ class RoomCreationHandler(BaseHandler):
                 etype=etype, state_key=state_key, content=content
             )
 
+        if config["encrypted"]:
+            last_sent_stream_id = await send(
+                etype=EventTypes.RoomEncryption,
+                state_key="",
+                content={"algorithm": RoomEncryptionAlgorithms.DEFAULT},
+            )
+
         return last_sent_stream_id
 
     async def _generate_room_id(
-        self, creator_id: str, is_public: str, room_version: RoomVersion,
+        self, creator_id: str, is_public: bool, room_version: RoomVersion,
     ):
         # autogen room IDs and try to create it. We may clash, so just
         # try a few times till one goes through, giving up eventually.
@@ -914,24 +976,31 @@ class RoomCreationHandler(BaseHandler):
         raise StoreError(500, "Couldn't generate a room ID.")
 
 
-class RoomContextHandler(object):
-    def __init__(self, hs):
+class RoomContextHandler:
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.store = hs.get_datastore()
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
 
-    async def get_event_context(self, user, room_id, event_id, limit, event_filter):
+    async def get_event_context(
+        self,
+        user: UserID,
+        room_id: str,
+        event_id: str,
+        limit: int,
+        event_filter: Optional[Filter],
+    ) -> Optional[JsonDict]:
         """Retrieves events, pagination tokens and state around a given event
         in a room.
 
         Args:
-            user (UserID)
-            room_id (str)
-            event_id (str)
-            limit (int): The maximum number of events to return in total
+            user
+            room_id
+            event_id
+            limit: The maximum number of events to return in total
                 (excluding state).
-            event_filter (Filter|None): the filter to apply to the events returned
+            event_filter: the filter to apply to the events returned
                 (excluding the target event_id)
 
         Returns:
@@ -1017,21 +1086,26 @@ class RoomContextHandler(object):
         return results
 
 
-class RoomEventSource(object):
-    def __init__(self, hs):
+class RoomEventSource:
+    def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
 
     async def get_new_events(
-        self, user, from_key, limit, room_ids, is_guest, explicit_room_id=None
-    ):
+        self,
+        user: UserID,
+        from_key: RoomStreamToken,
+        limit: int,
+        room_ids: List[str],
+        is_guest: bool,
+        explicit_room_id: Optional[str] = None,
+    ) -> Tuple[List[EventBase], RoomStreamToken]:
         # We just ignore the key for now.
 
-        to_key = await self.get_current_key()
+        to_key = self.get_current_key()
 
-        from_token = RoomStreamToken.parse(from_key)
-        if from_token.topological:
+        if from_key.topological:
             logger.warning("Stream has topological part!!!! %r", from_key)
-            from_key = "s%s" % (from_token.stream,)
+            from_key = RoomStreamToken(None, from_key.stream)
 
         app_service = self.store.get_app_service_by_user_id(user.to_string())
         if app_service:
@@ -1060,14 +1134,216 @@ class RoomEventSource(object):
                 events[:] = events[:limit]
 
             if events:
-                end_key = events[-1].internal_metadata.after
+                end_key = RoomStreamToken.parse(events[-1].internal_metadata.after)
             else:
                 end_key = to_key
 
         return (events, end_key)
 
-    def get_current_key(self):
-        return self.store.get_room_events_max_id()
+    def get_current_key(self) -> RoomStreamToken:
+        return RoomStreamToken(None, self.store.get_room_max_stream_ordering())
 
-    def get_current_key_for_room(self, room_id):
+    def get_current_key_for_room(self, room_id: str) -> Awaitable[str]:
         return self.store.get_room_events_max_id(room_id)
+
+
+class RoomShutdownHandler:
+
+    DEFAULT_MESSAGE = (
+        "Sharing illegal content on this server is not permitted and rooms in"
+        " violation will be blocked."
+    )
+    DEFAULT_ROOM_NAME = "Content Violation Notification"
+
+    def __init__(self, hs: "HomeServer"):
+        self.hs = hs
+        self.room_member_handler = hs.get_room_member_handler()
+        self._room_creation_handler = hs.get_room_creation_handler()
+        self._replication = hs.get_replication_data_handler()
+        self.event_creation_handler = hs.get_event_creation_handler()
+        self.state = hs.get_state_handler()
+        self.store = hs.get_datastore()
+
+    async def shutdown_room(
+        self,
+        room_id: str,
+        requester_user_id: str,
+        new_room_user_id: Optional[str] = None,
+        new_room_name: Optional[str] = None,
+        message: Optional[str] = None,
+        block: bool = False,
+    ) -> dict:
+        """
+        Shuts down a room. Moves all local users and room aliases automatically
+        to a new room if `new_room_user_id` is set. Otherwise local users only
+        leave the room without any information.
+
+        The new room will be created with the user specified by the
+        `new_room_user_id` parameter as room administrator and will contain a
+        message explaining what happened. Users invited to the new room will
+        have power level `-10` by default, and thus be unable to speak.
+
+        The local server will only have the power to move local user and room
+        aliases to the new room. Users on other servers will be unaffected.
+
+        Args:
+            room_id: The ID of the room to shut down.
+            requester_user_id:
+                User who requested the action and put the room on the
+                blocking list.
+            new_room_user_id:
+                If set, a new room will be created with this user ID
+                as the creator and admin, and all users in the old room will be
+                moved into that room. If not set, no new room will be created
+                and the users will just be removed from the old room.
+            new_room_name:
+                A string representing the name of the room that new users will
+                be invited to. Defaults to `Content Violation Notification`
+            message:
+                A string containing the first message that will be sent as
+                `new_room_user_id` in the new room. Ideally this will clearly
+                convey why the original room was shut down.
+                Defaults to `Sharing illegal content on this server is not
+                permitted and rooms in violation will be blocked.`
+            block:
+                If set to `true`, this room will be added to a blocking list,
+                preventing future attempts to join the room. Defaults to `false`.
+
+        Returns: a dict containing the following keys:
+            kicked_users: An array of users (`user_id`) that were kicked.
+            failed_to_kick_users:
+                An array of users (`user_id`) that that were not kicked.
+            local_aliases:
+                An array of strings representing the local aliases that were
+                migrated from the old room to the new.
+            new_room_id: A string representing the room ID of the new room.
+        """
+
+        if not new_room_name:
+            new_room_name = self.DEFAULT_ROOM_NAME
+        if not message:
+            message = self.DEFAULT_MESSAGE
+
+        if not RoomID.is_valid(room_id):
+            raise SynapseError(400, "%s is not a legal room ID" % (room_id,))
+
+        if not await self.store.get_room(room_id):
+            raise NotFoundError("Unknown room id %s" % (room_id,))
+
+        # This will work even if the room is already blocked, but that is
+        # desirable in case the first attempt at blocking the room failed below.
+        if block:
+            await self.store.block_room(room_id, requester_user_id)
+
+        if new_room_user_id is not None:
+            if not self.hs.is_mine_id(new_room_user_id):
+                raise SynapseError(
+                    400, "User must be our own: %s" % (new_room_user_id,)
+                )
+
+            room_creator_requester = create_requester(new_room_user_id)
+
+            info, stream_id = await self._room_creation_handler.create_room(
+                room_creator_requester,
+                config={
+                    "preset": RoomCreationPreset.PUBLIC_CHAT,
+                    "name": new_room_name,
+                    "power_level_content_override": {"users_default": -10},
+                },
+                ratelimit=False,
+            )
+            new_room_id = info["room_id"]
+
+            logger.info(
+                "Shutting down room %r, joining to new room: %r", room_id, new_room_id
+            )
+
+            # We now wait for the create room to come back in via replication so
+            # that we can assume that all the joins/invites have propogated before
+            # we try and auto join below.
+            await self._replication.wait_for_stream_position(
+                self.hs.config.worker.events_shard_config.get_instance(new_room_id),
+                "events",
+                stream_id,
+            )
+        else:
+            new_room_id = None
+            logger.info("Shutting down room %r", room_id)
+
+        users = await self.state.get_current_users_in_room(room_id)
+        kicked_users = []
+        failed_to_kick_users = []
+        for user_id in users:
+            if not self.hs.is_mine_id(user_id):
+                continue
+
+            logger.info("Kicking %r from %r...", user_id, room_id)
+
+            try:
+                # Kick users from room
+                target_requester = create_requester(user_id)
+                _, stream_id = await self.room_member_handler.update_membership(
+                    requester=target_requester,
+                    target=target_requester.user,
+                    room_id=room_id,
+                    action=Membership.LEAVE,
+                    content={},
+                    ratelimit=False,
+                    require_consent=False,
+                )
+
+                # Wait for leave to come in over replication before trying to forget.
+                await self._replication.wait_for_stream_position(
+                    self.hs.config.worker.events_shard_config.get_instance(room_id),
+                    "events",
+                    stream_id,
+                )
+
+                await self.room_member_handler.forget(target_requester.user, room_id)
+
+                # Join users to new room
+                if new_room_user_id:
+                    await self.room_member_handler.update_membership(
+                        requester=target_requester,
+                        target=target_requester.user,
+                        room_id=new_room_id,
+                        action=Membership.JOIN,
+                        content={},
+                        ratelimit=False,
+                        require_consent=False,
+                    )
+
+                kicked_users.append(user_id)
+            except Exception:
+                logger.exception(
+                    "Failed to leave old room and join new room for %r", user_id
+                )
+                failed_to_kick_users.append(user_id)
+
+        # Send message in new room and move aliases
+        if new_room_user_id:
+            await self.event_creation_handler.create_and_send_nonmember_event(
+                room_creator_requester,
+                {
+                    "type": "m.room.message",
+                    "content": {"body": message, "msgtype": "m.text"},
+                    "room_id": new_room_id,
+                    "sender": new_room_user_id,
+                },
+                ratelimit=False,
+            )
+
+            aliases_for_room = await self.store.get_aliases_for_room(room_id)
+
+            await self.store.update_aliases_for_room(
+                room_id, new_room_id, requester_user_id
+            )
+        else:
+            aliases_for_room = []
+
+        return {
+            "kicked_users": kicked_users,
+            "failed_to_kick_users": failed_to_kick_users,
+            "local_aliases": aliases_for_room,
+            "new_room_id": new_room_id,
+        }

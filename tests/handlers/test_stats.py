@@ -15,7 +15,7 @@
 
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
-from synapse.storage.data_stores.main import stats
+from synapse.storage.databases.main import stats
 
 from tests import unittest
 
@@ -42,16 +42,16 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         Add the background updates we need to run.
         """
         # Ugh, have to reset this flag
-        self.store.db.updates._all_done = False
+        self.store.db_pool.updates._all_done = False
 
         self.get_success(
-            self.store.db.simple_insert(
+            self.store.db_pool.simple_insert(
                 "background_updates",
                 {"update_name": "populate_stats_prepare", "progress_json": "{}"},
             )
         )
         self.get_success(
-            self.store.db.simple_insert(
+            self.store.db_pool.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_stats_process_rooms",
@@ -61,7 +61,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             )
         )
         self.get_success(
-            self.store.db.simple_insert(
+            self.store.db_pool.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_stats_process_users",
@@ -71,7 +71,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             )
         )
         self.get_success(
-            self.store.db.simple_insert(
+            self.store.db_pool.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_stats_cleanup",
@@ -81,8 +81,8 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             )
         )
 
-    def get_all_room_state(self):
-        return self.store.db.simple_select_list(
+    async def get_all_room_state(self):
+        return await self.store.db_pool.simple_select_list(
             "room_stats_state", None, retcols=("name", "topic", "canonical_alias")
         )
 
@@ -96,7 +96,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         end_ts = self.store.quantise_stats_time(self.reactor.seconds() * 1000)
 
         return self.get_success(
-            self.store.db.simple_select_one(
+            self.store.db_pool.simple_select_one(
                 table + "_historical",
                 {id_col: stat_id, end_ts: end_ts},
                 cols,
@@ -109,10 +109,10 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self._add_background_updates()
 
         while not self.get_success(
-            self.store.db.updates.has_completed_background_updates()
+            self.store.db_pool.updates.has_completed_background_updates()
         ):
             self.get_success(
-                self.store.db.updates.do_next_background_update(100), by=0.1
+                self.store.db_pool.updates.do_next_background_update(100), by=0.1
             )
 
     def test_initial_room(self):
@@ -146,10 +146,10 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self._add_background_updates()
 
         while not self.get_success(
-            self.store.db.updates.has_completed_background_updates()
+            self.store.db_pool.updates.has_completed_background_updates()
         ):
             self.get_success(
-                self.store.db.updates.do_next_background_update(100), by=0.1
+                self.store.db_pool.updates.do_next_background_update(100), by=0.1
             )
 
         r = self.get_success(self.get_all_room_state())
@@ -186,9 +186,9 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         # the position that the deltas should begin at, once they take over.
         self.hs.config.stats_enabled = True
         self.handler.stats_enabled = True
-        self.store.db.updates._all_done = False
+        self.store.db_pool.updates._all_done = False
         self.get_success(
-            self.store.db.simple_update_one(
+            self.store.db_pool.simple_update_one(
                 table="stats_incremental_position",
                 keyvalues={},
                 updatevalues={"stream_id": 0},
@@ -196,17 +196,17 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         )
 
         self.get_success(
-            self.store.db.simple_insert(
+            self.store.db_pool.simple_insert(
                 "background_updates",
                 {"update_name": "populate_stats_prepare", "progress_json": "{}"},
             )
         )
 
         while not self.get_success(
-            self.store.db.updates.has_completed_background_updates()
+            self.store.db_pool.updates.has_completed_background_updates()
         ):
             self.get_success(
-                self.store.db.updates.do_next_background_update(100), by=0.1
+                self.store.db_pool.updates.do_next_background_update(100), by=0.1
             )
 
         # Now, before the table is actually ingested, add some more events.
@@ -217,13 +217,13 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         # Now do the initial ingestion.
         self.get_success(
-            self.store.db.simple_insert(
+            self.store.db_pool.simple_insert(
                 "background_updates",
                 {"update_name": "populate_stats_process_rooms", "progress_json": "{}"},
             )
         )
         self.get_success(
-            self.store.db.simple_insert(
+            self.store.db_pool.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_stats_cleanup",
@@ -233,12 +233,12 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             )
         )
 
-        self.store.db.updates._all_done = False
+        self.store.db_pool.updates._all_done = False
         while not self.get_success(
-            self.store.db.updates.has_completed_background_updates()
+            self.store.db_pool.updates.has_completed_background_updates()
         ):
             self.get_success(
-                self.store.db.updates.do_next_background_update(100), by=0.1
+                self.store.db_pool.updates.do_next_background_update(100), by=0.1
             )
 
         self.reactor.advance(86401)
@@ -253,7 +253,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         # self.handler.notify_new_event()
 
         # We need to let the delta processor advance…
-        self.pump(10 * 60)
+        self.reactor.advance(10 * 60)
 
         # Get the slices! There should be two -- day 1, and day 2.
         r = self.get_success(self.store.get_statistics_for_subject("room", room_1, 0))
@@ -345,6 +345,37 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         r1stats_post = self._get_current_stats("room", r1)
 
         self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
+
+    def test_updating_profile_information_does_not_increase_joined_members_count(self):
+        """
+        Check that the joined_members count does not increase when a user changes their
+        profile information (which is done by sending another join membership event into
+        the room.
+        """
+        self._perform_background_initial_update()
+
+        # Create a user and room
+        u1 = self.register_user("u1", "pass")
+        u1token = self.login("u1", "pass")
+        r1 = self.helper.create_room_as(u1, tok=u1token)
+
+        # Get the current room stats
+        r1stats_ante = self._get_current_stats("room", r1)
+
+        # Send a profile update into the room
+        new_profile = {"displayname": "bob"}
+        self.helper.change_membership(
+            r1, u1, u1, "join", extra_data=new_profile, tok=u1token
+        )
+
+        # Get the new room stats
+        r1stats_post = self._get_current_stats("room", r1)
+
+        # Ensure that the user count did not changed
+        self.assertEqual(r1stats_post["joined_members"], r1stats_ante["joined_members"])
+        self.assertEqual(
+            r1stats_post["local_users_in_room"], r1stats_ante["local_users_in_room"]
+        )
 
     def test_send_state_event_nonoverwriting(self):
         """
@@ -669,15 +700,15 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         # preparation stage of the initial background update
         # Ugh, have to reset this flag
-        self.store.db.updates._all_done = False
+        self.store.db_pool.updates._all_done = False
 
         self.get_success(
-            self.store.db.simple_delete(
+            self.store.db_pool.simple_delete(
                 "room_stats_current", {"1": 1}, "test_delete_stats"
             )
         )
         self.get_success(
-            self.store.db.simple_delete(
+            self.store.db_pool.simple_delete(
                 "user_stats_current", {"1": 1}, "test_delete_stats"
             )
         )
@@ -689,9 +720,9 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         # now do the background updates
 
-        self.store.db.updates._all_done = False
+        self.store.db_pool.updates._all_done = False
         self.get_success(
-            self.store.db.simple_insert(
+            self.store.db_pool.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_stats_process_rooms",
@@ -701,7 +732,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             )
         )
         self.get_success(
-            self.store.db.simple_insert(
+            self.store.db_pool.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_stats_process_users",
@@ -711,7 +742,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             )
         )
         self.get_success(
-            self.store.db.simple_insert(
+            self.store.db_pool.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_stats_cleanup",
@@ -722,10 +753,10 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         )
 
         while not self.get_success(
-            self.store.db.updates.has_completed_background_updates()
+            self.store.db_pool.updates.has_completed_background_updates()
         ):
             self.get_success(
-                self.store.db.updates.do_next_background_update(100), by=0.1
+                self.store.db_pool.updates.do_next_background_update(100), by=0.1
             )
 
         r1stats_complete = self._get_current_stats("room", r1)

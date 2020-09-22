@@ -15,9 +15,9 @@
 
 
 import threading
+from io import StringIO
 
 from mock import NonCallableMock
-from six import StringIO
 
 from twisted.internet import defer, reactor
 
@@ -112,7 +112,7 @@ class FileConsumerTests(unittest.TestCase):
         self.assertTrue(string_file.closed)
 
 
-class DummyPullProducer(object):
+class DummyPullProducer:
     def __init__(self):
         self.consumer = None
         self.deferred = defer.Deferred()
@@ -134,7 +134,7 @@ class DummyPullProducer(object):
         return d
 
 
-class BlockingStringWrite(object):
+class BlockingStringWrite:
     def __init__(self):
         self.buffer = ""
         self.closed = False

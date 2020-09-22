@@ -14,9 +14,7 @@
 # limitations under the License.
 
 
-import inspect
 import logging
-import time
 from functools import wraps
 from inspect import getcallargs
 
@@ -31,11 +29,11 @@ def _log_debug_as_f(f, msg, msg_args):
         lineno = f.__code__.co_firstlineno
         pathname = f.__code__.co_filename
 
-        record = logging.LogRecord(
+        record = logger.makeRecord(
             name=name,
             level=logging.DEBUG,
-            pathname=pathname,
-            lineno=lineno,
+            fn=pathname,
+            lno=lineno,
             msg=msg,
             args=msg_args,
             exc_info=None,
@@ -74,127 +72,3 @@ def log_function(f):
 
     wrapped.__name__ = func_name
     return wrapped
-
-
-def time_function(f):
-    func_name = f.__name__
-
-    @wraps(f)
-    def wrapped(*args, **kwargs):
-        global _TIME_FUNC_ID
-        id = _TIME_FUNC_ID
-        _TIME_FUNC_ID += 1
-
-        start = time.clock()
-
-        try:
-            _log_debug_as_f(f, "[FUNC START] {%s-%d}", (func_name, id))
-
-            r = f(*args, **kwargs)
-        finally:
-            end = time.clock()
-            _log_debug_as_f(
-                f, "[FUNC END] {%s-%d} %.3f sec", (func_name, id, end - start)
-            )
-
-        return r
-
-    return wrapped
-
-
-def trace_function(f):
-    func_name = f.__name__
-    linenum = f.func_code.co_firstlineno
-    pathname = f.func_code.co_filename
-
-    @wraps(f)
-    def wrapped(*args, **kwargs):
-        name = f.__module__
-        logger = logging.getLogger(name)
-        level = logging.DEBUG
-
-        frame = inspect.currentframe()
-        if frame is None:
-            raise Exception("Can't get current frame!")
-
-        s = frame.f_back
-
-        to_print = [
-            "\t%s:%s %s. Args: args=%s, kwargs=%s"
-            % (pathname, linenum, func_name, args, kwargs)
-        ]
-        while s:
-            if True or s.f_globals["__name__"].startswith("synapse"):
-                filename, lineno, function, _, _ = inspect.getframeinfo(s)
-                args_string = inspect.formatargvalues(*inspect.getargvalues(s))
-
-                to_print.append(
-                    "\t%s:%d %s. Args: %s" % (filename, lineno, function, args_string)
-                )
-
-            s = s.f_back
-
-        msg = "\nTraceback for %s:\n" % (func_name,) + "\n".join(to_print)
-
-        record = logging.LogRecord(
-            name=name,
-            level=level,
-            pathname=pathname,
-            lineno=lineno,
-            msg=msg,
-            args=(),
-            exc_info=None,
-        )
-
-        logger.handle(record)
-
-        return f(*args, **kwargs)
-
-    wrapped.__name__ = func_name
-    return wrapped
-
-
-def get_previous_frames():
-
-    frame = inspect.currentframe()
-    if frame is None:
-        raise Exception("Can't get current frame!")
-
-    s = frame.f_back.f_back
-    to_return = []
-    while s:
-        if s.f_globals["__name__"].startswith("synapse"):
-            filename, lineno, function, _, _ = inspect.getframeinfo(s)
-            args_string = inspect.formatargvalues(*inspect.getargvalues(s))
-
-            to_return.append(
-                "{{  %s:%d %s - Args: %s }}" % (filename, lineno, function, args_string)
-            )
-
-        s = s.f_back
-
-    return ", ".join(to_return)
-
-
-def get_previous_frame(ignore=[]):
-    frame = inspect.currentframe()
-    if frame is None:
-        raise Exception("Can't get current frame!")
-    s = frame.f_back.f_back
-
-    while s:
-        if s.f_globals["__name__"].startswith("synapse"):
-            if not any(s.f_globals["__name__"].startswith(ig) for ig in ignore):
-                filename, lineno, function, _, _ = inspect.getframeinfo(s)
-                args_string = inspect.formatargvalues(*inspect.getargvalues(s))
-
-                return "{{  %s:%d %s - Args: %s }}" % (
-                    filename,
-                    lineno,
-                    function,
-                    args_string,
-                )
-
-        s = s.f_back
-
-    return None

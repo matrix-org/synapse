@@ -17,8 +17,6 @@
 """
 import logging
 
-from six import string_types
-
 from synapse.api.errors import AuthError, SynapseError
 from synapse.handlers.presence import format_user_presence_state
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
@@ -32,7 +30,7 @@ class PresenceStatusRestServlet(RestServlet):
     PATTERNS = client_patterns("/presence/(?P<user_id>[^/]*)/status", v1=True)
 
     def __init__(self, hs):
-        super(PresenceStatusRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.presence_handler = hs.get_presence_handler()
         self.clock = hs.get_clock()
@@ -51,7 +49,9 @@ class PresenceStatusRestServlet(RestServlet):
                 raise AuthError(403, "You are not allowed to see their presence.")
 
         state = await self.presence_handler.get_state(target_user=user)
-        state = format_user_presence_state(state, self.clock.time_msec())
+        state = format_user_presence_state(
+            state, self.clock.time_msec(), include_user_id=False
+        )
 
         return 200, state
 
@@ -71,7 +71,7 @@ class PresenceStatusRestServlet(RestServlet):
 
             if "status_msg" in content:
                 state["status_msg"] = content.pop("status_msg")
-                if not isinstance(state["status_msg"], string_types):
+                if not isinstance(state["status_msg"], str):
                     raise SynapseError(400, "status_msg must be a string.")
 
             if content:
