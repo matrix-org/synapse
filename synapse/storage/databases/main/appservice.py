@@ -320,7 +320,7 @@ class ApplicationServiceTransactionWorkerStore(
         )
 
     async def get_new_events_for_appservice(self, current_id, limit):
-        """Get all new evnets"""
+        """Get all new events for an appservice"""
 
         def get_new_events_for_appservice_txn(txn):
             sql = (
@@ -350,6 +350,48 @@ class ApplicationServiceTransactionWorkerStore(
         events = await self.get_events_as_list(event_ids)
 
         return upper_bound, events
+    
+    async def get_device_messages_token_for_appservice(self, service):
+        txn.execute(
+            "SELECT device_message_stream_id FROM application_services_state WHERE as_id=?",
+            (service.id,),
+        )
+        last_txn_id = txn.fetchone()
+        if last_txn_id is None or last_txn_id[0] is None:  # no row exists
+            return 0
+        else:
+            return int(last_txn_id[0])  # select 'last_txn' col
+
+    async def set_device_messages_token_for_appservice(self, service, pos) -> None:
+        def set_appservice_last_pos_txn(txn):
+            txn.execute(
+                "UPDATE application_services_state SET device_message_stream_id = ? WHERE as_id=?", (pos, service.id)
+            )
+
+        await self.db_pool.runInteraction(
+            "set_device_messages_token_for_appservice", set_appservice_last_pos_txn
+        )
+    
+    async def get_device_list_token_for_appservice(self, service):
+        txn.execute(
+            "SELECT device_list_stream_id FROM application_services_state WHERE as_id=?",
+            (service.id,),
+        )
+        last_txn_id = txn.fetchone()
+        if last_txn_id is None or last_txn_id[0] is None:  # no row exists
+            return 0
+        else:
+            return int(last_txn_id[0])  # select 'last_txn' col
+
+    async def set_device_list_token_for_appservice(self, service, pos) -> None:
+        def set_appservice_last_pos_txn(txn):
+            txn.execute(
+                "UPDATE application_services_state SET device_list_stream_id = ?", (pos, service.id)
+            )
+
+        await self.db_pool.runInteraction(
+            "set_device_list_token_for_appservice", set_appservice_last_pos_txn
+        )
 
 
 class ApplicationServiceTransactionStore(ApplicationServiceTransactionWorkerStore):

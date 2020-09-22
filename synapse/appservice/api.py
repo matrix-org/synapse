@@ -201,7 +201,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         key = (service.id, protocol)
         return await self.protocol_meta_cache.wrap(key, _get)
 
-    async def push_ephemeral(self, service, events):
+    async def push_ephemeral(self, service, events, to_device=None, device_lists=None):
         if service.url is None:
             return True
         if service.supports_ephemeral is False:
@@ -213,7 +213,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         try:
             await self.put_json(
                 uri=uri,
-                json_body={"events": events},
+                json_body={"events": events, "device_messages": to_device, "device_lists": device_lists},
                 args={"access_token": service.hs_token},
             )
             return True

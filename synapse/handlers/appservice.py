@@ -201,35 +201,61 @@ class ApplicationServicesHandler:
                     )
                     events = receipts
                 elif stream_key == "presence_key":
-                    events = []
-                    presence_source = self.event_sources.sources["presence"]
-                    for user in users:
-                        interested = await service.is_interested_in_presence(user, self.store)
-                        if not interested:
-                            continue
-                        presence_events, _key = await presence_source.get_new_events(
-                            user=user,
-                            service=service,
-                            from_key=None, # I don't think this is required
-                        )
-                        time_now = self.clock.time_msec()
-                        presence_events = [
-                            {
-                                "type": "m.presence",
-                                "sender": event.user_id,
-                                "content": format_user_presence_state(
-                                    event, time_now, include_user_id=False
-                                ),
-                            }
-                            for event in presence_events
-                        ]
-                        events = events + presence_events
+                    events = await self._handle_as_presence(service, users)
+                elif stream_key == "device_list_key":
+                    # Check if the device lists have changed for any of the users we are interested in
+                    print("device_list_key", users)
                 elif stream_key == "to_device_key":
-                    print("to_device_key", users)
+                    # Check the inbox for any users the bridge owns 
+                    events, to_device_token = await self._handle_to_device(service, users, new_token)
+                    if events:
+                        # TODO: Do in background?
+                        await self.scheduler.submit_ephemeral_events_for_as(service, events, new_token)
+                        if stream_key == "to_device_key":
+                            # Update database with new token
+                            await self.store.set_device_messages_token_for_appservice(service, to_device_token)
+                        return
                 if events:
                     # TODO: Do in background?
-                    await self.scheduler.submit_ephemeral_events_for_as(service, events)
+                    await self.scheduler.submit_ephemeral_events_for_as(service, events, new_token)
+
+    async def _handle_device_list(self, service, users, token):
+        if not any([True for u in users if service.is_interested_in_user(u)]):
+            return False
+
+    async def _handle_to_device(self, service, users, token):
+        if not any([True for u in users if service.is_interested_in_user(u)]):
+            return False
         
+        since_token = await self.store.get_device_messages_token_for_appservice(service)
+        
+        messages, new_token = await self.store.get_new_messages_for_as(service, since_token, token)
+        return messages, new_token
+
+    async def _handle_as_presence(self, service, users):
+        events = []
+        presence_source = self.event_sources.sources["presence"]
+        for user in users:
+            interested = await service.is_interested_in_presence(user, self.store)
+            if not interested:
+                continue
+            presence_events, _key = await presence_source.get_new_events(
+                user=user,
+                service=service,
+                from_key=None, # TODO: I don't think this is required?
+            )
+            time_now = self.clock.time_msec()
+            presence_events = [
+                {
+                    "type": "m.presence",
+                    "sender": event.user_id,
+                    "content": format_user_presence_state(
+                        event, time_now, include_user_id=False
+                    ),
+                }
+                for event in presence_events
+            ]
+            events = events + presence_events
 
     async def query_user_exists(self, user_id):
         """Check if any application service knows this user_id exists.
