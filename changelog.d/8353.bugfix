@@ -1,1 +1,1 @@
-Don't push if an user account has expired.
+Don't send push notifications to expired user accounts.
