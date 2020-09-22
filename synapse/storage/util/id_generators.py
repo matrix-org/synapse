@@ -304,13 +304,20 @@ class MultiWriterIdGenerator:
             # than it from the DB so that we can prefill
             # `_known_persisted_positions` and get a more accurate
             # `_persisted_upto_position`.
+            #
+            # We also check if any of the later rows are from this instance, in
+            # which case we use that for this instance's current position. This
+            # is to handle the case where we didn't finish persisting to the
+            # stream positions table before restart (or the stream position
+            # table otherwise got out of date).
 
             sql = """
-                SELECT %(id)s FROM %(table)s
+                SELECT %(instance)s, %(id)s FROM %(table)s
                 WHERE ? %(cmp)s %(id)s
             """ % {
                 "id": id_column,
                 "table": table,
+                "instance": instance_column,
                 "cmp": "<=" if self._positive else ">=",
             }
             sql = self._db.engine.convert_param_style(sql)
@@ -319,8 +326,12 @@ class MultiWriterIdGenerator:
             self._persisted_upto_position = min_stream_id
 
             with self._lock:
-                for (stream_id,) in cur:
+                for (instance, stream_id,) in cur:
+                    stream_id = self._return_factor * stream_id
                     self._add_persisted_position(stream_id)
+
+                    if instance == self._instance_name:
+                        self._current_positions[instance] = stream_id
 
         cur.close()
 
