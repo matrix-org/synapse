@@ -18,13 +18,3 @@ CREATE TABLE IF NOT EXISTS dehydrated_devices(
     device_id TEXT NOT NULL,
     device_data TEXT NOT NULL
 );
-
-CREATE TABLE IF NOT EXISTS dehydration_token(
-    token TEXT NOT NULL PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    device_id TEXT NOT NULL,
-    login_submission TEXT NOT NULL,
-    creation_time BIGINT NOT NULL
-);
-
--- FIXME: index on creation_time to expire old tokens
