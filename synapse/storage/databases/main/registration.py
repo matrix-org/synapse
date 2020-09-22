@@ -125,7 +125,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             current_ts: The current timestamp
 
         Returns:
-            Deferred[bool]: whether the user account has expired
+            Whether the user account has expired
         """
         expiration_ts = await self.get_expiration_ts_for_user(user_id)
         if expiration_ts is not None and current_ts >= expiration_ts:
