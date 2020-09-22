@@ -159,6 +159,14 @@ class OIDCConfig(Config):
           #
           #skip_verification: true
 
+          # Whether to fetch the user profile from the userinfo endpoint. Valid
+          # values are:
+          #
+          # Defaults to "auto", which fetches the userinfo endpoint if "openid" is included
+          # in `scopes`. Uncomment the following to always fetch the userinfo endpoint.
+          #
+          #user_profile_method: "userinfo_endpoint"
+
           # An external module can be provided here as a custom solution to mapping
           # attributes returned from a OIDC provider onto a matrix user.
           #
