@@ -472,10 +472,9 @@ class StateResolutionHandler:
     def __init__(self, hs):
         self.clock = hs.get_clock()
 
-        # dict of set of event_ids -> _StateCacheEntry.
-        self._state_cache = None
         self.resolve_linearizer = Linearizer(name="state_resolve_lock")
 
+        # dict of set of event_ids -> _StateCacheEntry.
         self._state_cache = ExpiringCache(
             cache_name="state_cache",
             clock=self.clock,
@@ -519,57 +518,28 @@ class StateResolutionHandler:
         Returns:
             The resolved state
         """
-        logger.debug("resolve_state_groups state_groups %s", state_groups_ids.keys())
-
         group_names = frozenset(state_groups_ids.keys())
 
         with (await self.resolve_linearizer.queue(group_names)):
-            if self._state_cache is not None:
-                cache = self._state_cache.get(group_names, None)
-                if cache:
-                    return cache
+            cache = self._state_cache.get(group_names, None)
+            if cache:
+                return cache
 
             logger.info(
-                "Resolving state for %s with %d groups", room_id, len(state_groups_ids)
+                "Resolving state for %s with groups %s", room_id, list(group_names),
             )
 
             state_groups_histogram.observe(len(state_groups_ids))
 
-            # start by assuming we won't have any conflicted state, and build up the new
-            # state map by iterating through the state groups. If we discover a conflict,
-            # we give up and instead use `resolve_events_with_store`.
-            #
-            # XXX: is this actually worthwhile, or should we just let
-            # resolve_events_with_store do it?
-            new_state = {}  # type: MutableStateMap[str]
-            conflicted_state = False
-            for st in state_groups_ids.values():
-                for key, e_id in st.items():
-                    if key in new_state:
-                        conflicted_state = True
-                        break
-                    new_state[key] = e_id
-                if conflicted_state:
-                    break
-
-            if conflicted_state:
-                logger.info("Resolving conflicted state for %r", room_id)
-                with Measure(self.clock, "state._resolve_events"):
-                    # resolve_events_with_store returns a StateMap, but we can
-                    # treat it as a MutableStateMap as it is above. It isn't
-                    # actually mutated anymore (and is frozen in
-                    # _make_state_cache_entry below).
-                    new_state = cast(
-                        MutableStateMap,
-                        await resolve_events_with_store(
-                            self.clock,
-                            room_id,
-                            room_version,
-                            list(state_groups_ids.values()),
-                            event_map=event_map,
-                            state_res_store=state_res_store,
-                        ),
-                    )
+            with Measure(self.clock, "state._resolve_events"):
+                new_state = await resolve_events_with_store(
+                    self.clock,
+                    room_id,
+                    room_version,
+                    list(state_groups_ids.values()),
+                    event_map=event_map,
+                    state_res_store=state_res_store,
+                )
 
             # if the new state matches any of the input state groups, we can
             # use that state group again. Otherwise we will generate a state_id
@@ -579,8 +549,7 @@ class StateResolutionHandler:
             with Measure(self.clock, "state.create_group_ids"):
                 cache = _make_state_cache_entry(new_state, state_groups_ids)
 
-            if self._state_cache is not None:
-                self._state_cache[group_names] = cache
+            self._state_cache[group_names] = cache
 
             return cache
 
