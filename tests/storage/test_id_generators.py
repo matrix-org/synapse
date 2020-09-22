@@ -43,16 +43,20 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
             """
         )
 
-    def _create_id_generator(self, instance_name="master") -> MultiWriterIdGenerator:
+    def _create_id_generator(
+        self, instance_name="master", writers=["master"]
+    ) -> MultiWriterIdGenerator:
         def _create(conn):
             return MultiWriterIdGenerator(
                 conn,
                 self.db_pool,
+                stream_name="test_stream",
                 instance_name=instance_name,
                 table="foobar",
                 instance_column="instance_name",
                 id_column="stream_id",
                 sequence_name="foobar_seq",
+                writers=writers,
             )
 
         return self.get_success(self.db_pool.runWithConnection(_create))
@@ -68,6 +72,13 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
                     "INSERT INTO foobar VALUES (nextval('foobar_seq'), ?)",
                     (instance_name,),
                 )
+                txn.execute(
+                    """
+                    INSERT INTO stream_positions VALUES ('test_stream', ?,  lastval())
+                    ON CONFLICT (stream_name, instance_name) DO UPDATE SET stream_id = lastval()
+                    """,
+                    (instance_name,),
+                )
 
         self.get_success(self.db_pool.runInteraction("_insert_rows", _insert))
 
@@ -81,6 +92,13 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
                 "INSERT INTO foobar VALUES (?, ?)", (stream_id, instance_name,),
             )
             txn.execute("SELECT setval('foobar_seq', ?)", (stream_id,))
+            txn.execute(
+                """
+                INSERT INTO stream_positions VALUES ('test_stream', ?, ?)
+                ON CONFLICT (stream_name, instance_name) DO UPDATE SET stream_id = ?
+                """,
+                (instance_name, stream_id, stream_id),
+            )
 
         self.get_success(self.db_pool.runInteraction("_insert_row_with_id", _insert))
 
@@ -179,8 +197,8 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self._insert_rows("first", 3)
         self._insert_rows("second", 4)
 
-        first_id_gen = self._create_id_generator("first")
-        second_id_gen = self._create_id_generator("second")
+        first_id_gen = self._create_id_generator("first", writers=["first", "second"])
+        second_id_gen = self._create_id_generator("second", writers=["first", "second"])
 
         self.assertEqual(first_id_gen.get_positions(), {"first": 3, "second": 7})
         self.assertEqual(first_id_gen.get_current_token_for_writer("first"), 3)
@@ -262,7 +280,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self._insert_row_with_id("first", 3)
         self._insert_row_with_id("second", 5)
 
-        id_gen = self._create_id_generator("first")
+        id_gen = self._create_id_generator("first", writers=["first", "second"])
 
         self.assertEqual(id_gen.get_positions(), {"first": 3, "second": 5})
 
@@ -300,7 +318,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self._insert_row_with_id("first", 3)
         self._insert_row_with_id("second", 5)
 
-        id_gen = self._create_id_generator("first")
+        id_gen = self._create_id_generator("first", writers=["first", "second"])
 
         self.assertEqual(id_gen.get_positions(), {"first": 3, "second": 5})
 
@@ -345,16 +363,20 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
             """
         )
 
-    def _create_id_generator(self, instance_name="master") -> MultiWriterIdGenerator:
+    def _create_id_generator(
+        self, instance_name="master", writers=["master"]
+    ) -> MultiWriterIdGenerator:
         def _create(conn):
             return MultiWriterIdGenerator(
                 conn,
                 self.db_pool,
+                stream_name="test_stream",
                 instance_name=instance_name,
                 table="foobar",
                 instance_column="instance_name",
                 id_column="stream_id",
                 sequence_name="foobar_seq",
+                writers=writers,
                 positive=False,
             )
 
@@ -367,6 +389,13 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
         def _insert(txn):
             txn.execute(
                 "INSERT INTO foobar VALUES (?, ?)", (stream_id, instance_name,),
+            )
+            txn.execute(
+                """
+                INSERT INTO stream_positions VALUES ('test_stream', ?, ?)
+                ON CONFLICT (stream_name, instance_name) DO UPDATE SET stream_id = ?
+                """,
+                (instance_name, -stream_id, -stream_id),
             )
 
         self.get_success(self.db_pool.runInteraction("_insert_row", _insert))
@@ -409,8 +438,8 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
         """Tests that having multiple instances that get advanced over
         federation works corretly.
         """
-        id_gen_1 = self._create_id_generator("first")
-        id_gen_2 = self._create_id_generator("second")
+        id_gen_1 = self._create_id_generator("first", writers=["first", "second"])
+        id_gen_2 = self._create_id_generator("second", writers=["first", "second"])
 
         async def _get_next_async():
             async with id_gen_1.get_next() as stream_id:
