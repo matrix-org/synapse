@@ -25,7 +25,6 @@ from typing import (
     Sequence,
     Set,
     Union,
-    cast,
     overload,
 )
 
@@ -42,7 +41,7 @@ from synapse.logging.utils import log_function
 from synapse.state import v1, v2
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.roommember import ProfileInfo
-from synapse.types import Collection, MutableStateMap, StateMap
+from synapse.types import Collection, StateMap
 from synapse.util import Clock
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
