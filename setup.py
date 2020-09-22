@@ -97,7 +97,12 @@ CONDITIONAL_REQUIREMENTS["all"] = list(ALL_OPTIONAL_REQUIREMENTS)
 # Developer dependencies should not get included in "all".
 #
 # We pin black so that our tests don't start failing on new releases.
-CONDITIONAL_REQUIREMENTS["lint"] = ["isort==5.0.3", "black==19.10b0", "flake8-comprehensions", "flake8"]
+CONDITIONAL_REQUIREMENTS["lint"] = [
+    "isort==5.0.3",
+    "black==19.10b0",
+    "flake8-comprehensions",
+    "flake8",
+]
 
 # Dependencies which are exclusively required by unit test code. This is
 # NOT a list of all modules that are necessary to run the unit tests.
