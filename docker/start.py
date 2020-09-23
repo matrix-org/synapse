@@ -212,7 +212,9 @@ def main(args, environ):
 
     if not filter(lambda p: p.startswith("--config-path"), args):
         config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
-        config_path = environ.get("SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml")
+        config_path = environ.get(
+            "SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml"
+        )
 
         if not os.path.exists(config_path):
             if "SYNAPSE_SERVER_NAME" in environ:
@@ -238,7 +240,7 @@ running with 'migrate_config'. See the README for more details.
         if "--config-path=" + config_path not in args:
             args += ["--config-path", config_path]
 
-    log("Starting synapse with args " + ' '.join(args))
+    log("Starting synapse with args " + " ".join(args))
 
     if ownership is not None:
         args = ["gosu", ownership] + args
