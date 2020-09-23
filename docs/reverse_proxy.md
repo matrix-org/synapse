@@ -121,6 +121,14 @@ example.com:8448 {
 
 **NOTE**: ensure the  `nocanon` options are included.
 
+**NOTE 2**: It appears that Synapse is currently incompatible with the ModSecurity module for Apache (`mod_security2`). If you need it enabled for other services on your web server, you can disable it for Synapse's two VirtualHosts by including the following lines before each of the two `</VirtualHost>` above:
+
+```
+<IfModule security2_module>
+    SecRuleEngine off
+</IfModule>
+```
+
 ### HAProxy
 
 ```
