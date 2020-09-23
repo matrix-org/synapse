@@ -19,6 +19,6 @@ CREATE TABLE IF NOT EXISTS e2e_fallback_keys_json (
     algorithm TEXT NOT NULL, -- Which algorithm this fallback key is for.
     key_id TEXT NOT NULL, -- An id for suppressing duplicate uploads.
     key_json TEXT NOT NULL, -- The key as a JSON blob.
-    used SMALLINT NOT NULL DEFAULT 0, -- Whether the key has been used or not.
+    used BOOLEAN NOT NULL DEFAULT FALSE, -- Whether the key has been used or not.
     CONSTRAINT e2e_fallback_keys_json_uniqueness UNIQUE (user_id, device_id, algorithm)
 );

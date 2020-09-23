@@ -393,7 +393,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 values={
                     "key_id": key_id,
                     "key_json": json_encoder.encode(fallback_key),
-                    "used": 0,
+                    "used": False,
                 },
                 desc="set_e2e_fallback_key",
             )
@@ -413,7 +413,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         """
         return await self.db_pool.simple_select_onecol(
             "e2e_fallback_keys_json",
-            keyvalues={"user_id": user_id, "device_id": device_id, "used": 0},
+            keyvalues={"user_id": user_id, "device_id": device_id, "used": False},
             retcol="algorithm",
             desc="get_e2e_unused_fallback_keys",
         )
@@ -775,7 +775,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                     txn.execute(fallback_sql, (user_id, device_id, algorithm))
                     for key_id, key_json, used in txn:
                         device_result[algorithm + ":" + key_id] = key_json
-                        if used == 0:
+                        if not used:
                             used_fallbacks.append(
                                 (user_id, device_id, algorithm, key_id)
                             )
@@ -808,7 +808,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                         "algorithm": algorithm,
                         "key_id": key_id,
                     },
-                    {"used": 1},
+                    {"used": True},
                 )
                 self._invalidate_cache_and_stream(
                     txn, self.get_e2e_unused_fallback_keys, (user_id, device_id)
