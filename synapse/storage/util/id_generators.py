@@ -451,6 +451,9 @@ class MultiWriterIdGenerator:
 @attr.s(slots=True)
 class _AsyncCtxManagerWrapper:
     """Helper class to convert a plain context manager to an async one.
+
+    This is mainly useful if you have a plain context manager but the interface
+    requires an async one.
     """
 
     inner = attr.ib()
@@ -462,7 +465,7 @@ class _AsyncCtxManagerWrapper:
         return self.inner.__exit__(exc_type, exc, tb)
 
 
-@attr.s
+@attr.s(slots=True)
 class _MultiWriterCtxManager:
     """Async context manager returned by MultiWriterIdGenerator
     """
