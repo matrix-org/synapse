@@ -907,27 +907,23 @@ class OidcHandler:
 
         localpart = map_username_to_mxid_localpart(attributes["localpart"])
 
-        user_id = UserID(localpart, self._hostname)
-        users = await self._datastore.get_users_by_id_case_insensitive(
-            user_id.to_string()
-        )
+        user_id = UserID(localpart, self._hostname).to_string()
+        users = await self._datastore.get_users_by_id_case_insensitive(user_id)
         if users:
             if self._allow_existing_users:
                 if len(users) == 1:
-                    registered_user_id = UserID.from_string(next(iter(users)))
+                    registered_user_id = next(iter(users))
                 elif user_id in users:
                     registered_user_id = user_id
                 else:
                     raise MappingException(
                         "Attempted to login as '{}' but it matches more than one user inexactly: {}".format(
-                            user_id.to_string(), list(users.keys())
+                            user_id, list(users.keys())
                         )
                     )
             else:
                 # This mxid is taken
-                raise MappingException(
-                    "mxid '{}' is already taken".format(user_id.to_string())
-                )
+                raise MappingException("mxid '{}' is already taken".format(user_id))
         else:
             # It's the first time this user is logging in and the mapped mxid was
             # not taken, register the user
