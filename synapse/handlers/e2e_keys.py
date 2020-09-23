@@ -507,9 +507,7 @@ class E2eKeysHandler:
             )
             await self.store.set_e2e_fallback_keys(user_id, device_id, fallback_keys)
         elif fallback_keys:
-            log_kv(
-                {"message": "Did not update fallback_keys", "reason": "not a dict"}
-            )
+            log_kv({"message": "Did not update fallback_keys", "reason": "not a dict"})
         else:
             log_kv(
                 {"message": "Did not update fallback_keys", "reason": "no keys given"}
