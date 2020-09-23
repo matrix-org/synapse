@@ -885,7 +885,6 @@ def start(config_options):
     # For backwards compatibility let any of the old app names.
     assert config.worker_app in (
         "synapse.app.appservice",
-        "synapse.app.background_worker",
         "synapse.app.client_reader",
         "synapse.app.event_creator",
         "synapse.app.federation_reader",
