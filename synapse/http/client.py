@@ -17,7 +17,18 @@
 import logging
 import urllib
 from io import BytesIO
-from typing import Any, BinaryIO, Dict, Iterable, List, Optional, Tuple, Union
+from typing import (
+    Any,
+    BinaryIO,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 import treq
 from canonicaljson import encode_canonical_json
@@ -59,11 +70,18 @@ incoming_responses_counter = Counter(
     "synapse_http_client_responses", "", ["method", "code"]
 )
 
-# the type of the headers list, to be passed to the t.w.h.Headers
-RawHeaders = Dict[Union[str, bytes], List[Union[str, bytes]]]
+# the type of the headers list, to be passed to the t.w.h.Headers.
+# Actually we can mix str and bytes keys, but Mapping treats 'key' as invariant so
+# we simplify.
+RawHeaders = Union[Mapping[str, "RawHeaderValue"], Mapping[bytes, "RawHeaderValue"]]
+
+# the value actually has to be a List, but List is invariant so we can't specify that
+# the entries can either be Lists or bytes.
+RawHeaderValue = Sequence[Union[str, bytes]]
 
 # the type of the query params, to be passed into `urlencode`
-QueryParams = Dict[Union[str, bytes], Union[str, bytes, Iterable[Union[str, bytes]]]]
+QueryParamValue = Union[str, bytes, Iterable[Union[str, bytes]]]
+QueryParams = Union[Mapping[str, QueryParamValue], Mapping[bytes, QueryParamValue]]
 
 
 def check_against_blacklist(ip_address, ip_whitelist, ip_blacklist):
@@ -379,7 +397,7 @@ class SimpleHttpClient:
     async def post_urlencoded_get_json(
         self,
         uri: str,
-        args: Dict[str, Union[str, List[str]]] = {},
+        args: Mapping[str, Union[str, List[str]]] = {},
         headers: Optional[RawHeaders] = None,
     ) -> Any:
         """
