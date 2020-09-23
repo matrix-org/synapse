@@ -52,7 +52,7 @@ class InitialSyncHandler(BaseHandler):
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
 
-    def snapshot_all_rooms(
+    async def snapshot_all_rooms(
         self,
         user_id: str,
         pagin_config: PaginationConfig,
@@ -84,7 +84,7 @@ class InitialSyncHandler(BaseHandler):
             include_archived,
         )
 
-        return self.snapshot_cache.wrap(
+        return await self.snapshot_cache.wrap(
             key,
             self._snapshot_all_rooms,
             user_id,
