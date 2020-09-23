@@ -32,7 +32,7 @@ class GroupServlet(RestServlet):
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/profile$")
 
     def __init__(self, hs):
-        super(GroupServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
@@ -66,7 +66,7 @@ class GroupSummaryServlet(RestServlet):
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/summary$")
 
     def __init__(self, hs):
-        super(GroupSummaryServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
@@ -97,7 +97,7 @@ class GroupSummaryRoomsCatServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(GroupSummaryRoomsCatServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
@@ -137,7 +137,7 @@ class GroupCategoryServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(GroupCategoryServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
@@ -181,7 +181,7 @@ class GroupCategoriesServlet(RestServlet):
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/categories/$")
 
     def __init__(self, hs):
-        super(GroupCategoriesServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
@@ -204,7 +204,7 @@ class GroupRoleServlet(RestServlet):
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/roles/(?P<role_id>[^/]+)$")
 
     def __init__(self, hs):
-        super(GroupRoleServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
@@ -248,7 +248,7 @@ class GroupRolesServlet(RestServlet):
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/roles/$")
 
     def __init__(self, hs):
-        super(GroupRolesServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
@@ -279,7 +279,7 @@ class GroupSummaryUsersRoleServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(GroupSummaryUsersRoleServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
@@ -317,7 +317,7 @@ class GroupRoomServlet(RestServlet):
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/rooms$")
 
     def __init__(self, hs):
-        super(GroupRoomServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
@@ -343,7 +343,7 @@ class GroupUsersServlet(RestServlet):
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/users$")
 
     def __init__(self, hs):
-        super(GroupUsersServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
@@ -366,7 +366,7 @@ class GroupInvitedUsersServlet(RestServlet):
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/invited_users$")
 
     def __init__(self, hs):
-        super(GroupInvitedUsersServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
@@ -389,7 +389,7 @@ class GroupSettingJoinPolicyServlet(RestServlet):
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/settings/m.join_policy$")
 
     def __init__(self, hs):
-        super(GroupSettingJoinPolicyServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.groups_handler = hs.get_groups_local_handler()
 
@@ -413,7 +413,7 @@ class GroupCreateServlet(RestServlet):
     PATTERNS = client_patterns("/create_group$")
 
     def __init__(self, hs):
-        super(GroupCreateServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
@@ -444,7 +444,7 @@ class GroupAdminRoomsServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(GroupAdminRoomsServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
@@ -481,7 +481,7 @@ class GroupAdminRoomsConfigServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(GroupAdminRoomsConfigServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
@@ -507,7 +507,7 @@ class GroupAdminUsersInviteServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(GroupAdminUsersInviteServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
@@ -536,7 +536,7 @@ class GroupAdminUsersKickServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(GroupAdminUsersKickServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
@@ -560,7 +560,7 @@ class GroupSelfLeaveServlet(RestServlet):
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/leave$")
 
     def __init__(self, hs):
-        super(GroupSelfLeaveServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
@@ -584,7 +584,7 @@ class GroupSelfJoinServlet(RestServlet):
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/join$")
 
     def __init__(self, hs):
-        super(GroupSelfJoinServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
@@ -608,7 +608,7 @@ class GroupSelfAcceptInviteServlet(RestServlet):
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/accept_invite$")
 
     def __init__(self, hs):
-        super(GroupSelfAcceptInviteServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
@@ -632,7 +632,7 @@ class GroupSelfUpdatePublicityServlet(RestServlet):
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/update_publicity$")
 
     def __init__(self, hs):
-        super(GroupSelfUpdatePublicityServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
@@ -655,7 +655,7 @@ class PublicisedGroupsForUserServlet(RestServlet):
     PATTERNS = client_patterns("/publicised_groups/(?P<user_id>[^/]*)$")
 
     def __init__(self, hs):
-        super(PublicisedGroupsForUserServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
@@ -676,7 +676,7 @@ class PublicisedGroupsForUsersServlet(RestServlet):
     PATTERNS = client_patterns("/publicised_groups$")
 
     def __init__(self, hs):
-        super(PublicisedGroupsForUsersServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
@@ -700,7 +700,7 @@ class GroupsForUserServlet(RestServlet):
     PATTERNS = client_patterns("/joined_groups$")
 
     def __init__(self, hs):
-        super(GroupsForUserServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()

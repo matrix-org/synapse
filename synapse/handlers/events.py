@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 class EventStreamHandler(BaseHandler):
     def __init__(self, hs: "HomeServer"):
-        super(EventStreamHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.clock = hs.get_clock()
 
@@ -142,7 +142,7 @@ class EventStreamHandler(BaseHandler):
 
 class EventHandler(BaseHandler):
     def __init__(self, hs: "HomeServer"):
-        super(EventHandler, self).__init__(hs)
+        super().__init__(hs)
         self.storage = hs.get_storage()
 
     async def get_event(

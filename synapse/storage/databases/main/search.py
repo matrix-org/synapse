@@ -89,7 +89,7 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
     EVENT_SEARCH_USE_GIN_POSTGRES_NAME = "event_search_postgres_gin"
 
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(SearchBackgroundUpdateStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         if not hs.config.enable_search:
             return
@@ -342,7 +342,7 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
 
 class SearchStore(SearchBackgroundUpdateStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(SearchStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
     async def search_msgs(self, room_ids, search_term, keys):
         """Performs a full text search over events with given keys.

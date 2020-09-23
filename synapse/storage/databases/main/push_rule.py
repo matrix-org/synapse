@@ -77,7 +77,7 @@ class PushRulesWorkerStore(
     """
 
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(PushRulesWorkerStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         if hs.config.worker.worker_app is None:
             self._push_rules_stream_id_gen = StreamIdGenerator(

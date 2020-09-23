@@ -44,7 +44,7 @@ class BaseProfileHandler(BaseHandler):
     """
 
     def __init__(self, hs):
-        super(BaseProfileHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.federation = hs.get_federation_client()
         hs.get_federation_registry().register_query_handler(
@@ -369,7 +369,7 @@ class MasterProfileHandler(BaseProfileHandler):
     PROFILE_UPDATE_EVERY_MS = 24 * 60 * 60 * 1000
 
     def __init__(self, hs):
-        super(MasterProfileHandler, self).__init__(hs)
+        super().__init__(hs)
 
         assert hs.config.worker_app is None
 

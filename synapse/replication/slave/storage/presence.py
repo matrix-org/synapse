@@ -25,7 +25,7 @@ from ._slaved_id_tracker import SlavedIdTracker
 
 class SlavedPresenceStore(BaseSlavedStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(SlavedPresenceStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
         self._presence_id_gen = SlavedIdTracker(db_conn, "presence_stream", "stream_id")
 
         self._presence_on_startup = self._get_active_presence(db_conn)  # type: ignore

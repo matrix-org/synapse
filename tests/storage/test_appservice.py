@@ -413,7 +413,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
 # required for ApplicationServiceTransactionStoreTestCase tests
 class TestTransactionStore(ApplicationServiceTransactionStore, ApplicationServiceStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(TestTransactionStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
 
 class ApplicationServiceStoreConfigTestCase(unittest.TestCase):

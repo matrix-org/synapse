@@ -27,7 +27,7 @@ class SetPasswordHandler(BaseHandler):
     """Handler which deals with changing user account passwords"""
 
     def __init__(self, hs):
-        super(SetPasswordHandler, self).__init__(hs)
+        super().__init__(hs)
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
         self._password_policy_handler = hs.get_password_policy_handler()

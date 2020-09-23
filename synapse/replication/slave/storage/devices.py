@@ -24,7 +24,7 @@ from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 class SlavedDeviceStore(EndToEndKeyWorkerStore, DeviceWorkerStore, BaseSlavedStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(SlavedDeviceStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self.hs = hs
 

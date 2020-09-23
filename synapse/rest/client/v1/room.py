@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 
 class TransactionRestServlet(RestServlet):
     def __init__(self, hs):
-        super(TransactionRestServlet, self).__init__()
+        super().__init__()
         self.txns = HttpTransactionCache(hs)
 
 
@@ -65,7 +65,7 @@ class RoomCreateRestServlet(TransactionRestServlet):
     # No PATTERN; we have custom dispatch rules here
 
     def __init__(self, hs):
-        super(RoomCreateRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self._room_creation_handler = hs.get_room_creation_handler()
         self.auth = hs.get_auth()
 
@@ -111,7 +111,7 @@ class RoomCreateRestServlet(TransactionRestServlet):
 # TODO: Needs unit testing for generic events
 class RoomStateEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
-        super(RoomStateEventRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self.handlers = hs.get_handlers()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
@@ -229,7 +229,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 # TODO: Needs unit testing for generic events + feedback
 class RoomSendEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
-        super(RoomSendEventRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
 
@@ -280,7 +280,7 @@ class RoomSendEventRestServlet(TransactionRestServlet):
 # TODO: Needs unit testing for room ID + alias joins
 class JoinRoomAliasServlet(TransactionRestServlet):
     def __init__(self, hs):
-        super(JoinRoomAliasServlet, self).__init__(hs)
+        super().__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
@@ -343,7 +343,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
     PATTERNS = client_patterns("/publicRooms$", v1=True)
 
     def __init__(self, hs):
-        super(PublicRoomListRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self.hs = hs
         self.auth = hs.get_auth()
 
@@ -448,7 +448,7 @@ class RoomMemberListRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/members$", v1=True)
 
     def __init__(self, hs):
-        super(RoomMemberListRestServlet, self).__init__()
+        super().__init__()
         self.message_handler = hs.get_message_handler()
         self.auth = hs.get_auth()
 
@@ -499,7 +499,7 @@ class JoinedRoomMemberListRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/joined_members$", v1=True)
 
     def __init__(self, hs):
-        super(JoinedRoomMemberListRestServlet, self).__init__()
+        super().__init__()
         self.message_handler = hs.get_message_handler()
         self.auth = hs.get_auth()
 
@@ -518,7 +518,7 @@ class RoomMessageListRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/messages$", v1=True)
 
     def __init__(self, hs):
-        super(RoomMessageListRestServlet, self).__init__()
+        super().__init__()
         self.pagination_handler = hs.get_pagination_handler()
         self.auth = hs.get_auth()
 
@@ -557,7 +557,7 @@ class RoomStateRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/state$", v1=True)
 
     def __init__(self, hs):
-        super(RoomStateRestServlet, self).__init__()
+        super().__init__()
         self.message_handler = hs.get_message_handler()
         self.auth = hs.get_auth()
 
@@ -577,7 +577,7 @@ class RoomInitialSyncRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/initialSync$", v1=True)
 
     def __init__(self, hs):
-        super(RoomInitialSyncRestServlet, self).__init__()
+        super().__init__()
         self.initial_sync_handler = hs.get_initial_sync_handler()
         self.auth = hs.get_auth()
 
@@ -596,7 +596,7 @@ class RoomEventServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(RoomEventServlet, self).__init__()
+        super().__init__()
         self.clock = hs.get_clock()
         self.event_handler = hs.get_event_handler()
         self._event_serializer = hs.get_event_client_serializer()
@@ -628,7 +628,7 @@ class RoomEventContextServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(RoomEventContextServlet, self).__init__()
+        super().__init__()
         self.clock = hs.get_clock()
         self.room_context_handler = hs.get_room_context_handler()
         self._event_serializer = hs.get_event_client_serializer()
@@ -675,7 +675,7 @@ class RoomEventContextServlet(RestServlet):
 
 class RoomForgetRestServlet(TransactionRestServlet):
     def __init__(self, hs):
-        super(RoomForgetRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
@@ -701,7 +701,7 @@ class RoomForgetRestServlet(TransactionRestServlet):
 # TODO: Needs unit testing
 class RoomMembershipRestServlet(TransactionRestServlet):
     def __init__(self, hs):
-        super(RoomMembershipRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
@@ -792,7 +792,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
 
 class RoomRedactEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
-        super(RoomRedactEventRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self.handlers = hs.get_handlers()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
@@ -841,7 +841,7 @@ class RoomTypingRestServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(RoomTypingRestServlet, self).__init__()
+        super().__init__()
         self.presence_handler = hs.get_presence_handler()
         self.typing_handler = hs.get_typing_handler()
         self.auth = hs.get_auth()
@@ -914,7 +914,7 @@ class SearchRestServlet(RestServlet):
     PATTERNS = client_patterns("/search$", v1=True)
 
     def __init__(self, hs):
-        super(SearchRestServlet, self).__init__()
+        super().__init__()
         self.handlers = hs.get_handlers()
         self.auth = hs.get_auth()
 
@@ -935,7 +935,7 @@ class JoinedRoomsRestServlet(RestServlet):
     PATTERNS = client_patterns("/joined_rooms$", v1=True)
 
     def __init__(self, hs):
-        super(JoinedRoomsRestServlet, self).__init__()
+        super().__init__()
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 

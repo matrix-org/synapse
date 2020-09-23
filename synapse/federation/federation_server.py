@@ -90,7 +90,7 @@ pdu_process_time = Histogram(
 
 class FederationServer(FederationBase):
     def __init__(self, hs):
-        super(FederationServer, self).__init__(hs)
+        super().__init__(hs)
 
         self.auth = hs.get_auth()
         self.handler = hs.get_handlers().federation_handler

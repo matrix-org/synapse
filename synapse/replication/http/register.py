@@ -29,7 +29,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
     PATH_ARGS = ("user_id",)
 
     def __init__(self, hs):
-        super(ReplicationRegisterServlet, self).__init__(hs)
+        super().__init__(hs)
         self.store = hs.get_datastore()
         self.registration_handler = hs.get_registration_handler()
 
@@ -104,7 +104,7 @@ class ReplicationPostRegisterActionsServlet(ReplicationEndpoint):
     PATH_ARGS = ("user_id",)
 
     def __init__(self, hs):
-        super(ReplicationPostRegisterActionsServlet, self).__init__(hs)
+        super().__init__(hs)
         self.store = hs.get_datastore()
         self.registration_handler = hs.get_registration_handler()
 

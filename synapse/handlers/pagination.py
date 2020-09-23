@@ -358,9 +358,9 @@ class PaginationHandler:
                 # if we're going backwards, we might need to backfill. This
                 # requires that we have a topo token.
                 if room_token.topological:
-                    max_topo = room_token.topological
+                    curr_topo = room_token.topological
                 else:
-                    max_topo = await self.store.get_max_topological_token(
+                    curr_topo = await self.store.get_current_topological_token(
                         room_id, room_token.stream
                     )
 
@@ -379,13 +379,13 @@ class PaginationHandler:
                     leave_token = RoomStreamToken.parse(leave_token_str)
                     assert leave_token.topological is not None
 
-                    if leave_token.topological < max_topo:
+                    if leave_token.topological < curr_topo:
                         from_token = from_token.copy_and_replace(
                             "room_key", leave_token
                         )
 
                 await self.hs.get_handlers().federation_handler.maybe_backfill(
-                    room_id, max_topo
+                    room_id, curr_topo, limit=pagin_config.limit,
                 )
 
             to_room_key = None

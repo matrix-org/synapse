@@ -336,7 +336,7 @@ class GroupsServerWorkerHandler:
 
 class GroupsServerHandler(GroupsServerWorkerHandler):
     def __init__(self, hs):
-        super(GroupsServerHandler, self).__init__(hs)
+        super().__init__(hs)
 
         # Ensure attestations get renewed
         hs.get_groups_attestation_renewer()
