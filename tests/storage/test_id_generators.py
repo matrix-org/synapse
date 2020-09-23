@@ -381,6 +381,36 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         id_gen_worker.advance("master", 9)
         self.assertEqual(id_gen_worker.get_positions(), {"master": 9})
 
+    def test_writer_config_change(self):
+        """Test that changing the writer config correctly works.
+        """
+
+        self._insert_row_with_id("first", 3)
+        self._insert_row_with_id("second", 5)
+
+        # Initial config has two writers
+        id_gen = self._create_id_generator("first", writers=["first", "second"])
+        self.assertEqual(id_gen.get_persisted_upto_position(), 3)
+
+        # New config removes one of the configs. Note that if the writer is
+        # removed from config we assume that it has been shut down and has
+        # finished persisting, hence why the persisted upto position is 5.
+        id_gen_2 = self._create_id_generator("second", writers=["second"])
+        self.assertEqual(id_gen_2.get_persisted_upto_position(), 5)
+
+        # This config points to a single, previously unused writer.
+        id_gen_3 = self._create_id_generator("third", writers=["third"])
+        self.assertEqual(id_gen_3.get_persisted_upto_position(), 5)
+
+        # Check that we get a sane next stream ID with this new config.
+
+        async def _get_next_async():
+            async with id_gen_3.get_next() as stream_id:
+                self.assertEqual(stream_id, 6)
+
+        self.get_success(_get_next_async())
+        self.assertEqual(id_gen_3.get_persisted_upto_position(), 6)
+
 
 class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
     """Tests MultiWriterIdGenerator that produce *negative* stream IDs.
