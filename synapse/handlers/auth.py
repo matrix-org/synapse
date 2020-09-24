@@ -239,6 +239,10 @@ class AuthHandler(BaseHandler):
         # cast to tuple for use with str.startswith
         self._whitelisted_sso_clients = tuple(hs.config.sso_client_whitelist)
 
+        # A mapping of user ID to extra attributes to include in the login
+        # response.
+        self._extra_attributes = {}  # type: Dict[str, Dict[str, Any]]
+
     async def validate_user_via_ui_auth(
         self,
         requester: Requester,
@@ -1165,6 +1169,7 @@ class AuthHandler(BaseHandler):
         registered_user_id: str,
         request: SynapseRequest,
         client_redirect_url: str,
+        extra_attributes: Optional[JsonDict] = None,
     ):
         """Having figured out a mxid for this user, complete the HTTP request
 
@@ -1173,6 +1178,8 @@ class AuthHandler(BaseHandler):
             request: The request to complete.
             client_redirect_url: The URL to which to redirect the user at the end of the
                 process.
+            extra_attributes: Extra attributes which will be passed to the client
+                during successful login. Must be JSON serializable.
         """
         # If the account has been deactivated, do not proceed with the login
         # flow.
@@ -1181,19 +1188,26 @@ class AuthHandler(BaseHandler):
             respond_with_html(request, 403, self._sso_account_deactivated_template)
             return
 
-        self._complete_sso_login(registered_user_id, request, client_redirect_url)
+        self._complete_sso_login(
+            registered_user_id, request, client_redirect_url, extra_attributes
+        )
 
     def _complete_sso_login(
         self,
         registered_user_id: str,
         request: SynapseRequest,
         client_redirect_url: str,
+        extra_attributes: Optional[JsonDict] = None,
     ):
         """
         The synchronous portion of complete_sso_login.
 
         This exists purely for backwards compatibility of synapse.module_api.ModuleApi.
         """
+        # Store any extra attributes which will be passed in the login response.
+        if extra_attributes:
+            self._extra_attributes[registered_user_id] = extra_attributes
+
         # Create a login token
         login_token = self.macaroon_gen.generate_short_term_login_token(
             registered_user_id
@@ -1225,6 +1239,20 @@ class AuthHandler(BaseHandler):
             server_name=self._server_name,
         )
         respond_with_html(request, 200, html)
+
+    async def _sso_login_callback(self, login_result: JsonDict) -> None:
+        """
+        A login callback which might add additional attributes to the login response.
+
+        Args:
+            login_result: The data to be sent to the client. Includes the user
+                ID and access token.
+        """
+        extra_attributes = self._extra_attributes.get(login_result["user_id"])
+        if extra_attributes:
+            login_result.update(
+                (("extra_attributes", extra_attributes.extra_attributes),)
+            )
 
     @staticmethod
     def add_query_param_to_url(url: str, param_name: str, param: Any):

@@ -87,6 +87,13 @@ class TestMappingProvider(OidcMappingProvider):
     async def map_user_attributes(self, userinfo, token):
         return {"localpart": userinfo["username"], "display_name": None}
 
+    # Do not include get_extra_attributes to test backwards compatibility paths.
+
+
+class TestMappingProviderExtra(TestMappingProvider):
+    async def get_extra_attributes(self, userinfo, token):
+        return {"phone": userinfo["phone"]}
+
 
 def simple_async_mock(return_value=None, raises=None):
     # AsyncMock is not available in python3.5, this mimics part of its behaviour
@@ -377,7 +384,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "sub": "foo",
             "preferred_username": "bar",
         }
-        user_id = UserID("foo", "domain.org")
+        user_id = "@foo:domain.org"
         self.handler._render_error = Mock(return_value=None)
         self.handler._exchange_code = simple_async_mock(return_value=token)
         self.handler._parse_id_token = simple_async_mock(return_value=userinfo)
@@ -413,7 +420,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
 
         self.handler._auth_handler.complete_sso_login.assert_called_once_with(
-            user_id, request, client_redirect_url,
+            user_id, request, client_redirect_url, None,
         )
         self.handler._exchange_code.assert_called_once_with(code)
         self.handler._parse_id_token.assert_called_once_with(token, nonce=nonce)
@@ -447,7 +454,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
 
         self.handler._auth_handler.complete_sso_login.assert_called_once_with(
-            user_id, request, client_redirect_url,
+            user_id, request, client_redirect_url, None,
         )
         self.handler._exchange_code.assert_called_once_with(code)
         self.handler._parse_id_token.assert_not_called()
@@ -590,6 +597,65 @@ class OidcHandlerTestCase(HomeserverTestCase):
         with self.assertRaises(OidcError) as exc:
             yield defer.ensureDeferred(self.handler._exchange_code(code))
         self.assertEqual(exc.exception.error, "some_error")
+
+    @defer.inlineCallbacks
+    def test_extra_attributes(self):
+        """
+        Login while using a mapping provider that implements get_extra_attributes.
+        """
+        # We cannot just override the configuration since the mapping provider
+        # gets stored on the handler.
+        self.handler._user_mapping_provider = TestMappingProviderExtra(
+            self.hs.config.oidc_user_mapping_provider_config
+        )
+
+        token = {
+            "type": "bearer",
+            "id_token": "id_token",
+            "access_token": "access_token",
+        }
+        userinfo = {
+            "sub": "foo",
+            "phone": "1234567",
+        }
+        user_id = "@foo:domain.org"
+        self.handler._render_error = Mock(return_value=None)
+        self.handler._exchange_code = simple_async_mock(return_value=token)
+        self.handler._parse_id_token = simple_async_mock(return_value=userinfo)
+        self.handler._fetch_userinfo = simple_async_mock(return_value=userinfo)
+        self.handler._map_userinfo_to_user = simple_async_mock(return_value=user_id)
+        self.handler._auth_handler.complete_sso_login = simple_async_mock()
+        request = Mock(
+            spec=["args", "getCookie", "addCookie", "requestHeaders", "getClientIP"]
+        )
+
+        code = "code"
+        state = "state"
+        nonce = "nonce"
+        client_redirect_url = "http://client/redirect"
+        user_agent = "Browser"
+        ip_address = "10.0.0.1"
+        session = self.handler._generate_oidc_session_token(
+            state=state,
+            nonce=nonce,
+            client_redirect_url=client_redirect_url,
+            ui_auth_session_id=None,
+        )
+        request.getCookie.return_value = session
+
+        request.args = {}
+        request.args[b"code"] = [code.encode("utf-8")]
+        request.args[b"state"] = [state.encode("utf-8")]
+
+        request.requestHeaders = Mock(spec=["getRawHeaders"])
+        request.requestHeaders.getRawHeaders.return_value = [user_agent.encode("ascii")]
+        request.getClientIP.return_value = ip_address
+
+        yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
+
+        self.handler._auth_handler.complete_sso_login.assert_called_once_with(
+            user_id, request, client_redirect_url, {"phone": "1234567"},
+        )
 
     def test_map_userinfo_to_user(self):
         """Ensure that mapping the userinfo returned from a provider to an MXID works properly."""

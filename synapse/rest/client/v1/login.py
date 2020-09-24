@@ -284,9 +284,7 @@ class LoginRestServlet(RestServlet):
         self,
         user_id: str,
         login_submission: JsonDict,
-        callback: Optional[
-            Callable[[Dict[str, str]], Awaitable[Dict[str, str]]]
-        ] = None,
+        callback: Optional[Callable[[Dict[str, str]], Awaitable[None]]] = None,
         create_non_existent_users: bool = False,
     ) -> Dict[str, str]:
         """Called when we've successfully authed the user and now need to
@@ -339,14 +337,24 @@ class LoginRestServlet(RestServlet):
         return result
 
     async def _do_token_login(self, login_submission: JsonDict) -> Dict[str, str]:
+        """
+        Handle the final stage of SSO login.
+
+        Args:
+             login_submission: The JSON request body.
+
+        Returns:
+            The body of the JSON response.
+        """
         token = login_submission["token"]
         auth_handler = self.auth_handler
         user_id = await auth_handler.validate_short_term_login_token_and_get_user_id(
             token
         )
 
-        result = await self._complete_login(user_id, login_submission)
-        return result
+        return await self._complete_login(
+            user_id, login_submission, self.auth_handler._sso_login_callback
+        )
 
     async def _do_jwt_login(self, login_submission: JsonDict) -> Dict[str, str]:
         token = login_submission.get("token", None)

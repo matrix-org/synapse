@@ -204,6 +204,14 @@ class OIDCConfig(Config):
               # If unset, no displayname will be set.
               #
               #display_name_template: "{{{{ user.given_name }}}} {{{{ user.last_name }}}}"
+
+              # Jinja2 templates for extra attributes to send back to the client during
+              # login.
+              #
+              # Note that these are non-standard and clients will ignore them without modifications.
+              #
+              #extra_attributes:
+                #birthdate: "{{ user.birthdate }}"
         """.format(
             mapping_provider=DEFAULT_USER_MAPPING_PROVIDER
         )

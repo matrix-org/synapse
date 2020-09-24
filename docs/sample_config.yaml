@@ -1735,6 +1735,14 @@ oidc_config:
       #
       #display_name_template: "{{ user.given_name }} {{ user.last_name }}"
 
+      # Jinja2 templates for extra attributes to send back to the client during
+      # login.
+      #
+      # Note that these are non-standard and clients will ignore them without modifications.
+      #
+      #extra_attributes:
+        #birthdate: "{ user.birthdate }"
+
 
 
 # Enable CAS for registration and login.
