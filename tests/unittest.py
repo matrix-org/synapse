@@ -23,7 +23,7 @@ import logging
 import time
 from typing import Optional, Tuple, Type, TypeVar, Union
 
-from mock import Mock
+from mock import Mock, patch
 
 from canonicaljson import json
 
@@ -167,6 +167,19 @@ def INFO(target):
     Can apply to either a TestCase or an individual test method."""
     target.loglevel = logging.INFO
     return target
+
+
+def logcontext_clean(target):
+    """A decorator which marks the TestCase or method as 'logcontext_clean'
+
+    ... ie, any logcontext errors should cause a test failure
+    """
+
+    def logcontext_error(msg):
+        raise AssertionError("logcontext error: %s" % (msg))
+
+    patcher = patch("synapse.logging.context.logcontext_error", new=logcontext_error)
+    return patcher(target)
 
 
 class HomeserverTestCase(TestCase):
