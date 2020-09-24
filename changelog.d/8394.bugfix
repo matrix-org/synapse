@@ -1,0 +1,1 @@
+Fix URLs being accidentally escaped in Jinja2 templates. Broke in v1.20.0.
