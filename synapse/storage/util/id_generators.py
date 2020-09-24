@@ -604,7 +604,7 @@ class _MultiWriterCtxManager:
         # bother, as nothing will read it).
         #
         # We only do this on the success path so that the persisted current
-        # position points to a persited row with the correct instance name.
+        # position points to a persisted row with the correct instance name.
         if self.id_gen._writers:
             await self.id_gen._db.runInteraction(
                 "MultiWriterIdGenerator._update_table",
