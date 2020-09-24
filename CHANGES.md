@@ -1,3 +1,13 @@
+Synapse 1.20.1 (2020-09-24)
+===========================
+
+Bugfixes
+--------
+
+- Fix a bug introduced in v1.20.0 which caused the `synapse_port_db` script to fail. ([\#8386](https://github.com/matrix-org/synapse/issues/8386))
+- Fix a bug introduced in v1.20.0 which caused variables to be incorrectly escaped in Jinja2 templates. ([\#8394](https://github.com/matrix-org/synapse/issues/8394))
+
+
 Synapse 1.20.0 (2020-09-22)
 ===========================
 
