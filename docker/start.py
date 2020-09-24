@@ -210,7 +210,7 @@ def main(args, environ):
     if "-m" not in args:
         args = ["-m", synapse_worker] + args
 
-    if not filter(lambda p: p.startswith("--config-path"), args):
+    if not any(p.startswith("--config-path") for p in args):
         config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
         config_path = environ.get(
             "SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml"
