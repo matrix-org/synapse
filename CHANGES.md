@@ -5,7 +5,7 @@ Bugfixes
 --------
 
 - Fix a bug introduced in v1.20.0 which caused the `synapse_port_db` script to fail. ([\#8386](https://github.com/matrix-org/synapse/issues/8386))
-- Fix URLs being accidentally escaped in Jinja2 templates. Broke in v1.20.0. ([\#8394](https://github.com/matrix-org/synapse/issues/8394))
+- Fix a bug introduced in v1.20.0 which caused URLs to be accidentally escaped in Jinja2 templates. ([\#8394](https://github.com/matrix-org/synapse/issues/8394))
 
 
 Synapse 1.20.0 (2020-09-22)
