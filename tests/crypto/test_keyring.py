@@ -34,7 +34,6 @@ from synapse.crypto.keyring import (
 )
 from synapse.logging.context import (
     LoggingContext,
-    PreserveLoggingContext,
     current_context,
     make_deferred_yieldable,
 )
@@ -88,7 +87,9 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         first_lookup_deferred = Deferred()
 
         async def first_lookup_fetch(keys_to_fetch):
+            self.assertEquals(current_context().request, "context_11")
             self.assertEqual(keys_to_fetch, {"server10": {get_key_id(key1): 0}})
+
             await make_deferred_yieldable(first_lookup_deferred)
             return {
                 "server10": {
@@ -119,10 +120,6 @@ class KeyringTestCase(unittest.HomeserverTestCase):
 
                 await make_deferred_yieldable(res_deferreds[0])
 
-                # let verify_json_objects_for_server finish its work before we kill the
-                # logcontext
-                await self.clock.sleep(0)
-
         d0 = ensureDeferred(first_lookup())
 
         # wait a tick for it to send the request to the fetcher
@@ -133,6 +130,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         # should block rather than start a second call
 
         async def second_lookup_fetch(keys_to_fetch):
+            self.assertEquals(current_context().request, "context_12")
             return {
                 "server10": {
                     get_key_id(key1): FetchKeyResult(get_verify_key(key1), 100)
@@ -154,10 +152,6 @@ class KeyringTestCase(unittest.HomeserverTestCase):
                 second_lookup_state[0] = 1
                 await make_deferred_yieldable(res_deferreds_2[0])
                 second_lookup_state[0] = 2
-
-                # let verify_json_objects_for_server finish its work before we kill the
-                # logcontext
-                await self.clock.sleep(0)
 
         d2 = ensureDeferred(second_lookup())
 
