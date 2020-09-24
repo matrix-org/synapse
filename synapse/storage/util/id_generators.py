@@ -281,8 +281,6 @@ class MultiWriterIdGenerator:
                 for instance, stream_id in cur
                 if instance in self._writers
             }
-        else:
-            self._current_positions = {}
 
         # We set the `_persisted_upto_position` to be the minimum of all current
         # positions. If empty we use the max stream ID from the DB table.
