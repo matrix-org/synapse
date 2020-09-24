@@ -389,8 +389,6 @@ def setup(config_options):
     except UpgradeDatabaseException as e:
         quit_with_error("Failed to upgrade database: %s" % (e,))
 
-    hs.setup_master()
-
     async def do_acme() -> bool:
         """
         Reprovision an ACME certificate, if it's required.
