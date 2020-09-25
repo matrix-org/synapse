@@ -41,7 +41,12 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
         """
 
         def _count_users(txn):
-            sql = "SELECT COALESCE(count(*), 0) FROM monthly_active_users"
+            # Ensure we only fetch native users
+            sql = """
+                SELECT COALESCE(count(*), 0)
+                FROM monthly_active_users
+                INNER JOIN users ON monthly_active_users.user_id=users.name AND appservice_id IS NULL;
+            """
             txn.execute(sql)
             (count,) = txn.fetchone()
             return count
