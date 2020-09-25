@@ -22,7 +22,7 @@ from typing import Dict, List, Tuple
 
 from prometheus_client import Counter, Gauge
 
-from synapse.api.errors import HttpResponseException, RequestSendFailed, SynapseError
+from synapse.api.errors import HttpResponseException, SynapseError
 from synapse.http import RequestTimedOutError
 from synapse.logging.opentracing import inject_active_span_byte_dict, trace
 from synapse.util.caches.response_cache import ResponseCache
