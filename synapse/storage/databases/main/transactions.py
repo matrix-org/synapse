@@ -50,8 +50,7 @@ class TransactionStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
 
-        if hs.config.run_background_tasks:
-            self._clock.looping_call(self._start_cleanup_transactions, 30 * 60 * 1000)
+        self._clock.looping_call(self._start_cleanup_transactions, 30 * 60 * 1000)
 
         self._destination_retry_cache = ExpiringCache(
             cache_name="get_destination_retry_timings",

@@ -52,8 +52,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
                 "read_forward_extremities", self._read_forward_extremities
             )
 
-        if hs.config.run_background_tasks:
-            hs.get_clock().looping_call(read_forward_extremities, 60 * 60 * 1000)
+        hs.get_clock().looping_call(read_forward_extremities, 60 * 60 * 1000)
 
     async def _read_forward_extremities(self):
         def fetch(txn):

@@ -914,8 +914,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
                 self.cull_expired_threepid_validation_tokens,
             )
 
-        if hs.config.run_background_tasks:
-            hs.get_clock().looping_call(start_cull, THIRTY_MINUTES_IN_MS)
+        hs.get_clock().looping_call(start_cull, THIRTY_MINUTES_IN_MS)
 
     async def add_access_token_to_user(
         self,

@@ -372,7 +372,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
             "before", "shutdown", self._update_client_ips_batch
         )
 
-        if hs.config.run_background_tasks and self.user_ips_max_age:
+        if self.user_ips_max_age:
             self._clock.looping_call(self._prune_old_user_ips, 5 * 1000)
 
     async def insert_client_ip(
