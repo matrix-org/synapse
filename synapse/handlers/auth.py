@@ -137,6 +137,15 @@ def login_id_phone_to_thirdparty(identifier: JsonDict) -> Dict[str, str]:
     }
 
 
+@attr.s(slots=True)
+class SsoLoginExtraAttributes:
+    """Data we track about SAML2 sessions"""
+
+    # time the session was created, in milliseconds
+    creation_time = attr.ib(type=int)
+    extra_attributes = attr.ib(type=JsonDict)
+
+
 class AuthHandler(BaseHandler):
     SESSION_EXPIRE_MS = 48 * 60 * 60 * 1000
 
@@ -241,7 +250,7 @@ class AuthHandler(BaseHandler):
 
         # A mapping of user ID to extra attributes to include in the login
         # response.
-        self._extra_attributes = {}  # type: Dict[str, Dict[str, Any]]
+        self._extra_attributes = {}  # type: Dict[str, SsoLoginExtraAttributes]
 
     async def validate_user_via_ui_auth(
         self,
@@ -1205,8 +1214,12 @@ class AuthHandler(BaseHandler):
         This exists purely for backwards compatibility of synapse.module_api.ModuleApi.
         """
         # Store any extra attributes which will be passed in the login response.
+        # Note that this is per-user so it may overwrite a previous value, this
+        # is considered OK since the newest SSO attributes should be most valid.
         if extra_attributes:
-            self._extra_attributes[registered_user_id] = extra_attributes
+            self._extra_attributes[registered_user_id] = SsoLoginExtraAttributes(
+                self._clock.time_msec(), extra_attributes,
+            )
 
         # Create a login token
         login_token = self.macaroon_gen.generate_short_term_login_token(
@@ -1248,11 +1261,30 @@ class AuthHandler(BaseHandler):
             login_result: The data to be sent to the client. Includes the user
                 ID and access token.
         """
+        # Expire attributes before processing. Note that there shouldn't be any
+        # valid logins that still have extra attributes.
+        self._expire_sso_extra_attributes()
+
         extra_attributes = self._extra_attributes.get(login_result["user_id"])
         if extra_attributes:
             login_result.update(
                 (("extra_attributes", extra_attributes.extra_attributes),)
             )
+
+    def _expire_sso_extra_attributes(self) -> None:
+        """
+        Iterate through the mapping of user IDs to extra attributes and remove any that are no longer valid.
+        """
+        # TODO This should match the amount of time the macaroon is valid for.
+        LOGIN_TOKEN_EXPIRATION_TIME = 2 * 60 * 1000
+        expire_before = self._clock.time_msec() - LOGIN_TOKEN_EXPIRATION_TIME
+        to_expire = set()
+        for user_id, data in self._extra_attributes.items():
+            if data.creation_time < expire_before:
+                to_expire.add(user_id)
+        for user_id in to_expire:
+            logger.debug("Expiring extra attributes for user %s", user_id)
+            del self._extra_attributes[user_id]
 
     @staticmethod
     def add_query_param_to_url(url: str, param_name: str, param: Any):
