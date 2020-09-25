@@ -306,8 +306,9 @@ stream_writers:
 #### Background tasks
 
 There is also *experimental* support for moving background tasks to a separate
-worker. These are either run periodically or started via replication and which
-tasks are run depend on your Synapse configuration (e.g. if stats is enabled).
+worker. Background tasks are run periodically or started via replication. Exactly
+which tasks are configured to run depends on your Synapse configuration (e.g. if
+stats is enabled).
 
 To enable this, the worker must have a `worker_name` and be listed in the
 `instance_map` config. For example, to move background tasks to a dedicated
