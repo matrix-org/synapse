@@ -287,8 +287,12 @@ class MultiWriterIdGenerator:
         min_stream_id = min(self._current_positions.values(), default=None)
 
         if min_stream_id is None:
+            # We add a GREATEST here to ensure that the result is always
+            # positive. (This can be a problem for e.g. backfill streams where
+            # the server has never backfilled).
             sql = """
-                SELECT COALESCE(%(agg)s(%(id)s), 1) FROM %(table)s
+                SELECT GREATEST(COALESCE(%(agg)s(%(id)s), 1), 1)
+                FROM %(table)s
             """ % {
                 "id": id_column,
                 "table": table,
