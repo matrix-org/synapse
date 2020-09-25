@@ -70,7 +70,7 @@ class KnockServlet(TransactionRestServlet):
             content=event_content,
         )
 
-        return 200, {}
+        return 200, {"room_id": room_id}
 
     def on_PUT(self, request: Request, room_id: str, txn_id: str):
         set_tag("txn_id", txn_id)
@@ -131,7 +131,7 @@ class KnockRoomAliasServlet(TransactionRestServlet):
             content=event_content,
         )
 
-        return 200, {}
+        return 200, {"room_id": room_id}
 
     def on_PUT(self, request: Request, room_identifier: str, txn_id: str):
         set_tag("txn_id", txn_id)
