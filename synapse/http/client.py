@@ -52,11 +52,7 @@ from twisted.web.http_headers import Headers
 from twisted.web.iweb import IResponse
 
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
-from synapse.http import (
-    QuieterFileBodyProducer,
-    cancelled_to_request_timed_out_error,
-    redact_uri,
-)
+from synapse.http import QuieterFileBodyProducer, RequestTimedOutError, redact_uri
 from synapse.http.proxyagent import ProxyAgent
 from synapse.logging.context import make_deferred_yieldable
 from synapse.logging.opentracing import set_tag, start_active_span, tags
@@ -362,15 +358,17 @@ class SimpleHttpClient:
                     data=body_producer,
                     headers=headers,
                     **self._extra_treq_args
-                )
+                )  # type: defer.Deferred
+
                 # we use our own timeout mechanism rather than treq's as a workaround
                 # for https://twistedmatrix.com/trac/ticket/9534.
                 request_deferred = timeout_deferred(
-                    request_deferred,
-                    60,
-                    self.hs.get_reactor(),
-                    cancelled_to_request_timed_out_error,
+                    request_deferred, 60, self.hs.get_reactor(),
                 )
+
+                # turn timeouts into RequestTimedOutErrors
+                request_deferred.addErrback(_timeout_to_request_timed_out_error)
+
                 response = await make_deferred_yieldable(request_deferred)
 
                 incoming_responses_counter.labels(method, response.code).inc()
@@ -682,6 +680,13 @@ class SimpleHttpClient:
             response.request.absoluteURI.decode("ascii"),
             response.code,
         )
+
+
+def _timeout_to_request_timed_out_error(f: Failure):
+    if f.check(defer.TimeoutError):
+        raise RequestTimedOutError()
+
+    return f
 
 
 # XXX: FIXME: This is horribly copy-pasted from matrixfederationclient.

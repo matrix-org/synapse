@@ -16,8 +16,6 @@
 import re
 
 from twisted.internet import task
-from twisted.internet.defer import CancelledError
-from twisted.python import failure
 from twisted.web.client import FileBodyProducer
 
 from synapse.api.errors import SynapseError
@@ -28,17 +26,6 @@ class RequestTimedOutError(SynapseError):
 
     def __init__(self):
         super().__init__(504, "Timed out")
-
-
-def cancelled_to_request_timed_out_error(value, timeout):
-    """Turns CancelledErrors into RequestTimedOutErrors.
-
-    For use with async.add_timeout_to_deferred
-    """
-    if isinstance(value, failure.Failure):
-        value.trap(CancelledError)
-        raise RequestTimedOutError()
-    return value
 
 
 ACCESS_TOKEN_RE = re.compile(r"(\?.*access(_|%5[Ff])token=)[^&]*(.*)$")
