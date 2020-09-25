@@ -837,7 +837,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         self._clock.looping_call(self._prune_old_outbound_device_pokes, 60 * 60 * 1000)
 
     async def store_device(
-        self, user_id: str, device_id: str, initial_device_display_name: str
+        self, user_id: str, device_id: str, initial_device_display_name: Optional[str]
     ) -> bool:
         """Ensure the given device is known; add it to the store if not
 
