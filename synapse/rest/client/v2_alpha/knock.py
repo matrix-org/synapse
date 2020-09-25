@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2020 Sorunome
+# Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,14 +13,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
+from typing import TYPE_CHECKING, List, Optional, Tuple
+
+from twisted.web.server import Request
 
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.logging.opentracing import set_tag
 from synapse.rest.client.transactions import HttpTransactionCache
-from synapse.types import RoomAlias, RoomID
+from synapse.types import JsonDict, RoomAlias, RoomID
+
+if TYPE_CHECKING:
+    from synapse.app.homeserver import HomeServer
 
 from ._base import client_patterns
 
@@ -27,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 class TransactionRestServlet(RestServlet):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super(TransactionRestServlet, self).__init__()
         self.txns = HttpTransactionCache(hs)
 
@@ -39,12 +45,14 @@ class KnockServlet(TransactionRestServlet):
 
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/knock")
 
-    def __init__(self, hs):
-        super(KnockServlet, self).__init__(hs)
+    def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
-    async def on_POST(self, request, room_id, txn_id=None):
+    async def on_POST(
+        self, request: Request, room_id: str, txn_id: Optional[str] = None
+    ):
         requester = await self.auth.get_user_by_req(request)
 
         content = parse_json_object_from_request(request)
@@ -64,7 +72,7 @@ class KnockServlet(TransactionRestServlet):
 
         return 200, {}
 
-    def on_PUT(self, request, room_id, txn_id):
+    def on_PUT(self, request: Request, room_id: str, txn_id: str):
         set_tag("txn_id", txn_id)
 
         return self.txns.fetch_or_execute_request(
@@ -79,12 +87,14 @@ class KnockRoomAliasServlet(TransactionRestServlet):
 
     PATTERNS = client_patterns("/knock/(?P<room_identifier>[^/]*)")
 
-    def __init__(self, hs):
-        super(KnockRoomAliasServlet, self).__init__(hs)
+    def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
-    async def on_POST(self, request, room_identifier, txn_id=None):
+    async def on_POST(
+        self, request: Request, room_identifier: str, txn_id: Optional[str] = None,
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
         content = parse_json_object_from_request(request)
@@ -97,14 +107,14 @@ class KnockRoomAliasServlet(TransactionRestServlet):
             try:
                 remote_room_hosts = [
                     x.decode("ascii") for x in request.args[b"server_name"]
-                ]
+                ]  # type: Optional[List[str]]
             except Exception:
                 remote_room_hosts = None
         elif RoomAlias.is_valid(room_identifier):
             handler = self.room_member_handler
             room_alias = RoomAlias.from_string(room_identifier)
-            room_id, remote_room_hosts = await handler.lookup_room_alias(room_alias)
-            room_id = room_id.to_string()
+            room_id_obj, remote_room_hosts = await handler.lookup_room_alias(room_alias)
+            room_id = room_id_obj.to_string()
         else:
             raise SynapseError(
                 400, "%s was not legal room ID or room alias" % (room_identifier,)
@@ -123,7 +133,7 @@ class KnockRoomAliasServlet(TransactionRestServlet):
 
         return 200, {}
 
-    def on_PUT(self, request, room_identifier, txn_id):
+    def on_PUT(self, request: Request, room_identifier: str, txn_id: str):
         set_tag("txn_id", txn_id)
 
         return self.txns.fetch_or_execute_request(

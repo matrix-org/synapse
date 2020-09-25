@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
+# Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -78,6 +79,20 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
             content=content,
         )
         return ret["event_id"], ret["stream_id"]
+
+    async def _remote_knock(
+        self, remote_room_hosts: List[str], room_id: str, user: UserID, content: dict,
+    ) -> Tuple[str, int]:
+        """Sends a knock to a room.
+
+        Implements RoomMemberHandler._remote_knock
+        """
+        return await self._remote_knock(
+            remote_room_hosts=remote_room_hosts,
+            room_id=room_id,
+            user=user,
+            content=content,
+        )
 
     async def _user_left_room(self, target: UserID, room_id: str) -> None:
         """Implements RoomMemberHandler._user_left_room

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2019-2020 The Matrix.org Foundation C.I.C.
 # Copyright 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -1382,31 +1382,53 @@ class FederationHandler(BaseHandler):
         return True
 
     @log_function
-    async def do_knock(self, target_hosts, room_id, knockee, content):
-        """ Sends the knock to the remote server.
+    async def do_knock(
+        self, target_hosts: List[str], room_id: str, knockee: str, content: JsonDict,
+    ) -> Tuple[str, int]:
+        """Sends the knock to the remote server.
 
-        This first triggers a /make_knock/ request that returns a partial
+        This first triggers a /make_knock request that returns a partial
         event that we can fill out and sign. This is then sent to the
-        remote server via /send_knock/.
+        remote server via /send_knock.
 
-        Knockees must be signed by the knockee's server before distributing.
+        Knock events must be signed by the knockee's server before distributing.
+
+        Args:
+            target_hosts: A list of hosts that we want to try knocking through.
+            room_id: The ID of the room to knock on.
+            knockee: The ID of the user who is knocking.
+            content: The content of the knock event.
+
+        Returns:
+            A tuple of (event ID, stream ID).
+
+        Raises:
+            SynapseError: If the chosen remote server returns a 3xx/4xx code.
+            RuntimeError: If no servers were reachable.
         """
-        logger.debug("Knocking %s to %s", knockee, room_id)
+        logger.debug("Knocking on room %s on behalf of user %s", room_id, knockee)
 
+        # Ask the remote server to create a valid knock event for us. Once received,
+        # we sign the event
         origin, event, event_format_version = await self._make_and_verify_event(
             target_hosts, room_id, knockee, "knock", content,
         )
 
-        # Try the host that we successfully called /make_knock/ on first for
-        # the /send_knock/ request.
+        # Initially try the host that we successfully called /make_knock on
         try:
             target_hosts.remove(origin)
             target_hosts.insert(0, origin)
         except ValueError:
             pass
 
+        # Send the signed event back to the room
         await self.federation_client.send_knock(target_hosts, event)
-        return event
+
+        context = await self.state_handler.compute_event_context(event)
+        stream_id = await self.persist_events_and_notify(
+            event.room_id, [(event, context)]
+        )
+        return event.event_id, stream_id
 
     async def _handle_queued_pdus(self, room_queue):
         """Process PDUs which got queued up while we were busy send_joining.

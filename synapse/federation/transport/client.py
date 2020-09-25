@@ -2,6 +2,7 @@
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 # Copyright 2020 Sorunome
+# Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,6 +28,7 @@ from synapse.api.urls import (
     FEDERATION_V2_PREFIX,
 )
 from synapse.logging.utils import log_function
+from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
 
@@ -295,14 +297,14 @@ class TransportLayerClient:
         return response
 
     @log_function
-    async def send_knock_v1(self, destination, room_id, event_id, content):
+    async def send_knock_v1(
+        self, destination: str, room_id: str, event_id: str, content: JsonDict,
+    ):
         path = _create_v1_path("/send_knock/%s/%s", room_id, event_id)
 
-        response = await self.client.put_json(
+        return await self.client.put_json(
             destination=destination, path=path, data=content
         )
-
-        return response
 
     @log_function
     async def send_invite_v1(self, destination, room_id, event_id, content):

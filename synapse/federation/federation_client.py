@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyrignt 2020 Sorunome
+# Copyrignt 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -880,47 +881,50 @@ class FederationClient(FederationBase):
         # content.
         return resp[1]
 
-    def send_knock(self, destinations, pdu):
-        """Sends a knock event to one of a list of homeservers.
+    async def send_knock(self, destinations: List[str], pdu: EventBase) -> None:
+        """Attempts to send a knock event to given a list of servers. Iterates
+        through the list until one attempt succeeds.
 
-        Doing so will cause the remote server to add teh event to the graph,
+        Doing so will cause the remote server to add the event to the graph,
         and send the event out to the rest of the federation.
 
         Args:
-            destinations (str): Candidate homeservers which are probably participating in the room.
-            pdu (BaseEvent): event to be sent
+            destinations: A list of candidate homeservers which are likely to be
+                participating in the room.
+            pdu: The event to be sent.
 
-        Return:
-            Deferred: resolves to None.
-
-            Fails with a ``SynapseError`` if the chosen remote server
-            returns a 300/400 code.
-
-            Fails with a ``RuntimeError`` if no servers were reachable.
+        Raises:
+            SynapseError: If the chosen remote server returns a 3xx/4xx code.
+            RuntimeError: If no servers were reachable.
         """
 
-        @defer.inlineCallbacks
-        def send_request(destination):
-            content = yield self._do_send_knock(destination, pdu)
-
+        async def send_request(destination: str) -> None:
+            content = await self._do_send_knock(destination, pdu)
             logger.debug("Got content: %s", content)
-            return None
 
-        return self._try_destination_list("send_knock", destinations, send_request)
+        return await self._try_destination_list(
+            "send_knock", destinations, send_request
+        )
 
-    @defer.inlineCallbacks
-    def _do_send_knock(self, destination, pdu):
+    async def _do_send_knock(self, destination: str, pdu: EventBase) -> JsonDict:
+        """Send a knock event to a remote homeserver.
+
+        Args:
+            destination: The homeserver to send to.
+            pdu: The event to send.
+
+        Returns:
+            The response from the remote homeserver.
+        """
         time_now = self._clock.time_msec()
 
         # Only v1 exists!
-        content = yield self.transport_layer.send_knock_v1(
+        return await self.transport_layer.send_knock_v1(
             destination=destination,
             room_id=pdu.room_id,
             event_id=pdu.event_id,
             content=pdu.get_pdu_json(time_now),
         )
-
-        return content
 
     def get_public_rooms(
         self,
