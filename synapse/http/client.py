@@ -38,7 +38,7 @@ from zope.interface import implementer, provider
 
 from OpenSSL import SSL
 from OpenSSL.SSL import VERIFY_NONE
-from twisted.internet import defer, protocol, ssl
+from twisted.internet import defer, error as twisted_error, protocol, ssl
 from twisted.internet.interfaces import (
     IReactorPluggableNameResolver,
     IResolutionReceiver,
@@ -328,8 +328,6 @@ class SimpleHttpClient:
             RequestTimedOutError if the request times out before the headers are read
 
         """
-        # A small wrapper around self.agent.request() so we can easily attach
-        # counters to it
         outgoing_requests_counter.labels(method).inc()
 
         # log request but strip `access_token` (AS requests for example include this)
@@ -408,7 +406,7 @@ class SimpleHttpClient:
             parsed json
 
         Raises:
-            RequestTimedOutException: if there is a timeout before the response headers
+            RequestTimedOutError: if there is a timeout before the response headers
                are received. Note there is currently no timeout on reading the response
                body.
 
@@ -459,7 +457,7 @@ class SimpleHttpClient:
             parsed json
 
         Raises:
-            RequestTimedOutException: if there is a timeout before the response headers
+            RequestTimedOutError: if there is a timeout before the response headers
                are received. Note there is currently no timeout on reading the response
                body.
 
@@ -504,7 +502,7 @@ class SimpleHttpClient:
         Returns:
             Succeeds when we get a 2xx HTTP response, with the HTTP body as JSON.
         Raises:
-            RequestTimedOutException: if there is a timeout before the response headers
+            RequestTimedOutError: if there is a timeout before the response headers
                are received. Note there is currently no timeout on reading the response
                body.
 
@@ -536,7 +534,7 @@ class SimpleHttpClient:
         Returns:
             Succeeds when we get a 2xx HTTP response, with the HTTP body as JSON.
         Raises:
-             RequestTimedOutException: if there is a timeout before the response headers
+             RequestTimedOutError: if there is a timeout before the response headers
                are received. Note there is currently no timeout on reading the response
                body.
 
@@ -584,7 +582,7 @@ class SimpleHttpClient:
             Succeeds when we get a 2xx HTTP response, with the
             HTTP body as bytes.
         Raises:
-            RequestTimedOutException: if there is a timeout before the response headers
+            RequestTimedOutError: if there is a timeout before the response headers
                are received. Note there is currently no timeout on reading the response
                body.
 
@@ -629,7 +627,7 @@ class SimpleHttpClient:
             headers, absolute URI of the response and HTTP response code.
 
         Raises:
-            RequestTimedOutException: if there is a timeout before the response headers
+            RequestTimedOutError: if there is a timeout before the response headers
                are received. Note there is currently no timeout on reading the response
                body.
 
@@ -683,8 +681,13 @@ class SimpleHttpClient:
 
 
 def _timeout_to_request_timed_out_error(f: Failure):
-    if f.check(defer.TimeoutError):
-        raise RequestTimedOutError()
+    if f.check(twisted_error.TimeoutError):
+        # the TCP connection has its own timeout (set by the 'connectTimeout' param
+        # on the Agent), which raises this exception.
+        raise RequestTimedOutError("Timeout connecting to remote server")
+    elif f.check(defer.TimeoutError):
+        # this one means that we hit our overall timeout on the request
+        raise RequestTimedOutError("Timeout waiting for response from remote server")
 
     return f
 

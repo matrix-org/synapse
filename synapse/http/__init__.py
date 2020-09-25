@@ -24,8 +24,8 @@ from synapse.api.errors import SynapseError
 class RequestTimedOutError(SynapseError):
     """Exception representing timeout of an outbound request"""
 
-    def __init__(self):
-        super().__init__(504, "Timed out")
+    def __init__(self, msg):
+        super().__init__(504, msg)
 
 
 ACCESS_TOKEN_RE = re.compile(r"(\?.*access(_|%5[Ff])token=)[^&]*(.*)$")
