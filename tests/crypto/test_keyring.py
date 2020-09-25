@@ -122,8 +122,6 @@ class KeyringTestCase(unittest.HomeserverTestCase):
 
         d0 = ensureDeferred(first_lookup())
 
-        # wait a tick for it to send the request to the fetcher
-        # self.pump()
         mock_fetcher.get_keys.assert_called_once()
 
         # a second request for a server with outstanding requests
