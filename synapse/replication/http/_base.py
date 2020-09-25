@@ -149,7 +149,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         instance_map = hs.config.worker.instance_map
 
         @trace(opname="outgoing_replication_request")
-        @_pending_outgoing_requests.track_inprogress()
+        @_pending_outgoing_requests.labels(cls.NAME).track_inprogress()
         async def send_request(instance_name="master", **kwargs):
             if instance_name == local_instance_name:
                 raise Exception("Trying to send HTTP request to self")
