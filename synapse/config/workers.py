@@ -109,10 +109,12 @@ class WorkerConfig(Config):
             federation_sender_instances
         )
 
-        # A map from instance name to host/port of their HTTP replication endpoint.
+        # A map from instance name to host/port of their HTTP replication endpoint
+        # (or None if there's no HTTP replication endpoint).
         instance_map = config.get("instance_map") or {}
         self.instance_map = {
-            name: InstanceLocationConfig(**c) for name, c in instance_map.items()
+            name: InstanceLocationConfig(**c) if c else None
+            for name, c in instance_map.items()
         }
 
         # Map from type of streams to source, c.f. WriterLocations.

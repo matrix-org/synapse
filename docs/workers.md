@@ -315,9 +315,7 @@ worker, the shared configuration would include:
 
 ```yaml
 instance_map:
-    background_worker:
-        host: localhost
-        port: 8035
+    background_worker: null
 
 run_background_tasks: background_worker
 ```
