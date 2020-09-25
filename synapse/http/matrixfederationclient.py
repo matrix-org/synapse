@@ -706,8 +706,13 @@ class MatrixFederationHttpClient:
             timeout=timeout,
         )
 
+        if timeout is not None:
+            _sec_timeout = timeout / 1000
+        else:
+            _sec_timeout = self.default_timeout
+
         body = await _handle_json_response(
-            self.reactor, self.default_timeout, request, response, start_ms
+            self.reactor, _sec_timeout, request, response, start_ms
         )
 
         return body
@@ -842,8 +847,13 @@ class MatrixFederationHttpClient:
             timeout=timeout,
         )
 
+        if timeout is not None:
+            _sec_timeout = timeout / 1000
+        else:
+            _sec_timeout = self.default_timeout
+
         body = await _handle_json_response(
-            self.reactor, self.default_timeout, request, response, start_ms
+            self.reactor, _sec_timeout, request, response, start_ms
         )
 
         return body
@@ -902,8 +912,13 @@ class MatrixFederationHttpClient:
             ignore_backoff=ignore_backoff,
         )
 
+        if timeout is not None:
+            _sec_timeout = timeout / 1000
+        else:
+            _sec_timeout = self.default_timeout
+
         body = await _handle_json_response(
-            self.reactor, self.default_timeout, request, response, start_ms
+            self.reactor, _sec_timeout, request, response, start_ms
         )
         return body
 
