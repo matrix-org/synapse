@@ -145,6 +145,7 @@ IGNORED_TABLES = {
     # the sessions are transient anyway, so ignore them.
     "ui_auth_sessions",
     "ui_auth_sessions_credentials",
+    "ui_auth_sessions_ips",
 }
 
 
