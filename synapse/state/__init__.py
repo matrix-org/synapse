@@ -449,8 +449,7 @@ class StateHandler:
         state_map = {ev.event_id: ev for st in state_sets for ev in st}
 
         with Measure(self.clock, "state._resolve_events"):
-            new_state = await resolve_events_with_store(
-                self.clock,
+            new_state = await self._state_resolution_handler.resolve_events_with_store(
                 event.room_id,
                 room_version,
                 state_set_ids,
@@ -531,8 +530,7 @@ class StateResolutionHandler:
             state_groups_histogram.observe(len(state_groups_ids))
 
             with Measure(self.clock, "state._resolve_events"):
-                new_state = await resolve_events_with_store(
-                    self.clock,
+                new_state = await self.resolve_events_with_store(
                     room_id,
                     room_version,
                     list(state_groups_ids.values()),
@@ -551,6 +549,51 @@ class StateResolutionHandler:
             self._state_cache[group_names] = cache
 
             return cache
+
+    def resolve_events_with_store(
+        self,
+        room_id: str,
+        room_version: str,
+        state_sets: Sequence[StateMap[str]],
+        event_map: Optional[Dict[str, EventBase]],
+        state_res_store: "StateResolutionStore",
+    ) -> Awaitable[StateMap[str]]:
+        """
+        Args:
+            room_id: the room we are working in
+
+            room_version: Version of the room
+
+            state_sets: List of dicts of (type, state_key) -> event_id,
+                which are the different state groups to resolve.
+
+            event_map:
+                a dict from event_id to event, for any events that we happen to
+                have in flight (eg, those currently being persisted). This will be
+                used as a starting point fof finding the state we need; any missing
+                events will be requested via state_map_factory.
+
+                If None, all events will be fetched via state_res_store.
+
+            state_res_store: a place to fetch events from
+
+        Returns:
+            a map from (type, state_key) to event_id.
+        """
+        v = KNOWN_ROOM_VERSIONS[room_version]
+        if v.state_res == StateResolutionVersions.V1:
+            return v1.resolve_events_with_store(
+                room_id, state_sets, event_map, state_res_store.get_events
+            )
+        else:
+            return v2.resolve_events_with_store(
+                self.clock,
+                room_id,
+                room_version,
+                state_sets,
+                event_map,
+                state_res_store,
+            )
 
 
 def _make_state_cache_entry(
@@ -603,47 +646,6 @@ def _make_state_cache_entry(
     return _StateCacheEntry(
         state=new_state, state_group=None, prev_group=prev_group, delta_ids=delta_ids
     )
-
-
-def resolve_events_with_store(
-    clock: Clock,
-    room_id: str,
-    room_version: str,
-    state_sets: Sequence[StateMap[str]],
-    event_map: Optional[Dict[str, EventBase]],
-    state_res_store: "StateResolutionStore",
-) -> Awaitable[StateMap[str]]:
-    """
-    Args:
-        room_id: the room we are working in
-
-        room_version: Version of the room
-
-        state_sets: List of dicts of (type, state_key) -> event_id,
-            which are the different state groups to resolve.
-
-        event_map:
-            a dict from event_id to event, for any events that we happen to
-            have in flight (eg, those currently being persisted). This will be
-            used as a starting point fof finding the state we need; any missing
-            events will be requested via state_map_factory.
-
-            If None, all events will be fetched via state_res_store.
-
-        state_res_store: a place to fetch events from
-
-    Returns:
-        a map from (type, state_key) to event_id.
-    """
-    v = KNOWN_ROOM_VERSIONS[room_version]
-    if v.state_res == StateResolutionVersions.V1:
-        return v1.resolve_events_with_store(
-            room_id, state_sets, event_map, state_res_store.get_events
-        )
-    else:
-        return v2.resolve_events_with_store(
-            clock, room_id, room_version, state_sets, event_map, state_res_store
-        )
 
 
 @attr.s(slots=True)
