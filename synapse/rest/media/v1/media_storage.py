@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import contextlib
-import inspect
 import logging
 import os
 import shutil
@@ -30,12 +29,12 @@ from .filepath import MediaFilePaths
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
-    from .storage_provider import StorageProvider
+    from .storage_provider import StorageProviderWrapper
 
 logger = logging.getLogger(__name__)
 
 
-class MediaStorage(object):
+class MediaStorage:
     """Responsible for storing/fetching files from local sources.
 
     Args:
@@ -50,7 +49,7 @@ class MediaStorage(object):
         hs: "HomeServer",
         local_media_directory: str,
         filepaths: MediaFilePaths,
-        storage_providers: Sequence["StorageProvider"],
+        storage_providers: Sequence["StorageProviderWrapper"],
     ):
         self.hs = hs
         self.local_media_directory = local_media_directory
@@ -115,11 +114,7 @@ class MediaStorage(object):
 
         async def finish():
             for provider in self.storage_providers:
-                # store_file is supposed to return an Awaitable, but guard
-                # against improper implementations.
-                result = provider.store_file(path, file_info)
-                if inspect.isawaitable(result):
-                    await result
+                await provider.store_file(path, file_info)
 
             finished_called[0] = True
 
@@ -152,12 +147,22 @@ class MediaStorage(object):
         if os.path.exists(local_path):
             return FileResponder(open(local_path, "rb"))
 
+        # Fallback for paths without method names
+        # Should be removed in the future
+        if file_info.thumbnail and file_info.server_name:
+            legacy_path = self.filepaths.remote_media_thumbnail_rel_legacy(
+                server_name=file_info.server_name,
+                file_id=file_info.file_id,
+                width=file_info.thumbnail_width,
+                height=file_info.thumbnail_height,
+                content_type=file_info.thumbnail_type,
+            )
+            legacy_local_path = os.path.join(self.local_media_directory, legacy_path)
+            if os.path.exists(legacy_local_path):
+                return FileResponder(open(legacy_local_path, "rb"))
+
         for provider in self.storage_providers:
-            res = provider.fetch(path, file_info)  # type: Any
-            # Fetch is supposed to return an Awaitable[Responder], but guard
-            # against improper implementations.
-            if inspect.isawaitable(res):
-                res = await res
+            res = await provider.fetch(path, file_info)  # type: Any
             if res:
                 logger.debug("Streaming %s from %s", path, provider)
                 return res
@@ -179,16 +184,26 @@ class MediaStorage(object):
         if os.path.exists(local_path):
             return local_path
 
+        # Fallback for paths without method names
+        # Should be removed in the future
+        if file_info.thumbnail and file_info.server_name:
+            legacy_path = self.filepaths.remote_media_thumbnail_rel_legacy(
+                server_name=file_info.server_name,
+                file_id=file_info.file_id,
+                width=file_info.thumbnail_width,
+                height=file_info.thumbnail_height,
+                content_type=file_info.thumbnail_type,
+            )
+            legacy_local_path = os.path.join(self.local_media_directory, legacy_path)
+            if os.path.exists(legacy_local_path):
+                return legacy_local_path
+
         dirname = os.path.dirname(local_path)
         if not os.path.exists(dirname):
             os.makedirs(dirname)
 
         for provider in self.storage_providers:
-            res = provider.fetch(path, file_info)  # type: Any
-            # Fetch is supposed to return an Awaitable[Responder], but guard
-            # against improper implementations.
-            if inspect.isawaitable(res):
-                res = await res
+            res = await provider.fetch(path, file_info)  # type: Any
             if res:
                 with res:
                     consumer = BackgroundFileConsumer(

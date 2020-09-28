@@ -18,6 +18,11 @@ from typing import Awaitable, Callable, Dict, Optional
 
 from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
+from synapse.appservice import ApplicationService
+from synapse.handlers.auth import (
+    convert_client_dict_legacy_fields_to_identifier,
+    login_id_phone_to_thirdparty,
+)
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
@@ -28,54 +33,9 @@ from synapse.http.site import SynapseRequest
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import JsonDict, UserID
-from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.threepids import canonicalise_email
 
 logger = logging.getLogger(__name__)
-
-
-def login_submission_legacy_convert(submission):
-    """
-    If the input login submission is an old style object
-    (ie. with top-level user / medium / address) convert it
-    to a typed object.
-    """
-    if "user" in submission:
-        submission["identifier"] = {"type": "m.id.user", "user": submission["user"]}
-        del submission["user"]
-
-    if "medium" in submission and "address" in submission:
-        submission["identifier"] = {
-            "type": "m.id.thirdparty",
-            "medium": submission["medium"],
-            "address": submission["address"],
-        }
-        del submission["medium"]
-        del submission["address"]
-
-
-def login_id_thirdparty_from_phone(identifier):
-    """
-    Convert a phone login identifier type to a generic threepid identifier
-    Args:
-        identifier(dict): Login identifier dict of type 'm.id.phone'
-
-    Returns: Login identifier dict of type 'm.id.threepid'
-    """
-    if "country" not in identifier or (
-        # The specification requires a "phone" field, while Synapse used to require a "number"
-        # field. Accept both for backwards compatibility.
-        "phone" not in identifier
-        and "number" not in identifier
-    ):
-        raise SynapseError(400, "Invalid phone-type identifier")
-
-    # Accept both "phone" and "number" as valid keys in m.id.phone
-    phone_number = identifier.get("phone", identifier["number"])
-
-    msisdn = phone_number_to_msisdn(identifier["country"], phone_number)
-
-    return {"type": "m.id.thirdparty", "medium": "msisdn", "address": msisdn}
 
 
 class LoginRestServlet(RestServlet):
@@ -85,9 +45,10 @@ class LoginRestServlet(RestServlet):
     TOKEN_TYPE = "m.login.token"
     JWT_TYPE = "org.matrix.login.jwt"
     JWT_TYPE_DEPRECATED = "m.login.jwt"
+    APPSERVICE_TYPE = "uk.half-shot.msc2778.login.application_service"
 
     def __init__(self, hs):
-        super(LoginRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
 
         # JWT configuration variables.
@@ -101,6 +62,8 @@ class LoginRestServlet(RestServlet):
         self.saml2_enabled = hs.config.saml2_enabled
         self.cas_enabled = hs.config.cas_enabled
         self.oidc_enabled = hs.config.oidc_enabled
+
+        self.auth = hs.get_auth()
 
         self.auth_handler = self.hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
@@ -148,6 +111,8 @@ class LoginRestServlet(RestServlet):
             ({"type": t} for t in self.auth_handler.get_supported_login_types())
         )
 
+        flows.append({"type": LoginRestServlet.APPSERVICE_TYPE})
+
         return 200, {"flows": flows}
 
     def on_OPTIONS(self, request: SynapseRequest):
@@ -157,8 +122,12 @@ class LoginRestServlet(RestServlet):
         self._address_ratelimiter.ratelimit(request.getClientIP())
 
         login_submission = parse_json_object_from_request(request)
+
         try:
-            if self.jwt_enabled and (
+            if login_submission["type"] == LoginRestServlet.APPSERVICE_TYPE:
+                appservice = self.auth.get_appservice_by_req(request)
+                result = await self._do_appservice_login(login_submission, appservice)
+            elif self.jwt_enabled and (
                 login_submission["type"] == LoginRestServlet.JWT_TYPE
                 or login_submission["type"] == LoginRestServlet.JWT_TYPE_DEPRECATED
             ):
@@ -174,6 +143,33 @@ class LoginRestServlet(RestServlet):
         if well_known_data:
             result["well_known"] = well_known_data
         return 200, result
+
+    def _get_qualified_user_id(self, identifier):
+        if identifier["type"] != "m.id.user":
+            raise SynapseError(400, "Unknown login identifier type")
+        if "user" not in identifier:
+            raise SynapseError(400, "User identifier is missing 'user' key")
+
+        if identifier["user"].startswith("@"):
+            return identifier["user"]
+        else:
+            return UserID(identifier["user"], self.hs.hostname).to_string()
+
+    async def _do_appservice_login(
+        self, login_submission: JsonDict, appservice: ApplicationService
+    ):
+        logger.info(
+            "Got appservice login request with identifier: %r",
+            login_submission.get("identifier"),
+        )
+
+        identifier = convert_client_dict_legacy_fields_to_identifier(login_submission)
+        qualified_user_id = self._get_qualified_user_id(identifier)
+
+        if not appservice.is_interested_in_user(qualified_user_id):
+            raise LoginError(403, "Invalid access_token", errcode=Codes.FORBIDDEN)
+
+        return await self._complete_login(qualified_user_id, login_submission)
 
     async def _do_other_login(self, login_submission: JsonDict) -> Dict[str, str]:
         """Handle non-token/saml/jwt logins
@@ -194,18 +190,11 @@ class LoginRestServlet(RestServlet):
             login_submission.get("address"),
             login_submission.get("user"),
         )
-        login_submission_legacy_convert(login_submission)
-
-        if "identifier" not in login_submission:
-            raise SynapseError(400, "Missing param: identifier")
-
-        identifier = login_submission["identifier"]
-        if "type" not in identifier:
-            raise SynapseError(400, "Login identifier has no type")
+        identifier = convert_client_dict_legacy_fields_to_identifier(login_submission)
 
         # convert phone type identifiers to generic threepids
         if identifier["type"] == "m.id.phone":
-            identifier = login_id_thirdparty_from_phone(identifier)
+            identifier = login_id_phone_to_thirdparty(identifier)
 
         # convert threepid identifiers to user IDs
         if identifier["type"] == "m.id.thirdparty":
@@ -267,15 +256,7 @@ class LoginRestServlet(RestServlet):
 
         # by this point, the identifier should be an m.id.user: if it's anything
         # else, we haven't understood it.
-        if identifier["type"] != "m.id.user":
-            raise SynapseError(400, "Unknown login identifier type")
-        if "user" not in identifier:
-            raise SynapseError(400, "User identifier is missing 'user' key")
-
-        if identifier["user"].startswith("@"):
-            qualified_user_id = identifier["user"]
-        else:
-            qualified_user_id = UserID(identifier["user"], self.hs.hostname).to_string()
+        qualified_user_id = self._get_qualified_user_id(identifier)
 
         # Check if we've hit the failed ratelimit (but don't update it)
         self._failed_attempts_ratelimiter.ratelimit(
@@ -448,7 +429,7 @@ class CasTicketServlet(RestServlet):
     PATTERNS = client_patterns("/login/cas/ticket", v1=True)
 
     def __init__(self, hs):
-        super(CasTicketServlet, self).__init__()
+        super().__init__()
         self._cas_handler = hs.get_cas_handler()
 
     async def on_GET(self, request: SynapseRequest) -> None:

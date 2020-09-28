@@ -49,7 +49,7 @@ http_badges_failed_counter = Counter(
 )
 
 
-class HttpPusher(object):
+class HttpPusher:
     INITIAL_BACKOFF_SEC = 1  # in seconds because that's what Twisted takes
     MAX_BACKOFF_SEC = 60 * 60
 
@@ -114,7 +114,7 @@ class HttpPusher(object):
         if should_check_for_notifs:
             self._start_processing()
 
-    def on_new_notifications(self, min_stream_ordering, max_stream_ordering):
+    def on_new_notifications(self, max_stream_ordering):
         self.max_stream_ordering = max(
             max_stream_ordering, self.max_stream_ordering or 0
         )

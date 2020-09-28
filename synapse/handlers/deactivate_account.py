@@ -29,7 +29,7 @@ class DeactivateAccountHandler(BaseHandler):
     """Handler which deals with deactivating user accounts."""
 
     def __init__(self, hs):
-        super(DeactivateAccountHandler, self).__init__(hs)
+        super().__init__(hs)
         self.hs = hs
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()

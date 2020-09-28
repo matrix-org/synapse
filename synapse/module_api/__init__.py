@@ -31,7 +31,7 @@ __all__ = ["errors", "make_deferred_yieldable", "run_in_background", "ModuleApi"
 logger = logging.getLogger(__name__)
 
 
-class ModuleApi(object):
+class ModuleApi:
     """A proxy object that gets passed to various plugin modules so they
     can register new users etc if necessary.
     """
@@ -167,8 +167,10 @@ class ModuleApi(object):
             external_id: id on that system
             user_id: complete mxid that it is mapped to
         """
-        return self._store.record_user_external_id(
-            auth_provider_id, remote_user_id, registered_user_id
+        return defer.ensureDeferred(
+            self._store.record_user_external_id(
+                auth_provider_id, remote_user_id, registered_user_id
+            )
         )
 
     def generate_short_term_login_token(
@@ -194,12 +196,16 @@ class ModuleApi(object):
             synapse.api.errors.AuthError: the access token is invalid
         """
         # see if the access token corresponds to a device
-        user_info = yield self._auth.get_user_by_access_token(access_token)
+        user_info = yield defer.ensureDeferred(
+            self._auth.get_user_by_access_token(access_token)
+        )
         device_id = user_info.get("device_id")
         user_id = user_info["user"].to_string()
         if device_id:
             # delete the device, which will also delete its access tokens
-            yield self._hs.get_device_handler().delete_device(user_id, device_id)
+            yield defer.ensureDeferred(
+                self._hs.get_device_handler().delete_device(user_id, device_id)
+            )
         else:
             # no associated device. Just delete the access token.
             yield defer.ensureDeferred(
@@ -219,7 +225,9 @@ class ModuleApi(object):
         Returns:
             Deferred[object]: result of func
         """
-        return self._store.db.runInteraction(desc, func, *args, **kwargs)
+        return defer.ensureDeferred(
+            self._store.db_pool.runInteraction(desc, func, *args, **kwargs)
+        )
 
     def complete_sso_login(
         self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str

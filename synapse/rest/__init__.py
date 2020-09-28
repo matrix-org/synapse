@@ -13,8 +13,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import synapse.rest.admin
 from synapse.http.server import JsonResource
+from synapse.rest import admin
 from synapse.rest.client import versions
 from synapse.rest.client.v1 import (
     directory,
@@ -50,6 +50,7 @@ from synapse.rest.client.v2_alpha import (
     room_keys,
     room_upgrade_rest_servlet,
     sendtodevice,
+    shared_rooms,
     sync,
     tags,
     thirdparty,
@@ -122,6 +123,7 @@ class ClientRestResource(JsonResource):
         password_policy.register_servlets(hs, client_resource)
 
         # moving to /_synapse/admin
-        synapse.rest.admin.register_servlets_for_client_rest_resource(
-            hs, client_resource
-        )
+        admin.register_servlets_for_client_rest_resource(hs, client_resource)
+
+        # unstable
+        shared_rooms.register_servlets(hs, client_resource)

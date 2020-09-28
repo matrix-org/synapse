@@ -20,7 +20,7 @@ from .identity import IdentityHandler
 from .search import SearchHandler
 
 
-class Handlers(object):
+class Handlers:
 
     """ Deprecated. A collection of handlers.
 

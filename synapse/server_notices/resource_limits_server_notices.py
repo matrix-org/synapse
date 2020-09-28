@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import List, Tuple
 
 from synapse.api.constants import (
     EventTypes,
@@ -26,7 +27,7 @@ from synapse.server_notices.server_notices_manager import SERVER_NOTICE_ROOM_TAG
 logger = logging.getLogger(__name__)
 
 
-class ResourceLimitsServerNotices(object):
+class ResourceLimitsServerNotices:
     """ Keeps track of whether the server has reached it's resource limit and
     ensures that the client is kept up to date.
     """
@@ -52,7 +53,7 @@ class ResourceLimitsServerNotices(object):
             and not hs.config.hs_disabled
         )
 
-    async def maybe_send_server_notice_to_user(self, user_id):
+    async def maybe_send_server_notice_to_user(self, user_id: str) -> None:
         """Check if we need to send a notice to this user, this will be true in
         two cases.
         1. The server has reached its limit does not reflect this
@@ -60,10 +61,7 @@ class ResourceLimitsServerNotices(object):
         actually the server is fine
 
         Args:
-            user_id (str): user to check
-
-        Returns:
-            Deferred
+            user_id: user to check
         """
         if not self._enabled:
             return
@@ -115,19 +113,21 @@ class ResourceLimitsServerNotices(object):
             elif not currently_blocked and limit_msg:
                 # Room is not notifying of a block, when it ought to be.
                 await self._apply_limit_block_notification(
-                    user_id, limit_msg, limit_type
+                    user_id, limit_msg, limit_type  # type: ignore
                 )
         except SynapseError as e:
             logger.error("Error sending resource limits server notice: %s", e)
 
-    async def _remove_limit_block_notification(self, user_id, ref_events):
+    async def _remove_limit_block_notification(
+        self, user_id: str, ref_events: List[str]
+    ) -> None:
         """Utility method to remove limit block notifications from the server
         notices room.
 
         Args:
-            user_id (str): user to notify
-            ref_events (list[str]): The event_ids of pinned events that are unrelated to
-            limit blocking and need to be preserved.
+            user_id: user to notify
+            ref_events: The event_ids of pinned events that are unrelated to
+                limit blocking and need to be preserved.
         """
         content = {"pinned": ref_events}
         await self._server_notices_manager.send_notice(
@@ -135,16 +135,16 @@ class ResourceLimitsServerNotices(object):
         )
 
     async def _apply_limit_block_notification(
-        self, user_id, event_body, event_limit_type
-    ):
+        self, user_id: str, event_body: str, event_limit_type: str
+    ) -> None:
         """Utility method to apply limit block notifications in the server
         notices room.
 
         Args:
-            user_id (str): user to notify
-            event_body(str): The human readable text that describes the block.
-            event_limit_type(str): Specifies the type of block e.g. monthly active user
-            limit has been exceeded.
+            user_id: user to notify
+            event_body: The human readable text that describes the block.
+            event_limit_type: Specifies the type of block e.g. monthly active user
+                limit has been exceeded.
         """
         content = {
             "body": event_body,
@@ -162,7 +162,7 @@ class ResourceLimitsServerNotices(object):
             user_id, content, EventTypes.Pinned, ""
         )
 
-    async def _check_and_set_tags(self, user_id, room_id):
+    async def _check_and_set_tags(self, user_id: str, room_id: str) -> None:
         """
         Since server notices rooms were originally not with tags,
         important to check that tags have been set correctly
@@ -182,17 +182,16 @@ class ResourceLimitsServerNotices(object):
             )
             self._notifier.on_new_event("account_data_key", max_id, users=[user_id])
 
-    async def _is_room_currently_blocked(self, room_id):
+    async def _is_room_currently_blocked(self, room_id: str) -> Tuple[bool, List[str]]:
         """
         Determines if the room is currently blocked
 
         Args:
-            room_id(str): The room id of the server notices room
+            room_id: The room id of the server notices room
 
         Returns:
-            Deferred[Tuple[bool, List]]:
             bool: Is the room currently blocked
-            list: The list of pinned events that are unrelated to limit blocking
+            list: The list of pinned event IDs that are unrelated to limit blocking
             This list can be used as a convenience in the case where the block
             is to be lifted and the remaining pinned event references need to be
             preserved
@@ -207,7 +206,7 @@ class ResourceLimitsServerNotices(object):
             # The user has yet to join the server notices room
             pass
 
-        referenced_events = []
+        referenced_events = []  # type: List[str]
         if pinned_state_event is not None:
             referenced_events = list(pinned_state_event.content.get("pinned", []))
 

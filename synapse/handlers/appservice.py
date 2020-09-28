@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 events_processed_counter = Counter("synapse_handlers_appservice_events_processed", "")
 
 
-class ApplicationServicesHandler(object):
+class ApplicationServicesHandler:
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.is_mine_id = hs.is_mine_id
@@ -101,7 +101,7 @@ class ApplicationServicesHandler(object):
 
                             async def start_scheduler():
                                 try:
-                                    return self.scheduler.start()
+                                    return await self.scheduler.start()
                                 except Exception:
                                     logger.error("Application Services Failure")
 

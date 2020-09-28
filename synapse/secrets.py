@@ -25,15 +25,19 @@ import sys
 if sys.version_info[0:2] >= (3, 6):
     import secrets
 
-    def Secrets():
-        return secrets
+    class Secrets:
+        def token_bytes(self, nbytes=32):
+            return secrets.token_bytes(nbytes)
+
+        def token_hex(self, nbytes=32):
+            return secrets.token_hex(nbytes)
 
 
 else:
     import binascii
     import os
 
-    class Secrets(object):
+    class Secrets:
         def token_bytes(self, nbytes=32):
             return os.urandom(nbytes)
 

@@ -88,7 +88,7 @@ class CacheTestCase(unittest.TestCase):
 class DescriptorTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_cache(self):
-        class Cls(object):
+        class Cls:
             def __init__(self):
                 self.mock = mock.Mock()
 
@@ -122,7 +122,7 @@ class DescriptorTestCase(unittest.TestCase):
     def test_cache_num_args(self):
         """Only the first num_args arguments should matter to the cache"""
 
-        class Cls(object):
+        class Cls:
             def __init__(self):
                 self.mock = mock.Mock()
 
@@ -156,7 +156,7 @@ class DescriptorTestCase(unittest.TestCase):
         """If the wrapped function throws synchronously, things should continue to work
         """
 
-        class Cls(object):
+        class Cls:
             @cached()
             def fn(self, arg1):
                 raise SynapseError(100, "mai spoon iz too big!!1")
@@ -180,7 +180,7 @@ class DescriptorTestCase(unittest.TestCase):
 
         complete_lookup = defer.Deferred()
 
-        class Cls(object):
+        class Cls:
             @descriptors.cached()
             def fn(self, arg1):
                 @defer.inlineCallbacks
@@ -223,7 +223,7 @@ class DescriptorTestCase(unittest.TestCase):
         """Check that the cache sets and restores logcontexts correctly when
         the lookup function throws an exception"""
 
-        class Cls(object):
+        class Cls:
             @descriptors.cached()
             def fn(self, arg1):
                 @defer.inlineCallbacks
@@ -263,7 +263,7 @@ class DescriptorTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_cache_default_args(self):
-        class Cls(object):
+        class Cls:
             def __init__(self):
                 self.mock = mock.Mock()
 
@@ -300,7 +300,7 @@ class DescriptorTestCase(unittest.TestCase):
         obj.mock.assert_not_called()
 
     def test_cache_iterable(self):
-        class Cls(object):
+        class Cls:
             def __init__(self):
                 self.mock = mock.Mock()
 
@@ -336,7 +336,7 @@ class DescriptorTestCase(unittest.TestCase):
         """If the wrapped function throws synchronously, things should continue to work
         """
 
-        class Cls(object):
+        class Cls:
             @descriptors.cached(iterable=True)
             def fn(self, arg1):
                 raise SynapseError(100, "mai spoon iz too big!!1")
@@ -358,7 +358,7 @@ class DescriptorTestCase(unittest.TestCase):
 class CachedListDescriptorTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_cache(self):
-        class Cls(object):
+        class Cls:
             def __init__(self):
                 self.mock = mock.Mock()
 
@@ -366,11 +366,11 @@ class CachedListDescriptorTestCase(unittest.TestCase):
             def fn(self, arg1, arg2):
                 pass
 
-            @descriptors.cachedList("fn", "args1", inlineCallbacks=True)
-            def list_fn(self, args1, arg2):
+            @descriptors.cachedList("fn", "args1")
+            async def list_fn(self, args1, arg2):
                 assert current_context().request == "c1"
                 # we want this to behave like an asynchronous function
-                yield run_on_reactor()
+                await run_on_reactor()
                 assert current_context().request == "c1"
                 return self.mock(args1, arg2)
 
@@ -408,7 +408,7 @@ class CachedListDescriptorTestCase(unittest.TestCase):
     def test_invalidate(self):
         """Make sure that invalidation callbacks are called."""
 
-        class Cls(object):
+        class Cls:
             def __init__(self):
                 self.mock = mock.Mock()
 
@@ -416,10 +416,10 @@ class CachedListDescriptorTestCase(unittest.TestCase):
             def fn(self, arg1, arg2):
                 pass
 
-            @descriptors.cachedList("fn", "args1", inlineCallbacks=True)
-            def list_fn(self, args1, arg2):
+            @descriptors.cachedList("fn", "args1")
+            async def list_fn(self, args1, arg2):
                 # we want this to behave like an asynchronous function
-                yield run_on_reactor()
+                await run_on_reactor()
                 return self.mock(args1, arg2)
 
         obj = Cls()

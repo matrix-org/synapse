@@ -123,17 +123,18 @@ from synapse.rest.client.v2_alpha.account_data import (
 from synapse.rest.client.v2_alpha.keys import KeyChangesServlet, KeyQueryServlet
 from synapse.rest.client.v2_alpha.register import RegisterRestServlet
 from synapse.rest.client.versions import VersionsRestServlet
+from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
-from synapse.server import HomeServer
-from synapse.storage.data_stores.main.censor_events import CensorEventsStore
-from synapse.storage.data_stores.main.media_repository import MediaRepositoryStore
-from synapse.storage.data_stores.main.monthly_active_users import (
+from synapse.server import HomeServer, cache_in_self
+from synapse.storage.databases.main.censor_events import CensorEventsStore
+from synapse.storage.databases.main.media_repository import MediaRepositoryStore
+from synapse.storage.databases.main.monthly_active_users import (
     MonthlyActiveUsersWorkerStore,
 )
-from synapse.storage.data_stores.main.presence import UserPresenceState
-from synapse.storage.data_stores.main.search import SearchWorkerStore
-from synapse.storage.data_stores.main.ui_auth import UIAuthWorkerStore
-from synapse.storage.data_stores.main.user_directory import UserDirectoryStore
+from synapse.storage.databases.main.presence import UserPresenceState
+from synapse.storage.databases.main.search import SearchWorkerStore
+from synapse.storage.databases.main.ui_auth import UIAuthWorkerStore
+from synapse.storage.databases.main.user_directory import UserDirectoryStore
 from synapse.types import ReadReceipt
 from synapse.util.async_helpers import Linearizer
 from synapse.util.httpresourcetree import create_resource_tree
@@ -151,7 +152,7 @@ class PresenceStatusStubServlet(RestServlet):
     PATTERNS = client_patterns("/presence/(?P<user_id>[^/]*)/status")
 
     def __init__(self, hs):
-        super(PresenceStatusStubServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
 
     async def on_GET(self, request, user_id):
@@ -175,7 +176,7 @@ class KeyUploadServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(KeyUploadServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.http_client = hs.get_simple_http_client()
@@ -493,7 +494,10 @@ class GenericWorkerServer(HomeServer):
         site_tag = listener_config.http_options.tag
         if site_tag is None:
             site_tag = port
-        resources = {}
+
+        # We always include a health resource.
+        resources = {"/health": HealthResource()}
+
         for res in listener_config.http_options.resources:
             for name in res.names:
                 if name == "metrics":
@@ -631,16 +635,18 @@ class GenericWorkerServer(HomeServer):
     async def remove_pusher(self, app_id, push_key, user_id):
         self.get_tcp_replication().send_remove_pusher(app_id, push_key, user_id)
 
-    def build_replication_data_handler(self):
+    @cache_in_self
+    def get_replication_data_handler(self):
         return GenericWorkerReplicationHandler(self)
 
-    def build_presence_handler(self):
+    @cache_in_self
+    def get_presence_handler(self):
         return GenericWorkerPresence(self)
 
 
 class GenericWorkerReplicationHandler(ReplicationDataHandler):
     def __init__(self, hs):
-        super(GenericWorkerReplicationHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.store = hs.get_datastore()
         self.presence_handler = hs.get_presence_handler()  # type: GenericWorkerPresence
@@ -739,7 +745,7 @@ class GenericWorkerReplicationHandler(ReplicationDataHandler):
             self.send_handler.wake_destination(server)
 
 
-class FederationSenderHandler(object):
+class FederationSenderHandler:
     """Processes the fedration replication stream
 
     This class is only instantiate on the worker responsible for sending outbound

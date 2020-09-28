@@ -31,7 +31,7 @@ from synapse.rest.admin._base import (
     assert_user_is_admin,
     historical_admin_path_patterns,
 )
-from synapse.storage.data_stores.main.room import RoomSortOrder
+from synapse.storage.databases.main.room import RoomSortOrder
 from synapse.types import RoomAlias, RoomID, UserID, create_requester
 
 logger = logging.getLogger(__name__)
@@ -316,6 +316,9 @@ class JoinRoomAliasServlet(RestServlet):
         join_rules_event = room_state.get((EventTypes.JoinRules, ""))
         if join_rules_event:
             if not (join_rules_event.content.get("join_rule") == JoinRules.PUBLIC):
+                # update_membership with an action of "invite" can raise a
+                # ShadowBanError. This is not handled since it is assumed that
+                # an admin isn't going to call this API with a shadow-banned user.
                 await self.room_member_handler.update_membership(
                     requester=requester,
                     target=fake_requester.user,

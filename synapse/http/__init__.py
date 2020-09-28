@@ -27,7 +27,7 @@ class RequestTimedOutError(SynapseError):
     """Exception representing timeout of an outbound request"""
 
     def __init__(self):
-        super(RequestTimedOutError, self).__init__(504, "Timed out")
+        super().__init__(504, "Timed out")
 
 
 def cancelled_to_request_timed_out_error(value, timeout):

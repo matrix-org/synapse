@@ -378,11 +378,10 @@ retention:
   #  min_lifetime: 1d
   #  max_lifetime: 1y
 
-  # Retention policy limits. If set, a user won't be able to send a
-  # 'm.room.retention' event which features a 'min_lifetime' or a 'max_lifetime'
-  # that's not within this range. This is especially useful in closed federations,
-  # in which server admins can make sure every federating server applies the same
-  # rules.
+  # Retention policy limits. If set, and the state of a room contains a
+  # 'm.room.retention' event in its state which contains a 'min_lifetime' or a
+  # 'max_lifetime' that's out of these bounds, Synapse will cap the room's policy
+  # to these limits when running purge jobs.
   #
   #allowed_lifetime_min: 1d
   #allowed_lifetime_max: 1y
@@ -408,12 +407,19 @@ retention:
   # (e.g. every 12h), but not want that purge to be performed by a job that's
   # iterating over every room it knows, which could be heavy on the server.
   #
+  # If any purge job is configured, it is strongly recommended to have at least
+  # a single job with neither 'shortest_max_lifetime' nor 'longest_max_lifetime'
+  # set, or one job without 'shortest_max_lifetime' and one job without
+  # 'longest_max_lifetime' set. Otherwise some rooms might be ignored, even if
+  # 'allowed_lifetime_min' and 'allowed_lifetime_max' are set, because capping a
+  # room's policy to these values is done after the policies are retrieved from
+  # Synapse's database (which is done using the range specified in a purge job's
+  # configuration).
+  #
   #purge_jobs:
-  #  - shortest_max_lifetime: 1d
-  #    longest_max_lifetime: 3d
+  #  - longest_max_lifetime: 3d
   #    interval: 12h
   #  - shortest_max_lifetime: 3d
-  #    longest_max_lifetime: 1y
   #    interval: 1d
 
 # Inhibits the /requestToken endpoints from returning an error that might leak
@@ -425,6 +431,24 @@ retention:
 # act as if no error happened and return a fake session ID ('sid') to clients.
 #
 #request_token_inhibit_3pid_errors: true
+
+# A list of domains that the domain portion of 'next_link' parameters
+# must match.
+#
+# This parameter is optionally provided by clients while requesting
+# validation of an email or phone number, and maps to a link that
+# users will be automatically redirected to after validation
+# succeeds. Clients can make use this parameter to aid the validation
+# process.
+#
+# The whitelist is applied whether the homeserver or an
+# identity server is handling validation.
+#
+# The default value is no whitelist functionality; all domains are
+# allowed. Setting this value to an empty list will instead disallow
+# all domains.
+#
+#next_link_domain_whitelist: ["matrix.org"]
 
 
 ## TLS ##
@@ -746,6 +770,10 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #   - one for ratelimiting redactions by room admins. If this is not explicitly
 #     set then it uses the same ratelimiting as per rc_message. This is useful
 #     to allow room admins to deal with abuse quickly.
+#   - two for ratelimiting number of rooms a user can join, "local" for when
+#     users are joining rooms the server is already in (this is cheap) vs
+#     "remote" for when users are trying to join rooms not on the server (which
+#     can be more expensive)
 #
 # The defaults are as shown below.
 #
@@ -771,6 +799,14 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #rc_admin_redaction:
 #  per_second: 1
 #  burst_count: 50
+#
+#rc_joins:
+#  local:
+#    per_second: 0.1
+#    burst_count: 3
+#  remote:
+#    per_second: 0.01
+#    burst_count: 3
 
 
 # Ratelimiting settings for incoming federation
@@ -1449,10 +1485,13 @@ trusted_key_servers:
 # At least one of `sp_config` or `config_path` must be set in this section to
 # enable SAML login.
 #
-# (You will probably also want to set the following options to `false` to
+# You will probably also want to set the following options to `false` to
 # disable the regular login/registration flows:
 #   * enable_registration
 #   * password_config.enabled
+#
+# You will also want to investigate the settings under the "sso" configuration
+# section below.
 #
 # Once SAML support is enabled, a metadata file will be exposed at
 # https://<server>:<port>/_matrix/saml2/metadata.xml, which you may be able to
@@ -1565,30 +1604,16 @@ saml2_config:
   #
   #grandfathered_mxid_source_attribute: upn
 
-  # Directory in which Synapse will try to find the template files below.
-  # If not set, default templates from within the Synapse package will be used.
+  # It is possible to configure Synapse to only allow logins if SAML attributes
+  # match particular values. The requirements can be listed under
+  # `attribute_requirements` as shown below. All of the listed attributes must
+  # match for the login to be permitted.
   #
-  # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
-  # If you *do* uncomment it, you will need to make sure that all the templates
-  # below are in the directory.
-  #
-  # Synapse will look for the following templates in this directory:
-  #
-  # * HTML page to display to users if something goes wrong during the
-  #   authentication process: 'saml_error.html'.
-  #
-  #   When rendering, this template is given the following variables:
-  #     * code: an HTML error code corresponding to the error that is being
-  #       returned (typically 400 or 500)
-  #
-  #     * msg: a textual message describing the error.
-  #
-  #   The variables will automatically be HTML-escaped.
-  #
-  # You can see the default templates at:
-  # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
-  #
-  #template_dir: "res/templates"
+  #attribute_requirements:
+  #  - attribute: userGroup
+  #    value: "staff"
+  #  - attribute: department
+  #    value: "sales"
 
 
 # OpenID Connect integration. The following settings can be used to make Synapse
@@ -1663,6 +1688,11 @@ oidc_config:
   # Avoid this in production.
   #
   #skip_verification: true
+
+  # Uncomment to allow a user logging in via OIDC to match a pre-existing account instead
+  # of failing. This could be used if switching from password logins to OIDC. Defaults to false.
+  #
+  #allow_existing_users: true
 
   # An external module can be provided here as a custom solution to mapping
   # attributes returned from a OIDC provider onto a matrix user.
@@ -1979,9 +2009,7 @@ email:
   # Directory in which Synapse will try to find the template files below.
   # If not set, default templates from within the Synapse package will be used.
   #
-  # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
-  # If you *do* uncomment it, you will need to make sure that all the templates
-  # below are in the directory.
+  # Do not uncomment this setting unless you want to customise the templates.
   #
   # Synapse will look for the following templates in this directory:
   #
@@ -1994,9 +2022,13 @@ email:
   # * The contents of password reset emails sent by the homeserver:
   #   'password_reset.html' and 'password_reset.txt'
   #
-  # * HTML pages for success and failure that a user will see when they follow
-  #   the link in the password reset email: 'password_reset_success.html' and
-  #   'password_reset_failure.html'
+  # * An HTML page that a user will see when they follow the link in the password
+  #   reset email. The user will be asked to confirm the action before their
+  #   password is reset: 'password_reset_confirmation.html'
+  #
+  # * HTML pages for success and failure that a user will see when they confirm
+  #   the password reset flow using the page above: 'password_reset_success.html'
+  #   and 'password_reset_failure.html'
   #
   # * The contents of address verification emails sent during registration:
   #   'registration.html' and 'registration.txt'

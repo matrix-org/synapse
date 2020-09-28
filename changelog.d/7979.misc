@@ -1,1 +1,0 @@
-Switch to the JSON implementation from the standard library and bump the minimum version of the canonicaljson library to 1.2.0.

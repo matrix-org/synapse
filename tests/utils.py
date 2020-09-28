@@ -154,6 +154,10 @@ def default_config(name, parse=False):
             "account": {"per_second": 10000, "burst_count": 10000},
             "failed_attempts": {"per_second": 10000, "burst_count": 10000},
         },
+        "rc_joins": {
+            "local": {"per_second": 10000, "burst_count": 10000},
+            "remote": {"per_second": 10000, "burst_count": 10000},
+        },
         "saml2_enabled": False,
         "public_baseurl": None,
         "default_identity_server": None,
@@ -468,7 +472,7 @@ class MockHttpResource(HttpServer):
             self.callbacks.append((method, path_pattern, callback))
 
 
-class MockKey(object):
+class MockKey:
     alg = "mock_alg"
     version = "mock_version"
     signature = b"\x9a\x87$"
@@ -487,7 +491,7 @@ class MockKey(object):
         return b"<fake_encoded_key>"
 
 
-class MockClock(object):
+class MockClock:
     now = 1000
 
     def __init__(self):
@@ -564,7 +568,7 @@ def _format_call(args, kwargs):
     )
 
 
-class DeferredMockCallable(object):
+class DeferredMockCallable:
     """A callable instance that stores a set of pending call expectations and
     return values for them. It allows a unit test to assert that the given set
     of function calls are eventually made, by awaiting on them to be called.

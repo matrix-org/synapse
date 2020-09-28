@@ -17,7 +17,7 @@ from typing import Dict
 from ._base import Config
 
 
-class RateLimitConfig(object):
+class RateLimitConfig:
     def __init__(
         self,
         config: Dict[str, float],
@@ -27,7 +27,7 @@ class RateLimitConfig(object):
         self.burst_count = config.get("burst_count", defaults["burst_count"])
 
 
-class FederationRateLimitConfig(object):
+class FederationRateLimitConfig:
     _items_and_default = {
         "window_size": 1000,
         "sleep_limit": 10,
@@ -93,6 +93,15 @@ class RatelimitConfig(Config):
         if rc_admin_redaction:
             self.rc_admin_redaction = RateLimitConfig(rc_admin_redaction)
 
+        self.rc_joins_local = RateLimitConfig(
+            config.get("rc_joins", {}).get("local", {}),
+            defaults={"per_second": 0.1, "burst_count": 3},
+        )
+        self.rc_joins_remote = RateLimitConfig(
+            config.get("rc_joins", {}).get("remote", {}),
+            defaults={"per_second": 0.01, "burst_count": 3},
+        )
+
     def generate_config_section(self, **kwargs):
         return """\
         ## Ratelimiting ##
@@ -118,6 +127,10 @@ class RatelimitConfig(Config):
         #   - one for ratelimiting redactions by room admins. If this is not explicitly
         #     set then it uses the same ratelimiting as per rc_message. This is useful
         #     to allow room admins to deal with abuse quickly.
+        #   - two for ratelimiting number of rooms a user can join, "local" for when
+        #     users are joining rooms the server is already in (this is cheap) vs
+        #     "remote" for when users are trying to join rooms not on the server (which
+        #     can be more expensive)
         #
         # The defaults are as shown below.
         #
@@ -143,6 +156,14 @@ class RatelimitConfig(Config):
         #rc_admin_redaction:
         #  per_second: 1
         #  burst_count: 50
+        #
+        #rc_joins:
+        #  local:
+        #    per_second: 0.1
+        #    burst_count: 3
+        #  remote:
+        #    per_second: 0.01
+        #    burst_count: 3
 
 
         # Ratelimiting settings for incoming federation

@@ -17,9 +17,8 @@
 
 import logging
 
-from canonicaljson import json
-
 from synapse.api.errors import Codes, SynapseError
+from synapse.util import json_decoder
 
 logger = logging.getLogger(__name__)
 
@@ -215,7 +214,7 @@ def parse_json_value_from_request(request, allow_empty_body=False):
         return None
 
     try:
-        content = json.loads(content_bytes.decode("utf-8"))
+        content = json_decoder.decode(content_bytes.decode("utf-8"))
     except Exception as e:
         logger.warning("Unable to parse JSON: %s", e)
         raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
@@ -257,7 +256,7 @@ def assert_params_in_dict(body, required):
         raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
 
 
-class RestServlet(object):
+class RestServlet:
 
     """ A Synapse REST Servlet.
 

@@ -566,7 +566,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
             "state_groups_state",
         ):
             count = self.get_success(
-                self.store.db.simple_select_one_onecol(
+                self.store.db_pool.simple_select_one_onecol(
                     table=table,
                     keyvalues={"room_id": room_id},
                     retcol="COUNT(*)",
@@ -667,7 +667,7 @@ class PurgeRoomTestCase(unittest.HomeserverTestCase):
             "state_groups_state",
         ):
             count = self.get_success(
-                self.store.db.simple_select_one_onecol(
+                self.store.db_pool.simple_select_one_onecol(
                     table=table,
                     keyvalues={"room_id": room_id},
                     retcol="COUNT(*)",
@@ -1174,6 +1174,8 @@ class RoomTestCase(unittest.HomeserverTestCase):
 
         self.assertIn("room_id", channel.json_body)
         self.assertIn("name", channel.json_body)
+        self.assertIn("topic", channel.json_body)
+        self.assertIn("avatar", channel.json_body)
         self.assertIn("canonical_alias", channel.json_body)
         self.assertIn("joined_members", channel.json_body)
         self.assertIn("joined_local_members", channel.json_body)
