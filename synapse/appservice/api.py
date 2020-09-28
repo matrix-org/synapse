@@ -178,7 +178,7 @@ class ApplicationServiceApi(SimpleHttpClient):
                 urllib.parse.quote(protocol),
             )
             try:
-                info = await self.get_json(uri, {})
+                info = await self.get_json(uri)
 
                 if not _is_valid_3pe_metadata(info):
                     logger.warning(

@@ -617,3 +617,38 @@ class OidcHandlerTestCase(HomeserverTestCase):
             )
         )
         self.assertEqual(mxid, "@test_user_2:test")
+
+        # Test if the mxid is already taken
+        store = self.hs.get_datastore()
+        user3 = UserID.from_string("@test_user_3:test")
+        self.get_success(
+            store.register_user(user_id=user3.to_string(), password_hash=None)
+        )
+        userinfo = {"sub": "test3", "username": "test_user_3"}
+        e = self.get_failure(
+            self.handler._map_userinfo_to_user(
+                userinfo, token, "user-agent", "10.10.10.10"
+            ),
+            MappingException,
+        )
+        self.assertEqual(str(e.value), "mxid '@test_user_3:test' is already taken")
+
+    @override_config({"oidc_config": {"allow_existing_users": True}})
+    def test_map_userinfo_to_existing_user(self):
+        """Existing users can log in with OpenID Connect when allow_existing_users is True."""
+        store = self.hs.get_datastore()
+        user4 = UserID.from_string("@test_user_4:test")
+        self.get_success(
+            store.register_user(user_id=user4.to_string(), password_hash=None)
+        )
+        userinfo = {
+            "sub": "test4",
+            "username": "test_user_4",
+        }
+        token = {}
+        mxid = self.get_success(
+            self.handler._map_userinfo_to_user(
+                userinfo, token, "user-agent", "10.10.10.10"
+            )
+        )
+        self.assertEqual(mxid, "@test_user_4:test")

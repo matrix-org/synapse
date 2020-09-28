@@ -1689,6 +1689,11 @@ oidc_config:
   #
   #skip_verification: true
 
+  # Uncomment to allow a user logging in via OIDC to match a pre-existing account instead
+  # of failing. This could be used if switching from password logins to OIDC. Defaults to false.
+  #
+  #allow_existing_users: true
+
   # An external module can be provided here as a custom solution to mapping
   # attributes returned from a OIDC provider onto a matrix user.
   #

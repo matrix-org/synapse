@@ -114,6 +114,7 @@ class OidcHandler:
             hs.config.oidc_user_mapping_provider_config
         )  # type: OidcMappingProvider
         self._skip_verification = hs.config.oidc_skip_verification  # type: bool
+        self._allow_existing_users = hs.config.oidc_allow_existing_users  # type: bool
 
         self._http_client = hs.get_proxied_http_client()
         self._auth_handler = hs.get_auth_handler()
@@ -849,7 +850,8 @@ class OidcHandler:
         If we don't find the user that way, we should register the user,
         mapping the localpart and the display name from the UserInfo.
 
-        If a user already exists with the mxid we've mapped, raise an exception.
+        If a user already exists with the mxid we've mapped and allow_existing_users
+        is disabled, raise an exception.
 
         Args:
             userinfo: an object representing the user
@@ -905,21 +907,31 @@ class OidcHandler:
 
         localpart = map_username_to_mxid_localpart(attributes["localpart"])
 
-        user_id = UserID(localpart, self._hostname)
-        if await self._datastore.get_users_by_id_case_insensitive(user_id.to_string()):
-            # This mxid is taken
-            raise MappingException(
-                "mxid '{}' is already taken".format(user_id.to_string())
+        user_id = UserID(localpart, self._hostname).to_string()
+        users = await self._datastore.get_users_by_id_case_insensitive(user_id)
+        if users:
+            if self._allow_existing_users:
+                if len(users) == 1:
+                    registered_user_id = next(iter(users))
+                elif user_id in users:
+                    registered_user_id = user_id
+                else:
+                    raise MappingException(
+                        "Attempted to login as '{}' but it matches more than one user inexactly: {}".format(
+                            user_id, list(users.keys())
+                        )
+                    )
+            else:
+                # This mxid is taken
+                raise MappingException("mxid '{}' is already taken".format(user_id))
+        else:
+            # It's the first time this user is logging in and the mapped mxid was
+            # not taken, register the user
+            registered_user_id = await self._registration_handler.register_user(
+                localpart=localpart,
+                default_display_name=attributes["display_name"],
+                user_agent_ips=(user_agent, ip_address),
             )
-
-        # It's the first time this user is logging in and the mapped mxid was
-        # not taken, register the user
-        registered_user_id = await self._registration_handler.register_user(
-            localpart=localpart,
-            default_display_name=attributes["display_name"],
-            user_agent_ips=(user_agent, ip_address),
-        )
-
         await self._datastore.record_user_external_id(
             self._auth_provider_id, remote_user_id, registered_user_id,
         )

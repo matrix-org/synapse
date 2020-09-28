@@ -21,6 +21,8 @@ SELECT setval('events_stream_seq', (
 
 CREATE SEQUENCE IF NOT EXISTS events_backfill_stream_seq;
 
+-- If the server has never backfilled a room then doing `-MIN(...)` will give
+-- a negative result, hence why we do `GREATEST(...)`
 SELECT setval('events_backfill_stream_seq', (
-    SELECT COALESCE(-MIN(stream_ordering), 1) FROM events
+    SELECT GREATEST(COALESCE(-MIN(stream_ordering), 1), 1) FROM events
 ));
