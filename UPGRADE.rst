@@ -1,16 +1,3 @@
-Upgrading to v1.20.0
-====================
-
-Shared rooms endpoint (MSC2666)
--------------------------------
-
-This release contains a new unstable endpoint `/_matrix/client/unstable/uk.half-shot.msc2666/user/shared_rooms/.*`
-for fetching rooms one user has in common with another. This feature requires the
-`update_user_directory` config flag to be `True`. If you are you are using a `synapse.app.user_dir`
-worker, requests to this endpoint must be handled by that worker.
-See `docs/workers.md <docs/workers.md>`_ for more details.
-
-
 Upgrading Synapse
 =================
 
@@ -145,12 +132,15 @@ ThirdPartyEventRules breaking changes
 -------------------------------------
 
 This release introduces a backwards-incompatible change to modules making use of
-`ThirdPartyEventRules` in Synapse.
+``ThirdPartyEventRules`` in Synapse. If you make use of a module defined under the
+``third_party_event_rules`` config option, please make sure it is updated to handle
+the below change:
 
-The `http_client` argument is no longer passed to modules as they are initialised. Instead,
-modules are expected to make use of the `http_client` property on the `ModuleApi` class.
-Modules are now passed a `module_api` argument during initialisation, which is an instance of
-`ModuleApi`.
+The ``http_client`` argument is no longer passed to modules as they are initialised. Instead,
+modules are expected to make use of the ``http_client`` property on the ``ModuleApi`` class.
+Modules are now passed a ``module_api`` argument during initialisation, which is an instance of
+``ModuleApi``. ``ModuleApi`` instances have a ``http_client`` property which acts the same as
+the ``http_client`` argument previously passed to ``ThirdPartyEventRules`` modules.
 
 Upgrading to v1.18.0
 ====================
