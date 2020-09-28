@@ -147,7 +147,8 @@ class MediaRepository(object):
         """Store uploaded content for a local user and return the mxc URL
 
         Args:
-            media_type(str): The content type of the file
+            media_type: The content type of the file.
+            upload_name: The name of the file, if provided.
             content: A file like object that is the content to store
             content_length: The length of the content
             auth_user: The user_id of the uploader
