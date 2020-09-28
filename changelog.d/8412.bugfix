@@ -1,0 +1,1 @@
+Fix retries of HTTP requests between Synapse workers when the requests time out.
