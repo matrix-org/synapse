@@ -64,7 +64,7 @@ class UploadResource(DirectServeJsonResource):
                 )
     
         # upload_name might be an empty byte string
-        if len(upload_name) === 0:
+        if not len(upload_name):
             upload_name = None
 
         headers = request.requestHeaders
