@@ -48,8 +48,26 @@ class ModuleApi:
         self._auth = hs.get_auth()
         self._auth_handler = auth_handler
 
-        self.http_client = hs.get_simple_http_client()  # type: SimpleHttpClient
-        self.public_room_list_manager = PublicRoomListManager(hs)
+        # We expose these as properties below in order to attach a helpful docstring.
+        self._http_client = hs.get_simple_http_client()  # type: SimpleHttpClient
+        self._public_room_list_manager = PublicRoomListManager(hs)
+
+    @property
+    def http_client(self):
+        """Allows making outbound HTTP requests to remote resources.
+
+        An instance of synapse.http.client.SimpleHttpClient
+        """
+        return self._http_client
+
+    @property
+    def public_room_list_manager(self):
+        """Allows adding to, removing from and checking the status of rooms in the
+        public room list.
+
+        An instance of synapse.module_api.PublicRoomListManager
+        """
+        return self._public_room_list_manager
 
     def get_user_by_req(self, req, allow_guest=False):
         """Check the access_token provided for a request
