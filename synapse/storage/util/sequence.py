@@ -32,8 +32,8 @@ Postgres sequence '%(seq)s' is inconsistent with associated
 table '%(table)s'. This can happen if Synapse has been downgraded and
 then upgraded again, or due to a bad migration.
 
-To fix shut down Synapse (including any and all workers) and run the
-following SQL:
+To fix this error, shut down Synapse (including any and all workers)
+and run the following SQL:
 
     SELECT setval('%(seq)s', (
         %(max_id_sql)s
@@ -100,7 +100,7 @@ class PostgresSequenceGenerator(SequenceGenerator):
             txn.close()
             return
 
-        # Now we fetch the current value from the sequence and compare wit the
+        # Now we fetch the current value from the sequence and compare with the
         # above.
         max_stream_id = row[0]
         txn.execute(
