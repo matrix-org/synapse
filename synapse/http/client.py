@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 import urllib
 from io import BytesIO
@@ -46,7 +45,12 @@ from twisted.internet.interfaces import (
 from twisted.internet.task import Cooperator
 from twisted.python.failure import Failure
 from twisted.web._newclient import ResponseDone
-from twisted.web.client import Agent, HTTPConnectionPool, readBody
+from twisted.web.client import (
+    Agent,
+    HTTPConnectionPool,
+    ResponseNeverReceived,
+    readBody,
+)
 from twisted.web.http import PotentialDataLoss
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IResponse
@@ -681,11 +685,11 @@ class SimpleHttpClient:
 
 
 def _timeout_to_request_timed_out_error(f: Failure):
-    if f.check(twisted_error.TimeoutError):
-        # the TCP connection has its own timeout (set by the 'connectTimeout' param
-        # on the Agent), which raises this exception.
+    if f.check(twisted_error.TimeoutError, twisted_error.ConnectingCancelledError):
+        # The TCP connection has its own timeout (set by the 'connectTimeout' param
+        # on the Agent), which raises twisted_error.TimeoutError exception.
         raise RequestTimedOutError("Timeout connecting to remote server")
-    elif f.check(defer.TimeoutError):
+    elif f.check(defer.TimeoutError, ResponseNeverReceived):
         # this one means that we hit our overall timeout on the request
         raise RequestTimedOutError("Timeout waiting for response from remote server")
 
