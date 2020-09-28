@@ -497,7 +497,7 @@ def timeout_deferred(
     def convert_cancelled(value: failure.Failure):
         # if the orgininal deferred was cancelled, and our timeout has fired, then
         # the reason it was cancelled was due to our timeout. Turn the CancelledError
-        # into a TimeOutError.
+        # into a TimeoutError.
         if timed_out[0] and value.check(CancelledError):
             raise defer.TimeoutError("Timed out after %gs" % (timeout,))
         return value
