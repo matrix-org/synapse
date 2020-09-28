@@ -1,0 +1,1 @@
+Remove unnecessary 3PID registration check when resetting password via an email address. Bug introduced in v0.34.0rc2.
