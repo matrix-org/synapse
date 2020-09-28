@@ -26,7 +26,6 @@ from twisted.web.http import Request
 from twisted.web.resource import Resource
 
 from synapse.api.errors import (
-    Codes,
     FederationDeniedError,
     HttpResponseException,
     NotFoundError,
