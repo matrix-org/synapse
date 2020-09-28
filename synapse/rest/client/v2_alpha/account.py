@@ -91,13 +91,6 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
 
-        if not await check_3pid_allowed(self.hs, "email", email):
-            raise SynapseError(
-                403,
-                "Your email domain is not authorized on this server",
-                Codes.THREEPID_DENIED,
-            )
-
         # The email will be sent to the stored address.
         # This avoids a potential account hijack by requesting a password reset to
         # an email address which is controlled by the attacker but which, after
