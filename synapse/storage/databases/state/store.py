@@ -99,6 +99,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         self._state_group_seq_gen = build_sequence_generator(
             self.database_engine, get_max_state_group_txn, "state_group_id_seq"
         )
+        self._state_group_seq_gen.check_consistency(
+            db_conn, table="state_groups", id_column="id"
+        )
 
     @cached(max_entries=10000, iterable=True)
     async def get_state_group_delta(self, state_group):

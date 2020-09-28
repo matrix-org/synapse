@@ -12,9 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 from synapse.storage.database import DatabasePool
+from synapse.storage.engines import IncorrectDatabaseSetup
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
 
 from tests.unittest import HomeserverTestCase
@@ -59,7 +58,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
                 writers=writers,
             )
 
-        return self.get_success(self.db_pool.runWithConnection(_create))
+        return self.get_success_or_raise(self.db_pool.runWithConnection(_create))
 
     def _insert_rows(self, instance_name: str, number: int):
         """Insert N rows as the given instance, inserting with stream IDs pulled
@@ -410,6 +409,23 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
         self.get_success(_get_next_async())
         self.assertEqual(id_gen_3.get_persisted_upto_position(), 6)
+
+    def test_sequence_consistency(self):
+        """Test that we error out if the table and sequence diverges.
+        """
+
+        # Prefill with some rows
+        self._insert_row_with_id("master", 3)
+
+        # Now we add a row *without* updating the stream ID
+        def _insert(txn):
+            txn.execute("INSERT INTO foobar VALUES (26, 'master')")
+
+        self.get_success(self.db_pool.runInteraction("_insert", _insert))
+
+        # Creating the ID gen should error
+        with self.assertRaises(IncorrectDatabaseSetup):
+            self._create_id_generator("first")
 
 
 class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):

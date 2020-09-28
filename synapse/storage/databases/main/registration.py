@@ -41,6 +41,9 @@ class RegistrationWorkerStore(SQLBaseStore):
         self.config = hs.config
         self.clock = hs.get_clock()
 
+        # Note: we don't check this sequence for consistency as we'd have to
+        # call `find_max_generated_user_id_localpart` each time, which is
+        # expensive if there are many entries.
         self._user_id_seq = build_sequence_generator(
             database.engine, find_max_generated_user_id_localpart, "user_id_seq",
         )

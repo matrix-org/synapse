@@ -258,6 +258,11 @@ class MultiWriterIdGenerator:
 
         self._sequence_gen = PostgresSequenceGenerator(sequence_name)
 
+        # We check that the table and sequence haven't diverged.
+        self._sequence_gen.check_consistency(
+            db_conn, table=table, id_column=id_column, positive=positive
+        )
+
         # This goes and fills out the above state from the database.
         self._load_current_ids(db_conn, table, instance_column, id_column)
 
