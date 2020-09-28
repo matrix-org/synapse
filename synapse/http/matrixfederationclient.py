@@ -657,9 +657,13 @@ class MatrixFederationHttpClient:
             long_retries (bool): whether to use the long retry algorithm. See
                 docs on _send_request for details.
 
-            timeout (int|None): number of milliseconds to wait for the response headers
-                (including connecting to the server), *for each attempt*.
+            timeout (int|None): number of milliseconds to wait for the response.
                 self._default_timeout (60s) by default.
+
+                Note that we may make several attempts to send the request; this
+                timeout applies to the time spent waiting for response headers for
+                *each* attempt (including connection time) as well as the time spent
+                reading the response body after a 200 response.
 
             ignore_backoff (bool): true to ignore the historical backoff data
                 and try the request anyway.
@@ -741,9 +745,13 @@ class MatrixFederationHttpClient:
             long_retries (bool): whether to use the long retry algorithm. See
                 docs on _send_request for details.
 
-            timeout (int|None): number of milliseconds to wait for the response headers
-                (including connecting to the server), *for each attempt*.
+            timeout (int|None): number of milliseconds to wait for the response.
                 self._default_timeout (60s) by default.
+
+                Note that we may make several attempts to send the request; this
+                timeout applies to the time spent waiting for response headers for
+                *each* attempt (including connection time) as well as the time spent
+                reading the response body after a 200 response.
 
             ignore_backoff (bool): true to ignore the historical backoff data and
                 try the request anyway.
@@ -808,9 +816,13 @@ class MatrixFederationHttpClient:
             args (dict|None): A dictionary used to create query strings, defaults to
                 None.
 
-            timeout (int|None): number of milliseconds to wait for the response headers
-                (including connecting to the server), *for each attempt*.
+            timeout (int|None): number of milliseconds to wait for the response.
                 self._default_timeout (60s) by default.
+
+                Note that we may make several attempts to send the request; this
+                timeout applies to the time spent waiting for response headers for
+                *each* attempt (including connection time) as well as the time spent
+                reading the response body after a 200 response.
 
             ignore_backoff (bool): true to ignore the historical backoff data
                 and try the request anyway.
@@ -877,9 +889,13 @@ class MatrixFederationHttpClient:
             long_retries (bool): whether to use the long retry algorithm. See
                 docs on _send_request for details.
 
-            timeout (int|None): number of milliseconds to wait for the response headers
-                (including connecting to the server), *for each attempt*.
+            timeout (int|None): number of milliseconds to wait for the response.
                 self._default_timeout (60s) by default.
+
+                Note that we may make several attempts to send the request; this
+                timeout applies to the time spent waiting for response headers for
+                *each* attempt (including connection time) as well as the time spent
+                reading the response body after a 200 response.
 
             ignore_backoff (bool): true to ignore the historical backoff data and
                 try the request anyway.
