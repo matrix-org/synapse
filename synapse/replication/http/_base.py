@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import abc
 import logging
 import re
@@ -26,6 +25,7 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
+from synapse.http import RequestTimedOutError
 from synapse.logging.opentracing import inject_active_span_byte_dict, trace
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import random_string
@@ -195,6 +195,9 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                         break
                     except CodeMessageException as e:
                         if e.code != 504 or not cls.RETRY_ON_TIMEOUT:
+                            raise
+                    except RequestTimedOutError:
+                        if not cls.RETRY_ON_TIMEOUT:
                             raise
 
                     logger.warning("%s request timed out", cls.NAME)

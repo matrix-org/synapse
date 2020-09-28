@@ -35,6 +35,7 @@ from synapse.config import (
     workers,
 )
 
+
 class ConfigError(Exception): ...
 
 MISSING_REPORT_STATS_CONFIG_INSTRUCTIONS: str
