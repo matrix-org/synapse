@@ -36,50 +36,6 @@ __all__ = ["errors", "make_deferred_yieldable", "run_in_background", "ModuleApi"
 logger = logging.getLogger(__name__)
 
 
-class PublicRoomListManager:
-    """Contains methods for adding to, removing from and querying whether a room
-    is in the public room list.
-
-    Args:
-        hs: The Homeserver object
-    """
-
-    def __init__(self, hs: "HomeServer"):
-        self._store = hs.get_datastore()
-
-    async def room_is_in_public_room_list(self, room_id: str) -> bool:
-        """Checks whether a room is in the public room list.
-
-        Args:
-            room_id: The ID of the room.
-
-        Returns:
-            Whether the room is in the public room list. Returns False if the room does
-            not exist.
-        """
-        room = await self._store.get_room(room_id)
-        if not room:
-            return False
-
-        return room.get("is_public", False)
-
-    async def add_room_to_public_room_list(self, room_id: str) -> None:
-        """Publishes a room to the public room list.
-
-        Args:
-            room_id: The ID of the room.
-        """
-        await self._store.set_room_is_public(room_id, True)
-
-    async def remove_room_from_public_room_list(self, room_id: str) -> None:
-        """Removes a room from the public room list.
-
-        Args:
-            room_id: The ID of the room.
-        """
-        await self._store.set_room_is_public(room_id, False)
-
-
 class ModuleApi:
     """A proxy object that gets passed to various plugin modules so they
     can register new users etc if necessary.
@@ -318,3 +274,47 @@ class ModuleApi:
         await self._auth_handler.complete_sso_login(
             registered_user_id, request, client_redirect_url,
         )
+
+
+class PublicRoomListManager:
+    """Contains methods for adding to, removing from and querying whether a room
+    is in the public room list.
+
+    Args:
+        hs: The Homeserver object
+    """
+
+    def __init__(self, hs: "HomeServer"):
+        self._store = hs.get_datastore()
+
+    async def room_is_in_public_room_list(self, room_id: str) -> bool:
+        """Checks whether a room is in the public room list.
+
+        Args:
+            room_id: The ID of the room.
+
+        Returns:
+            Whether the room is in the public room list. Returns False if the room does
+            not exist.
+        """
+        room = await self._store.get_room(room_id)
+        if not room:
+            return False
+
+        return room.get("is_public", False)
+
+    async def add_room_to_public_room_list(self, room_id: str) -> None:
+        """Publishes a room to the public room list.
+
+        Args:
+            room_id: The ID of the room.
+        """
+        await self._store.set_room_is_public(room_id, True)
+
+    async def remove_room_from_public_room_list(self, room_id: str) -> None:
+        """Removes a room from the public room list.
+
+        Args:
+            room_id: The ID of the room.
+        """
+        await self._store.set_room_is_public(room_id, False)
