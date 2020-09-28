@@ -45,7 +45,9 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
             sql = """
                 SELECT COALESCE(count(*), 0)
                 FROM monthly_active_users
-                INNER JOIN users ON monthly_active_users.user_id=users.name AND appservice_id IS NULL;
+                    LEFT JOIN users
+                    ON monthly_active_users.user_id=users.name
+                WHERE (users.appservice_id IS NULL OR users.appservice_id = '');
             """
             txn.execute(sql)
             (count,) = txn.fetchone()
