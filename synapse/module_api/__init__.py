@@ -279,9 +279,6 @@ class ModuleApi:
 class PublicRoomListManager:
     """Contains methods for adding to, removing from and querying whether a room
     is in the public room list.
-
-    Args:
-        hs: The Homeserver object
     """
 
     def __init__(self, hs: "HomeServer"):
