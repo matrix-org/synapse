@@ -29,6 +29,18 @@ _extremities_collecter = GaugeBucketCollector(
     buckets=[1, 2, 3, 5, 7, 10, 15, 20, 50, 100, 200, 500],
 )
 
+# we also expose metrics on the "number of excess extremity events", which is
+# (E-1)*N, where E is the number of extremities and N is the number of state
+# events in the room. This is an approximation to the number of state events
+# we could remove from state resolution by reducing the graph to a single
+# forward extremity.
+_excess_state_events_collecter = GaugeBucketCollector(
+    "synapse_excess_extremity_events",
+    "Number of rooms on the server with the given number of excess extremity "
+    "events, or fewer",
+    buckets=[0] + [1 << n for n in range(12)],
+)
+
 
 class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
     """Functions to pull various metrics from the DB, for e.g. phone home
@@ -52,14 +64,25 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
         def fetch(txn):
             txn.execute(
                 """
-                select count(*) c from event_forward_extremities
-                group by room_id
+                SELECT t1.c, t2.c
+                FROM (
+                    SELECT room_id, COUNT(*) c FROM event_forward_extremities
+                    GROUP BY room_id
+                ) t1 LEFT JOIN (
+                    SELECT room_id, COUNT(*) c FROM current_state_events
+                    GROUP BY room_id
+                ) t2 ON t1.room_id = t2.room_id
                 """
             )
             return txn.fetchall()
 
         res = await self.db_pool.runInteraction("read_forward_extremities", fetch)
+
         _extremities_collecter.update_data(x[0] for x in res)
+
+        _excess_state_events_collecter.update_data(
+            (x[0] - 1) * x[1] for x in res if x[1]
+        )
 
     async def count_daily_messages(self):
         """
