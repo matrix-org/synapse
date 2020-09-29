@@ -64,7 +64,8 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
                 "read_forward_extremities", self._read_forward_extremities
             )
 
-        hs.get_clock().looping_call(read_forward_extremities, 60 * 60 * 1000)
+        if hs.config.run_background_tasks:
+            self._clock.looping_call(read_forward_extremities, 60 * 60 * 1000)
 
         # Used in _generate_user_daily_visits to keep track of progress
         self._last_user_visit_update = self._get_start_of_day()
