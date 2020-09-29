@@ -16,7 +16,7 @@
 import logging
 from typing import Awaitable, Callable, Dict, Optional
 
-from synapse.api.errors import Codes, LoginError, NotFoundError, SynapseError
+from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
@@ -103,7 +103,6 @@ class LoginRestServlet(RestServlet):
         self.oidc_enabled = hs.config.oidc_enabled
 
         self.auth_handler = self.hs.get_auth_handler()
-        self.device_handler = hs.get_device_handler()
         self.registration_handler = hs.get_registration_handler()
         self.handlers = hs.get_handlers()
         self._well_known_builder = WellKnownBuilder(hs)
@@ -402,114 +401,6 @@ class LoginRestServlet(RestServlet):
         return result
 
 
-class RestoreDeviceServlet(RestServlet):
-    # FIXME: move this to v2_alpha/devices.py.  This is kept here for now to
-    # make it easier to compare with the other PR.
-    """Request or complete a rehydration request.
-
-    GET /org.matrix.msc2697.v2/restore_device
-
-    HTTP/1.1 200 OK
-    Content-Type: application/json
-
-    {
-      "device_id": "dehydrated_device_id",
-      "device_data": {"device": "data"}
-    }
-
-    POST /org.matrix.msc2697.v2/restore_device
-    Content-Type: application/json
-
-    {
-      "device_id": "dehydrated_device_id"
-    }
-
-    HTTP/1.1 200 OK
-    Content-Type: application/json
-
-    {
-      "success": true,
-    }
-
-    """
-
-    PATTERNS = client_patterns("/org.matrix.msc2697.v2/restore_device")
-
-    def __init__(self, hs):
-        super(RestoreDeviceServlet, self).__init__()
-        self.hs = hs
-        self.auth = hs.get_auth()
-        self.device_handler = hs.get_device_handler()
-        self._well_known_builder = WellKnownBuilder(hs)
-
-    async def on_GET(self, request: SynapseRequest):
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        (
-            device_id,
-            dehydrated_device,
-        ) = await self.device_handler.get_dehydrated_device(requester.user.to_string())
-        if dehydrated_device:
-            result = {"device_id": device_id, "device_data": dehydrated_device}
-            return (200, result)
-        else:
-            raise NotFoundError()
-
-    async def on_POST(self, request: SynapseRequest):
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
-
-        submission = parse_json_object_from_request(request)
-
-        result = await self.device_handler.rehydrate_device(
-            requester.user.to_string(),
-            self.auth.get_access_token_from_request(request),
-            submission["device_id"],
-        )
-
-        return (200, result)
-
-
-class StoreDeviceServlet(RestServlet):
-    """Store a dehydrated device.
-
-    POST /org.matrix.msc2697/device/dehydrate
-    Content-Type: application/json
-
-    {
-      "device_data": {
-        "algorithm": "m.dehydration.v1.olm",
-        "account": "dehydrated_device"
-      }
-    }
-
-    HTTP/1.1 200 OK
-    Content-Type: application/json
-
-    {
-      "device_id": "dehydrated_device_id"
-    }
-
-    """
-
-    PATTERNS = client_patterns("/org.matrix.msc2697/device/dehydrate")
-
-    def __init__(self, hs):
-        super(StoreDeviceServlet, self).__init__()
-        self.hs = hs
-        self.auth = hs.get_auth()
-        self.device_handler = hs.get_device_handler()
-
-    async def on_POST(self, request: SynapseRequest):
-        submission = parse_json_object_from_request(request)
-        requester = await self.auth.get_user_by_req(request)
-
-        device_id = await self.device_handler.store_dehydrated_device(
-            requester.user.to_string(),
-            submission["device_data"],
-            submission.get("initial_device_display_name", None),
-        )
-        return 200, {"device_id": device_id}
-
-
 class BaseSSORedirectServlet(RestServlet):
     """Common base class for /login/sso/redirect impls"""
 
@@ -608,8 +499,6 @@ class OIDCRedirectServlet(BaseSSORedirectServlet):
 
 def register_servlets(hs, http_server):
     LoginRestServlet(hs).register(http_server)
-    RestoreDeviceServlet(hs).register(http_server)
-    StoreDeviceServlet(hs).register(http_server)
     if hs.config.cas_enabled:
         CasRedirectServlet(hs).register(http_server)
         CasTicketServlet(hs).register(http_server)
