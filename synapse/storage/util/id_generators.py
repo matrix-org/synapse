@@ -273,6 +273,19 @@ class MultiWriterIdGenerator:
 
         # Load the current positions of all writers for the stream.
         if self._writers:
+            # We delete any stale entries in the positions table. This is
+            # important if we add back a writer after a long time; we want to
+            # consider that a "new" writer, rather than using the old stale
+            # entry here.
+            sql = """
+                DELETE FROM stream_positions
+                WHERE
+                    stream_name = ?
+                    AND instance_name != ALL(?)
+            """
+            sql = self._db.engine.convert_param_style(sql)
+            cur.execute(sql, (self._stream_name, self._writers))
+
             sql = """
                 SELECT instance_name, stream_id FROM stream_positions
                 WHERE stream_name = ?

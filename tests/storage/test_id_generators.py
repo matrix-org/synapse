@@ -421,6 +421,13 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self.get_success(_get_next_async())
         self.assertEqual(id_gen_3.get_persisted_upto_position(), 6)
 
+        # If we add back the old "first" then we shouldn't see the persisted up
+        # to position revert back to 3.
+        id_gen_5 = self._create_id_generator("five", writers=["first", "third"])
+        self.assertEqual(id_gen_5.get_persisted_upto_position(), 6)
+        self.assertEqual(id_gen_5.get_current_token_for_writer("first"), 6)
+        self.assertEqual(id_gen_5.get_current_token_for_writer("third"), 6)
+
     def test_sequence_consistency(self):
         """Test that we error out if the table and sequence diverges.
         """
