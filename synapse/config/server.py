@@ -650,8 +650,9 @@ class ServerConfig(Config):
         # In most cases you should avoid using a matrix specific subdomain such as
         # matrix.example.com or synapse.example.com as the server_name for the same
         # reasons you wouldn't use user@email.example.com as your email address.
-        # See docs/delegate.md for information on how to host Synapse on a subdomain
-        # while preserving a clean server_name.
+        # See https://github.com/matrix-org/synapse/blob/master/docs/delegate.md
+        # for information on how to host Synapse on a subdomain while preserving
+        # a clean server_name.
         #
         # The server_name cannot be changed later so it is important to
         # configure this correctly before you start Synapse. It should be all
