@@ -1134,7 +1134,7 @@ class RoomEventSource:
                 events[:] = events[:limit]
 
             if events:
-                end_key = RoomStreamToken.parse(events[-1].internal_metadata.after)
+                end_key = events[-1].internal_metadata.after
             else:
                 end_key = to_key
 

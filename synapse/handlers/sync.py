@@ -519,7 +519,7 @@ class SyncHandler:
             if len(recents) > timeline_limit:
                 limited = True
                 recents = recents[-timeline_limit:]
-                room_key = RoomStreamToken.parse(recents[0].internal_metadata.before)
+                room_key = recents[0].internal_metadata.before
 
             prev_batch_token = now_token.copy_and_replace("room_key", room_key)
 
