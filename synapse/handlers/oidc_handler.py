@@ -197,7 +197,7 @@ class OidcHandler:
                     % (m["response_types_supported"],)
                 )
 
-        # Ensure there's a userinfo endpoint to fetch from if it is requred.
+        # Ensure there's a userinfo endpoint to fetch from if it is required.
         if self._uses_userinfo:
             if m.get("userinfo_endpoint") is None:
                 raise ValueError(
