@@ -1138,7 +1138,7 @@ class EventCreationHandler:
             if prev_state_ids:
                 raise AuthError(403, "Changing the room create event is forbidden")
 
-        event_stream_id, max_stream_id = await self.storage.persistence.persist_event(
+        event_pos, max_stream_token = await self.storage.persistence.persist_event(
             event, context=context
         )
 
@@ -1149,7 +1149,7 @@ class EventCreationHandler:
         def _notify():
             try:
                 self.notifier.on_new_room_event(
-                    event, event_stream_id, max_stream_id, extra_users=extra_users
+                    event, event_pos, max_stream_token, extra_users=extra_users
                 )
             except Exception:
                 logger.exception("Error notifying about new room event")
@@ -1161,7 +1161,7 @@ class EventCreationHandler:
             # matters as sometimes presence code can take a while.
             run_in_background(self._bump_active_time, requester.user)
 
-        return event_stream_id
+        return event_pos.stream
 
     async def _bump_active_time(self, user: UserID) -> None:
         try:
@@ -1182,54 +1182,7 @@ class EventCreationHandler:
         )
 
         for room_id in room_ids:
-            # For each room we need to find a joined member we can use to send
-            # the dummy event with.
-
-            latest_event_ids = await self.store.get_prev_events_for_room(room_id)
-
-            members = await self.state.get_current_users_in_room(
-                room_id, latest_event_ids=latest_event_ids
-            )
-            dummy_event_sent = False
-            for user_id in members:
-                if not self.hs.is_mine_id(user_id):
-                    continue
-                requester = create_requester(user_id)
-                try:
-                    event, context = await self.create_event(
-                        requester,
-                        {
-                            "type": "org.matrix.dummy_event",
-                            "content": {},
-                            "room_id": room_id,
-                            "sender": user_id,
-                        },
-                        prev_event_ids=latest_event_ids,
-                    )
-
-                    event.internal_metadata.proactively_send = False
-
-                    # Since this is a dummy-event it is OK if it is sent by a
-                    # shadow-banned user.
-                    await self.send_nonmember_event(
-                        requester,
-                        event,
-                        context,
-                        ratelimit=False,
-                        ignore_shadow_ban=True,
-                    )
-                    dummy_event_sent = True
-                    break
-                except ConsentNotGivenError:
-                    logger.info(
-                        "Failed to send dummy event into room %s for user %s due to "
-                        "lack of consent. Will try another user" % (room_id, user_id)
-                    )
-                except AuthError:
-                    logger.info(
-                        "Failed to send dummy event into room %s for user %s due to "
-                        "lack of power. Will try another user" % (room_id, user_id)
-                    )
+            dummy_event_sent = await self._send_dummy_event_for_room(room_id)
 
             if not dummy_event_sent:
                 # Did not find a valid user in the room, so remove from future attempts
@@ -1241,6 +1194,59 @@ class EventCreationHandler:
                 )
                 now = self.clock.time_msec()
                 self._rooms_to_exclude_from_dummy_event_insertion[room_id] = now
+
+    async def _send_dummy_event_for_room(self, room_id: str) -> bool:
+        """Attempt to send a dummy event for the given room.
+
+        Args:
+            room_id: room to try to send an event from
+
+        Returns:
+            True if a dummy event was successfully sent. False if no user was able
+            to send an event.
+        """
+
+        # For each room we need to find a joined member we can use to send
+        # the dummy event with.
+        latest_event_ids = await self.store.get_prev_events_for_room(room_id)
+        members = await self.state.get_current_users_in_room(
+            room_id, latest_event_ids=latest_event_ids
+        )
+        for user_id in members:
+            if not self.hs.is_mine_id(user_id):
+                continue
+            requester = create_requester(user_id)
+            try:
+                event, context = await self.create_event(
+                    requester,
+                    {
+                        "type": "org.matrix.dummy_event",
+                        "content": {},
+                        "room_id": room_id,
+                        "sender": user_id,
+                    },
+                    prev_event_ids=latest_event_ids,
+                )
+
+                event.internal_metadata.proactively_send = False
+
+                # Since this is a dummy-event it is OK if it is sent by a
+                # shadow-banned user.
+                await self.send_nonmember_event(
+                    requester, event, context, ratelimit=False, ignore_shadow_ban=True,
+                )
+                return True
+            except ConsentNotGivenError:
+                logger.info(
+                    "Failed to send dummy event into room %s for user %s due to "
+                    "lack of consent. Will try another user" % (room_id, user_id)
+                )
+            except AuthError:
+                logger.info(
+                    "Failed to send dummy event into room %s for user %s due to "
+                    "lack of power. Will try another user" % (room_id, user_id)
+                )
+        return False
 
     def _expire_rooms_to_exclude_from_dummy_event_insertion(self):
         expire_before = self.clock.time_msec() - _DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY

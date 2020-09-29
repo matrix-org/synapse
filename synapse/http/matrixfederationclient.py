@@ -473,8 +473,6 @@ class MatrixFederationHttpClient:
                             )
 
                             response = await request_deferred
-                    except TimeoutError as e:
-                        raise RequestSendFailed(e, can_retry=True) from e
                     except DNSLookupError as e:
                         raise RequestSendFailed(e, can_retry=retry_on_dns_fail) from e
                     except Exception as e:
