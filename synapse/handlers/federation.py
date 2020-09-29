@@ -156,7 +156,7 @@ class FederationHandler(BaseHandler):
             self._maybe_store_room_on_invite = self.store.maybe_store_room_on_invite
 
         # When joining a room we need to queue any events for that room up
-        self.room_queues = {}
+        self.room_queues = {}  # type: Dict[str, List[Tuple[str, EventBase]]]
         self._room_pdu_linearizer = Linearizer("fed_room_pdu")
 
         self.third_party_event_rules = hs.get_third_party_event_rules()
@@ -813,6 +813,9 @@ class FederationHandler(BaseHandler):
         events = await self.federation_client.backfill(
             dest, room_id, limit=limit, extremities=extremities
         )
+
+        if not events:
+            return []
 
         # ideally we'd sanity check the events here for excess prev_events etc,
         # but it's hard to reject events at this point without completely
@@ -2164,10 +2167,10 @@ class FederationHandler(BaseHandler):
             # given state at the event. This should correctly handle cases
             # like bans, especially with state res v2.
 
-            state_sets = await self.state_store.get_state_groups(
+            state_sets_d = await self.state_store.get_state_groups(
                 event.room_id, extrem_ids
             )
-            state_sets = list(state_sets.values())
+            state_sets = list(state_sets_d.values())  # type: List[Iterable[EventBase]]
             state_sets.append(state)
             current_states = await self.state_handler.resolve_events(
                 room_version, state_sets, event
@@ -2958,6 +2961,7 @@ class FederationHandler(BaseHandler):
             )
             return result["max_stream_id"]
         else:
+            assert self.storage.persistence
             max_stream_token = await self.storage.persistence.persist_events(
                 event_and_contexts, backfilled=backfilled
             )

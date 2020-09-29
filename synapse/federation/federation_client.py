@@ -24,10 +24,12 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Mapping,
     Optional,
     Sequence,
     Tuple,
     TypeVar,
+    Union,
 )
 
 from prometheus_client import Counter
@@ -501,7 +503,7 @@ class FederationClient(FederationBase):
         user_id: str,
         membership: str,
         content: dict,
-        params: Dict[str, str],
+        params: Optional[Mapping[str, Union[str, Iterable[str]]]],
     ) -> Tuple[str, EventBase, RoomVersion]:
         """
         Creates an m.room.member event, with context, without participating in the room.
