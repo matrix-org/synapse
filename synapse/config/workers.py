@@ -109,12 +109,10 @@ class WorkerConfig(Config):
             federation_sender_instances
         )
 
-        # A map from instance name to host/port of their HTTP replication endpoint
-        # (or None if there's no HTTP replication endpoint).
+        # A map from instance name to host/port of their HTTP replication endpoint.
         instance_map = config.get("instance_map") or {}
         self.instance_map = {
-            name: InstanceLocationConfig(**c) if c else None
-            for name, c in instance_map.items()
+            name: InstanceLocationConfig(**c) for name, c in instance_map.items()
         }
 
         # Map from type of streams to source, c.f. WriterLocations.
@@ -140,14 +138,9 @@ class WorkerConfig(Config):
         # be able to run on only a single instance (meaning that they don't
         # depend on any in-memory state of a particular worker).
         #
-        # Effort is not made to ensure only a single instance of these tasks is
+        # No effort is made to ensure only a single instance of these tasks is
         # running.
         instance = config.get("run_background_tasks_on") or "master"
-        if instance != "master" and instance not in self.instance_map:
-            raise ConfigError(
-                "Instance %r is configured to run background tasks but does not appear in `instance_map` config."
-                % (instance,)
-            )
         self.run_background_tasks = (
             self.worker_name is None and instance == "master"
         ) or self.worker_name == instance

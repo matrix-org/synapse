@@ -310,15 +310,12 @@ worker. Background tasks are run periodically or started via replication. Exactl
 which tasks are configured to run depends on your Synapse configuration (e.g. if
 stats is enabled).
 
-To enable this, the worker must have a `worker_name` and be listed in the
-`instance_map` config. For example, to move background tasks to a dedicated
-worker, the shared configuration would include:
+To enable this, the worker must have a `worker_name` and can be configured to run
+background tasks. For example, to move background tasks to a dedicated worker,
+the shared configuration would include:
 
 ```yaml
-instance_map:
-    background_worker: null
-
-run_background_tasks: background_worker
+run_background_tasks_on: background_worker
 ```
 
 ### `synapse.app.pusher`
