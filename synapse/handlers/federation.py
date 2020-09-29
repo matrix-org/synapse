@@ -155,8 +155,9 @@ class FederationHandler(BaseHandler):
             self._device_list_updater = hs.get_device_handler().device_list_updater
             self._maybe_store_room_on_invite = self.store.maybe_store_room_on_invite
 
-        # When joining a room we need to queue any events for that room up
-        self.room_queues = {}  # type: Dict[str, List[Tuple[str, EventBase]]]
+        # When joining a room we need to queue any events for that room up.
+        # For each room, a list of (pdu, origin) tuples.
+        self.room_queues = {}  # type: Dict[str, List[Tuple[EventBase, str]]]
         self._room_pdu_linearizer = Linearizer("fed_room_pdu")
 
         self.third_party_event_rules = hs.get_third_party_event_rules()
