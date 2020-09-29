@@ -466,7 +466,7 @@ class MultiWriterIdGenerator:
         """Returns the position of the given writer.
         """
 
-        # If we don't have an entry for the given instance name, we assume its a
+        # If we don't have an entry for the given instance name, we assume it's a
         # new writer.
         #
         # For new writers we assume their initial position to be the current
