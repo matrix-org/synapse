@@ -41,7 +41,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
         """
 
         def _count_users(txn):
-            # Ensure we only fetch native users
+            # Exclude app service users
             sql = """
                 SELECT COALESCE(count(*), 0)
                 FROM monthly_active_users
