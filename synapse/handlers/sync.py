@@ -1595,15 +1595,23 @@ class SyncHandler:
 
             if leave_events:
                 leave_event = leave_events[-1]
-                leave_stream_token = await self.store.get_stream_token_for_event(
+                leave_position = await self.store.get_position_for_event(
                     leave_event.event_id
                 )
-                leave_token = since_token.copy_and_replace(
-                    "room_key", leave_stream_token
-                )
 
-                if since_token and since_token.is_after(leave_token):
+                # If the leave event happened before the since token then we
+                # bail.
+                if since_token and not leave_position.persisted_after(
+                    since_token.room_key
+                ):
                     continue
+
+                # We can safely convert the position of the leave event into a
+                # stream token as it'll only be used in the context of this
+                # room. (c.f. the docstring of `to_room_stream_token`).
+                leave_token = since_token.copy_and_replace(
+                    "room_key", leave_position.to_room_stream_token()
+                )
 
                 # If this is an out of band message, like a remote invite
                 # rejection, we include it in the recents batch. Otherwise, we
