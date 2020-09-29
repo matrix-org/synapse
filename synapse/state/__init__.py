@@ -448,14 +448,13 @@ class StateHandler:
 
         state_map = {ev.event_id: ev for st in state_sets for ev in st}
 
-        with Measure(self.clock, "state._resolve_events"):
-            new_state = await self._state_resolution_handler.resolve_events_with_store(
-                event.room_id,
-                room_version,
-                state_set_ids,
-                event_map=state_map,
-                state_res_store=StateResolutionStore(self.store),
-            )
+        new_state = await self._state_resolution_handler.resolve_events_with_store(
+            event.room_id,
+            room_version,
+            state_set_ids,
+            event_map=state_map,
+            state_res_store=StateResolutionStore(self.store),
+        )
 
         return {key: state_map[ev_id] for key, ev_id in new_state.items()}
 
@@ -529,14 +528,13 @@ class StateResolutionHandler:
 
             state_groups_histogram.observe(len(state_groups_ids))
 
-            with Measure(self.clock, "state._resolve_events"):
-                new_state = await self.resolve_events_with_store(
-                    room_id,
-                    room_version,
-                    list(state_groups_ids.values()),
-                    event_map=event_map,
-                    state_res_store=state_res_store,
-                )
+            new_state = await self.resolve_events_with_store(
+                room_id,
+                room_version,
+                list(state_groups_ids.values()),
+                event_map=event_map,
+                state_res_store=state_res_store,
+            )
 
             # if the new state matches any of the input state groups, we can
             # use that state group again. Otherwise we will generate a state_id
@@ -550,14 +548,14 @@ class StateResolutionHandler:
 
             return cache
 
-    def resolve_events_with_store(
+    async def resolve_events_with_store(
         self,
         room_id: str,
         room_version: str,
         state_sets: Sequence[StateMap[str]],
         event_map: Optional[Dict[str, EventBase]],
         state_res_store: "StateResolutionStore",
-    ) -> Awaitable[StateMap[str]]:
+    ) -> StateMap[str]:
         """
         Args:
             room_id: the room we are working in
@@ -580,20 +578,21 @@ class StateResolutionHandler:
         Returns:
             a map from (type, state_key) to event_id.
         """
-        v = KNOWN_ROOM_VERSIONS[room_version]
-        if v.state_res == StateResolutionVersions.V1:
-            return v1.resolve_events_with_store(
-                room_id, state_sets, event_map, state_res_store.get_events
-            )
-        else:
-            return v2.resolve_events_with_store(
-                self.clock,
-                room_id,
-                room_version,
-                state_sets,
-                event_map,
-                state_res_store,
-            )
+        with Measure(self.clock, "state._resolve_events"):
+            v = KNOWN_ROOM_VERSIONS[room_version]
+            if v.state_res == StateResolutionVersions.V1:
+                return await v1.resolve_events_with_store(
+                    room_id, state_sets, event_map, state_res_store.get_events
+                )
+            else:
+                return await v2.resolve_events_with_store(
+                    self.clock,
+                    room_id,
+                    room_version,
+                    state_sets,
+                    event_map,
+                    state_res_store,
+                )
 
 
 def _make_state_cache_entry(
