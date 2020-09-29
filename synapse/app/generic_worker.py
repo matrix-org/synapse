@@ -127,6 +127,7 @@ from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.server import HomeServer, cache_in_self
 from synapse.storage.databases.main.censor_events import CensorEventsStore
+from synapse.storage.databases.main.client_ips import ClientIpWorkerStore
 from synapse.storage.databases.main.media_repository import MediaRepositoryStore
 from synapse.storage.databases.main.metrics import ServerMetricsStore
 from synapse.storage.databases.main.monthly_active_users import (
@@ -466,6 +467,7 @@ class GenericWorkerSlavedStore(
     SlavedAccountDataStore,
     SlavedPusherStore,
     CensorEventsStore,
+    ClientIpWorkerStore,
     SlavedEventStore,
     SlavedKeyStore,
     RoomStore,
