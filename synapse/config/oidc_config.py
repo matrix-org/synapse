@@ -161,7 +161,7 @@ class OIDCConfig(Config):
           #skip_verification: true
 
           # Whether to fetch the user profile from the userinfo endpoint. Valid
-          # values are:
+          # values are: "auto" or "userinfo_endpoint".
           #
           # Defaults to "auto", which fetches the userinfo endpoint if "openid" is included
           # in `scopes`. Uncomment the following to always fetch the userinfo endpoint.
