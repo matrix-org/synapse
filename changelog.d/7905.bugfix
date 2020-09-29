@@ -1,0 +1,1 @@
+Fix a longstanding bug when storing a media file with an empty `upload_name`.
