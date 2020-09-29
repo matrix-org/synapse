@@ -136,6 +136,7 @@ from synapse.storage.databases.main.monthly_active_users import (
 from synapse.storage.databases.main.presence import UserPresenceState
 from synapse.storage.databases.main.search import SearchWorkerStore
 from synapse.storage.databases.main.stats import StatsStore
+from synapse.storage.databases.main.transactions import TransactionWorkerStore
 from synapse.storage.databases.main.ui_auth import UIAuthWorkerStore
 from synapse.storage.databases.main.user_directory import UserDirectoryStore
 from synapse.types import ReadReceipt
@@ -483,6 +484,7 @@ class GenericWorkerSlavedStore(
     MediaRepositoryStore,
     ServerMetricsStore,
     SearchWorkerStore,
+    TransactionWorkerStore,
     BaseSlavedStore,
 ):
     pass
