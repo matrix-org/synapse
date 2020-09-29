@@ -63,8 +63,8 @@ class UploadResource(DirectServeJsonResource):
                     msg="Invalid UTF-8 filename parameter: %r" % (upload_name), code=400
                 )
 
-        # upload_name might be an empty byte string
-        if not len(upload_name):
+        # If the name is falsey (e.g. an empty byte string) ensure it is None.
+        else:
             upload_name = None
 
         headers = request.requestHeaders
