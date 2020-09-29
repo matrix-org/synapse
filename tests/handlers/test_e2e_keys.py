@@ -179,7 +179,7 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
 
         yield defer.ensureDeferred(
             self.handler.upload_keys_for_user(
-                local_user, device_id, {"fallback_keys": keys}
+                local_user, device_id, {"org.matrix.msc2732.fallback_keys": keys}
             )
         )
 
