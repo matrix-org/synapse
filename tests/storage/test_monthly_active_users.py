@@ -137,6 +137,21 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         count = self.get_success(self.store.get_monthly_active_count())
         self.assertEqual(count, 1)
 
+    def test_appservice_user_not_counted_in_mau(self):
+        self.get_success(
+            self.store.register_user(
+                user_id="@appservice_user:server", appservice_id="wibble"
+            )
+        )
+        count = self.get_success(self.store.get_monthly_active_count())
+        self.assertEqual(count, 0)
+
+        d = self.store.upsert_monthly_active_user("@appservice_user:server")
+        self.get_success(d)
+
+        count = self.get_success(self.store.get_monthly_active_count())
+        self.assertEqual(count, 0)
+
     def test_user_last_seen_monthly_active(self):
         user_id1 = "@user1:server"
         user_id2 = "@user2:server"
@@ -383,7 +398,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.get_success(self.store.upsert_monthly_active_user(appservice2_user1))
 
         count = self.get_success(self.store.get_monthly_active_count())
-        self.assertEqual(count, 4)
+        self.assertEqual(count, 1)
 
         d = self.store.get_monthly_active_count_by_service()
         result = self.get_success(d)
