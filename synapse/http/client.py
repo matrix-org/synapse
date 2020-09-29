@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 import urllib
 from io import BytesIO
@@ -38,7 +37,7 @@ from zope.interface import implementer, provider
 
 from OpenSSL import SSL
 from OpenSSL.SSL import VERIFY_NONE
-from twisted.internet import defer, protocol, ssl
+from twisted.internet import defer, error as twisted_error, protocol, ssl
 from twisted.internet.interfaces import (
     IReactorPluggableNameResolver,
     IResolutionReceiver,
@@ -46,17 +45,18 @@ from twisted.internet.interfaces import (
 from twisted.internet.task import Cooperator
 from twisted.python.failure import Failure
 from twisted.web._newclient import ResponseDone
-from twisted.web.client import Agent, HTTPConnectionPool, readBody
+from twisted.web.client import (
+    Agent,
+    HTTPConnectionPool,
+    ResponseNeverReceived,
+    readBody,
+)
 from twisted.web.http import PotentialDataLoss
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IResponse
 
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
-from synapse.http import (
-    QuieterFileBodyProducer,
-    cancelled_to_request_timed_out_error,
-    redact_uri,
-)
+from synapse.http import QuieterFileBodyProducer, RequestTimedOutError, redact_uri
 from synapse.http.proxyagent import ProxyAgent
 from synapse.logging.context import make_deferred_yieldable
 from synapse.logging.opentracing import set_tag, start_active_span, tags
@@ -332,8 +332,6 @@ class SimpleHttpClient:
             RequestTimedOutError if the request times out before the headers are read
 
         """
-        # A small wrapper around self.agent.request() so we can easily attach
-        # counters to it
         outgoing_requests_counter.labels(method).inc()
 
         # log request but strip `access_token` (AS requests for example include this)
@@ -362,15 +360,17 @@ class SimpleHttpClient:
                     data=body_producer,
                     headers=headers,
                     **self._extra_treq_args
-                )
+                )  # type: defer.Deferred
+
                 # we use our own timeout mechanism rather than treq's as a workaround
                 # for https://twistedmatrix.com/trac/ticket/9534.
                 request_deferred = timeout_deferred(
-                    request_deferred,
-                    60,
-                    self.hs.get_reactor(),
-                    cancelled_to_request_timed_out_error,
+                    request_deferred, 60, self.hs.get_reactor(),
                 )
+
+                # turn timeouts into RequestTimedOutErrors
+                request_deferred.addErrback(_timeout_to_request_timed_out_error)
+
                 response = await make_deferred_yieldable(request_deferred)
 
                 incoming_responses_counter.labels(method, response.code).inc()
@@ -410,7 +410,7 @@ class SimpleHttpClient:
             parsed json
 
         Raises:
-            RequestTimedOutException: if there is a timeout before the response headers
+            RequestTimedOutError: if there is a timeout before the response headers
                are received. Note there is currently no timeout on reading the response
                body.
 
@@ -461,7 +461,7 @@ class SimpleHttpClient:
             parsed json
 
         Raises:
-            RequestTimedOutException: if there is a timeout before the response headers
+            RequestTimedOutError: if there is a timeout before the response headers
                are received. Note there is currently no timeout on reading the response
                body.
 
@@ -506,7 +506,7 @@ class SimpleHttpClient:
         Returns:
             Succeeds when we get a 2xx HTTP response, with the HTTP body as JSON.
         Raises:
-            RequestTimedOutException: if there is a timeout before the response headers
+            RequestTimedOutError: if there is a timeout before the response headers
                are received. Note there is currently no timeout on reading the response
                body.
 
@@ -538,7 +538,7 @@ class SimpleHttpClient:
         Returns:
             Succeeds when we get a 2xx HTTP response, with the HTTP body as JSON.
         Raises:
-             RequestTimedOutException: if there is a timeout before the response headers
+             RequestTimedOutError: if there is a timeout before the response headers
                are received. Note there is currently no timeout on reading the response
                body.
 
@@ -586,7 +586,7 @@ class SimpleHttpClient:
             Succeeds when we get a 2xx HTTP response, with the
             HTTP body as bytes.
         Raises:
-            RequestTimedOutException: if there is a timeout before the response headers
+            RequestTimedOutError: if there is a timeout before the response headers
                are received. Note there is currently no timeout on reading the response
                body.
 
@@ -631,7 +631,7 @@ class SimpleHttpClient:
             headers, absolute URI of the response and HTTP response code.
 
         Raises:
-            RequestTimedOutException: if there is a timeout before the response headers
+            RequestTimedOutError: if there is a timeout before the response headers
                are received. Note there is currently no timeout on reading the response
                body.
 
@@ -682,6 +682,18 @@ class SimpleHttpClient:
             response.request.absoluteURI.decode("ascii"),
             response.code,
         )
+
+
+def _timeout_to_request_timed_out_error(f: Failure):
+    if f.check(twisted_error.TimeoutError, twisted_error.ConnectingCancelledError):
+        # The TCP connection has its own timeout (set by the 'connectTimeout' param
+        # on the Agent), which raises twisted_error.TimeoutError exception.
+        raise RequestTimedOutError("Timeout connecting to remote server")
+    elif f.check(defer.TimeoutError, ResponseNeverReceived):
+        # this one means that we hit our overall timeout on the request
+        raise RequestTimedOutError("Timeout waiting for response from remote server")
+
+    return f
 
 
 # XXX: FIXME: This is horribly copy-pasted from matrixfederationclient.
