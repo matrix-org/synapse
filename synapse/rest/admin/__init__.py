@@ -109,7 +109,8 @@ class PurgeHistoryRestServlet(RestServlet):
             if event.room_id != room_id:
                 raise SynapseError(400, "Event is for wrong room.")
 
-            token = await self.store.get_topological_token_for_event(event_id)
+            room_token = await self.store.get_topological_token_for_event(event_id)
+            token = str(room_token)
 
             logger.info("[purge] purging up to token %s (event_id %s)", token, event_id)
         elif "purge_up_to_ts" in body:
