@@ -111,8 +111,9 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        # Raise if the provided next_link value isn't valid
-        assert_valid_next_link(self.hs, next_link)
+        if next_link:
+            # Raise if the provided next_link value isn't valid
+            assert_valid_next_link(self.hs, next_link)
 
         # The email will be sent to the stored address.
         # This avoids a potential account hijack by requesting a password reset to
@@ -462,8 +463,9 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        # Raise if the provided next_link value isn't valid
-        assert_valid_next_link(self.hs, next_link)
+        if next_link:
+            # Raise if the provided next_link value isn't valid
+            assert_valid_next_link(self.hs, next_link)
 
         existing_user_id = await self.store.get_user_id_by_threepid("email", email)
 
@@ -533,8 +535,9 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        # Raise if the provided next_link value isn't valid
-        assert_valid_next_link(self.hs, next_link)
+        if next_link:
+            # Raise if the provided next_link value isn't valid
+            assert_valid_next_link(self.hs, next_link)
 
         existing_user_id = await self.store.get_user_id_by_threepid("msisdn", msisdn)
 

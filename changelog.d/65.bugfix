@@ -1,0 +1,1 @@
+Fix `nextLink` parameters being checked on validation endpoints even if they weren't provided by the client.
