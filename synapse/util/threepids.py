@@ -19,7 +19,7 @@ import re
 logger = logging.getLogger(__name__)
 
 
-async def check_3pid_allowed(hs, medium, address):
+async def check_3pid_allowed(hs, medium, address, during_registration: bool = False):
     """Checks whether a given format of 3PID is allowed to be used on this HS
 
     Args:
@@ -27,17 +27,29 @@ async def check_3pid_allowed(hs, medium, address):
         medium (str): 3pid medium - e.g. email, msisdn
         address (str): address within that medium (e.g. "wotan@matrix.org")
             msisdns need to first have been canonicalised
+        during_registration: Whether this request has been made while registering a new
+            user.
     Returns:
         bool: whether the 3PID medium/address is allowed to be added to this HS
     """
 
-    if hs.config.check_is_for_allowed_local_3pids:
+    if hs.config.check_is_for_allowed_local_3pids and during_registration:
+        # If this 3pid is being approved as part of registering a new user,
+        # we'll want to make sure the 3pid has been invited by someone already.
+        #
+        # We condition on registration so that user 3pids do not require an invite while
+        # doing tasks other than registration, such as resetting their password or adding a
+        # second email to their account.
         data = await hs.get_simple_http_client().get_json(
             "https://%s%s" % (
                 hs.config.check_is_for_allowed_local_3pids,
                 "/_matrix/identity/api/v1/internal-info"
             ),
             {'medium': medium, 'address': address}
+        )
+        logger.info(
+            "Received internal-info data for medium '%s', address '%s': %s",
+            medium, address, data,
         )
 
         # Check for invalid response
@@ -49,10 +61,19 @@ async def check_3pid_allowed(hs, medium, address):
             data.get('hs') != hs.config.server_name
             and data.get('shadow_hs') != hs.config.server_name
         ):
+            logger.info(
+                "%s did not match %s or %s did not match %s",
+                data.get("hs"), hs.config.server_name,
+                data.get("shadow_hs"), hs.config.server_name,
+            )
             return False
 
         if data.get('requires_invite', False) and not data.get('invited', False):
             # Requires an invite but hasn't been invited
+            logger.info(
+                "3PID check failed due to 'required_invite' = '%s' and 'invited' = '%s'",
+                data.get('required_invite'), data.get("invited"),
+            )
             return False
 
         return True
