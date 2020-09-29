@@ -182,10 +182,9 @@ class WorkerConfig(Config):
         #  typing: worker1
 
         # The worker that is used to run background tasks (e.g. cleaning up expired
-        # data). This should be one of the workers from `instance_map`. If not
-        # provided this defaults to the main process.
+        # data). If not provided this defaults to the main process.
         #
-        #run_background_tasks: worker1
+        #run_background_tasks_on: worker1
         """
 
     def read_arguments(self, args):
