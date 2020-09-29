@@ -188,7 +188,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     REQUIRED_ON_BACKGROUND_TASK_STARTUP = [
         "auth",
         "stats",
-        "user_directory",
     ]
 
     # This is overridden in derived application classes
@@ -255,6 +254,9 @@ class HomeServer(metaclass=abc.ABCMeta):
         self.datastores = Databases(self.DATASTORE_CLASS, self)
         logger.info("Finished setting up.")
 
+        # Register background tasks required by this server. This must be done
+        # somewhat manually due to the background tasks not being registered
+        # unless handlers are instantiated.
         if self.config.run_background_tasks:
             self.setup_background_tasks()
 

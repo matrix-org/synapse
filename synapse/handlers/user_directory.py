@@ -54,7 +54,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         # Guard to ensure we only process deltas one at a time
         self._is_processing = False
 
-        if hs.config.run_background_tasks and self.update_user_directory:
+        if self.update_user_directory:
             self.notifier.add_replication_callback(self.notify_new_event)
 
             # We kick this off so that we don't have to wait for a change before
