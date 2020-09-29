@@ -33,7 +33,13 @@ async def check_3pid_allowed(hs, medium, address, during_registration: bool = Fa
         bool: whether the 3PID medium/address is allowed to be added to this HS
     """
 
-    if hs.config.check_is_for_allowed_local_3pids:
+    if hs.config.check_is_for_allowed_local_3pids and during_registration:
+        # If this 3pid is being approved as part of registering a new user,
+        # we'll want to make sure the 3pid has been invited by someone already.
+        #
+        # We condition on registration so that user 3pids do not require an invite while
+        # doing tasks other than registration, such as resetting their password or adding a
+        # second email to their account.
         data = await hs.get_simple_http_client().get_json(
             "https://%s%s" % (
                 hs.config.check_is_for_allowed_local_3pids,
