@@ -39,6 +39,10 @@ async def check_3pid_allowed(hs, medium, address):
             ),
             {'medium': medium, 'address': address}
         )
+        logger.info(
+            "Received internal-info data for medium '%s', address '%s': %s",
+            medium, address, data,
+        )
 
         # Check for invalid response
         if 'hs' not in data and 'shadow_hs' not in data:
@@ -49,10 +53,19 @@ async def check_3pid_allowed(hs, medium, address):
             data.get('hs') != hs.config.server_name
             and data.get('shadow_hs') != hs.config.server_name
         ):
+            logger.info(
+                "%s did not match %s or %s did not match %s",
+                data.get("hs"), hs.config.server_name,
+                data.get("shadow_hs"), hs.config.server_name,
+            )
             return False
 
         if data.get('requires_invite', False) and not data.get('invited', False):
             # Requires an invite but hasn't been invited
+            logger.info(
+                "3PID check failed due to 'required_invite' = '%s' and 'invited' = '%s'",
+                data.get('required_invite'), data.get("invited"),
+            )
             return False
 
         return True
