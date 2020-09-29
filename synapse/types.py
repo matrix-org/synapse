@@ -393,7 +393,7 @@ class RoomStreamToken:
     stream = attr.ib(type=int, validator=attr.validators.instance_of(int))
 
     @classmethod
-    def parse(cls, string: str) -> "RoomStreamToken":
+    async def parse(cls, store, string: str) -> "RoomStreamToken":
         try:
             if string[0] == "s":
                 return cls(topological=None, stream=int(string[1:]))
@@ -453,13 +453,15 @@ class StreamToken:
     START = None  # type: StreamToken
 
     @classmethod
-    def from_string(cls, string):
+    async def from_string(cls, store, string):
         try:
             keys = string.split(cls._SEPARATOR)
             while len(keys) < len(attr.fields(cls)):
                 # i.e. old token from before receipt_key
                 keys.append("0")
-            return cls(RoomStreamToken.parse(keys[0]), *(int(k) for k in keys[1:]))
+            return cls(
+                await RoomStreamToken.parse(store, keys[0]), *(int(k) for k in keys[1:])
+            )
         except Exception:
             raise SynapseError(400, "Invalid Token")
 
@@ -493,7 +495,7 @@ class StreamToken:
         return attr.evolve(self, **{key: new_value})
 
 
-StreamToken.START = StreamToken.from_string("s0_0")
+StreamToken.START = StreamToken(RoomStreamToken(None, 0), 0, 0, 0, 0, 0, 0, 0, 0)
 
 
 @attr.s(slots=True, frozen=True)

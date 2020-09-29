@@ -77,6 +77,7 @@ class SyncRestServlet(RestServlet):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
         self.sync_handler = hs.get_sync_handler()
         self.clock = hs.get_clock()
         self.filtering = hs.get_filtering()
@@ -152,7 +153,7 @@ class SyncRestServlet(RestServlet):
         )
 
         if since is not None:
-            since_token = StreamToken.from_string(since)
+            since_token = await StreamToken.from_string(self.store, since)
         else:
             since_token = None
 

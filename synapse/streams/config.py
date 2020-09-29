@@ -39,8 +39,9 @@ class PaginationConfig:
     limit = attr.ib(type=Optional[int])
 
     @classmethod
-    def from_request(
+    async def from_request(
         cls,
+        store,
         request: SynapseRequest,
         raise_invalid_params: bool = True,
         default_limit: Optional[int] = None,
@@ -54,13 +55,13 @@ class PaginationConfig:
             if from_tok == "END":
                 from_tok = None  # For backwards compat.
             elif from_tok:
-                from_tok = StreamToken.from_string(from_tok)
+                from_tok = await StreamToken.from_string(store, from_tok)
         except Exception:
             raise SynapseError(400, "'from' parameter is invalid")
 
         try:
             if to_tok:
-                to_tok = StreamToken.from_string(to_tok)
+                to_tok = await StreamToken.from_string(store, to_tok)
         except Exception:
             raise SynapseError(400, "'to' parameter is invalid")
 
