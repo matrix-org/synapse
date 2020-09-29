@@ -1,1 +1,1 @@
-Fix synapse storing a media file with an invalid media_type or upload_name.
+Fix synapse storing a media file with an invalid upload_name.
