@@ -33,7 +33,7 @@
 
 ## Server ##
 
-# The public facing domain of the server
+# The public-facing domain of the server
 #
 # The server_name name will appear at the end of usernames and room addresses
 # created on this server. For example if the server_name was example.com,
