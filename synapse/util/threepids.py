@@ -19,7 +19,7 @@ import re
 logger = logging.getLogger(__name__)
 
 
-async def check_3pid_allowed(hs, medium, address):
+async def check_3pid_allowed(hs, medium, address, during_registration: bool = False):
     """Checks whether a given format of 3PID is allowed to be used on this HS
 
     Args:
@@ -27,6 +27,8 @@ async def check_3pid_allowed(hs, medium, address):
         medium (str): 3pid medium - e.g. email, msisdn
         address (str): address within that medium (e.g. "wotan@matrix.org")
             msisdns need to first have been canonicalised
+        during_registration: Whether this request has been made while registering a new
+            user.
     Returns:
         bool: whether the 3PID medium/address is allowed to be added to this HS
     """
