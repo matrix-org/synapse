@@ -1741,7 +1741,7 @@ oidc_config:
       # Note that these are non-standard and clients will ignore them without modifications.
       #
       #extra_attributes:
-        #birthdate: "{ user.birthdate }"
+        #birthdate: "{{ user.birthdate }}"
 
 
 
