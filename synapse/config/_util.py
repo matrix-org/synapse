@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, List
+from typing import Any, Iterable
 
 import jsonschema
 
@@ -20,7 +20,9 @@ from synapse.config._base import ConfigError
 from synapse.types import JsonDict
 
 
-def validate_config(json_schema: JsonDict, config: Any, config_path: List[str]) -> None:
+def validate_config(
+    json_schema: JsonDict, config: Any, config_path: Iterable[str]
+) -> None:
     """Validates a config setting against a JsonSchema definition
 
     This can be used to validate a section of the config file against a schema

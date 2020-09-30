@@ -471,7 +471,6 @@ class TlsConfig(Config):
         # or by checking matrix.org/federationtester/api/report?server_name=$host
         #
         #tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
-
         """
             # Lowercase the string representation of boolean values
             % {
