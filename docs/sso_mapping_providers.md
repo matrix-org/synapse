@@ -74,8 +74,10 @@ A custom mapping provider must specify the following methods:
       - `token` - A dictionary which includes information necessary to make
                   further requests to the OpenID provider.
     - Returns a dictionary that is suitable to be serialized to JSON. This
-      dictionary will be returned under the `extra_attributes` key in the
-      response during a successful login.
+      will be returned as part of the response during a successful login.
+      
+      Note that care should be taken to not overwrite any of the parameters
+      usually returned as part of the [login response](https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-login).
 
 ### Default OpenID Mapping Provider
 

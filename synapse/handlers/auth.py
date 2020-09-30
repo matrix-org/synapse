@@ -1267,9 +1267,7 @@ class AuthHandler(BaseHandler):
 
         extra_attributes = self._extra_attributes.get(login_result["user_id"])
         if extra_attributes:
-            login_result.update(
-                (("extra_attributes", extra_attributes.extra_attributes),)
-            )
+            login_result.update(extra_attributes.extra_attributes)
 
     def _expire_sso_extra_attributes(self) -> None:
         """
