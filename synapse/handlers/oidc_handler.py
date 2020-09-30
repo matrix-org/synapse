@@ -37,7 +37,7 @@ from synapse.config import ConfigError
 from synapse.http.server import respond_with_html
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
-from synapse.types import UserID, map_username_to_mxid_localpart
+from synapse.types import JsonDict, UserID, map_username_to_mxid_localpart
 from synapse.util import json_decoder
 
 if TYPE_CHECKING:
@@ -707,6 +707,15 @@ class OidcHandler:
             self._render_error(request, "mapping_error", str(e))
             return
 
+        # Mapping providers might not have get_extra_attributes: only call this
+        # method if it exists.
+        extra_attributes = None
+        get_extra_attributes = getattr(
+            self._user_mapping_provider, "get_extra_attributes", None
+        )
+        if get_extra_attributes:
+            extra_attributes = await get_extra_attributes(userinfo, token)
+
         # and finally complete the login
         if ui_auth_session_id:
             await self._auth_handler.complete_sso_ui_auth(
@@ -714,7 +723,7 @@ class OidcHandler:
             )
         else:
             await self._auth_handler.complete_sso_login(
-                user_id, request, client_redirect_url
+                user_id, request, client_redirect_url, extra_attributes
             )
 
     def _generate_oidc_session_token(
@@ -984,7 +993,7 @@ class OidcMappingProvider(Generic[C]):
     async def map_user_attributes(
         self, userinfo: UserInfo, token: Token
     ) -> UserAttribute:
-        """Map a ``UserInfo`` objects into user attributes.
+        """Map a `UserInfo` object into user attributes.
 
         Args:
             userinfo: An object representing the user given by the OIDC provider
@@ -994,6 +1003,18 @@ class OidcMappingProvider(Generic[C]):
             A dict containing the ``localpart`` and (optionally) the ``display_name``
         """
         raise NotImplementedError()
+
+    async def get_extra_attributes(self, userinfo: UserInfo, token: Token) -> JsonDict:
+        """Map a `UserInfo` object into additional attributes passed to the client during login.
+
+        Args:
+            userinfo: An object representing the user given by the OIDC provider
+            token: A dict with the tokens returned by the provider
+
+        Returns:
+            A dict containing additional attributes. Must be JSON serializable.
+        """
+        return {}
 
 
 # Used to clear out "None" values in templates
@@ -1009,6 +1030,7 @@ class JinjaOidcMappingConfig:
     subject_claim = attr.ib()  # type: str
     localpart_template = attr.ib()  # type: Template
     display_name_template = attr.ib()  # type: Optional[Template]
+    extra_attributes = attr.ib()  # type: Dict[str, Template]
 
 
 class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
@@ -1047,10 +1069,28 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
                     % (e,)
                 )
 
+        extra_attributes = {}  # type Dict[str, Template]
+        if "extra_attributes" in config:
+            extra_attributes_config = config.get("extra_attributes") or {}
+            if not isinstance(extra_attributes_config, dict):
+                raise ConfigError(
+                    "oidc_config.user_mapping_provider.config.extra_attributes must be a dict"
+                )
+
+            for key, value in extra_attributes_config.items():
+                try:
+                    extra_attributes[key] = env.from_string(value)
+                except Exception as e:
+                    raise ConfigError(
+                        "invalid jinja template for oidc_config.user_mapping_provider.config.extra_attributes.%s: %r"
+                        % (key, e)
+                    )
+
         return JinjaOidcMappingConfig(
             subject_claim=subject_claim,
             localpart_template=localpart_template,
             display_name_template=display_name_template,
+            extra_attributes=extra_attributes,
         )
 
     def get_remote_user_id(self, userinfo: UserInfo) -> str:
@@ -1071,3 +1111,13 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
                 display_name = None
 
         return UserAttribute(localpart=localpart, display_name=display_name)
+
+    async def get_extra_attributes(self, userinfo: UserInfo, token: Token) -> JsonDict:
+        extras = {}  # type: Dict[str, str]
+        for key, template in self._config.extra_attributes.items():
+            try:
+                extras[key] = template.render(user=userinfo).strip()
+            except Exception as e:
+                # Log an error and skip this value (don't break login for this).
+                logger.error("Failed to render OIDC extra attribute %s: %s" % (key, e))
+        return extras
