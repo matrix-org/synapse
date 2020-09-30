@@ -1,0 +1,1 @@
+Fix "Re-starting finished log context" warning when receiving an event we already had over federation.

@@ -413,6 +413,18 @@ class RoomStreamToken:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
 
+    def copy_and_advance(self, other: "RoomStreamToken") -> "RoomStreamToken":
+        """Return a new token such that if an event is after both this token and
+        the other token, then its after the returned token too.
+        """
+
+        if self.topological or other.topological:
+            raise Exception("Can't advance topological tokens")
+
+        max_stream = max(self.stream, other.stream)
+
+        return RoomStreamToken(None, max_stream)
+
     def as_tuple(self) -> Tuple[Optional[int], int]:
         return (self.topological, self.stream)
 
@@ -458,31 +470,20 @@ class StreamToken:
     def room_stream_id(self):
         return self.room_key.stream
 
-    def is_after(self, other):
-        """Does this token contain events that the other doesn't?"""
-        return (
-            (other.room_stream_id < self.room_stream_id)
-            or (int(other.presence_key) < int(self.presence_key))
-            or (int(other.typing_key) < int(self.typing_key))
-            or (int(other.receipt_key) < int(self.receipt_key))
-            or (int(other.account_data_key) < int(self.account_data_key))
-            or (int(other.push_rules_key) < int(self.push_rules_key))
-            or (int(other.to_device_key) < int(self.to_device_key))
-            or (int(other.device_list_key) < int(self.device_list_key))
-            or (int(other.groups_key) < int(self.groups_key))
-        )
-
     def copy_and_advance(self, key, new_value) -> "StreamToken":
         """Advance the given key in the token to a new value if and only if the
         new value is after the old value.
         """
-        new_token = self.copy_and_replace(key, new_value)
         if key == "room_key":
-            new_id = new_token.room_stream_id
-            old_id = self.room_stream_id
-        else:
-            new_id = int(getattr(new_token, key))
-            old_id = int(getattr(self, key))
+            new_token = self.copy_and_replace(
+                "room_key", self.room_key.copy_and_advance(new_value)
+            )
+            return new_token
+
+        new_token = self.copy_and_replace(key, new_value)
+        new_id = int(getattr(new_token, key))
+        old_id = int(getattr(self, key))
+
         if old_id < new_id:
             return new_token
         else:
@@ -493,6 +494,33 @@ class StreamToken:
 
 
 StreamToken.START = StreamToken.from_string("s0_0")
+
+
+@attr.s(slots=True, frozen=True)
+class PersistedEventPosition:
+    """Position of a newly persisted event with instance that persisted it.
+
+    This can be used to test whether the event is persisted before or after a
+    RoomStreamToken.
+    """
+
+    instance_name = attr.ib(type=str)
+    stream = attr.ib(type=int)
+
+    def persisted_after(self, token: RoomStreamToken) -> bool:
+        return token.stream < self.stream
+
+    def to_room_stream_token(self) -> RoomStreamToken:
+        """Converts the position to a room stream token such that events
+        persisted in the same room after this position will be after the
+        returned `RoomStreamToken`.
+
+        Note: no guarentees are made about ordering w.r.t. events in other
+        rooms.
+        """
+        # Doing the naive thing satisfies the desired properties described in
+        # the docstring.
+        return RoomStreamToken(None, self.stream)
 
 
 class ThirdPartyInstanceID(

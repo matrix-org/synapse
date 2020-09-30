@@ -153,7 +153,7 @@ class AdminHandler(BaseHandler):
                 if not events:
                     break
 
-                from_key = RoomStreamToken.parse(events[-1].internal_metadata.after)
+                from_key = events[-1].internal_metadata.after
 
                 events = await filter_events_for_client(self.storage, user_id, events)
 

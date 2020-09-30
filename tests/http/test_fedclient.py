@@ -318,14 +318,14 @@ class FederationClientTests(HomeserverTestCase):
         r = self.successResultOf(d)
         self.assertEqual(r.code, 200)
 
-    def test_client_headers_no_body(self):
+    @parameterized.expand(["get_json", "post_json", "delete_json", "put_json"])
+    def test_timeout_reading_body(self, method_name: str):
         """
         If the HTTP request is connected, but gets no response before being
-        timed out, it'll give a ResponseNeverReceived.
+        timed out, it'll give a RequestSendFailed with can_retry.
         """
-        d = defer.ensureDeferred(
-            self.cl.post_json("testserv:8008", "foo/bar", timeout=10000)
-        )
+        method = getattr(self.cl, method_name)
+        d = defer.ensureDeferred(method("testserv:8008", "foo/bar", timeout=10000))
 
         self.pump()
 
@@ -349,7 +349,9 @@ class FederationClientTests(HomeserverTestCase):
         self.reactor.advance(10.5)
         f = self.failureResultOf(d)
 
-        self.assertIsInstance(f.value, TimeoutError)
+        self.assertIsInstance(f.value, RequestSendFailed)
+        self.assertTrue(f.value.can_retry)
+        self.assertIsInstance(f.value.inner_exception, defer.TimeoutError)
 
     def test_client_requires_trailing_slashes(self):
         """

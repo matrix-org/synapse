@@ -874,6 +874,10 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self._is_erased("@user:test", False)
+        d = self.store.mark_user_erased("@user:test")
+        self.assertIsNone(self.get_success(d))
+        self._is_erased("@user:test", True)
 
         # Attempt to reactivate the user (without a password).
         request, channel = self.make_request(
@@ -906,6 +910,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(False, channel.json_body["deactivated"])
+        self._is_erased("@user:test", False)
 
     def test_set_user_as_admin(self):
         """
@@ -995,6 +1000,15 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         # Ensure they're still alive
         self.assertEqual(0, channel.json_body["deactivated"])
+
+    def _is_erased(self, user_id, expect):
+        """Assert that the user is erased or not
+        """
+        d = self.store.is_user_erased(user_id)
+        if expect:
+            self.assertTrue(self.get_success(d))
+        else:
+            self.assertFalse(self.get_success(d))
 
 
 class UserMembershipRestTestCase(unittest.HomeserverTestCase):

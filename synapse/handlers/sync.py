@@ -519,7 +519,7 @@ class SyncHandler:
             if len(recents) > timeline_limit:
                 limited = True
                 recents = recents[-timeline_limit:]
-                room_key = RoomStreamToken.parse(recents[0].internal_metadata.before)
+                room_key = recents[0].internal_metadata.before
 
             prev_batch_token = now_token.copy_and_replace("room_key", room_key)
 
@@ -967,7 +967,7 @@ class SyncHandler:
             raise NotImplementedError()
         else:
             joined_room_ids = await self.get_rooms_for_user_at(
-                user_id, now_token.room_stream_id
+                user_id, now_token.room_key
             )
         sync_result_builder = SyncResultBuilder(
             sync_config,
@@ -1595,15 +1595,23 @@ class SyncHandler:
 
             if leave_events:
                 leave_event = leave_events[-1]
-                leave_stream_token = await self.store.get_stream_token_for_event(
+                leave_position = await self.store.get_position_for_event(
                     leave_event.event_id
                 )
-                leave_token = since_token.copy_and_replace(
-                    "room_key", leave_stream_token
-                )
 
-                if since_token and since_token.is_after(leave_token):
+                # If the leave event happened before the since token then we
+                # bail.
+                if since_token and not leave_position.persisted_after(
+                    since_token.room_key
+                ):
                     continue
+
+                # We can safely convert the position of the leave event into a
+                # stream token as it'll only be used in the context of this
+                # room. (c.f. the docstring of `to_room_stream_token`).
+                leave_token = since_token.copy_and_replace(
+                    "room_key", leave_position.to_room_stream_token()
+                )
 
                 # If this is an out of band message, like a remote invite
                 # rejection, we include it in the recents batch. Otherwise, we
@@ -1916,7 +1924,7 @@ class SyncHandler:
             raise Exception("Unrecognized rtype: %r", room_builder.rtype)
 
     async def get_rooms_for_user_at(
-        self, user_id: str, stream_ordering: int
+        self, user_id: str, room_key: RoomStreamToken
     ) -> FrozenSet[str]:
         """Get set of joined rooms for a user at the given stream ordering.
 
@@ -1942,15 +1950,15 @@ class SyncHandler:
         # If the membership's stream ordering is after the given stream
         # ordering, we need to go and work out if the user was in the room
         # before.
-        for room_id, membership_stream_ordering in joined_rooms:
-            if membership_stream_ordering <= stream_ordering:
+        for room_id, event_pos in joined_rooms:
+            if not event_pos.persisted_after(room_key):
                 joined_room_ids.add(room_id)
                 continue
 
             logger.info("User joined room after current token: %s", room_id)
 
             extrems = await self.store.get_forward_extremeties_for_room(
-                room_id, stream_ordering
+                room_id, event_pos.stream
             )
             users_in_room = await self.state.get_current_users_in_room(room_id, extrems)
             if user_id in users_in_room:
