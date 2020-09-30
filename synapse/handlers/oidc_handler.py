@@ -1115,5 +1115,9 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
     async def get_extra_attributes(self, userinfo: UserInfo, token: Token) -> JsonDict:
         extras = {}  # type: Dict[str, str]
         for key, template in self._config.extra_attributes.items():
-            extras[key] = template.render(user=userinfo).strip()
+            try:
+                extras[key] = template.render(user=userinfo).strip()
+            except Exception as e:
+                # Log an error and skip this value (don't break login for this).
+                logger.error("Failed to render OIDC extra attribute %s: %s" % (key, e))
         return extras
