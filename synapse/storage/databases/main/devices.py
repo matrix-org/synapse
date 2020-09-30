@@ -715,7 +715,9 @@ class DeviceWorkerStore(SQLBaseStore):
             allow_none=True,
         )
         return (
-            (row["device_id"], json_decoder.decode(row["device_data"])) if row else (None, None)
+            (row["device_id"], json_decoder.decode(row["device_data"]))
+            if row
+            else (None, None)
         )
 
     def _store_dehydrated_device_txn(
