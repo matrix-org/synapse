@@ -711,7 +711,7 @@ class OidcHandler:
         # method if it exists. It might also raise NotImplementedError.
         extra_attributes = None
         get_extra_attributes = getattr(
-            self._user_mapping_provider, "get_extra_attributes"
+            self._user_mapping_provider, "get_extra_attributes", None
         )
         if get_extra_attributes:
             try:
@@ -996,7 +996,7 @@ class OidcMappingProvider(Generic[C]):
     async def map_user_attributes(
         self, userinfo: UserInfo, token: Token
     ) -> UserAttribute:
-        """Map a ``UserInfo`` objects into user attributes.
+        """Map a `UserInfo` object into user attributes.
 
         Args:
             userinfo: An object representing the user given by the OIDC provider
@@ -1008,7 +1008,7 @@ class OidcMappingProvider(Generic[C]):
         raise NotImplementedError()
 
     async def get_extra_attributes(self, userinfo: UserInfo, token: Token) -> JsonDict:
-        """Map a ``UserInfo`` objects into additional attributes passed to the client during login.
+        """Map a `UserInfo` object into additional attributes passed to the client during login.
 
         Args:
             userinfo: An object representing the user given by the OIDC provider
@@ -1080,7 +1080,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
                 except Exception as e:
                     raise ConfigError(
                         "invalid jinja template for oidc_config.user_mapping_provider.config.extra_attributes.%s: %r"
-                        % (key, e,)
+                        % (key, e)
                     )
 
         return JinjaOidcMappingConfig(

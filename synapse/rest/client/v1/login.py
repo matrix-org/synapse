@@ -297,12 +297,12 @@ class LoginRestServlet(RestServlet):
         Args:
             user_id: ID of the user to register.
             login_submission: Dictionary of login information.
-            callback: Callback function to run after registration.
+            callback: Callback function to run after login.
             create_non_existent_users: Whether to create the user if they don't
                 exist. Defaults to False.
 
         Returns:
-            result: Dictionary of account information after successful registration.
+            result: Dictionary of account information after successful login.
         """
 
         # Before we actually log them in we check if they've already logged in

@@ -75,7 +75,7 @@ A custom mapping provider must specify the following methods:
                   further requests to the OpenID provider.
     - Returns a dictionary that is suitable to be serialized to JSON. This
       will be returned as part of the response during a successful login.
-      
+
       Note that care should be taken to not overwrite any of the parameters
       usually returned as part of the [login response](https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-login).
 

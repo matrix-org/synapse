@@ -211,7 +211,7 @@ class OIDCConfig(Config):
               # Note that these are non-standard and clients will ignore them without modifications.
               #
               #extra_attributes:
-                #birthdate: "{{ user.birthdate }}"
+                #birthdate: "{{{{ user.birthdate }}}}"
         """.format(
             mapping_provider=DEFAULT_USER_MAPPING_PROVIDER
         )
