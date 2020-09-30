@@ -1,1 +1,1 @@
-Add config option for always using userinfo endpoint for OpenID Connect with Gitlab. Contributed by Benjamin Koch.
+Add a configuration option for always using "userinfo endpoint" for OpenID Connect. This fixes support for some identity providers, e.g. GitLab. Contributed by Benjamin Koch.
