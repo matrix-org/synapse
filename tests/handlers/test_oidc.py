@@ -619,10 +619,8 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "phone": "1234567",
         }
         user_id = "@foo:domain.org"
-        self.handler._render_error = Mock(return_value=None)
         self.handler._exchange_code = simple_async_mock(return_value=token)
         self.handler._parse_id_token = simple_async_mock(return_value=userinfo)
-        self.handler._fetch_userinfo = simple_async_mock(return_value=userinfo)
         self.handler._map_userinfo_to_user = simple_async_mock(return_value=user_id)
         self.handler._auth_handler.complete_sso_login = simple_async_mock()
         request = Mock(
