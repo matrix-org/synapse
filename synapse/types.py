@@ -406,7 +406,7 @@ class RoomStreamToken:
     stream = attr.ib(type=int, validator=attr.validators.instance_of(int))
 
     @classmethod
-    async def parse(cls, store, string: str) -> "RoomStreamToken":
+    async def parse(cls, store: "DataStore", string: str) -> "RoomStreamToken":
         try:
             if string[0] == "s":
                 return cls(topological=None, stream=int(string[1:]))
@@ -466,7 +466,7 @@ class StreamToken:
     START = None  # type: StreamToken
 
     @classmethod
-    async def from_string(cls, store, string):
+    async def from_string(cls, store: "DataStore", string: str) -> "StreamToken":
         try:
             keys = string.split(cls._SEPARATOR)
             while len(keys) < len(attr.fields(cls)):

@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 from typing import Optional
 
@@ -21,6 +20,7 @@ import attr
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import parse_integer, parse_string
 from synapse.http.site import SynapseRequest
+from synapse.storage.databases.main import DataStore
 from synapse.types import StreamToken
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ class PaginationConfig:
     @classmethod
     async def from_request(
         cls,
-        store,
+        store: "DataStore",
         request: SynapseRequest,
         raise_invalid_params: bool = True,
         default_limit: Optional[int] = None,

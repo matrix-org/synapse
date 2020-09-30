@@ -152,10 +152,9 @@ class SyncRestServlet(RestServlet):
             device_id=device_id,
         )
 
+        since_token = None
         if since is not None:
             since_token = await StreamToken.from_string(self.store, since)
-        else:
-            since_token = None
 
         # send any outstanding server notices to the user.
         await self._server_notices_sender.on_user_syncing(user.to_string())
