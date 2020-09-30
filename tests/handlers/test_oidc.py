@@ -132,7 +132,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         config = self.default_config()
         config["public_baseurl"] = BASE_URL
-        oidc_config = config.get("oidc_config", {})
+        oidc_config = {}
         oidc_config["enabled"] = True
         oidc_config["client_id"] = CLIENT_ID
         oidc_config["client_secret"] = CLIENT_SECRET
@@ -141,6 +141,10 @@ class OidcHandlerTestCase(HomeserverTestCase):
         oidc_config["user_mapping_provider"] = {
             "module": __name__ + ".TestMappingProvider",
         }
+
+        # Update this config with what's in the default config so that
+        # override_config works as expected.
+        oidc_config.update(config.get("oidc_config", {}))
         config["oidc_config"] = oidc_config
 
         hs = self.setup_test_homeserver(
@@ -583,16 +587,19 @@ class OidcHandlerTestCase(HomeserverTestCase):
         exc = self.get_failure(self.handler._exchange_code(code), OidcError)
         self.assertEqual(exc.value.error, "some_error")
 
+    @override_config(
+        {
+            "oidc_config": {
+                "user_mapping_provider": {
+                    "module": __name__ + ".TestMappingProviderExtra"
+                }
+            }
+        }
+    )
     def test_extra_attributes(self):
         """
         Login while using a mapping provider that implements get_extra_attributes.
         """
-        # We cannot just override the configuration since the mapping provider
-        # gets stored on the handler.
-        self.handler._user_mapping_provider = TestMappingProviderExtra(
-            self.hs.config.oidc_user_mapping_provider_config
-        )
-
         token = {
             "type": "bearer",
             "id_token": "id_token",
