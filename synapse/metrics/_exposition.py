@@ -24,7 +24,6 @@ expect, and the newer "best practice" version of the up-to-date official client.
 
 import math
 import threading
-from collections import namedtuple
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 from urllib.parse import parse_qs, urlparse
@@ -34,14 +33,6 @@ from prometheus_client import REGISTRY
 from twisted.web.resource import Resource
 
 from synapse.util import caches
-
-try:
-    from prometheus_client.samples import Sample
-except ImportError:
-    Sample = namedtuple(  # type: ignore[no-redef] # noqa
-        "Sample", ["name", "labels", "value", "timestamp", "exemplar"]
-    )
-
 
 CONTENT_TYPE_LATEST = str("text/plain; version=0.0.4; charset=utf-8")
 
@@ -93,17 +84,6 @@ def sample_line(line, name):
     )
 
 
-def nameify_sample(sample):
-    """
-    If we get a prometheus_client<0.4.0 sample as a tuple, transform it into a
-    namedtuple which has the names we expect.
-    """
-    if not isinstance(sample, Sample):
-        sample = Sample(*sample, None, None)
-
-    return sample
-
-
 def generate_latest(registry, emit_help=False):
 
     # Trigger the cache metrics to be rescraped, which updates the common
@@ -144,7 +124,7 @@ def generate_latest(registry, emit_help=False):
                 )
             )
         output.append("# TYPE {0} {1}\n".format(mname, mtype))
-        for sample in map(nameify_sample, metric.samples):
+        for sample in metric.samples:
             # Get rid of the OpenMetrics specific samples
             for suffix in ["_created", "_gsum", "_gcount"]:
                 if sample.name.endswith(suffix):
@@ -172,7 +152,7 @@ def generate_latest(registry, emit_help=False):
                 )
             )
         output.append("# TYPE {0} {1}\n".format(mnewname, mtype))
-        for sample in map(nameify_sample, metric.samples):
+        for sample in metric.samples:
             # Get rid of the OpenMetrics specific samples
             for suffix in ["_created", "_gsum", "_gcount"]:
                 if sample.name.endswith(suffix):
