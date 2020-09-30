@@ -401,13 +401,12 @@ class OidcHandlerTestCase(HomeserverTestCase):
         client_redirect_url = "http://client/redirect"
         user_agent = "Browser"
         ip_address = "10.0.0.1"
-        session = self.handler._generate_oidc_session_token(
+        request.getCookie.return_value = self.handler._generate_oidc_session_token(
             state=state,
             nonce=nonce,
             client_redirect_url=client_redirect_url,
             ui_auth_session_id=None,
         )
-        request.getCookie.return_value = session
 
         request.args = {}
         request.args[b"code"] = [code.encode("utf-8")]
@@ -627,27 +626,22 @@ class OidcHandlerTestCase(HomeserverTestCase):
             spec=["args", "getCookie", "addCookie", "requestHeaders", "getClientIP"]
         )
 
-        code = "code"
         state = "state"
-        nonce = "nonce"
         client_redirect_url = "http://client/redirect"
-        user_agent = "Browser"
-        ip_address = "10.0.0.1"
-        session = self.handler._generate_oidc_session_token(
+        request.getCookie.return_value = self.handler._generate_oidc_session_token(
             state=state,
-            nonce=nonce,
+            nonce="nonce",
             client_redirect_url=client_redirect_url,
             ui_auth_session_id=None,
         )
-        request.getCookie.return_value = session
 
         request.args = {}
-        request.args[b"code"] = [code.encode("utf-8")]
+        request.args[b"code"] = [b"code"]
         request.args[b"state"] = [state.encode("utf-8")]
 
         request.requestHeaders = Mock(spec=["getRawHeaders"])
-        request.requestHeaders.getRawHeaders.return_value = [user_agent.encode("ascii")]
-        request.getClientIP.return_value = ip_address
+        request.requestHeaders.getRawHeaders.return_value = [b"Browser"]
+        request.getClientIP.return_value = "10.0.0.1"
 
         yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
 
