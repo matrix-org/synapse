@@ -47,12 +47,15 @@ class PurgeTests(HomeserverTestCase):
         storage = self.hs.get_storage()
 
         # Get the topological token
-        event = str(
-            self.get_success(store.get_topological_token_for_event(last["event_id"]))
+        token = self.get_success(
+            store.get_topological_token_for_event(last["event_id"])
         )
+        token_str = self.get_success(token.to_string(self.hs.get_datastore()))
 
         # Purge everything before this topological token
-        self.get_success(storage.purge_events.purge_history(self.room_id, event, True))
+        self.get_success(
+            storage.purge_events.purge_history(self.room_id, token_str, True)
+        )
 
         # 1-3 should fail and last will succeed, meaning that 1-3 are deleted
         # and last is not.
