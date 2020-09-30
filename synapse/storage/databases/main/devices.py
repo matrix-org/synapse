@@ -804,8 +804,9 @@ class DeviceWorkerStore(SQLBaseStore):
             user_id: the user that the dehydrated device belongs to
             device_id: the ID of the dehydrated device
         """
-        count = self.db_pool.simple_delete(
-            "dehydrated_devices", {"user_id": user_id, "device_id": device_id,},
+        count = await self.db_pool.simple_delete(
+            "dehydrated_devices", {"user_id": user_id, "device_id": device_id},
+            desc="remove_dehydrated_device"
         )
         return count >= 1
 
