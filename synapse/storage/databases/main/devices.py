@@ -43,7 +43,7 @@ from synapse.util.caches.descriptors import (
     cachedList,
 )
 from synapse.util.iterutils import batch_iter
-from synapse.util.stringutils import random_string, shortstr
+from synapse.util.stringutils import shortstr
 
 logger = logging.getLogger(__name__)
 
