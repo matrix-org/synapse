@@ -1077,11 +1077,13 @@ class RoomContextHandler:
         # the token, which we replace.
         token = StreamToken.START
 
-        results["start"] = token.copy_and_replace(
+        results["start"] = await token.copy_and_replace(
             "room_key", results["start"]
-        ).to_string()
+        ).to_string(self.store)
 
-        results["end"] = token.copy_and_replace("room_key", results["end"]).to_string()
+        results["end"] = await token.copy_and_replace(
+            "room_key", results["end"]
+        ).to_string(self.store)
 
         return results
 

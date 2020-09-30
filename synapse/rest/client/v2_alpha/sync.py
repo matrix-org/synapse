@@ -237,7 +237,7 @@ class SyncRestServlet(RestServlet):
                 "leave": sync_result.groups.leave,
             },
             "device_one_time_keys_count": sync_result.device_one_time_keys_count,
-            "next_batch": sync_result.next_batch.to_string(),
+            "next_batch": await sync_result.next_batch.to_string(self.store),
         }
 
     @staticmethod
@@ -414,7 +414,7 @@ class SyncRestServlet(RestServlet):
         result = {
             "timeline": {
                 "events": serialized_timeline,
-                "prev_batch": room.timeline.prev_batch.to_string(),
+                "prev_batch": await room.timeline.prev_batch.to_string(self.store),
                 "limited": room.timeline.limited,
             },
             "state": {"events": serialized_state},

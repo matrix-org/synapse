@@ -413,8 +413,8 @@ class PaginationHandler:
         if not events:
             return {
                 "chunk": [],
-                "start": from_token.to_string(),
-                "end": next_token.to_string(),
+                "start": await from_token.to_string(self.store),
+                "end": await next_token.to_string(self.store),
             }
 
         state = None
@@ -442,8 +442,8 @@ class PaginationHandler:
                     events, time_now, as_client_event=as_client_event
                 )
             ),
-            "start": from_token.to_string(),
-            "end": next_token.to_string(),
+            "start": await from_token.to_string(self.store),
+            "end": await next_token.to_string(self.store),
         }
 
         if state:

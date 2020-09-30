@@ -18,13 +18,26 @@ import re
 import string
 import sys
 from collections import namedtuple
-from typing import Any, Dict, Mapping, MutableMapping, Optional, Tuple, Type, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+)
 
 import attr
 from signedjson.key import decode_verify_key_bytes
 from unpaddedbase64 import decode_base64
 
 from synapse.api.errors import Codes, SynapseError
+
+if TYPE_CHECKING:
+    from synapse.storage.databases.main import DataStore
 
 # define a version of typing.Collection that works on python 3.5
 if sys.version_info[:3] >= (3, 6, 0):
@@ -428,7 +441,7 @@ class RoomStreamToken:
     def as_tuple(self) -> Tuple[Optional[int], int]:
         return (self.topological, self.stream)
 
-    def to_string(self) -> str:
+    async def to_string(self, store: "DataStore") -> str:
         if self.topological is not None:
             return "t%d-%d" % (self.topological, self.stream)
         else:
@@ -465,10 +478,10 @@ class StreamToken:
         except Exception:
             raise SynapseError(400, "Invalid Token")
 
-    def to_string(self):
+    async def to_string(self, store: "DataStore") -> str:
         return self._SEPARATOR.join(
             [
-                self.room_key.to_string(),
+                await self.room_key.to_string(store),
                 str(self.presence_key),
                 str(self.typing_key),
                 str(self.receipt_key),
