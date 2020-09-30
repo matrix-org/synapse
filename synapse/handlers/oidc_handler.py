@@ -1074,7 +1074,13 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
 
         extra_attributes = {}  # type Dict[str, Template]
         if "extra_attributes" in config:
-            for key, value in config["extra_attributes"].items():
+            extra_attributes_config = config.get("extra_attributes") or {}
+            if not isinstance(extra_attributes_config, dict):
+                raise ConfigError(
+                    "oidc_config.user_mapping_provider.config.extra_attributes must be a dict"
+                )
+
+            for key, value in extra_attributes_config.items():
                 try:
                     extra_attributes[key] = env.from_string(value)
                 except Exception as e:
