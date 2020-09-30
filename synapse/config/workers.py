@@ -140,10 +140,10 @@ class WorkerConfig(Config):
         #
         # No effort is made to ensure only a single instance of these tasks is
         # running.
-        instance = config.get("run_background_tasks_on") or "master"
+        background_tasks_instance = config.get("run_background_tasks_on") or "master"
         self.run_background_tasks = (
-            self.worker_name is None and instance == "master"
-        ) or self.worker_name == instance
+            self.worker_name is None and background_tasks_instance == "master"
+        ) or self.worker_name == background_tasks_instance
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
