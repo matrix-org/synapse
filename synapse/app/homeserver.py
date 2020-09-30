@@ -41,7 +41,6 @@ from synapse.api.urls import (
 )
 from synapse.app import _base
 from synapse.app._base import listen_ssl, listen_tcp, quit_with_error
-from synapse.app.phone_stats_home import start_phone_stats_home
 from synapse.config._base import ConfigError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.config.homeserver import HomeServerConfig
@@ -490,11 +489,6 @@ def run(hs):
 
         ThreadPool._worker = profile(ThreadPool._worker)
         reactor.run = profile(reactor.run)
-
-    # If background tasks are running on the main process, start collecting the
-    # phone home stats.
-    if hs.config.run_background_tasks:
-        start_phone_stats_home(hs)
 
     _base.start_reactor(
         "synapse-homeserver",

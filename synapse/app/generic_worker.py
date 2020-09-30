@@ -34,7 +34,6 @@ from synapse.api.urls import (
     SERVER_KEY_V2_PREFIX,
 )
 from synapse.app import _base
-from synapse.app.phone_stats_home import start_phone_stats_home
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
@@ -977,11 +976,6 @@ def start(config_options):
     setup_logging(hs, config, use_worker_options=True)
 
     hs.setup()
-
-    # If background tasks are running on this worker, start collecting the phone
-    # home stats.
-    if hs.config.run_background_tasks:
-        start_phone_stats_home(hs)
 
     # Ensure the replication streamer is always started in case we write to any
     # streams. Will no-op if no streams can be written to by this worker.
