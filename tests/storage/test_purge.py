@@ -47,9 +47,9 @@ class PurgeTests(HomeserverTestCase):
         storage = self.hs.get_storage()
 
         # Get the topological token
-        event = str(
-            self.get_success(store.get_topological_token_for_event(last["event_id"]))
-        )
+        event = self.get_success(
+            store.get_topological_token_for_event(last["event_id"])
+        ).to_string()
 
         # Purge everything before this topological token
         self.get_success(storage.purge_events.purge_history(self.room_id, event, True))

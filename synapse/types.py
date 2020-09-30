@@ -428,7 +428,7 @@ class RoomStreamToken:
     def as_tuple(self) -> Tuple[Optional[int], int]:
         return (self.topological, self.stream)
 
-    def __str__(self) -> str:
+    def to_string(self) -> str:
         if self.topological is not None:
             return "t%d-%d" % (self.topological, self.stream)
         else:
@@ -466,7 +466,19 @@ class StreamToken:
             raise SynapseError(400, "Invalid Token")
 
     def to_string(self):
-        return self._SEPARATOR.join([str(k) for k in attr.astuple(self, recurse=False)])
+        return self._SEPARATOR.join(
+            [
+                self.room_key.to_string(),
+                str(self.presence_key),
+                str(self.typing_key),
+                str(self.receipt_key),
+                str(self.account_data_key),
+                str(self.push_rules_key),
+                str(self.to_device_key),
+                str(self.device_list_key),
+                str(self.groups_key),
+            ]
+        )
 
     @property
     def room_stream_id(self):
