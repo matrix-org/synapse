@@ -708,16 +708,13 @@ class OidcHandler:
             return
 
         # Mapping providers might not have get_extra_attributes: only call this
-        # method if it exists. It might also raise NotImplementedError.
+        # method if it exists.
         extra_attributes = None
         get_extra_attributes = getattr(
             self._user_mapping_provider, "get_extra_attributes", None
         )
         if get_extra_attributes:
-            try:
-                extra_attributes = await get_extra_attributes(userinfo, token)
-            except NotImplementedError:
-                pass
+            extra_attributes = await get_extra_attributes(userinfo, token)
 
         # and finally complete the login
         if ui_auth_session_id:
@@ -1017,7 +1014,7 @@ class OidcMappingProvider(Generic[C]):
         Returns:
             A dict containing additional attributes. Must be JSON serializable.
         """
-        raise NotImplementedError()
+        return {}
 
 
 # Used to clear out "None" values in templates
