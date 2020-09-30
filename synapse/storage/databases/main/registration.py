@@ -965,18 +965,39 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             desc="add_access_token_to_user",
         )
 
-    async def set_device_for_access_token(self, token, device_id):
+    def _set_device_for_access_token_txn(
+            self, txn, token: str, device_id: str
+    ) -> str:
+        old_device_id = self.db_pool.simple_select_one_onecol_txn(
+            txn, "access_tokens", {"token": token}, "device_id"
+        )
+
+        self.db_pool.simple_update_txn(
+            txn,
+            "access_tokens", {"token": token}, {"device_id": device_id}
+        )
+
+        self._invalidate_cache_and_stream(
+            txn, self.get_user_by_access_token, (token,)
+        )
+
+        return old_device_id
+
+    async def set_device_for_access_token(self, token, device_id) -> str:
         """Sets the device ID associated with an access token.
 
         Args:
             token (str): The access token to modify.
             device_id (str): The new device ID.
+        Returns:
+            The old device ID associated with the access token.
         """
 
-        # FIXME: invalidate caches
-
-        return await self.db_pool.simple_update(
-            "access_tokens", {"token": token}, {"device_id": device_id}
+        return await self.db_pool.runInteraction(
+            "set_device_for_access_token",
+            self._set_device_for_access_token_txn,
+            token,
+            device_id,
         )
 
     def register_user(

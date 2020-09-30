@@ -545,8 +545,14 @@ class DeviceHandler(DeviceWorkerHandler):
         if success:
             # If the dehydrated device was successfully deleted (the device ID
             # matched the stored dehydrated device), then modify the access
-            # token to use the dehydrated device's ID
-            await self.store.set_device_for_access_token(access_token, device_id)
+            # token to use the dehydrated device's ID and destroy the old device ID
+            old_device_id = await self.store.set_device_for_access_token(access_token, device_id)
+            await self.store.delete_device(user_id, old_device_id)
+            await self.store.delete_e2e_keys_by_device(user_id=user_id, device_id=old_device_id)
+
+            # tell everyone that the old device is gone
+            await self.notify_device_update(user_id, [old_device_id])
+
             return {"success": True}
         else:
             raise errors.NotFoundError()
