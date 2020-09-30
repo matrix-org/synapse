@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 from synapse.api.constants import EventTypes
 from synapse.appservice.api import ApplicationServiceApi
 from synapse.types import GroupID, get_domain_from_id
-from synapse.util.caches.descriptors import cached, cachedList
+from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
     from synapse.storage.databases.main import DataStore

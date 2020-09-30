@@ -213,7 +213,11 @@ class ApplicationServiceApi(SimpleHttpClient):
         try:
             await self.put_json(
                 uri=uri,
-                json_body={"events": events, "device_messages": to_device, "device_lists": device_lists},
+                json_body={
+                    "events": events,
+                    "device_messages": to_device,
+                    "device_lists": device_lists,
+                },
                 args={"access_token": service.hs_token},
             )
             return True

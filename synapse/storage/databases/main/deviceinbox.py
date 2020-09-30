@@ -16,12 +16,12 @@
 import logging
 from typing import List, Tuple
 
+from synapse.appservice import ApplicationService
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool
 from synapse.util import json_encoder
 from synapse.util.caches.expiringcache import ExpiringCache
-from synapse.appservice import ApplicationService
 
 logger = logging.getLogger(__name__)
 
@@ -44,15 +44,18 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 " ORDER BY stream_id ASC"
                 " LIMIT ?"
             )
-            txn.execute(
-                sql, (last_stream_id, current_stream_id, limit)
-            )
+            txn.execute(sql, (last_stream_id, current_stream_id, limit))
             messages = []
 
             for row in txn:
                 stream_pos = row[0]
                 if service.is_interested_in_user(row.user_id):
-                    messages.append(db_to_json(row[1]))
+                    msg = db_to_json(row[1])
+                    msg.recipient = {
+                        "device_id": row.device_id,
+                        "user_id": row.user_id,
+                    }
+                    messages.append(msg)
             if len(messages) < limit:
                 stream_pos = current_stream_id
             return messages, stream_pos

@@ -431,7 +431,9 @@ class TypingNotificationEventSource:
             "content": {"user_ids": list(typing)},
         }
 
-    async def get_new_events_as(self, from_key, service, **kwargs):
+    async def get_new_events_as(
+        self, from_key: int, service: ApplicationService, **kwargs
+    ):
         with Measure(self.clock, "typing.get_new_events_as"):
             from_key = int(from_key)
             handler = self.get_typing_handler()
@@ -441,8 +443,9 @@ class TypingNotificationEventSource:
                 if handler._room_serials[room_id] <= from_key:
                     print("Key too old")
                     continue
-                # XXX: Store gut wrenching
-                if not await service.matches_user_in_member_list(room_id, handler.store):
+                if not await service.matches_user_in_member_list(
+                    room_id, handler.store
+                ):
                     continue
 
                 events.append(self._make_event_for(room_id))

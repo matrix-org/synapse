@@ -283,9 +283,7 @@ class ReceiptsWorkerStore(SQLBaseStore, metaclass=abc.ABCMeta):
         }
         return results
 
-    @cached(
-        num_args=2,
-    )
+    @cached(num_args=2,)
     async def _get_linearized_receipts_for_all_rooms(self, to_key, from_key=None):
         def f(txn):
             if from_key:
@@ -325,7 +323,6 @@ class ReceiptsWorkerStore(SQLBaseStore, metaclass=abc.ABCMeta):
             receipt_type[row["user_id"]] = db_to_json(row["data"])
 
         return results
-
 
     async def get_users_sent_receipts_between(
         self, last_id: int, current_id: int

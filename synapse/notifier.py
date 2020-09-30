@@ -329,9 +329,16 @@ class Notifier:
         except Exception:
             logger.exception("Error notifying application services of event")
 
-    async def _notify_app_services_ephemeral(self, stream_key: str, new_token: Union[int, RoomStreamToken], users: Collection[UserID] = []):
+    async def _notify_app_services_ephemeral(
+        self,
+        stream_key: str,
+        new_token: Union[int, RoomStreamToken],
+        users: Collection[UserID] = [],
+    ):
         try:
-            await self.appservice_handler.notify_interested_services_ephemeral(stream_key, new_token, users)
+            await self.appservice_handler.notify_interested_services_ephemeral(
+                stream_key, new_token, users
+            )
         except Exception:
             logger.exception("Error notifying application services of event")
 
@@ -375,7 +382,11 @@ class Notifier:
 
                 # Notify appservices
                 run_as_background_process(
-                    "_notify_app_services_ephemeral", self._notify_app_services_ephemeral, stream_key, new_token, users,
+                    "_notify_app_services_ephemeral",
+                    self._notify_app_services_ephemeral,
+                    stream_key,
+                    new_token,
+                    users,
                 )
 
     def on_new_replication_data(self) -> None:
