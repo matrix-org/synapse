@@ -15,16 +15,17 @@
 # limitations under the License.
 
 import inspect
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
-from synapse.spam_checker_api import SpamCheckerApi
+from synapse.spam_checker_api import RegistrationBehaviour, SpamCheckerApi
+from synapse.types import Collection
 
 MYPY = False
 if MYPY:
     import synapse.server
 
 
-class SpamChecker(object):
+class SpamChecker:
     def __init__(self, hs: "synapse.server.HomeServer"):
         self.spam_checkers = []  # type: List[Any]
 
@@ -160,3 +161,33 @@ class SpamChecker(object):
                     return True
 
         return False
+
+    def check_registration_for_spam(
+        self,
+        email_threepid: Optional[dict],
+        username: Optional[str],
+        request_info: Collection[Tuple[str, str]],
+    ) -> RegistrationBehaviour:
+        """Checks if we should allow the given registration request.
+
+        Args:
+            email_threepid: The email threepid used for registering, if any
+            username: The request user name, if any
+            request_info: List of tuples of user agent and IP that
+                were used during the registration process.
+
+        Returns:
+            Enum for how the request should be handled
+        """
+
+        for spam_checker in self.spam_checkers:
+            # For backwards compatibility, only run if the method exists on the
+            # spam checker
+            checker = getattr(spam_checker, "check_registration_for_spam", None)
+            if checker:
+                behaviour = checker(email_threepid, username, request_info)
+                assert isinstance(behaviour, RegistrationBehaviour)
+                if behaviour != RegistrationBehaviour.ALLOW:
+                    return behaviour
+
+        return RegistrationBehaviour.ALLOW

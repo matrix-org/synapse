@@ -16,8 +16,6 @@
 import logging
 from typing import Any, Dict
 
-from canonicaljson import json
-
 from synapse.api.errors import SynapseError
 from synapse.logging.context import run_in_background
 from synapse.logging.opentracing import (
@@ -27,12 +25,13 @@ from synapse.logging.opentracing import (
     start_active_span,
 )
 from synapse.types import UserID, get_domain_from_id
+from synapse.util import json_encoder
 from synapse.util.stringutils import random_string
 
 logger = logging.getLogger(__name__)
 
 
-class DeviceMessageHandler(object):
+class DeviceMessageHandler:
     def __init__(self, hs):
         """
         Args:
@@ -174,7 +173,7 @@ class DeviceMessageHandler(object):
                     "sender": sender_user_id,
                     "type": message_type,
                     "message_id": message_id,
-                    "org.matrix.opentracing_context": json.dumps(context),
+                    "org.matrix.opentracing_context": json_encoder.encode(context),
                 }
 
         log_kv({"local_messages": local_messages})

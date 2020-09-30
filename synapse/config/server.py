@@ -19,14 +19,13 @@ import logging
 import os.path
 import re
 from textwrap import indent
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Set
 
 import attr
 import yaml
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.endpoint import parse_and_validate_server_name
-from synapse.python_dependencies import DependencyException, check_requirements
 
 from ._base import Config, ConfigError
 
@@ -425,7 +424,7 @@ class ServerConfig(Config):
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
 
         @attr.s
-        class LimitRemoteRoomsConfig(object):
+        class LimitRemoteRoomsConfig:
             enabled = attr.ib(
                 validator=attr.validators.instance_of(bool), default=False
             )
@@ -508,8 +507,6 @@ class ServerConfig(Config):
                 )
             )
 
-        _check_resource_config(self.listeners)
-
         self.cleanup_extremities_with_dummy_events = config.get(
             "cleanup_extremities_with_dummy_events", True
         )
@@ -529,6 +526,34 @@ class ServerConfig(Config):
         self.request_token_inhibit_3pid_errors = config.get(
             "request_token_inhibit_3pid_errors", False,
         )
+
+        # List of users trialing the new experimental default push rules. This setting is
+        # not included in the sample configuration file on purpose as it's a temporary
+        # hack, so that some users can trial the new defaults without impacting every
+        # user on the homeserver.
+        users_new_default_push_rules = (
+            config.get("users_new_default_push_rules") or []
+        )  # type: list
+        if not isinstance(users_new_default_push_rules, list):
+            raise ConfigError("'users_new_default_push_rules' must be a list")
+
+        # Turn the list into a set to improve lookup speed.
+        self.users_new_default_push_rules = set(
+            users_new_default_push_rules
+        )  # type: set
+
+        # Whitelist of domain names that given next_link parameters must have
+        next_link_domain_whitelist = config.get(
+            "next_link_domain_whitelist"
+        )  # type: Optional[List[str]]
+
+        self.next_link_domain_whitelist = None  # type: Optional[Set[str]]
+        if next_link_domain_whitelist is not None:
+            if not isinstance(next_link_domain_whitelist, list):
+                raise ConfigError("'next_link_domain_whitelist' must be a list")
+
+            # Turn the list into a set to improve lookup speed.
+            self.next_link_domain_whitelist = set(next_link_domain_whitelist)
 
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)
@@ -616,10 +641,23 @@ class ServerConfig(Config):
             """\
         ## Server ##
 
-        # The domain name of the server, with optional explicit port.
-        # This is used by remote servers to connect to this server,
-        # e.g. matrix.org, localhost:8080, etc.
-        # This is also the last part of your UserID.
+        # The public-facing domain of the server
+        #
+        # The server_name name will appear at the end of usernames and room addresses
+        # created on this server. For example if the server_name was example.com,
+        # usernames on this server would be in the format @user:example.com
+        #
+        # In most cases you should avoid using a matrix specific subdomain such as
+        # matrix.example.com or synapse.example.com as the server_name for the same
+        # reasons you wouldn't use user@email.example.com as your email address.
+        # See https://github.com/matrix-org/synapse/blob/master/docs/delegate.md
+        # for information on how to host Synapse on a subdomain while preserving
+        # a clean server_name.
+        #
+        # The server_name cannot be changed later so it is important to
+        # configure this correctly before you start Synapse. It should be all
+        # lowercase and may contain an explicit port.
+        # Examples: matrix.org, localhost:8080
         #
         server_name: "%(server_name)s"
 
@@ -949,11 +987,10 @@ class ServerConfig(Config):
           #  min_lifetime: 1d
           #  max_lifetime: 1y
 
-          # Retention policy limits. If set, a user won't be able to send a
-          # 'm.room.retention' event which features a 'min_lifetime' or a 'max_lifetime'
-          # that's not within this range. This is especially useful in closed federations,
-          # in which server admins can make sure every federating server applies the same
-          # rules.
+          # Retention policy limits. If set, and the state of a room contains a
+          # 'm.room.retention' event in its state which contains a 'min_lifetime' or a
+          # 'max_lifetime' that's out of these bounds, Synapse will cap the room's policy
+          # to these limits when running purge jobs.
           #
           #allowed_lifetime_min: 1d
           #allowed_lifetime_max: 1y
@@ -979,12 +1016,19 @@ class ServerConfig(Config):
           # (e.g. every 12h), but not want that purge to be performed by a job that's
           # iterating over every room it knows, which could be heavy on the server.
           #
+          # If any purge job is configured, it is strongly recommended to have at least
+          # a single job with neither 'shortest_max_lifetime' nor 'longest_max_lifetime'
+          # set, or one job without 'shortest_max_lifetime' and one job without
+          # 'longest_max_lifetime' set. Otherwise some rooms might be ignored, even if
+          # 'allowed_lifetime_min' and 'allowed_lifetime_max' are set, because capping a
+          # room's policy to these values is done after the policies are retrieved from
+          # Synapse's database (which is done using the range specified in a purge job's
+          # configuration).
+          #
           #purge_jobs:
-          #  - shortest_max_lifetime: 1d
-          #    longest_max_lifetime: 3d
+          #  - longest_max_lifetime: 3d
           #    interval: 12h
           #  - shortest_max_lifetime: 3d
-          #    longest_max_lifetime: 1y
           #    interval: 1d
 
         # Inhibits the /requestToken endpoints from returning an error that might leak
@@ -996,6 +1040,24 @@ class ServerConfig(Config):
         # act as if no error happened and return a fake session ID ('sid') to clients.
         #
         #request_token_inhibit_3pid_errors: true
+
+        # A list of domains that the domain portion of 'next_link' parameters
+        # must match.
+        #
+        # This parameter is optionally provided by clients while requesting
+        # validation of an email or phone number, and maps to a link that
+        # users will be automatically redirected to after validation
+        # succeeds. Clients can make use this parameter to aid the validation
+        # process.
+        #
+        # The whitelist is applied whether the homeserver or an
+        # identity server is handling validation.
+        #
+        # The default value is no whitelist functionality; all domains are
+        # allowed. Setting this value to an empty list will instead disallow
+        # all domains.
+        #
+        #next_link_domain_whitelist: ["matrix.org"]
         """
             % locals()
         )
@@ -1118,20 +1180,3 @@ def _warn_if_webclient_configured(listeners: Iterable[ListenerConfig]) -> None:
                 if name == "webclient":
                     logger.warning(NO_MORE_WEB_CLIENT_WARNING)
                     return
-
-
-def _check_resource_config(listeners: Iterable[ListenerConfig]) -> None:
-    resource_names = {
-        res_name
-        for listener in listeners
-        if listener.http_options
-        for res in listener.http_options.resources
-        for res_name in res.names
-    }
-
-    for resource in resource_names:
-        if resource == "consent":
-            try:
-                check_requirements("resources.consent")
-            except DependencyException as e:
-                raise ConfigError(e.message)

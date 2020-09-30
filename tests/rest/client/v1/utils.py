@@ -30,7 +30,7 @@ from tests.server import make_request, render
 
 
 @attr.s
-class RestHelper(object):
+class RestHelper:
     """Contains extra helper functions to quickly and clearly perform a given
     REST action, which isn't the focus of the test.
     """
@@ -39,7 +39,9 @@ class RestHelper(object):
     resource = attr.ib()
     auth_user_id = attr.ib()
 
-    def create_room_as(self, room_creator=None, is_public=True, tok=None):
+    def create_room_as(
+        self, room_creator=None, is_public=True, tok=None, expect_code=200,
+    ):
         temp_id = self.auth_user_id
         self.auth_user_id = room_creator
         path = "/_matrix/client/r0/createRoom"
@@ -54,9 +56,11 @@ class RestHelper(object):
         )
         render(request, self.resource, self.hs.get_reactor())
 
-        assert channel.result["code"] == b"200", channel.result
+        assert channel.result["code"] == b"%d" % expect_code, channel.result
         self.auth_user_id = temp_id
-        return channel.json_body["room_id"]
+
+        if expect_code == 200:
+            return channel.json_body["room_id"]
 
     def invite(self, room=None, src=None, targ=None, expect_code=200, tok=None):
         self.change_membership(
@@ -155,26 +159,6 @@ class RestHelper(object):
 
         request, channel = make_request(
             self.hs.get_reactor(), "PUT", path, json.dumps(content).encode("utf8")
-        )
-        render(request, self.resource, self.hs.get_reactor())
-
-        assert int(channel.result["code"]) == expect_code, (
-            "Expected: %d, got: %d, resp: %r"
-            % (expect_code, int(channel.result["code"]), channel.result["body"])
-        )
-
-        return channel.json_body
-
-    def redact(self, room_id, event_id, txn_id=None, tok=None, expect_code=200):
-        if txn_id is None:
-            txn_id = "m%s" % (str(time.time()))
-
-        path = "/_matrix/client/r0/rooms/%s/redact/%s/%s" % (room_id, event_id, txn_id)
-        if tok:
-            path = path + "?access_token=%s" % tok
-
-        request, channel = make_request(
-            self.hs.get_reactor(), "PUT", path, json.dumps({}).encode("utf8")
         )
         render(request, self.resource, self.hs.get_reactor())
 

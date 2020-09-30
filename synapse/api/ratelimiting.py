@@ -17,10 +17,11 @@ from collections import OrderedDict
 from typing import Any, Optional, Tuple
 
 from synapse.api.errors import LimitExceededError
+from synapse.types import Requester
 from synapse.util import Clock
 
 
-class Ratelimiter(object):
+class Ratelimiter:
     """
     Ratelimit actions marked by arbitrary keys.
 
@@ -42,6 +43,42 @@ class Ratelimiter(object):
         #   * The point in time
         #   * The rate_hz of this particular entry. This can vary per request
         self.actions = OrderedDict()  # type: OrderedDict[Any, Tuple[float, int, float]]
+
+    def can_requester_do_action(
+        self,
+        requester: Requester,
+        rate_hz: Optional[float] = None,
+        burst_count: Optional[int] = None,
+        update: bool = True,
+        _time_now_s: Optional[int] = None,
+    ) -> Tuple[bool, float]:
+        """Can the requester perform the action?
+
+        Args:
+            requester: The requester to key off when rate limiting. The user property
+                will be used.
+            rate_hz: The long term number of actions that can be performed in a second.
+                Overrides the value set during instantiation if set.
+            burst_count: How many actions that can be performed before being limited.
+                Overrides the value set during instantiation if set.
+            update: Whether to count this check as performing the action
+            _time_now_s: The current time. Optional, defaults to the current time according
+                to self.clock. Only used by tests.
+
+        Returns:
+            A tuple containing:
+                * A bool indicating if they can perform the action now
+                * The reactor timestamp for when the action can be performed next.
+                  -1 if rate_hz is less than or equal to zero
+        """
+        # Disable rate limiting of users belonging to any AS that is configured
+        # not to be rate limited in its registration file (rate_limited: true|false).
+        if requester.app_service and not requester.app_service.is_rate_limited():
+            return True, -1.0
+
+        return self.can_do_action(
+            requester.user.to_string(), rate_hz, burst_count, update, _time_now_s
+        )
 
     def can_do_action(
         self,

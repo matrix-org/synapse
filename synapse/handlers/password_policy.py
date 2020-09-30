@@ -22,7 +22,7 @@ from synapse.api.errors import Codes, PasswordRefusedError
 logger = logging.getLogger(__name__)
 
 
-class PasswordPolicyHandler(object):
+class PasswordPolicyHandler:
     def __init__(self, hs):
         self.policy = hs.config.password_policy
         self.enabled = hs.config.password_policy_enabled

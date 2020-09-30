@@ -30,7 +30,7 @@ class AccountValidityConfig(Config):
     def __init__(self, config, synapse_config):
         if config is None:
             return
-        super(AccountValidityConfig, self).__init__()
+        super().__init__()
         self.enabled = config.get("enabled", False)
         self.renew_by_email_enabled = "renew_at" in config
 

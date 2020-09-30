@@ -30,7 +30,7 @@ class SlavedReceiptsStore(ReceiptsWorkerStore, BaseSlavedStore):
             db_conn, "receipts_linearized", "stream_id"
         )
 
-        super(SlavedReceiptsStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
     def get_max_receipt_stream_id(self):
         return self._receipts_id_gen.get_current_token()
@@ -46,7 +46,7 @@ class SlavedReceiptsStore(ReceiptsWorkerStore, BaseSlavedStore):
 
     def process_replication_rows(self, stream_name, instance_name, token, rows):
         if stream_name == ReceiptsStream.NAME:
-            self._receipts_id_gen.advance(token)
+            self._receipts_id_gen.advance(instance_name, token)
             for row in rows:
                 self.invalidate_caches_for_receipt(
                     row.room_id, row.receipt_type, row.user_id

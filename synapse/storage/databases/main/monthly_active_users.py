@@ -13,9 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import List
-
-from twisted.internet import defer
+from typing import Dict, List
 
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool, make_in_list_sql_clause
@@ -30,28 +28,35 @@ LAST_SEEN_GRANULARITY = 60 * 60 * 1000
 
 class MonthlyActiveUsersWorkerStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(MonthlyActiveUsersWorkerStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
         self._clock = hs.get_clock()
         self.hs = hs
 
     @cached(num_args=0)
-    def get_monthly_active_count(self):
+    async def get_monthly_active_count(self) -> int:
         """Generates current count of monthly active users
 
         Returns:
-            Defered[int]: Number of current monthly active users
+            Number of current monthly active users
         """
 
         def _count_users(txn):
-            sql = "SELECT COALESCE(count(*), 0) FROM monthly_active_users"
+            # Exclude app service users
+            sql = """
+                SELECT COALESCE(count(*), 0)
+                FROM monthly_active_users
+                    LEFT JOIN users
+                    ON monthly_active_users.user_id=users.name
+                WHERE (users.appservice_id IS NULL OR users.appservice_id = '');
+            """
             txn.execute(sql)
             (count,) = txn.fetchone()
             return count
 
-        return self.db_pool.runInteraction("count_users", _count_users)
+        return await self.db_pool.runInteraction("count_users", _count_users)
 
     @cached(num_args=0)
-    def get_monthly_active_count_by_service(self):
+    async def get_monthly_active_count_by_service(self) -> Dict[str, int]:
         """Generates current count of monthly active users broken down by service.
         A service is typically an appservice but also includes native matrix users.
         Since the `monthly_active_users` table is populated from the `user_ips` table
@@ -59,8 +64,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
         method to return anything other than native matrix users.
 
         Returns:
-            Deferred[dict]: dict that includes a mapping between app_service_id
-                and the number of occurrences.
+            A mapping between app_service_id and the number of occurrences.
 
         """
 
@@ -76,7 +80,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
             result = txn.fetchall()
             return dict(result)
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "count_users_by_service", _count_users_by_service
         )
 
@@ -101,17 +105,18 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
         return users
 
     @cached(num_args=1)
-    def user_last_seen_monthly_active(self, user_id):
+    async def user_last_seen_monthly_active(self, user_id: str) -> int:
         """
-            Checks if a given user is part of the monthly active user group
-            Arguments:
-                user_id (str): user to add/update
-            Return:
-                Deferred[int] : timestamp since last seen, None if never seen
+        Checks if a given user is part of the monthly active user group
 
+        Arguments:
+            user_id: user to add/update
+
+        Return:
+            Timestamp since last seen, None if never seen
         """
 
-        return self.db_pool.simple_select_one_onecol(
+        return await self.db_pool.simple_select_one_onecol(
             table="monthly_active_users",
             keyvalues={"user_id": user_id},
             retcol="timestamp",
@@ -122,7 +127,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
 
 class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(MonthlyActiveUsersStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self._limit_usage_by_mau = hs.config.limit_usage_by_mau
         self._mau_stats_only = hs.config.mau_stats_only
@@ -252,16 +257,12 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
             "reap_monthly_active_users", _reap_users, reserved_users
         )
 
-    @defer.inlineCallbacks
-    def upsert_monthly_active_user(self, user_id):
+    async def upsert_monthly_active_user(self, user_id: str) -> None:
         """Updates or inserts the user into the monthly active user table, which
         is used to track the current MAU usage of the server
 
         Args:
-            user_id (str): user to add/update
-
-        Returns:
-            Deferred
+            user_id: user to add/update
         """
         # Support user never to be included in MAU stats. Note I can't easily call this
         # from upsert_monthly_active_user_txn because then I need a _txn form of
@@ -271,11 +272,11 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
         # _initialise_reserved_users reasoning that it would be very strange to
         #  include a support user in this context.
 
-        is_support = yield self.is_support_user(user_id)
+        is_support = await self.is_support_user(user_id)
         if is_support:
             return
 
-        yield self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "upsert_monthly_active_user", self.upsert_monthly_active_user_txn, user_id
         )
 
@@ -322,8 +323,7 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
 
         return is_insert
 
-    @defer.inlineCallbacks
-    def populate_monthly_active_users(self, user_id):
+    async def populate_monthly_active_users(self, user_id):
         """Checks on the state of monthly active user limits and optionally
         add the user to the monthly active tables
 
@@ -332,14 +332,14 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
         """
         if self._limit_usage_by_mau or self._mau_stats_only:
             # Trial users and guests should not be included as part of MAU group
-            is_guest = yield self.is_guest(user_id)
+            is_guest = await self.is_guest(user_id)
             if is_guest:
                 return
-            is_trial = yield self.is_trial_user(user_id)
+            is_trial = await self.is_trial_user(user_id)
             if is_trial:
                 return
 
-            last_seen_timestamp = yield self.user_last_seen_monthly_active(user_id)
+            last_seen_timestamp = await self.user_last_seen_monthly_active(user_id)
             now = self.hs.get_clock().time_msec()
 
             # We want to reduce to the total number of db writes, and are happy
@@ -352,10 +352,10 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
                 # False, there is no point in checking get_monthly_active_count - it
                 # adds no value and will break the logic if max_mau_value is exceeded.
                 if not self._limit_usage_by_mau:
-                    yield self.upsert_monthly_active_user(user_id)
+                    await self.upsert_monthly_active_user(user_id)
                 else:
-                    count = yield self.get_monthly_active_count()
+                    count = await self.get_monthly_active_count()
                     if count < self._max_mau_value:
-                        yield self.upsert_monthly_active_user(user_id)
+                        await self.upsert_monthly_active_user(user_id)
             elif now - last_seen_timestamp > LAST_SEEN_GRANULARITY:
-                yield self.upsert_monthly_active_user(user_id)
+                await self.upsert_monthly_active_user(user_id)

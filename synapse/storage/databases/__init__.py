@@ -24,7 +24,7 @@ from synapse.storage.prepare_database import prepare_database
 logger = logging.getLogger(__name__)
 
 
-class Databases(object):
+class Databases:
     """The various databases.
 
     These are low level interfaces to physical databases.
@@ -38,18 +38,23 @@ class Databases(object):
         # store.
 
         self.databases = []
-        self.main = None
-        self.state = None
-        self.persist_events = None
+        main = None
+        state = None
+        persist_events = None
 
         for database_config in hs.config.database.databases:
             db_name = database_config.name
             engine = create_engine(database_config.config)
 
             with make_conn(database_config, engine) as db_conn:
-                logger.info("Preparing database %r...", db_name)
-
+                logger.info("[database config %r]: Checking database server", db_name)
                 engine.check_database(db_conn)
+
+                logger.info(
+                    "[database config %r]: Preparing for databases %r",
+                    db_name,
+                    database_config.databases,
+                )
                 prepare_database(
                     db_conn, engine, hs.config, databases=database_config.databases,
                 )
@@ -57,41 +62,58 @@ class Databases(object):
                 database = DatabasePool(hs, database_config, engine)
 
                 if "main" in database_config.databases:
-                    logger.info("Starting 'main' data store")
+                    logger.info(
+                        "[database config %r]: Starting 'main' database", db_name
+                    )
 
                     # Sanity check we don't try and configure the main store on
                     # multiple databases.
-                    if self.main:
+                    if main:
                         raise Exception("'main' data store already configured")
 
-                    self.main = main_store_class(database, db_conn, hs)
+                    main = main_store_class(database, db_conn, hs)
 
                     # If we're on a process that can persist events also
                     # instantiate a `PersistEventsStore`
-                    if hs.config.worker.writers.events == hs.get_instance_name():
-                        self.persist_events = PersistEventsStore(
-                            hs, database, self.main
-                        )
+                    if hs.get_instance_name() in hs.config.worker.writers.events:
+                        persist_events = PersistEventsStore(hs, database, main)
 
                 if "state" in database_config.databases:
-                    logger.info("Starting 'state' data store")
+                    logger.info(
+                        "[database config %r]: Starting 'state' database", db_name
+                    )
 
                     # Sanity check we don't try and configure the state store on
                     # multiple databases.
-                    if self.state:
+                    if state:
                         raise Exception("'state' data store already configured")
 
-                    self.state = StateGroupDataStore(database, db_conn, hs)
+                    state = StateGroupDataStore(database, db_conn, hs)
 
                 db_conn.commit()
 
                 self.databases.append(database)
 
-                logger.info("Database %r prepared", db_name)
+                logger.info("[database config %r]: prepared", db_name)
+
+            # Closing the context manager doesn't close the connection.
+            # psycopg will close the connection when the object gets GCed, but *only*
+            # if the PID is the same as when the connection was opened [1], and
+            # it may not be if we fork in the meantime.
+            #
+            # [1]: https://github.com/psycopg/psycopg2/blob/2_8_5/psycopg/connection_type.c#L1378
+
+            db_conn.close()
 
         # Sanity check that we have actually configured all the required stores.
-        if not self.main:
-            raise Exception("No 'main' data store configured")
+        if not main:
+            raise Exception("No 'main' database configured")
 
-        if not self.state:
-            raise Exception("No 'main' data store configured")
+        if not state:
+            raise Exception("No 'state' database configured")
+
+        # We use local variables here to ensure that the databases do not have
+        # optional types.
+        self.main = main
+        self.state = state
+        self.persist_events = persist_events

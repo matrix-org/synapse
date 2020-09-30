@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-class WorkerServerNoticesSender(object):
+class WorkerServerNoticesSender:
     """Stub impl of ServerNoticesSender which does nothing"""
 
     def __init__(self, hs):

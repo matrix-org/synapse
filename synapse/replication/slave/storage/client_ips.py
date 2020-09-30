@@ -22,13 +22,13 @@ from ._base import BaseSlavedStore
 
 class SlavedClientIpStore(BaseSlavedStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(SlavedClientIpStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self.client_ip_last_seen = Cache(
             name="client_ip_last_seen", keylen=4, max_entries=50000
         )
 
-    def insert_client_ip(self, user_id, access_token, ip, user_agent, device_id):
+    async def insert_client_ip(self, user_id, access_token, ip, user_agent, device_id):
         now = int(self._clock.time_msec())
         key = (user_id, access_token, ip)
 

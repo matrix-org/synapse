@@ -15,8 +15,6 @@
 
 from mock import Mock
 
-from twisted.internet import defer
-
 from synapse.api.errors import Codes, SynapseError
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
@@ -60,7 +58,7 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
 
         # Artificially raise the complexity
         store = self.hs.get_datastore()
-        store.get_current_state_event_counts = lambda x: defer.succeed(500 * 1.23)
+        store.get_current_state_event_counts = lambda x: make_awaitable(500 * 1.23)
 
         # Get the room complexity again -- make sure it's our artificial value
         request, channel = self.make_request(
@@ -154,7 +152,7 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         )
 
         # Artificially raise the complexity
-        self.hs.get_datastore().get_current_state_event_counts = lambda x: defer.succeed(
+        self.hs.get_datastore().get_current_state_event_counts = lambda x: make_awaitable(
             600
         )
 

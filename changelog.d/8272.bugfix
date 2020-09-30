@@ -1,0 +1,1 @@
+Fix messages over federation being lost until an event is sent into the same room.

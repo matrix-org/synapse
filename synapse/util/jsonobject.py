@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-class JsonEncodedObject(object):
+class JsonEncodedObject:
     """ A common base class for defining protocol units that are represented
     as JSON.
 

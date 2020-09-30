@@ -57,7 +57,7 @@ A custom mapping provider must specify the following methods:
     - This method must return a string, which is the unique identifier for the
       user. Commonly the ``sub`` claim of the response.
 * `map_user_attributes(self, userinfo, token)`
-    - This method should be async.
+    - This method must be async.
     - Arguments:
       - `userinfo` - A `authlib.oidc.core.claims.UserInfo` object to extract user
                      information from.
@@ -66,6 +66,18 @@ A custom mapping provider must specify the following methods:
     - Returns a dictionary with two keys:
       - localpart: A required string, used to generate the Matrix ID.
       - displayname: An optional string, the display name for the user.
+* `get_extra_attributes(self, userinfo, token)`
+    - This method must be async.
+    - Arguments:
+      - `userinfo` - A `authlib.oidc.core.claims.UserInfo` object to extract user
+                     information from.
+      - `token` - A dictionary which includes information necessary to make
+                  further requests to the OpenID provider.
+    - Returns a dictionary that is suitable to be serialized to JSON. This
+      will be returned as part of the response during a successful login.
+
+      Note that care should be taken to not overwrite any of the parameters
+      usually returned as part of the [login response](https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-login).
 
 ### Default OpenID Mapping Provider
 

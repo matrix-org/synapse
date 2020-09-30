@@ -21,13 +21,22 @@ async def get_badge_count(store, user_id):
     invites = await store.get_invited_rooms_for_local_user(user_id)
     joins = await store.get_rooms_for_user(user_id)
 
+    my_receipts_by_room = await store.get_receipts_for_user(user_id, "m.read")
+
     badge = len(invites)
 
     for room_id in joins:
-        unread_count = await store.get_unread_message_count_for_user(room_id, user_id)
-        # return one badge count per conversation, as count per
-        # message is so noisy as to be almost useless
-        badge += 1 if unread_count else 0
+        if room_id in my_receipts_by_room:
+            last_unread_event_id = my_receipts_by_room[room_id]
+
+            notifs = await (
+                store.get_unread_event_push_actions_by_room_for_user(
+                    room_id, user_id, last_unread_event_id
+                )
+            )
+            # return one badge count per conversation, as count per
+            # message is so noisy as to be almost useless
+            badge += 1 if notifs["notify_count"] else 0
     return badge
 
 

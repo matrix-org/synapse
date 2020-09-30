@@ -12,18 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import attr
-from canonicaljson import json
 
 from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore, db_to_json
+from synapse.storage.database import LoggingTransaction
 from synapse.types import JsonDict
-from synapse.util import stringutils as stringutils
+from synapse.util import json_encoder, stringutils
 
 
-@attr.s
+@attr.s(slots=True)
 class UIAuthSessionData:
     session_id = attr.ib(type=str)
     # The dictionary from the client root level, not the 'auth' key.
@@ -72,7 +72,7 @@ class UIAuthWorkerStore(SQLBaseStore):
             StoreError if a unique session ID cannot be generated.
         """
         # The clientdict gets stored as JSON.
-        clientdict_json = json.dumps(clientdict)
+        clientdict_json = json_encoder.encode(clientdict)
 
         # autogen a session ID and try to create it. We may clash, so just
         # try a few times till one goes through, giving up eventually.
@@ -143,7 +143,7 @@ class UIAuthWorkerStore(SQLBaseStore):
             await self.db_pool.simple_upsert(
                 table="ui_auth_sessions_credentials",
                 keyvalues={"session_id": session_id, "stage_type": stage_type},
-                values={"result": json.dumps(result)},
+                values={"result": json_encoder.encode(result)},
                 desc="mark_ui_auth_stage_complete",
             )
         except self.db_pool.engine.module.IntegrityError:
@@ -184,7 +184,7 @@ class UIAuthWorkerStore(SQLBaseStore):
                 The dictionary from the client root level, not the 'auth' key.
         """
         # The clientdict gets stored as JSON.
-        clientdict_json = json.dumps(clientdict)
+        clientdict_json = json_encoder.encode(clientdict)
 
         await self.db_pool.simple_update_one(
             table="ui_auth_sessions",
@@ -214,14 +214,16 @@ class UIAuthWorkerStore(SQLBaseStore):
             value,
         )
 
-    def _set_ui_auth_session_data_txn(self, txn, session_id: str, key: str, value: Any):
+    def _set_ui_auth_session_data_txn(
+        self, txn: LoggingTransaction, session_id: str, key: str, value: Any
+    ):
         # Get the current value.
         result = self.db_pool.simple_select_one_txn(
             txn,
             table="ui_auth_sessions",
             keyvalues={"session_id": session_id},
             retcols=("serverdict",),
-        )
+        )  # type: Dict[str, Any]  # type: ignore
 
         # Update it and add it back to the database.
         serverdict = db_to_json(result["serverdict"])
@@ -231,7 +233,7 @@ class UIAuthWorkerStore(SQLBaseStore):
             txn,
             table="ui_auth_sessions",
             keyvalues={"session_id": session_id},
-            updatevalues={"serverdict": json.dumps(serverdict)},
+            updatevalues={"serverdict": json_encoder.encode(serverdict)},
         )
 
     async def get_ui_auth_session_data(
@@ -258,9 +260,37 @@ class UIAuthWorkerStore(SQLBaseStore):
 
         return serverdict.get(key, default)
 
+    async def add_user_agent_ip_to_ui_auth_session(
+        self, session_id: str, user_agent: str, ip: str,
+    ):
+        """Add the given user agent / IP to the tracking table
+        """
+        await self.db_pool.simple_upsert(
+            table="ui_auth_sessions_ips",
+            keyvalues={"session_id": session_id, "user_agent": user_agent, "ip": ip},
+            values={},
+            desc="add_user_agent_ip_to_ui_auth_session",
+        )
+
+    async def get_user_agents_ips_to_ui_auth_session(
+        self, session_id: str,
+    ) -> List[Tuple[str, str]]:
+        """Get the given user agents / IPs used during the ui auth process
+
+        Returns:
+            List of user_agent/ip pairs
+        """
+        rows = await self.db_pool.simple_select_list(
+            table="ui_auth_sessions_ips",
+            keyvalues={"session_id": session_id},
+            retcols=("user_agent", "ip"),
+            desc="get_user_agents_ips_to_ui_auth_session",
+        )
+        return [(row["user_agent"], row["ip"]) for row in rows]
+
 
 class UIAuthStore(UIAuthWorkerStore):
-    def delete_old_ui_auth_sessions(self, expiration_time: int):
+    async def delete_old_ui_auth_sessions(self, expiration_time: int) -> None:
         """
         Remove sessions which were last used earlier than the expiration time.
 
@@ -269,17 +299,28 @@ class UIAuthStore(UIAuthWorkerStore):
                 This is an epoch time in milliseconds.
 
         """
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "delete_old_ui_auth_sessions",
             self._delete_old_ui_auth_sessions_txn,
             expiration_time,
         )
 
-    def _delete_old_ui_auth_sessions_txn(self, txn, expiration_time: int):
+    def _delete_old_ui_auth_sessions_txn(
+        self, txn: LoggingTransaction, expiration_time: int
+    ):
         # Get the expired sessions.
         sql = "SELECT session_id FROM ui_auth_sessions WHERE creation_time <= ?"
         txn.execute(sql, [expiration_time])
         session_ids = [r[0] for r in txn.fetchall()]
+
+        # Delete the corresponding IP/user agents.
+        self.db_pool.simple_delete_many_txn(
+            txn,
+            table="ui_auth_sessions_ips",
+            column="session_id",
+            iterable=session_ids,
+            keyvalues={},
+        )
 
         # Delete the corresponding completed credentials.
         self.db_pool.simple_delete_many_txn(

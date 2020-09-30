@@ -12,8 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import re
-
 from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import (
@@ -22,6 +20,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
 )
 from synapse.rest.admin import assert_requester_is_admin
+from synapse.rest.admin._base import admin_patterns
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.types import UserID
 
@@ -56,13 +55,13 @@ class SendServerNoticeServlet(RestServlet):
         self.snm = hs.get_server_notices_manager()
 
     def register(self, json_resource):
-        PATTERN = "^/_synapse/admin/v1/send_server_notice"
+        PATTERN = "/send_server_notice"
         json_resource.register_paths(
-            "POST", (re.compile(PATTERN + "$"),), self.on_POST, self.__class__.__name__
+            "POST", admin_patterns(PATTERN + "$"), self.on_POST, self.__class__.__name__
         )
         json_resource.register_paths(
             "PUT",
-            (re.compile(PATTERN + "/(?P<txn_id>[^/]*)$"),),
+            admin_patterns(PATTERN + "/(?P<txn_id>[^/]*)$"),
             self.on_PUT,
             self.__class__.__name__,
         )

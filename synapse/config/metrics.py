@@ -22,7 +22,7 @@ from ._base import Config, ConfigError
 
 
 @attr.s
-class MetricsFlags(object):
+class MetricsFlags:
     known_servers = attr.ib(default=False, validator=attr.validators.instance_of(bool))
 
     @classmethod

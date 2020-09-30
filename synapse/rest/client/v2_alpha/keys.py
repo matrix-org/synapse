@@ -64,7 +64,7 @@ class KeyUploadServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(KeyUploadServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
         self.device_handler = hs.get_device_handler()
@@ -153,7 +153,7 @@ class KeyQueryServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer):
         """
-        super(KeyQueryServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
 
@@ -183,9 +183,10 @@ class KeyChangesServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer):
         """
-        super(KeyChangesServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
+        self.store = hs.get_datastore()
 
     async def on_GET(self, request):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
@@ -197,7 +198,7 @@ class KeyChangesServlet(RestServlet):
         # changes after the "to" as well as before.
         set_tag("to", parse_string(request, "to"))
 
-        from_token = StreamToken.from_string(from_token_string)
+        from_token = await StreamToken.from_string(self.store, from_token_string)
 
         user_id = requester.user.to_string()
 
@@ -228,7 +229,7 @@ class OneTimeKeyServlet(RestServlet):
     PATTERNS = client_patterns("/keys/claim$")
 
     def __init__(self, hs):
-        super(OneTimeKeyServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
 
@@ -256,7 +257,7 @@ class SigningKeyUploadServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(SigningKeyUploadServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
@@ -314,7 +315,7 @@ class SignaturesUploadServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(SignaturesUploadServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
 

@@ -36,7 +36,7 @@ class SendToDeviceRestServlet(servlet.RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(SendToDeviceRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.txns = HttpTransactionCache(hs)

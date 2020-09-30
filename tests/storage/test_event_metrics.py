@@ -27,7 +27,7 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
         room_creator = self.hs.get_room_creation_handler()
 
         user = UserID("alice", "test")
-        requester = Requester(user, None, False, None, None)
+        requester = Requester(user, None, False, False, None, None)
 
         # Real events, forward extremities
         events = [(3, 2), (6, 2), (4, 6)]
@@ -52,14 +52,14 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
         self.reactor.advance(60 * 60 * 1000)
         self.pump(1)
 
-        items = set(
+        items = list(
             filter(
                 lambda x: b"synapse_forward_extremities_" in x,
-                generate_latest(REGISTRY).split(b"\n"),
+                generate_latest(REGISTRY, emit_help=False).split(b"\n"),
             )
         )
 
-        expected = {
+        expected = [
             b'synapse_forward_extremities_bucket{le="1.0"} 0.0',
             b'synapse_forward_extremities_bucket{le="2.0"} 2.0',
             b'synapse_forward_extremities_bucket{le="3.0"} 2.0',
@@ -72,9 +72,12 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
             b'synapse_forward_extremities_bucket{le="100.0"} 3.0',
             b'synapse_forward_extremities_bucket{le="200.0"} 3.0',
             b'synapse_forward_extremities_bucket{le="500.0"} 3.0',
-            b'synapse_forward_extremities_bucket{le="+Inf"} 3.0',
-            b"synapse_forward_extremities_count 3.0",
-            b"synapse_forward_extremities_sum 10.0",
-        }
-
+            # per https://docs.google.com/document/d/1KwV0mAXwwbvvifBvDKH_LU1YjyXE_wxCkHNoCGq1GX0/edit#heading=h.wghdjzzh72j9,
+            # "inf" is valid: "this includes variants such as inf"
+            b'synapse_forward_extremities_bucket{le="inf"} 3.0',
+            b"# TYPE synapse_forward_extremities_gcount gauge",
+            b"synapse_forward_extremities_gcount 3.0",
+            b"# TYPE synapse_forward_extremities_gsum gauge",
+            b"synapse_forward_extremities_gsum 10.0",
+        ]
         self.assertEqual(items, expected)

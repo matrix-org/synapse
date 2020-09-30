@@ -40,7 +40,7 @@ class ClientDirectoryServer(RestServlet):
     PATTERNS = client_patterns("/directory/room/(?P<room_alias>[^/]*)$", v1=True)
 
     def __init__(self, hs):
-        super(ClientDirectoryServer, self).__init__()
+        super().__init__()
         self.store = hs.get_datastore()
         self.handlers = hs.get_handlers()
         self.auth = hs.get_auth()
@@ -89,7 +89,7 @@ class ClientDirectoryServer(RestServlet):
         dir_handler = self.handlers.directory_handler
 
         try:
-            service = await self.auth.get_appservice_by_req(request)
+            service = self.auth.get_appservice_by_req(request)
             room_alias = RoomAlias.from_string(room_alias)
             await dir_handler.delete_appservice_association(service, room_alias)
             logger.info(
@@ -120,7 +120,7 @@ class ClientDirectoryListServer(RestServlet):
     PATTERNS = client_patterns("/directory/list/room/(?P<room_id>[^/]*)$", v1=True)
 
     def __init__(self, hs):
-        super(ClientDirectoryListServer, self).__init__()
+        super().__init__()
         self.store = hs.get_datastore()
         self.handlers = hs.get_handlers()
         self.auth = hs.get_auth()
@@ -160,7 +160,7 @@ class ClientAppserviceDirectoryListServer(RestServlet):
     )
 
     def __init__(self, hs):
-        super(ClientAppserviceDirectoryListServer, self).__init__()
+        super().__init__()
         self.store = hs.get_datastore()
         self.handlers = hs.get_handlers()
         self.auth = hs.get_auth()

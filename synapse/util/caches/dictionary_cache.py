@@ -40,7 +40,7 @@ class DictionaryEntry(namedtuple("DictionaryEntry", ("full", "known_absent", "va
         return len(self.value)
 
 
-class DictionaryCache(object):
+class DictionaryCache:
     """Caches key -> dictionary lookups, supporting caching partial dicts, i.e.
     fetching a subset of dictionary keys for a particular key.
     """
@@ -53,7 +53,7 @@ class DictionaryCache(object):
         self.thread = None
         # caches_by_name[name] = self.cache
 
-        class Sentinel(object):
+        class Sentinel:
             __slots__ = []
 
         self.sentinel = Sentinel()

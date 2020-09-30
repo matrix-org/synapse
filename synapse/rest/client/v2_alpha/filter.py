@@ -28,7 +28,7 @@ class GetFilterRestServlet(RestServlet):
     PATTERNS = client_patterns("/user/(?P<user_id>[^/]*)/filter/(?P<filter_id>[^/]*)")
 
     def __init__(self, hs):
-        super(GetFilterRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.filtering = hs.get_filtering()
@@ -64,7 +64,7 @@ class CreateFilterRestServlet(RestServlet):
     PATTERNS = client_patterns("/user/(?P<user_id>[^/]*)/filter")
 
     def __init__(self, hs):
-        super(CreateFilterRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.filtering = hs.get_filtering()

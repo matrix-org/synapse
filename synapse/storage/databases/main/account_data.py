@@ -16,29 +16,25 @@
 
 import abc
 import logging
-from typing import List, Tuple
-
-from canonicaljson import json
-
-from twisted.internet import defer
+from typing import Dict, List, Optional, Tuple
 
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool
 from synapse.storage.util.id_generators import StreamIdGenerator
-from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
+from synapse.types import JsonDict
+from synapse.util import json_encoder
+from synapse.util.caches.descriptors import _CacheContext, cached
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 logger = logging.getLogger(__name__)
 
 
-class AccountDataWorkerStore(SQLBaseStore):
+# The ABCMeta metaclass ensures that it cannot be instantiated without
+# the abstract methods being implemented.
+class AccountDataWorkerStore(SQLBaseStore, metaclass=abc.ABCMeta):
     """This is an abstract base class where subclasses must implement
     `get_max_account_data_stream_id` which can be called in the initializer.
     """
-
-    # This ABCMeta metaclass ensures that we cannot be instantiated without
-    # the abstract methods being implemented.
-    __metaclass__ = abc.ABCMeta
 
     def __init__(self, database: DatabasePool, db_conn, hs):
         account_max = self.get_max_account_data_stream_id()
@@ -46,7 +42,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             "AccountDataAndTagsChangeCache", account_max
         )
 
-        super(AccountDataWorkerStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
     @abc.abstractmethod
     def get_max_account_data_stream_id(self):
@@ -58,14 +54,16 @@ class AccountDataWorkerStore(SQLBaseStore):
         raise NotImplementedError()
 
     @cached()
-    def get_account_data_for_user(self, user_id):
+    async def get_account_data_for_user(
+        self, user_id: str
+    ) -> Tuple[Dict[str, JsonDict], Dict[str, Dict[str, JsonDict]]]:
         """Get all the client account_data for a user.
 
         Args:
-            user_id(str): The user to get the account_data for.
+            user_id: The user to get the account_data for.
         Returns:
-            A deferred pair of a dict of global account_data and a dict
-            mapping from room_id string to per room account_data dicts.
+            A 2-tuple of a dict of global account_data and a dict mapping from
+            room_id string to per room account_data dicts.
         """
 
         def get_account_data_for_user_txn(txn):
@@ -94,17 +92,19 @@ class AccountDataWorkerStore(SQLBaseStore):
 
             return global_account_data, by_room
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_account_data_for_user", get_account_data_for_user_txn
         )
 
-    @cachedInlineCallbacks(num_args=2, max_entries=5000)
-    def get_global_account_data_by_type_for_user(self, data_type, user_id):
+    @cached(num_args=2, max_entries=5000)
+    async def get_global_account_data_by_type_for_user(
+        self, data_type: str, user_id: str
+    ) -> Optional[JsonDict]:
         """
         Returns:
-            Deferred: A dict
+            The account data.
         """
-        result = yield self.db_pool.simple_select_one_onecol(
+        result = await self.db_pool.simple_select_one_onecol(
             table="account_data",
             keyvalues={"user_id": user_id, "account_data_type": data_type},
             retcol="content",
@@ -118,14 +118,16 @@ class AccountDataWorkerStore(SQLBaseStore):
             return None
 
     @cached(num_args=2)
-    def get_account_data_for_room(self, user_id, room_id):
+    async def get_account_data_for_room(
+        self, user_id: str, room_id: str
+    ) -> Dict[str, JsonDict]:
         """Get all the client account_data for a user for a room.
 
         Args:
-            user_id(str): The user to get the account_data for.
-            room_id(str): The room to get the account_data for.
+            user_id: The user to get the account_data for.
+            room_id: The room to get the account_data for.
         Returns:
-            A deferred dict of the room account_data
+            A dict of the room account_data
         """
 
         def get_account_data_for_room_txn(txn):
@@ -140,21 +142,22 @@ class AccountDataWorkerStore(SQLBaseStore):
                 row["account_data_type"]: db_to_json(row["content"]) for row in rows
             }
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_account_data_for_room", get_account_data_for_room_txn
         )
 
     @cached(num_args=3, max_entries=5000)
-    def get_account_data_for_room_and_type(self, user_id, room_id, account_data_type):
+    async def get_account_data_for_room_and_type(
+        self, user_id: str, room_id: str, account_data_type: str
+    ) -> Optional[JsonDict]:
         """Get the client account_data of given type for a user for a room.
 
         Args:
-            user_id(str): The user to get the account_data for.
-            room_id(str): The room to get the account_data for.
-            account_data_type (str): The account data type to get.
+            user_id: The user to get the account_data for.
+            room_id: The room to get the account_data for.
+            account_data_type: The account data type to get.
         Returns:
-            A deferred of the room account_data for that type, or None if
-            there isn't any set.
+            The room account_data for that type, or None if there isn't any set.
         """
 
         def get_account_data_for_room_and_type_txn(txn):
@@ -172,7 +175,7 @@ class AccountDataWorkerStore(SQLBaseStore):
 
             return db_to_json(content_json) if content_json else None
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_account_data_for_room_and_type", get_account_data_for_room_and_type_txn
         )
 
@@ -236,12 +239,14 @@ class AccountDataWorkerStore(SQLBaseStore):
             "get_updated_room_account_data", get_updated_room_account_data_txn
         )
 
-    def get_updated_account_data_for_user(self, user_id, stream_id):
+    async def get_updated_account_data_for_user(
+        self, user_id: str, stream_id: int
+    ) -> Tuple[Dict[str, JsonDict], Dict[str, Dict[str, JsonDict]]]:
         """Get all the client account_data for a that's changed for a user
 
         Args:
-            user_id(str): The user to get the account_data for.
-            stream_id(int): The point in the stream since which to get updates
+            user_id: The user to get the account_data for.
+            stream_id: The point in the stream since which to get updates
         Returns:
             A deferred pair of a dict of global account_data and a dict
             mapping from room_id string to per room account_data dicts.
@@ -275,15 +280,17 @@ class AccountDataWorkerStore(SQLBaseStore):
             user_id, int(stream_id)
         )
         if not changed:
-            return defer.succeed(({}, {}))
+            return ({}, {})
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_updated_account_data_for_user", get_updated_account_data_for_user_txn
         )
 
-    @cachedInlineCallbacks(num_args=2, cache_context=True, max_entries=5000)
-    def is_ignored_by(self, ignored_user_id, ignorer_user_id, cache_context):
-        ignored_account_data = yield self.get_global_account_data_by_type_for_user(
+    @cached(num_args=2, cache_context=True, max_entries=5000)
+    async def is_ignored_by(
+        self, ignored_user_id: str, ignorer_user_id: str, cache_context: _CacheContext
+    ) -> bool:
+        ignored_account_data = await self.get_global_account_data_by_type_for_user(
             "m.ignored_user_list",
             ignorer_user_id,
             on_invalidate=cache_context.invalidate,
@@ -306,34 +313,37 @@ class AccountDataStore(AccountDataWorkerStore):
             ],
         )
 
-        super(AccountDataStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
-    def get_max_account_data_stream_id(self):
+    def get_max_account_data_stream_id(self) -> int:
         """Get the current max stream id for the private user data stream
 
         Returns:
-            A deferred int.
+            The maximum stream ID.
         """
         return self._account_data_id_gen.get_current_token()
 
-    @defer.inlineCallbacks
-    def add_account_data_to_room(self, user_id, room_id, account_data_type, content):
+    async def add_account_data_to_room(
+        self, user_id: str, room_id: str, account_data_type: str, content: JsonDict
+    ) -> int:
         """Add some account_data to a room for a user.
-        Args:
-            user_id(str): The user to add a tag for.
-            room_id(str): The room to add a tag for.
-            account_data_type(str): The type of account_data to add.
-            content(dict): A json object to associate with the tag.
-        Returns:
-            A deferred that completes once the account_data has been added.
-        """
-        content_json = json.dumps(content)
 
-        with self._account_data_id_gen.get_next() as next_id:
+        Args:
+            user_id: The user to add a tag for.
+            room_id: The room to add a tag for.
+            account_data_type: The type of account_data to add.
+            content: A json object to associate with the tag.
+
+        Returns:
+            The maximum stream ID.
+        """
+        content_json = json_encoder.encode(content)
+
+        async with self._account_data_id_gen.get_next() as next_id:
             # no need to lock here as room_account_data has a unique constraint
             # on (user_id, room_id, account_data_type) so simple_upsert will
             # retry if there is a conflict.
-            yield self.db_pool.simple_upsert(
+            await self.db_pool.simple_upsert(
                 desc="add_room_account_data",
                 table="room_account_data",
                 keyvalues={
@@ -351,7 +361,7 @@ class AccountDataStore(AccountDataWorkerStore):
             # doesn't sound any worse than the whole update getting lost,
             # which is what would happen if we combined the two into one
             # transaction.
-            yield self._update_max_stream_id(next_id)
+            await self._update_max_stream_id(next_id)
 
             self._account_data_stream_cache.entity_has_changed(user_id, next_id)
             self.get_account_data_for_user.invalidate((user_id,))
@@ -360,26 +370,28 @@ class AccountDataStore(AccountDataWorkerStore):
                 (user_id, room_id, account_data_type), content
             )
 
-        result = self._account_data_id_gen.get_current_token()
-        return result
+        return self._account_data_id_gen.get_current_token()
 
-    @defer.inlineCallbacks
-    def add_account_data_for_user(self, user_id, account_data_type, content):
+    async def add_account_data_for_user(
+        self, user_id: str, account_data_type: str, content: JsonDict
+    ) -> int:
         """Add some account_data to a room for a user.
-        Args:
-            user_id(str): The user to add a tag for.
-            account_data_type(str): The type of account_data to add.
-            content(dict): A json object to associate with the tag.
-        Returns:
-            A deferred that completes once the account_data has been added.
-        """
-        content_json = json.dumps(content)
 
-        with self._account_data_id_gen.get_next() as next_id:
+        Args:
+            user_id: The user to add a tag for.
+            account_data_type: The type of account_data to add.
+            content: A json object to associate with the tag.
+
+        Returns:
+            The maximum stream ID.
+        """
+        content_json = json_encoder.encode(content)
+
+        async with self._account_data_id_gen.get_next() as next_id:
             # no need to lock here as account_data has a unique constraint on
             # (user_id, account_data_type) so simple_upsert will retry if
             # there is a conflict.
-            yield self.db_pool.simple_upsert(
+            await self.db_pool.simple_upsert(
                 desc="add_user_account_data",
                 table="account_data",
                 keyvalues={"user_id": user_id, "account_data_type": account_data_type},
@@ -397,7 +409,7 @@ class AccountDataStore(AccountDataWorkerStore):
             # Note: This is only here for backwards compat to allow admins to
             # roll back to a previous Synapse version. Next time we update the
             # database version we can remove this table.
-            yield self._update_max_stream_id(next_id)
+            await self._update_max_stream_id(next_id)
 
             self._account_data_stream_cache.entity_has_changed(user_id, next_id)
             self.get_account_data_for_user.invalidate((user_id,))
@@ -405,14 +417,13 @@ class AccountDataStore(AccountDataWorkerStore):
                 (account_data_type, user_id)
             )
 
-        result = self._account_data_id_gen.get_current_token()
-        return result
+        return self._account_data_id_gen.get_current_token()
 
-    def _update_max_stream_id(self, next_id):
+    async def _update_max_stream_id(self, next_id: int) -> None:
         """Update the max stream_id
 
         Args:
-            next_id(int): The the revision to advance to.
+            next_id: The the revision to advance to.
         """
 
         # Note: This is only here for backwards compat to allow admins to
@@ -427,4 +438,4 @@ class AccountDataStore(AccountDataWorkerStore):
             )
             txn.execute(update_max_id_sql, (next_id, next_id))
 
-        return self.db_pool.runInteraction("update_account_data_max_stream_id", _update)
+        await self.db_pool.runInteraction("update_account_data_max_stream_id", _update)

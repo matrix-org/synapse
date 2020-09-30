@@ -13,15 +13,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import abc
 import logging
 from typing import List, Tuple, Union
 
-from canonicaljson import json
-
-from twisted.internet import defer
-
+from synapse.api.errors import NotFoundError, StoreError
 from synapse.push.baserules import list_with_base_rules
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.storage._base import SQLBaseStore, db_to_json
@@ -31,15 +27,17 @@ from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.pusher import PusherWorkerStore
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
-from synapse.storage.util.id_generators import ChainedIdGenerator
-from synapse.util.caches.descriptors import cachedInlineCallbacks, cachedList
+from synapse.storage.util.id_generators import StreamIdGenerator
+from synapse.util import json_encoder
+from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 logger = logging.getLogger(__name__)
 
 
-def _load_rules(rawrules, enabled_map):
+def _load_rules(rawrules, enabled_map, use_new_defaults=False):
     ruleslist = []
     for rawrule in rawrules:
         rule = dict(rawrule)
@@ -49,7 +47,7 @@ def _load_rules(rawrules, enabled_map):
         ruleslist.append(rule)
 
     # We're going to be mutating this a lot, so do a deep copy
-    rules = list(list_with_base_rules(ruleslist))
+    rules = list(list_with_base_rules(ruleslist, use_new_defaults))
 
     for i, rule in enumerate(rules):
         rule_id = rule["rule_id"]
@@ -63,6 +61,8 @@ def _load_rules(rawrules, enabled_map):
     return rules
 
 
+# The ABCMeta metaclass ensures that it cannot be instantiated without
+# the abstract methods being implemented.
 class PushRulesWorkerStore(
     ApplicationServiceWorkerStore,
     ReceiptsWorkerStore,
@@ -70,22 +70,19 @@ class PushRulesWorkerStore(
     RoomMemberWorkerStore,
     EventsWorkerStore,
     SQLBaseStore,
+    metaclass=abc.ABCMeta,
 ):
     """This is an abstract base class where subclasses must implement
     `get_max_push_rules_stream_id` which can be called in the initializer.
     """
 
-    # This ABCMeta metaclass ensures that we cannot be instantiated without
-    # the abstract methods being implemented.
-    __metaclass__ = abc.ABCMeta
-
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(PushRulesWorkerStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         if hs.config.worker.worker_app is None:
-            self._push_rules_stream_id_gen = ChainedIdGenerator(
-                self._stream_id_gen, db_conn, "push_rules_stream", "stream_id"
-            )  # type: Union[ChainedIdGenerator, SlavedIdTracker]
+            self._push_rules_stream_id_gen = StreamIdGenerator(
+                db_conn, "push_rules_stream", "stream_id"
+            )  # type: Union[StreamIdGenerator, SlavedIdTracker]
         else:
             self._push_rules_stream_id_gen = SlavedIdTracker(
                 db_conn, "push_rules_stream", "stream_id"
@@ -105,6 +102,8 @@ class PushRulesWorkerStore(
             prefilled_cache=push_rules_prefill,
         )
 
+        self._users_new_default_push_rules = hs.config.users_new_default_push_rules
+
     @abc.abstractmethod
     def get_max_push_rules_stream_id(self):
         """Get the position of the push rules stream.
@@ -114,9 +113,9 @@ class PushRulesWorkerStore(
         """
         raise NotImplementedError()
 
-    @cachedInlineCallbacks(max_entries=5000)
-    def get_push_rules_for_user(self, user_id):
-        rows = yield self.db_pool.simple_select_list(
+    @cached(max_entries=5000)
+    async def get_push_rules_for_user(self, user_id):
+        rows = await self.db_pool.simple_select_list(
             table="push_rules",
             keyvalues={"user_name": user_id},
             retcols=(
@@ -132,15 +131,15 @@ class PushRulesWorkerStore(
 
         rows.sort(key=lambda row: (-int(row["priority_class"]), -int(row["priority"])))
 
-        enabled_map = yield self.get_push_rules_enabled_for_user(user_id)
+        enabled_map = await self.get_push_rules_enabled_for_user(user_id)
 
-        rules = _load_rules(rows, enabled_map)
+        use_new_defaults = user_id in self._users_new_default_push_rules
 
-        return rules
+        return _load_rules(rows, enabled_map, use_new_defaults)
 
-    @cachedInlineCallbacks(max_entries=5000)
-    def get_push_rules_enabled_for_user(self, user_id):
-        results = yield self.db_pool.simple_select_list(
+    @cached(max_entries=5000)
+    async def get_push_rules_enabled_for_user(self, user_id):
+        results = await self.db_pool.simple_select_list(
             table="push_rules_enable",
             keyvalues={"user_name": user_id},
             retcols=("user_name", "rule_id", "enabled"),
@@ -148,9 +147,11 @@ class PushRulesWorkerStore(
         )
         return {r["rule_id"]: False if r["enabled"] == 0 else True for r in results}
 
-    def have_push_rules_changed_for_user(self, user_id, last_id):
+    async def have_push_rules_changed_for_user(
+        self, user_id: str, last_id: int
+    ) -> bool:
         if not self.push_rules_stream_cache.has_entity_changed(user_id, last_id):
-            return defer.succeed(False)
+            return False
         else:
 
             def have_push_rules_changed_txn(txn):
@@ -162,23 +163,20 @@ class PushRulesWorkerStore(
                 (count,) = txn.fetchone()
                 return bool(count)
 
-            return self.db_pool.runInteraction(
+            return await self.db_pool.runInteraction(
                 "have_push_rules_changed", have_push_rules_changed_txn
             )
 
     @cachedList(
-        cached_method_name="get_push_rules_for_user",
-        list_name="user_ids",
-        num_args=1,
-        inlineCallbacks=True,
+        cached_method_name="get_push_rules_for_user", list_name="user_ids", num_args=1,
     )
-    def bulk_get_push_rules(self, user_ids):
+    async def bulk_get_push_rules(self, user_ids):
         if not user_ids:
             return {}
 
         results = {user_id: [] for user_id in user_ids}
 
-        rows = yield self.db_pool.simple_select_many_batch(
+        rows = await self.db_pool.simple_select_many_batch(
             table="push_rules",
             column="user_name",
             iterable=user_ids,
@@ -191,21 +189,26 @@ class PushRulesWorkerStore(
         for row in rows:
             results.setdefault(row["user_name"], []).append(row)
 
-        enabled_map_by_user = yield self.bulk_get_push_rules_enabled(user_ids)
+        enabled_map_by_user = await self.bulk_get_push_rules_enabled(user_ids)
 
         for user_id, rules in results.items():
-            results[user_id] = _load_rules(rules, enabled_map_by_user.get(user_id, {}))
+            use_new_defaults = user_id in self._users_new_default_push_rules
+
+            results[user_id] = _load_rules(
+                rules, enabled_map_by_user.get(user_id, {}), use_new_defaults,
+            )
 
         return results
 
-    @defer.inlineCallbacks
-    def copy_push_rule_from_room_to_room(self, new_room_id, user_id, rule):
+    async def copy_push_rule_from_room_to_room(
+        self, new_room_id: str, user_id: str, rule: dict
+    ) -> None:
         """Copy a single push rule from one room to another for a specific user.
 
         Args:
-            new_room_id (str): ID of the new room.
-            user_id (str): ID of user the push rule belongs to.
-            rule (Dict): A push rule.
+            new_room_id: ID of the new room.
+            user_id : ID of user the push rule belongs to.
+            rule: A push rule.
         """
         # Create new rule id
         rule_id_scope = "/".join(rule["rule_id"].split("/")[:-1])
@@ -217,7 +220,7 @@ class PushRulesWorkerStore(
                 condition["pattern"] = new_room_id
 
         # Add the rule for the new room
-        yield self.add_push_rule(
+        await self.add_push_rule(
             user_id=user_id,
             rule_id=new_rule_id,
             priority_class=rule["priority_class"],
@@ -225,20 +228,19 @@ class PushRulesWorkerStore(
             actions=rule["actions"],
         )
 
-    @defer.inlineCallbacks
-    def copy_push_rules_from_room_to_room_for_user(
-        self, old_room_id, new_room_id, user_id
-    ):
+    async def copy_push_rules_from_room_to_room_for_user(
+        self, old_room_id: str, new_room_id: str, user_id: str
+    ) -> None:
         """Copy all of the push rules from one room to another for a specific
         user.
 
         Args:
-            old_room_id (str): ID of the old room.
-            new_room_id (str): ID of the new room.
-            user_id (str): ID of user to copy push rules for.
+            old_room_id: ID of the old room.
+            new_room_id: ID of the new room.
+            user_id: ID of user to copy push rules for.
         """
         # Retrieve push rules for this user
-        user_push_rules = yield self.get_push_rules_for_user(user_id)
+        user_push_rules = await self.get_push_rules_for_user(user_id)
 
         # Get rules relating to the old room and copy them to the new room
         for rule in user_push_rules:
@@ -247,96 +249,20 @@ class PushRulesWorkerStore(
                 (c.get("key") == "room_id" and c.get("pattern") == old_room_id)
                 for c in conditions
             ):
-                yield self.copy_push_rule_from_room_to_room(new_room_id, user_id, rule)
-
-    @defer.inlineCallbacks
-    def bulk_get_push_rules_for_room(self, event, context):
-        state_group = context.state_group
-        if not state_group:
-            # If state_group is None it means it has yet to be assigned a
-            # state group, i.e. we need to make sure that calls with a state_group
-            # of None don't hit previous cached calls with a None state_group.
-            # To do this we set the state_group to a new object as object() != object()
-            state_group = object()
-
-        current_state_ids = yield defer.ensureDeferred(context.get_current_state_ids())
-        result = yield self._bulk_get_push_rules_for_room(
-            event.room_id, state_group, current_state_ids, event=event
-        )
-        return result
-
-    @cachedInlineCallbacks(num_args=2, cache_context=True)
-    def _bulk_get_push_rules_for_room(
-        self, room_id, state_group, current_state_ids, cache_context, event=None
-    ):
-        # We don't use `state_group`, its there so that we can cache based
-        # on it. However, its important that its never None, since two current_state's
-        # with a state_group of None are likely to be different.
-        # See bulk_get_push_rules_for_room for how we work around this.
-        assert state_group is not None
-
-        # We also will want to generate notifs for other people in the room so
-        # their unread countss are correct in the event stream, but to avoid
-        # generating them for bot / AS users etc, we only do so for people who've
-        # sent a read receipt into the room.
-
-        users_in_room = yield self._get_joined_users_from_context(
-            room_id,
-            state_group,
-            current_state_ids,
-            on_invalidate=cache_context.invalidate,
-            event=event,
-        )
-
-        # We ignore app service users for now. This is so that we don't fill
-        # up the `get_if_users_have_pushers` cache with AS entries that we
-        # know don't have pushers, nor even read receipts.
-        local_users_in_room = {
-            u
-            for u in users_in_room
-            if self.hs.is_mine_id(u)
-            and not self.get_if_app_services_interested_in_user(u)
-        }
-
-        # users in the room who have pushers need to get push rules run because
-        # that's how their pushers work
-        if_users_with_pushers = yield self.get_if_users_have_pushers(
-            local_users_in_room, on_invalidate=cache_context.invalidate
-        )
-        user_ids = {
-            uid for uid, have_pusher in if_users_with_pushers.items() if have_pusher
-        }
-
-        users_with_receipts = yield self.get_users_with_read_receipts_in_room(
-            room_id, on_invalidate=cache_context.invalidate
-        )
-
-        # any users with pushers must be ours: they have pushers
-        for uid in users_with_receipts:
-            if uid in local_users_in_room:
-                user_ids.add(uid)
-
-        rules_by_user = yield self.bulk_get_push_rules(
-            user_ids, on_invalidate=cache_context.invalidate
-        )
-
-        rules_by_user = {k: v for k, v in rules_by_user.items() if v is not None}
-
-        return rules_by_user
+                await self.copy_push_rule_from_room_to_room(new_room_id, user_id, rule)
 
     @cachedList(
         cached_method_name="get_push_rules_enabled_for_user",
         list_name="user_ids",
         num_args=1,
-        inlineCallbacks=True,
     )
-    def bulk_get_push_rules_enabled(self, user_ids):
+    async def bulk_get_push_rules_enabled(self, user_ids):
         if not user_ids:
             return {}
 
         results = {user_id: {} for user_id in user_ids}
 
-        rows = yield self.db_pool.simple_select_many_batch(
+        rows = await self.db_pool.simple_select_many_batch(
             table="push_rules_enable",
             column="user_name",
             iterable=user_ids,
@@ -400,8 +326,7 @@ class PushRulesWorkerStore(
 
 
 class PushRuleStore(PushRulesWorkerStore):
-    @defer.inlineCallbacks
-    def add_push_rule(
+    async def add_push_rule(
         self,
         user_id,
         rule_id,
@@ -410,13 +335,14 @@ class PushRuleStore(PushRulesWorkerStore):
         actions,
         before=None,
         after=None,
-    ):
-        conditions_json = json.dumps(conditions)
-        actions_json = json.dumps(actions)
-        with self._push_rules_stream_id_gen.get_next() as ids:
-            stream_id, event_stream_ordering = ids
+    ) -> None:
+        conditions_json = json_encoder.encode(conditions)
+        actions_json = json_encoder.encode(actions)
+        async with self._push_rules_stream_id_gen.get_next() as stream_id:
+            event_stream_ordering = self._stream_id_gen.get_current_token()
+
             if before or after:
-                yield self.db_pool.runInteraction(
+                await self.db_pool.runInteraction(
                     "_add_push_rule_relative_txn",
                     self._add_push_rule_relative_txn,
                     stream_id,
@@ -430,7 +356,7 @@ class PushRuleStore(PushRulesWorkerStore):
                     after,
                 )
             else:
-                yield self.db_pool.runInteraction(
+                await self.db_pool.runInteraction(
                     "_add_push_rule_highest_priority_txn",
                     self._add_push_rule_highest_priority_txn,
                     stream_id,
@@ -614,19 +540,43 @@ class PushRuleStore(PushRulesWorkerStore):
                 },
             )
 
-    @defer.inlineCallbacks
-    def delete_push_rule(self, user_id, rule_id):
+        # ensure we have a push_rules_enable row
+        # enabledness defaults to true
+        if isinstance(self.database_engine, PostgresEngine):
+            sql = """
+                INSERT INTO push_rules_enable (id, user_name, rule_id, enabled)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT DO NOTHING
+            """
+        elif isinstance(self.database_engine, Sqlite3Engine):
+            sql = """
+                INSERT OR IGNORE INTO push_rules_enable (id, user_name, rule_id, enabled)
+                VALUES (?, ?, ?, ?)
+            """
+        else:
+            raise RuntimeError("Unknown database engine")
+
+        new_enable_id = self._push_rules_enable_id_gen.get_next()
+        txn.execute(sql, (new_enable_id, user_id, rule_id, 1))
+
+    async def delete_push_rule(self, user_id: str, rule_id: str) -> None:
         """
         Delete a push rule. Args specify the row to be deleted and can be
         any of the columns in the push_rule table, but below are the
         standard ones
 
         Args:
-            user_id (str): The matrix ID of the push rule owner
-            rule_id (str): The rule_id of the rule to be deleted
+            user_id: The matrix ID of the push rule owner
+            rule_id: The rule_id of the rule to be deleted
         """
 
         def delete_push_rule_txn(txn, stream_id, event_stream_ordering):
+            # we don't use simple_delete_one_txn because that would fail if the
+            # user did not have a push_rule_enable row.
+            self.db_pool.simple_delete_txn(
+                txn, "push_rules_enable", {"user_name": user_id, "rule_id": rule_id}
+            )
+
             self.db_pool.simple_delete_one_txn(
                 txn, "push_rules", {"user_name": user_id, "rule_id": rule_id}
             )
@@ -635,20 +585,40 @@ class PushRuleStore(PushRulesWorkerStore):
                 txn, stream_id, event_stream_ordering, user_id, rule_id, op="DELETE"
             )
 
-        with self._push_rules_stream_id_gen.get_next() as ids:
-            stream_id, event_stream_ordering = ids
-            yield self.db_pool.runInteraction(
+        async with self._push_rules_stream_id_gen.get_next() as stream_id:
+            event_stream_ordering = self._stream_id_gen.get_current_token()
+
+            await self.db_pool.runInteraction(
                 "delete_push_rule",
                 delete_push_rule_txn,
                 stream_id,
                 event_stream_ordering,
             )
 
-    @defer.inlineCallbacks
-    def set_push_rule_enabled(self, user_id, rule_id, enabled):
-        with self._push_rules_stream_id_gen.get_next() as ids:
-            stream_id, event_stream_ordering = ids
-            yield self.db_pool.runInteraction(
+    async def set_push_rule_enabled(
+        self, user_id: str, rule_id: str, enabled: bool, is_default_rule: bool
+    ) -> None:
+        """
+        Sets the `enabled` state of a push rule.
+
+        Args:
+            user_id: the user ID of the user who wishes to enable/disable the rule
+                e.g. '@tina:example.org'
+            rule_id: the full rule ID of the rule to be enabled/disabled
+                e.g. 'global/override/.m.rule.roomnotif'
+                  or 'global/override/myCustomRule'
+            enabled: True if the rule is to be enabled, False if it is to be
+                disabled
+            is_default_rule: True if and only if this is a server-default rule.
+                This skips the check for existence (as only user-created rules
+                are always stored in the database `push_rules` table).
+
+        Raises:
+            NotFoundError if the rule does not exist.
+        """
+        async with self._push_rules_stream_id_gen.get_next() as stream_id:
+            event_stream_ordering = self._stream_id_gen.get_current_token()
+            await self.db_pool.runInteraction(
                 "_set_push_rule_enabled_txn",
                 self._set_push_rule_enabled_txn,
                 stream_id,
@@ -656,12 +626,47 @@ class PushRuleStore(PushRulesWorkerStore):
                 user_id,
                 rule_id,
                 enabled,
+                is_default_rule,
             )
 
     def _set_push_rule_enabled_txn(
-        self, txn, stream_id, event_stream_ordering, user_id, rule_id, enabled
+        self,
+        txn,
+        stream_id,
+        event_stream_ordering,
+        user_id,
+        rule_id,
+        enabled,
+        is_default_rule,
     ):
         new_id = self._push_rules_enable_id_gen.get_next()
+
+        if not is_default_rule:
+            # first check it exists; we need to lock for key share so that a
+            # transaction that deletes the push rule will conflict with this one.
+            # We also need a push_rule_enable row to exist for every push_rules
+            # row, otherwise it is possible to simultaneously delete a push rule
+            # (that has no _enable row) and enable it, resulting in a dangling
+            # _enable row. To solve this: we either need to use SERIALISABLE or
+            # ensure we always have a push_rule_enable row for every push_rule
+            # row. We chose the latter.
+            for_key_share = "FOR KEY SHARE"
+            if not isinstance(self.database_engine, PostgresEngine):
+                # For key share is not applicable/available on SQLite
+                for_key_share = ""
+            sql = (
+                """
+                SELECT 1 FROM push_rules
+                WHERE user_name = ? AND rule_id = ?
+                %s
+            """
+                % for_key_share
+            )
+            txn.execute(sql, (user_id, rule_id))
+            if txn.fetchone() is None:
+                # needed to set NOT_FOUND code.
+                raise NotFoundError("Push rule does not exist.")
+
         self.db_pool.simple_upsert_txn(
             txn,
             "push_rules_enable",
@@ -679,9 +684,32 @@ class PushRuleStore(PushRulesWorkerStore):
             op="ENABLE" if enabled else "DISABLE",
         )
 
-    @defer.inlineCallbacks
-    def set_push_rule_actions(self, user_id, rule_id, actions, is_default_rule):
-        actions_json = json.dumps(actions)
+    async def set_push_rule_actions(
+        self,
+        user_id: str,
+        rule_id: str,
+        actions: List[Union[dict, str]],
+        is_default_rule: bool,
+    ) -> None:
+        """
+        Sets the `actions` state of a push rule.
+
+        Will throw NotFoundError if the rule does not exist; the Code for this
+        is NOT_FOUND.
+
+        Args:
+            user_id: the user ID of the user who wishes to enable/disable the rule
+                e.g. '@tina:example.org'
+            rule_id: the full rule ID of the rule to be enabled/disabled
+                e.g. 'global/override/.m.rule.roomnotif'
+                  or 'global/override/myCustomRule'
+            actions: A list of actions (each action being a dict or string),
+                e.g. ["notify", {"set_tweak": "highlight", "value": false}]
+            is_default_rule: True if and only if this is a server-default rule.
+                This skips the check for existence (as only user-created rules
+                are always stored in the database `push_rules` table).
+        """
+        actions_json = json_encoder.encode(actions)
 
         def set_push_rule_actions_txn(txn, stream_id, event_stream_ordering):
             if is_default_rule:
@@ -702,12 +730,19 @@ class PushRuleStore(PushRulesWorkerStore):
                     update_stream=False,
                 )
             else:
-                self.db_pool.simple_update_one_txn(
-                    txn,
-                    "push_rules",
-                    {"user_name": user_id, "rule_id": rule_id},
-                    {"actions": actions_json},
-                )
+                try:
+                    self.db_pool.simple_update_one_txn(
+                        txn,
+                        "push_rules",
+                        {"user_name": user_id, "rule_id": rule_id},
+                        {"actions": actions_json},
+                    )
+                except StoreError as serr:
+                    if serr.code == 404:
+                        # this sets the NOT_FOUND error Code
+                        raise NotFoundError("Push rule does not exist")
+                    else:
+                        raise
 
             self._insert_push_rules_update_txn(
                 txn,
@@ -719,9 +754,10 @@ class PushRuleStore(PushRulesWorkerStore):
                 data={"actions": actions_json},
             )
 
-        with self._push_rules_stream_id_gen.get_next() as ids:
-            stream_id, event_stream_ordering = ids
-            yield self.db_pool.runInteraction(
+        async with self._push_rules_stream_id_gen.get_next() as stream_id:
+            event_stream_ordering = self._stream_id_gen.get_current_token()
+
+            await self.db_pool.runInteraction(
                 "set_push_rule_actions",
                 set_push_rule_actions_txn,
                 stream_id,
@@ -749,11 +785,5 @@ class PushRuleStore(PushRulesWorkerStore):
             self.push_rules_stream_cache.entity_has_changed, user_id, stream_id
         )
 
-    def get_push_rules_stream_token(self):
-        """Get the position of the push rules stream.
-        Returns a pair of a stream id for the push_rules stream and the
-        room stream ordering it corresponds to."""
-        return self._push_rules_stream_id_gen.get_current_token()
-
     def get_max_push_rules_stream_id(self):
-        return self.get_push_rules_stream_token()[0]
+        return self._push_rules_stream_id_gen.get_current_token()

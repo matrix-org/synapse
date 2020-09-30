@@ -60,7 +60,7 @@ DEFAULT_ATTESTATION_JITTER = (0.9, 1.3)
 UPDATE_ATTESTATION_TIME_MS = 1 * 24 * 60 * 60 * 1000
 
 
-class GroupAttestationSigning(object):
+class GroupAttestationSigning:
     """Creates and verifies group attestations.
     """
 
@@ -124,7 +124,7 @@ class GroupAttestationSigning(object):
         )
 
 
-class GroupAttestionRenewer(object):
+class GroupAttestionRenewer:
     """Responsible for sending and receiving attestation updates.
     """
 

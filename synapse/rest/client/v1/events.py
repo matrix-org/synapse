@@ -30,9 +30,10 @@ class EventStreamRestServlet(RestServlet):
     DEFAULT_LONGPOLL_TIME_MS = 30000
 
     def __init__(self, hs):
-        super(EventStreamRestServlet, self).__init__()
+        super().__init__()
         self.event_stream_handler = hs.get_event_stream_handler()
         self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
 
     async def on_GET(self, request):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
@@ -44,7 +45,7 @@ class EventStreamRestServlet(RestServlet):
         if b"room_id" in request.args:
             room_id = request.args[b"room_id"][0].decode("ascii")
 
-        pagin_config = PaginationConfig.from_request(request)
+        pagin_config = await PaginationConfig.from_request(self.store, request)
         timeout = EventStreamRestServlet.DEFAULT_LONGPOLL_TIME_MS
         if b"timeout" in request.args:
             try:
@@ -74,7 +75,7 @@ class EventRestServlet(RestServlet):
     PATTERNS = client_patterns("/events/(?P<event_id>[^/]*)$", v1=True)
 
     def __init__(self, hs):
-        super(EventRestServlet, self).__init__()
+        super().__init__()
         self.clock = hs.get_clock()
         self.event_handler = hs.get_event_handler()
         self.auth = hs.get_auth()

@@ -25,7 +25,7 @@ from synapse.types import UserID
 logger = logging.getLogger(__name__)
 
 
-class BaseHandler(object):
+class BaseHandler:
     """
     Common base class for the event handlers.
     """

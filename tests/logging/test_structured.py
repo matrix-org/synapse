@@ -29,12 +29,12 @@ from synapse.logging.context import LoggingContext
 from tests.unittest import DEBUG, HomeserverTestCase
 
 
-class FakeBeginner(object):
+class FakeBeginner:
     def beginLoggingTo(self, observers, **kwargs):
         self.observers = observers
 
 
-class StructuredLoggingTestBase(object):
+class StructuredLoggingTestBase:
     """
     Test base that registers a cleanup handler to reset the stdlib log handler
     to 'unset'.

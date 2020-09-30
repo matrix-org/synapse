@@ -99,7 +99,7 @@ class CacheTestCase(unittest.HomeserverTestCase):
 class CacheDecoratorTestCase(unittest.HomeserverTestCase):
     @defer.inlineCallbacks
     def test_passthrough(self):
-        class A(object):
+        class A:
             @cached()
             def func(self, key):
                 return key
@@ -113,7 +113,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
     def test_hit(self):
         callcount = [0]
 
-        class A(object):
+        class A:
             @cached()
             def func(self, key):
                 callcount[0] += 1
@@ -131,7 +131,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
     def test_invalidate(self):
         callcount = [0]
 
-        class A(object):
+        class A:
             @cached()
             def func(self, key):
                 callcount[0] += 1
@@ -149,7 +149,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
         self.assertEquals(callcount[0], 2)
 
     def test_invalidate_missing(self):
-        class A(object):
+        class A:
             @cached()
             def func(self, key):
                 return key
@@ -160,7 +160,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
     def test_max_entries(self):
         callcount = [0]
 
-        class A(object):
+        class A:
             @cached(max_entries=10)
             def func(self, key):
                 callcount[0] += 1
@@ -187,7 +187,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
 
         d = defer.succeed(123)
 
-        class A(object):
+        class A:
             @cached()
             def func(self, key):
                 callcount[0] += 1
@@ -205,7 +205,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
         callcount = [0]
         callcount2 = [0]
 
-        class A(object):
+        class A:
             @cached()
             def func(self, key):
                 callcount[0] += 1
@@ -238,7 +238,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
         callcount = [0]
         callcount2 = [0]
 
-        class A(object):
+        class A:
             @cached(max_entries=2)
             def func(self, key):
                 callcount[0] += 1
@@ -275,7 +275,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
         callcount = [0]
         callcount2 = [0]
 
-        class A(object):
+        class A:
             @cached()
             def func(self, key):
                 callcount[0] += 1

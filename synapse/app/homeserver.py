@@ -15,8 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
-
 import gc
 import logging
 import math
@@ -48,6 +46,7 @@ from synapse.api.urls import (
 from synapse.app import _base
 from synapse.app._base import listen_ssl, listen_tcp, quit_with_error
 from synapse.config._base import ConfigError
+from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import ListenerConfig
 from synapse.federation.transport.server import TransportLayerServer
@@ -68,6 +67,7 @@ from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
 from synapse.rest.admin import AdminRestResource
+from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.well_known import WellKnownResource
 from synapse.server import HomeServer
@@ -98,7 +98,9 @@ class SynapseHomeServer(HomeServer):
         if site_tag is None:
             site_tag = port
 
-        resources = {}
+        # We always include a health resource.
+        resources = {"/health": HealthResource()}
+
         for res in listener_config.http_options.resources:
             for name in res.names:
                 if name == "openid" and "federation" in res.names:
@@ -205,6 +207,15 @@ class SynapseHomeServer(HomeServer):
                 from synapse.rest.saml2 import SAML2Resource
 
                 resources["/_matrix/saml2"] = SAML2Resource(self)
+
+            if self.get_config().threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+                from synapse.rest.synapse.client.password_reset import (
+                    PasswordResetSubmitTokenResource,
+                )
+
+                resources[
+                    "/_synapse/client/password_reset/email/submit_token"
+                ] = PasswordResetSubmitTokenResource(self)
 
         if name == "consent":
             from synapse.rest.consent.consent_resource import ConsentResource
@@ -408,26 +419,24 @@ def setup(config_options):
 
         return provision
 
-    @defer.inlineCallbacks
-    def reprovision_acme():
+    async def reprovision_acme():
         """
         Provision a certificate from ACME, if required, and reload the TLS
         certificate if it's renewed.
         """
-        reprovisioned = yield defer.ensureDeferred(do_acme())
+        reprovisioned = await do_acme()
         if reprovisioned:
             _base.refresh_certificate(hs)
 
-    @defer.inlineCallbacks
-    def start():
+    async def start():
         try:
             # Run the ACME provisioning code, if it's enabled.
             if hs.config.acme_enabled:
                 acme = hs.get_acme_handler()
                 # Start up the webservices which we will respond to ACME
                 # challenges with, and then provision.
-                yield defer.ensureDeferred(acme.start_listening())
-                yield defer.ensureDeferred(do_acme())
+                await acme.start_listening()
+                await do_acme()
 
                 # Check if it needs to be reprovisioned every day.
                 hs.get_clock().looping_call(reprovision_acme, 24 * 60 * 60 * 1000)
@@ -436,8 +445,8 @@ def setup(config_options):
             if hs.config.oidc_enabled:
                 oidc = hs.get_oidc_handler()
                 # Loading the provider metadata also ensures the provider config is valid.
-                yield defer.ensureDeferred(oidc.load_metadata())
-                yield defer.ensureDeferred(oidc.load_jwks())
+                await oidc.load_metadata()
+                await oidc.load_jwks()
 
             _base.start(hs, config.listeners)
 
@@ -453,7 +462,7 @@ def setup(config_options):
                 reactor.stop()
             sys.exit(1)
 
-    reactor.callWhenRunning(start)
+    reactor.callWhenRunning(lambda: defer.ensureDeferred(start()))
 
     return hs
 

@@ -105,7 +105,7 @@ def tweaks_for_actions(actions: List[Union[str, Dict]]) -> Dict[str, Any]:
     return tweaks
 
 
-class PushRuleEvaluatorForEvent(object):
+class PushRuleEvaluatorForEvent:
     def __init__(
         self,
         event: EventBase,
