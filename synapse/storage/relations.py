@@ -22,7 +22,7 @@ from synapse.api.errors import SynapseError
 logger = logging.getLogger(__name__)
 
 
-@attr.s
+@attr.s(slots=True)
 class PaginationChunk:
     """Returned by relation pagination APIs.
 

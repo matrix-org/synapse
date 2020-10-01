@@ -21,8 +21,6 @@ import logging
 import urllib.parse
 from typing import Awaitable, Callable, Dict, List, Optional, Tuple
 
-from twisted.internet.error import TimeoutError
-
 from synapse.api.errors import (
     CodeMessageException,
     Codes,
@@ -30,6 +28,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.config.emailconfig import ThreepidBehaviour
+from synapse.http import RequestTimedOutError
 from synapse.http.client import SimpleHttpClient
 from synapse.types import JsonDict, Requester
 from synapse.util import json_decoder
@@ -45,7 +44,7 @@ id_server_scheme = "https://"
 
 class IdentityHandler(BaseHandler):
     def __init__(self, hs):
-        super(IdentityHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.http_client = SimpleHttpClient(hs)
         # We create a blacklisting instance of SimpleHttpClient for contacting identity
@@ -93,7 +92,7 @@ class IdentityHandler(BaseHandler):
 
         try:
             data = await self.http_client.get_json(url, query_params)
-        except TimeoutError:
+        except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
         except HttpResponseException as e:
             logger.info(
@@ -173,7 +172,7 @@ class IdentityHandler(BaseHandler):
             if e.code != 404 or not use_v2:
                 logger.error("3PID bind failed with Matrix error: %r", e)
                 raise e.to_synapse_error()
-        except TimeoutError:
+        except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
         except CodeMessageException as e:
             data = json_decoder.decode(e.msg)  # XXX WAT?
@@ -273,7 +272,7 @@ class IdentityHandler(BaseHandler):
             else:
                 logger.error("Failed to unbind threepid on identity server: %s", e)
                 raise SynapseError(500, "Failed to contact identity server")
-        except TimeoutError:
+        except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
 
         await self.store.remove_user_bound_threepid(
@@ -419,7 +418,7 @@ class IdentityHandler(BaseHandler):
         except HttpResponseException as e:
             logger.info("Proxied requestToken failed: %r", e)
             raise e.to_synapse_error()
-        except TimeoutError:
+        except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
 
     async def requestMsisdnToken(
@@ -471,7 +470,7 @@ class IdentityHandler(BaseHandler):
         except HttpResponseException as e:
             logger.info("Proxied requestToken failed: %r", e)
             raise e.to_synapse_error()
-        except TimeoutError:
+        except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
 
         assert self.hs.config.public_baseurl
@@ -553,7 +552,7 @@ class IdentityHandler(BaseHandler):
                 id_server + "/_matrix/identity/api/v1/validate/msisdn/submitToken",
                 body,
             )
-        except TimeoutError:
+        except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
         except HttpResponseException as e:
             logger.warning("Error contacting msisdn account_threepid_delegate: %s", e)
@@ -627,7 +626,7 @@ class IdentityHandler(BaseHandler):
                 # require or validate it. See the following for context:
                 # https://github.com/matrix-org/synapse/issues/5253#issuecomment-666246950
                 return data["mxid"]
-        except TimeoutError:
+        except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
         except IOError as e:
             logger.warning("Error from v1 identity server lookup: %s" % (e,))
@@ -655,7 +654,7 @@ class IdentityHandler(BaseHandler):
                 "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server),
                 {"access_token": id_access_token},
             )
-        except TimeoutError:
+        except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
 
         if not isinstance(hash_details, dict):
@@ -727,7 +726,7 @@ class IdentityHandler(BaseHandler):
                 },
                 headers=headers,
             )
-        except TimeoutError:
+        except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
         except Exception as e:
             logger.warning("Error when performing a v2 3pid lookup: %s", e)
@@ -823,7 +822,7 @@ class IdentityHandler(BaseHandler):
                     invite_config,
                     {"Authorization": create_id_access_token_header(id_access_token)},
                 )
-            except TimeoutError:
+            except RequestTimedOutError:
                 raise SynapseError(500, "Timed out contacting identity server")
             except HttpResponseException as e:
                 if e.code != 404:
@@ -841,7 +840,7 @@ class IdentityHandler(BaseHandler):
                 data = await self.blacklisting_http_client.post_json_get_json(
                     url, invite_config
                 )
-            except TimeoutError:
+            except RequestTimedOutError:
                 raise SynapseError(500, "Timed out contacting identity server")
             except HttpResponseException as e:
                 logger.warning(

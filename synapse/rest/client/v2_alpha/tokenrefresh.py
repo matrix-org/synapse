@@ -28,7 +28,7 @@ class TokenRefreshRestServlet(RestServlet):
     PATTERNS = client_patterns("/tokenrefresh")
 
     def __init__(self, hs):
-        super(TokenRefreshRestServlet, self).__init__()
+        super().__init__()
 
     async def on_POST(self, request):
         raise AuthError(403, "tokenrefresh is no longer supported.")

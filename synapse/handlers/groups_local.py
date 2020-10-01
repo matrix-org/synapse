@@ -240,7 +240,7 @@ class GroupsLocalWorkerHandler:
 
 class GroupsLocalHandler(GroupsLocalWorkerHandler):
     def __init__(self, hs):
-        super(GroupsLocalHandler, self).__init__(hs)
+        super().__init__(hs)
 
         # Ensure attestations get renewed
         hs.get_groups_attestation_renewer()

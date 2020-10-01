@@ -37,11 +37,7 @@ logger = logging.getLogger(__name__)
 
 class EventStreamHandler(BaseHandler):
     def __init__(self, hs: "HomeServer"):
-        super(EventStreamHandler, self).__init__(hs)
-
-        self.distributor = hs.get_distributor()
-        self.distributor.declare("started_user_eventstream")
-        self.distributor.declare("stopped_user_eventstream")
+        super().__init__(hs)
 
         self.clock = hs.get_clock()
 
@@ -137,8 +133,8 @@ class EventStreamHandler(BaseHandler):
 
             chunk = {
                 "chunk": chunks,
-                "start": tokens[0].to_string(),
-                "end": tokens[1].to_string(),
+                "start": await tokens[0].to_string(self.store),
+                "end": await tokens[1].to_string(self.store),
             }
 
             return chunk
@@ -146,7 +142,7 @@ class EventStreamHandler(BaseHandler):
 
 class EventHandler(BaseHandler):
     def __init__(self, hs: "HomeServer"):
-        super(EventHandler, self).__init__(hs)
+        super().__init__(hs)
         self.storage = hs.get_storage()
 
     async def get_event(

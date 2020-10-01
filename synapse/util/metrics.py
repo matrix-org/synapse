@@ -19,7 +19,11 @@ from typing import Any, Callable, Optional, TypeVar, cast
 
 from prometheus_client import Counter
 
-from synapse.logging.context import LoggingContext, current_context
+from synapse.logging.context import (
+    ContextResourceUsage,
+    LoggingContext,
+    current_context,
+)
 from synapse.metrics import InFlightGauge
 
 logger = logging.getLogger(__name__)
@@ -104,27 +108,27 @@ class Measure:
     def __init__(self, clock, name):
         self.clock = clock
         self.name = name
-        self._logging_context = None
-        self.start = None
-
-    def __enter__(self):
-        if self._logging_context:
-            raise RuntimeError("Measure() objects cannot be re-used")
-
-        self.start = self.clock.time()
         parent_context = current_context()
         self._logging_context = LoggingContext(
             "Measure[%s]" % (self.name,), parent_context
         )
+        self.start = None
+
+    def __enter__(self) -> "Measure":
+        if self.start is not None:
+            raise RuntimeError("Measure() objects cannot be re-used")
+
+        self.start = self.clock.time()
         self._logging_context.__enter__()
         in_flight.register((self.name,), self._update_in_flight)
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if not self._logging_context:
+        if self.start is None:
             raise RuntimeError("Measure() block exited without being entered")
 
         duration = self.clock.time() - self.start
-        usage = self._logging_context.get_resource_usage()
+        usage = self.get_resource_usage()
 
         in_flight.unregister((self.name,), self._update_in_flight)
         self._logging_context.__exit__(exc_type, exc_val, exc_tb)
@@ -139,6 +143,13 @@ class Measure:
             block_db_sched_duration.labels(self.name).inc(usage.db_sched_duration_sec)
         except ValueError:
             logger.warning("Failed to save metrics! Usage: %s", usage)
+
+    def get_resource_usage(self) -> ContextResourceUsage:
+        """Get the resources used within this Measure block
+
+        If the Measure block is still active, returns the resource usage so far.
+        """
+        return self._logging_context.get_resource_usage()
 
     def _update_in_flight(self, metrics):
         """Gets called when processing in flight metrics

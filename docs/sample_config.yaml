@@ -33,10 +33,23 @@
 
 ## Server ##
 
-# The domain name of the server, with optional explicit port.
-# This is used by remote servers to connect to this server,
-# e.g. matrix.org, localhost:8080, etc.
-# This is also the last part of your UserID.
+# The public-facing domain of the server
+#
+# The server_name name will appear at the end of usernames and room addresses
+# created on this server. For example if the server_name was example.com,
+# usernames on this server would be in the format @user:example.com
+#
+# In most cases you should avoid using a matrix specific subdomain such as
+# matrix.example.com or synapse.example.com as the server_name for the same
+# reasons you wouldn't use user@email.example.com as your email address.
+# See https://github.com/matrix-org/synapse/blob/master/docs/delegate.md
+# for information on how to host Synapse on a subdomain while preserving
+# a clean server_name.
+#
+# The server_name cannot be changed later so it is important to
+# configure this correctly before you start Synapse. It should be all
+# lowercase and may contain an explicit port.
+# Examples: matrix.org, localhost:8080
 #
 server_name: "SERVERNAME"
 
@@ -432,6 +445,24 @@ retention:
 #
 #request_token_inhibit_3pid_errors: true
 
+# A list of domains that the domain portion of 'next_link' parameters
+# must match.
+#
+# This parameter is optionally provided by clients while requesting
+# validation of an email or phone number, and maps to a link that
+# users will be automatically redirected to after validation
+# succeeds. Clients can make use this parameter to aid the validation
+# process.
+#
+# The whitelist is applied whether the homeserver or an
+# identity server is handling validation.
+#
+# The default value is no whitelist functionality; all domains are
+# allowed. Setting this value to an empty list will instead disallow
+# all domains.
+#
+#next_link_domain_whitelist: ["matrix.org"]
+
 
 ## TLS ##
 
@@ -598,6 +629,7 @@ acme:
 #tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
 
 
+## Federation ##
 
 # Restrict federation to the following whitelist of domains.
 # N.B. we recommend also firewalling your federation listener to limit
@@ -630,6 +662,17 @@ federation_ip_range_blacklist:
   - '::1/128'
   - 'fe80::/64'
   - 'fc00::/7'
+
+# Report prometheus metrics on the age of PDUs being sent to and received from
+# the following domains. This can be used to give an idea of "delay" on inbound
+# and outbound federation, though be aware that any delay can be due to problems
+# at either end or with the intermediate network.
+#
+# By default, no domains are monitored in this way.
+#
+#federation_metrics_domains:
+#  - matrix.org
+#  - example.com
 
 
 ## Caching ##
@@ -1467,10 +1510,13 @@ trusted_key_servers:
 # At least one of `sp_config` or `config_path` must be set in this section to
 # enable SAML login.
 #
-# (You will probably also want to set the following options to `false` to
+# You will probably also want to set the following options to `false` to
 # disable the regular login/registration flows:
 #   * enable_registration
 #   * password_config.enabled
+#
+# You will also want to investigate the settings under the "sso" configuration
+# section below.
 #
 # Once SAML support is enabled, a metadata file will be exposed at
 # https://<server>:<port>/_matrix/saml2/metadata.xml, which you may be able to
@@ -1594,31 +1640,6 @@ saml2_config:
   #  - attribute: department
   #    value: "sales"
 
-  # Directory in which Synapse will try to find the template files below.
-  # If not set, default templates from within the Synapse package will be used.
-  #
-  # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
-  # If you *do* uncomment it, you will need to make sure that all the templates
-  # below are in the directory.
-  #
-  # Synapse will look for the following templates in this directory:
-  #
-  # * HTML page to display to users if something goes wrong during the
-  #   authentication process: 'saml_error.html'.
-  #
-  #   When rendering, this template is given the following variables:
-  #     * code: an HTML error code corresponding to the error that is being
-  #       returned (typically 400 or 500)
-  #
-  #     * msg: a textual message describing the error.
-  #
-  #   The variables will automatically be HTML-escaped.
-  #
-  # You can see the default templates at:
-  # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
-  #
-  #template_dir: "res/templates"
-
 
 # OpenID Connect integration. The following settings can be used to make Synapse
 # use an OpenID Connect Provider for authentication, instead of its internal
@@ -1693,6 +1714,11 @@ oidc_config:
   #
   #skip_verification: true
 
+  # Uncomment to allow a user logging in via OIDC to match a pre-existing account instead
+  # of failing. This could be used if switching from password logins to OIDC. Defaults to false.
+  #
+  #allow_existing_users: true
+
   # An external module can be provided here as a custom solution to mapping
   # attributes returned from a OIDC provider onto a matrix user.
   #
@@ -1733,6 +1759,14 @@ oidc_config:
       # If unset, no displayname will be set.
       #
       #display_name_template: "{{ user.given_name }} {{ user.last_name }}"
+
+      # Jinja2 templates for extra attributes to send back to the client during
+      # login.
+      #
+      # Note that these are non-standard and clients will ignore them without modifications.
+      #
+      #extra_attributes:
+        #birthdate: "{{ user.birthdate }}"
 
 
 
@@ -2021,9 +2055,13 @@ email:
   # * The contents of password reset emails sent by the homeserver:
   #   'password_reset.html' and 'password_reset.txt'
   #
-  # * HTML pages for success and failure that a user will see when they follow
-  #   the link in the password reset email: 'password_reset_success.html' and
-  #   'password_reset_failure.html'
+  # * An HTML page that a user will see when they follow the link in the password
+  #   reset email. The user will be asked to confirm the action before their
+  #   password is reset: 'password_reset_confirmation.html'
+  #
+  # * HTML pages for success and failure that a user will see when they confirm
+  #   the password reset flow using the page above: 'password_reset_success.html'
+  #   and 'password_reset_failure.html'
   #
   # * The contents of address verification emails sent during registration:
   #   'registration.html' and 'registration.txt'

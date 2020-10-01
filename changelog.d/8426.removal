@@ -1,0 +1,1 @@
+Drop support for `prometheus_client` older than 0.4.0.

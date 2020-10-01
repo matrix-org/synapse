@@ -217,6 +217,7 @@ expressions:
     ^/_matrix/client/(api/v1|r0|unstable)/joined_groups$
     ^/_matrix/client/(api/v1|r0|unstable)/publicised_groups$
     ^/_matrix/client/(api/v1|r0|unstable)/publicised_groups/
+    ^/_synapse/client/password_reset/email/submit_token$
 
     # Registration/login requests
     ^/_matrix/client/(api/v1|r0|unstable)/login$
@@ -241,6 +242,22 @@ ensure that the purge history admin API is not used while pagination requests
 for the room are in flight:
 
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/messages$
+
+Additionally, the following endpoints should be included if Synapse is configured
+to use SSO (you only need to include the ones for whichever SSO provider you're
+using):
+
+    # OpenID Connect requests.
+    ^/_matrix/client/(api/v1|r0|unstable)/login/sso/redirect$
+    ^/_synapse/oidc/callback$
+
+    # SAML requests.
+    ^/_matrix/client/(api/v1|r0|unstable)/login/sso/redirect$
+    ^/_matrix/saml2/authn_response$
+
+    # CAS requests.
+    ^/_matrix/client/(api/v1|r0|unstable)/login/(cas|sso)/redirect$
+    ^/_matrix/client/(api/v1|r0|unstable)/login/cas/ticket$
 
 Note that a HTTP listener with `client` and `federation` resources must be
 configured in the `worker_listeners` option in the worker config.

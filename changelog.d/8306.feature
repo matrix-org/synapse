@@ -1,0 +1,1 @@
+Add an admin API for querying rooms where a user is a member. Contributed by @dklimpel.

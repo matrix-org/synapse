@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import re
 
 from synapse.api.errors import NotFoundError, SynapseError
 from synapse.http.servlet import (
@@ -21,7 +20,7 @@ from synapse.http.servlet import (
     assert_params_in_dict,
     parse_json_object_from_request,
 )
-from synapse.rest.admin._base import assert_requester_is_admin
+from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
 from synapse.types import UserID
 
 logger = logging.getLogger(__name__)
@@ -32,14 +31,12 @@ class DeviceRestServlet(RestServlet):
     Get, update or delete the given user's device
     """
 
-    PATTERNS = (
-        re.compile(
-            "^/_synapse/admin/v2/users/(?P<user_id>[^/]*)/devices/(?P<device_id>[^/]*)$"
-        ),
+    PATTERNS = admin_patterns(
+        "/users/(?P<user_id>[^/]*)/devices/(?P<device_id>[^/]*)$", "v2"
     )
 
     def __init__(self, hs):
-        super(DeviceRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
@@ -98,7 +95,7 @@ class DevicesRestServlet(RestServlet):
     Retrieve the given user's devices
     """
 
-    PATTERNS = (re.compile("^/_synapse/admin/v2/users/(?P<user_id>[^/]*)/devices$"),)
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/devices$", "v2")
 
     def __init__(self, hs):
         """
@@ -131,9 +128,7 @@ class DeleteDevicesRestServlet(RestServlet):
     key which lists the device_ids to delete.
     """
 
-    PATTERNS = (
-        re.compile("^/_synapse/admin/v2/users/(?P<user_id>[^/]*)/delete_devices$"),
-    )
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/delete_devices$", "v2")
 
     def __init__(self, hs):
         self.hs = hs

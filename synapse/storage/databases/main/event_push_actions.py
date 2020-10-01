@@ -68,7 +68,7 @@ def _deserialize_action(actions, is_highlight):
 
 class EventPushActionsWorkerStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(EventPushActionsWorkerStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         # These get correctly set by _find_stream_orderings_for_times_txn
         self.stream_ordering_month_ago = None
@@ -661,7 +661,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
     EPA_HIGHLIGHT_INDEX = "epa_highlight_index"
 
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(EventPushActionsStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self.db_pool.updates.register_background_index_update(
             self.EPA_HIGHLIGHT_INDEX,
@@ -969,7 +969,7 @@ def _action_has_highlight(actions):
     return False
 
 
-@attr.s
+@attr.s(slots=True)
 class _EventPushSummary:
     """Summary of pending event push actions for a given user in a given room.
     Used in _rotate_notifs_before_txn to manipulate results from event_push_actions.

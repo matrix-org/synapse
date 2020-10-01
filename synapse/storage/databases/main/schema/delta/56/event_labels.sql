@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
--- room_id and topoligical_ordering are denormalised from the events table in order to
+-- room_id and topological_ordering are denormalised from the events table in order to
 -- make the index work.
 CREATE TABLE IF NOT EXISTS event_labels (
     event_id TEXT,

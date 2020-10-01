@@ -194,7 +194,10 @@ class Config:
             return file_stream.read()
 
     def read_templates(
-        self, filenames: List[str], custom_template_directory: Optional[str] = None,
+        self,
+        filenames: List[str],
+        custom_template_directory: Optional[str] = None,
+        autoescape: bool = False,
     ) -> List[jinja2.Template]:
         """Load a list of template files from disk using the given variables.
 
@@ -209,6 +212,9 @@ class Config:
 
             custom_template_directory: A directory to try to look for the templates
                 before using the default Synapse template directory instead.
+
+            autoescape: Whether to autoescape variables before inserting them into the
+                template.
 
         Raises:
             ConfigError: if the file's path is incorrect or otherwise cannot be read.
@@ -233,7 +239,7 @@ class Config:
             search_directories.insert(0, custom_template_directory)
 
         loader = jinja2.FileSystemLoader(search_directories)
-        env = jinja2.Environment(loader=loader, autoescape=True)
+        env = jinja2.Environment(loader=loader, autoescape=autoescape)
 
         # Update the environment with our custom filters
         env.filters.update(
@@ -832,10 +838,25 @@ class ShardedWorkerHandlingConfig:
     def should_handle(self, instance_name: str, key: str) -> bool:
         """Whether this instance is responsible for handling the given key.
         """
-
-        # If multiple instances are not defined we always return true.
+        # If multiple instances are not defined we always return true
         if not self.instances or len(self.instances) == 1:
             return True
+
+        return self.get_instance(key) == instance_name
+
+    def get_instance(self, key: str) -> str:
+        """Get the instance responsible for handling the given key.
+
+        Note: For things like federation sending the config for which instance
+        is sending is known only to the sender instance if there is only one.
+        Therefore `should_handle` should be used where possible.
+        """
+
+        if not self.instances:
+            return "master"
+
+        if len(self.instances) == 1:
+            return self.instances[0]
 
         # We shard by taking the hash, modulo it by the number of instances and
         # then checking whether this instance matches the instance at that
@@ -846,7 +867,7 @@ class ShardedWorkerHandlingConfig:
         dest_hash = sha256(key.encode("utf8")).digest()
         dest_int = int.from_bytes(dest_hash, byteorder="little")
         remainder = dest_int % (len(self.instances))
-        return self.instances[remainder] == instance_name
+        return self.instances[remainder]
 
 
 __all__ = ["Config", "RootConfig", "ShardedWorkerHandlingConfig"]

@@ -15,10 +15,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 from typing import List
 
 import jsonschema
-from canonicaljson import json
 from jsonschema import FormatChecker
 
 from synapse.api.constants import EventContentFields
@@ -132,7 +132,7 @@ def matrix_user_id_validator(user_id_str):
 
 class Filtering:
     def __init__(self, hs):
-        super(Filtering, self).__init__()
+        super().__init__()
         self.store = hs.get_datastore()
 
     async def get_user_filter(self, user_localpart, filter_id):

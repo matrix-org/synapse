@@ -1,0 +1,1 @@
+Factor out a `_send_dummy_event_for_room` method.

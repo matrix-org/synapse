@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import print_function
 
 # This file can't be called email.py because if it is, we cannot:
 import email.utils
@@ -228,6 +227,7 @@ class EmailConfig(Config):
                 self.email_registration_template_text,
                 self.email_add_threepid_template_html,
                 self.email_add_threepid_template_text,
+                self.email_password_reset_template_confirmation_html,
                 self.email_password_reset_template_failure_html,
                 self.email_registration_template_failure_html,
                 self.email_add_threepid_template_failure_html,
@@ -242,6 +242,7 @@ class EmailConfig(Config):
                     registration_template_text,
                     add_threepid_template_html,
                     add_threepid_template_text,
+                    "password_reset_confirmation.html",
                     password_reset_template_failure_html,
                     registration_template_failure_html,
                     add_threepid_template_failure_html,
@@ -404,9 +405,13 @@ class EmailConfig(Config):
           # * The contents of password reset emails sent by the homeserver:
           #   'password_reset.html' and 'password_reset.txt'
           #
-          # * HTML pages for success and failure that a user will see when they follow
-          #   the link in the password reset email: 'password_reset_success.html' and
-          #   'password_reset_failure.html'
+          # * An HTML page that a user will see when they follow the link in the password
+          #   reset email. The user will be asked to confirm the action before their
+          #   password is reset: 'password_reset_confirmation.html'
+          #
+          # * HTML pages for success and failure that a user will see when they confirm
+          #   the password reset flow using the page above: 'password_reset_success.html'
+          #   and 'password_reset_failure.html'
           #
           # * The contents of address verification emails sent during registration:
           #   'registration.html' and 'registration.txt'
