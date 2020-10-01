@@ -26,31 +26,6 @@ from ._base import client_patterns
 logger = logging.getLogger(__name__)
 
 
-SUCCESS_TEMPLATE = """
-<html>
-<head>
-<title>Success!</title>
-<meta name='viewport' content='width=device-width, initial-scale=1,
-    user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
-<link rel="stylesheet" href="/_matrix/static/client/register/style.css">
-<script>
-if (window.onAuthDone) {
-    window.onAuthDone();
-} else if (window.opener && window.opener.postMessage) {
-     window.opener.postMessage("authDone", "*");
-}
-</script>
-</head>
-<body>
-    <div>
-        <p>Thank you</p>
-        <p>You may now close this window and return to the application</p>
-    </div>
-</body>
-</html>
-"""
-
-
 class AuthRestServlet(RestServlet):
     """
     Handles Client / Server API authentication in any situations where it
@@ -84,6 +59,7 @@ class AuthRestServlet(RestServlet):
 
         self.recaptcha_template = hs.config.recaptcha_template
         self.terms_template = hs.config.terms_template
+        self.success_template = hs.config.fallback_success_template
 
     async def on_GET(self, request, stagetype):
         session = parse_string(request, "session")
@@ -162,7 +138,7 @@ class AuthRestServlet(RestServlet):
             )
 
             if success:
-                html = SUCCESS_TEMPLATE
+                html = self.success_template.render()
             else:
                 html = self.recaptcha_template.render(
                     session=session,
@@ -178,7 +154,7 @@ class AuthRestServlet(RestServlet):
             )
 
             if success:
-                html = SUCCESS_TEMPLATE
+                html = self.success_template.render()
             else:
                 html = self.terms_template.render(
                     session=session,
