@@ -102,6 +102,8 @@ class FederationConfig(Config):
         # and outbound federation, though be aware that any delay can be due to problems
         # at either end or with the intermediate network.
         #
+        # By default, no domains are monitored in this way.
+        #
         #federation_metrics_domains:
         #  - matrix.org
         #  - example.com
