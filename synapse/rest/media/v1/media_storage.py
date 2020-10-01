@@ -159,29 +159,27 @@ class MediaStorage:
         if os.path.exists(local_path):
             logger.debug("responding with local file %s", local_path)
             return FileResponder(open(local_path, "rb"))
+        logger.debug("local file %s did not exist", local_path)
 
         if legacy_path:
-            logger.debug(
-                "local file %s did not exist; checking legacy name", local_path
-            )
             legacy_local_path = os.path.join(self.local_media_directory, legacy_path)
             if os.path.exists(legacy_local_path):
                 logger.debug("responding with local file %s", legacy_local_path)
                 return FileResponder(open(legacy_local_path, "rb"))
+            logger.debug("legacy local file %s did not exist", legacy_local_path)
 
         for provider in self.storage_providers:
             res = await provider.fetch(path, file_info)  # type: Any
             if res:
                 logger.debug("Streaming %s from %s", path, provider)
                 return res
+            logger.debug("%s not found on %s", path, provider)
             if legacy_path:
-                logger.debug(
-                    "Provider %s did not find %s; checking legacy name", provider, path
-                )
                 res = await provider.fetch(legacy_path, file_info)
                 if res:
                     logger.debug("Streaming %s from %s", legacy_path, provider)
                     return res
+                logger.debug("%s not found on %s", legacy_path, provider)
 
         return None
 
