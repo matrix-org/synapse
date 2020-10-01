@@ -25,46 +25,6 @@ from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
-RECAPTCHA_TEMPLATE = """
-<html>
-<head>
-<title>Authentication</title>
-<meta name='viewport' content='width=device-width, initial-scale=1,
-    user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
-<script src="https://www.recaptcha.net/recaptcha/api.js"
-    async defer></script>
-<script src="//code.jquery.com/jquery-1.11.2.min.js"></script>
-<link rel="stylesheet" href="/_matrix/static/client/register/style.css">
-<script>
-function captchaDone() {
-    $('#registrationForm').submit();
-}
-</script>
-</head>
-<body>
-<form id="registrationForm" method="post" action="%(myurl)s">
-    <div>
-        <p>
-        Hello! We need to prevent computer programs and other automated
-        things from creating accounts on this server.
-        </p>
-        <p>
-        Please verify that you're not a robot.
-        </p>
-        <input type="hidden" name="session" value="%(session)s" />
-        <div class="g-recaptcha"
-            data-sitekey="%(sitekey)s"
-            data-callback="captchaDone">
-        </div>
-        <noscript>
-        <input type="submit" value="All Done" />
-        </noscript>
-        </div>
-    </div>
-</form>
-</body>
-</html>
-"""
 
 TERMS_TEMPLATE = """
 <html>
@@ -145,18 +105,20 @@ class AuthRestServlet(RestServlet):
             self._cas_server_url = hs.config.cas_server_url
             self._cas_service_url = hs.config.cas_service_url
 
+        self.recaptcha_template = hs.config.recaptcha_template
+
     async def on_GET(self, request, stagetype):
         session = parse_string(request, "session")
         if not session:
             raise SynapseError(400, "No session supplied")
 
         if stagetype == LoginType.RECAPTCHA:
-            html = RECAPTCHA_TEMPLATE % {
-                "session": session,
-                "myurl": "%s/r0/auth/%s/fallback/web"
+            html = self.recaptcha_template.render(
+                session=session,
+                myurl="%s/r0/auth/%s/fallback/web"
                 % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
-                "sitekey": self.hs.config.recaptcha_public_key,
-            }
+                sitekey=self.hs.config.recaptcha_public_key,
+            )
         elif stagetype == LoginType.TERMS:
             html = TERMS_TEMPLATE % {
                 "session": session,
@@ -224,12 +186,12 @@ class AuthRestServlet(RestServlet):
             if success:
                 html = SUCCESS_TEMPLATE
             else:
-                html = RECAPTCHA_TEMPLATE % {
-                    "session": session,
-                    "myurl": "%s/r0/auth/%s/fallback/web"
+                html = self.recaptcha_template.render(
+                    session=session,
+                    myurl="%s/r0/auth/%s/fallback/web"
                     % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
-                    "sitekey": self.hs.config.recaptcha_public_key,
-                }
+                    sitekey=self.hs.config.recaptcha_public_key,
+                )
         elif stagetype == LoginType.TERMS:
             authdict = {"session": session}
 
