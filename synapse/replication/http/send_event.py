@@ -52,7 +52,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
     PATH_ARGS = ("event_id",)
 
     def __init__(self, hs):
-        super(ReplicationSendEventRestServlet, self).__init__(hs)
+        super().__init__(hs)
 
         self.event_creation_handler = hs.get_event_creation_handler()
         self.store = hs.get_datastore()

@@ -16,7 +16,7 @@
 
 import logging
 import re
-from typing import Any, Dict, List, Pattern, Union
+from typing import Any, Dict, List, Optional, Pattern, Union
 
 from synapse.events import EventBase
 from synapse.types import UserID
@@ -105,7 +105,7 @@ def tweaks_for_actions(actions: List[Union[str, Dict]]) -> Dict[str, Any]:
     return tweaks
 
 
-class PushRuleEvaluatorForEvent(object):
+class PushRuleEvaluatorForEvent:
     def __init__(
         self,
         event: EventBase,
@@ -181,7 +181,7 @@ class PushRuleEvaluatorForEvent(object):
 
         return r.search(body)
 
-    def _get_value(self, dotted_key: str) -> str:
+    def _get_value(self, dotted_key: str) -> Optional[str]:
         return self._value_cache.get(dotted_key, None)
 
 

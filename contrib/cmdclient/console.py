@@ -15,8 +15,6 @@
 # limitations under the License.
 
 """ Starts a synapse client console. """
-from __future__ import print_function
-
 import argparse
 import cmd
 import getpass

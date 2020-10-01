@@ -102,7 +102,7 @@ for endpoint, globs in _oembed_globs.items():
         _oembed_patterns[re.compile(pattern)] = endpoint
 
 
-@attr.s
+@attr.s(slots=True)
 class OEmbedResult:
     # Either HTML content or URL must be provided.
     html = attr.ib(type=Optional[str])
@@ -450,7 +450,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             logger.warning("Error downloading oEmbed metadata from %s: %r", url, e)
             raise OEmbedError() from e
 
-    async def _download_url(self, url, user):
+    async def _download_url(self, url: str, user):
         # TODO: we should probably honour robots.txt... except in practice
         # we're most likely being explicitly triggered by a human rather than a
         # bot, so are we really a robot?
@@ -460,7 +460,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         file_info = FileInfo(server_name=None, file_id=file_id, url_cache=True)
 
         # If this URL can be accessed via oEmbed, use that instead.
-        url_to_download = url
+        url_to_download = url  # type: Optional[str]
         oembed_url = self._get_oembed_url(url)
         if oembed_url:
             # The result might be a new URL to download, or it might be HTML content.
@@ -520,9 +520,15 @@ class PreviewUrlResource(DirectServeJsonResource):
                 # FIXME: we should calculate a proper expiration based on the
                 # Cache-Control and Expire headers.  But for now, assume 1 hour.
                 expires = ONE_HOUR
-                etag = headers["ETag"][0] if "ETag" in headers else None
+                etag = (
+                    headers[b"ETag"][0].decode("ascii") if b"ETag" in headers else None
+                )
         else:
-            html_bytes = oembed_result.html.encode("utf-8")  # type: ignore
+            # we can only get here if we did an oembed request and have an oembed_result.html
+            assert oembed_result.html is not None
+            assert oembed_url is not None
+
+            html_bytes = oembed_result.html.encode("utf-8")
             with self.media_storage.store_into_file(file_info) as (f, fname, finish):
                 f.write(html_bytes)
                 await finish()

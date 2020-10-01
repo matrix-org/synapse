@@ -52,7 +52,7 @@ def _create_rerouter(func_name):
     return f
 
 
-class GroupsLocalWorkerHandler(object):
+class GroupsLocalWorkerHandler:
     def __init__(self, hs):
         self.hs = hs
         self.store = hs.get_datastore()
@@ -240,7 +240,7 @@ class GroupsLocalWorkerHandler(object):
 
 class GroupsLocalHandler(GroupsLocalWorkerHandler):
     def __init__(self, hs):
-        super(GroupsLocalHandler, self).__init__(hs)
+        super().__init__(hs)
 
         # Ensure attestations get renewed
         hs.get_groups_attestation_renewer()

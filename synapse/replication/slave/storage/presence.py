@@ -25,7 +25,7 @@ from ._slaved_id_tracker import SlavedIdTracker
 
 class SlavedPresenceStore(BaseSlavedStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(SlavedPresenceStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
         self._presence_id_gen = SlavedIdTracker(db_conn, "presence_stream", "stream_id")
 
         self._presence_on_startup = self._get_active_presence(db_conn)  # type: ignore
@@ -44,7 +44,7 @@ class SlavedPresenceStore(BaseSlavedStore):
 
     def process_replication_rows(self, stream_name, instance_name, token, rows):
         if stream_name == PresenceStream.NAME:
-            self._presence_id_gen.advance(token)
+            self._presence_id_gen.advance(instance_name, token)
             for row in rows:
                 self.presence_stream_cache.entity_has_changed(row.user_id, token)
                 self._get_presence_for_user.invalidate((row.user_id,))

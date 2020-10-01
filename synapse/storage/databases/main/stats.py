@@ -15,8 +15,9 @@
 # limitations under the License.
 
 import logging
+from collections import Counter
 from itertools import chain
-from typing import Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from twisted.internet.defer import DeferredLock
 
@@ -60,7 +61,7 @@ TYPE_TO_ORIGIN_TABLE = {"room": ("rooms", "room_id"), "user": ("users", "name")}
 
 class StatsStore(StateDeltasStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(StatsStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self.server_name = hs.hostname
         self.clock = self.hs.get_clock()
@@ -71,9 +72,6 @@ class StatsStore(StateDeltasStore):
 
         self.db_pool.updates.register_background_update_handler(
             "populate_stats_process_rooms", self._populate_stats_process_rooms
-        )
-        self.db_pool.updates.register_background_update_handler(
-            "populate_stats_process_rooms_2", self._populate_stats_process_rooms_2
         )
         self.db_pool.updates.register_background_update_handler(
             "populate_stats_process_users", self._populate_stats_process_users
@@ -147,31 +145,10 @@ class StatsStore(StateDeltasStore):
         return len(users_to_work_on)
 
     async def _populate_stats_process_rooms(self, progress, batch_size):
-        """
-        This was a background update which regenerated statistics for rooms.
-
-        It has been replaced by StatsStore._populate_stats_process_rooms_2. This background
-        job has been scheduled to run as part of Synapse v1.0.0, and again now. To ensure
-        someone upgrading from <v1.0.0, this background task has been turned into a no-op
-        so that the potentially expensive task is not run twice.
-
-        Further context: https://github.com/matrix-org/synapse/pull/7977
-        """
-        await self.db_pool.updates._end_background_update(
-            "populate_stats_process_rooms"
-        )
-        return 1
-
-    async def _populate_stats_process_rooms_2(self, progress, batch_size):
-        """
-        This is a background update which regenerates statistics for rooms.
-
-        It replaces StatsStore._populate_stats_process_rooms. See its docstring for the
-        reasoning.
-        """
+        """This is a background update which regenerates statistics for rooms."""
         if not self.stats_enabled:
             await self.db_pool.updates._end_background_update(
-                "populate_stats_process_rooms_2"
+                "populate_stats_process_rooms"
             )
             return 1
 
@@ -188,13 +165,13 @@ class StatsStore(StateDeltasStore):
             return [r for r, in txn]
 
         rooms_to_work_on = await self.db_pool.runInteraction(
-            "populate_stats_rooms_2_get_batch", _get_next_batch
+            "populate_stats_rooms_get_batch", _get_next_batch
         )
 
         # No more rooms -- complete the transaction.
         if not rooms_to_work_on:
             await self.db_pool.updates._end_background_update(
-                "populate_stats_process_rooms_2"
+                "populate_stats_process_rooms"
             )
             return 1
 
@@ -203,34 +180,53 @@ class StatsStore(StateDeltasStore):
             progress["last_room_id"] = room_id
 
         await self.db_pool.runInteraction(
-            "_populate_stats_process_rooms_2",
+            "_populate_stats_process_rooms",
             self.db_pool.updates._background_update_progress_txn,
-            "populate_stats_process_rooms_2",
+            "populate_stats_process_rooms",
             progress,
         )
 
         return len(rooms_to_work_on)
 
-    def get_stats_positions(self):
+    async def get_stats_positions(self) -> int:
         """
         Returns the stats processor positions.
         """
-        return self.db_pool.simple_select_one_onecol(
+        return await self.db_pool.simple_select_one_onecol(
             table="stats_incremental_position",
             keyvalues={},
             retcol="stream_id",
             desc="stats_incremental_position",
         )
 
-    def update_room_state(self, room_id, fields):
-        """
-        Args:
-            room_id (str)
-            fields (dict[str:Any])
-        """
+    async def update_room_state(self, room_id: str, fields: Dict[str, Any]) -> None:
+        """Update the state of a room.
 
-        # For whatever reason some of the fields may contain null bytes, which
-        # postgres isn't a fan of, so we replace those fields with null.
+        fields can contain the following keys with string values:
+        * join_rules
+        * history_visibility
+        * encryption
+        * name
+        * topic
+        * avatar
+        * canonical_alias
+        * guest_access
+
+        A is_federatable key can also be included with a boolean value.
+
+        Args:
+            room_id: The room ID to update the state of.
+            fields: The fields to update. This can include a partial list of the
+                above fields to only update some room information.
+        """
+        # Ensure that the values to update are valid, they should be strings and
+        # not contain any null bytes.
+        #
+        # Invalid data gets overwritten with null.
+        #
+        # Note that a missing value should not be overwritten (it keeps the
+        # previous value).
+        sentinel = object()
         for col in (
             "join_rules",
             "history_visibility",
@@ -239,33 +235,36 @@ class StatsStore(StateDeltasStore):
             "topic",
             "avatar",
             "canonical_alias",
+            "guest_access",
         ):
-            field = fields.get(col)
-            if field and "\0" in field:
+            field = fields.get(col, sentinel)
+            if field is not sentinel and (not isinstance(field, str) or "\0" in field):
                 fields[col] = None
 
-        return self.db_pool.simple_upsert(
+        await self.db_pool.simple_upsert(
             table="room_stats_state",
             keyvalues={"room_id": room_id},
             values=fields,
             desc="update_room_state",
         )
 
-    def get_statistics_for_subject(self, stats_type, stats_id, start, size=100):
+    async def get_statistics_for_subject(
+        self, stats_type: str, stats_id: str, start: str, size: int = 100
+    ) -> List[dict]:
         """
         Get statistics for a given subject.
 
         Args:
-            stats_type (str): The type of subject
-            stats_id (str): The ID of the subject (e.g. room_id or user_id)
-            start (int): Pagination start. Number of entries, not timestamp.
-            size (int): How many entries to return.
+            stats_type: The type of subject
+            stats_id: The ID of the subject (e.g. room_id or user_id)
+            start: Pagination start. Number of entries, not timestamp.
+            size: How many entries to return.
 
         Returns:
-            Deferred[list[dict]], where the dict has the keys of
+            A list of dicts, where the dict has the keys of
             ABSOLUTE_STATS_FIELDS[stats_type],  and "bucket_size" and "end_ts".
         """
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_statistics_for_subject",
             self._get_statistics_for_subject_txn,
             stats_type,
@@ -300,7 +299,7 @@ class StatsStore(StateDeltasStore):
         return slice_list
 
     @cached()
-    def get_earliest_token_for_stats(self, stats_type, id):
+    async def get_earliest_token_for_stats(self, stats_type: str, id: str) -> int:
         """
         Fetch the "earliest token". This is used by the room stats delta
         processor to ignore deltas that have been processed between the
@@ -308,29 +307,28 @@ class StatsStore(StateDeltasStore):
         being calculated.
 
         Returns:
-            Deferred[int]
+            The earliest token.
         """
         table, id_col = TYPE_TO_TABLE[stats_type]
 
-        return self.db_pool.simple_select_one_onecol(
+        return await self.db_pool.simple_select_one_onecol(
             "%s_current" % (table,),
             keyvalues={id_col: id},
             retcol="completed_delta_stream_id",
             allow_none=True,
         )
 
-    def bulk_update_stats_delta(self, ts, updates, stream_id):
+    async def bulk_update_stats_delta(
+        self, ts: int, updates: Dict[str, Dict[str, Dict[str, Counter]]], stream_id: int
+    ) -> None:
         """Bulk update stats tables for a given stream_id and updates the stats
         incremental position.
 
         Args:
-            ts (int): Current timestamp in ms
-            updates(dict[str, dict[str, dict[str, Counter]]]): The updates to
-                commit as a mapping stats_type -> stats_id -> field -> delta.
-            stream_id (int): Current position.
-
-        Returns:
-            Deferred
+            ts: Current timestamp in ms
+            updates: The updates to commit as a mapping of
+                stats_type -> stats_id -> field -> delta.
+            stream_id: Current position.
         """
 
         def _bulk_update_stats_delta_txn(txn):
@@ -355,38 +353,37 @@ class StatsStore(StateDeltasStore):
                 updatevalues={"stream_id": stream_id},
             )
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "bulk_update_stats_delta", _bulk_update_stats_delta_txn
         )
 
-    def update_stats_delta(
+    async def update_stats_delta(
         self,
-        ts,
-        stats_type,
-        stats_id,
-        fields,
-        complete_with_stream_id,
-        absolute_field_overrides=None,
-    ):
+        ts: int,
+        stats_type: str,
+        stats_id: str,
+        fields: Dict[str, int],
+        complete_with_stream_id: Optional[int],
+        absolute_field_overrides: Optional[Dict[str, int]] = None,
+    ) -> None:
         """
         Updates the statistics for a subject, with a delta (difference/relative
         change).
 
         Args:
-            ts (int): timestamp of the change
-            stats_type (str): "room" or "user" – the kind of subject
-            stats_id (str): the subject's ID (room ID or user ID)
-            fields (dict[str, int]): Deltas of stats values.
-            complete_with_stream_id (int, optional):
+            ts: timestamp of the change
+            stats_type: "room" or "user" – the kind of subject
+            stats_id: the subject's ID (room ID or user ID)
+            fields: Deltas of stats values.
+            complete_with_stream_id:
                 If supplied, converts an incomplete row into a complete row,
                 with the supplied stream_id marked as the stream_id where the
                 row was completed.
-            absolute_field_overrides (dict[str, int]): Current stats values
-                (i.e. not deltas) of absolute fields.
-                Does not work with per-slice fields.
+            absolute_field_overrides: Current stats values (i.e. not deltas) of
+                absolute fields. Does not work with per-slice fields.
         """
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "update_stats_delta",
             self._update_stats_delta_txn,
             ts,
@@ -646,19 +643,20 @@ class StatsStore(StateDeltasStore):
                     txn, into_table, all_dest_keyvalues, src_row
                 )
 
-    def get_changes_room_total_events_and_bytes(self, min_pos, max_pos):
+    async def get_changes_room_total_events_and_bytes(
+        self, min_pos: int, max_pos: int
+    ) -> Dict[str, Dict[str, int]]:
         """Fetches the counts of events in the given range of stream IDs.
 
         Args:
-            min_pos (int)
-            max_pos (int)
+            min_pos
+            max_pos
 
         Returns:
-            Deferred[dict[str, dict[str, int]]]: Mapping of room ID to field
-            changes.
+            Mapping of room ID to field changes.
         """
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "stats_incremental_total_events_and_bytes",
             self.get_changes_room_total_events_and_bytes_txn,
             min_pos,

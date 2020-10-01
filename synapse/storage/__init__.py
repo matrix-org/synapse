@@ -37,7 +37,7 @@ from synapse.storage.state import StateGroupStorage
 __all__ = ["DataStores", "DataStore"]
 
 
-class Storage(object):
+class Storage:
     """The high level interfaces for talking to various storage layers.
     """
 
@@ -47,6 +47,9 @@ class Storage(object):
         # interfaces.
         self.main = stores.main
 
-        self.persistence = EventsPersistenceStorage(hs, stores)
         self.purge_events = PurgeEventsStorage(hs, stores)
         self.state = StateGroupStorage(hs, stores)
+
+        self.persistence = None
+        if stores.persist_events:
+            self.persistence = EventsPersistenceStorage(hs, stores)

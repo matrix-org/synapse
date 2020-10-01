@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import List
+from typing import Dict, List
 
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool, make_in_list_sql_clause
@@ -28,28 +28,35 @@ LAST_SEEN_GRANULARITY = 60 * 60 * 1000
 
 class MonthlyActiveUsersWorkerStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(MonthlyActiveUsersWorkerStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
         self._clock = hs.get_clock()
         self.hs = hs
 
     @cached(num_args=0)
-    def get_monthly_active_count(self):
+    async def get_monthly_active_count(self) -> int:
         """Generates current count of monthly active users
 
         Returns:
-            Defered[int]: Number of current monthly active users
+            Number of current monthly active users
         """
 
         def _count_users(txn):
-            sql = "SELECT COALESCE(count(*), 0) FROM monthly_active_users"
+            # Exclude app service users
+            sql = """
+                SELECT COALESCE(count(*), 0)
+                FROM monthly_active_users
+                    LEFT JOIN users
+                    ON monthly_active_users.user_id=users.name
+                WHERE (users.appservice_id IS NULL OR users.appservice_id = '');
+            """
             txn.execute(sql)
             (count,) = txn.fetchone()
             return count
 
-        return self.db_pool.runInteraction("count_users", _count_users)
+        return await self.db_pool.runInteraction("count_users", _count_users)
 
     @cached(num_args=0)
-    def get_monthly_active_count_by_service(self):
+    async def get_monthly_active_count_by_service(self) -> Dict[str, int]:
         """Generates current count of monthly active users broken down by service.
         A service is typically an appservice but also includes native matrix users.
         Since the `monthly_active_users` table is populated from the `user_ips` table
@@ -57,8 +64,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
         method to return anything other than native matrix users.
 
         Returns:
-            Deferred[dict]: dict that includes a mapping between app_service_id
-                and the number of occurrences.
+            A mapping between app_service_id and the number of occurrences.
 
         """
 
@@ -74,7 +80,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
             result = txn.fetchall()
             return dict(result)
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "count_users_by_service", _count_users_by_service
         )
 
@@ -99,17 +105,18 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
         return users
 
     @cached(num_args=1)
-    def user_last_seen_monthly_active(self, user_id):
+    async def user_last_seen_monthly_active(self, user_id: str) -> int:
         """
-            Checks if a given user is part of the monthly active user group
-            Arguments:
-                user_id (str): user to add/update
-            Return:
-                Deferred[int] : timestamp since last seen, None if never seen
+        Checks if a given user is part of the monthly active user group
 
+        Arguments:
+            user_id: user to add/update
+
+        Return:
+            Timestamp since last seen, None if never seen
         """
 
-        return self.db_pool.simple_select_one_onecol(
+        return await self.db_pool.simple_select_one_onecol(
             table="monthly_active_users",
             keyvalues={"user_id": user_id},
             retcol="timestamp",
@@ -120,7 +127,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
 
 class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(MonthlyActiveUsersStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self._limit_usage_by_mau = hs.config.limit_usage_by_mau
         self._mau_stats_only = hs.config.mau_stats_only

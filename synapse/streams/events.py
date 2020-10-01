@@ -23,7 +23,7 @@ from synapse.handlers.typing import TypingNotificationEventSource
 from synapse.types import StreamToken
 
 
-class EventSources(object):
+class EventSources:
     SOURCE_TYPES = {
         "room": RoomEventSource,
         "presence": PresenceEventSource,
@@ -39,7 +39,7 @@ class EventSources(object):
         self.store = hs.get_datastore()
 
     def get_current_token(self) -> StreamToken:
-        push_rules_key, _ = self.store.get_push_rules_stream_token()
+        push_rules_key = self.store.get_max_push_rules_stream_id()
         to_device_key = self.store.get_to_device_stream_token()
         device_list_key = self.store.get_device_stream_token()
         groups_key = self.store.get_group_stream_token()

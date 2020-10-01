@@ -37,7 +37,7 @@ else:
     import binascii
     import os
 
-    class Secrets(object):
+    class Secrets:
         def token_bytes(self, nbytes=32):
             return os.urandom(nbytes)
 

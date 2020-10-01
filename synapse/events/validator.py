@@ -20,7 +20,7 @@ from synapse.events.utils import validate_canonicaljson
 from synapse.types import EventID, RoomID, UserID
 
 
-class EventValidator(object):
+class EventValidator:
     def validate_new(self, event, config):
         """Validates the event has roughly the right format
 
@@ -74,15 +74,14 @@ class EventValidator(object):
                         )
 
         if event.type == EventTypes.Retention:
-            self._validate_retention(event, config)
+            self._validate_retention(event)
 
-    def _validate_retention(self, event, config):
+    def _validate_retention(self, event):
         """Checks that an event that defines the retention policy for a room respects the
-        boundaries imposed by the server's administrator.
+        format enforced by the spec.
 
         Args:
             event (FrozenEvent): The event to validate.
-            config (Config): The homeserver's configuration.
         """
         min_lifetime = event.content.get("min_lifetime")
         max_lifetime = event.content.get("max_lifetime")
@@ -95,63 +94,11 @@ class EventValidator(object):
                     errcode=Codes.BAD_JSON,
                 )
 
-            if (
-                config.retention_allowed_lifetime_min is not None
-                and min_lifetime < config.retention_allowed_lifetime_min
-            ):
-                raise SynapseError(
-                    code=400,
-                    msg=(
-                        "'min_lifetime' can't be lower than the minimum allowed"
-                        " value enforced by the server's administrator"
-                    ),
-                    errcode=Codes.BAD_JSON,
-                )
-
-            if (
-                config.retention_allowed_lifetime_max is not None
-                and min_lifetime > config.retention_allowed_lifetime_max
-            ):
-                raise SynapseError(
-                    code=400,
-                    msg=(
-                        "'min_lifetime' can't be greater than the maximum allowed"
-                        " value enforced by the server's administrator"
-                    ),
-                    errcode=Codes.BAD_JSON,
-                )
-
         if max_lifetime is not None:
             if not isinstance(max_lifetime, int):
                 raise SynapseError(
                     code=400,
                     msg="'max_lifetime' must be an integer",
-                    errcode=Codes.BAD_JSON,
-                )
-
-            if (
-                config.retention_allowed_lifetime_min is not None
-                and max_lifetime < config.retention_allowed_lifetime_min
-            ):
-                raise SynapseError(
-                    code=400,
-                    msg=(
-                        "'max_lifetime' can't be lower than the minimum allowed value"
-                        " enforced by the server's administrator"
-                    ),
-                    errcode=Codes.BAD_JSON,
-                )
-
-            if (
-                config.retention_allowed_lifetime_max is not None
-                and max_lifetime > config.retention_allowed_lifetime_max
-            ):
-                raise SynapseError(
-                    code=400,
-                    msg=(
-                        "'max_lifetime' can't be greater than the maximum allowed"
-                        " value enforced by the server's administrator"
-                    ),
                     errcode=Codes.BAD_JSON,
                 )
 

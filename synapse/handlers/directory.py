@@ -23,6 +23,7 @@ from synapse.api.errors import (
     CodeMessageException,
     Codes,
     NotFoundError,
+    ShadowBanError,
     StoreError,
     SynapseError,
 )
@@ -36,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 class DirectoryHandler(BaseHandler):
     def __init__(self, hs):
-        super(DirectoryHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.state = hs.get_state_handler()
         self.appservice_handler = hs.get_application_service_handler()
@@ -199,6 +200,8 @@ class DirectoryHandler(BaseHandler):
 
         try:
             await self._update_canonical_alias(requester, user_id, room_id, room_alias)
+        except ShadowBanError as e:
+            logger.info("Failed to update alias events due to shadow-ban: %s", e)
         except AuthError as e:
             logger.info("Failed to update alias events: %s", e)
 
@@ -292,6 +295,9 @@ class DirectoryHandler(BaseHandler):
         """
         Send an updated canonical alias event if the removed alias was set as
         the canonical alias or listed in the alt_aliases field.
+
+        Raises:
+            ShadowBanError if the requester has been shadow-banned.
         """
         alias_event = await self.state.get_current_state(
             room_id, EventTypes.CanonicalAlias, ""
@@ -377,7 +383,7 @@ class DirectoryHandler(BaseHandler):
         """
         creator = await self.store.get_room_alias_creator(alias.to_string())
 
-        if creator is not None and creator == user_id:
+        if creator == user_id:
             return True
 
         # Resolve the alias to the corresponding room.

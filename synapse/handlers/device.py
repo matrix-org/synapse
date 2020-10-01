@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional
 from synapse.api import errors
 from synapse.api.constants import EventTypes
 from synapse.api.errors import (
+    Codes,
     FederationDeniedError,
     HttpResponseException,
     RequestSendFailed,
@@ -28,7 +29,7 @@ from synapse.api.errors import (
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import (
-    RoomStreamToken,
+    StreamToken,
     get_domain_from_id,
     get_verify_key_from_cross_signing_key,
 )
@@ -47,7 +48,7 @@ MAX_DEVICE_DISPLAY_NAME_LEN = 100
 
 class DeviceWorkerHandler(BaseHandler):
     def __init__(self, hs):
-        super(DeviceWorkerHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.hs = hs
         self.state = hs.get_state_handler()
@@ -104,18 +105,14 @@ class DeviceWorkerHandler(BaseHandler):
 
     @trace
     @measure_func("device.get_user_ids_changed")
-    async def get_user_ids_changed(self, user_id, from_token):
+    async def get_user_ids_changed(self, user_id: str, from_token: StreamToken):
         """Get list of users that have had the devices updated, or have newly
         joined a room, that `user_id` may be interested in.
-
-        Args:
-            user_id (str)
-            from_token (StreamToken)
         """
 
         set_tag("user_id", user_id)
         set_tag("from_token", from_token)
-        now_room_key = await self.store.get_room_events_max_id()
+        now_room_key = self.store.get_room_max_token()
 
         room_ids = await self.store.get_rooms_for_user(user_id)
 
@@ -142,7 +139,7 @@ class DeviceWorkerHandler(BaseHandler):
         )
         rooms_changed.update(event.room_id for event in member_events)
 
-        stream_ordering = RoomStreamToken.parse_stream_token(from_token.room_key).stream
+        stream_ordering = from_token.room_key.stream
 
         possibly_changed = set(changed)
         possibly_left = set()
@@ -234,7 +231,9 @@ class DeviceWorkerHandler(BaseHandler):
         return result
 
     async def on_federation_query_user_devices(self, user_id):
-        stream_id, devices = await self.store.get_devices_with_keys_by_user(user_id)
+        stream_id, devices = await self.store.get_e2e_device_keys_for_federation_query(
+            user_id
+        )
         master_key = await self.store.get_e2e_cross_signing_key(user_id, "master")
         self_signing_key = await self.store.get_e2e_cross_signing_key(
             user_id, "self_signing"
@@ -251,7 +250,7 @@ class DeviceWorkerHandler(BaseHandler):
 
 class DeviceHandler(DeviceWorkerHandler):
     def __init__(self, hs):
-        super(DeviceHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.federation_sender = hs.get_federation_sender()
 
@@ -264,6 +263,24 @@ class DeviceHandler(DeviceWorkerHandler):
         )
 
         hs.get_distributor().observe("user_left_room", self.user_left_room)
+
+    def _check_device_name_length(self, name: str):
+        """
+        Checks whether a device name is longer than the maximum allowed length.
+
+        Args:
+            name: The name of the device.
+
+        Raises:
+            SynapseError: if the device name is too long.
+        """
+        if name and len(name) > MAX_DEVICE_DISPLAY_NAME_LEN:
+            raise SynapseError(
+                400,
+                "Device display name is too long (max %i)"
+                % (MAX_DEVICE_DISPLAY_NAME_LEN,),
+                errcode=Codes.TOO_LARGE,
+            )
 
     async def check_device_registered(
         self, user_id, device_id, initial_device_display_name=None
@@ -282,6 +299,9 @@ class DeviceHandler(DeviceWorkerHandler):
         Returns:
             str: device id (generated if none was supplied)
         """
+
+        self._check_device_name_length(initial_device_display_name)
+
         if device_id is not None:
             new_device = await self.store.store_device(
                 user_id=user_id,
@@ -397,12 +417,8 @@ class DeviceHandler(DeviceWorkerHandler):
 
         # Reject a new displayname which is too long.
         new_display_name = content.get("display_name")
-        if new_display_name and len(new_display_name) > MAX_DEVICE_DISPLAY_NAME_LEN:
-            raise SynapseError(
-                400,
-                "Device display name is too long (max %i)"
-                % (MAX_DEVICE_DISPLAY_NAME_LEN,),
-            )
+
+        self._check_device_name_length(new_display_name)
 
         try:
             await self.store.update_device(
@@ -495,7 +511,7 @@ def _update_device_from_client_ips(device, client_ips):
     device.update({"last_seen_ts": ip.get("last_seen"), "last_seen_ip": ip.get("ip")})
 
 
-class DeviceListUpdater(object):
+class DeviceListUpdater:
     "Handles incoming device list updates from federation and updates the DB"
 
     def __init__(self, hs, device_handler):

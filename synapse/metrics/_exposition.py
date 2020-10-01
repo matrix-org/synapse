@@ -24,9 +24,9 @@ expect, and the newer "best practice" version of the up-to-date official client.
 
 import math
 import threading
-from collections import namedtuple
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
+from typing import Dict, List
 from urllib.parse import parse_qs, urlparse
 
 from prometheus_client import REGISTRY
@@ -34,14 +34,6 @@ from prometheus_client import REGISTRY
 from twisted.web.resource import Resource
 
 from synapse.util import caches
-
-try:
-    from prometheus_client.samples import Sample
-except ImportError:
-    Sample = namedtuple(  # type: ignore[no-redef] # noqa
-        "Sample", ["name", "labels", "value", "timestamp", "exemplar"]
-    )
-
 
 CONTENT_TYPE_LATEST = str("text/plain; version=0.0.4; charset=utf-8")
 
@@ -93,17 +85,6 @@ def sample_line(line, name):
     )
 
 
-def nameify_sample(sample):
-    """
-    If we get a prometheus_client<0.4.0 sample as a tuple, transform it into a
-    namedtuple which has the names we expect.
-    """
-    if not isinstance(sample, Sample):
-        sample = Sample(*sample, None, None)
-
-    return sample
-
-
 def generate_latest(registry, emit_help=False):
 
     # Trigger the cache metrics to be rescraped, which updates the common
@@ -144,16 +125,33 @@ def generate_latest(registry, emit_help=False):
                 )
             )
         output.append("# TYPE {0} {1}\n".format(mname, mtype))
-        for sample in map(nameify_sample, metric.samples):
-            # Get rid of the OpenMetrics specific samples
+
+        om_samples = {}  # type: Dict[str, List[str]]
+        for s in metric.samples:
             for suffix in ["_created", "_gsum", "_gcount"]:
-                if sample.name.endswith(suffix):
+                if s.name == metric.name + suffix:
+                    # OpenMetrics specific sample, put in a gauge at the end.
+                    # (these come from gaugehistograms which don't get renamed,
+                    # so no need to faff with mnewname)
+                    om_samples.setdefault(suffix, []).append(sample_line(s, s.name))
                     break
             else:
-                newname = sample.name.replace(mnewname, mname)
+                newname = s.name.replace(mnewname, mname)
                 if ":" in newname and newname.endswith("_total"):
                     newname = newname[: -len("_total")]
-                output.append(sample_line(sample, newname))
+                output.append(sample_line(s, newname))
+
+        for suffix, lines in sorted(om_samples.items()):
+            if emit_help:
+                output.append(
+                    "# HELP {0}{1} {2}\n".format(
+                        metric.name,
+                        suffix,
+                        metric.documentation.replace("\\", r"\\").replace("\n", r"\n"),
+                    )
+                )
+            output.append("# TYPE {0}{1} gauge\n".format(metric.name, suffix))
+            output.extend(lines)
 
         # Get rid of the weird colon things while we're at it
         if mtype == "counter":
@@ -172,16 +170,16 @@ def generate_latest(registry, emit_help=False):
                 )
             )
         output.append("# TYPE {0} {1}\n".format(mnewname, mtype))
-        for sample in map(nameify_sample, metric.samples):
-            # Get rid of the OpenMetrics specific samples
+
+        for s in metric.samples:
+            # Get rid of the OpenMetrics specific samples (we should already have
+            # dealt with them above anyway.)
             for suffix in ["_created", "_gsum", "_gcount"]:
-                if sample.name.endswith(suffix):
+                if s.name == metric.name + suffix:
                     break
             else:
                 output.append(
-                    sample_line(
-                        sample, sample.name.replace(":total", "").replace(":", "_")
-                    )
+                    sample_line(s, s.name.replace(":total", "").replace(":", "_"))
                 )
 
     return "".join(output).encode("utf-8")

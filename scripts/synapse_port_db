@@ -89,6 +89,7 @@ BOOLEAN_COLUMNS = {
     "redactions": ["have_censored"],
     "room_stats_state": ["is_federatable"],
     "local_media_repository": ["safe_from_quarantine"],
+    "users": ["shadow_banned"],
 }
 
 
@@ -144,6 +145,7 @@ IGNORED_TABLES = {
     # the sessions are transient anyway, so ignore them.
     "ui_auth_sessions",
     "ui_auth_sessions_credentials",
+    "ui_auth_sessions_ips",
 }
 
 
@@ -627,6 +629,7 @@ class Porter(object):
             self.progress.set_state("Setting up sequence generators")
             await self._setup_state_group_id_seq()
             await self._setup_user_id_seq()
+            await self._setup_events_stream_seqs()
 
             self.progress.done()
         except Exception as e:
@@ -802,6 +805,29 @@ class Porter(object):
             txn.execute("ALTER SEQUENCE user_id_seq RESTART WITH %s", (next_id,))
 
         return self.postgres_store.db_pool.runInteraction("setup_user_id_seq", r)
+
+    def _setup_events_stream_seqs(self):
+        def r(txn):
+            txn.execute("SELECT MAX(stream_ordering) FROM events")
+            curr_id = txn.fetchone()[0]
+            if curr_id:
+                next_id = curr_id + 1
+                txn.execute(
+                    "ALTER SEQUENCE events_stream_seq RESTART WITH %s", (next_id,)
+                )
+
+            txn.execute("SELECT -MIN(stream_ordering) FROM events")
+            curr_id = txn.fetchone()[0]
+            if curr_id:
+                next_id = curr_id + 1
+                txn.execute(
+                    "ALTER SEQUENCE events_backfill_stream_seq RESTART WITH %s",
+                    (next_id,),
+                )
+
+        return self.postgres_store.db_pool.runInteraction(
+            "_setup_events_stream_seqs", r
+        )
 
 
 ##############################################
