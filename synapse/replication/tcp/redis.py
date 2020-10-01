@@ -15,7 +15,7 @@
 
 import logging
 from inspect import isawaitable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import txredisapi
 
@@ -232,16 +232,16 @@ class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
 
 def lazyConnection(
     reactor,
-    host="localhost",
-    port=6379,
-    dbid=None,
-    reconnect=True,
-    charset="utf-8",
-    password=None,
-    connectTimeout=None,
-    replyTimeout=None,
-    convertNumbers=True,
-):
+    host: str = "localhost",
+    port: int = 6379,
+    dbid: Optional[int] = None,
+    reconnect: bool = True,
+    charset: str = "utf-8",
+    password: Optional[str] = None,
+    connectTimeout: Optional[int] = None,
+    replyTimeout: Optional[int] = None,
+    convertNumbers: bool = True,
+) -> txredisapi.RedisProtocol:
     """Equivalent to `txredisapi.lazyConnection`, except allows specifying a
     reactor.
     """
@@ -265,7 +265,4 @@ def lazyConnection(
     for x in range(poolsize):
         reactor.connectTCP(host, port, factory, connectTimeout)
 
-    if isLazy:
-        return factory.handler
-    else:
-        return factory.deferred
+    return factory.handler
