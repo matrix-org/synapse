@@ -160,7 +160,7 @@ def _load_appservice(hostname, as_info, config_filename):
     if as_info.get("ip_range_whitelist"):
         ip_range_whitelist = IPSet(as_info.get("ip_range_whitelist"))
 
-    supports_ephemeral = as_info.get("uk.half-shot.appservice.push_ephemeral", False)
+    supports_ephemeral = as_info.get("de.sorunome.msc2409.push_ephemeral", False)
 
     return ApplicationService(
         token=as_info["as_token"],

@@ -217,7 +217,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         uri = service.url + ("/transactions/%s" % urllib.parse.quote(txn_id))
         body = {"events": events}
         if ephemeral:
-            body["uk.half-shot.appservice.ephemeral"] = ephemeral
+            body["de.sorunome.msc2409.ephemeral"] = ephemeral
         try:
             await self.put_json(
                 uri=uri, json_body=body, args={"access_token": service.hs_token},
