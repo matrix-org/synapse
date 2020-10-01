@@ -488,6 +488,21 @@ class RoomStreamToken:
     def as_tuple(self) -> Tuple[Optional[int], int]:
         return (self.topological, self.stream)
 
+    def get_stream_pos_for_instance(self, instance_name: str) -> int:
+        """Get the stream position for the instance
+        """
+        return self.instance_map.get(instance_name, self.stream)
+
+    def get_max_stream_pos(self) -> int:
+        """Get the maximum stream position referenced in this token.
+
+        The corresponding "min" position is, by definition just `self.stream`.
+
+        This is used to handle tokens that have non-empty `instance_map`, and so
+        reference stream positions after the `self.stream` position.
+        """
+        return max(self.instance_map.values(), default=self.stream)
+
     async def to_string(self, store: "DataStore") -> str:
         if self.topological is not None:
             return "t%d-%d" % (self.topological, self.stream)
