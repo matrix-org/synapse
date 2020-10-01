@@ -201,33 +201,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         key = (service.id, protocol)
         return await self.protocol_meta_cache.wrap(key, _get)
 
-    async def push_ephemeral(self, service, events, to_device=None, device_lists=None):
-        if service.url is None:
-            return True
-        if service.supports_ephemeral is False:
-            return True
-
-        uri = service.url + (
-            "%s/uk.half-shot.appservice/ephemeral" % APP_SERVICE_PREFIX
-        )
-        try:
-            await self.put_json(
-                uri=uri,
-                json_body={
-                    "events": events,
-                    "device_messages": to_device,
-                    "device_lists": device_lists,
-                },
-                args={"access_token": service.hs_token},
-            )
-            return True
-        except CodeMessageException as e:
-            logger.warning("push_ephemeral to %s received %s", uri, e.code)
-        except Exception as ex:
-            logger.warning("push_ephemeral to %s threw exception %s", uri, ex)
-        return False
-
-    async def push_bulk(self, service, events, txn_id=None):
+    async def push_bulk(self, service, events, ephemeral=None, txn_id=None):
         if service.url is None:
             return True
 
@@ -241,11 +215,12 @@ class ApplicationServiceApi(SimpleHttpClient):
         txn_id = str(txn_id)
 
         uri = service.url + ("/transactions/%s" % urllib.parse.quote(txn_id))
+        body = {"events": events}
+        if ephemeral:
+            body["uk.half-shot.appservice.ephemeral"] = ephemeral
         try:
             await self.put_json(
-                uri=uri,
-                json_body={"events": events},
-                args={"access_token": service.hs_token},
+                uri=uri, json_body=body, args={"access_token": service.hs_token},
             )
             sent_transactions_counter.labels(service.id).inc()
             sent_events_counter.labels(service.id).inc(len(events))

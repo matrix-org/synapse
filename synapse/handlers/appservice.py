@@ -179,39 +179,27 @@ class ApplicationServicesHandler:
         logger.info("Checking interested services for %s" % (stream_key))
         with Measure(self.clock, "notify_interested_services_ephemeral"):
             for service in services:
-                events = []
                 if stream_key == "typing_key":
                     events = await self._handle_typing(service, new_token)
+                    if events:
+                        self.scheduler.submit_ephemeral_events_for_as(service, events)
+                    # We don't persist the token for typing_key for performance reasons
                 elif stream_key == "receipt_key":
                     events = await self._handle_receipts(service)
-                elif stream_key == "presence_key":
-                    events = await self._handle_as_presence(service, users)
-                elif stream_key == "device_list_key":
-                    # Check if the device lists have changed for any of the users we are interested in
-                    events = await self._handle_device_list(service, users, new_token)
-                elif stream_key == "to_device_key":
-                    # Check the inbox for any users the bridge owns
-                    events = await self._handle_to_device(service, users, new_token)
-                if events:
-                    # TODO: Do in background?
-                    await self.scheduler.submit_ephemeral_events_for_as(
-                        service, events, new_token
-                    )
-                    # We don't persist the token for typing_key
-                    if stream_key == "presence_key":
-                        await self.store.set_type_stream_id_for_appservice(
-                            service, "presence", new_token
-                        )
-                    elif stream_key == "receipt_key":
+                    if events:
+                        self.scheduler.submit_ephemeral_events_for_as(service, events)
                         await self.store.set_type_stream_id_for_appservice(
                             service, "read_receipt", new_token
                         )
-                    elif stream_key == "to_device_key":
-                        await self.store.set_type_stream_id_for_appservice(
-                            service, "to_device", new_token
-                        )
+                elif stream_key == "presence_key":
+                    events = await self._handle_as_presence(service, users)
+                    if events:
+                        self.scheduler.submit_ephemeral_events_for_as(service, events)
+                    await self.store.set_type_stream_id_for_appservice(
+                        service, "presence", new_token
+                    )
 
-    async def _handle_typing(self, service, new_token):
+    async def _handle_typing(self, service: ApplicationService, new_token: int):
         typing_source = self.event_sources.sources["typing"]
         # Get the typing events from just before current
         typing, _key = await typing_source.get_new_events_as(
@@ -223,7 +211,7 @@ class ApplicationServicesHandler:
         )
         return typing
 
-    async def _handle_receipts(self, service, token: int):
+    async def _handle_receipts(self, service: ApplicationService, token: int):
         from_key = await self.store.get_type_stream_id_for_appservice(
             service, "read_receipt"
         )
@@ -233,36 +221,7 @@ class ApplicationServicesHandler:
         )
         return receipts
 
-    async def _handle_device_list(
-        self, service: ApplicationService, users: List[str], new_token: int
-    ):
-        # TODO: Determine if any user have left and report those
-        from_token = await self.store.get_type_stream_id_for_appservice(
-            service, "device_list"
-        )
-        changed_user_ids = await self.store.get_device_changes_for_as(
-            service, from_token, new_token
-        )
-        # Return the
-        return {
-            "type": "m.device_list_update",
-            "content": {"changed": changed_user_ids,}, 
-        }
-
-    async def _handle_to_device(self, service, users, token):
-        if not any([True for u in users if service.is_interested_in_user(u)]):
-            return False
-
-        since_token = await self.store.get_type_stream_id_for_appservice(
-            service, "to_device"
-        )
-        messages, _ = await self.store.get_new_messages_for_as(
-            service, since_token, token
-        )
-        # This returns user_id -> device_id -> message
-        return messages
-
-    async def _handle_as_presence(self, service, users):
+    async def _handle_as_presence(self, service: ApplicationService, users: List[str]):
         events = []
         presence_source = self.event_sources.sources["presence"]
         from_key = await self.store.get_type_stream_id_for_appservice(

@@ -85,9 +85,8 @@ class ApplicationServiceScheduler:
     def submit_event_for_as(self, service, event):
         self.queuer.enqueue(service, event)
 
-    async def submit_ephemeral_events_for_as(self, service, events):
-        if self.txn_ctrl.is_service_up(service):
-            await self.as_api.push_ephemeral(service, events)
+    def submit_ephemeral_events_for_as(self, service, events):
+        self.queuer.enqueue_ephemeral(service, events)
 
 
 class _ServiceQueuer:
@@ -100,6 +99,7 @@ class _ServiceQueuer:
 
     def __init__(self, txn_ctrl, clock):
         self.queued_events = {}  # dict of {service_id: [events]}
+        self.queued_ephemeral = {} # dict of {service_id: [events]}
 
         # the appservices which currently have a transaction in flight
         self.requests_in_flight = set()
@@ -115,10 +115,22 @@ class _ServiceQueuer:
             return
 
         run_as_background_process(
-            "as-sender-%s" % (service.id,), self._send_request, service
+            "as-sender-%s" % (service.id), self._send_request, service
         )
 
-    async def _send_request(self, service):
+    def enqueue_ephemeral(self, service, events):
+        self.queued_ephemeral.setdefault(service.id, []).extend(events)
+
+        # start a sender for this appservice if we don't already have one
+
+        if service.id in self.requests_in_flight:
+            return
+
+        run_as_background_process(
+            "as-sender-%s" % (service.id), self._send_request, service
+        )
+
+    async def _send_request(self, service, ephemeral=None):
         # sanity-check: we shouldn't get here if this service already has a sender
         # running.
         assert service.id not in self.requests_in_flight
@@ -127,10 +139,11 @@ class _ServiceQueuer:
         try:
             while True:
                 events = self.queued_events.pop(service.id, [])
-                if not events:
+                ephemeral = self.queued_ephemeral.pop(service.id, [])
+                if not events and not ephemeral:
                     return
                 try:
-                    await self.txn_ctrl.send(service, events)
+                    await self.txn_ctrl.send(service, events, ephemeral)
                 except Exception:
                     logger.exception("AS request failed")
         finally:
@@ -162,9 +175,9 @@ class _TransactionController:
         # for UTs
         self.RECOVERER_CLASS = _Recoverer
 
-    async def send(self, service, events):
+    async def send(self, service, events, ephemeral=None):
         try:
-            txn = await self.store.create_appservice_txn(service=service, events=events)
+            txn = await self.store.create_appservice_txn(service=service, events=events, ephemeral=ephemeral)
             service_is_up = await self.is_service_up(service)
             if service_is_up:
                 sent = await txn.send(self.as_api)

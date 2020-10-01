@@ -16,7 +16,6 @@
 import logging
 from typing import List, Tuple
 
-from synapse.appservice import ApplicationService
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool
@@ -29,40 +28,6 @@ logger = logging.getLogger(__name__)
 class DeviceInboxWorkerStore(SQLBaseStore):
     def get_to_device_stream_token(self):
         return self._device_inbox_id_gen.get_current_token()
-
-    async def get_new_messages_for_as(
-        self,
-        service: ApplicationService,
-        last_stream_id: int,
-        current_stream_id: int,
-        limit: int = 100,
-    ) -> Tuple[List[dict], int]:
-        def get_new_messages_for_device_txn(txn):
-            sql = (
-                "SELECT stream_id, message_json, device_id, user_id FROM device_inbox"
-                " WHERE ? < stream_id AND stream_id <= ?"
-                " ORDER BY stream_id ASC"
-                " LIMIT ?"
-            )
-            txn.execute(sql, (last_stream_id, current_stream_id, limit))
-            messages = []
-
-            for row in txn:
-                stream_pos = row[0]
-                if service.is_interested_in_user(row.user_id):
-                    msg = db_to_json(row[1])
-                    msg.recipient = {
-                        "device_id": row.device_id,
-                        "user_id": row.user_id,
-                    }
-                    messages.append(msg)
-            if len(messages) < limit:
-                stream_pos = current_stream_id
-            return messages, stream_pos
-
-        return await self.db_pool.runInteraction(
-            "get_new_messages_for_device", get_new_messages_for_device_txn
-        )
 
     async def get_new_messages_for_device(
         self,

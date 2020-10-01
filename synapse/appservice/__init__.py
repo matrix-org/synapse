@@ -35,10 +35,11 @@ class ApplicationServiceState:
 class AppServiceTransaction:
     """Represents an application service transaction."""
 
-    def __init__(self, service, id, events):
+    def __init__(self, service, id, events, ephemeral=None):
         self.service = service
         self.id = id
         self.events = events
+        self.ephemeral = ephemeral
 
     async def send(self, as_api: ApplicationServiceApi) -> bool:
         """Sends this transaction using the provided AS API interface.
@@ -49,7 +50,10 @@ class AppServiceTransaction:
             True if the transaction was sent.
         """
         return await as_api.push_bulk(
-            service=self.service, events=self.events, txn_id=self.id
+            service=self.service,
+            events=self.events,
+            ephemeral=self.ephemeral,
+            txn_id=self.id,
         )
 
     async def complete(self, store: "DataStore") -> None:

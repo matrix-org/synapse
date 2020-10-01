@@ -19,7 +19,6 @@ import logging
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from synapse.api.errors import Codes, StoreError
-from synapse.appservice import ApplicationService
 from synapse.logging.opentracing import (
     get_active_span_text_map,
     set_tag,
@@ -524,31 +523,6 @@ class DeviceWorkerStore(SQLBaseStore):
 
         return await self.db_pool.runInteraction(
             "get_users_whose_devices_changed", _get_users_whose_devices_changed_txn
-        )
-
-    async def get_device_changes_for_as(
-        self,
-        service: ApplicationService,
-        last_stream_id: int,
-        current_stream_id: int,
-        limit: int = 100,
-    ) -> Tuple[List[dict], int]:
-        def get_device_changes_for_as_txn(txn):
-            sql = (
-                "SELECT DISTINCT user_ids FROM device_lists_stream"
-                " WHERE ? < stream_id AND stream_id <= ?"
-                " ORDER BY stream_id ASC"
-                " LIMIT ?"
-            )
-            txn.execute(sql, (last_stream_id, current_stream_id, limit))
-            rows = txn.fetchall()
-            users = []
-            for user in db_to_json(rows[0]):
-                if await service.is_interested_in_presence(user):
-                    users.append(user)
-
-        return await self.db_pool.runInteraction(
-            "get_device_changes_for_as", get_device_changes_for_as_txn
         )
 
     async def get_users_whose_signatures_changed(
