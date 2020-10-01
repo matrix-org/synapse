@@ -33,48 +33,6 @@ class ApplicationServiceState:
     UP = "up"
 
 
-class AppServiceTransaction:
-    """Represents an application service transaction."""
-
-    def __init__(
-        self,
-        service: ApplicationService,
-        id: int,
-        events: List[EventBase],
-        ephemeral=None,
-    ):
-        self.service = service
-        self.id = id
-        self.events = events
-        self.ephemeral = ephemeral
-
-    async def send(self, as_api: ApplicationServiceApi) -> bool:
-        """Sends this transaction using the provided AS API interface.
-
-        Args:
-            as_api: The API to use to send.
-        Returns:
-            True if the transaction was sent.
-        """
-        return await as_api.push_bulk(
-            service=self.service,
-            events=self.events,
-            ephemeral=self.ephemeral,
-            txn_id=self.id,
-        )
-
-    async def complete(self, store: "DataStore") -> None:
-        """Completes this transaction as successful.
-
-        Marks this transaction ID on the application service and removes the
-        transaction contents from the database.
-
-        Args:
-            store: The database store to operate on.
-        """
-        await store.complete_appservice_txn(service=self.service, txn_id=self.id)
-
-
 class ApplicationService:
     """Defines an application service. This definition is mostly what is
     provided to the /register AS API.
@@ -208,9 +166,7 @@ class ApplicationService:
     async def matches_user_in_member_list(
         self, room_id: str, store: DataStore, cache_context: _CacheContext
     ):
-        member_list = await store.get_users_in_room(
-            room_id
-        )
+        member_list = await store.get_users_in_room(room_id)
 
         # check joined member events
         for user_id in member_list:
@@ -330,3 +286,45 @@ class ApplicationService:
         dict_copy["token"] = "<redacted>"
         dict_copy["hs_token"] = "<redacted>"
         return "ApplicationService: %s" % (dict_copy,)
+
+
+class AppServiceTransaction:
+    """Represents an application service transaction."""
+
+    def __init__(
+        self,
+        service: ApplicationService,
+        id: int,
+        events: List[EventBase],
+        ephemeral=None,
+    ):
+        self.service = service
+        self.id = id
+        self.events = events
+        self.ephemeral = ephemeral
+
+    async def send(self, as_api: ApplicationServiceApi) -> bool:
+        """Sends this transaction using the provided AS API interface.
+
+        Args:
+            as_api: The API to use to send.
+        Returns:
+            True if the transaction was sent.
+        """
+        return await as_api.push_bulk(
+            service=self.service,
+            events=self.events,
+            ephemeral=self.ephemeral,
+            txn_id=self.id,
+        )
+
+    async def complete(self, store: "DataStore") -> None:
+        """Completes this transaction as successful.
+
+        Marks this transaction ID on the application service and removes the
+        transaction contents from the database.
+
+        Args:
+            store: The database store to operate on.
+        """
+        await store.complete_appservice_txn(service=self.service, txn_id=self.id)
