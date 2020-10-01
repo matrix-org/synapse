@@ -1,0 +1,1 @@
+Allow events to be sent to clients sooner when using sharded event persisters.
