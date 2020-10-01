@@ -662,7 +662,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
     async def send_membership_event(
         self,
-        requester: Requester,
+        requester: Optional[Requester],
         event: EventBase,
         context: EventContext,
         ratelimit: bool = True,

@@ -257,7 +257,7 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
             if isinstance(raw_callback_return, (defer.Deferred, types.CoroutineType)):
                 callback_return = await raw_callback_return
             else:
-                callback_return = raw_callback_return
+                callback_return = raw_callback_return  # type: ignore
 
             return callback_return
 
@@ -406,7 +406,7 @@ class JsonResource(DirectServeJsonResource):
         if isinstance(raw_callback_return, (defer.Deferred, types.CoroutineType)):
             callback_return = await raw_callback_return
         else:
-            callback_return = raw_callback_return
+            callback_return = raw_callback_return  # type: ignore
 
         return callback_return
 

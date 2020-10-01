@@ -1,1 +1,0 @@
-Fix non-user visible bug in implementation of `MultiWriterIdGenerator.get_current_token_for_writer`.

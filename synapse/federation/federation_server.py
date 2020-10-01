@@ -22,7 +22,6 @@ from typing import (
     Callable,
     Dict,
     List,
-    Match,
     Optional,
     Tuple,
     Union,
@@ -825,14 +824,14 @@ def server_matches_acl_event(server_name: str, acl_event: EventBase) -> bool:
     return False
 
 
-def _acl_entry_matches(server_name: str, acl_entry: str) -> Match:
+def _acl_entry_matches(server_name: str, acl_entry: Any) -> bool:
     if not isinstance(acl_entry, str):
         logger.warning(
             "Ignoring non-str ACL entry '%s' (is %s)", acl_entry, type(acl_entry)
         )
         return False
     regex = glob_to_regex(acl_entry)
-    return regex.match(server_name)
+    return bool(regex.match(server_name))
 
 
 class FederationHandlerRegistry:
