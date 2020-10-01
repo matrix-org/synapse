@@ -17,7 +17,6 @@ import re
 from typing import TYPE_CHECKING, List
 
 from synapse.api.constants import EventTypes
-from synapse.appservice.api import ApplicationServiceApi
 from synapse.events import EventBase
 from synapse.types import GroupID, UserID, get_domain_from_id
 from synapse.util.caches.descriptors import _CacheContext, cached
@@ -164,7 +163,7 @@ class ApplicationService:
 
     @cached(num_args=1, cache_context=True)
     async def matches_user_in_member_list(
-        self, room_id: str, store: DataStore, cache_context: _CacheContext
+        self, room_id: str, store, cache_context: _CacheContext
     ):
         member_list = await store.get_users_in_room(room_id)
 
@@ -212,7 +211,7 @@ class ApplicationService:
 
     @cached(num_args=1, cache_context=True)
     async def is_interested_in_presence(
-        self, user_id: UserID, store: DataStore, cache_context: _CacheContext
+        self, user_id: UserID, store, cache_context: _CacheContext
     ):
         # Find all the rooms the sender is in
         if self.is_interested_in_user(user_id.to_string()):
@@ -303,7 +302,7 @@ class AppServiceTransaction:
         self.events = events
         self.ephemeral = ephemeral
 
-    async def send(self, as_api: ApplicationServiceApi) -> bool:
+    async def send(self, as_api) -> bool:
         """Sends this transaction using the provided AS API interface.
 
         Args:

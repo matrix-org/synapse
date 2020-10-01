@@ -14,18 +14,20 @@
 # limitations under the License.
 import logging
 import urllib
-from typing import Any, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional
 
 from prometheus_client import Counter
 
 from synapse.api.constants import EventTypes, ThirdPartyEntityKind
 from synapse.api.errors import CodeMessageException
-from synapse.appservice import ApplicationService
 from synapse.events import EventBase
 from synapse.events.utils import serialize_event
 from synapse.http.client import SimpleHttpClient
 from synapse.types import JsonDict, ThirdPartyInstanceID
 from synapse.util.caches.response_cache import ResponseCache
+
+if TYPE_CHECKING:
+    from synapse.appservice import ApplicationService
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +204,7 @@ class ApplicationServiceApi(SimpleHttpClient):
 
     async def push_bulk(
         self,
-        service: ApplicationService,
+        service: "ApplicationService",
         events: List[EventBase],
         ephemeral: Optional[Any] = None,
         txn_id: Optional[int] = None,
