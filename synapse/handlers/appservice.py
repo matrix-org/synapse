@@ -15,7 +15,6 @@
 
 import logging
 from typing import List, Union
-from synapse.types import Collection
 
 from prometheus_client import Counter
 
@@ -31,7 +30,7 @@ from synapse.metrics import (
     event_processing_loop_room_count,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import RoomStreamToken, UserID
+from synapse.types import Collection, RoomStreamToken, UserID
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)

@@ -134,9 +134,7 @@ class _ServiceQueuer:
             "as-sender-%s" % (service.id), self._send_request, service
         )
 
-    async def _send_request(
-        self, service: ApplicationService
-    ):
+    async def _send_request(self, service: ApplicationService):
         # sanity-check: we shouldn't get here if this service already has a sender
         # running.
         assert service.id not in self.requests_in_flight
