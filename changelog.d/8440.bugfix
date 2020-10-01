@@ -1,0 +1,1 @@
+Do not expose the experimental `uk.half-shot.msc2778.login.application_service` flow in the login API.
