@@ -14,7 +14,8 @@
 # limitations under the License.
 
 import logging
-from typing import Collection, List, Union
+from typing import List, Union
+from synapse.types import Collection
 
 from prometheus_client import Counter
 
