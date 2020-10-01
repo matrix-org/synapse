@@ -14,6 +14,7 @@
 # limitations under the License.
 import logging
 
+from synapse.appservice import ApplicationService
 from synapse.handlers._base import BaseHandler
 from synapse.types import ReadReceipt, get_domain_from_id
 from synapse.util.async_helpers import maybe_awaitable
@@ -140,7 +141,9 @@ class ReceiptEventSource:
 
         return (events, to_key)
 
-    async def get_new_events_as(self, from_key, service, **kwargs):
+    async def get_new_events_as(
+        self, from_key: int, service: ApplicationService, **kwargs
+    ):
         from_key = int(from_key)
         to_key = self.get_current_key()
 

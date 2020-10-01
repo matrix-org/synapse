@@ -284,7 +284,9 @@ class ReceiptsWorkerStore(SQLBaseStore, metaclass=abc.ABCMeta):
         return results
 
     @cached(num_args=2,)
-    async def _get_linearized_receipts_for_all_rooms(self, to_key, from_key=None):
+    async def _get_linearized_receipts_for_all_rooms(
+        self, to_key: int, from_key: Optional[int] = None
+    ):
         def f(txn):
             if from_key:
                 sql = """

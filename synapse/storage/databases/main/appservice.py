@@ -15,9 +15,11 @@
 # limitations under the License.
 import logging
 import re
+from typing import Any, List, Optional
 
-from synapse.appservice import AppServiceTransaction
+from synapse.appservice import ApplicationService, AppServiceTransaction
 from synapse.config.appservice import load_appservices
+from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
@@ -172,7 +174,12 @@ class ApplicationServiceTransactionWorkerStore(
             "application_services_state", {"as_id": service.id}, {"state": state}
         )
 
-    async def create_appservice_txn(self, service, events, ephemeral=None):
+    async def create_appservice_txn(
+        self,
+        service: ApplicationService,
+        events: List[EventBase],
+        ephemeral: Optional[Any] = None,
+    ):
         """Atomically creates a new transaction for this application service
         with the given list of events.
 
@@ -353,7 +360,9 @@ class ApplicationServiceTransactionWorkerStore(
 
         return upper_bound, events
 
-    async def get_type_stream_id_for_appservice(self, service, type: str) -> int:
+    async def get_type_stream_id_for_appservice(
+        self, service: ApplicationService, type: str
+    ) -> int:
         def get_type_stream_id_for_appservice_txn(txn):
             stream_id_type = "%s_stream_id" % type
             txn.execute(
@@ -371,7 +380,7 @@ class ApplicationServiceTransactionWorkerStore(
         )
 
     async def set_type_stream_id_for_appservice(
-        self, service, type: str, pos: int
+        self, service: ApplicationService, type: str, pos: int
     ) -> None:
         def set_type_stream_id_for_appservice_txn(txn):
             stream_id_type = "%s_stream_id" % type

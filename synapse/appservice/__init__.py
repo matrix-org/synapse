@@ -14,12 +14,13 @@
 # limitations under the License.
 import logging
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 from synapse.api.constants import EventTypes
 from synapse.appservice.api import ApplicationServiceApi
-from synapse.types import GroupID, get_domain_from_id
-from synapse.util.caches.descriptors import cached
+from synapse.events import EventBase
+from synapse.types import GroupID, UserID, get_domain_from_id
+from synapse.util.caches.descriptors import _CacheContext, cached
 
 if TYPE_CHECKING:
     from synapse.storage.databases.main import DataStore
@@ -35,7 +36,13 @@ class ApplicationServiceState:
 class AppServiceTransaction:
     """Represents an application service transaction."""
 
-    def __init__(self, service, id, events, ephemeral=None):
+    def __init__(
+        self,
+        service: ApplicationService,
+        id: int,
+        events: List[EventBase],
+        ephemeral=None,
+    ):
         self.service = service
         self.id = id
         self.events = events
@@ -198,9 +205,11 @@ class ApplicationService:
         return does_match
 
     @cached(num_args=1, cache_context=True)
-    async def matches_user_in_member_list(self, room_id, store, cache_context):
+    async def matches_user_in_member_list(
+        self, room_id: str, store: DataStore, cache_context: _CacheContext
+    ):
         member_list = await store.get_users_in_room(
-            room_id, on_invalidate=cache_context.invalidate
+            room_id
         )
 
         # check joined member events
@@ -246,7 +255,9 @@ class ApplicationService:
         return False
 
     @cached(num_args=1, cache_context=True)
-    async def is_interested_in_presence(self, user_id, store, cache_context):
+    async def is_interested_in_presence(
+        self, user_id: UserID, store: DataStore, cache_context: _CacheContext
+    ):
         # Find all the rooms the sender is in
         if self.is_interested_in_user(user_id.to_string()):
             return True
@@ -254,7 +265,7 @@ class ApplicationService:
 
         # Then find out if the appservice is interested in any of those rooms
         for room_id in room_ids:
-            if await self.matches_user_in_member_list(room_id, store, cache_context):
+            if await self.matches_user_in_member_list(room_id, store):
                 return True
         return False
 

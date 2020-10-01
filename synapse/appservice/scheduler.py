@@ -49,8 +49,10 @@ This is all tied together by the AppServiceScheduler which DIs the required
 components.
 """
 import logging
+from typing import Any, List, Optional
 
-from synapse.appservice import ApplicationServiceState
+from synapse.appservice import ApplicationService, ApplicationServiceState
+from synapse.events import EventBase
 from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 
@@ -82,10 +84,12 @@ class ApplicationServiceScheduler:
         for service in services:
             self.txn_ctrl.start_recoverer(service)
 
-    def submit_event_for_as(self, service, event):
+    def submit_event_for_as(self, service: ApplicationService, event: EventBase):
         self.queuer.enqueue(service, event)
 
-    def submit_ephemeral_events_for_as(self, service, events):
+    def submit_ephemeral_events_for_as(
+        self, service: ApplicationService, events: List[Any]
+    ):
         self.queuer.enqueue_ephemeral(service, events)
 
 
@@ -99,7 +103,7 @@ class _ServiceQueuer:
 
     def __init__(self, txn_ctrl, clock):
         self.queued_events = {}  # dict of {service_id: [events]}
-        self.queued_ephemeral = {} # dict of {service_id: [events]}
+        self.queued_ephemeral = {}  # dict of {service_id: [events]}
 
         # the appservices which currently have a transaction in flight
         self.requests_in_flight = set()
@@ -118,7 +122,7 @@ class _ServiceQueuer:
             "as-sender-%s" % (service.id), self._send_request, service
         )
 
-    def enqueue_ephemeral(self, service, events):
+    def enqueue_ephemeral(self, service: ApplicationService, events: List[Any]):
         self.queued_ephemeral.setdefault(service.id, []).extend(events)
 
         # start a sender for this appservice if we don't already have one
@@ -130,7 +134,9 @@ class _ServiceQueuer:
             "as-sender-%s" % (service.id), self._send_request, service
         )
 
-    async def _send_request(self, service, ephemeral=None):
+    async def _send_request(
+        self, service: ApplicationService, ephemeral: Optional[Any] = None
+    ):
         # sanity-check: we shouldn't get here if this service already has a sender
         # running.
         assert service.id not in self.requests_in_flight
@@ -175,9 +181,16 @@ class _TransactionController:
         # for UTs
         self.RECOVERER_CLASS = _Recoverer
 
-    async def send(self, service, events, ephemeral=None):
+    async def send(
+        self,
+        service: ApplicationService,
+        events: List[EventBase],
+        ephemeral: Optional[Any] = None,
+    ):
         try:
-            txn = await self.store.create_appservice_txn(service=service, events=events, ephemeral=ephemeral)
+            txn = await self.store.create_appservice_txn(
+                service=service, events=events, ephemeral=ephemeral
+            )
             service_is_up = await self.is_service_up(service)
             if service_is_up:
                 sent = await txn.send(self.as_api)
@@ -221,7 +234,7 @@ class _TransactionController:
         recoverer.recover()
         logger.info("Now %i active recoverers", len(self.recoverers))
 
-    async def is_service_up(self, service):
+    async def is_service_up(self, service: ApplicationService):
         state = await self.store.get_appservice_state(service)
         return state == ApplicationServiceState.UP or state is None
 
