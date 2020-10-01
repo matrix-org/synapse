@@ -135,7 +135,7 @@ class _ServiceQueuer:
         )
 
     async def _send_request(
-        self, service: ApplicationService, ephemeral: Optional[Any] = None
+        self, service: ApplicationService
     ):
         # sanity-check: we shouldn't get here if this service already has a sender
         # running.
@@ -145,7 +145,7 @@ class _ServiceQueuer:
         try:
             while True:
                 events = self.queued_events.pop(service.id, [])
-                ephemeral = self.queued_ephemeral.pop(service.id, [])
+                ephemeral = self.queued_ephemeral.pop(service.id, None)
                 if not events and not ephemeral:
                     return
                 try:

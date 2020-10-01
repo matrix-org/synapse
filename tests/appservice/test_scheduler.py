@@ -203,7 +203,7 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
         service = Mock(id=4)
         event = Mock()
         self.queuer.enqueue(service, event)
-        self.txn_ctrl.send.assert_called_once_with(service, [event])
+        self.txn_ctrl.send.assert_called_once_with(service, [event], None)
 
     def test_send_single_event_with_queue(self):
         d = defer.Deferred()
@@ -217,11 +217,11 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
         # Send more events: expect send() to NOT be called multiple times.
         self.queuer.enqueue(service, event2)
         self.queuer.enqueue(service, event3)
-        self.txn_ctrl.send.assert_called_with(service, [event])
+        self.txn_ctrl.send.assert_called_with(service, [event], None)
         self.assertEquals(1, self.txn_ctrl.send.call_count)
         # Resolve the send event: expect the queued events to be sent
         d.callback(service)
-        self.txn_ctrl.send.assert_called_with(service, [event2, event3])
+        self.txn_ctrl.send.assert_called_with(service, [event2, event3], None)
         self.assertEquals(2, self.txn_ctrl.send.call_count)
 
     def test_multiple_service_queues(self):
@@ -247,13 +247,13 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
         # send events for different ASes and make sure they are sent
         self.queuer.enqueue(srv1, srv_1_event)
         self.queuer.enqueue(srv1, srv_1_event2)
-        self.txn_ctrl.send.assert_called_with(srv1, [srv_1_event])
+        self.txn_ctrl.send.assert_called_with(srv1, [srv_1_event], None)
         self.queuer.enqueue(srv2, srv_2_event)
         self.queuer.enqueue(srv2, srv_2_event2)
-        self.txn_ctrl.send.assert_called_with(srv2, [srv_2_event])
+        self.txn_ctrl.send.assert_called_with(srv2, [srv_2_event], None)
 
         # make sure callbacks for a service only send queued events for THAT
         # service
         srv_2_defer.callback(srv2)
-        self.txn_ctrl.send.assert_called_with(srv2, [srv_2_event2])
+        self.txn_ctrl.send.assert_called_with(srv2, [srv_2_event2], None)
         self.assertEquals(3, self.txn_ctrl.send.call_count)
