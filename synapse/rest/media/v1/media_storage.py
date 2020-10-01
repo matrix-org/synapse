@@ -143,12 +143,9 @@ class MediaStorage:
         """
 
         path = self._file_info_to_path(file_info)
-        local_path = os.path.join(self.local_media_directory, path)
-        if os.path.exists(local_path):
-            return FileResponder(open(local_path, "rb"))
 
-        # Fallback for paths without method names
-        # Should be removed in the future
+        # fallback for remote thumbnails with no method in the filename
+        legacy_path = None
         if file_info.thumbnail and file_info.server_name:
             legacy_path = self.filepaths.remote_media_thumbnail_rel_legacy(
                 server_name=file_info.server_name,
@@ -157,8 +154,19 @@ class MediaStorage:
                 height=file_info.thumbnail_height,
                 content_type=file_info.thumbnail_type,
             )
+
+        local_path = os.path.join(self.local_media_directory, path)
+        if os.path.exists(local_path):
+            logger.debug("responding with local file %s", local_path)
+            return FileResponder(open(local_path, "rb"))
+
+        if legacy_path:
+            logger.debug(
+                "local file %s did not exist; checking legacy name", local_path
+            )
             legacy_local_path = os.path.join(self.local_media_directory, legacy_path)
             if os.path.exists(legacy_local_path):
+                logger.debug("responding with local file %s", legacy_local_path)
                 return FileResponder(open(legacy_local_path, "rb"))
 
         for provider in self.storage_providers:
@@ -166,6 +174,14 @@ class MediaStorage:
             if res:
                 logger.debug("Streaming %s from %s", path, provider)
                 return res
+            if legacy_path:
+                logger.debug(
+                    "Provider %s did not find %s; checking legacy name", provider, path
+                )
+                res = await provider.fetch(legacy_path, file_info)
+                if res:
+                    logger.debug("Streaming %s from %s", legacy_path, provider)
+                    return res
 
         return None
 
