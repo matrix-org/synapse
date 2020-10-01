@@ -110,10 +110,6 @@ class WellKnownResolver:
         Returns:
             The result of the lookup
         """
-
-        if server_name == b"kde.org":
-            return WellKnownLookupResult(delegated_server=b"kde.modular.im:443")
-
         try:
             prev_result, expiry, ttl = self._well_known_cache.get_with_expiry(
                 server_name
