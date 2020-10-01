@@ -412,10 +412,8 @@ class EventCreationHandler:
         if self._block_events_without_consent_error:
             self._consent_uri_builder = ConsentURIBuilder(self.config)
 
-        self._is_worker_app = self.config.worker_app is not None
-
         if (
-            not self._is_worker_app
+            not self.config.worker_app
             and self.config.cleanup_extremities_with_dummy_events
         ):
             self.clock.looping_call(
