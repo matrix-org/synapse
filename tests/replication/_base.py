@@ -224,7 +224,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         # manually have to go and explicitly set it up each time (plus sometimes
         # it is impossible to write the handling explicitly in the tests).
         #
-        # This sets registers the master replication listener:
+        # Register the master replication listener:
         self.reactor.add_tcp_client_callback(
             "1.2.3.4",
             8765,
@@ -647,5 +647,5 @@ class FakeRedisPubSubProtocol(Protocol):
 
         raise Exception("Unrecognized type for encoding redis: %r: %r", type(obj), obj)
 
-    def connectionList(self, reason):
+    def connectionLost(self, reason):
         self._server.remove_subscriber(self)
