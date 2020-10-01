@@ -26,29 +26,6 @@ from ._base import client_patterns
 logger = logging.getLogger(__name__)
 
 
-TERMS_TEMPLATE = """
-<html>
-<head>
-<title>Authentication</title>
-<meta name='viewport' content='width=device-width, initial-scale=1,
-    user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
-<link rel="stylesheet" href="/_matrix/static/client/register/style.css">
-</head>
-<body>
-<form id="registrationForm" method="post" action="%(myurl)s">
-    <div>
-        <p>
-            Please click the button below if you agree to the
-            <a href="%(terms_url)s">privacy policy of this homeserver.</a>
-        </p>
-        <input type="hidden" name="session" value="%(session)s" />
-        <input type="submit" value="Agree" />
-    </div>
-</form>
-</body>
-</html>
-"""
-
 SUCCESS_TEMPLATE = """
 <html>
 <head>
@@ -106,6 +83,7 @@ class AuthRestServlet(RestServlet):
             self._cas_service_url = hs.config.cas_service_url
 
         self.recaptcha_template = hs.config.recaptcha_template
+        self.terms_template = hs.config.terms_template
 
     async def on_GET(self, request, stagetype):
         session = parse_string(request, "session")
@@ -120,13 +98,13 @@ class AuthRestServlet(RestServlet):
                 sitekey=self.hs.config.recaptcha_public_key,
             )
         elif stagetype == LoginType.TERMS:
-            html = TERMS_TEMPLATE % {
-                "session": session,
-                "terms_url": "%s_matrix/consent?v=%s"
+            html = self.terms_template.render(
+                session=session,
+                terms_url="%s_matrix/consent?v=%s"
                 % (self.hs.config.public_baseurl, self.hs.config.user_consent_version),
-                "myurl": "%s/r0/auth/%s/fallback/web"
+                myurl="%s/r0/auth/%s/fallback/web"
                 % (CLIENT_API_PREFIX, LoginType.TERMS),
-            }
+            )
 
         elif stagetype == LoginType.SSO:
             # Display a confirmation page which prompts the user to
@@ -202,16 +180,16 @@ class AuthRestServlet(RestServlet):
             if success:
                 html = SUCCESS_TEMPLATE
             else:
-                html = TERMS_TEMPLATE % {
-                    "session": session,
-                    "terms_url": "%s_matrix/consent?v=%s"
+                html = self.terms_template.render(
+                    session=session,
+                    terms_url="%s_matrix/consent?v=%s"
                     % (
                         self.hs.config.public_baseurl,
                         self.hs.config.user_consent_version,
                     ),
-                    "myurl": "%s/r0/auth/%s/fallback/web"
+                    myurl="%s/r0/auth/%s/fallback/web"
                     % (CLIENT_API_PREFIX, LoginType.TERMS),
-                }
+                )
         elif stagetype == LoginType.SSO:
             # The SSO fallback workflow should not post here,
             raise SynapseError(404, "Fallback SSO auth does not support POST requests.")
