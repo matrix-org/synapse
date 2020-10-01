@@ -206,7 +206,7 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
                 # a least recently active basis.
                 # Note it is not possible to write this query using OFFSET due to
                 # incompatibilities in how sqlite and postgres support the feature.
-                # Sqlite requires 'LIMIT -1 OFFSET ?', the LIMIT must be presents,
+                # Sqlite requires 'LIMIT -1 OFFSET ?', the LIMIT must be present,
                 # while Postgres does not require 'LIMIT', but also does not support
                 # negative LIMIT values. So there is no way to write it that both can
                 # support
