@@ -52,16 +52,6 @@ event_counter = Counter(
 )
 
 
-def encode_json(json_object):
-    """
-    Encode a Python object as JSON and return it in a Unicode string.
-    """
-    out = frozendict_json_encoder.encode(json_object)
-    if isinstance(out, bytes):
-        out = out.decode("utf8")
-    return out
-
-
 _EventCacheEntry = namedtuple("_EventCacheEntry", ("event", "redacted_event"))
 
 
@@ -743,7 +733,9 @@ class PersistEventsStore:
                     logger.exception("")
                     raise
 
-                metadata_json = encode_json(event.internal_metadata.get_dict())
+                metadata_json = frozendict_json_encoder.encode(
+                    event.internal_metadata.get_dict()
+                )
 
                 sql = "UPDATE event_json SET internal_metadata = ? WHERE event_id = ?"
                 txn.execute(sql, (metadata_json, event.event_id))
@@ -797,10 +789,10 @@ class PersistEventsStore:
                 {
                     "event_id": event.event_id,
                     "room_id": event.room_id,
-                    "internal_metadata": encode_json(
+                    "internal_metadata": frozendict_json_encoder.encode(
                         event.internal_metadata.get_dict()
                     ),
-                    "json": encode_json(event_dict(event)),
+                    "json": frozendict_json_encoder.encode(event_dict(event)),
                     "format_version": event.format_version,
                 }
                 for event, _ in events_and_contexts

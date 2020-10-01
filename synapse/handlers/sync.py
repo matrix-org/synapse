@@ -87,7 +87,7 @@ class SyncConfig:
 class TimelineBatch:
     prev_batch = attr.ib(type=StreamToken)
     events = attr.ib(type=List[EventBase])
-    limited = attr.ib(bool)
+    limited = attr.ib(type=bool)
 
     def __bool__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used

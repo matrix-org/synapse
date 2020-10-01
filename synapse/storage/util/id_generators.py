@@ -421,7 +421,7 @@ class MultiWriterIdGenerator:
             self._unfinished_ids.discard(next_id)
             self._finished_ids.add(next_id)
 
-            new_cur = None
+            new_cur = None  # type: Optional[int]
 
             if self._unfinished_ids:
                 # If there are unfinished IDs then the new position will be the
