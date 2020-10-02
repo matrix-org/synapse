@@ -629,6 +629,7 @@ acme:
 #tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
 
 
+## Federation ##
 
 # Restrict federation to the following whitelist of domains.
 # N.B. we recommend also firewalling your federation listener to limit
@@ -661,6 +662,17 @@ federation_ip_range_blacklist:
   - '::1/128'
   - 'fe80::/64'
   - 'fc00::/7'
+
+# Report prometheus metrics on the age of PDUs being sent to and received from
+# the following domains. This can be used to give an idea of "delay" on inbound
+# and outbound federation, though be aware that any delay can be due to problems
+# at either end or with the intermediate network.
+#
+# By default, no domains are monitored in this way.
+#
+#federation_metrics_domains:
+#  - matrix.org
+#  - example.com
 
 
 ## Caching ##
@@ -1701,6 +1713,14 @@ oidc_config:
   # Avoid this in production.
   #
   #skip_verification: true
+
+  # Whether to fetch the user profile from the userinfo endpoint. Valid
+  # values are: "auto" or "userinfo_endpoint".
+  #
+  # Defaults to "auto", which fetches the userinfo endpoint if "openid" is included
+  # in `scopes`. Uncomment the following to always fetch the userinfo endpoint.
+  #
+  #user_profile_method: "userinfo_endpoint"
 
   # Uncomment to allow a user logging in via OIDC to match a pre-existing account instead
   # of failing. This could be used if switching from password logins to OIDC. Defaults to false.

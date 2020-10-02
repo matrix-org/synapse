@@ -92,5 +92,4 @@ class HomeServerConfig(RootConfig):
         TracerConfig,
         WorkerConfig,
         RedisConfig,
-        FederationConfig,
     ]
