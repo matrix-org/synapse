@@ -446,7 +446,9 @@ def check_redaction(
 
     if room_version_obj.event_format == EventFormatVersions.V1:
         redacter_domain = get_domain_from_id(event.event_id)
-        redactee_domain = get_domain_from_id(event.redacts)
+        redactee_domain = None
+        if event.redacts:
+            redactee_domain = get_domain_from_id(event.redacts)
         if redacter_domain == redactee_domain:
             return True
     else:
