@@ -298,7 +298,11 @@ class AccountDataWorkerStore(SQLBaseStore, metaclass=abc.ABCMeta):
         if not ignored_account_data:
             return False
 
-        return ignored_user_id in ignored_account_data.get("ignored_users", {})
+        try:
+            return ignored_user_id in ignored_account_data.get("ignored_users", {})
+        except TypeError:
+            # The type of the ignored_users field is invalid.
+            return False
 
 
 class AccountDataStore(AccountDataWorkerStore):
