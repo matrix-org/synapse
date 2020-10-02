@@ -50,7 +50,9 @@ def prune_event(event: EventBase) -> EventBase:
     )
 
     # copy the internal fields
-    pruned_event.internal_metadata.stream_ordering = event.stream_ordering
+    pruned_event.internal_metadata.stream_ordering = (
+        event.internal_metadata.stream_ordering
+    )
 
     # Mark the event as redacted
     pruned_event.internal_metadata.redacted = True
