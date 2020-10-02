@@ -110,6 +110,11 @@ class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
     def in_transaction(self, conn: Connection) -> bool:
         return conn.in_transaction  # type: ignore
 
+    def set_autocommit(self, conn: Connection, autocommit: bool):
+        # Twisted doesn't let us set attributes on the connections, so we can't
+        # set the connection to autocommit mode.
+        pass
+
 
 # Following functions taken from: https://github.com/coleifer/peewee
 

@@ -103,3 +103,11 @@ class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
         """Whether the connection is currently in a transaction.
         """
         ...
+
+    @abc.abstractmethod
+    def set_autocommit(self, conn: Connection, autocommit: bool):
+        """Set the connections autocommit mode.
+
+        When True queries are run outside of transactions.
+        """
+        ...

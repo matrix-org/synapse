@@ -461,8 +461,23 @@ class DatabasePool:
         exception_callbacks: List[_CallbackListEntry],
         func: "Callable[..., R]",
         *args: Any,
+        db_retry: bool = True,
         **kwargs: Any
     ) -> R:
+        """Start a new database transaction with the given connection.
+
+        Args:
+            conn
+            desc
+            after_callbacks
+            exception_callbacks
+            func
+            *args
+            db_retry: Whether to retry the transaction by calling `func` again.
+                This should be disabled if connection is in autocommit mode.
+            **kwargs
+        """
+
         start = monotonic_time()
         txn_id = self._TXN_ID
 
@@ -493,7 +508,7 @@ class DatabasePool:
                     transaction_logger.warning(
                         "[TXN OPERROR] {%s} %s %d/%d", name, e, i, N,
                     )
-                    if i < N:
+                    if db_retry and i < N:
                         i += 1
                         try:
                             conn.rollback()
@@ -506,7 +521,7 @@ class DatabasePool:
                         transaction_logger.warning(
                             "[TXN DEADLOCK] {%s} %d/%d", name, i, N
                         )
-                        if i < N:
+                        if db_retry and i < N:
                             i += 1
                             try:
                                 conn.rollback()
@@ -566,7 +581,12 @@ class DatabasePool:
             sql_txn_timer.labels(desc).observe(duration)
 
     async def runInteraction(
-        self, desc: str, func: "Callable[..., R]", *args: Any, **kwargs: Any
+        self,
+        desc: str,
+        func: "Callable[..., R]",
+        *args: Any,
+        db_autocommit: bool = False,
+        **kwargs: Any
     ) -> R:
         """Starts a transaction on the database and runs a given function
 
@@ -575,6 +595,12 @@ class DatabasePool:
             func: callback function, which will be called with a
                 database transaction (twisted.enterprise.adbapi.Transaction) as
                 its first argument, followed by `args` and `kwargs`.
+
+            db_autocommit: Whether to run the function in "autocommit" mode,
+                i.e. outside of a transaction. This is useful for transaction
+                that are only a single query. Currently only affects postgres.
+                WARNING: This means that if func fails half way through then
+                the changes will *not* be rolled back.
 
             args: positional args to pass to `func`
             kwargs: named args to pass to `func`
@@ -596,6 +622,8 @@ class DatabasePool:
                 exception_callbacks,
                 func,
                 *args,
+                db_autocommit=db_autocommit,
+                db_retry=not db_autocommit,  # Don't retry in auto commit mode.
                 **kwargs
             )
 
@@ -609,7 +637,11 @@ class DatabasePool:
         return cast(R, result)
 
     async def runWithConnection(
-        self, func: "Callable[..., R]", *args: Any, **kwargs: Any
+        self,
+        func: "Callable[..., R]",
+        *args: Any,
+        db_autocommit: bool = False,
+        **kwargs: Any
     ) -> R:
         """Wraps the .runWithConnection() method on the underlying db_pool.
 
@@ -618,6 +650,9 @@ class DatabasePool:
                 database connection (twisted.enterprise.adbapi.Connection) as
                 its first argument, followed by `args` and `kwargs`.
             args: positional args to pass to `func`
+            db_autocommit: Whether to run the function in "autocommit" mode,
+                i.e. outside of a transaction. This is useful for transaction
+                that are only a single query. Currently only affects postgres.
             kwargs: named args to pass to `func`
 
         Returns:
@@ -649,10 +684,17 @@ class DatabasePool:
                     logger.debug("Reconnecting closed database connection")
                     conn.reconnect()
 
-                db_conn = LoggingDatabaseConnection(
-                    conn, self.engine, "runWithConnection"
-                )
-                return func(db_conn, *args, **kwargs)
+                try:
+                    if db_autocommit:
+                        self.engine.set_autocommit(conn, True)
+
+                    db_conn = LoggingDatabaseConnection(
+                        conn, self.engine, "runWithConnection"
+                    )
+                    return func(db_conn, *args, **kwargs)
+                finally:
+                    if db_autocommit:
+                        self.engine.set_autocommit(conn, False)
 
         return await make_deferred_yieldable(
             self._db_pool.runWithConnection(inner_func, *args, **kwargs)
