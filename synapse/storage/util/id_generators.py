@@ -341,7 +341,7 @@ class MultiWriterIdGenerator:
                 "cmp": "<=" if self._positive else ">=",
             }
             sql = self._db.engine.convert_param_style(sql)
-            cur.execute(sql, (min_stream_id,))
+            cur.execute(sql, (min_stream_id * self._return_factor,))
 
             self._persisted_upto_position = min_stream_id
 
