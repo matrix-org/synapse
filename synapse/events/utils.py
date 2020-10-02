@@ -49,6 +49,9 @@ def prune_event(event: EventBase) -> EventBase:
         pruned_event_dict, event.room_version, event.internal_metadata.get_dict()
     )
 
+    # copy the internal fields
+    pruned_event.internal_metadata.stream_ordering = event.stream_ordering
+
     # Mark the event as redacted
     pruned_event.internal_metadata.redacted = True
 
