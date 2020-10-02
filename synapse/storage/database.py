@@ -112,9 +112,11 @@ def make_conn(
         for k, v in db_config.config.get("args", {}).items()
         if not k.startswith("cp_")
     }
-    db_conn = engine.module.connect(**db_params)
+    native_db_conn = engine.module.connect(**db_params)
+    db_conn = LoggingDatabaseConnection(native_db_conn, engine, default_txn_name)
+
     engine.on_new_connection(db_conn)
-    return LoggingDatabaseConnection(db_conn, engine, default_txn_name)
+    return db_conn
 
 
 @attr.s(slots=True)
