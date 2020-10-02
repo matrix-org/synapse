@@ -764,12 +764,8 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 user_result = result.setdefault(user_id, {})
                 device_result = user_result.setdefault(device_id, {})
                 txn.execute(sql, (user_id, device_id, algorithm))
-                found = False
-                for key_id, key_json in txn:
-                    found = True
-                    device_result[algorithm + ":" + key_id] = key_json
-                    delete.append((user_id, device_id, algorithm, key_id))
-                if not found:
+                row = txn.fetchone()
+                if row is None:
                     # no one-time key available, so see if there's a fallback
                     # key
                     txn.execute(fallback_sql, (user_id, device_id, algorithm))
@@ -779,6 +775,10 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                             used_fallbacks.append(
                                 (user_id, device_id, algorithm, key_id)
                             )
+                else:
+                    (key_id, key_json) = row
+                    device_result[algorithm + ":" + key_id] = key_json
+                    delete.append((user_id, device_id, algorithm, key_id))
 
             # drop any one-time keys that were claimed
             sql = (
