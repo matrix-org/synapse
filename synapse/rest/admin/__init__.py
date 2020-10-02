@@ -110,7 +110,9 @@ class PurgeHistoryRestServlet(RestServlet):
             if event.room_id != room_id:
                 raise SynapseError(400, "Event is for wrong room.")
 
-            room_token = RoomStreamToken(event.depth, event.stream_ordering)
+            room_token = RoomStreamToken(
+                event.depth, event.internal_metadata.stream_ordering
+            )
             token = await room_token.to_string(self.store)
 
             logger.info("[purge] purging up to token %s (event_id %s)", token, event_id)
