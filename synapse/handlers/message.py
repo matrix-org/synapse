@@ -683,8 +683,8 @@ class EventCreationHandler:
                     prev_event.event_id,
                 )
                 # we know it was persisted, so must have a stream ordering
-                assert prev_event.stream_ordering
-                return prev_event.stream_ordering
+                assert prev_event.internal_metadata.stream_ordering
+                return prev_event.internal_metadata.stream_ordering
 
         return await self.handle_new_client_event(
             requester=requester, event=event, context=context, ratelimit=ratelimit
