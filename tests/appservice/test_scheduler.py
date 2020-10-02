@@ -207,7 +207,9 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
 
     def test_send_single_event_with_queue(self):
         d = defer.Deferred()
-        self.txn_ctrl.send = Mock(side_effect=lambda x, y: make_deferred_yieldable(d))
+        self.txn_ctrl.send = Mock(
+            side_effect=lambda x, y, z: make_deferred_yieldable(d)
+        )
         service = Mock(id=4)
         event = Mock(event_id="first")
         event2 = Mock(event_id="second")
@@ -239,7 +241,7 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
 
         send_return_list = [srv_1_defer, srv_2_defer]
 
-        def do_send(x, y):
+        def do_send(x, y, z):
             return make_deferred_yieldable(send_return_list.pop(0))
 
         self.txn_ctrl.send = Mock(side_effect=do_send)

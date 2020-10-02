@@ -119,7 +119,7 @@ class _ServiceQueuer:
             return
 
         run_as_background_process(
-            "as-sender-%s" % (service.id), self._send_request, service
+            "as-sender-%s" % (service.id,), self._send_request, service
         )
 
     def enqueue_ephemeral(self, service: ApplicationService, events: List[Any]):
@@ -131,7 +131,7 @@ class _ServiceQueuer:
             return
 
         run_as_background_process(
-            "as-sender-%s" % (service.id), self._send_request, service
+            "as-sender-%s" % (service.id,), self._send_request, service
         )
 
     async def _send_request(self, service: ApplicationService):
