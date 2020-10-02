@@ -822,7 +822,7 @@ class EventsWorkerStore(SQLBaseStore):
                   rej.reason
                 FROM events AS e
                   JOIN event_json AS ej USING (event_id)
-                  LEFT JOIN rooms r USING (room_id)
+                  LEFT JOIN rooms r ON r.room_id = e.room_id
                   LEFT JOIN rejections as rej USING (event_id)
                 WHERE """
 
