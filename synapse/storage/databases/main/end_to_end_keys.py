@@ -368,7 +368,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         )
 
     async def set_e2e_fallback_keys(
-        self, user_id: str, device_id: str, fallback_keys: dict
+        self, user_id: str, device_id: str, fallback_keys: JsonDict
     ) -> None:
         """Set the user's e2e fallback keys.
 
@@ -399,7 +399,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             )
 
     @cached(max_entries=10000)
-    async def get_e2e_unused_fallback_keys(
+    async def get_e2e_unused_fallback_key_types(
         self, user_id: str, device_id: str
     ) -> List[str]:
         """Returns the fallback key types that have an unused key.
@@ -415,7 +415,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             "e2e_fallback_keys_json",
             keyvalues={"user_id": user_id, "device_id": device_id, "used": False},
             retcol="algorithm",
-            desc="get_e2e_unused_fallback_keys",
+            desc="get_e2e_unused_fallback_key_types",
         )
 
     async def get_e2e_cross_signing_key(
@@ -811,7 +811,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                     {"used": True},
                 )
                 self._invalidate_cache_and_stream(
-                    txn, self.get_e2e_unused_fallback_keys, (user_id, device_id)
+                    txn, self.get_e2e_unused_fallback_key_types, (user_id, device_id)
                 )
 
             return result
@@ -848,7 +848,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 keyvalues={"user_id": user_id, "device_id": device_id},
             )
             self._invalidate_cache_and_stream(
-                txn, self.get_e2e_unused_fallback_keys, (user_id, device_id)
+                txn, self.get_e2e_unused_fallback_key_types, (user_id, device_id)
             )
 
         await self.db_pool.runInteraction(
