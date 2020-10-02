@@ -310,6 +310,14 @@ class EventBase(metaclass=abc.ABCMeta):
         """
         return [e for e, _ in self.auth_events]
 
+    @property
+    def stream_ordering(self) -> Optional[int]:
+        """Returns the stream ordering of this event.
+
+        None if the event has not yet been persisted.
+        """
+        return self.internal_metadata._dict.get("stream_ordering")
+
 
 class FrozenEvent(EventBase):
     format_version = EventFormatVersions.V1  # All events of this type are V1

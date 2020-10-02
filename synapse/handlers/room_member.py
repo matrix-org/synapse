@@ -194,8 +194,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         )
         if duplicate is not None:
             # Discard the new event since this membership change is a no-op.
-            _, stream_id = await self.store.get_event_ordering(duplicate.event_id)
-            return duplicate.event_id, stream_id
+            # we know it was persisted, so must have a stream ordering.
+            assert duplicate.stream_ordering
+            return duplicate.event_id, duplicate.stream_ordering
 
         prev_state_ids = await context.get_prev_state_ids()
 
@@ -441,13 +442,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 same_membership = old_membership == effective_membership_state
                 same_sender = requester.user.to_string() == old_state.sender
                 if same_sender and same_membership and same_content:
-                    _, stream_id = await self.store.get_event_ordering(
-                        old_state.event_id
-                    )
-                    return (
-                        old_state.event_id,
-                        stream_id,
-                    )
+                    # duplicate event.
+                    # we know it was persisted, so must have a stream ordering.
+                    assert old_state.stream_ordering
+                    return (old_state.event_id, old_state.stream_ordering)
 
             if old_membership in ["ban", "leave"] and action == "kick":
                 raise AuthError(403, "The target user is not in the room")
