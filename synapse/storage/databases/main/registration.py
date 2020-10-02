@@ -977,12 +977,12 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
 
         return old_device_id
 
-    async def set_device_for_access_token(self, token, device_id) -> str:
+    async def set_device_for_access_token(self, token: str, device_id: str) -> str:
         """Sets the device ID associated with an access token.
 
         Args:
-            token (str): The access token to modify.
-            device_id (str): The new device ID.
+            token: The access token to modify.
+            device_id: The new device ID.
         Returns:
             The old device ID associated with the access token.
         """
