@@ -185,7 +185,10 @@ class HomeServer(metaclass=abc.ABCMeta):
             we are listening on to provide HTTP services.
     """
 
-    REQUIRED_ON_MASTER_STARTUP = ["user_directory_handler", "stats_handler"]
+    REQUIRED_ON_BACKGROUND_TASK_STARTUP = [
+        "auth",
+        "stats",
+    ]
 
     # This is overridden in derived application classes
     # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
@@ -251,14 +254,20 @@ class HomeServer(metaclass=abc.ABCMeta):
         self.datastores = Databases(self.DATASTORE_CLASS, self)
         logger.info("Finished setting up.")
 
-    def setup_master(self) -> None:
+        # Register background tasks required by this server. This must be done
+        # somewhat manually due to the background tasks not being registered
+        # unless handlers are instantiated.
+        if self.config.run_background_tasks:
+            self.setup_background_tasks()
+
+    def setup_background_tasks(self) -> None:
         """
         Some handlers have side effects on instantiation (like registering
         background updates). This function causes them to be fetched, and
         therefore instantiated, to run those side effects.
         """
-        for i in self.REQUIRED_ON_MASTER_STARTUP:
-            getattr(self, "get_" + i)()
+        for i in self.REQUIRED_ON_BACKGROUND_TASK_STARTUP:
+            getattr(self, "get_" + i + "_handler")()
 
     def get_reactor(self) -> twisted.internet.base.ReactorBase:
         """

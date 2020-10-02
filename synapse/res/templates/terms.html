@@ -1,0 +1,20 @@
+<html>
+<head>
+<title>Authentication</title>
+<meta name='viewport' content='width=device-width, initial-scale=1,
+    user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
+<link rel="stylesheet" href="/_matrix/static/client/register/style.css">
+</head>
+<body>
+<form id="registrationForm" method="post" action="{{ myurl }}">
+    <div>
+        <p>
+            Please click the button below if you agree to the
+            <a href="{{ terms_url }}">privacy policy of this homeserver.</a>
+        </p>
+        <input type="hidden" name="session" value="{{ session }}" />
+        <input type="submit" value="Agree" />
+    </div>
+</form>
+</body>
+</html>

@@ -288,8 +288,6 @@ class UIAuthWorkerStore(SQLBaseStore):
         )
         return [(row["user_agent"], row["ip"]) for row in rows]
 
-
-class UIAuthStore(UIAuthWorkerStore):
     async def delete_old_ui_auth_sessions(self, expiration_time: int) -> None:
         """
         Remove sessions which were last used earlier than the expiration time.
@@ -339,3 +337,7 @@ class UIAuthStore(UIAuthWorkerStore):
             iterable=session_ids,
             keyvalues={},
         )
+
+
+class UIAuthStore(UIAuthWorkerStore):
+    pass

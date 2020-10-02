@@ -490,7 +490,7 @@ class PerDestinationQueue:
                 )
 
             if logger.isEnabledFor(logging.INFO):
-                rooms = (p.room_id for p in catchup_pdus)
+                rooms = [p.room_id for p in catchup_pdus]
                 logger.info("Catching up rooms to %s: %r", self._destination, rooms)
 
             success = await self._transaction_manager.send_new_transaction(

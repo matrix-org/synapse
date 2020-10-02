@@ -30,6 +30,8 @@ for port in 8080 8081 8082; do
     if ! grep -F "Customisation made by demo/start.sh" -q  $DIR/etc/$port.config; then
         printf '\n\n# Customisation made by demo/start.sh\n' >> $DIR/etc/$port.config
 
+        echo "public_baseurl: http://localhost:$port/" >> $DIR/etc/$port.config
+
         echo 'enable_registration: true' >> $DIR/etc/$port.config
 
         # Warning, this heredoc depends on the interaction of tabs and spaces. Please don't

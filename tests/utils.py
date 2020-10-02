@@ -278,7 +278,7 @@ def setup_test_homeserver(
 
         hs.setup()
         if homeserverToUse.__name__ == "TestHomeServer":
-            hs.setup_master()
+            hs.setup_background_tasks()
 
         if isinstance(db_engine, PostgresEngine):
             database = hs.get_datastores().databases[0]
