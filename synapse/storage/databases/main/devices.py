@@ -698,7 +698,9 @@ class DeviceWorkerStore(SQLBaseStore):
             _mark_remote_user_device_list_as_unsubscribed_txn,
         )
 
-    async def get_dehydrated_device(self, user_id: str) -> Tuple[str, JsonDict]:
+    async def get_dehydrated_device(
+        self, user_id: str
+    ) -> Optional[Tuple[str, JsonDict]]:
         """Retrieve the information for a dehydrated device.
 
         Args:
@@ -715,9 +717,7 @@ class DeviceWorkerStore(SQLBaseStore):
             allow_none=True,
         )
         return (
-            (row["device_id"], json_decoder.decode(row["device_data"]))
-            if row
-            else (None, None)
+            (row["device_id"], json_decoder.decode(row["device_data"])) if row else None
         )
 
     def _store_dehydrated_device_txn(
@@ -730,23 +730,12 @@ class DeviceWorkerStore(SQLBaseStore):
             retcol="device_id",
             allow_none=True,
         )
-        if old_device_id is None:
-            self.db_pool.simple_insert_txn(
-                txn,
-                table="dehydrated_devices",
-                values={
-                    "user_id": user_id,
-                    "device_id": device_id,
-                    "device_data": device_data,
-                },
-            )
-        else:
-            self.db_pool.simple_update_txn(
-                txn,
-                table="dehydrated_devices",
-                keyvalues={"user_id": user_id},
-                updatevalues={"device_id": device_id, "device_data": device_data},
-            )
+        self.db_pool.simple_upsert_txn(
+            txn,
+            table="dehydrated_devices",
+            keyvalues={"user_id": user_id},
+            values={"device_id": device_id, "device_data": device_data},
+        )
         return old_device_id
 
     async def store_dehydrated_device(
@@ -756,8 +745,8 @@ class DeviceWorkerStore(SQLBaseStore):
 
         Args:
             user_id: the user that we are storing the device for
+            device_id: the ID of the dehydrated device
             device_data: the dehydrated device information
-            initial_device_display_name: The display name to use for the device
         Returns:
             device id of the user's previous dehydrated device, if any
         """

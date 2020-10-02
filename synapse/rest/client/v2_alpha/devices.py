@@ -188,7 +188,7 @@ class DehydratedDeviceServlet(RestServlet):
 
     """
 
-    PATTERNS = client_patterns("/org.matrix.msc2697.v2/dehydrated_device")
+    PATTERNS = client_patterns("/org.matrix.msc2697.v2/dehydrated_device", releases=())
 
     def __init__(self, hs):
         super(DehydratedDeviceServlet, self).__init__()
@@ -197,20 +197,31 @@ class DehydratedDeviceServlet(RestServlet):
         self.device_handler = hs.get_device_handler()
 
     async def on_GET(self, request: SynapseRequest):
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        (
-            device_id,
-            dehydrated_device,
-        ) = await self.device_handler.get_dehydrated_device(requester.user.to_string())
-        if dehydrated_device:
+        requester = await self.auth.get_user_by_req(request)
+        dehydrated_device = await self.device_handler.get_dehydrated_device(
+            requester.user.to_string()
+        )
+        if dehydrated_device is not None:
+            (device_id, device_data) = dehydrated_device
             result = {"device_id": device_id, "device_data": dehydrated_device}
             return (200, result)
         else:
-            raise errors.NotFoundError()
+            raise errors.NotFoundError("No dehydrated device available")
 
     async def on_PUT(self, request: SynapseRequest):
         submission = parse_json_object_from_request(request)
         requester = await self.auth.get_user_by_req(request)
+
+        if "device_data" not in submission:
+            raise errors.SynapseError(
+                400, "device_data missing", errcode=errors.Codes.MISSING_PARAM,
+            )
+        elif isinstance(submission["device_id"], dict):
+            raise errors.SynapseError(
+                400,
+                "device_data must be an object",
+                errcode=errors.Codes.INVALID_PARAM,
+            )
 
         device_id = await self.device_handler.store_dehydrated_device(
             requester.user.to_string(),
@@ -239,7 +250,9 @@ class ClaimDehydratedDeviceServlet(RestServlet):
 
     """
 
-    PATTERNS = client_patterns("/org.matrix.msc2697.v2/dehydrated_device/claim")
+    PATTERNS = client_patterns(
+        "/org.matrix.msc2697.v2/dehydrated_device/claim", releases=()
+    )
 
     def __init__(self, hs):
         super(ClaimDehydratedDeviceServlet, self).__init__()
@@ -248,9 +261,18 @@ class ClaimDehydratedDeviceServlet(RestServlet):
         self.device_handler = hs.get_device_handler()
 
     async def on_POST(self, request: SynapseRequest):
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        requester = await self.auth.get_user_by_req(request)
 
         submission = parse_json_object_from_request(request)
+
+        if "device_id" not in submission:
+            raise errors.SynapseError(
+                400, "device_id missing", errcode=errors.Codes.MISSING_PARAM,
+            )
+        elif isinstance(submission["device_id"], str):
+            raise errors.SynapseError(
+                400, "device_id must be a string", errcode=errors.Codes.INVALID_PARAM,
+            )
 
         result = await self.device_handler.rehydrate_device(
             requester.user.to_string(),

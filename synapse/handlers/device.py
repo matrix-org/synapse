@@ -532,7 +532,9 @@ class DeviceHandler(DeviceWorkerHandler):
             await self.delete_device(user_id, old_device_id)
         return device_id
 
-    async def get_dehydrated_device(self, user_id: str) -> Tuple[str, JsonDict]:
+    async def get_dehydrated_device(
+        self, user_id: str
+    ) -> Optional[Tuple[str, JsonDict]]:
         """Retrieve the information for a dehydrated device.
 
         Args:
