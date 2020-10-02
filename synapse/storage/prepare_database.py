@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import imp
 import logging
 import os
@@ -24,9 +23,10 @@ from typing import Optional, TextIO
 import attr
 
 from synapse.config.homeserver import HomeServerConfig
+from synapse.storage.database import LoggingDatabaseConnection
 from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.engines.postgres import PostgresEngine
-from synapse.storage.types import Connection, Cursor
+from synapse.storage.types import Cursor
 from synapse.types import Collection
 
 logger = logging.getLogger(__name__)
@@ -67,7 +67,7 @@ UNAPPLIED_DELTA_ON_WORKER_ERROR = (
 
 
 def prepare_database(
-    db_conn: Connection,
+    db_conn: LoggingDatabaseConnection,
     database_engine: BaseDatabaseEngine,
     config: Optional[HomeServerConfig],
     databases: Collection[str] = ["main", "state"],
@@ -89,7 +89,7 @@ def prepare_database(
     """
 
     try:
-        cur = db_conn.cursor()
+        cur = db_conn.cursor(txn_name="prepare_database")
 
         # sqlite does not automatically start transactions for DDL / SELECT statements,
         # so we start one before running anything. This ensures that any upgrades
