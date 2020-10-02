@@ -61,6 +61,8 @@ def _load_rules(rawrules, enabled_map, use_new_defaults=False):
     return rules
 
 
+# The ABCMeta metaclass ensures that it cannot be instantiated without
+# the abstract methods being implemented.
 class PushRulesWorkerStore(
     ApplicationServiceWorkerStore,
     ReceiptsWorkerStore,
@@ -68,17 +70,14 @@ class PushRulesWorkerStore(
     RoomMemberWorkerStore,
     EventsWorkerStore,
     SQLBaseStore,
+    metaclass=abc.ABCMeta,
 ):
     """This is an abstract base class where subclasses must implement
     `get_max_push_rules_stream_id` which can be called in the initializer.
     """
 
-    # This ABCMeta metaclass ensures that we cannot be instantiated without
-    # the abstract methods being implemented.
-    __metaclass__ = abc.ABCMeta
-
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(PushRulesWorkerStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         if hs.config.worker.worker_app is None:
             self._push_rules_stream_id_gen = StreamIdGenerator(
@@ -339,7 +338,7 @@ class PushRuleStore(PushRulesWorkerStore):
     ) -> None:
         conditions_json = json_encoder.encode(conditions)
         actions_json = json_encoder.encode(actions)
-        with await self._push_rules_stream_id_gen.get_next() as stream_id:
+        async with self._push_rules_stream_id_gen.get_next() as stream_id:
             event_stream_ordering = self._stream_id_gen.get_current_token()
 
             if before or after:
@@ -586,7 +585,7 @@ class PushRuleStore(PushRulesWorkerStore):
                 txn, stream_id, event_stream_ordering, user_id, rule_id, op="DELETE"
             )
 
-        with await self._push_rules_stream_id_gen.get_next() as stream_id:
+        async with self._push_rules_stream_id_gen.get_next() as stream_id:
             event_stream_ordering = self._stream_id_gen.get_current_token()
 
             await self.db_pool.runInteraction(
@@ -617,7 +616,7 @@ class PushRuleStore(PushRulesWorkerStore):
         Raises:
             NotFoundError if the rule does not exist.
         """
-        with await self._push_rules_stream_id_gen.get_next() as stream_id:
+        async with self._push_rules_stream_id_gen.get_next() as stream_id:
             event_stream_ordering = self._stream_id_gen.get_current_token()
             await self.db_pool.runInteraction(
                 "_set_push_rule_enabled_txn",
@@ -755,7 +754,7 @@ class PushRuleStore(PushRulesWorkerStore):
                 data={"actions": actions_json},
             )
 
-        with await self._push_rules_stream_id_gen.get_next() as stream_id:
+        async with self._push_rules_stream_id_gen.get_next() as stream_id:
             event_stream_ordering = self._stream_id_gen.get_current_token()
 
             await self.db_pool.runInteraction(

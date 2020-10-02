@@ -17,9 +17,9 @@ https://help.github.com/articles/using-pull-requests/) to ask us to pull your
 changes into our repo.
 
 Some other points to follow:
- 
+
  * Please base your changes on the `develop` branch.
-  
+
  * Please follow the [code style requirements](#code-style).
 
  * Please include a [changelog entry](#changelog) with each PR.
@@ -46,7 +46,7 @@ locally. You'll need python 3.6 or later, and to install a number of tools:
 
 ```
 # Install the dependencies
-pip install -U black flake8 flake8-comprehensions isort
+pip install -e ".[lint]"
 
 # Run the linter script
 ./scripts-dev/lint.sh

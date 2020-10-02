@@ -30,7 +30,7 @@ from tests import unittest, utils
 
 class E2eKeysHandlerTestCase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
-        super(E2eKeysHandlerTestCase, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.hs = None  # type: synapse.server.HomeServer
         self.handler = None  # type: synapse.handlers.e2e_keys.E2eKeysHandler
 

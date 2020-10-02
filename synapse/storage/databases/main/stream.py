@@ -35,7 +35,6 @@ what sort order was used:
     - topological tokems: "t%d-%d", where the integers map to the topological
       and stream ordering columns respectively.
 """
-
 import abc
 import logging
 from collections import namedtuple
@@ -54,7 +53,7 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
-from synapse.types import Collection, RoomStreamToken
+from synapse.types import Collection, PersistedEventPosition, RoomStreamToken
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 if TYPE_CHECKING:
@@ -259,16 +258,14 @@ def filter_to_clause(event_filter: Optional[Filter]) -> Tuple[str, List[str]]:
     return " AND ".join(clauses), args
 
 
-class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
+class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
     """This is an abstract base class where subclasses must implement
     `get_room_max_stream_ordering` and `get_room_min_stream_ordering`
     which can be called in the initializer.
     """
 
-    __metaclass__ = abc.ABCMeta
-
     def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
-        super(StreamWorkerStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self._instance_name = hs.get_instance_name()
         self._send_federation = hs.should_send_federation()
@@ -306,6 +303,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
     @abc.abstractmethod
     def get_room_min_stream_ordering(self) -> int:
         raise NotImplementedError()
+
+    def get_room_max_token(self) -> RoomStreamToken:
+        return RoomStreamToken(None, self.get_room_max_stream_ordering())
 
     async def get_room_events_stream_for_rooms(
         self,
@@ -546,7 +546,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
     async def get_room_event_before_stream_ordering(
         self, room_id: str, stream_ordering: int
-    ) -> Tuple[int, int, str]:
+    ) -> Optional[Tuple[int, int, str]]:
         """Gets details of the first event in a room at or before a stream ordering
 
         Args:
@@ -613,26 +613,28 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             allow_none=allow_none,
         )
 
-    async def get_stream_token_for_event(self, event_id: str) -> RoomStreamToken:
-        """The stream token for an event
-        Args:
-            event_id: The id of the event to look up a stream token for.
-        Raises:
-            StoreError if the event wasn't in the database.
-        Returns:
-            A stream token.
+    async def get_position_for_event(self, event_id: str) -> PersistedEventPosition:
+        """Get the persisted position for an event
         """
-        stream_id = await self.get_stream_id_for_event(event_id)
-        return RoomStreamToken(None, stream_id)
+        row = await self.db_pool.simple_select_one(
+            table="events",
+            keyvalues={"event_id": event_id},
+            retcols=("stream_ordering", "instance_name"),
+            desc="get_position_for_event",
+        )
 
-    async def get_topological_token_for_event(self, event_id: str) -> str:
+        return PersistedEventPosition(
+            row["instance_name"] or "master", row["stream_ordering"]
+        )
+
+    async def get_topological_token_for_event(self, event_id: str) -> RoomStreamToken:
         """The stream token for an event
         Args:
             event_id: The id of the event to look up a stream token for.
         Raises:
             StoreError if the event wasn't in the database.
         Returns:
-            A "t%d-%d" topological token.
+            A `RoomStreamToken` topological token.
         """
         row = await self.db_pool.simple_select_one(
             table="events",
@@ -640,25 +642,22 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             retcols=("stream_ordering", "topological_ordering"),
             desc="get_topological_token_for_event",
         )
-        return "t%d-%d" % (row["topological_ordering"], row["stream_ordering"])
+        return RoomStreamToken(row["topological_ordering"], row["stream_ordering"])
 
-    async def get_max_topological_token(self, room_id: str, stream_key: int) -> int:
-        """Get the max topological token in a room before the given stream
+    async def get_current_topological_token(self, room_id: str, stream_key: int) -> int:
+        """Gets the topological token in a room after or at the given stream
         ordering.
 
         Args:
             room_id
             stream_key
-
-        Returns:
-            The maximum topological token.
         """
         sql = (
-            "SELECT coalesce(max(topological_ordering), 0) FROM events"
-            " WHERE room_id = ? AND stream_ordering < ?"
+            "SELECT coalesce(MIN(topological_ordering), 0) FROM events"
+            " WHERE room_id = ? AND stream_ordering >= ?"
         )
         row = await self.db_pool.execute(
-            "get_max_topological_token", None, sql, room_id, stream_key
+            "get_current_topological_token", None, sql, room_id, stream_key
         )
         return row[0][0] if row else 0
 
@@ -692,8 +691,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             else:
                 topo = None
             internal = event.internal_metadata
-            internal.before = str(RoomStreamToken(topo, stream - 1))
-            internal.after = str(RoomStreamToken(topo, stream))
+            internal.before = RoomStreamToken(topo, stream - 1)
+            internal.after = RoomStreamToken(topo, stream)
             internal.order = (int(topo) if topo else 0, int(stream))
 
     async def get_events_around(

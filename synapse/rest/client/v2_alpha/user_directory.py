@@ -31,7 +31,7 @@ class UserDirectorySearchRestServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(UserDirectorySearchRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.user_directory_handler = hs.get_user_directory_handler()

@@ -16,7 +16,7 @@
 """Contains *incomplete* type hints for txredisapi.
 """
 
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Type
 
 class RedisProtocol:
     def publish(self, channel: str, message: bytes): ...
@@ -42,3 +42,21 @@ def lazyConnection(
 
 class SubscriberFactory:
     def buildProtocol(self, addr): ...
+
+class ConnectionHandler: ...
+
+class RedisFactory:
+    continueTrying: bool
+    handler: RedisProtocol
+    def __init__(
+        self,
+        uuid: str,
+        dbid: Optional[int],
+        poolsize: int,
+        isLazy: bool = False,
+        handler: Type = ConnectionHandler,
+        charset: str = "utf-8",
+        password: Optional[str] = None,
+        replyTimeout: Optional[int] = None,
+        convertNumbers: Optional[int] = True,
+    ): ...

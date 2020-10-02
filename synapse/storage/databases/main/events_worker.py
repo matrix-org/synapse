@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import division
-
 import itertools
 import logging
 import threading
@@ -76,8 +74,15 @@ class EventRedactBehaviour(Names):
 
 
 class EventsWorkerStore(SQLBaseStore):
+    # Whether to use dedicated DB threads for event fetching. This is only used
+    # if there are multiple DB threads available. When used will lock the DB
+    # thread for periods of time (so unit tests want to disable this when they
+    # run DB transactions on the main thread). See EVENT_QUEUE_* for more
+    # options controlling this.
+    USE_DEDICATED_DB_THREADS_FOR_EVENT_FETCHING = True
+
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(EventsWorkerStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         if isinstance(database.engine, PostgresEngine):
             # If we're using Postgres than we can use `MultiWriterIdGenerator`
@@ -85,21 +90,25 @@ class EventsWorkerStore(SQLBaseStore):
             self._stream_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
+                stream_name="events",
                 instance_name=hs.get_instance_name(),
                 table="events",
                 instance_column="instance_name",
                 id_column="stream_ordering",
                 sequence_name="events_stream_seq",
+                writers=hs.config.worker.writers.events,
             )
             self._backfill_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
+                stream_name="backfill",
                 instance_name=hs.get_instance_name(),
                 table="events",
                 instance_column="instance_name",
                 id_column="stream_ordering",
                 sequence_name="events_backfill_stream_seq",
                 positive=False,
+                writers=hs.config.worker.writers.events,
             )
         else:
             # We shouldn't be running in worker mode with SQLite, but its useful
@@ -520,7 +529,11 @@ class EventsWorkerStore(SQLBaseStore):
 
                 if not event_list:
                     single_threaded = self.database_engine.single_threaded
-                    if single_threaded or i > EVENT_QUEUE_ITERATIONS:
+                    if (
+                        not self.USE_DEDICATED_DB_THREADS_FOR_EVENT_FETCHING
+                        or single_threaded
+                        or i > EVENT_QUEUE_ITERATIONS
+                    ):
                         self._event_fetch_ongoing -= 1
                         return
                     else:

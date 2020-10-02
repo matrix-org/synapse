@@ -35,7 +35,7 @@ class DevicesRestServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(DevicesRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
@@ -57,7 +57,7 @@ class DeleteDevicesRestServlet(RestServlet):
     PATTERNS = client_patterns("/delete_devices")
 
     def __init__(self, hs):
-        super(DeleteDevicesRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
@@ -102,7 +102,7 @@ class DeviceRestServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(DeviceRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()

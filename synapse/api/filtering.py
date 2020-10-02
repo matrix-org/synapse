@@ -132,7 +132,7 @@ def matrix_user_id_validator(user_id_str):
 
 class Filtering:
     def __init__(self, hs):
-        super(Filtering, self).__init__()
+        super().__init__()
         self.store = hs.get_datastore()
 
     async def get_user_filter(self, user_localpart, filter_id):

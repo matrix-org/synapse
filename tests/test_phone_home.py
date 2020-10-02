@@ -17,7 +17,7 @@ import resource
 
 import mock
 
-from synapse.app.homeserver import phone_stats_home
+from synapse.app.phone_stats_home import phone_stats_home
 
 from tests.unittest import HomeserverTestCase
 

@@ -15,6 +15,8 @@
 import logging
 from typing import TYPE_CHECKING, List
 
+from prometheus_client import Gauge
+
 from synapse.api.errors import HttpResponseException
 from synapse.events import EventBase
 from synapse.federation.persistence import TransactionActions
@@ -34,6 +36,12 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+last_pdu_age_metric = Gauge(
+    "synapse_federation_last_sent_pdu_age",
+    "The age (in seconds) of the last PDU successfully sent to the given domain",
+    labelnames=("server_name",),
+)
+
 
 class TransactionManager:
     """Helper class which handles building and sending transactions
@@ -47,6 +55,10 @@ class TransactionManager:
         self._store = hs.get_datastore()
         self._transaction_actions = TransactionActions(self._store)
         self._transport_layer = hs.get_federation_transport_client()
+
+        self._federation_metrics_domains = (
+            hs.get_config().federation.federation_metrics_domains
+        )
 
         # HACK to get unique tx id
         self._next_txn_id = int(self.clock.time_msec())
@@ -119,6 +131,9 @@ class TransactionManager:
 
             # FIXME (erikj): This is a bit of a hack to make the Pdu age
             # keys work
+            # FIXME (richardv): I also believe it no longer works. We (now?) store
+            #  "age_ts" in "unsigned" rather than at the top level. See
+            #  https://github.com/matrix-org/synapse/issues/8429.
             def json_data_cb():
                 data = transaction.get_dict()
                 now = int(self.clock.time_msec())
@@ -166,6 +181,13 @@ class TransactionManager:
                         p.event_id,
                     )
                 success = False
+
+            if success and pdus and destination in self._federation_metrics_domains:
+                last_pdu = pdus[-1]
+                last_pdu_age = self.clock.time_msec() - last_pdu.origin_server_ts
+                last_pdu_age_metric.labels(server_name=destination).set(
+                    last_pdu_age / 1000
+                )
 
             set_tag(tags.ERROR, not success)
             return success

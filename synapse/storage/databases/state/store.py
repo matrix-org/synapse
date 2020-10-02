@@ -24,7 +24,7 @@ from synapse.storage.databases.state.bg_updates import StateBackgroundUpdateStor
 from synapse.storage.state import StateFilter
 from synapse.storage.types import Cursor
 from synapse.storage.util.sequence import build_sequence_generator
-from synapse.types import StateMap
+from synapse.types import MutableStateMap, StateMap
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.dictionary_cache import DictionaryCache
 
@@ -52,7 +52,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
     """
 
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(StateGroupDataStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         # Originally the state store used a single DictionaryCache to cache the
         # event IDs for the state types in a given state group to avoid hammering
@@ -98,6 +98,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
         self._state_group_seq_gen = build_sequence_generator(
             self.database_engine, get_max_state_group_txn, "state_group_id_seq"
+        )
+        self._state_group_seq_gen.check_consistency(
+            db_conn, table="state_groups", id_column="id"
         )
 
     @cached(max_entries=10000, iterable=True)
@@ -205,7 +208,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
     async def _get_state_for_groups(
         self, groups: Iterable[int], state_filter: StateFilter = StateFilter.all()
-    ) -> Dict[int, StateMap[str]]:
+    ) -> Dict[int, MutableStateMap[str]]:
         """Gets the state at each of a list of state groups, optionally
         filtering by type/state_key
 

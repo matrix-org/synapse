@@ -21,7 +21,7 @@ from tests import unittest
 
 class WellKnownTests(unittest.HomeserverTestCase):
     def setUp(self):
-        super(WellKnownTests, self).setUp()
+        super().setUp()
 
         # replace the JsonResource with a WellKnownResource
         self.resource = WellKnownResource(self.hs)
