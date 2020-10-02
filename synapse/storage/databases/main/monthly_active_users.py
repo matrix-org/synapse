@@ -214,7 +214,6 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
         self._mau_stats_only = hs.config.mau_stats_only
 
         # Do not add more reserved users than the total allowable number
-        # cur = LoggingTransaction(
         self.db_pool.new_transaction(
             db_conn,
             "initialise_mau_threepids",
