@@ -657,25 +657,23 @@ class EventCreationHandler:
         Return:
             The stream_id of the persisted event.
 
-        Raises:
-            ShadowBanError if the requester has been shadow-banned.
+
         """
         if event.type == EventTypes.Member:
             raise SynapseError(
                 500, "Tried to send member event through non-member codepath"
             )
 
-        if not ignore_shadow_ban and requester.shadow_banned:
-            # We randomly sleep a bit just to annoy the requester.
-            await self.clock.sleep(random.randint(1, 10))
-            raise ShadowBanError()
-
         user = UserID.from_string(event.sender)
 
         assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
 
         ev = await self.handle_new_client_event(
-            requester=requester, event=event, context=context, ratelimit=ratelimit
+            requester=requester,
+            event=event,
+            context=context,
+            ratelimit=ratelimit,
+            ignore_shadow_ban=ignore_shadow_ban,
         )
 
         # we know it was persisted, so must have a stream ordering
@@ -837,6 +835,7 @@ class EventCreationHandler:
         context: EventContext,
         ratelimit: bool = True,
         extra_users: List[UserID] = [],
+        ignore_shadow_ban: bool = False,
     ) -> EventBase:
         """Processes a new event.
 
@@ -853,10 +852,27 @@ class EventCreationHandler:
             ratelimit
             extra_users: Any extra users to notify about event
 
+            ignore_shadow_ban: True if shadow-banned users should be allowed to
+                send this event.
+
         Return:
             If the event was deduplicated, the previous, duplicate, event. Otherwise,
             `event`.
+
+        Raises:
+            ShadowBanError if the requester has been shadow-banned.
         """
+
+        # we don't apply shadow-banning to membership events, so that the user
+        # can come and go as they want.
+        if (
+            event.type != EventTypes.Member
+            and not ignore_shadow_ban
+            and requester.shadow_banned
+        ):
+            # We randomly sleep a bit just to annoy the requester.
+            await self.clock.sleep(random.randint(1, 10))
+            raise ShadowBanError()
 
         if event.is_state():
             prev_event = await self.deduplicate_state_event(event, context)
