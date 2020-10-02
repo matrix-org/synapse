@@ -133,12 +133,18 @@ class LoggingDatabaseConnection:
     engine = attr.ib(type=BaseDatabaseEngine)
     default_txn_name = attr.ib(type=str)
 
-    def cursor(self, *, txn_name=None) -> "LoggingTransaction":
+    def cursor(
+        self, *, txn_name=None, after_callbacks=None, exception_callbacks=None
+    ) -> "LoggingTransaction":
         if not txn_name:
             txn_name = self.default_txn_name
 
         return LoggingTransaction(
-            self.conn.cursor(), name=txn_name, database_engine=self.engine,
+            self.conn.cursor(),
+            name=txn_name,
+            database_engine=self.engine,
+            after_callbacks=after_callbacks,
+            exception_callbacks=exception_callbacks,
         )
 
     def close(self) -> None:
@@ -449,7 +455,7 @@ class DatabasePool:
 
     def new_transaction(
         self,
-        conn: Connection,
+        conn: LoggingDatabaseConnection,
         desc: str,
         after_callbacks: List[_CallbackListEntry],
         exception_callbacks: List[_CallbackListEntry],
@@ -472,12 +478,10 @@ class DatabasePool:
             i = 0
             N = 5
             while True:
-                cursor = LoggingTransaction(
-                    conn.cursor(),
-                    name,
-                    self.engine,
-                    after_callbacks,
-                    exception_callbacks,
+                cursor = conn.cursor(
+                    txn_name=name,
+                    after_callbacks=after_callbacks,
+                    exception_callbacks=exception_callbacks,
                 )
                 try:
                     r = func(cursor, *args, **kwargs)
@@ -638,7 +642,10 @@ class DatabasePool:
                     logger.debug("Reconnecting closed database connection")
                     conn.reconnect()
 
-                return func(conn, *args, **kwargs)
+                db_conn = LoggingDatabaseConnection(
+                    conn, self.engine, "runWithConnection"
+                )
+                return func(db_conn, *args, **kwargs)
 
         return await make_deferred_yieldable(
             self._db_pool.runWithConnection(inner_func, *args, **kwargs)
