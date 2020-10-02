@@ -195,7 +195,7 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         )
         self.assertEqual(
             res,
-            {"failures": {}, "one_time_keys": {local_user: {device_id: fallback_key}},},
+            {"failures": {}, "one_time_keys": {local_user: {device_id: fallback_key}}},
         )
 
         # claiming an OTK again should return the same fallback key
@@ -206,7 +206,7 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         )
         self.assertEqual(
             res,
-            {"failures": {}, "one_time_keys": {local_user: {device_id: fallback_key}},},
+            {"failures": {}, "one_time_keys": {local_user: {device_id: fallback_key}}},
         )
 
         # if the user uploads a one-time key, the next claim should fetch the
@@ -223,7 +223,7 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
             )
         )
         self.assertEqual(
-            res, {"failures": {}, "one_time_keys": {local_user: {device_id: otk}},},
+            res, {"failures": {}, "one_time_keys": {local_user: {device_id: otk}}},
         )
 
         res = yield defer.ensureDeferred(
@@ -233,7 +233,7 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         )
         self.assertEqual(
             res,
-            {"failures": {}, "one_time_keys": {local_user: {device_id: fallback_key}},},
+            {"failures": {}, "one_time_keys": {local_user: {device_id: fallback_key}}},
         )
 
     @defer.inlineCallbacks
