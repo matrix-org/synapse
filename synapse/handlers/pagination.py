@@ -373,9 +373,7 @@ class PaginationHandler:
                     # case "JOIN" would have been returned.
                     assert member_event_id
 
-                    leave_token = await self.store.get_topological_token_for_event(
-                        member_event_id
-                    )
+                    leave_token = await self.store.get_event_ordering(member_event_id)
                     assert leave_token.topological is not None
 
                     if leave_token.topological < curr_topo:

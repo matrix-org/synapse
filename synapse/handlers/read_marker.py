@@ -47,9 +47,11 @@ class ReadMarkerHandler(BaseHandler):
 
             if existing_read_marker:
                 # Only update if the new marker is ahead in the stream
-                should_update = await self.store.is_event_after(
-                    event_id, existing_read_marker["event_id"]
+                token1 = await self.store.get_event_ordering(event_id)
+                token2 = await self.store.get_event_ordering(
+                    existing_read_marker["event_id"]
                 )
+                should_update = token1 > token2
 
             if should_update:
                 content = {"event_id": event_id}

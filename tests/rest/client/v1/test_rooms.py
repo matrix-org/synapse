@@ -902,17 +902,13 @@ class RoomMessageListTestCase(RoomBase):
 
         # Send a first message in the room, which will be removed by the purge.
         first_event_id = self.helper.send(self.room_id, "message 1")["event_id"]
-        first_token = self.get_success(
-            store.get_topological_token_for_event(first_event_id)
-        )
+        first_token = self.get_success(store.get_event_ordering(first_event_id))
         first_token_str = self.get_success(first_token.to_string(store))
 
         # Send a second message in the room, which won't be removed, and which we'll
         # use as the marker to purge events before.
         second_event_id = self.helper.send(self.room_id, "message 2")["event_id"]
-        second_token = self.get_success(
-            store.get_topological_token_for_event(second_event_id)
-        )
+        second_token = self.get_success(store.get_event_ordering(second_event_id))
         second_token_str = self.get_success(second_token.to_string(store))
 
         # Send a third event in the room to ensure we don't fall under any edge case

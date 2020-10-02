@@ -42,6 +42,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple
 
 from twisted.internet import defer
 
+from synapse.api.errors import StoreError
 from synapse.api.filtering import Filter
 from synapse.events import EventBase
 from synapse.logging.context import make_deferred_yieldable, run_in_background
@@ -54,6 +55,7 @@ from synapse.storage.database import (
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
 from synapse.types import Collection, PersistedEventPosition, RoomStreamToken
+from synapse.util.caches.descriptors import cached
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 if TYPE_CHECKING:
@@ -614,7 +616,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
             row["instance_name"] or "master", row["stream_ordering"]
         )
 
-    async def get_topological_token_for_event(self, event_id: str) -> RoomStreamToken:
+    @cached(max_entries=5000)
+    async def get_event_ordering(self, event_id: str) -> RoomStreamToken:
         """The stream token for an event
         Args:
             event_id: The id of the event to look up a stream token for.
@@ -627,8 +630,12 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
             table="events",
             keyvalues={"event_id": event_id},
             retcols=("stream_ordering", "topological_ordering"),
-            desc="get_topological_token_for_event",
+            desc="get_event_ordering",
+            allow_none=True,
         )
+        if not row:
+            raise StoreError(404, "Could not find event %s" % (event_id,))
+
         return RoomStreamToken(row["topological_ordering"], row["stream_ordering"])
 
     async def get_current_topological_token(self, room_id: str, stream_key: int) -> int:
