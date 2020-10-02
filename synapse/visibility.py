@@ -16,7 +16,7 @@
 import logging
 import operator
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import AccountDataTypes, EventTypes, Membership
 from synapse.events.utils import prune_event
 from synapse.storage import Storage
 from synapse.storage.state import StateFilter
@@ -77,7 +77,7 @@ async def filter_events_for_client(
     )
 
     ignore_dict_content = await storage.main.get_global_account_data_by_type_for_user(
-        "m.ignored_user_list", user_id
+        AccountDataTypes.IGNORED_USER_LIST, user_id
     )
 
     ignore_list = frozenset()
