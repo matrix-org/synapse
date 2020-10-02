@@ -192,6 +192,18 @@ class RoomWorkerStore(SQLBaseStore):
             "count_public_rooms", _count_public_rooms_txn
         )
 
+    async def get_room_count(self) -> int:
+        """Retrieve the total number of rooms.
+        """
+
+        def f(txn):
+            sql = "SELECT count(*)  FROM rooms"
+            txn.execute(sql)
+            row = txn.fetchone()
+            return row[0] or 0
+
+        return await self.db_pool.runInteraction("get_rooms", f)
+
     async def get_largest_public_rooms(
         self,
         network_tuple: Optional[ThirdPartyInstanceID],
@@ -1291,18 +1303,6 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                 next_id,
             )
         self.hs.get_notifier().on_new_replication_data()
-
-    async def get_room_count(self) -> int:
-        """Retrieve the total number of rooms.
-        """
-
-        def f(txn):
-            sql = "SELECT count(*)  FROM rooms"
-            txn.execute(sql)
-            row = txn.fetchone()
-            return row[0] or 0
-
-        return await self.db_pool.runInteraction("get_rooms", f)
 
     async def add_event_report(
         self,
