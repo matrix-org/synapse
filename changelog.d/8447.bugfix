@@ -1,1 +1,0 @@
-Fix DB query on startup for negative streams which caused long start up times. Introduced in #8374.

@@ -1,3 +1,16 @@
+Synapse 1.21.0rc2 (2020-10-02)
+==============================
+
+Bugfixes
+--------
+
+- Fix a regression in v1.21.0rc1 which broke thumbnails of remote media. ([\#8438](https://github.com/matrix-org/synapse/issues/8438))
+- Do not expose the experimental `uk.half-shot.msc2778.login.application_service` flow in the login API. ([\#8440](https://github.com/matrix-org/synapse/issues/8440))
+- Fix malformed log line in new federation "catch up" logic. ([\#8442](https://github.com/matrix-org/synapse/issues/8442))
+- Convert additional templates from inline HTML to Jinja2 templates. ([\#8444](https://github.com/matrix-org/synapse/issues/8444))
+- Fix DB query on startup for negative streams which caused long start up times. Introduced in #8374. ([\#8447](https://github.com/matrix-org/synapse/issues/8447))
+
+
 Synapse 1.21.0rc1 (2020-10-01)
 ==============================
 
