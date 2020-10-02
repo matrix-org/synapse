@@ -1692,8 +1692,6 @@ class DatabasePool:
             "limit": limit,
         }
 
-        sql = self.engine.convert_param_style(sql)
-
         txn = db_conn.cursor()
         txn.execute(sql, (int(max_value),))
 

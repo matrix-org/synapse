@@ -283,15 +283,12 @@ class MultiWriterIdGenerator:
                     stream_name = ?
                     AND instance_name != ALL(?)
             """
-            sql = self._db.engine.convert_param_style(sql)
             cur.execute(sql, (self._stream_name, self._writers))
 
             sql = """
                 SELECT instance_name, stream_id FROM stream_positions
                 WHERE stream_name = ?
             """
-            sql = self._db.engine.convert_param_style(sql)
-
             cur.execute(sql, (self._stream_name,))
 
             self._current_positions = {
@@ -340,7 +337,6 @@ class MultiWriterIdGenerator:
                 "instance": instance_column,
                 "cmp": "<=" if self._positive else ">=",
             }
-            sql = self._db.engine.convert_param_style(sql)
             cur.execute(sql, (min_stream_id,))
 
             self._persisted_upto_position = min_stream_id

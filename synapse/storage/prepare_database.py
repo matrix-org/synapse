@@ -258,9 +258,7 @@ def _setup_new_database(cur, database_engine, databases):
             executescript(cur, entry.absolute_path)
 
     cur.execute(
-        database_engine.convert_param_style(
-            "INSERT INTO schema_version (version, upgraded) VALUES (?,?)"
-        ),
+        "INSERT INTO schema_version (version, upgraded) VALUES (?,?)",
         (max_current_ver, False),
     )
 
@@ -486,17 +484,13 @@ def _upgrade_existing_database(
 
             # Mark as done.
             cur.execute(
-                database_engine.convert_param_style(
-                    "INSERT INTO applied_schema_deltas (version, file) VALUES (?,?)"
-                ),
+                "INSERT INTO applied_schema_deltas (version, file) VALUES (?,?)",
                 (v, relative_path),
             )
 
             cur.execute("DELETE FROM schema_version")
             cur.execute(
-                database_engine.convert_param_style(
-                    "INSERT INTO schema_version (version, upgraded) VALUES (?,?)"
-                ),
+                "INSERT INTO schema_version (version, upgraded) VALUES (?,?)",
                 (v, True),
             )
 
@@ -532,10 +526,7 @@ def _apply_module_schema_files(cur, database_engine, modname, names_and_streams)
             schemas to be applied
     """
     cur.execute(
-        database_engine.convert_param_style(
-            "SELECT file FROM applied_module_schemas WHERE module_name = ?"
-        ),
-        (modname,),
+        "SELECT file FROM applied_module_schemas WHERE module_name = ?", (modname,),
     )
     applied_deltas = {d for d, in cur}
     for (name, stream) in names_and_streams:
@@ -553,9 +544,7 @@ def _apply_module_schema_files(cur, database_engine, modname, names_and_streams)
 
         # Mark as done.
         cur.execute(
-            database_engine.convert_param_style(
-                "INSERT INTO applied_module_schemas (module_name, file) VALUES (?,?)"
-            ),
+            "INSERT INTO applied_module_schemas (module_name, file) VALUES (?,?)",
             (modname, name),
         )
 
@@ -627,9 +616,7 @@ def _get_or_create_schema_state(txn, database_engine):
 
     if current_version:
         txn.execute(
-            database_engine.convert_param_style(
-                "SELECT file FROM applied_schema_deltas WHERE version >= ?"
-            ),
+            "SELECT file FROM applied_schema_deltas WHERE version >= ?",
             (current_version,),
         )
         applied_deltas = [d for d, in txn]
