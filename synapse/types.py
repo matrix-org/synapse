@@ -406,7 +406,7 @@ class RoomStreamToken:
     respective streams.
 
     The format of the token in such case is an initial integer min position,
-    followed by the mapping of instance ID to position seperate by '.' and '~':
+    followed by the mapping of instance ID to position separated by '.' and '~':
 
         m{min_pos}.{writer1}~{pos1}.{writer2}~{pos2}. ...
 

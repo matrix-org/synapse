@@ -219,7 +219,7 @@ def _filter_results(
 ) -> bool:
     """Filter results from fetching events in the DB against the given tokens.
 
-    This is necessary to handle the case where the tokens include positions
+    This is necessary to handle the case where the tokens include position
     maps, which we handle by fetching more than necessary from the DB and then
     filtering (rather than attempting to construct a complicated SQL query).
     """
@@ -477,7 +477,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
 
         def f(txn):
             # To handle tokens with a non-empty instance_map we fetch more
-            # results than necessary and the filter down
+            # results than necessary and then filter down
             min_from_id = from_key.stream
             max_to_id = to_key.get_max_stream_pos()
 
@@ -538,7 +538,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
 
         def f(txn):
             # To handle tokens with a non-empty instance_map we fetch more
-            # results than necessary and the filter down
+            # results than necessary and then filter down
             min_from_id = from_key.stream
             max_to_id = to_key.get_max_stream_pos()
 
@@ -1065,10 +1065,10 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
         else:
             order = "ASC"
 
-        # The bounds for the stream tokens are complicated by the fact the fact
+        # The bounds for the stream tokens are complicated by the fact
         # that we need to handle the instance_map part of the tokens. We do this
         # by fetching all events between the min stream token and the maximum
-        # stream token (as return by `RoomStreamToken.get_max_stream_pos`) and
+        # stream token (as returned by `RoomStreamToken.get_max_stream_pos`) and
         # then filtering the results.
         if from_token.topological is not None:
             from_bound = from_token.as_tuple()

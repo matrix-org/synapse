@@ -15,7 +15,7 @@
 
 
 -- A unique and immutable mapping between instance name and an integer ID. This
--- let's us refer to instances via a small ID in e.g. stream tokens, without
+-- lets us refer to instances via a small ID in e.g. stream tokens, without
 -- having to encode the full name.
 CREATE TABLE instance_map (
     instance_id SERIAL PRIMARY KEY,
