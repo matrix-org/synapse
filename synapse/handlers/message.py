@@ -674,21 +674,13 @@ class EventCreationHandler:
 
         assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
 
-        if event.is_state():
-            prev_event = await self.deduplicate_state_event(event, context)
-            if prev_event is not None:
-                logger.info(
-                    "Not bothering to persist state event %s duplicated by %s",
-                    event.event_id,
-                    prev_event.event_id,
-                )
-                # we know it was persisted, so must have a stream ordering
-                assert prev_event.internal_metadata.stream_ordering
-                return prev_event.internal_metadata.stream_ordering
-
-        return await self.handle_new_client_event(
+        ev = await self.handle_new_client_event(
             requester=requester, event=event, context=context, ratelimit=ratelimit
         )
+
+        # we know it was persisted, so must have a stream ordering
+        assert ev.internal_metadata.stream_ordering
+        return ev.internal_metadata.stream_ordering
 
     async def deduplicate_state_event(
         self, event: EventBase, context: EventContext
@@ -845,8 +837,10 @@ class EventCreationHandler:
         context: EventContext,
         ratelimit: bool = True,
         extra_users: List[UserID] = [],
-    ) -> int:
-        """Processes a new event. This includes checking auth, persisting it,
+    ) -> EventBase:
+        """Processes a new event.
+
+        This includes deduplicating, checking auth, persisting,
         notifying users, sending to remote servers, etc.
 
         If called from a worker will hit out to the master process for final
@@ -860,8 +854,19 @@ class EventCreationHandler:
             extra_users: Any extra users to notify about event
 
         Return:
-            The stream_id of the persisted event.
+            If the event was deduplicated, the previous, duplicate, event. Otherwise,
+            `event`.
         """
+
+        if event.is_state():
+            prev_event = await self.deduplicate_state_event(event, context)
+            if prev_event is not None:
+                logger.info(
+                    "Not bothering to persist state event %s duplicated by %s",
+                    event.event_id,
+                    prev_event.event_id,
+                )
+                return prev_event
 
         if event.is_state() and (event.type, event.state_key) == (
             EventTypes.Create,
@@ -917,13 +922,13 @@ class EventCreationHandler:
                 )
                 stream_id = result["stream_id"]
                 event.internal_metadata.stream_ordering = stream_id
-                return stream_id
+                return event
 
             stream_id = await self.persist_and_notify_client_event(
                 requester, event, context, ratelimit=ratelimit, extra_users=extra_users
             )
 
-            return stream_id
+            return event
         except Exception:
             # Ensure that we actually remove the entries in the push actions
             # staging area, if we calculated them.
