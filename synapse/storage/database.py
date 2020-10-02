@@ -1703,7 +1703,7 @@ class DatabasePool:
             "limit": limit,
         }
 
-        txn = db_conn.cursor()
+        txn = db_conn.cursor(txn_name="get_cache_dict")
         txn.execute(sql, (int(max_value),))
 
         cache = {row[0]: int(row[1]) for row in txn}
