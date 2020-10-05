@@ -185,6 +185,7 @@ class RoomCreationHandler(BaseHandler):
             ShadowBanError if the requester is shadow-banned.
         """
         user_id = requester.user.to_string()
+        assert self.hs.is_mine_id(user_id), "User must be our own: %s" % (user_id,)
 
         # start by allocating a new room id
         r = await self.store.get_room(old_room_id)

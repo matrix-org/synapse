@@ -664,10 +664,6 @@ class EventCreationHandler:
                 500, "Tried to send member event through non-member codepath"
             )
 
-        user = UserID.from_string(event.sender)
-
-        assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
-
         ev = await self.handle_new_client_event(
             requester=requester,
             event=event,
@@ -746,6 +742,10 @@ class EventCreationHandler:
         with (await self.limiter.queue(event_dict["room_id"])):
             event, context = await self.create_event(
                 requester, event_dict, token_id=requester.access_token_id, txn_id=txn_id
+            )
+
+            assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
+                event.sender,
             )
 
             spam_error = self.spam_checker.check_event_for_spam(event)
