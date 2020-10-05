@@ -64,6 +64,10 @@ class ThirdPartyEventRules:
         events = await self.store.get_events(prev_state_ids.values())
         state_events = {(ev.type, ev.state_key): ev for ev in events.values()}
 
+        # The module can modify the event slightly if it wants, but caution should be
+        # exercised, and it's likely to go very wrong if applied to events received over
+        # federation.
+
         return await self.third_party_rules.check_event_allowed(event, state_events)
 
     async def on_create_room(

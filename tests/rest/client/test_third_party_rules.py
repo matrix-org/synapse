@@ -110,3 +110,34 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
         self.assertEquals(channel.result["code"], b"403", channel.result)
+
+    def test_modify_event(self):
+        """Tests that the module can successfully tweak an event before it is persisted.
+        """
+        # first patch the event checker so that it will modify the event
+        async def check(ev: EventBase, state):
+            ev.content = {"x": "y"}
+
+        current_rules_module().check_event_allowed = check
+
+        # now send the event
+        request, channel = self.make_request(
+            "PUT",
+            "/_matrix/client/r0/rooms/%s/send/modifyme/1" % self.room_id,
+            {"x": "x"},
+            access_token=self.tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.result["code"], b"200", channel.result)
+        event_id = channel.json_body["event_id"]
+
+        # ... and check that it got modified
+        request, channel = self.make_request(
+            "GET",
+            "/_matrix/client/r0/rooms/%s/event/%s" % (self.room_id, event_id),
+            access_token=self.tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.result["code"], b"200", channel.result)
+        ev = channel.json_body
+        self.assertEqual(ev["content"]["x"], "y")
