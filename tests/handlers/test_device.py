@@ -260,7 +260,7 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         # Create a new login for the user and dehydrated the device
         device_id, access_token = self.get_success(
             self.registration.register_device(
-                user_id=user_id, device_id=None, initial_display_name=None,
+                user_id=user_id, device_id=None, initial_display_name="new device",
             )
         )
 
@@ -290,6 +290,11 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         user_info = self.get_success(self.auth.get_user_by_access_token(access_token))
 
         self.assertEqual(user_info["device_id"], retrieved_device_id)
+
+        # make sure the device has the display name that was set from the login
+        res = self.get_success(self.handler.get_device(user_id, retrieved_device_id))
+
+        self.assertEqual(res["display_name"], "new device")
 
         # make sure that the device ID that we were initially assigned no longer exists
         self.get_failure(
