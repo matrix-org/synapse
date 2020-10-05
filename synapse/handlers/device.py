@@ -569,7 +569,9 @@ class DeviceHandler(DeviceWorkerHandler):
                 access_token, device_id
             )
             old_device = await self.store.get_device(user_id, old_device_id)
-            await self.store.update_device(user_id, device_id, old_device["display_name"])
+            await self.store.update_device(
+                user_id, device_id, old_device["display_name"]
+            )
             await self.store.delete_device(user_id, old_device_id)
             await self.store.delete_e2e_keys_by_device(
                 user_id=user_id, device_id=old_device_id
