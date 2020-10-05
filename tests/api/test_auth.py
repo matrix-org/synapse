@@ -49,7 +49,7 @@ class AuthTestCase(unittest.TestCase):
 
         self.hs = yield setup_test_homeserver(self.addCleanup, handlers=None)
         self.hs.get_datastore = Mock(return_value=self.store)
-        self.hs.handlers = TestHandlers(self.hs)
+        self.hs._handlers = TestHandlers(self.hs)
         self.auth = Auth(self.hs)
 
         # AuthBlocking reads from the hs' config on initialization. We need to
@@ -283,7 +283,7 @@ class AuthTestCase(unittest.TestCase):
         self.store.get_device = Mock(return_value=defer.succeed(None))
 
         token = yield defer.ensureDeferred(
-            self.hs.handlers.auth_handler.get_access_token_for_user_id(
+            self.hs.get_handlers().auth_handler.get_access_token_for_user_id(
                 USER_ID, "DEVICE", valid_until_ms=None
             )
         )

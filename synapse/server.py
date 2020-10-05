@@ -140,7 +140,8 @@ def cache_in_self(builder: T) -> T:
             "@cache_in_self can only be used on functions starting with `get_`"
         )
 
-    depname = builder.__name__[len("get_") :]
+    # get_attr -> _attr
+    depname = builder.__name__[len("get") :]
 
     building = [False]
 
@@ -195,7 +196,13 @@ class HomeServer(metaclass=abc.ABCMeta):
     # instantiated during setup() for future return by get_datastore()
     DATASTORE_CLASS = abc.abstractproperty()
 
-    def __init__(self, hostname: str, config: HomeServerConfig, reactor=None, **kwargs):
+    def __init__(
+        self,
+        hostname: str,
+        config: HomeServerConfig,
+        reactor=None,
+        version_string="Synapse",
+    ):
         """
         Args:
             hostname : The hostname for the server.
@@ -217,20 +224,18 @@ class HomeServer(metaclass=abc.ABCMeta):
         self._instance_id = random_string(5)
         self._instance_name = config.worker_name or "master"
 
-        self.clock = Clock(reactor)
+        self._clock = Clock(reactor)
         self.distributor = Distributor()
 
         self.registration_ratelimiter = Ratelimiter(
-            clock=self.clock,
+            clock=self._clock,
             rate_hz=config.rc_registration.per_second,
             burst_count=config.rc_registration.burst_count,
         )
 
-        self.datastores = None  # type: Optional[Databases]
+        self.version_string = version_string
 
-        # Other kwargs are explicit dependencies
-        for depname in kwargs:
-            setattr(self, depname, kwargs[depname])
+        self.datastores = None  # type: Optional[Databases]
 
     def get_instance_id(self) -> str:
         """A unique ID for this synapse process instance.
@@ -285,8 +290,11 @@ class HomeServer(metaclass=abc.ABCMeta):
     def is_mine_id(self, string: str) -> bool:
         return string.split(":", 1)[1] == self.hostname
 
+    # The caching attribute for this is technically already set in __init__, but it's replicated for the sake of
+    # consistency
+    @cache_in_self
     def get_clock(self) -> Clock:
-        return self.clock
+        return Clock(self._reactor)
 
     def get_datastore(self) -> DataStore:
         if not self.datastores:
@@ -654,7 +662,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_federation_ratelimiter(self) -> FederationRateLimiter:
-        return FederationRateLimiter(self.clock, config=self.config.rc_federation)
+        return FederationRateLimiter(self.get_clock(), config=self.config.rc_federation)
 
     async def remove_pusher(self, app_id: str, push_key: str, user_id: str):
         return await self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

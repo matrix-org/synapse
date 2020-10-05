@@ -59,7 +59,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         self.reactor.lookups["testserv"] = "1.2.3.4"
         self.worker_hs = self.setup_test_homeserver(
             http_client=None,
-            homeserverToUse=GenericWorkerServer,
+            homeserver_to_use=GenericWorkerServer,
             config=self._get_worker_hs_config(),
             reactor=self.reactor,
         )
@@ -69,7 +69,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         self.worker_hs.get_datastore().db_pool = hs.get_datastore().db_pool
 
         self.test_handler = self._build_replication_data_handler()
-        self.worker_hs.replication_data_handler = self.test_handler
+        self.worker_hs._replication_data_handler = self.test_handler
 
         repl_handler = ReplicationCommandHandler(self.worker_hs)
         self.client = ClientReplicationStreamProtocol(
@@ -266,7 +266,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         config.update(extra_config)
 
         worker_hs = self.setup_test_homeserver(
-            homeserverToUse=GenericWorkerServer,
+            homeserver_to_use=GenericWorkerServer,
             config=config,
             reactor=self.reactor,
             **kwargs

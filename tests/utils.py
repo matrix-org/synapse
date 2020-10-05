@@ -21,6 +21,7 @@ import time
 import uuid
 import warnings
 from inspect import getcallargs
+from typing import Type
 from urllib import parse as urlparse
 
 from mock import Mock, patch
@@ -195,8 +196,8 @@ def setup_test_homeserver(
     datastore=None,
     config=None,
     reactor=None,
-    homeserverToUse=TestHomeServer,
-    **kargs
+    homeserver_to_use: Type[HomeServer] = TestHomeServer,
+    **kwargs
 ):
     """
     Setup a homeserver suitable for running tests against.  Keyword arguments
@@ -219,8 +220,8 @@ def setup_test_homeserver(
 
     config.ldap_enabled = False
 
-    if "clock" not in kargs:
-        kargs["clock"] = MockClock()
+    if "clock" not in kwargs:
+        kwargs["clock"] = MockClock()
 
     if USE_POSTGRES_FOR_TESTS:
         test_db = "synapse_test_%s" % uuid.uuid4().hex
@@ -265,19 +266,23 @@ def setup_test_homeserver(
         cur.close()
         db_conn.close()
 
+    def inject_cache(obj, kw: dict):
+        # Install @cache_in_self attributes
+        for key, val in kw.items():
+            setattr(obj, "_" + key, val)
+
+        obj.tls_server_context_factory = Mock()
+        obj.tls_client_options_factory = Mock()
+
     if datastore is None:
-        hs = homeserverToUse(
-            name,
-            config=config,
-            version_string="Synapse/tests",
-            tls_server_context_factory=Mock(),
-            tls_client_options_factory=Mock(),
-            reactor=reactor,
-            **kargs
+        hs = homeserver_to_use(
+            name, config=config, version_string="Synapse/tests", reactor=reactor,
         )
 
+        inject_cache(hs, kwargs)
+
         hs.setup()
-        if homeserverToUse.__name__ == "TestHomeServer":
+        if homeserver_to_use == TestHomeServer:
             hs.setup_background_tasks()
 
         if isinstance(db_engine, PostgresEngine):
@@ -328,16 +333,13 @@ def setup_test_homeserver(
                 cleanup_func(cleanup)
 
     else:
-        hs = homeserverToUse(
-            name,
-            datastore=datastore,
-            config=config,
-            version_string="Synapse/tests",
-            tls_server_context_factory=Mock(),
-            tls_client_options_factory=Mock(),
-            reactor=reactor,
-            **kargs
+        hs = homeserver_to_use(
+            name, config=config, version_string="Synapse/tests", reactor=reactor,
         )
+
+        inject_cache(hs, kwargs)
+
+        hs.datastore = datastore
 
     # bcrypt is far too slow to be doing in unit tests
     # Need to let the HS build an auth handler and then mess with it
@@ -353,7 +355,7 @@ def setup_test_homeserver(
 
     hs.get_auth_handler().validate_hash = validate_hash
 
-    fed = kargs.get("resource_for_federation", None)
+    fed = kwargs.get("resource_for_federation", None)
     if fed:
         register_federation_servlets(hs, fed)
 

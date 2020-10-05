@@ -354,7 +354,8 @@ class IdentityHandler(BaseHandler):
             raise SynapseError(500, "An error was encountered when sending the email")
 
         token_expires = (
-            self.hs.clock.time_msec() + self.hs.config.email_validation_token_lifetime
+            self.hs.get_clock().time_msec()
+            + self.hs.config.email_validation_token_lifetime
         )
 
         await self.store.start_or_continue_validation_session(
