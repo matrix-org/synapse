@@ -548,7 +548,7 @@ class MultiWriterIdGenerator:
                 # do.
                 break
 
-    def _update_stream_positions_table_txn(self, txn):
+    def _update_stream_positions_table_txn(self, txn: LoggingTransaction):
         """Update the `stream_positions` table with newly persisted position.
         """
 
@@ -632,10 +632,16 @@ class _MultiWriterCtxManager:
         #
         # We only do this on the success path so that the persisted current
         # position points to a persisted row with the correct instance name.
+        #
+        # We do this in autocommit mode as a) the upsert works correctly outside
+        # transactions and b) reduces the amount of time the rows are locked
+        # for. If we don't do this then we'll often hit serialization errors due
+        # to the fact we default to REPEATABLE READ isolation levels.
         if self.id_gen._writers:
             await self.id_gen._db.runInteraction(
                 "MultiWriterIdGenerator._update_table",
                 self.id_gen._update_stream_positions_table_txn,
+                db_autocommit=True,
             )
 
         return False
