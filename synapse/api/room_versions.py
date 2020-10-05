@@ -57,7 +57,7 @@ class RoomVersion:
     state_res = attr.ib()  # int; one of the StateResolutionVersions
     enforce_key_validity = attr.ib()  # bool
 
-    # Before MSC2261/MSC2432, m.room.aliases had special auth rules and redaction rules
+    # Before MSC2432, m.room.aliases had special auth rules and redaction rules
     special_case_aliases_auth = attr.ib(type=bool)
     # Strictly enforce canonicaljson, do not allow:
     # * Integers outside the range of [-2 ^ 53 + 1, 2 ^ 53 - 1]
