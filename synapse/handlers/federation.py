@@ -3008,6 +3008,9 @@ class FederationHandler(BaseHandler):
         elif event.internal_metadata.is_outlier():
             return
 
+        # the event has been persisted so it should have a stream ordering.
+        assert event.internal_metadata.stream_ordering
+
         event_pos = PersistedEventPosition(
             self._instance_name, event.internal_metadata.stream_ordering
         )

@@ -97,12 +97,15 @@ class DefaultDictProperty(DictProperty):
 
 
 class _EventInternalMetadata:
-    __slots__ = ["_dict"]
+    __slots__ = ["_dict", "stream_ordering"]
 
     def __init__(self, internal_metadata_dict: JsonDict):
         # we have to copy the dict, because it turns out that the same dict is
         # reused. TODO: fix that
         self._dict = dict(internal_metadata_dict)
+
+        # the stream ordering of this event. None, until it has been persisted.
+        self.stream_ordering = None  # type: Optional[int]
 
     outlier = DictProperty("outlier")  # type: bool
     out_of_band_membership = DictProperty("out_of_band_membership")  # type: bool
@@ -113,7 +116,6 @@ class _EventInternalMetadata:
     redacted = DictProperty("redacted")  # type: bool
     txn_id = DictProperty("txn_id")  # type: str
     token_id = DictProperty("token_id")  # type: str
-    stream_ordering = DictProperty("stream_ordering")  # type: int
 
     # XXX: These are set by StreamWorkerStore._set_before_and_after.
     # I'm pretty sure that these are never persisted to the database, so shouldn't
