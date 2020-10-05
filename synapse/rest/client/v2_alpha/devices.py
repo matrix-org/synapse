@@ -203,7 +203,7 @@ class DehydratedDeviceServlet(RestServlet):
         )
         if dehydrated_device is not None:
             (device_id, device_data) = dehydrated_device
-            result = {"device_id": device_id, "device_data": dehydrated_device}
+            result = {"device_id": device_id, "device_data": device_data}
             return (200, result)
         else:
             raise errors.NotFoundError("No dehydrated device available")
@@ -216,7 +216,7 @@ class DehydratedDeviceServlet(RestServlet):
             raise errors.SynapseError(
                 400, "device_data missing", errcode=errors.Codes.MISSING_PARAM,
             )
-        elif not isinstance(submission["device_id"], dict):
+        elif not isinstance(submission["device_data"], dict):
             raise errors.SynapseError(
                 400,
                 "device_data must be an object",
