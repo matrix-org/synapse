@@ -73,6 +73,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
                 "delivered_txn",
                 "get_received_txn_response",
                 "set_received_txn_response",
+                "get_destination_last_successful_stream_ordering",
                 "get_destination_retry_timings",
                 "get_devices_by_remote",
                 "maybe_store_room_on_invite",
@@ -119,6 +120,10 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.datastore.get_device_updates_by_remote.return_value = make_awaitable(
             (0, [])
+        )
+
+        self.datastore.get_destination_last_successful_stream_ordering.return_value = make_awaitable(
+            None
         )
 
         def get_received_txn_response(*args):

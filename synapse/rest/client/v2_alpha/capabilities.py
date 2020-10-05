@@ -32,7 +32,7 @@ class CapabilitiesRestServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(CapabilitiesRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.config = hs.config
         self.auth = hs.get_auth()

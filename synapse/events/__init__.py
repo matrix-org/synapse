@@ -23,7 +23,7 @@ from typing import Dict, Optional, Tuple, Type
 from unpaddedbase64 import encode_base64
 
 from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
-from synapse.types import JsonDict
+from synapse.types import JsonDict, RoomStreamToken
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 
@@ -118,8 +118,8 @@ class _EventInternalMetadata:
     # XXX: These are set by StreamWorkerStore._set_before_and_after.
     # I'm pretty sure that these are never persisted to the database, so shouldn't
     # be here
-    before = DictProperty("before")  # type: str
-    after = DictProperty("after")  # type: str
+    before = DictProperty("before")  # type: RoomStreamToken
+    after = DictProperty("after")  # type: RoomStreamToken
     order = DictProperty("order")  # type: Tuple[int, int]
 
     def get_dict(self) -> JsonDict:

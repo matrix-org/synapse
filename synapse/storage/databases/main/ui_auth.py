@@ -23,7 +23,7 @@ from synapse.types import JsonDict
 from synapse.util import json_encoder, stringutils
 
 
-@attr.s
+@attr.s(slots=True)
 class UIAuthSessionData:
     session_id = attr.ib(type=str)
     # The dictionary from the client root level, not the 'auth' key.
@@ -288,8 +288,6 @@ class UIAuthWorkerStore(SQLBaseStore):
         )
         return [(row["user_agent"], row["ip"]) for row in rows]
 
-
-class UIAuthStore(UIAuthWorkerStore):
     async def delete_old_ui_auth_sessions(self, expiration_time: int) -> None:
         """
         Remove sessions which were last used earlier than the expiration time.
@@ -339,3 +337,7 @@ class UIAuthStore(UIAuthWorkerStore):
             iterable=session_ids,
             keyvalues={},
         )
+
+
+class UIAuthStore(UIAuthWorkerStore):
+    pass

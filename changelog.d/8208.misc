@@ -1,1 +1,0 @@
-Fix tests on distros which disable TLSv1.0. Contributed by @danc86.

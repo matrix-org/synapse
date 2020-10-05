@@ -30,7 +30,7 @@ class PasswordPolicyServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(PasswordPolicyServlet, self).__init__()
+        super().__init__()
 
         self.policy = hs.config.password_policy
         self.enabled = hs.config.password_policy_enabled

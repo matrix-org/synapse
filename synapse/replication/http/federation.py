@@ -57,7 +57,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
     PATH_ARGS = ()
 
     def __init__(self, hs):
-        super(ReplicationFederationSendEventsRestServlet, self).__init__(hs)
+        super().__init__(hs)
 
         self.store = hs.get_datastore()
         self.storage = hs.get_storage()
@@ -150,7 +150,7 @@ class ReplicationFederationSendEduRestServlet(ReplicationEndpoint):
     PATH_ARGS = ("edu_type",)
 
     def __init__(self, hs):
-        super(ReplicationFederationSendEduRestServlet, self).__init__(hs)
+        super().__init__(hs)
 
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
@@ -193,7 +193,7 @@ class ReplicationGetQueryRestServlet(ReplicationEndpoint):
     CACHE = False
 
     def __init__(self, hs):
-        super(ReplicationGetQueryRestServlet, self).__init__(hs)
+        super().__init__(hs)
 
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
@@ -236,7 +236,7 @@ class ReplicationCleanRoomRestServlet(ReplicationEndpoint):
     PATH_ARGS = ("room_id",)
 
     def __init__(self, hs):
-        super(ReplicationCleanRoomRestServlet, self).__init__(hs)
+        super().__init__(hs)
 
         self.store = hs.get_datastore()
 

@@ -641,10 +641,23 @@ class ServerConfig(Config):
             """\
         ## Server ##
 
-        # The domain name of the server, with optional explicit port.
-        # This is used by remote servers to connect to this server,
-        # e.g. matrix.org, localhost:8080, etc.
-        # This is also the last part of your UserID.
+        # The public-facing domain of the server
+        #
+        # The server_name name will appear at the end of usernames and room addresses
+        # created on this server. For example if the server_name was example.com,
+        # usernames on this server would be in the format @user:example.com
+        #
+        # In most cases you should avoid using a matrix specific subdomain such as
+        # matrix.example.com or synapse.example.com as the server_name for the same
+        # reasons you wouldn't use user@email.example.com as your email address.
+        # See https://github.com/matrix-org/synapse/blob/master/docs/delegate.md
+        # for information on how to host Synapse on a subdomain while preserving
+        # a clean server_name.
+        #
+        # The server_name cannot be changed later so it is important to
+        # configure this correctly before you start Synapse. It should be all
+        # lowercase and may contain an explicit port.
+        # Examples: matrix.org, localhost:8080
         #
         server_name: "%(server_name)s"
 

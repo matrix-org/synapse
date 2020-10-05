@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from synapse.handlers.e2e_keys import SignatureListItem
 
 
-@attr.s
+@attr.s(slots=True)
 class DeviceKeyLookupResult:
     """The type returned by get_e2e_device_keys_and_signatures"""
 
@@ -831,7 +831,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             key (dict): the key data
         """
 
-        with await self._cross_signing_id_gen.get_next() as stream_id:
+        async with self._cross_signing_id_gen.get_next() as stream_id:
             return await self.db_pool.runInteraction(
                 "add_e2e_cross_signing_key",
                 self._set_e2e_cross_signing_key_txn,

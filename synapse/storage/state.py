@@ -20,7 +20,7 @@ import attr
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.types import StateMap
+from synapse.types import MutableStateMap, StateMap
 
 logger = logging.getLogger(__name__)
 
@@ -349,7 +349,7 @@ class StateGroupStorage:
 
     async def get_state_groups_ids(
         self, _room_id: str, event_ids: Iterable[str]
-    ) -> Dict[int, StateMap[str]]:
+    ) -> Dict[int, MutableStateMap[str]]:
         """Get the event IDs of all the state for the state groups for the given events
 
         Args:
@@ -532,7 +532,7 @@ class StateGroupStorage:
 
     def _get_state_for_groups(
         self, groups: Iterable[int], state_filter: StateFilter = StateFilter.all()
-    ) -> Awaitable[Dict[int, StateMap[str]]]:
+    ) -> Awaitable[Dict[int, MutableStateMap[str]]]:
         """Gets the state at each of a list of state groups, optionally
         filtering by type/state_key
 

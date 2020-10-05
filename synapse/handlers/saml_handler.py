@@ -46,7 +46,7 @@ class MappingException(Exception):
     """Used to catch errors when mapping the SAML2 response to a user."""
 
 
-@attr.s
+@attr.s(slots=True)
 class Saml2SessionData:
     """Data we track about SAML2 sessions"""
 

@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 class AdminHandler(BaseHandler):
     def __init__(self, hs):
-        super(AdminHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
@@ -153,7 +153,7 @@ class AdminHandler(BaseHandler):
                 if not events:
                     break
 
-                from_key = RoomStreamToken.parse(events[-1].internal_metadata.after)
+                from_key = events[-1].internal_metadata.after
 
                 events = await filter_events_for_client(self.storage, user_id, events)
 

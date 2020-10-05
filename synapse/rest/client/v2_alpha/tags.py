@@ -31,7 +31,7 @@ class TagListServlet(RestServlet):
     PATTERNS = client_patterns("/user/(?P<user_id>[^/]*)/rooms/(?P<room_id>[^/]*)/tags")
 
     def __init__(self, hs):
-        super(TagListServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
 
@@ -56,7 +56,7 @@ class TagServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(TagServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.notifier = hs.get_notifier()

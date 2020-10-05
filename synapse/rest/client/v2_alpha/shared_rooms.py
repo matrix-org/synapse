@@ -34,7 +34,7 @@ class UserSharedRoomsServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(UserSharedRoomsServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.user_directory_active = hs.config.update_user_directory

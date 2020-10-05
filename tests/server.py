@@ -260,7 +260,7 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
                 return succeed(lookups[name])
 
         self.nameResolver = SimpleResolverComplexifier(FakeResolver())
-        super(ThreadedMemoryReactorClock, self).__init__()
+        super().__init__()
 
     def listenUDP(self, port, protocol, interface="", maxPacketSize=8196):
         p = udp.Port(port, protocol, interface, maxPacketSize, self)
@@ -371,6 +371,10 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
         pool.runInteraction = runInteraction
         pool.threadpool = ThreadPool(clock._reactor)
         pool.running = True
+
+    # We've just changed the Databases to run DB transactions on the same
+    # thread, so we need to disable the dedicated thread behaviour.
+    server.get_datastores().main.USE_DEDICATED_DB_THREADS_FOR_EVENT_FETCHING = False
 
     return server
 

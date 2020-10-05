@@ -26,7 +26,7 @@ class ReadMarkerRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/read_markers$")
 
     def __init__(self, hs):
-        super(ReadMarkerRestServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.receipts_handler = hs.get_receipts_handler()
         self.read_marker_handler = hs.get_read_marker_handler()

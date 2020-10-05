@@ -56,6 +56,8 @@ class OIDCConfig(Config):
         self.oidc_userinfo_endpoint = oidc_config.get("userinfo_endpoint")
         self.oidc_jwks_uri = oidc_config.get("jwks_uri")
         self.oidc_skip_verification = oidc_config.get("skip_verification", False)
+        self.oidc_user_profile_method = oidc_config.get("user_profile_method", "auto")
+        self.oidc_allow_existing_users = oidc_config.get("allow_existing_users", False)
 
         ump_config = oidc_config.get("user_mapping_provider", {})
         ump_config.setdefault("module", DEFAULT_USER_MAPPING_PROVIDER)
@@ -158,6 +160,19 @@ class OIDCConfig(Config):
           #
           #skip_verification: true
 
+          # Whether to fetch the user profile from the userinfo endpoint. Valid
+          # values are: "auto" or "userinfo_endpoint".
+          #
+          # Defaults to "auto", which fetches the userinfo endpoint if "openid" is included
+          # in `scopes`. Uncomment the following to always fetch the userinfo endpoint.
+          #
+          #user_profile_method: "userinfo_endpoint"
+
+          # Uncomment to allow a user logging in via OIDC to match a pre-existing account instead
+          # of failing. This could be used if switching from password logins to OIDC. Defaults to false.
+          #
+          #allow_existing_users: true
+
           # An external module can be provided here as a custom solution to mapping
           # attributes returned from a OIDC provider onto a matrix user.
           #
@@ -198,6 +213,14 @@ class OIDCConfig(Config):
               # If unset, no displayname will be set.
               #
               #display_name_template: "{{{{ user.given_name }}}} {{{{ user.last_name }}}}"
+
+              # Jinja2 templates for extra attributes to send back to the client during
+              # login.
+              #
+              # Note that these are non-standard and clients will ignore them without modifications.
+              #
+              #extra_attributes:
+                #birthdate: "{{{{ user.birthdate }}}}"
         """.format(
             mapping_provider=DEFAULT_USER_MAPPING_PROVIDER
         )

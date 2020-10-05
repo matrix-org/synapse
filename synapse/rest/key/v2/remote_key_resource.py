@@ -35,7 +35,7 @@ class RemoteKey(DirectServeJsonResource):
 
     Supports individual GET APIs and a bulk query POST API.
 
-    Requsts:
+    Requests:
 
     GET /_matrix/key/v2/query/remote.server.example.com HTTP/1.1
 
