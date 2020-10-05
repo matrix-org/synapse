@@ -154,7 +154,7 @@ class DeviceRestServlet(RestServlet):
 
 
 class DehydratedDeviceServlet(RestServlet):
-    """Request or complete a rehydration request.
+    """Retrieve or store a dehydrated device.
 
     GET /org.matrix.msc2697.v2/dehydrated_device
 
@@ -232,7 +232,7 @@ class DehydratedDeviceServlet(RestServlet):
 
 
 class ClaimDehydratedDeviceServlet(RestServlet):
-    """Store a dehydrated device.
+    """Claim a dehydrated device.
 
     POST /org.matrix.msc2697.v2/dehydrated_device/claim
     Content-Type: application/json
