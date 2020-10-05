@@ -598,10 +598,13 @@ class _MultiWriterCtxManager:
     stream_ids = attr.ib(type=List[int], factory=list)
 
     async def __aenter__(self) -> Union[int, List[int]]:
+        # It's safe to run this in autocommit mode as fetching values from a
+        # sequence ignores transaction semantics anyway.
         self.stream_ids = await self.id_gen._db.runInteraction(
             "_load_next_mult_id",
             self.id_gen._load_next_mult_id_txn,
             self.multiple_ids or 1,
+            db_autocommit=True,
         )
 
         # Assert the fetched ID is actually greater than any ID we've already
