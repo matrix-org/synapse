@@ -1,0 +1,1 @@
+Apply some internal fixes to the `HomeServer` class to make code and usage more python-idiomatic.

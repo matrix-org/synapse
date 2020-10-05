@@ -290,8 +290,8 @@ class HomeServer(metaclass=abc.ABCMeta):
     def is_mine_id(self, string: str) -> bool:
         return string.split(":", 1)[1] == self.hostname
 
-    # The caching attribute for this is technically already set in __init__, but it's replicated for the sake of
-    # consistency
+    # The caching attribute for this is technically already set in __init__,
+    # but it's replicated for the sake of consistency
     @cache_in_self
     def get_clock(self) -> Clock:
         return Clock(self._reactor)
