@@ -40,7 +40,10 @@ class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBase
                 "_censor_redactions", self._censor_redactions
             )
 
-        if self.hs.config.redaction_retention_period is not None:
+        if (
+            hs.config.run_background_tasks
+            and self.hs.config.redaction_retention_period is not None
+        ):
             hs.get_clock().looping_call(_censor_redactions, 5 * 60 * 1000)
 
     async def _censor_redactions(self):
