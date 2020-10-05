@@ -28,7 +28,7 @@ class ModuleApiTestCase(HomeserverTestCase):
 
     def prepare(self, reactor, clock, homeserver):
         self.store = homeserver.get_datastore()
-        self.module_api = ModuleApi(homeserver, homeserver.get_auth_handler())
+        self.module_api = homeserver.get_module_api()
 
     def test_can_register_user(self):
         """Tests that an external module can register a user"""

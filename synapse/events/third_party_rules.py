@@ -16,7 +16,6 @@ from typing import Callable
 
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
-from synapse.module_api import ModuleApi
 from synapse.types import Requester, StateMap
 
 
@@ -40,7 +39,7 @@ class ThirdPartyEventRules:
 
         if module is not None:
             self.third_party_rules = module(
-                config=config, module_api=ModuleApi(hs, hs.get_auth_handler()),
+                config=config, module_api=hs.get_module_api(),
             )
 
     async def check_event_allowed(

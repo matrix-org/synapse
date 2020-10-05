@@ -164,7 +164,14 @@ class AuthHandler(BaseHandler):
 
         self.bcrypt_rounds = hs.config.bcrypt_rounds
 
+        # we can't use hs.get_module_api() here, because to do so will create an
+        # import loop.
+        #
+        # TODO: refactor this class to separate the lower-level stuff that
+        #   ModuleApi can use from the higher-level stuff that uses ModuleApi, as
+        #   better way to break the loop
         account_handler = ModuleApi(hs, self)
+
         self.password_providers = [
             module(config=config, account_handler=account_handler)
             for module, config in hs.config.password_providers
