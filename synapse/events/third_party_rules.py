@@ -61,12 +61,10 @@ class ThirdPartyEventRules:
         prev_state_ids = await context.get_prev_state_ids()
 
         # Retrieve the state events from the database.
-        state_events = {}
-        for key, event_id in prev_state_ids.items():
-            state_events[key] = await self.store.get_event(event_id, allow_none=True)
+        events = await self.store.get_events(prev_state_ids.values())
+        state_events = {(ev.type, ev.state_key): ev for ev in events.values()}
 
-        ret = await self.third_party_rules.check_event_allowed(event, state_events)
-        return ret
+        return await self.third_party_rules.check_event_allowed(event, state_events)
 
     async def on_create_room(
         self, requester: Requester, config: dict, is_requester_admin: bool
