@@ -28,6 +28,7 @@ from twisted.protocols.tls import TLSMemoryBIOFactory
 
 import synapse
 from synapse.app import check_bind_error
+from synapse.app.phone_stats_home import start_phone_stats_home
 from synapse.config.server import ListenerConfig
 from synapse.crypto import context_factory
 from synapse.logging.context import PreserveLoggingContext
@@ -271,8 +272,18 @@ def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerConfig]):
         hs.get_datastore().db_pool.start_profiling()
         hs.get_pusherpool().start()
 
+        # Log when we start the shut down process.
+        hs.get_reactor().addSystemEventTrigger(
+            "before", "shutdown", logger.info, "Shutting down..."
+        )
+
         setup_sentry(hs)
         setup_sdnotify(hs)
+
+        # If background tasks are running on the main process, start collecting the
+        # phone home stats.
+        if hs.config.run_background_tasks:
+            start_phone_stats_home(hs)
 
         # We now freeze all allocated objects in the hopes that (almost)
         # everything currently allocated are things that will be used for the

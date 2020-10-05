@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple, Union
 from unpaddedbase64 import encode_base64
 
 from synapse import types
-from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
+from synapse.api.constants import MAX_DEPTH, AccountDataTypes, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -194,8 +194,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         )
         if duplicate is not None:
             # Discard the new event since this membership change is a no-op.
-            _, stream_id = await self.store.get_event_ordering(duplicate.event_id)
-            return duplicate.event_id, stream_id
+            # we know it was persisted, so must have a stream ordering.
+            assert duplicate.internal_metadata.stream_ordering
+            return duplicate.event_id, duplicate.internal_metadata.stream_ordering
 
         prev_state_ids = await context.get_prev_state_ids()
 
@@ -247,7 +248,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         user_account_data, _ = await self.store.get_account_data_for_user(user_id)
 
         # Copy direct message state if applicable
-        direct_rooms = user_account_data.get("m.direct", {})
+        direct_rooms = user_account_data.get(AccountDataTypes.DIRECT, {})
 
         # Check which key this room is under
         if isinstance(direct_rooms, dict):
@@ -258,7 +259,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
                     # Save back to user's m.direct account data
                     await self.store.add_account_data_for_user(
-                        user_id, "m.direct", direct_rooms
+                        user_id, AccountDataTypes.DIRECT, direct_rooms
                     )
                     break
 
@@ -441,12 +442,12 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 same_membership = old_membership == effective_membership_state
                 same_sender = requester.user.to_string() == old_state.sender
                 if same_sender and same_membership and same_content:
-                    _, stream_id = await self.store.get_event_ordering(
-                        old_state.event_id
-                    )
+                    # duplicate event.
+                    # we know it was persisted, so must have a stream ordering.
+                    assert old_state.internal_metadata.stream_ordering
                     return (
                         old_state.event_id,
-                        stream_id,
+                        old_state.internal_metadata.stream_ordering,
                     )
 
             if old_membership in ["ban", "leave"] and action == "kick":
@@ -642,7 +643,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
     async def send_membership_event(
         self,
-        requester: Requester,
+        requester: Optional[Requester],
         event: EventBase,
         context: EventContext,
         ratelimit: bool = True,

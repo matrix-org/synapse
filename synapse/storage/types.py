@@ -61,3 +61,9 @@ class Connection(Protocol):
 
     def rollback(self, *args, **kwargs) -> None:
         ...
+
+    def __enter__(self) -> "Connection":
+        ...
+
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        ...

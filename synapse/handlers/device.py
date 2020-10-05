@@ -40,7 +40,6 @@ from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import (
     JsonDict,
-    RoomStreamToken,
     StreamToken,
     UserID,
     get_domain_from_id,
@@ -130,8 +129,7 @@ class DeviceWorkerHandler(BaseHandler):
 
         set_tag("user_id", user_id)
         set_tag("from_token", from_token)
-        now_room_id = self.store.get_room_max_stream_ordering()
-        now_room_key = RoomStreamToken(None, now_room_id)
+        now_room_key = self.store.get_room_max_token()
 
         room_ids = await self.store.get_rooms_for_user(user_id)
 

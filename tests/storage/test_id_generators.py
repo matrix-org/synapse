@@ -12,9 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 from synapse.storage.database import DatabasePool
+from synapse.storage.engines import IncorrectDatabaseSetup
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
 
 from tests.unittest import HomeserverTestCase
@@ -59,7 +58,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
                 writers=writers,
             )
 
-        return self.get_success(self.db_pool.runWithConnection(_create))
+        return self.get_success_or_raise(self.db_pool.runWithConnection(_create))
 
     def _insert_rows(self, instance_name: str, number: int):
         """Insert N rows as the given instance, inserting with stream IDs pulled
@@ -391,16 +390,27 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         # Initial config has two writers
         id_gen = self._create_id_generator("first", writers=["first", "second"])
         self.assertEqual(id_gen.get_persisted_upto_position(), 3)
+        self.assertEqual(id_gen.get_current_token_for_writer("first"), 3)
+        self.assertEqual(id_gen.get_current_token_for_writer("second"), 5)
 
         # New config removes one of the configs. Note that if the writer is
         # removed from config we assume that it has been shut down and has
         # finished persisting, hence why the persisted upto position is 5.
         id_gen_2 = self._create_id_generator("second", writers=["second"])
         self.assertEqual(id_gen_2.get_persisted_upto_position(), 5)
+        self.assertEqual(id_gen_2.get_current_token_for_writer("second"), 5)
 
         # This config points to a single, previously unused writer.
         id_gen_3 = self._create_id_generator("third", writers=["third"])
         self.assertEqual(id_gen_3.get_persisted_upto_position(), 5)
+
+        # For new writers we assume their initial position to be the current
+        # persisted up to position. This stops Synapse from doing a full table
+        # scan when a new writer comes along.
+        self.assertEqual(id_gen_3.get_current_token_for_writer("third"), 5)
+
+        id_gen_4 = self._create_id_generator("fourth", writers=["third"])
+        self.assertEqual(id_gen_4.get_current_token_for_writer("third"), 5)
 
         # Check that we get a sane next stream ID with this new config.
 
@@ -410,6 +420,30 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
         self.get_success(_get_next_async())
         self.assertEqual(id_gen_3.get_persisted_upto_position(), 6)
+
+        # If we add back the old "first" then we shouldn't see the persisted up
+        # to position revert back to 3.
+        id_gen_5 = self._create_id_generator("five", writers=["first", "third"])
+        self.assertEqual(id_gen_5.get_persisted_upto_position(), 6)
+        self.assertEqual(id_gen_5.get_current_token_for_writer("first"), 6)
+        self.assertEqual(id_gen_5.get_current_token_for_writer("third"), 6)
+
+    def test_sequence_consistency(self):
+        """Test that we error out if the table and sequence diverges.
+        """
+
+        # Prefill with some rows
+        self._insert_row_with_id("master", 3)
+
+        # Now we add a row *without* updating the stream ID
+        def _insert(txn):
+            txn.execute("INSERT INTO foobar VALUES (26, 'master')")
+
+        self.get_success(self.db_pool.runInteraction("_insert", _insert))
+
+        # Creating the ID gen should error
+        with self.assertRaises(IncorrectDatabaseSetup):
+            self._create_id_generator("first")
 
 
 class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):

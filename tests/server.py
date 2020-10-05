@@ -372,6 +372,10 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
         pool.threadpool = ThreadPool(clock._reactor)
         pool.running = True
 
+    # We've just changed the Databases to run DB transactions on the same
+    # thread, so we need to disable the dedicated thread behaviour.
+    server.get_datastores().main.USE_DEDICATED_DB_THREADS_FOR_EVENT_FETCHING = False
+
     return server
 
 

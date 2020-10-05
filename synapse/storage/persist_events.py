@@ -197,7 +197,7 @@ class EventsPersistenceStorage:
 
     async def persist_events(
         self,
-        events_and_contexts: List[Tuple[EventBase, EventContext]],
+        events_and_contexts: Iterable[Tuple[EventBase, EventContext]],
         backfilled: bool = False,
     ) -> RoomStreamToken:
         """
@@ -229,7 +229,7 @@ class EventsPersistenceStorage:
             defer.gatherResults(deferreds, consumeErrors=True)
         )
 
-        return RoomStreamToken(None, self.main_store.get_current_events_token())
+        return self.main_store.get_room_max_token()
 
     async def persist_event(
         self, event: EventBase, context: EventContext, backfilled: bool = False
@@ -247,11 +247,12 @@ class EventsPersistenceStorage:
 
         await make_deferred_yieldable(deferred)
 
-        max_persisted_id = self.main_store.get_current_events_token()
         event_stream_id = event.internal_metadata.stream_ordering
+        # stream ordering should have been assigned by now
+        assert event_stream_id
 
         pos = PersistedEventPosition(self._instance_name, event_stream_id)
-        return pos, RoomStreamToken(None, max_persisted_id)
+        return pos, self.main_store.get_room_max_token()
 
     def _maybe_start_persisting(self, room_id: str):
         async def persisting_queue(item):

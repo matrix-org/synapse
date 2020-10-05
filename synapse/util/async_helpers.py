@@ -449,18 +449,8 @@ class ReadWriteLock:
 R = TypeVar("R")
 
 
-def _cancelled_to_timed_out_error(value: R, timeout: float) -> R:
-    if isinstance(value, failure.Failure):
-        value.trap(CancelledError)
-        raise defer.TimeoutError(timeout, "Deferred")
-    return value
-
-
 def timeout_deferred(
-    deferred: defer.Deferred,
-    timeout: float,
-    reactor: IReactorTime,
-    on_timeout_cancel: Optional[Callable[[Any, float], Any]] = None,
+    deferred: defer.Deferred, timeout: float, reactor: IReactorTime,
 ) -> defer.Deferred:
     """The in built twisted `Deferred.addTimeout` fails to time out deferreds
     that have a canceller that throws exceptions. This method creates a new
@@ -469,27 +459,21 @@ def timeout_deferred(
 
     (See https://twistedmatrix.com/trac/ticket/9534)
 
-    NOTE: Unlike `Deferred.addTimeout`, this function returns a new deferred
+    NOTE: Unlike `Deferred.addTimeout`, this function returns a new deferred.
+
+    NOTE: the TimeoutError raised by the resultant deferred is
+    twisted.internet.defer.TimeoutError, which is *different* to the built-in
+    TimeoutError, as well as various other TimeoutErrors you might have imported.
 
     Args:
         deferred: The Deferred to potentially timeout.
         timeout: Timeout in seconds
         reactor: The twisted reactor to use
-        on_timeout_cancel: A callable which is called immediately
-            after the deferred times out, and not if this deferred is
-            otherwise cancelled before the timeout.
 
-            It takes an arbitrary value, which is the value of the deferred at
-            that exact point in time (probably a CancelledError Failure), and
-            the timeout.
-
-            The default callable (if none is provided) will translate a
-            CancelledError Failure into a defer.TimeoutError.
 
     Returns:
-        A new Deferred.
+        A new Deferred, which will errback with defer.TimeoutError on timeout.
     """
-
     new_d = defer.Deferred()
 
     timed_out = [False]
@@ -502,18 +486,23 @@ def timeout_deferred(
         except:  # noqa: E722, if we throw any exception it'll break time outs
             logger.exception("Canceller failed during timeout")
 
+        # the cancel() call should have set off a chain of errbacks which
+        # will have errbacked new_d, but in case it hasn't, errback it now.
+
         if not new_d.called:
-            new_d.errback(defer.TimeoutError(timeout, "Deferred"))
+            new_d.errback(defer.TimeoutError("Timed out after %gs" % (timeout,)))
 
     delayed_call = reactor.callLater(timeout, time_it_out)
 
-    def convert_cancelled(value):
-        if timed_out[0]:
-            to_call = on_timeout_cancel or _cancelled_to_timed_out_error
-            return to_call(value, timeout)
+    def convert_cancelled(value: failure.Failure):
+        # if the orgininal deferred was cancelled, and our timeout has fired, then
+        # the reason it was cancelled was due to our timeout. Turn the CancelledError
+        # into a TimeoutError.
+        if timed_out[0] and value.check(CancelledError):
+            raise defer.TimeoutError("Timed out after %gs" % (timeout,))
         return value
 
-    deferred.addBoth(convert_cancelled)
+    deferred.addErrback(convert_cancelled)
 
     def cancel_timeout(result):
         # stop the pending call to cancel the deferred if it's been fired

@@ -362,13 +362,13 @@ class SearchHandler(BaseHandler):
                     self.storage, user.to_string(), res["events_after"]
                 )
 
-                res["start"] = now_token.copy_and_replace(
+                res["start"] = await now_token.copy_and_replace(
                     "room_key", res["start"]
-                ).to_string()
+                ).to_string(self.store)
 
-                res["end"] = now_token.copy_and_replace(
+                res["end"] = await now_token.copy_and_replace(
                     "room_key", res["end"]
-                ).to_string()
+                ).to_string(self.store)
 
                 if include_profile:
                     senders = {

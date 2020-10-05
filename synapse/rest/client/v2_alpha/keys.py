@@ -180,6 +180,7 @@ class KeyChangesServlet(RestServlet):
         super().__init__()
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
+        self.store = hs.get_datastore()
 
     async def on_GET(self, request):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
@@ -191,7 +192,7 @@ class KeyChangesServlet(RestServlet):
         # changes after the "to" as well as before.
         set_tag("to", parse_string(request, "to"))
 
-        from_token = StreamToken.from_string(from_token_string)
+        from_token = await StreamToken.from_string(self.store, from_token_string)
 
         user_id = requester.user.to_string()
 

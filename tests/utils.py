@@ -38,6 +38,7 @@ from synapse.http.server import HttpServer
 from synapse.logging.context import current_context, set_current_context
 from synapse.server import HomeServer
 from synapse.storage import DataStore
+from synapse.storage.database import LoggingDatabaseConnection
 from synapse.storage.engines import PostgresEngine, create_engine
 from synapse.storage.prepare_database import prepare_database
 from synapse.util.ratelimitutils import FederationRateLimiter
@@ -88,6 +89,7 @@ def setupdb():
             host=POSTGRES_HOST,
             password=POSTGRES_PASSWORD,
         )
+        db_conn = LoggingDatabaseConnection(db_conn, db_engine, "tests")
         prepare_database(db_conn, db_engine, None)
         db_conn.close()
 
@@ -276,7 +278,7 @@ def setup_test_homeserver(
 
         hs.setup()
         if homeserverToUse.__name__ == "TestHomeServer":
-            hs.setup_master()
+            hs.setup_background_tasks()
 
         if isinstance(db_engine, PostgresEngine):
             database = hs.get_datastores().databases[0]

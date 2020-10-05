@@ -54,7 +54,7 @@ def _load_current_id(db_conn, table, column, step=1):
     """
     # debug logging for https://github.com/matrix-org/synapse/issues/7968
     logger.info("initialising stream generator for %s(%s)", table, column)
-    cur = db_conn.cursor()
+    cur = db_conn.cursor(txn_name="_load_current_id")
     if step == 1:
         cur.execute("SELECT MAX(%s) FROM %s" % (column, table))
     else:
@@ -258,22 +258,37 @@ class MultiWriterIdGenerator:
 
         self._sequence_gen = PostgresSequenceGenerator(sequence_name)
 
+        # We check that the table and sequence haven't diverged.
+        self._sequence_gen.check_consistency(
+            db_conn, table=table, id_column=id_column, positive=positive
+        )
+
         # This goes and fills out the above state from the database.
         self._load_current_ids(db_conn, table, instance_column, id_column)
 
     def _load_current_ids(
         self, db_conn, table: str, instance_column: str, id_column: str
     ):
-        cur = db_conn.cursor()
+        cur = db_conn.cursor(txn_name="_load_current_ids")
 
         # Load the current positions of all writers for the stream.
         if self._writers:
+            # We delete any stale entries in the positions table. This is
+            # important if we add back a writer after a long time; we want to
+            # consider that a "new" writer, rather than using the old stale
+            # entry here.
+            sql = """
+                DELETE FROM stream_positions
+                WHERE
+                    stream_name = ?
+                    AND instance_name != ALL(?)
+            """
+            cur.execute(sql, (self._stream_name, self._writers))
+
             sql = """
                 SELECT instance_name, stream_id FROM stream_positions
                 WHERE stream_name = ?
             """
-            sql = self._db.engine.convert_param_style(sql)
-
             cur.execute(sql, (self._stream_name,))
 
             self._current_positions = {
@@ -287,8 +302,12 @@ class MultiWriterIdGenerator:
         min_stream_id = min(self._current_positions.values(), default=None)
 
         if min_stream_id is None:
+            # We add a GREATEST here to ensure that the result is always
+            # positive. (This can be a problem for e.g. backfill streams where
+            # the server has never backfilled).
             sql = """
-                SELECT COALESCE(%(agg)s(%(id)s), 1) FROM %(table)s
+                SELECT GREATEST(COALESCE(%(agg)s(%(id)s), 1), 1)
+                FROM %(table)s
             """ % {
                 "id": id_column,
                 "table": table,
@@ -318,8 +337,7 @@ class MultiWriterIdGenerator:
                 "instance": instance_column,
                 "cmp": "<=" if self._positive else ">=",
             }
-            sql = self._db.engine.convert_param_style(sql)
-            cur.execute(sql, (min_stream_id,))
+            cur.execute(sql, (min_stream_id * self._return_factor,))
 
             self._persisted_upto_position = min_stream_id
 
@@ -399,7 +417,7 @@ class MultiWriterIdGenerator:
             self._unfinished_ids.discard(next_id)
             self._finished_ids.add(next_id)
 
-            new_cur = None
+            new_cur = None  # type: Optional[int]
 
             if self._unfinished_ids:
                 # If there are unfinished IDs then the new position will be the
@@ -444,11 +462,22 @@ class MultiWriterIdGenerator:
         """Returns the position of the given writer.
         """
 
+        # If we don't have an entry for the given instance name, we assume it's a
+        # new writer.
+        #
+        # For new writers we assume their initial position to be the current
+        # persisted up to position. This stops Synapse from doing a full table
+        # scan when a new writer announces itself over replication.
         with self._lock:
-            return self._return_factor * self._current_positions.get(instance_name, 0)
+            return self._return_factor * self._current_positions.get(
+                instance_name, self._persisted_upto_position
+            )
 
     def get_positions(self) -> Dict[str, int]:
         """Get a copy of the current positon map.
+
+        Note that this won't necessarily include all configured writers if some
+        writers haven't written anything yet.
         """
 
         with self._lock:

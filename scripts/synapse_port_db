@@ -145,6 +145,7 @@ IGNORED_TABLES = {
     # the sessions are transient anyway, so ignore them.
     "ui_auth_sessions",
     "ui_auth_sessions_credentials",
+    "ui_auth_sessions_ips",
 }
 
 
@@ -488,7 +489,7 @@ class Porter(object):
 
         hs = MockHomeserver(self.hs_config)
 
-        with make_conn(db_config, engine) as db_conn:
+        with make_conn(db_config, engine, "portdb") as db_conn:
             engine.check_database(
                 db_conn, allow_outdated_version=allow_outdated_version
             )

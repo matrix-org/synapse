@@ -187,6 +187,11 @@ class RegistrationConfig(Config):
             session_lifetime = self.parse_duration(session_lifetime)
         self.session_lifetime = session_lifetime
 
+        # The success template used during fallback auth.
+        self.fallback_success_template = self.read_templates(
+            ["auth_success.html"], autoescape=True
+        )[0]
+
     def generate_config_section(self, generate_secrets=False, **kwargs):
         if generate_secrets:
             registration_shared_secret = 'registration_shared_secret: "%s"' % (
