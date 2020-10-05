@@ -97,3 +97,9 @@ class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
         """Gets a string giving the server version. For example: '3.22.0'
         """
         ...
+
+    @abc.abstractmethod
+    def in_transaction(self, conn: Connection) -> bool:
+        """Whether the connection is currently in a transaction.
+        """
+        ...

@@ -15,7 +15,8 @@
 
 import logging
 
-from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
+from synapse.storage.engines._base import BaseDatabaseEngine, IncorrectDatabaseSetup
+from synapse.storage.types import Connection
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +120,7 @@ class PostgresEngine(BaseDatabaseEngine):
             cursor.execute("SET synchronous_commit TO OFF")
 
         cursor.close()
+        db_conn.commit()
 
     @property
     def can_native_upsert(self):
@@ -171,3 +173,6 @@ class PostgresEngine(BaseDatabaseEngine):
             return "%i.%i" % (numver / 10000, numver % 10000)
         else:
             return "%i.%i.%i" % (numver / 10000, (numver % 10000) / 100, numver % 100)
+
+    def in_transaction(self, conn: Connection) -> bool:
+        return conn.status != self.module.extensions.STATUS_READY  # type: ignore
