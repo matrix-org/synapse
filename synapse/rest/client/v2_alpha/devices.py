@@ -216,7 +216,7 @@ class DehydratedDeviceServlet(RestServlet):
             raise errors.SynapseError(
                 400, "device_data missing", errcode=errors.Codes.MISSING_PARAM,
             )
-        elif isinstance(submission["device_id"], dict):
+        elif not isinstance(submission["device_id"], dict):
             raise errors.SynapseError(
                 400,
                 "device_data must be an object",
@@ -269,7 +269,7 @@ class ClaimDehydratedDeviceServlet(RestServlet):
             raise errors.SynapseError(
                 400, "device_id missing", errcode=errors.Codes.MISSING_PARAM,
             )
-        elif isinstance(submission["device_id"], str):
+        elif not isinstance(submission["device_id"], str):
             raise errors.SynapseError(
                 400, "device_id must be a string", errcode=errors.Codes.INVALID_PARAM,
             )

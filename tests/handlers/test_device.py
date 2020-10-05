@@ -300,4 +300,4 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         # make sure that there's no device available for dehydrating now
         ret = self.get_success(self.handler.get_dehydrated_device(user_id=user_id))
 
-        self.assertEqual(ret, None)
+        self.assertIsNone(ret)
