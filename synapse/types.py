@@ -408,13 +408,13 @@ class RoomStreamToken:
     The format of the token in such case is an initial integer min position,
     followed by the mapping of instance ID to position separated by '.' and '~':
 
-        m{min_pos}.{writer1}~{pos1}.{writer2}~{pos2}. ...
+        m{min_pos}~{writer1}.{pos1}~{writer2}.{pos2}. ...
 
     The `min_pos` corresponds to the minimum position all writers have persisted
     up to, and then only writers that are ahead of that position need to be
     encoded. An example token is:
 
-        m56.2~58.3~59
+        m56~2.58~3.59
 
     Which corresponds to a set of three (or more writers) where instances 2 and
     3 (these are instance IDs that can be looked up in the DB to fetch the more
@@ -454,12 +454,12 @@ class RoomStreamToken:
                 parts = string[1:].split("-", 1)
                 return cls(topological=int(parts[0]), stream=int(parts[1]))
             if string[0] == "m":
-                parts = string[1:].split(".")
+                parts = string[1:].split("~")
                 stream = int(parts[0])
 
                 instance_map = {}
                 for part in parts[1:]:
-                    key, value = part.split("~")
+                    key, value = part.split(".")
                     instance_id = int(key)
                     pos = int(value)
 
@@ -539,10 +539,10 @@ class RoomStreamToken:
             entries = []
             for name, pos in self.instance_map.items():
                 instance_id = await store.get_id_for_instance(name)
-                entries.append("{}~{}".format(instance_id, pos))
+                entries.append("{}.{}".format(instance_id, pos))
 
-            encoded_map = ".".join(entries)
-            return "m{}.{}".format(self.stream, encoded_map)
+            encoded_map = "~".join(entries)
+            return "m{}~{}".format(self.stream, encoded_map)
         else:
             return "s%d" % (self.stream,)
 
