@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from synapse.api.errors import SynapseError
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -22,13 +22,16 @@ from synapse.types import UserID, create_requester
 
 from ._base import BaseHandler
 
+if TYPE_CHECKING:
+    from synapse.app.homeserver import HomeServer
+
 logger = logging.getLogger(__name__)
 
 
 class DeactivateAccountHandler(BaseHandler):
     """Handler which deals with deactivating user accounts."""
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.hs = hs
         self._auth_handler = hs.get_auth_handler()
@@ -137,7 +140,7 @@ class DeactivateAccountHandler(BaseHandler):
 
         return identity_server_supports_unbinding
 
-    async def _reject_pending_invites_for_user(self, user_id: str):
+    async def _reject_pending_invites_for_user(self, user_id: str) -> None:
         """Reject pending invites addressed to a given user ID.
 
         Args:
