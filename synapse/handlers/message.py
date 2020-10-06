@@ -672,6 +672,7 @@ class EventCreationHandler:
         txn_id: Optional[str] = None,
         ignore_shadow_ban: bool = False,
         ignore_spam_check: bool = False,
+        ignore_third_party_event_rules: bool = False,
     ) -> Tuple[EventBase, int]:
         """
         Creates an event, then sends it.
@@ -686,6 +687,8 @@ class EventCreationHandler:
             ignore_shadow_ban: True if shadow-banned users should be allowed to
                 send this event.
             ignore_spam_check: True to bypass spam-checking of the event.
+            ignore_third_party_event_rules: True to bypass checking of the event via
+                ThirdPartyEventRules.
 
         Returns:
             The event, and its stream ordering (if state event deduplication happened,
@@ -734,6 +737,7 @@ class EventCreationHandler:
                 context=context,
                 ratelimit=ratelimit,
                 ignore_shadow_ban=ignore_shadow_ban,
+                ignore_third_party_event_rules=ignore_third_party_event_rules,
             )
 
         # we know it was persisted, so must have a stream ordering
@@ -813,6 +817,7 @@ class EventCreationHandler:
         ratelimit: bool = True,
         extra_users: List[UserID] = [],
         ignore_shadow_ban: bool = False,
+        ignore_third_party_event_rules: bool = False,
     ) -> EventBase:
         """Processes a new event.
 
@@ -828,6 +833,8 @@ class EventCreationHandler:
             context
             ratelimit
             extra_users: Any extra users to notify about event
+            ignore_third_party_event_rules: If True, bypass checking the event against
+                ThirdPartyEventRules.
 
             ignore_shadow_ban: True if shadow-banned users should be allowed to
                 send this event.
@@ -870,13 +877,14 @@ class EventCreationHandler:
         else:
             room_version = await self.store.get_room_version_id(event.room_id)
 
-        event_allowed = await self.third_party_event_rules.check_event_allowed(
-            event, context
-        )
-        if not event_allowed:
-            raise SynapseError(
-                403, "This event is not allowed in this context", Codes.FORBIDDEN
+        if not ignore_third_party_event_rules:
+            event_allowed = await self.third_party_event_rules.check_event_allowed(
+                event, context
             )
+            if not event_allowed:
+                raise SynapseError(
+                    403, "This event is not allowed in this context", Codes.FORBIDDEN
+                )
 
         if event.internal_metadata.is_out_of_band_membership():
             # the only sort of out-of-band-membership events we expect to see here
@@ -1234,11 +1242,12 @@ class EventCreationHandler:
                 # Since this is a dummy-event it is OK if it is sent by a
                 # shadow-banned user.
                 await self.handle_new_client_event(
-                    requester=requester,
-                    event=event,
-                    context=context,
+                    requester,
+                    event,
+                    context,
                     ratelimit=False,
                     ignore_shadow_ban=True,
+                    ignore_third_party_event_rules=True,
                 )
                 return True
             except ConsentNotGivenError:
