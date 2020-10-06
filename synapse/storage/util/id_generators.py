@@ -24,6 +24,7 @@ from typing_extensions import Deque
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.database import DatabasePool, LoggingTransaction
+from synapse.storage.types import Cursor
 from synapse.storage.util.sequence import PostgresSequenceGenerator
 
 logger = logging.getLogger(__name__)
@@ -548,7 +549,7 @@ class MultiWriterIdGenerator:
                 # do.
                 break
 
-    def _update_stream_positions_table_txn(self, txn: LoggingTransaction):
+    def _update_stream_positions_table_txn(self, txn: Cursor):
         """Update the `stream_positions` table with newly persisted position.
         """
 

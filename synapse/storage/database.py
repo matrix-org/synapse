@@ -461,10 +461,15 @@ class DatabasePool:
         exception_callbacks: List[_CallbackListEntry],
         func: "Callable[..., R]",
         *args: Any,
-        db_retry: bool = True,
         **kwargs: Any
     ) -> R:
         """Start a new database transaction with the given connection.
+
+        Note: The given func may be called multiple times under certain
+        failure modes. This is normally fine when in a standard transaction,
+        but care must be taken if the connection is in `autocommit` mode that
+        the function will correctly handle being aborted and retried half way
+        through its execution.
 
         Args:
             conn
@@ -473,8 +478,6 @@ class DatabasePool:
             exception_callbacks
             func
             *args
-            db_retry: Whether to retry the transaction by calling `func` again.
-                This should be disabled if connection is in autocommit mode.
             **kwargs
         """
 
@@ -508,7 +511,7 @@ class DatabasePool:
                     transaction_logger.warning(
                         "[TXN OPERROR] {%s} %s %d/%d", name, e, i, N,
                     )
-                    if db_retry and i < N:
+                    if i < N:
                         i += 1
                         try:
                             conn.rollback()
@@ -521,7 +524,7 @@ class DatabasePool:
                         transaction_logger.warning(
                             "[TXN DEADLOCK] {%s} %d/%d", name, i, N
                         )
-                        if db_retry and i < N:
+                        if i < N:
                             i += 1
                             try:
                                 conn.rollback()
@@ -600,7 +603,9 @@ class DatabasePool:
                 i.e. outside of a transaction. This is useful for transaction
                 that are only a single query. Currently only affects postgres.
                 WARNING: This means that if func fails half way through then
-                the changes will *not* be rolled back.
+                the changes will *not* be rolled back. `func` may also get
+                called multiple times if the transaction is retried, so must
+                correctly handle that case.
 
             args: positional args to pass to `func`
             kwargs: named args to pass to `func`
@@ -623,7 +628,6 @@ class DatabasePool:
                 func,
                 *args,
                 db_autocommit=db_autocommit,
-                db_retry=not db_autocommit,  # Don't retry in auto commit mode.
                 **kwargs
             )
 
