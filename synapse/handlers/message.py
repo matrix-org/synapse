@@ -59,6 +59,7 @@ from synapse.visibility import filter_events_for_client
 from ._base import BaseHandler
 
 if TYPE_CHECKING:
+    from synapse.events.third_party_rules import ThirdPartyEventRules
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -393,7 +394,7 @@ class EventCreationHandler:
         self.action_generator = hs.get_action_generator()
 
         self.spam_checker = hs.get_spam_checker()
-        self.third_party_event_rules = hs.get_third_party_event_rules()
+        self.third_party_event_rules = None  # type: Optional[ThirdPartyEventRules]
 
         self._block_events_without_consent_error = (
             self.config.block_events_without_consent_error
@@ -878,6 +879,12 @@ class EventCreationHandler:
             room_version = await self.store.get_room_version_id(event.room_id)
 
         if not ignore_third_party_event_rules:
+            if not self.third_party_event_rules:
+                # Only initialise this if necessary. It's possible for ThirdPartyEventRules to call
+                # this function. However, it should not reach this line. If it does, a cyclic
+                # dependency will be created.
+                self.third_party_event_rules = self.hs.get_third_party_event_rules()
+
             event_allowed = await self.third_party_event_rules.check_event_allowed(
                 event, context
             )
