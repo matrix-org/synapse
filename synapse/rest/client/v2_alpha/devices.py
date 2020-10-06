@@ -191,7 +191,7 @@ class DehydratedDeviceServlet(RestServlet):
     PATTERNS = client_patterns("/org.matrix.msc2697.v2/dehydrated_device", releases=())
 
     def __init__(self, hs):
-        super(DehydratedDeviceServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
@@ -255,7 +255,7 @@ class ClaimDehydratedDeviceServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(ClaimDehydratedDeviceServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
