@@ -356,6 +356,14 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     def get_room_max_token(self) -> RoomStreamToken:
+        """Get a `RoomStreamToken` that marks the current maximum persisted
+        position of the events stream. Useful to get a token that represents
+        "now".
+
+        The token returned is a "live" token that may have an instance_map
+        component.
+        """
+
         min_pos = self._stream_id_gen.get_current_token()
 
         positions = {}
@@ -371,9 +379,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
                 for i, p in self._stream_id_gen.get_positions().items()
                 if p > min_pos
             }
-
-            if set(positions.values()) == {min_pos}:
-                positions = {}
 
         return RoomStreamToken(None, min_pos, positions)
 
