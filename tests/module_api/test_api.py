@@ -12,9 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from mock import Mock
 
+from synapse.events import EventBase
+from synapse.module_api import ModuleApi
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
+from synapse.types import create_requester
 
 from tests.unittest import HomeserverTestCase
 
@@ -59,6 +63,101 @@ class ModuleApiTestCase(HomeserverTestCase):
         # Check that the displayname was assigned
         displayname = self.get_success(self.store.get_profile_displayname("bob"))
         self.assertEqual(displayname, "Bobberino")
+
+    def test_sending_events_into_room(self):
+        """Tests that a module can send events into a room"""
+        # Mock out create_and_send_nonmember_event to check whether events are being sent
+        self.event_creation_handler.create_and_send_nonmember_event = Mock(
+            spec=[],
+            side_effect=self.event_creation_handler.create_and_send_nonmember_event,
+        )
+
+        # Create a user and room to play with
+        user_id = self.register_user("summer", "monkey")
+        tok = self.login("summer", "monkey")
+        room_id = self.helper.create_room_as(user_id, tok=tok)
+
+        # Create and send a non-state event
+        content = {"body": "I am a puppet", "msgtype": "m.text"}
+        event = self.get_success(
+            self.module_api.create_and_send_event_into_room(
+                user_id, room_id, event_type="m.room.message", content=content,
+            )
+        )  # type: EventBase
+        self.assertEqual(event.sender, user_id)
+        self.assertEqual(event.type, "m.room.message")
+        self.assertEqual(event.room_id, room_id)
+        self.assertFalse(hasattr(event, "state_key"))
+        self.assertDictEqual(event.content, content)
+
+        # Check that the event was sent
+        self.event_creation_handler.create_and_send_nonmember_event.assert_called_with(
+            create_requester(user_id),
+            {
+                "type": "m.room.message",
+                "content": content,
+                "room_id": room_id,
+                "sender": user_id,
+            },
+            ratelimit=False,
+            ignore_shadow_ban=True,
+            ignore_spam_check=True,
+            ignore_third_party_event_rules=True,
+        )
+
+        # Create and send a state event
+        content = {
+            "events_default": 0,
+            "users": {user_id: 100},
+            "state_default": 50,
+            "users_default": 0,
+            "events": {"test.event.type": 25},
+        }
+        event = self.get_success(
+            self.module_api.create_and_send_event_into_room(
+                user_id,
+                room_id,
+                event_type="m.room.power_levels",
+                content=content,
+                state_key="",
+            )
+        )  # type: EventBase
+        self.assertEqual(event.sender, user_id)
+        self.assertEqual(event.type, "m.room.power_levels")
+        self.assertEqual(event.room_id, room_id)
+        self.assertEqual(event.state_key, "")
+        self.assertDictEqual(event.content, content)
+
+        # Check that the event was sent
+        self.event_creation_handler.create_and_send_nonmember_event.assert_called_with(
+            create_requester(user_id),
+            {
+                "type": "m.room.power_levels",
+                "content": content,
+                "room_id": room_id,
+                "sender": user_id,
+                "state_key": "",
+            },
+            ratelimit=False,
+            ignore_shadow_ban=True,
+            ignore_spam_check=True,
+            ignore_third_party_event_rules=True,
+        )
+
+        # Check that we can't send membership events
+        content = {
+            "membership": "leave",
+        }
+        self.get_failure(
+            self.module_api.create_and_send_event_into_room(
+                user_id,
+                room_id,
+                event_type="m.room.message",
+                content=content,
+                state_key=user_id,
+            ),
+            Exception,
+        )
 
     def test_public_rooms(self):
         """Tests that a room can be added and removed from the public rooms list,
