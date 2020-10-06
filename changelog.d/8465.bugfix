@@ -1,0 +1,1 @@
+Don't attempt to respond to some requests if the client has already disconnected.

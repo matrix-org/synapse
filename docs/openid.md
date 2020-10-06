@@ -238,13 +238,36 @@ Synapse config:
 
 ```yaml
 oidc_config:
-   enabled: true
-   issuer: "https://id.twitch.tv/oauth2/"
-   client_id: "your-client-id" # TO BE FILLED
-   client_secret: "your-client-secret" # TO BE FILLED
-   client_auth_method: "client_secret_post"
-   user_mapping_provider:
-     config:
-       localpart_template: '{{ user.preferred_username }}'
-       display_name_template: '{{ user.name }}'
+  enabled: true
+  issuer: "https://id.twitch.tv/oauth2/"
+  client_id: "your-client-id" # TO BE FILLED
+  client_secret: "your-client-secret" # TO BE FILLED
+  client_auth_method: "client_secret_post"
+  user_mapping_provider:
+    config:
+      localpart_template: "{{ user.preferred_username }}"
+      display_name_template: "{{ user.name }}"
+```
+
+### GitLab
+
+1. Create a [new application](https://gitlab.com/profile/applications).
+2. Add the `read_user` and `openid` scopes.
+3. Add this Callback URL: `[synapse public baseurl]/_synapse/oidc/callback`
+
+Synapse config:
+
+```yaml
+oidc_config:
+  enabled: true
+  issuer: "https://gitlab.com/"
+  client_id: "your-client-id" # TO BE FILLED
+  client_secret: "your-client-secret" # TO BE FILLED
+  client_auth_method: "client_secret_post"
+  scopes: ["openid", "read_user"]
+  user_profile_method: "userinfo_endpoint"
+  user_mapping_provider:
+    config:
+      localpart_template: '{{ user.nickname }}'
+      display_name_template: '{{ user.name }}'
 ```

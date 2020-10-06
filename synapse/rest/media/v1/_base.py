@@ -213,6 +213,12 @@ async def respond_with_responder(
         file_size (int|None): Size in bytes of the media. If not known it should be None
         upload_name (str|None): The name of the requested file, if any.
     """
+    if request._disconnected:
+        logger.warning(
+            "Not sending response to request %s, already disconnected.", request
+        )
+        return
+
     if not responder:
         respond_404(request)
         return
