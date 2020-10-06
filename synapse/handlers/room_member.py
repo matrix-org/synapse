@@ -229,7 +229,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                         retry_after_ms=int(1000 * (time_allowed - time_now_s))
                     )
 
-        stream_id = await self.event_creation_handler.handle_new_client_event(
+        event, stream_id = await self.event_creation_handler.handle_new_client_event(
             requester, event, context, extra_users=[target], ratelimit=ratelimit,
         )
 
@@ -700,7 +700,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             if is_blocked:
                 raise SynapseError(403, "This room has been blocked on this server")
 
-        await self.event_creation_handler.handle_new_client_event(
+        event, _ = await self.event_creation_handler.handle_new_client_event(
             requester, event, context, extra_users=[target_user], ratelimit=ratelimit
         )
 
@@ -1193,7 +1193,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         context = await self.state_handler.compute_event_context(event)
         context.app_service = requester.app_service
-        stream_id = await self.event_creation_handler.handle_new_client_event(
+        event, stream_id = await self.event_creation_handler.handle_new_client_event(
             requester, event, context, extra_users=[UserID.from_string(target_user)],
         )
         return event.event_id, stream_id

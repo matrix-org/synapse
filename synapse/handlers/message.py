@@ -642,7 +642,7 @@ class EventCreationHandler:
         context: EventContext,
         ratelimit: bool = True,
         ignore_shadow_ban: bool = False,
-    ) -> int:
+    ) -> Tuple[EventBase, int]:
         """
         Persists and notifies local clients and federation of an event.
 
@@ -654,8 +654,10 @@ class EventCreationHandler:
             ignore_shadow_ban: True if shadow-banned users should be allowed to
                 send this event.
 
-        Return:
-            The stream_id of the persisted event.
+        Returns:
+            The event and stream_id of the persisted event. The returned event
+            may not match the given event if it was deduplicated due to an
+            existing event matching the transaction ID.
 
         Raises:
             ShadowBanError if the requester has been shadow-banned.
@@ -682,7 +684,10 @@ class EventCreationHandler:
                     event.event_id,
                     prev_event.event_id,
                 )
-                return await self.store.get_stream_id_for_event(prev_event.event_id)
+                return (
+                    prev_event,
+                    await self.store.get_stream_id_for_event(prev_event.event_id),
+                )
 
         return await self.handle_new_client_event(
             requester=requester, event=event, context=context, ratelimit=ratelimit
@@ -738,6 +743,11 @@ class EventCreationHandler:
             ignore_shadow_ban: True if shadow-banned users should be allowed to
                 send this event.
 
+        Returns:
+            The event and stream_id of the persisted event. The returned event
+            may not match the given event if it was deduplicated due to an
+            existing event matching the transaction ID.
+
         Raises:
             ShadowBanError if the requester has been shadow-banned.
         """
@@ -770,7 +780,7 @@ class EventCreationHandler:
                     spam_error = "Spam is not permitted here"
                 raise SynapseError(403, spam_error, Codes.FORBIDDEN)
 
-            stream_id = await self.send_nonmember_event(
+            event, stream_id = await self.send_nonmember_event(
                 requester,
                 event,
                 context,
@@ -851,7 +861,7 @@ class EventCreationHandler:
         context: EventContext,
         ratelimit: bool = True,
         extra_users: List[UserID] = [],
-    ) -> int:
+    ) -> Tuple[EventBase, int]:
         """Processes a new event. This includes checking auth, persisting it,
         notifying users, sending to remote servers, etc.
 
@@ -865,8 +875,10 @@ class EventCreationHandler:
             ratelimit
             extra_users: Any extra users to notify about event
 
-        Return:
-            The stream_id of the persisted event.
+        Returns:
+            The event and stream_id of the persisted event. The returned event
+            may not match the given event if it was deduplicated due to an
+            existing event matching the transaction ID.
         """
 
         if event.is_state() and (event.type, event.state_key) == (
@@ -922,14 +934,17 @@ class EventCreationHandler:
                     extra_users=extra_users,
                 )
                 stream_id = result["stream_id"]
+                event_id = result["event_id"]
+                if event_id != event.event_id:
+                    event = await self.store.get_event(event_id)
                 event.internal_metadata.stream_ordering = stream_id
-                return stream_id
+                return event, stream_id
 
-            stream_id = await self.persist_and_notify_client_event(
+            event, stream_id = await self.persist_and_notify_client_event(
                 requester, event, context, ratelimit=ratelimit, extra_users=extra_users
             )
 
-            return stream_id
+            return event, stream_id
         except Exception:
             # Ensure that we actually remove the entries in the push actions
             # staging area, if we calculated them.
@@ -974,7 +989,7 @@ class EventCreationHandler:
         context: EventContext,
         ratelimit: bool = True,
         extra_users: List[UserID] = [],
-    ) -> int:
+    ) -> Tuple[EventBase, int]:
         """Called when we have fully built the event, have already
         calculated the push actions for the event, and checked auth.
 
@@ -1146,9 +1161,13 @@ class EventCreationHandler:
             if prev_state_ids:
                 raise AuthError(403, "Changing the room create event is forbidden")
 
-        event_pos, max_stream_token = await self.storage.persistence.persist_event(
-            event, context=context
-        )
+        # Note that this returns the event that was persisted, which may not be
+        # the same as we passed in if it was deduplicated due transaction IDs.
+        (
+            event,
+            event_pos,
+            max_stream_token,
+        ) = await self.storage.persistence.persist_event(event, context=context)
 
         if self._ephemeral_events_enabled:
             # If there's an expiry timestamp on the event, schedule its expiry.
@@ -1169,7 +1188,7 @@ class EventCreationHandler:
             # matters as sometimes presence code can take a while.
             run_in_background(self._bump_active_time, requester.user)
 
-        return event_pos.stream
+        return event, event_pos.stream
 
     async def _bump_active_time(self, user: UserID) -> None:
         try:

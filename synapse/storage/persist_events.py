@@ -199,7 +199,7 @@ class EventsPersistenceStorage:
         self,
         events_and_contexts: Iterable[Tuple[EventBase, EventContext]],
         backfilled: bool = False,
-    ) -> RoomStreamToken:
+    ) -> Tuple[List[EventBase], RoomStreamToken]:
         """
         Write events to the database
         Args:
@@ -209,7 +209,11 @@ class EventsPersistenceStorage:
                 which might update the current state etc.
 
         Returns:
-            the stream ordering of the latest persisted event
+            List of events persisted, the current position room stream position.
+            The list of events persisted may not be the same as those passed in
+            if they were deduplicated due to an event already existing that
+            matched the transcation ID; the existing event is returned in such
+            a case.
         """
         partitioned = {}  # type: Dict[str, List[Tuple[EventBase, EventContext]]]
         for event, ctx in events_and_contexts:
@@ -225,19 +229,41 @@ class EventsPersistenceStorage:
         for room_id in partitioned:
             self._maybe_start_persisting(room_id)
 
-        await make_deferred_yieldable(
+        # The deferred returns a map from event ID to existing event ID if the
+        # event was deduplicated. (The dict may also include other entries if
+        # the event was persisted in a batch with other events).
+        #
+        # Since we use `defer.gatherResults` we need to merge the returned list
+        # of dicts into one.
+        ret_vals = await make_deferred_yieldable(
             defer.gatherResults(deferreds, consumeErrors=True)
         )
+        replaced_events = {}
+        for d in ret_vals:
+            replaced_events.update(d)
 
-        return self.main_store.get_room_max_token()
+        events = []
+        for event, _ in events_and_contexts:
+            existing_event_id = replaced_events.get(event.event_id)
+            if existing_event_id:
+                events.append(await self.main_store.get_event(existing_event_id))
+            else:
+                events.append(event)
+
+        return (
+            events,
+            self.main_store.get_room_max_token(),
+        )
 
     async def persist_event(
         self, event: EventBase, context: EventContext, backfilled: bool = False
-    ) -> Tuple[PersistedEventPosition, RoomStreamToken]:
+    ) -> Tuple[EventBase, PersistedEventPosition, RoomStreamToken]:
         """
         Returns:
-            The stream ordering of `event`, and the stream ordering of the
-            latest persisted event
+            The event, stream ordering of `event`, and the stream ordering of the
+            latest persisted event. The returned event may not match the given
+            event if it was deduplicated due to an existing event matching the
+            transaction ID.
         """
         deferred = self._event_persist_queue.add_to_queue(
             event.room_id, [(event, context)], backfilled=backfilled
@@ -245,6 +271,9 @@ class EventsPersistenceStorage:
 
         self._maybe_start_persisting(event.room_id)
 
+        # The deferred returns a map from event ID to existing event ID if the
+        # event was deduplicated. (The dict may also include other entries if
+        # the event was persisted in a batch with other events.)
         replaced_events = await make_deferred_yieldable(deferred)
         replaced_event = replaced_events.get(event.event_id)
         if replaced_event:
@@ -253,12 +282,12 @@ class EventsPersistenceStorage:
         event_stream_id = event.internal_metadata.stream_ordering
 
         pos = PersistedEventPosition(self._instance_name, event_stream_id)
-        return pos, self.main_store.get_room_max_token()
+        return event, pos, self.main_store.get_room_max_token()
 
     def _maybe_start_persisting(self, room_id: str):
         async def persisting_queue(item):
             with Measure(self._clock, "persist_events"):
-                await self._persist_events(
+                return await self._persist_events(
                     item.events_and_contexts, backfilled=item.backfilled
                 )
 
