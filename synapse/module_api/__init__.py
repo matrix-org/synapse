@@ -18,11 +18,13 @@ from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 
 from twisted.internet import defer
 
+from synapse.api.constants import EventTypes
+from synapse.events import EventBase
 from synapse.http.client import SimpleHttpClient
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.storage.state import StateFilter
-from synapse.types import UserID
+from synapse.types import JsonDict, UserID, create_requester
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -52,6 +54,7 @@ class ModuleApi:
         # We expose these as properties below in order to attach a helpful docstring.
         self._http_client = hs.get_simple_http_client()  # type: SimpleHttpClient
         self._public_room_list_manager = PublicRoomListManager(hs)
+        self._event_creation_handler = hs.get_event_creation_handler()
 
     @property
     def http_client(self):
@@ -319,6 +322,62 @@ class ModuleApi:
         )
         state = yield defer.ensureDeferred(self._store.get_events(state_ids.values()))
         return state.values()
+
+    async def create_and_send_event_into_room(
+        self,
+        sender: str,
+        room_id: str,
+        event_type: str,
+        content: JsonDict,
+        state_key: Optional[str] = None,
+    ) -> EventBase:
+        """Create and send an event into a room.
+
+        Args:
+            sender: The user ID of the event sender.
+            room_id: The ID of the room to send the event into.
+            event_type: The type of the event.
+            content: The event content.
+            state_key: The event's state key. None if this is not a state event.
+
+        Returns:
+            The event that was sent.
+
+        Raises:
+            SynapseError if the event was not allowed.
+        """
+        if event_type == EventTypes.Member:
+            raise Exception(
+                "ThirdPartyEventRules modules are not currently able to send "
+                "m.room.member events"
+            )
+
+        # Build event dictionary
+        event_dict = {
+            "type": event_type,
+            "content": content,
+            "room_id": room_id,
+            "sender": sender,
+        }
+
+        # Check whether this is intended to be a state event
+        if state_key is not None:
+            event_dict["state_key"] = state_key
+
+        # Create a requester object
+        requester = create_requester(sender)
+
+        # Create and send the event
+        event, _ = await self._event_creation_handler.create_and_send_nonmember_event(
+            requester,
+            event_dict,
+            ratelimit=False,
+            ignore_shadow_ban=True,
+            ignore_spam_check=True,
+            ignore_third_party_event_rules=True,
+        )
+
+        return event
 
 
 class PublicRoomListManager:
