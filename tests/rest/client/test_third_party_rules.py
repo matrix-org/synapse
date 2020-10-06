@@ -94,7 +94,7 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
 
         callback.assert_called_once()
 
-        # there should be various state events in the state arg: do some basic cheks
+        # there should be various state events in the state arg: do some basic checks
         state_arg = callback.call_args[0][1]
         for k in (("m.room.create", ""), ("m.room.member", self.user_id)):
             self.assertIn(k, state_arg)
