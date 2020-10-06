@@ -131,7 +131,9 @@ class ThirdPartyEventRules:
         if self.third_party_rules is None:
             return True
 
-        check_func = getattr(self.third_party_rules, "check_visibility_can_be_modified")
+        check_func = getattr(
+            self.third_party_rules, "check_visibility_can_be_modified", None
+        )
         if not check_func or not isinstance(check_func, Callable):
             return True
 

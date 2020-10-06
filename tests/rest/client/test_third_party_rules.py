@@ -49,7 +49,7 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         config = self.default_config()
         config["third_party_event_rules"] = {
-            "module": "tests.rest.client.third_party_rules.ThirdPartyRulesTestModule",
+            "module": __name__ + ".ThirdPartyRulesTestModule",
             "config": {},
         }
 
