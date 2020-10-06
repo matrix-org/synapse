@@ -2967,7 +2967,7 @@ class FederationHandler(BaseHandler):
         else:
             assert self.storage.persistence
 
-            # Note that this returns the events that wer persisted, which may not be
+            # Note that this returns the events that were persisted, which may not be
             # the same as we passed in if some were deduplicated due transaction IDs.
             events, max_stream_token = await self.storage.persistence.persist_events(
                 event_and_contexts, backfilled=backfilled
