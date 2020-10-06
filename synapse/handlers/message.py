@@ -1116,7 +1116,7 @@ class EventCreationHandler:
             room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
             if event_auth.check_redaction(
-                room_version_obj, event, auth_events=auth_events
+                room_version_obj, event, auth_events=auth_events, original_event=original_event
             ):
                 # this user doesn't have 'redact' rights, so we need to do some more
                 # checks on the original event. Let's start by checking the original

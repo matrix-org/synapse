@@ -161,6 +161,7 @@ def check(
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug("Auth events: %s", [a.event_id for a in auth_events.values()])
 
+    # 5. If type if m.room.membership
     if event.type == EventTypes.Member:
         _is_membership_change_allowed(event, auth_events)
         logger.debug("Allowing! %s", event)
@@ -267,7 +268,6 @@ def _is_membership_change_allowed(
 
     # FIXME (erikj): What should we do here as the default?
     ban_level = _get_named_level(auth_events, "ban", 50)
-    knock_level = _get_named_level(auth_events, "knock", 0)
 
     logger.debug(
         "_is_membership_change_allowed: %s",
@@ -345,13 +345,14 @@ def _is_membership_change_allowed(
         if user_level < ban_level or user_level <= target_level:
             raise AuthError(403, "You don't have permission to ban")
     elif Membership.KNOCK == membership:
-        # check that we have the leave event
-        if target and target.membership != Membership.LEAVE:
+        if join_rule != JoinRules.KNOCK:
             raise AuthError(403, "You don't have permission to knock")
-        elif join_rule != JoinRules.INVITE:
-            raise AuthError(403, "You don't have permission to knock")
-        elif user_level < knock_level:
-            raise AuthError(403, "You don't have permission to knock")
+        elif target_user_id != event.user_id:
+            raise AuthError(403, "You cannot knock for other users")
+        elif target_in_room:
+            raise AuthError(403, "You cannot knock on a room you are already in")
+        elif target_banned:
+            raise AuthError(403, "You are banned from this room")
     else:
         raise AuthError(500, "Unknown membership %s" % membership)
 
@@ -432,7 +433,10 @@ def _can_send_event(event: EventBase, auth_events: StateMap[EventBase]) -> bool:
 
 
 def check_redaction(
-    room_version_obj: RoomVersion, event: EventBase, auth_events: StateMap[EventBase],
+    room_version_obj: RoomVersion,
+    event: EventBase,
+    auth_events: StateMap[EventBase],
+    original_event: EventBase,
 ) -> bool:
     """Check whether the event sender is allowed to redact the target event.
 
@@ -463,6 +467,13 @@ def check_redaction(
     else:
         event.internal_metadata.recheck_redaction = True
         return True
+
+    if (
+        original_event.type == EventTypes.Member
+        and original_event.content
+        and original_event.content.get("membership", None) == Membership.KNOCK
+    ):
+        raise AuthError(403, "It is not possible to redact knocks")
 
     raise AuthError(403, "You don't have permission to redact events")
 

@@ -89,6 +89,9 @@ class Auth:
         auth_events = await self.store.get_events(auth_events_ids)
         auth_events = {(e.type, e.state_key): e for e in auth_events.values()}
 
+        # TODO:
+        # Would need to thread original_event everywhere we call event_auth.check
+        # Ask in #synapse-dev about this first...
         room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
         event_auth.check(
             room_version_obj, event, auth_events=auth_events, do_sig_check=do_sig_check
