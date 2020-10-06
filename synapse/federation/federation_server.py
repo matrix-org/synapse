@@ -861,7 +861,7 @@ class FederationHandlerRegistry:
         self._edu_type_to_instance = {}  # type: Dict[str, str]
 
     def register_edu_handler(
-        self, edu_type: str, handler: Callable[[str, dict], Awaitable[None]]
+        self, edu_type: str, handler: Callable[[str, JsonDict], Awaitable[None]]
     ):
         """Sets the handler callable that will be used to handle an incoming
         federation EDU of the given type.
