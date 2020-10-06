@@ -117,6 +117,7 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         # first patch the event checker so that it will modify the event
         async def check(ev: EventBase, state):
             ev.content = {"x": "y"}
+            return True
 
         current_rules_module().check_event_allowed = check
 
