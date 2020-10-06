@@ -367,6 +367,8 @@ class PersistEventsStore:
 
         self._store_event_txn(txn, events_and_contexts=events_and_contexts)
 
+        self._persist_transaction_ids_txn(txn, events_and_contexts)
+
         # Insert into event_to_state_groups.
         self._store_event_state_mappings_txn(txn, events_and_contexts)
 
@@ -410,6 +412,34 @@ class PersistEventsStore:
         # We call this last as it assumes we've inserted the events into
         # room_memberships, where applicable.
         self._update_current_state_txn(txn, state_delta_for_room, min_stream_order)
+
+    def _persist_transaction_ids_txn(
+        self,
+        txn: LoggingTransaction,
+        events_and_contexts: List[Tuple[EventBase, EventContext]],
+    ):
+        """Persist the mapping from transaction IDs to event IDs (if defined).
+        """
+
+        to_insert = []
+        for event, _ in events_and_contexts:
+            token_id = getattr(event.internal_metadata, "token_id", None)
+            txn_id = getattr(event.internal_metadata, "txn_id", None)
+            if token_id and txn_id:
+                to_insert.append(
+                    {
+                        "event_id": event.event_id,
+                        "user_id": event.sender,
+                        "token_id": token_id,
+                        "txn_id": txn_id,
+                        "inserted_ts": self._clock.time_msec(),
+                    }
+                )
+
+        if to_insert:
+            self.db_pool.simple_insert_many_txn(
+                txn, table="event_txn_id", values=to_insert,
+            )
 
     def _update_current_state_txn(
         self,

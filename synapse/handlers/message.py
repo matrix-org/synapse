@@ -752,6 +752,14 @@ class EventCreationHandler:
         # extremities to pile up, which in turn leads to state resolution
         # taking longer.
         with (await self.limiter.queue(event_dict["room_id"])):
+            if txn_id and requester.access_token_id:
+                existing_event_id = await self.store.get_event_id_from_transaction_id(
+                    requester.user.to_string(), requester.access_token_id, txn_id,
+                )
+                if existing_event_id:
+                    event = await self.store.get_event(existing_event_id)
+                    return event, event.internal_metadata.stream_ordering
+
             event, context = await self.create_event(
                 requester, event_dict, token_id=requester.access_token_id, txn_id=txn_id
             )

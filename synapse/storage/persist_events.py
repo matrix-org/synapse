@@ -245,7 +245,10 @@ class EventsPersistenceStorage:
 
         self._maybe_start_persisting(event.room_id)
 
-        await make_deferred_yieldable(deferred)
+        replaced_events = await make_deferred_yieldable(deferred)
+        replaced_event = replaced_events.get(event.event_id)
+        if replaced_event:
+            event = await self.main_store.get_event(replaced_event)
 
         event_stream_id = event.internal_metadata.stream_ordering
 
@@ -265,12 +268,37 @@ class EventsPersistenceStorage:
         self,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
         backfilled: bool = False,
-    ):
+    ) -> Dict[str, str]:
         """Calculates the change to current state and forward extremities, and
         persists the given events and with those updates.
+
+        Returns:
+            A dictionary of event ID to event ID we didn't persist as we already
+            had another event persisted with the same TXN ID.
         """
+        replaced_events = {}  # type: Dict[str, str]
         if not events_and_contexts:
-            return
+            return replaced_events
+
+        # Check if any of the events have a transaction ID that has already been
+        # persitsed, and if so we don't persist again.
+        #
+        # We should have checked this a long time before we get here, but its
+        # possible that different send event requests race in such a way that
+        # they both pass the earlier checks.
+        replaced_events = await self.main_store.get_already_persisted_events(
+            (event for event, _ in events_and_contexts)
+        )
+
+        if replaced_events:
+            events_and_contexts = [
+                (e, ctx)
+                for e, ctx in events_and_contexts
+                if e.event_id not in replaced_events
+            ]
+
+            if not events_and_contexts:
+                return replaced_events
 
         chunks = [
             events_and_contexts[x : x + 100]
@@ -438,6 +466,8 @@ class EventsPersistenceStorage:
             )
 
             await self._handle_potentially_left_users(potentially_left_users)
+
+        return replaced_events
 
     async def _calculate_new_extremities(
         self,
