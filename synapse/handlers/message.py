@@ -671,6 +671,7 @@ class EventCreationHandler:
         ratelimit: bool = True,
         txn_id: Optional[str] = None,
         ignore_shadow_ban: bool = False,
+        ignore_spam_check: bool = False,
     ) -> Tuple[EventBase, int]:
         """
         Creates an event, then sends it.
@@ -684,6 +685,7 @@ class EventCreationHandler:
             txn_id: The transaction ID.
             ignore_shadow_ban: True if shadow-banned users should be allowed to
                 send this event.
+            ignore_spam_check: True to bypass spam-checking of the event.
 
         Returns:
             The event, and its stream ordering (if state event deduplication happened,
@@ -691,6 +693,8 @@ class EventCreationHandler:
 
         Raises:
             ShadowBanError if the requester has been shadow-banned.
+            SynapseError if ignore_spam_check is False and the event is considered spam, or is
+                not allowed for some other reason.
         """
 
         if event_dict["type"] == EventTypes.Member:
@@ -717,11 +721,12 @@ class EventCreationHandler:
                 event.sender,
             )
 
-            spam_error = self.spam_checker.check_event_for_spam(event)
-            if spam_error:
-                if not isinstance(spam_error, str):
-                    spam_error = "Spam is not permitted here"
-                raise SynapseError(403, spam_error, Codes.FORBIDDEN)
+            if not ignore_spam_check:
+                spam_error = self.spam_checker.check_event_for_spam(event)
+                if spam_error:
+                    if not isinstance(spam_error, str):
+                        spam_error = "Spam is not permitted here"
+                    raise SynapseError(403, spam_error, Codes.FORBIDDEN)
 
             ev = await self.handle_new_client_event(
                 requester=requester,
