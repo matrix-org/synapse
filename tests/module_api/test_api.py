@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.module_api import ModuleApi
+
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 
