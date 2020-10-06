@@ -1226,7 +1226,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
 
     @cached()
     async def get_id_for_instance(self, instance_name: str) -> int:
-        """Get a unique, immutable ID that corresponds to the instance.
+        """Get a unique, immutable ID that corresponds to the given Synapse worker instance.
         """
 
         def _get_id_for_instance_txn(txn):

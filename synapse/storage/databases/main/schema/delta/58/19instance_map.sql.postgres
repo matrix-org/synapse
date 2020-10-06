@@ -17,9 +17,9 @@
 -- A unique and immutable mapping between instance name and an integer ID. This
 -- lets us refer to instances via a small ID in e.g. stream tokens, without
 -- having to encode the full name.
-CREATE TABLE instance_map (
+CREATE TABLE IF NOT EXISTS instance_map (
     instance_id SERIAL PRIMARY KEY,
     instance_name TEXT NOT NULL
 );
 
-CREATE UNIQUE INDEX instance_map_idx ON instance_map(instance_name);
+CREATE UNIQUE INDEX IF NOT EXISTS instance_map_idx ON instance_map(instance_name);
