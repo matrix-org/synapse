@@ -18,12 +18,9 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import attr
 
-from synapse.metrics.background_process_metrics import (
-    run_as_background_process,
-    wrap_as_background_process,
-)
+from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 
@@ -522,15 +519,14 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 "Error removing push actions after event persistence failure"
             )
 
-    def _find_stream_orderings_for_times(self):
-        return run_as_background_process(
-            "event_push_action_stream_orderings",
-            self.db_pool.runInteraction,
+    @wrap_as_background_process("event_push_action_stream_orderings")
+    async def _find_stream_orderings_for_times(self) -> None:
+        await self.db_pool.runInteraction(
             "_find_stream_orderings_for_times",
             self._find_stream_orderings_for_times_txn,
         )
 
-    def _find_stream_orderings_for_times_txn(self, txn):
+    def _find_stream_orderings_for_times_txn(self, txn: LoggingTransaction) -> None:
         logger.info("Searching for stream ordering 1 month ago")
         self.stream_ordering_month_ago = self._find_first_stream_ordering_after_ts_txn(
             txn, self._clock.time_msec() - 30 * 24 * 60 * 60 * 1000
