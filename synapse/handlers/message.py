@@ -402,21 +402,23 @@ class EventCreationHandler:
             self.config.block_events_without_consent_error
         )
 
-        # Rooms which should be excluded from dummy insertion. (For instance,
-        # those without local users who can send events into the room).
-        #
-        # map from room id to time-of-last-attempt.
-        #
-        self._rooms_to_exclude_from_dummy_event_insertion = {}  # type: Dict[str, int]
-
         # we need to construct a ConsentURIBuilder here, as it checks that the necessary
         # config options, but *only* if we have a configuration for which we are
         # going to need it.
         if self._block_events_without_consent_error:
             self._consent_uri_builder = ConsentURIBuilder(self.config)
 
+        # Rooms which should be excluded from dummy insertion. (For instance,
+        # those without local users who can send events into the room).
+        #
+        # map from room id to time-of-last-attempt.
+        #
+        self._rooms_to_exclude_from_dummy_event_insertion = {}  # type: Dict[str, int]
+        # The number of forward extremeities before a dummy event is sent.
+        self._dummy_events_threshold = hs.config.dummy_events_threshold
+
         if (
-            not self.config.worker_app
+            self.config.run_background_tasks
             and self.config.cleanup_extremities_with_dummy_events
         ):
             self.clock.looping_call(
@@ -430,8 +432,6 @@ class EventCreationHandler:
         self._message_handler = hs.get_message_handler()
 
         self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
-
-        self._dummy_events_threshold = hs.config.dummy_events_threshold
 
     async def create_event(
         self,
