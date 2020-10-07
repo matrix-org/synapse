@@ -18,7 +18,6 @@ from mock import Mock
 from synapse.api.auth import Auth
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, ResourceLimitError, SynapseError
-from synapse.handlers.register import RegistrationHandler
 from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.types import RoomAlias, UserID, create_requester
 
@@ -27,11 +26,6 @@ from tests.unittest import override_config
 from tests.utils import mock_getRawHeaders
 
 from .. import unittest
-
-
-class RegistrationHandlers:
-    def __init__(self, hs):
-        self.registration_handler = RegistrationHandler(hs)
 
 
 class RegistrationTestCase(unittest.HomeserverTestCase):
