@@ -383,7 +383,7 @@ class PaginationHandler:
                             "room_key", leave_token
                         )
 
-                await self.hs.get_handlers().federation_handler.maybe_backfill(
+                await self.hs.get_federation_handler().maybe_backfill(
                     room_id, curr_topo, limit=pagin_config.limit,
                 )
 

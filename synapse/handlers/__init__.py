@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .federation import FederationHandler
-
 
 class Handlers:
 
@@ -36,4 +34,4 @@ class Handlers:
     """
 
     def __init__(self, hs):
-        self.federation_handler = FederationHandler(hs)
+        pass

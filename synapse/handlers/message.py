@@ -1040,7 +1040,7 @@ class EventCreationHandler:
                         directory_handler, alias_str, event.room_id
                     )
 
-        federation_handler = self.hs.get_handlers().federation_handler
+        federation_handler = self.hs.get_federation_handler()
 
         if event.type == EventTypes.Member:
             if event.content["membership"] == Membership.INVITE:

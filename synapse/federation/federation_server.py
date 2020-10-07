@@ -99,7 +99,7 @@ class FederationServer(FederationBase):
         super().__init__(hs)
 
         self.auth = hs.get_auth()
-        self.handler = hs.get_handlers().federation_handler
+        self.handler = hs.get_federation_handler()
         self.state = hs.get_state_handler()
 
         self.device_handler = hs.get_device_handler()
