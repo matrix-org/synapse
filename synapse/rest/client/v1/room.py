@@ -112,7 +112,6 @@ class RoomCreateRestServlet(TransactionRestServlet):
 class RoomStateEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
         super().__init__(hs)
-        self.handlers = hs.get_handlers()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.message_handler = hs.get_message_handler()
@@ -798,7 +797,6 @@ class RoomMembershipRestServlet(TransactionRestServlet):
 class RoomRedactEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
         super().__init__(hs)
-        self.handlers = hs.get_handlers()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
 

@@ -12,26 +12,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
-class Handlers:
-
-    """ Deprecated. A collection of handlers.
-
-    At some point most of the classes whose name ended "Handler" were
-    accessed through this class.
-
-    However this makes it painful to unit test the handlers and to run cut
-    down versions of synapse that only use specific handlers because using a
-    single handler required creating all of the handlers. So some of the
-    handlers have been lifted out of the Handlers object and are now accessed
-    directly through the homeserver object itself.
-
-    Any new handlers should follow the new pattern of being accessed through
-    the homeserver object and should not be added to the Handlers object.
-
-    The remaining handlers should be moved out of the handlers object.
-    """
-
-    def __init__(self, hs):
-        pass

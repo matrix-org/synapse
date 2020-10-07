@@ -54,7 +54,6 @@ from synapse.federation.sender import FederationSender
 from synapse.federation.transport.client import TransportLayerClient
 from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
 from synapse.groups.groups_server import GroupsServerHandler, GroupsServerWorkerHandler
-from synapse.handlers import Handlers
 from synapse.handlers.account_validity import AccountValidityHandler
 from synapse.handlers.acme import AcmeHandler
 from synapse.handlers.admin import AdminHandler
@@ -322,10 +321,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_federation_server(self) -> FederationServer:
         return FederationServer(self)
-
-    @cache_in_self
-    def get_handlers(self) -> Handlers:
-        return Handlers(self)
 
     @cache_in_self
     def get_notifier(self) -> Notifier:
