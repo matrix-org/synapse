@@ -16,6 +16,9 @@
 
 -- A map of recent events persisted with transaction IDs. Used to deduplicate
 -- send event requests with the same transaction ID.
+--
+-- Note, transaction IDs are scoped to the user ID/access token that was used to
+-- make the request.
 CREATE TABLE event_txn_id (
     event_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
