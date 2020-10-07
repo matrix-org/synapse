@@ -14,13 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 
 from twisted.internet import defer
 
 from synapse.http.client import SimpleHttpClient
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.storage.state import StateFilter
 from synapse.types import UserID
 
 if TYPE_CHECKING:
@@ -292,6 +293,32 @@ class ModuleApi:
         await self._auth_handler.complete_sso_login(
             registered_user_id, request, client_redirect_url,
         )
+
+    @defer.inlineCallbacks
+    def get_state_events_in_room(
+        self, room_id: str, types: Iterable[Tuple[str, Optional[str]]]
+    ) -> defer.Deferred:
+        """Gets current state events for the given room.
+
+        (This is exposed for compatibility with the old SpamCheckerApi. We should
+        probably deprecate it and replace it with an async method in a subclass.)
+
+        Args:
+            room_id: The room ID to get state events in.
+            types: The event type and state key (using None
+                to represent 'any') of the room state to acquire.
+
+        Returns:
+            twisted.internet.defer.Deferred[list(synapse.events.FrozenEvent)]:
+                The filtered state events in the room.
+        """
+        state_ids = yield defer.ensureDeferred(
+            self._store.get_filtered_current_state_ids(
+                room_id=room_id, state_filter=StateFilter.from_types(types)
+            )
+        )
+        state = yield defer.ensureDeferred(self._store.get_events(state_ids.values()))
+        return state.values()
 
 
 class PublicRoomListManager:

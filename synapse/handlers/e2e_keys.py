@@ -496,6 +496,22 @@ class E2eKeysHandler:
             log_kv(
                 {"message": "Did not update one_time_keys", "reason": "no keys given"}
             )
+        fallback_keys = keys.get("org.matrix.msc2732.fallback_keys", None)
+        if fallback_keys and isinstance(fallback_keys, dict):
+            log_kv(
+                {
+                    "message": "Updating fallback_keys for device.",
+                    "user_id": user_id,
+                    "device_id": device_id,
+                }
+            )
+            await self.store.set_e2e_fallback_keys(user_id, device_id, fallback_keys)
+        elif fallback_keys:
+            log_kv({"message": "Did not update fallback_keys", "reason": "not a dict"})
+        else:
+            log_kv(
+                {"message": "Did not update fallback_keys", "reason": "no keys given"}
+            )
 
         # the device should have been registered already, but it may have been
         # deleted due to a race with a DELETE request. Or we may be using an

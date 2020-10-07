@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.module_api import ModuleApi
+
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 
@@ -28,7 +28,7 @@ class ModuleApiTestCase(HomeserverTestCase):
 
     def prepare(self, reactor, clock, homeserver):
         self.store = homeserver.get_datastore()
-        self.module_api = ModuleApi(homeserver, homeserver.get_auth_handler())
+        self.module_api = homeserver.get_module_api()
 
     def test_can_register_user(self):
         """Tests that an external module can register a user"""

@@ -651,6 +651,11 @@ def respond_with_json_bytes(
     Returns:
         twisted.web.server.NOT_DONE_YET if the request is still active.
     """
+    if request._disconnected:
+        logger.warning(
+            "Not sending response to request %s, already disconnected.", request
+        )
+        return
 
     request.setResponseCode(code)
     request.setHeader(b"Content-Type", b"application/json")

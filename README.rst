@@ -290,19 +290,6 @@ Testing with SyTest is recommended for verifying that changes related to the
 Client-Server API are functioning correctly. See the `installation instructions
 <https://github.com/matrix-org/sytest#installing>`_ for details.
 
-Building Internal API Documentation
-===================================
-
-Before building internal API documentation install sphinx and
-sphinxcontrib-napoleon::
-
-    pip install sphinx
-    pip install sphinxcontrib-napoleon
-
-Building internal API documentation::
-
-    python setup.py build_sphinx
-
 Troubleshooting
 ===============
 
