@@ -16,7 +16,7 @@
 import logging
 import operator
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import AccountDataTypes, EventTypes, Membership
 from synapse.events.utils import prune_event
 from synapse.storage import Storage
 from synapse.storage.state import StateFilter
@@ -77,15 +77,14 @@ async def filter_events_for_client(
     )
 
     ignore_dict_content = await storage.main.get_global_account_data_by_type_for_user(
-        "m.ignored_user_list", user_id
+        AccountDataTypes.IGNORED_USER_LIST, user_id
     )
 
-    # FIXME: This will explode if people upload something incorrect.
-    ignore_list = frozenset(
-        ignore_dict_content.get("ignored_users", {}).keys()
-        if ignore_dict_content
-        else []
-    )
+    ignore_list = frozenset()
+    if ignore_dict_content:
+        ignored_users_dict = ignore_dict_content.get("ignored_users", {})
+        if isinstance(ignored_users_dict, dict):
+            ignore_list = frozenset(ignored_users_dict.keys())
 
     erased_senders = await storage.main.are_users_erased((e.sender for e in events))
 

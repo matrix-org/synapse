@@ -35,9 +35,12 @@ This gives a Python REPL in which `hs` gives access to the
 `synapse.server.HomeServer` object - which in turn gives access to many other
 parts of the process.
 
+Note that any call which returns a coroutine will need to be wrapped in `ensureDeferred`.
+
 As a simple example, retrieving an event from the database:
 
-```
->>> hs.get_datastore().get_event('$1416420717069yeQaw:matrix.org')
+```pycon
+>>> from twisted.internet import defer
+>>> defer.ensureDeferred(hs.get_datastore().get_event('$1416420717069yeQaw:matrix.org'))
 <Deferred at 0x7ff253fc6998 current result: <FrozenEvent event_id='$1416420717069yeQaw:matrix.org', type='m.room.create', state_key=''>>
 ```

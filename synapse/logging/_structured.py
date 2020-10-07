@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 import os.path
 import sys
@@ -89,14 +88,7 @@ class LogContextObserver:
         context = current_context()
 
         # Copy the context information to the log event.
-        if context is not None:
-            context.copy_to_twisted_log_entry(event)
-        else:
-            # If there's no logging context, not even the root one, we might be
-            # starting up or it might be from non-Synapse code. Log it as if it
-            # came from the root logger.
-            event["request"] = None
-            event["scope"] = None
+        context.copy_to_twisted_log_entry(event)
 
         self.observer(event)
 

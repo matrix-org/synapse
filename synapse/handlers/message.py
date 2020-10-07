@@ -635,64 +635,6 @@ class EventCreationHandler:
         msg = self._block_events_without_consent_error % {"consent_uri": consent_uri}
         raise ConsentNotGivenError(msg=msg, consent_uri=consent_uri)
 
-    async def send_nonmember_event(
-        self,
-        requester: Requester,
-        event: EventBase,
-        context: EventContext,
-        ratelimit: bool = True,
-        ignore_shadow_ban: bool = False,
-    ) -> Tuple[EventBase, int]:
-        """
-        Persists and notifies local clients and federation of an event.
-
-        Args:
-            requester: The requester sending the event.
-            event: The event to send.
-            context: The context of the event.
-            ratelimit: Whether to rate limit this send.
-            ignore_shadow_ban: True if shadow-banned users should be allowed to
-                send this event.
-
-        Returns:
-            The event and stream_id of the persisted event. The returned event
-            may not match the given event if it was deduplicated due to an
-            existing event matching the transaction ID.
-
-        Raises:
-            ShadowBanError if the requester has been shadow-banned.
-        """
-        if event.type == EventTypes.Member:
-            raise SynapseError(
-                500, "Tried to send member event through non-member codepath"
-            )
-
-        if not ignore_shadow_ban and requester.shadow_banned:
-            # We randomly sleep a bit just to annoy the requester.
-            await self.clock.sleep(random.randint(1, 10))
-            raise ShadowBanError()
-
-        user = UserID.from_string(event.sender)
-
-        assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
-
-        if event.is_state():
-            prev_event = await self.deduplicate_state_event(event, context)
-            if prev_event is not None:
-                logger.info(
-                    "Not bothering to persist state event %s duplicated by %s",
-                    event.event_id,
-                    prev_event.event_id,
-                )
-                return (
-                    prev_event,
-                    prev_event.internal_metadata.stream_ordering,
-                )
-
-        return await self.handle_new_client_event(
-            requester=requester, event=event, context=context, ratelimit=ratelimit
-        )
-
     async def deduplicate_state_event(
         self, event: EventBase, context: EventContext
     ) -> Optional[EventBase]:
@@ -733,7 +675,7 @@ class EventCreationHandler:
         """
         Creates an event, then sends it.
 
-        See self.create_event and self.send_nonmember_event.
+        See self.create_event and self.handle_new_client_event.
 
         Args:
             requester: The requester sending the event.
@@ -744,13 +686,18 @@ class EventCreationHandler:
                 send this event.
 
         Returns:
-            The event and stream_id of the persisted event. The returned event
-            may not match the given event if it was deduplicated due to an
-            existing event matching the transaction ID.
+            The event, and its stream ordering (if deduplication happened,
+            the previous, duplicate event).
 
         Raises:
             ShadowBanError if the requester has been shadow-banned.
         """
+
+        if event_dict["type"] == EventTypes.Member:
+            raise SynapseError(
+                500, "Tried to send member event through non-member codepath"
+            )
+
         if not ignore_shadow_ban and requester.shadow_banned:
             # We randomly sleep a bit just to annoy the requester.
             await self.clock.sleep(random.randint(1, 10))
@@ -768,10 +715,16 @@ class EventCreationHandler:
                 )
                 if existing_event_id:
                     event = await self.store.get_event(existing_event_id)
+                    # we know it was persisted, so must have a stream ordering
+                    assert event.internal_metadata.stream_ordering
                     return event, event.internal_metadata.stream_ordering
 
             event, context = await self.create_event(
                 requester, event_dict, token_id=requester.access_token_id, txn_id=txn_id
+            )
+
+            assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
+                event.sender,
             )
 
             spam_error = self.spam_checker.check_event_for_spam(event)
@@ -780,14 +733,17 @@ class EventCreationHandler:
                     spam_error = "Spam is not permitted here"
                 raise SynapseError(403, spam_error, Codes.FORBIDDEN)
 
-            event, stream_id = await self.send_nonmember_event(
-                requester,
-                event,
-                context,
+            ev = await self.handle_new_client_event(
+                requester=requester,
+                event=event,
+                context=context,
                 ratelimit=ratelimit,
                 ignore_shadow_ban=ignore_shadow_ban,
             )
-        return event, stream_id
+
+        # we know it was persisted, so must have a stream ordering
+        assert ev.internal_metadata.stream_ordering
+        return ev, ev.internal_metadata.stream_ordering
 
     @measure_func("create_new_client_event")
     async def create_new_client_event(
@@ -861,8 +817,11 @@ class EventCreationHandler:
         context: EventContext,
         ratelimit: bool = True,
         extra_users: List[UserID] = [],
-    ) -> Tuple[EventBase, int]:
-        """Processes a new event. This includes checking auth, persisting it,
+        ignore_shadow_ban: bool = False,
+    ) -> EventBase:
+        """Processes a new event.
+
+        This includes deduplicating, checking auth, persisting,
         notifying users, sending to remote servers, etc.
 
         If called from a worker will hit out to the master process for final
@@ -875,11 +834,38 @@ class EventCreationHandler:
             ratelimit
             extra_users: Any extra users to notify about event
 
-        Returns:
-            The event and stream_id of the persisted event. The returned event
-            may not match the given event if it was deduplicated due to an
-            existing event matching the transaction ID.
+            ignore_shadow_ban: True if shadow-banned users should be allowed to
+                send this event.
+
+        Return:
+            If the event was deduplicated, the previous, duplicate, event. Otherwise,
+            `event`.
+
+        Raises:
+            ShadowBanError if the requester has been shadow-banned.
         """
+
+        # we don't apply shadow-banning to membership events here. Invites are blocked
+        # higher up the stack, and we allow shadow-banned users to send join and leave
+        # events as normal.
+        if (
+            event.type != EventTypes.Member
+            and not ignore_shadow_ban
+            and requester.shadow_banned
+        ):
+            # We randomly sleep a bit just to annoy the requester.
+            await self.clock.sleep(random.randint(1, 10))
+            raise ShadowBanError()
+
+        if event.is_state():
+            prev_event = await self.deduplicate_state_event(event, context)
+            if prev_event is not None:
+                logger.info(
+                    "Not bothering to persist state event %s duplicated by %s",
+                    event.event_id,
+                    prev_event.event_id,
+                )
+                return prev_event
 
         if event.is_state() and (event.type, event.state_key) == (
             EventTypes.Create,
@@ -937,14 +923,15 @@ class EventCreationHandler:
                 event_id = result["event_id"]
                 if event_id != event.event_id:
                     event = await self.store.get_event(event_id)
-                event.internal_metadata.stream_ordering = stream_id
-                return event, stream_id
+                else:
+                    event.internal_metadata.stream_ordering = stream_id
+                return event
 
             event, stream_id = await self.persist_and_notify_client_event(
                 requester, event, context, ratelimit=ratelimit, extra_users=extra_users
             )
 
-            return event, stream_id
+            return event
         except Exception:
             # Ensure that we actually remove the entries in the push actions
             # staging area, if we calculated them.
@@ -1259,8 +1246,12 @@ class EventCreationHandler:
 
                 # Since this is a dummy-event it is OK if it is sent by a
                 # shadow-banned user.
-                await self.send_nonmember_event(
-                    requester, event, context, ratelimit=False, ignore_shadow_ban=True,
+                await self.handle_new_client_event(
+                    requester=requester,
+                    event=event,
+                    context=context,
+                    ratelimit=False,
+                    ignore_shadow_ban=True,
                 )
                 return True
             except ConsentNotGivenError:

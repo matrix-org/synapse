@@ -67,9 +67,10 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
 
         event1, context = create_duplicate_event()
 
-        ret_event1, stream_id1 = self.get_success(
+        ret_event1 = self.get_success(
             handler.handle_new_client_event(requester, event1, context)
         )
+        stream_id1 = ret_event1.internal_metadata.stream_ordering
 
         self.assertEqual(event1.event_id, ret_event1.event_id)
 
@@ -79,9 +80,10 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         # so we want to make sure we test with different events.
         self.assertNotEqual(event1.event_id, event2.event_id)
 
-        ret_event2, stream_id2 = self.get_success(
+        ret_event2 = self.get_success(
             handler.handle_new_client_event(requester, event2, context)
         )
+        stream_id2 = ret_event2.internal_metadata.stream_ordering
 
         # Assert that the returned values match those from the initial event
         # rather than the new one.
