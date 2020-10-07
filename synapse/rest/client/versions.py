@@ -62,6 +62,8 @@ class VersionsRestServlet(RestServlet):
                     "org.matrix.msc2432": True,
                     # Implements additional endpoints as described in MSC2666
                     "uk.half-shot.msc2666": True,
+                    # Implements additional endpoints and features as described in MSC2403
+                    "xyz.amorgan.knock": True,
                 },
             },
         )
