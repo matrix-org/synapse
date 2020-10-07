@@ -113,6 +113,13 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
     stats["database_engine"] = hs.get_datastore().db_pool.engine.module.__name__
     stats["database_server_version"] = hs.get_datastore().db_pool.engine.server_version
 
+    #
+    # Logging configuration
+    #
+    synapse_logger = logging.getLogger("synapse")
+    log_level = synapse_logger.getEffectiveLevel()
+    stats["log_level"] = logging.getLevelName(log_level)
+
     logger.info("Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats))
     try:
         await hs.get_proxied_http_client().put_json(
