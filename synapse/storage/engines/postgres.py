@@ -177,5 +177,5 @@ class PostgresEngine(BaseDatabaseEngine):
     def in_transaction(self, conn: Connection) -> bool:
         return conn.status != self.module.extensions.STATUS_READY  # type: ignore
 
-    def set_autocommit(self, conn: Connection, autocommit: bool):
+    def attempt_to_set_autocommit(self, conn: Connection, autocommit: bool):
         return conn.set_session(autocommit=autocommit)  # type: ignore

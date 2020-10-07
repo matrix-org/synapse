@@ -105,9 +105,12 @@ class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
         ...
 
     @abc.abstractmethod
-    def set_autocommit(self, conn: Connection, autocommit: bool):
-        """Set the connections autocommit mode.
+    def attempt_to_set_autocommit(self, conn: Connection, autocommit: bool):
+        """Attempt to set the connections autocommit mode.
 
         When True queries are run outside of transactions.
+
+        Note: This has no effect on SQLite3, so callers still need to
+        commit/rollback the connections.
         """
         ...

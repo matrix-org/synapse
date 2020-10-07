@@ -601,11 +601,11 @@ class DatabasePool:
 
             db_autocommit: Whether to run the function in "autocommit" mode,
                 i.e. outside of a transaction. This is useful for transactions
-                that are only a single query. 
-                
+                that are only a single query.
+
                 Currently, this is only implemented for Postgres. SQLite will still
                 run the function inside a transaction.
-                
+
                 WARNING: This means that if func fails half way through then
                 the changes will *not* be rolled back. `func` may also get
                 called multiple times if the transaction is retried, so must
@@ -694,7 +694,7 @@ class DatabasePool:
 
                 try:
                     if db_autocommit:
-                        self.engine.set_autocommit(conn, True)
+                        self.engine.attempt_to_set_autocommit(conn, True)
 
                     db_conn = LoggingDatabaseConnection(
                         conn, self.engine, "runWithConnection"
@@ -702,7 +702,7 @@ class DatabasePool:
                     return func(db_conn, *args, **kwargs)
                 finally:
                     if db_autocommit:
-                        self.engine.set_autocommit(conn, False)
+                        self.engine.attempt_to_set_autocommit(conn, False)
 
         return await make_deferred_yieldable(
             self._db_pool.runWithConnection(inner_func, *args, **kwargs)
