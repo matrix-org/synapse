@@ -835,8 +835,9 @@ class EventCreationHandler:
             ShadowBanError if the requester has been shadow-banned.
         """
 
-        # we don't apply shadow-banning to membership events, so that the user
-        # can come and go as they want.
+        # we don't apply shadow-banning to membership events here. Invites are blocked
+        # higher up the stack, and we allow shadow-banned users to send join and leave
+        # events as normal.
         if (
             event.type != EventTypes.Member
             and not ignore_shadow_ban
