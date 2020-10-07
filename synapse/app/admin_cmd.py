@@ -89,7 +89,7 @@ async def export_data_command(hs, args):
     user_id = args.user_id
     directory = args.output_directory
 
-    res = await hs.get_handlers().admin_handler.export_user_data(
+    res = await hs.get_admin_handler().export_user_data(
         user_id, FileExfiltrationWriter(user_id, directory=directory)
     )
     print(res)

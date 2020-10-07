@@ -57,6 +57,7 @@ from synapse.groups.groups_server import GroupsServerHandler, GroupsServerWorker
 from synapse.handlers import Handlers
 from synapse.handlers.account_validity import AccountValidityHandler
 from synapse.handlers.acme import AcmeHandler
+from synapse.handlers.admin import AdminHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler, MacaroonGenerator
 from synapse.handlers.cas_handler import CasHandler
@@ -426,6 +427,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_acme_handler(self) -> AcmeHandler:
         return AcmeHandler(self)
+
+    @cache_in_self
+    def get_admin_handler(self) -> AdminHandler:
+        return AdminHandler(self)
 
     @cache_in_self
     def get_application_service_api(self) -> ApplicationServiceApi:

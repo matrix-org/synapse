@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .admin import AdminHandler
 from .federation import FederationHandler
 
 
@@ -38,4 +37,3 @@ class Handlers:
 
     def __init__(self, hs):
         self.federation_handler = FederationHandler(hs)
-        self.admin_handler = AdminHandler(hs)

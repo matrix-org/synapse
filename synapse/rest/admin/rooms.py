@@ -138,7 +138,7 @@ class ListRoomRestServlet(RestServlet):
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
-        self.admin_handler = hs.get_handlers().admin_handler
+        self.admin_handler = hs.get_admin_handler()
 
     async def on_GET(self, request):
         requester = await self.auth.get_user_by_req(request)
@@ -273,7 +273,7 @@ class JoinRoomAliasServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.room_member_handler = hs.get_room_member_handler()
-        self.admin_handler = hs.get_handlers().admin_handler
+        self.admin_handler = hs.get_admin_handler()
         self.state_handler = hs.get_state_handler()
 
     async def on_POST(self, request, room_identifier):
