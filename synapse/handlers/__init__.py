@@ -16,7 +16,6 @@
 from .admin import AdminHandler
 from .directory import DirectoryHandler
 from .federation import FederationHandler
-from .identity import IdentityHandler
 from .search import SearchHandler
 
 
@@ -43,5 +42,4 @@ class Handlers:
         self.federation_handler = FederationHandler(hs)
         self.directory_handler = DirectoryHandler(hs)
         self.admin_handler = AdminHandler(hs)
-        self.identity_handler = IdentityHandler(hs)
         self.search_handler = SearchHandler(hs)

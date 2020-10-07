@@ -67,6 +67,7 @@ from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.e2e_room_keys import E2eRoomKeysHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.groups_local import GroupsLocalHandler, GroupsLocalWorkerHandler
+from synapse.handlers.identity import IdentityHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.message import EventCreationHandler, MessageHandler
 from synapse.handlers.pagination import PaginationHandler
@@ -439,6 +440,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_event_stream_handler(self) -> EventStreamHandler:
         return EventStreamHandler(self)
+
+    @cache_in_self
+    def get_identity_handler(self) -> IdentityHandler:
+        return IdentityHandler(self)
 
     @cache_in_self
     def get_initial_sync_handler(self) -> InitialSyncHandler:
