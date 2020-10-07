@@ -269,6 +269,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
         today_start = calendar.timegm((now.tm_year, now.tm_mon, now.tm_mday, 0, 0, 0))
         return today_start * 1000
 
+    @wrap_as_background_process("generate_user_daily_visits")
     async def generate_user_daily_visits(self) -> None:
         """
         Generates daily visit data for use in cohort/ retention analysis
