@@ -600,8 +600,12 @@ class DatabasePool:
                 its first argument, followed by `args` and `kwargs`.
 
             db_autocommit: Whether to run the function in "autocommit" mode,
-                i.e. outside of a transaction. This is useful for transaction
-                that are only a single query. Currently only affects postgres.
+                i.e. outside of a transaction. This is useful for transactions
+                that are only a single query. 
+                
+                Currently, this is only implemented for Postgres. SQLite will still
+                run the function inside a transaction.
+                
                 WARNING: This means that if func fails half way through then
                 the changes will *not* be rolled back. `func` may also get
                 called multiple times if the transaction is retried, so must
