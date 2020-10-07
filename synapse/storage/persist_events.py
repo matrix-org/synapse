@@ -310,9 +310,9 @@ class EventsPersistenceStorage:
             return replaced_events
 
         # Check if any of the events have a transaction ID that has already been
-        # persitsed, and if so we don't persist again.
+        # persisted, and if so we don't persist it again.
         #
-        # We should have checked this a long time before we get here, but its
+        # We should have checked this a long time before we get here, but it's
         # possible that different send event requests race in such a way that
         # they both pass the earlier checks.
         replaced_events = await self.main_store.get_already_persisted_events(

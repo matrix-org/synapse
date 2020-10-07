@@ -60,7 +60,7 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
                         "sender": requester.user.to_string(),
                         "content": {"msgtype": "m.text", "body": "Hello"},
                     },
-                    token_id=4957834,
+                    token_id=token_id,
                     txn_id=txn_id,
                 )
             )
