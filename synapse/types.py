@@ -432,15 +432,20 @@ class RoomStreamToken:
     stream = attr.ib(type=int, validator=attr.validators.instance_of(int))
 
     instance_map = attr.ib(
-        type=Dict[str, int], factory=dict, validator=attr.validators.instance_of(dict)
+        type=Dict[str, int],
+        factory=dict,
+        validator=attr.validators.deep_mapping(
+            key_validator=attr.validators.instance_of(str),
+            value_validator=attr.validators.instance_of(int),
+            mapping_validator=attr.validators.instance_of(dict),
+        ),
     )
 
-    @instance_map.validator
-    def _validate_topological_or_live(self, attribute, value):
+    def __attrs_post_init__(self):
         """Validates that both `topological` and `instance_map` aren't set.
         """
 
-        if value and self.topological:
+        if self.instance_map and self.topological:
             raise ValueError(
                 "Cannot set both 'topological' and 'instance_map' on 'RoomStreamToken'."
             )
@@ -513,11 +518,13 @@ class RoomStreamToken:
         return (self.topological, self.stream)
 
     def get_stream_pos_for_instance(self, instance_name: str) -> int:
-        """Get the stream position that the writer was at at this token.
+        """Get the stream position that the given writer was at at this token.
 
         This only makes sense for "live" tokens that may have a vector clock
-        component.
+        component, and so asserts that this is a "live" token.
         """
+        assert self.topological is None
+
         # If we don't have an entry for the instance we can assume that it was
         # at `self.stream`.
         return self.instance_map.get(instance_name, self.stream)
