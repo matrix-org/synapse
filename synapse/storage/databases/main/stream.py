@@ -234,7 +234,7 @@ def _filter_results(
     )
 
     if lower_token:
-        if lower_token.topological:
+        if lower_token.topological is not None:
             # If these are historical tokens we compare the `(topological, stream)`
             # tuples.
             if event_historical_tuple <= lower_token.as_historical_tuple():
@@ -249,7 +249,7 @@ def _filter_results(
                 return False
 
     if upper_token:
-        if upper_token.topological:
+        if upper_token.topological is not None:
             if upper_token.as_historical_tuple() < event_historical_tuple:
                 return False
         else:
