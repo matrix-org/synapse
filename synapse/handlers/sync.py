@@ -460,8 +460,13 @@ class SyncHandler:
                 recents = []
 
             if not limited or block_all_timeline:
+                prev_batch_token = now_token
+                if recents:
+                    room_key = recents[0].internal_metadata.before
+                    prev_batch_token = now_token.copy_and_replace("room_key", room_key)
+
                 return TimelineBatch(
-                    events=recents, prev_batch=now_token, limited=False
+                    events=recents, prev_batch=prev_batch_token, limited=False
                 )
 
             filtering_factor = 2
