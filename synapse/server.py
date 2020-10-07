@@ -85,6 +85,7 @@ from synapse.handlers.room import (
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
+from synapse.handlers.search import SearchHandler
 from synapse.handlers.set_password import SetPasswordHandler
 from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
@@ -463,6 +464,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_deactivate_account_handler(self) -> DeactivateAccountHandler:
         return DeactivateAccountHandler(self)
+
+    @cache_in_self
+    def get_search_handler(self) -> SearchHandler:
+        return SearchHandler(self)
 
     @cache_in_self
     def get_set_password_handler(self) -> SetPasswordHandler:
