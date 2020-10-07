@@ -20,10 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, StoreError, SynapseError, ThreepidValidationError
-from synapse.metrics.background_process_metrics import (
-    run_as_background_process,
-    wrap_as_background_process,
-)
+from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
 from synapse.storage.types import Cursor
@@ -53,10 +50,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         self._account_validity = hs.config.account_validity
         if hs.config.run_background_tasks and self._account_validity.enabled:
             self._clock.call_later(
-                0.0,
-                run_as_background_process,
-                "account_validity_set_expiration_dates",
-                self._set_expiration_date_when_missing,
+                0.0, self._set_expiration_date_when_missing,
             )
 
         # Create a background job for culling expired 3PID validity tokens
@@ -812,6 +806,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             self.clock.time_msec(),
         )
 
+    @wrap_as_background_process("account_validity_set_expiration_dates")
     async def _set_expiration_date_when_missing(self):
         """
         Retrieves the list of registered users that don't have an expiration date, and
