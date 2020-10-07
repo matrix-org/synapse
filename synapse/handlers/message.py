@@ -686,7 +686,7 @@ class EventCreationHandler:
                 )
                 return (
                     prev_event,
-                    await self.store.get_stream_id_for_event(prev_event.event_id),
+                    prev_event.internal_metadata.stream_ordering,
                 )
 
         return await self.handle_new_client_event(
