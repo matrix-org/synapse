@@ -116,7 +116,8 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
     #
     # Logging configuration
     #
-    log_level = logger.getEffectiveLevel()
+    synapse_logger = logging.getLogger("synapse")
+    log_level = synapse_logger.getEffectiveLevel()
     stats["log_level"] = logging.getLevelName(log_level)
 
     logger.info("Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats))
