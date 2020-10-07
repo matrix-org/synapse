@@ -560,6 +560,7 @@ class RoomCreationHandler(BaseHandler):
         config: JsonDict,
         ratelimit: bool = True,
         creator_join_profile: Optional[JsonDict] = None,
+        requested_room_id: Optional[str] = None,
     ) -> Tuple[dict, int]:
         """ Creates a new room.
 
@@ -575,6 +576,10 @@ class RoomCreationHandler(BaseHandler):
                 derived from the user's profile. If set, should contain the
                 values to go in the body of the 'join' event (typically
                 `avatar_url` and/or `displayname`.
+
+            requested_room_id: Allow callees to request a particular room ID.
+                This is useful for testing event persistence sharding, and
+                *should not* be exposed to clients.
 
         Returns:
                 First, a dict containing the keys `room_id` and, if an alias
@@ -678,9 +683,18 @@ class RoomCreationHandler(BaseHandler):
         visibility = config.get("visibility", None)
         is_public = visibility == "public"
 
-        room_id = await self._generate_room_id(
-            creator_id=user_id, is_public=is_public, room_version=room_version,
-        )
+        if requested_room_id:
+            await self.store.store_room(
+                room_id=requested_room_id,
+                room_creator_user_id=user_id,
+                is_public=is_public,
+                room_version=room_version,
+            )
+            room_id = requested_room_id
+        else:
+            room_id = await self._generate_room_id(
+                creator_id=user_id, is_public=is_public, room_version=room_version,
+            )
 
         # Check whether this visibility value is blocked by a third party module
         allowed_by_third_party_rules = await (

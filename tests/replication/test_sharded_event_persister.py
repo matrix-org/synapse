@@ -16,6 +16,8 @@ import logging
 
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
+from synapse.rest.client.v2_alpha import sync
+from synapse.types import create_requester
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.utils import USE_POSTGRES_FOR_TESTS
@@ -36,6 +38,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,
+        sync.register_servlets,
     ]
 
     def prepare(self, reactor, clock, hs):
@@ -100,3 +103,171 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
 
         self.assertTrue(persisted_on_1)
         self.assertTrue(persisted_on_2)
+
+    def test_vector_clock_token(self):
+        """Tests that using a stream token with a vector clock component works
+        correctly with basic /sync and /messages usage.
+        """
+
+        self.make_worker_hs(
+            "synapse.app.generic_worker", {"worker_name": "worker1"},
+        )
+
+        self.make_worker_hs(
+            "synapse.app.generic_worker", {"worker_name": "worker2"},
+        )
+
+        sync_hs = self.make_worker_hs(
+            "synapse.app.generic_worker", {"worker_name": "sync"},
+        )
+
+        # Specially selected room IDs that get persisted on different workers.
+        room_id1 = "!foo:test"
+        room_id2 = "!baz:test"
+
+        self.assertEqual(
+            self.hs.config.worker.events_shard_config.get_instance(room_id1), "worker1"
+        )
+        self.assertEqual(
+            self.hs.config.worker.events_shard_config.get_instance(room_id2), "worker2"
+        )
+
+        user_id = self.register_user("user", "pass")
+        access_token = self.login("user", "pass")
+        requester = create_requester(user_id, access_token)
+
+        store = self.hs.get_datastore()
+
+        # Create two room on the different workers.
+        room_creator = self.hs.get_room_creation_handler()
+        self.get_success(
+            room_creator.create_room(requester, {}, requested_room_id=room_id1), by=0.1
+        )
+        self.get_success(
+            room_creator.create_room(requester, {}, requested_room_id=room_id2), by=0.1
+        )
+
+        # The other user joins
+        self.helper.join(
+            room=room_id1, user=self.other_user_id, tok=self.other_access_token
+        )
+        self.helper.join(
+            room=room_id2, user=self.other_user_id, tok=self.other_access_token
+        )
+
+        # Do an initial sync so that we're up to date.
+        request, channel = self.make_request("GET", "/sync", access_token=access_token)
+        self.render_on_worker(sync_hs, request)
+        next_batch = channel.json_body["next_batch"]
+
+        # We now fetch and throw away a stream ID so that there will be a gap in
+        # the stream orderings. This means that the MultiWriterIdGenerators
+        # won't be able to intelligently "roll foward" the persisted upto
+        # position, resulting in a RoomStreamToken that has non-empty instance
+        # map component.
+        #
+        # Note: ideally we'd try to simulate one event persister getting behind
+        # in a more realistic way, but that involves adding quite a bit of code
+        # to support doing that.
+        self.get_success(
+            store.db_pool.execute(
+                "test", None, "SELECT nextval(?)", "events_stream_seq"
+            )
+        )
+
+        response = self.helper.send(room_id1, body="Hi!", tok=self.other_access_token)
+        first_event_in_room1 = response["event_id"]
+
+        # Assert that the current stream token has an instance map component, as
+        # we are trying to test vector clock tokens.
+        room_stream_token = store.get_room_max_token()
+        self.assertNotEqual(len(room_stream_token.instance_map), 0)
+
+        # Check that syncing still gets the new event, despite the gap in the
+        # stream IDs.
+        request, channel = self.make_request(
+            "GET", "/sync?since={}".format(next_batch), access_token=access_token
+        )
+        self.render_on_worker(sync_hs, request)
+
+        # We should only see the new event and nothing else
+        self.assertIn(room_id1, channel.json_body["rooms"]["join"])
+        self.assertNotIn(room_id2, channel.json_body["rooms"]["join"])
+
+        events = channel.json_body["rooms"]["join"][room_id1]["timeline"]["events"]
+        self.assertListEqual(
+            [first_event_in_room1], [event["event_id"] for event in events]
+        )
+
+        # Get the next batch and makes sure its a vector clock style token.
+        vector_clock_token = channel.json_body["next_batch"]
+        self.assertTrue(vector_clock_token.startswith("m"))
+
+        # Now try and send an event to the other rooom so that we can test that
+        # the vector clock style token works as a `since` token.
+        response = self.helper.send(room_id2, body="Hi!", tok=self.other_access_token)
+        first_event_in_room2 = response["event_id"]
+
+        request, channel = self.make_request(
+            "GET",
+            "/sync?since={}".format(vector_clock_token),
+            access_token=access_token,
+        )
+        self.render_on_worker(sync_hs, request)
+
+        self.assertNotIn(room_id1, channel.json_body["rooms"]["join"])
+        self.assertIn(room_id2, channel.json_body["rooms"]["join"])
+
+        events = channel.json_body["rooms"]["join"][room_id2]["timeline"]["events"]
+        self.assertListEqual(
+            [first_event_in_room2], [event["event_id"] for event in events]
+        )
+
+        next_batch = channel.json_body["next_batch"]
+
+        # We also want to test that the vector clock style token works with
+        # pagination. We do this by sending a couple of new events into the room
+        # and syncing again to get a prev_batch token for each room, then
+        # paginating from there back to the vector clock token.
+        self.helper.send(room_id1, body="Hi again!", tok=self.other_access_token)
+        self.helper.send(room_id2, body="Hi again!", tok=self.other_access_token)
+
+        request, channel = self.make_request(
+            "GET", "/sync?since={}".format(next_batch), access_token=access_token
+        )
+        self.render_on_worker(sync_hs, request)
+
+        prev_batch1 = channel.json_body["rooms"]["join"][room_id1]["timeline"][
+            "prev_batch"
+        ]
+        prev_batch2 = channel.json_body["rooms"]["join"][room_id2]["timeline"][
+            "prev_batch"
+        ]
+
+        # Paginating back in the first room should not produce any results, as
+        # no events have happened in it. This tests that we are correctly
+        # filtering results based on the vector clock portion.
+        request, channel = self.make_request(
+            "GET",
+            "/rooms/{}/messages?from={}&to={}&dir=b".format(
+                room_id1, prev_batch1, vector_clock_token
+            ),
+            access_token=access_token,
+        )
+        self.render_on_worker(sync_hs, request)
+        self.assertListEqual([], channel.json_body["chunk"])
+
+        # Paginating back on the second room should produce the first event
+        # again. This tests that pagination isn't completely broken.
+        request, channel = self.make_request(
+            "GET",
+            "/rooms/{}/messages?from={}&to={}&dir=b".format(
+                room_id2, prev_batch2, vector_clock_token
+            ),
+            access_token=access_token,
+        )
+        self.render_on_worker(sync_hs, request)
+        self.assertEqual(len(channel.json_body["chunk"]), 1)
+        self.assertEqual(
+            channel.json_body["chunk"][0]["event_id"], first_event_in_room2
+        )
