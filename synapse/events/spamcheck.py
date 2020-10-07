@@ -17,24 +17,25 @@
 import inspect
 from typing import Any, Dict, List, Optional, Tuple
 
-from synapse.spam_checker_api import RegistrationBehaviour, SpamCheckerApi
+from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.types import Collection
 
 MYPY = False
 if MYPY:
+    import synapse.events
     import synapse.server
 
 
 class SpamChecker:
     def __init__(self, hs: "synapse.server.HomeServer"):
         self.spam_checkers = []  # type: List[Any]
+        api = hs.get_module_api()
 
         for module, config in hs.config.spam_checkers:
             # Older spam checkers don't accept the `api` argument, so we
             # try and detect support.
             spam_args = inspect.getfullargspec(module)
             if "api" in spam_args.args:
-                api = SpamCheckerApi(hs)
                 self.spam_checkers.append(module(config=config, api=api))
             else:
                 self.spam_checkers.append(module(config=config))

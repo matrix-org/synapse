@@ -75,6 +75,23 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+Upgrading to v1.22.0
+====================
+
+ThirdPartyEventRules breaking changes
+-------------------------------------
+
+This release introduces a backwards-incompatible change to modules making use of
+``ThirdPartyEventRules`` in Synapse. If you make use of a module defined under the
+``third_party_event_rules`` config option, please make sure it is updated to handle
+the below change:
+
+The ``http_client`` argument is no longer passed to modules as they are initialised. Instead,
+modules are expected to make use of the ``http_client`` property on the ``ModuleApi`` class.
+Modules are now passed a ``module_api`` argument during initialisation, which is an instance of
+``ModuleApi``. ``ModuleApi`` instances have a ``http_client`` property which acts the same as
+the ``http_client`` argument previously passed to ``ThirdPartyEventRules`` modules.
+
 Upgrading to v1.21.0
 ====================
 

@@ -1,0 +1,1 @@
+Reduce number of serialization errors of `MultiWriterIdGenerator._update_table`.
