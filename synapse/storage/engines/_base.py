@@ -97,3 +97,20 @@ class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
         """Gets a string giving the server version. For example: '3.22.0'
         """
         ...
+
+    @abc.abstractmethod
+    def in_transaction(self, conn: Connection) -> bool:
+        """Whether the connection is currently in a transaction.
+        """
+        ...
+
+    @abc.abstractmethod
+    def attempt_to_set_autocommit(self, conn: Connection, autocommit: bool):
+        """Attempt to set the connections autocommit mode.
+
+        When True queries are run outside of transactions.
+
+        Note: This has no effect on SQLite3, so callers still need to
+        commit/rollback the connections.
+        """
+        ...
