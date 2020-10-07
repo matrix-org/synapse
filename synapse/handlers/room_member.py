@@ -188,16 +188,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             require_consent=require_consent,
         )
 
-        # Check if this event matches the previous membership event for the user.
-        duplicate = await self.event_creation_handler.deduplicate_state_event(
-            event, context
-        )
-        if duplicate is not None:
-            # Discard the new event since this membership change is a no-op.
-            # we know it was persisted, so must have a stream ordering.
-            assert duplicate.internal_metadata.stream_ordering
-            return duplicate.event_id, duplicate.internal_metadata.stream_ordering
-
         prev_state_ids = await context.get_prev_state_ids()
 
         prev_member_event_id = prev_state_ids.get((EventTypes.Member, user_id), None)
@@ -222,7 +212,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                         retry_after_ms=int(1000 * (time_allowed - time_now_s))
                     )
 
-        stream_id = await self.event_creation_handler.handle_new_client_event(
+        result_event = await self.event_creation_handler.handle_new_client_event(
             requester, event, context, extra_users=[target], ratelimit=ratelimit,
         )
 
@@ -232,7 +222,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 if prev_member_event.membership == Membership.JOIN:
                     await self._user_left_room(target, room_id)
 
-        return event.event_id, stream_id
+        # we know it was persisted, so should have a stream ordering
+        assert result_event.internal_metadata.stream_ordering
+        return result_event.event_id, result_event.internal_metadata.stream_ordering
 
     async def copy_room_tags_and_direct_to_room(
         self, old_room_id, new_room_id, user_id
@@ -672,12 +664,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             assert self.hs.is_mine(sender), "Sender must be our own: %s" % (sender,)
         else:
             requester = types.create_requester(target_user)
-
-        prev_event = await self.event_creation_handler.deduplicate_state_event(
-            event, context
-        )
-        if prev_event is not None:
-            return
 
         prev_state_ids = await context.get_prev_state_ids()
         if event.membership == Membership.JOIN:
@@ -1186,10 +1172,13 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         context = await self.state_handler.compute_event_context(event)
         context.app_service = requester.app_service
-        stream_id = await self.event_creation_handler.handle_new_client_event(
+        result_event = await self.event_creation_handler.handle_new_client_event(
             requester, event, context, extra_users=[UserID.from_string(target_user)],
         )
-        return event.event_id, stream_id
+        # we know it was persisted, so must have a stream ordering
+        assert result_event.internal_metadata.stream_ordering
+
+        return result_event.event_id, result_event.internal_metadata.stream_ordering
 
     async def _user_left_room(self, target: UserID, room_id: str) -> None:
         """Implements RoomMemberHandler._user_left_room
