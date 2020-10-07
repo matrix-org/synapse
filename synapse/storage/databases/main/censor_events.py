@@ -17,7 +17,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from synapse.events.utils import prune_event_dict
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
@@ -35,17 +35,13 @@ class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBase
     def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
 
-        def _censor_redactions():
-            return run_as_background_process(
-                "_censor_redactions", self._censor_redactions
-            )
-
         if (
             hs.config.run_background_tasks
             and self.hs.config.redaction_retention_period is not None
         ):
-            hs.get_clock().looping_call(_censor_redactions, 5 * 60 * 1000)
+            hs.get_clock().looping_call(self._censor_redactions, 5 * 60 * 1000)
 
+    @wrap_as_background_process("_censor_redactions")
     async def _censor_redactions(self):
         """Censors all redactions older than the configured period that haven't
         been censored yet.

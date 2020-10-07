@@ -13,13 +13,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 from typing import Dict, List, Optional, Tuple, Union
 
 import attr
 
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.metrics.background_process_metrics import (
+    run_as_background_process,
+    wrap_as_background_process,
+)
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool
 from synapse.util import json_encoder
@@ -87,7 +89,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         self._doing_notif_rotation = False
         if hs.config.run_background_tasks:
             self._rotate_notif_loop = self._clock.looping_call(
-                self._start_rotate_notifs, 30 * 60 * 1000
+                self._rotate_notifs, 30 * 60 * 1000
             )
 
     @cached(num_args=3, tree=True, max_entries=5000)
@@ -658,9 +660,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         )
         return result[0] if result else None
 
-    def _start_rotate_notifs(self):
-        return run_as_background_process("rotate_notifs", self._rotate_notifs)
-
+    @wrap_as_background_process("rotate_notifs")
     async def _rotate_notifs(self):
         if self._doing_notif_rotation or self.stream_ordering_day_ago is None:
             return
