@@ -24,6 +24,7 @@ from typing_extensions import Deque
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.database import DatabasePool, LoggingTransaction
+from synapse.storage.types import Cursor
 from synapse.storage.util.sequence import PostgresSequenceGenerator
 
 logger = logging.getLogger(__name__)
@@ -552,7 +553,7 @@ class MultiWriterIdGenerator:
                 # do.
                 break
 
-    def _update_stream_positions_table_txn(self, txn):
+    def _update_stream_positions_table_txn(self, txn: Cursor):
         """Update the `stream_positions` table with newly persisted position.
         """
 
@@ -602,10 +603,13 @@ class _MultiWriterCtxManager:
     stream_ids = attr.ib(type=List[int], factory=list)
 
     async def __aenter__(self) -> Union[int, List[int]]:
+        # It's safe to run this in autocommit mode as fetching values from a
+        # sequence ignores transaction semantics anyway.
         self.stream_ids = await self.id_gen._db.runInteraction(
             "_load_next_mult_id",
             self.id_gen._load_next_mult_id_txn,
             self.multiple_ids or 1,
+            db_autocommit=True,
         )
 
         # Assert the fetched ID is actually greater than any ID we've already
@@ -636,10 +640,16 @@ class _MultiWriterCtxManager:
         #
         # We only do this on the success path so that the persisted current
         # position points to a persisted row with the correct instance name.
+        #
+        # We do this in autocommit mode as a) the upsert works correctly outside
+        # transactions and b) reduces the amount of time the rows are locked
+        # for. If we don't do this then we'll often hit serialization errors due
+        # to the fact we default to REPEATABLE READ isolation levels.
         if self.id_gen._writers:
             await self.id_gen._db.runInteraction(
                 "MultiWriterIdGenerator._update_table",
                 self.id_gen._update_stream_positions_table_txn,
+                db_autocommit=True,
             )
 
         return False
