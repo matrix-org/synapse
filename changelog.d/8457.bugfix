@@ -1,0 +1,1 @@
+Fix a bug where backfilling a room with an event that was missing the `redacts` field would break.

@@ -11,7 +11,7 @@ able to be imported by the running Synapse.
 The Python class is instantiated with two objects:
 
 * Any configuration (see below).
-* An instance of `synapse.spam_checker_api.SpamCheckerApi`.
+* An instance of `synapse.module_api.ModuleApi`.
 
 It then implements methods which return a boolean to alter behavior in Synapse.
 
@@ -26,11 +26,8 @@ well as some specific methods:
 The details of the each of these methods (as well as their inputs and outputs)
 are documented in the `synapse.events.spamcheck.SpamChecker` class.
 
-The `SpamCheckerApi` class provides a way for the custom spam checker class to
-call back into the homeserver internals. It currently implements the following
-methods:
-
-* `get_state_events_in_room`
+The `ModuleApi` class provides a way for the custom spam checker class to
+call back into the homeserver internals.
 
 ### Example
 

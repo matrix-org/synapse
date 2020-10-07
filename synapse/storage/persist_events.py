@@ -248,6 +248,8 @@ class EventsPersistenceStorage:
         await make_deferred_yieldable(deferred)
 
         event_stream_id = event.internal_metadata.stream_ordering
+        # stream ordering should have been assigned by now
+        assert event_stream_id
 
         pos = PersistedEventPosition(self._instance_name, event_stream_id)
         return pos, self.main_store.get_room_max_token()
