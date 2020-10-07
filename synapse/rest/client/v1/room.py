@@ -903,7 +903,7 @@ class RoomAliasListServlet(RestServlet):
     def __init__(self, hs: "synapse.server.HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.directory_handler = hs.get_handlers().directory_handler
+        self.directory_handler = hs.get_directory_handler()
 
     async def on_GET(self, request, room_id):
         requester = await self.auth.get_user_by_req(request)

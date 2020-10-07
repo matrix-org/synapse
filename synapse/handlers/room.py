@@ -691,7 +691,7 @@ class RoomCreationHandler(BaseHandler):
         if not allowed_by_third_party_rules:
             raise SynapseError(403, "Room visibility value not allowed.")
 
-        directory_handler = self.hs.get_handlers().directory_handler
+        directory_handler = self.hs.get_directory_handler()
         if room_alias:
             await directory_handler.create_association(
                 requester=requester,

@@ -63,6 +63,7 @@ from synapse.handlers.cas_handler import CasHandler
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
 from synapse.handlers.device import DeviceHandler, DeviceWorkerHandler
 from synapse.handlers.devicemessage import DeviceMessageHandler
+from synapse.handlers.directory import DirectoryHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.e2e_room_keys import E2eRoomKeysHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
@@ -409,6 +410,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_device_message_handler(self) -> DeviceMessageHandler:
         return DeviceMessageHandler(self)
+
+    @cache_in_self
+    def get_directory_handler(self) -> DirectoryHandler:
+        return DirectoryHandler(self)
 
     @cache_in_self
     def get_e2e_keys_handler(self) -> E2eKeysHandler:

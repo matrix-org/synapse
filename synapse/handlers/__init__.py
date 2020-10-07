@@ -14,7 +14,6 @@
 # limitations under the License.
 
 from .admin import AdminHandler
-from .directory import DirectoryHandler
 from .federation import FederationHandler
 
 
@@ -39,5 +38,4 @@ class Handlers:
 
     def __init__(self, hs):
         self.federation_handler = FederationHandler(hs)
-        self.directory_handler = DirectoryHandler(hs)
         self.admin_handler = AdminHandler(hs)
