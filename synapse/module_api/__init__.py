@@ -54,7 +54,6 @@ class ModuleApi:
         # We expose these as properties below in order to attach a helpful docstring.
         self._http_client = hs.get_simple_http_client()  # type: SimpleHttpClient
         self._public_room_list_manager = PublicRoomListManager(hs)
-        self._event_creation_handler = hs.get_event_creation_handler()
 
     @property
     def http_client(self):
@@ -367,7 +366,10 @@ class ModuleApi:
         requester = create_requester(sender)
 
         # Create and send the event
-        event, _ = await self._event_creation_handler.create_and_send_nonmember_event(
+        (
+            event,
+            _,
+        ) = await self._hs.get_event_creation_handler().create_and_send_nonmember_event(
             requester, event_dict, ratelimit=False, ignore_shadow_ban=True,
         )
 
