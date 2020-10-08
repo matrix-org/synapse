@@ -12,7 +12,7 @@
     <p>
         There was an error during authentication:
     </p>
-    <div id="errormsg" style="margin:20px 80px">{{ error_description }}</div>
+    <div id="errormsg" style="margin:20px 80px">{{ error_description | e }}</div>
     <p>
         If you are seeing this page after clicking a link sent to you via email, make
         sure you only click the confirmation link once, and that you open the

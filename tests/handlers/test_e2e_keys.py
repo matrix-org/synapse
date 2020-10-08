@@ -30,7 +30,7 @@ from tests import unittest, utils
 
 class E2eKeysHandlerTestCase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
-        super(E2eKeysHandlerTestCase, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.hs = None  # type: synapse.server.HomeServer
         self.handler = None  # type: synapse.handlers.e2e_keys.E2eKeysHandler
 
@@ -169,6 +169,71 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
                 "failures": {},
                 "one_time_keys": {local_user: {device_id: {"alg1:k1": "key1"}}},
             },
+        )
+
+    @defer.inlineCallbacks
+    def test_fallback_key(self):
+        local_user = "@boris:" + self.hs.hostname
+        device_id = "xyz"
+        fallback_key = {"alg1:k1": "key1"}
+        otk = {"alg1:k2": "key2"}
+
+        yield defer.ensureDeferred(
+            self.handler.upload_keys_for_user(
+                local_user,
+                device_id,
+                {"org.matrix.msc2732.fallback_keys": fallback_key},
+            )
+        )
+
+        # claiming an OTK when no OTKs are available should return the fallback
+        # key
+        res = yield defer.ensureDeferred(
+            self.handler.claim_one_time_keys(
+                {"one_time_keys": {local_user: {device_id: "alg1"}}}, timeout=None
+            )
+        )
+        self.assertEqual(
+            res,
+            {"failures": {}, "one_time_keys": {local_user: {device_id: fallback_key}}},
+        )
+
+        # claiming an OTK again should return the same fallback key
+        res = yield defer.ensureDeferred(
+            self.handler.claim_one_time_keys(
+                {"one_time_keys": {local_user: {device_id: "alg1"}}}, timeout=None
+            )
+        )
+        self.assertEqual(
+            res,
+            {"failures": {}, "one_time_keys": {local_user: {device_id: fallback_key}}},
+        )
+
+        # if the user uploads a one-time key, the next claim should fetch the
+        # one-time key, and then go back to the fallback
+        yield defer.ensureDeferred(
+            self.handler.upload_keys_for_user(
+                local_user, device_id, {"one_time_keys": otk}
+            )
+        )
+
+        res = yield defer.ensureDeferred(
+            self.handler.claim_one_time_keys(
+                {"one_time_keys": {local_user: {device_id: "alg1"}}}, timeout=None
+            )
+        )
+        self.assertEqual(
+            res, {"failures": {}, "one_time_keys": {local_user: {device_id: otk}}},
+        )
+
+        res = yield defer.ensureDeferred(
+            self.handler.claim_one_time_keys(
+                {"one_time_keys": {local_user: {device_id: "alg1"}}}, timeout=None
+            )
+        )
+        self.assertEqual(
+            res,
+            {"failures": {}, "one_time_keys": {local_user: {device_id: fallback_key}}},
         )
 
     @defer.inlineCallbacks

@@ -61,7 +61,7 @@ class RelationSendServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(RelationSendServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.txns = HttpTransactionCache(hs)
@@ -138,7 +138,7 @@ class RelationPaginationServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(RelationPaginationServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
@@ -233,7 +233,7 @@ class RelationAggregationPaginationServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(RelationAggregationPaginationServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.event_handler = hs.get_event_handler()
@@ -311,7 +311,7 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(RelationAggregationGroupPaginationServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()

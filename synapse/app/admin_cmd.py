@@ -208,6 +208,7 @@ def start(config_options):
 
     # Explicitly disable background processes
     config.update_user_directory = False
+    config.run_background_tasks = False
     config.start_pushers = False
     config.send_federation = False
 

@@ -18,7 +18,18 @@ import re
 import string
 import sys
 from collections import namedtuple
-from typing import Any, Dict, Mapping, MutableMapping, Optional, Tuple, Type, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+)
 
 import attr
 from signedjson.key import decode_verify_key_bytes
@@ -26,11 +37,14 @@ from unpaddedbase64 import decode_base64
 
 from synapse.api.errors import Codes, SynapseError
 
+if TYPE_CHECKING:
+    from synapse.storage.databases.main import DataStore
+
 # define a version of typing.Collection that works on python 3.5
 if sys.version_info[:3] >= (3, 6, 0):
     from typing import Collection
 else:
-    from typing import Container, Iterable, Sized
+    from typing import Container, Sized
 
     T_co = TypeVar("T_co", covariant=True)
 
@@ -165,7 +179,9 @@ def get_localpart_from_id(string):
 DS = TypeVar("DS", bound="DomainSpecificString")
 
 
-class DomainSpecificString(namedtuple("DomainSpecificString", ("localpart", "domain"))):
+class DomainSpecificString(
+    namedtuple("DomainSpecificString", ("localpart", "domain")), metaclass=abc.ABCMeta
+):
     """Common base class among ID/name strings that have a local part and a
     domain name, prefixed with a sigil.
 
@@ -174,8 +190,6 @@ class DomainSpecificString(namedtuple("DomainSpecificString", ("localpart", "dom
         'localpart' : The local part of the name (without the leading sigil)
         'domain' : The domain part of the name
     """
-
-    __metaclass__ = abc.ABCMeta
 
     SIGIL = abc.abstractproperty()  # type: str  # type: ignore
 
@@ -362,7 +376,7 @@ def map_username_to_mxid_localpart(username, case_sensitive=False):
     return username.decode("ascii")
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, cmp=False)
 class RoomStreamToken:
     """Tokens are positions between events. The token "s1" comes after event 1.
 
@@ -384,6 +398,31 @@ class RoomStreamToken:
     event it comes after. Historic tokens start with a "t" followed by the
     "topological_ordering" id of the event it comes after, followed by "-",
     followed by the "stream_ordering" id of the event it comes after.
+
+    There is also a third mode for live tokens where the token starts with "m",
+    which is sometimes used when using sharded event persisters. In this case
+    the events stream is considered to be a set of streams (one for each writer)
+    and the token encodes the vector clock of positions of each writer in their
+    respective streams.
+
+    The format of the token in such case is an initial integer min position,
+    followed by the mapping of instance ID to position separated by '.' and '~':
+
+        m{min_pos}~{writer1}.{pos1}~{writer2}.{pos2}. ...
+
+    The `min_pos` corresponds to the minimum position all writers have persisted
+    up to, and then only writers that are ahead of that position need to be
+    encoded. An example token is:
+
+        m56~2.58~3.59
+
+    Which corresponds to a set of three (or more writers) where instances 2 and
+    3 (these are instance IDs that can be looked up in the DB to fetch the more
+    commonly used instance names) are at positions 58 and 59 respectively, and
+    all other instances are at position 56.
+
+    Note: The `RoomStreamToken` cannot have both a topological part and an
+    instance map.
     """
 
     topological = attr.ib(
@@ -392,14 +431,47 @@ class RoomStreamToken:
     )
     stream = attr.ib(type=int, validator=attr.validators.instance_of(int))
 
+    instance_map = attr.ib(
+        type=Dict[str, int],
+        factory=dict,
+        validator=attr.validators.deep_mapping(
+            key_validator=attr.validators.instance_of(str),
+            value_validator=attr.validators.instance_of(int),
+            mapping_validator=attr.validators.instance_of(dict),
+        ),
+    )
+
+    def __attrs_post_init__(self):
+        """Validates that both `topological` and `instance_map` aren't set.
+        """
+
+        if self.instance_map and self.topological:
+            raise ValueError(
+                "Cannot set both 'topological' and 'instance_map' on 'RoomStreamToken'."
+            )
+
     @classmethod
-    def parse(cls, string: str) -> "RoomStreamToken":
+    async def parse(cls, store: "DataStore", string: str) -> "RoomStreamToken":
         try:
             if string[0] == "s":
                 return cls(topological=None, stream=int(string[1:]))
             if string[0] == "t":
                 parts = string[1:].split("-", 1)
                 return cls(topological=int(parts[0]), stream=int(parts[1]))
+            if string[0] == "m":
+                parts = string[1:].split("~")
+                stream = int(parts[0])
+
+                instance_map = {}
+                for part in parts[1:]:
+                    key, value = part.split(".")
+                    instance_id = int(key)
+                    pos = int(value)
+
+                    instance_name = await store.get_name_from_instance_id(instance_id)
+                    instance_map[instance_name] = pos
+
+                return cls(topological=None, stream=stream, instance_map=instance_map,)
         except Exception:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
@@ -413,12 +485,71 @@ class RoomStreamToken:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
 
-    def as_tuple(self) -> Tuple[Optional[int], int]:
+    def copy_and_advance(self, other: "RoomStreamToken") -> "RoomStreamToken":
+        """Return a new token such that if an event is after both this token and
+        the other token, then its after the returned token too.
+        """
+
+        if self.topological or other.topological:
+            raise Exception("Can't advance topological tokens")
+
+        max_stream = max(self.stream, other.stream)
+
+        instance_map = {
+            instance: max(
+                self.instance_map.get(instance, self.stream),
+                other.instance_map.get(instance, other.stream),
+            )
+            for instance in set(self.instance_map).union(other.instance_map)
+        }
+
+        return RoomStreamToken(None, max_stream, instance_map)
+
+    def as_historical_tuple(self) -> Tuple[int, int]:
+        """Returns a tuple of `(topological, stream)` for historical tokens.
+
+        Raises if not an historical token (i.e. doesn't have a topological part).
+        """
+        if self.topological is None:
+            raise Exception(
+                "Cannot call `RoomStreamToken.as_historical_tuple` on live token"
+            )
+
         return (self.topological, self.stream)
 
-    def __str__(self) -> str:
+    def get_stream_pos_for_instance(self, instance_name: str) -> int:
+        """Get the stream position that the given writer was at at this token.
+
+        This only makes sense for "live" tokens that may have a vector clock
+        component, and so asserts that this is a "live" token.
+        """
+        assert self.topological is None
+
+        # If we don't have an entry for the instance we can assume that it was
+        # at `self.stream`.
+        return self.instance_map.get(instance_name, self.stream)
+
+    def get_max_stream_pos(self) -> int:
+        """Get the maximum stream position referenced in this token.
+
+        The corresponding "min" position is, by definition just `self.stream`.
+
+        This is used to handle tokens that have non-empty `instance_map`, and so
+        reference stream positions after the `self.stream` position.
+        """
+        return max(self.instance_map.values(), default=self.stream)
+
+    async def to_string(self, store: "DataStore") -> str:
         if self.topological is not None:
             return "t%d-%d" % (self.topological, self.stream)
+        elif self.instance_map:
+            entries = []
+            for name, pos in self.instance_map.items():
+                instance_id = await store.get_id_for_instance(name)
+                entries.append("{}.{}".format(instance_id, pos))
+
+            encoded_map = "~".join(entries)
+            return "m{}~{}".format(self.stream, encoded_map)
         else:
             return "s%d" % (self.stream,)
 
@@ -441,48 +572,51 @@ class StreamToken:
     START = None  # type: StreamToken
 
     @classmethod
-    def from_string(cls, string):
+    async def from_string(cls, store: "DataStore", string: str) -> "StreamToken":
         try:
             keys = string.split(cls._SEPARATOR)
             while len(keys) < len(attr.fields(cls)):
                 # i.e. old token from before receipt_key
                 keys.append("0")
-            return cls(RoomStreamToken.parse(keys[0]), *(int(k) for k in keys[1:]))
+            return cls(
+                await RoomStreamToken.parse(store, keys[0]), *(int(k) for k in keys[1:])
+            )
         except Exception:
             raise SynapseError(400, "Invalid Token")
 
-    def to_string(self):
-        return self._SEPARATOR.join([str(k) for k in attr.astuple(self, recurse=False)])
+    async def to_string(self, store: "DataStore") -> str:
+        return self._SEPARATOR.join(
+            [
+                await self.room_key.to_string(store),
+                str(self.presence_key),
+                str(self.typing_key),
+                str(self.receipt_key),
+                str(self.account_data_key),
+                str(self.push_rules_key),
+                str(self.to_device_key),
+                str(self.device_list_key),
+                str(self.groups_key),
+            ]
+        )
 
     @property
     def room_stream_id(self):
         return self.room_key.stream
 
-    def is_after(self, other):
-        """Does this token contain events that the other doesn't?"""
-        return (
-            (other.room_stream_id < self.room_stream_id)
-            or (int(other.presence_key) < int(self.presence_key))
-            or (int(other.typing_key) < int(self.typing_key))
-            or (int(other.receipt_key) < int(self.receipt_key))
-            or (int(other.account_data_key) < int(self.account_data_key))
-            or (int(other.push_rules_key) < int(self.push_rules_key))
-            or (int(other.to_device_key) < int(self.to_device_key))
-            or (int(other.device_list_key) < int(self.device_list_key))
-            or (int(other.groups_key) < int(self.groups_key))
-        )
-
     def copy_and_advance(self, key, new_value) -> "StreamToken":
         """Advance the given key in the token to a new value if and only if the
         new value is after the old value.
         """
-        new_token = self.copy_and_replace(key, new_value)
         if key == "room_key":
-            new_id = new_token.room_stream_id
-            old_id = self.room_stream_id
-        else:
-            new_id = int(getattr(new_token, key))
-            old_id = int(getattr(self, key))
+            new_token = self.copy_and_replace(
+                "room_key", self.room_key.copy_and_advance(new_value)
+            )
+            return new_token
+
+        new_token = self.copy_and_replace(key, new_value)
+        new_id = int(getattr(new_token, key))
+        old_id = int(getattr(self, key))
+
         if old_id < new_id:
             return new_token
         else:
@@ -492,7 +626,34 @@ class StreamToken:
         return attr.evolve(self, **{key: new_value})
 
 
-StreamToken.START = StreamToken.from_string("s0_0")
+StreamToken.START = StreamToken(RoomStreamToken(None, 0), 0, 0, 0, 0, 0, 0, 0, 0)
+
+
+@attr.s(slots=True, frozen=True)
+class PersistedEventPosition:
+    """Position of a newly persisted event with instance that persisted it.
+
+    This can be used to test whether the event is persisted before or after a
+    RoomStreamToken.
+    """
+
+    instance_name = attr.ib(type=str)
+    stream = attr.ib(type=int)
+
+    def persisted_after(self, token: RoomStreamToken) -> bool:
+        return token.get_stream_pos_for_instance(self.instance_name) < self.stream
+
+    def to_room_stream_token(self) -> RoomStreamToken:
+        """Converts the position to a room stream token such that events
+        persisted in the same room after this position will be after the
+        returned `RoomStreamToken`.
+
+        Note: no guarentees are made about ordering w.r.t. events in other
+        rooms.
+        """
+        # Doing the naive thing satisfies the desired properties described in
+        # the docstring.
+        return RoomStreamToken(None, self.stream)
 
 
 class ThirdPartyInstanceID(

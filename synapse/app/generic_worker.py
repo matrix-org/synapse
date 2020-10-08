@@ -127,12 +127,16 @@ from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.server import HomeServer, cache_in_self
 from synapse.storage.databases.main.censor_events import CensorEventsStore
+from synapse.storage.databases.main.client_ips import ClientIpWorkerStore
 from synapse.storage.databases.main.media_repository import MediaRepositoryStore
+from synapse.storage.databases.main.metrics import ServerMetricsStore
 from synapse.storage.databases.main.monthly_active_users import (
     MonthlyActiveUsersWorkerStore,
 )
 from synapse.storage.databases.main.presence import UserPresenceState
 from synapse.storage.databases.main.search import SearchWorkerStore
+from synapse.storage.databases.main.stats import StatsStore
+from synapse.storage.databases.main.transactions import TransactionWorkerStore
 from synapse.storage.databases.main.ui_auth import UIAuthWorkerStore
 from synapse.storage.databases.main.user_directory import UserDirectoryStore
 from synapse.types import ReadReceipt
@@ -152,7 +156,7 @@ class PresenceStatusStubServlet(RestServlet):
     PATTERNS = client_patterns("/presence/(?P<user_id>[^/]*)/status")
 
     def __init__(self, hs):
-        super(PresenceStatusStubServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
 
     async def on_GET(self, request, user_id):
@@ -176,7 +180,7 @@ class KeyUploadServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(KeyUploadServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.http_client = hs.get_simple_http_client()
@@ -454,6 +458,7 @@ class GenericWorkerSlavedStore(
     # FIXME(#3714): We need to add UserDirectoryStore as we write directly
     # rather than going via the correct worker.
     UserDirectoryStore,
+    StatsStore,
     UIAuthWorkerStore,
     SlavedDeviceInboxStore,
     SlavedDeviceStore,
@@ -463,6 +468,7 @@ class GenericWorkerSlavedStore(
     SlavedAccountDataStore,
     SlavedPusherStore,
     CensorEventsStore,
+    ClientIpWorkerStore,
     SlavedEventStore,
     SlavedKeyStore,
     RoomStore,
@@ -476,7 +482,9 @@ class GenericWorkerSlavedStore(
     SlavedFilteringStore,
     MonthlyActiveUsersWorkerStore,
     MediaRepositoryStore,
+    ServerMetricsStore,
     SearchWorkerStore,
+    TransactionWorkerStore,
     BaseSlavedStore,
 ):
     pass
@@ -646,7 +654,7 @@ class GenericWorkerServer(HomeServer):
 
 class GenericWorkerReplicationHandler(ReplicationDataHandler):
     def __init__(self, hs):
-        super(GenericWorkerReplicationHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.store = hs.get_datastore()
         self.presence_handler = hs.get_presence_handler()  # type: GenericWorkerPresence

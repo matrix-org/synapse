@@ -25,94 +25,6 @@ from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
-RECAPTCHA_TEMPLATE = """
-<html>
-<head>
-<title>Authentication</title>
-<meta name='viewport' content='width=device-width, initial-scale=1,
-    user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
-<script src="https://www.recaptcha.net/recaptcha/api.js"
-    async defer></script>
-<script src="//code.jquery.com/jquery-1.11.2.min.js"></script>
-<link rel="stylesheet" href="/_matrix/static/client/register/style.css">
-<script>
-function captchaDone() {
-    $('#registrationForm').submit();
-}
-</script>
-</head>
-<body>
-<form id="registrationForm" method="post" action="%(myurl)s">
-    <div>
-        <p>
-        Hello! We need to prevent computer programs and other automated
-        things from creating accounts on this server.
-        </p>
-        <p>
-        Please verify that you're not a robot.
-        </p>
-        <input type="hidden" name="session" value="%(session)s" />
-        <div class="g-recaptcha"
-            data-sitekey="%(sitekey)s"
-            data-callback="captchaDone">
-        </div>
-        <noscript>
-        <input type="submit" value="All Done" />
-        </noscript>
-        </div>
-    </div>
-</form>
-</body>
-</html>
-"""
-
-TERMS_TEMPLATE = """
-<html>
-<head>
-<title>Authentication</title>
-<meta name='viewport' content='width=device-width, initial-scale=1,
-    user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
-<link rel="stylesheet" href="/_matrix/static/client/register/style.css">
-</head>
-<body>
-<form id="registrationForm" method="post" action="%(myurl)s">
-    <div>
-        <p>
-            Please click the button below if you agree to the
-            <a href="%(terms_url)s">privacy policy of this homeserver.</a>
-        </p>
-        <input type="hidden" name="session" value="%(session)s" />
-        <input type="submit" value="Agree" />
-    </div>
-</form>
-</body>
-</html>
-"""
-
-SUCCESS_TEMPLATE = """
-<html>
-<head>
-<title>Success!</title>
-<meta name='viewport' content='width=device-width, initial-scale=1,
-    user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
-<link rel="stylesheet" href="/_matrix/static/client/register/style.css">
-<script>
-if (window.onAuthDone) {
-    window.onAuthDone();
-} else if (window.opener && window.opener.postMessage) {
-     window.opener.postMessage("authDone", "*");
-}
-</script>
-</head>
-<body>
-    <div>
-        <p>Thank you</p>
-        <p>You may now close this window and return to the application</p>
-    </div>
-</body>
-</html>
-"""
-
 
 class AuthRestServlet(RestServlet):
     """
@@ -124,7 +36,7 @@ class AuthRestServlet(RestServlet):
     PATTERNS = client_patterns(r"/auth/(?P<stagetype>[\w\.]*)/fallback/web")
 
     def __init__(self, hs):
-        super(AuthRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
@@ -145,26 +57,30 @@ class AuthRestServlet(RestServlet):
             self._cas_server_url = hs.config.cas_server_url
             self._cas_service_url = hs.config.cas_service_url
 
+        self.recaptcha_template = hs.config.recaptcha_template
+        self.terms_template = hs.config.terms_template
+        self.success_template = hs.config.fallback_success_template
+
     async def on_GET(self, request, stagetype):
         session = parse_string(request, "session")
         if not session:
             raise SynapseError(400, "No session supplied")
 
         if stagetype == LoginType.RECAPTCHA:
-            html = RECAPTCHA_TEMPLATE % {
-                "session": session,
-                "myurl": "%s/r0/auth/%s/fallback/web"
+            html = self.recaptcha_template.render(
+                session=session,
+                myurl="%s/r0/auth/%s/fallback/web"
                 % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
-                "sitekey": self.hs.config.recaptcha_public_key,
-            }
+                sitekey=self.hs.config.recaptcha_public_key,
+            )
         elif stagetype == LoginType.TERMS:
-            html = TERMS_TEMPLATE % {
-                "session": session,
-                "terms_url": "%s_matrix/consent?v=%s"
+            html = self.terms_template.render(
+                session=session,
+                terms_url="%s_matrix/consent?v=%s"
                 % (self.hs.config.public_baseurl, self.hs.config.user_consent_version),
-                "myurl": "%s/r0/auth/%s/fallback/web"
+                myurl="%s/r0/auth/%s/fallback/web"
                 % (CLIENT_API_PREFIX, LoginType.TERMS),
-            }
+            )
 
         elif stagetype == LoginType.SSO:
             # Display a confirmation page which prompts the user to
@@ -222,14 +138,14 @@ class AuthRestServlet(RestServlet):
             )
 
             if success:
-                html = SUCCESS_TEMPLATE
+                html = self.success_template.render()
             else:
-                html = RECAPTCHA_TEMPLATE % {
-                    "session": session,
-                    "myurl": "%s/r0/auth/%s/fallback/web"
+                html = self.recaptcha_template.render(
+                    session=session,
+                    myurl="%s/r0/auth/%s/fallback/web"
                     % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
-                    "sitekey": self.hs.config.recaptcha_public_key,
-                }
+                    sitekey=self.hs.config.recaptcha_public_key,
+                )
         elif stagetype == LoginType.TERMS:
             authdict = {"session": session}
 
@@ -238,18 +154,18 @@ class AuthRestServlet(RestServlet):
             )
 
             if success:
-                html = SUCCESS_TEMPLATE
+                html = self.success_template.render()
             else:
-                html = TERMS_TEMPLATE % {
-                    "session": session,
-                    "terms_url": "%s_matrix/consent?v=%s"
+                html = self.terms_template.render(
+                    session=session,
+                    terms_url="%s_matrix/consent?v=%s"
                     % (
                         self.hs.config.public_baseurl,
                         self.hs.config.user_consent_version,
                     ),
-                    "myurl": "%s/r0/auth/%s/fallback/web"
+                    myurl="%s/r0/auth/%s/fallback/web"
                     % (CLIENT_API_PREFIX, LoginType.TERMS),
-                }
+                )
         elif stagetype == LoginType.SSO:
             # The SSO fallback workflow should not post here,
             raise SynapseError(404, "Fallback SSO auth does not support POST requests.")

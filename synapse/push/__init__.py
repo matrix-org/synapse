@@ -16,4 +16,4 @@
 
 class PusherConfigException(Exception):
     def __init__(self, msg):
-        super(PusherConfigException, self).__init__(msg)
+        super().__init__(msg)

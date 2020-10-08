@@ -22,7 +22,7 @@ import itertools
 import logging
 from collections.abc import Container
 from http import HTTPStatus
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 import attr
 from signedjson.key import decode_verify_key_bytes
@@ -70,11 +70,13 @@ from synapse.replication.http.federation import (
     ReplicationFederationSendEventsRestServlet,
     ReplicationStoreRoomOnInviteRestServlet,
 )
-from synapse.state import StateResolutionStore, resolve_events_with_store
+from synapse.state import StateResolutionStore
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.types import (
     JsonDict,
     MutableStateMap,
+    PersistedEventPosition,
+    RoomStreamToken,
     StateMap,
     UserID,
     get_domain_from_id,
@@ -83,6 +85,9 @@ from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import shortstr
 from synapse.visibility import filter_events_for_server
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -115,8 +120,8 @@ class FederationHandler(BaseHandler):
         rooms.
     """
 
-    def __init__(self, hs):
-        super(FederationHandler, self).__init__(hs)
+    def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
 
         self.hs = hs
 
@@ -125,6 +130,7 @@ class FederationHandler(BaseHandler):
         self.state_store = self.storage.state
         self.federation_client = hs.get_federation_client()
         self.state_handler = hs.get_state_handler()
+        self._state_resolution_handler = hs.get_state_resolution_handler()
         self.server_name = hs.hostname
         self.keyring = hs.get_keyring()
         self.action_generator = hs.get_action_generator()
@@ -154,8 +160,9 @@ class FederationHandler(BaseHandler):
             self._device_list_updater = hs.get_device_handler().device_list_updater
             self._maybe_store_room_on_invite = self.store.maybe_store_room_on_invite
 
-        # When joining a room we need to queue any events for that room up
-        self.room_queues = {}
+        # When joining a room we need to queue any events for that room up.
+        # For each room, a list of (pdu, origin) tuples.
+        self.room_queues = {}  # type: Dict[str, List[Tuple[EventBase, str]]]
         self._room_pdu_linearizer = Linearizer("fed_room_pdu")
 
         self.third_party_event_rules = hs.get_third_party_event_rules()
@@ -280,7 +287,7 @@ class FederationHandler(BaseHandler):
                             raise Exception(
                                 "Error fetching missing prev_events for %s: %s"
                                 % (event_id, e)
-                            )
+                            ) from e
 
                         # Update the set of things we've seen after trying to
                         # fetch the missing stuff
@@ -379,8 +386,7 @@ class FederationHandler(BaseHandler):
                                 event_map[x.event_id] = x
 
                     room_version = await self.store.get_room_version_id(room_id)
-                    state_map = await resolve_events_with_store(
-                        self.clock,
+                    state_map = await self._state_resolution_handler.resolve_events_with_store(
                         room_id,
                         room_version,
                         state_maps,
@@ -813,6 +819,9 @@ class FederationHandler(BaseHandler):
             dest, room_id, limit=limit, extremities=extremities
         )
 
+        if not events:
+            return []
+
         # ideally we'd sanity check the events here for excess prev_events etc,
         # but it's hard to reject events at this point without completely
         # breaking backfill in the same way that it is currently broken by
@@ -918,15 +927,26 @@ class FederationHandler(BaseHandler):
 
         return events
 
-    async def maybe_backfill(self, room_id, current_depth):
+    async def maybe_backfill(
+        self, room_id: str, current_depth: int, limit: int
+    ) -> bool:
         """Checks the database to see if we should backfill before paginating,
         and if so do.
+
+        Args:
+            room_id
+            current_depth: The depth from which we're paginating from. This is
+                used to decide if we should backfill and what extremities to
+                use.
+            limit: The number of events that the pagination request will
+                return. This is used as part of the heuristic to decide if we
+                should back paginate.
         """
         extremities = await self.store.get_oldest_events_with_depth_in_room(room_id)
 
         if not extremities:
             logger.debug("Not backfilling as no extremeties found.")
-            return
+            return False
 
         # We only want to paginate if we can actually see the events we'll get,
         # as otherwise we'll just spend a lot of resources to get redacted
@@ -979,15 +999,53 @@ class FederationHandler(BaseHandler):
         sorted_extremeties_tuple = sorted(extremities.items(), key=lambda e: -int(e[1]))
         max_depth = sorted_extremeties_tuple[0][1]
 
+        # If we're approaching an extremity we trigger a backfill, otherwise we
+        # no-op.
+        #
+        # We chose twice the limit here as then clients paginating backwards
+        # will send pagination requests that trigger backfill at least twice
+        # using the most recent extremity before it gets removed (see below). We
+        # chose more than one times the limit in case of failure, but choosing a
+        # much larger factor will result in triggering a backfill request much
+        # earlier than necessary.
+        if current_depth - 2 * limit > max_depth:
+            logger.debug(
+                "Not backfilling as we don't need to. %d < %d - 2 * %d",
+                max_depth,
+                current_depth,
+                limit,
+            )
+            return False
+
+        logger.debug(
+            "room_id: %s, backfill: current_depth: %s, max_depth: %s, extrems: %s",
+            room_id,
+            current_depth,
+            max_depth,
+            sorted_extremeties_tuple,
+        )
+
+        # We ignore extremities that have a greater depth than our current depth
+        # as:
+        #    1. we don't really care about getting events that have happened
+        #       before our current position; and
+        #    2. we have likely previously tried and failed to backfill from that
+        #       extremity, so to avoid getting "stuck" requesting the same
+        #       backfill repeatedly we drop those extremities.
+        filtered_sorted_extremeties_tuple = [
+            t for t in sorted_extremeties_tuple if int(t[1]) <= current_depth
+        ]
+
+        # However, we need to check that the filtered extremities are non-empty.
+        # If they are empty then either we can a) bail or b) still attempt to
+        # backill. We opt to try backfilling anyway just in case we do get
+        # relevant events.
+        if filtered_sorted_extremeties_tuple:
+            sorted_extremeties_tuple = filtered_sorted_extremeties_tuple
+
         # We don't want to specify too many extremities as it causes the backfill
         # request URI to be too long.
         extremities = dict(sorted_extremeties_tuple[:5])
-
-        if current_depth > max_depth:
-            logger.debug(
-                "Not backfilling as we don't need to. %d < %d", max_depth, current_depth
-            )
-            return
 
         # Now we need to decide which hosts to hit first.
 
@@ -2266,10 +2324,10 @@ class FederationHandler(BaseHandler):
             # given state at the event. This should correctly handle cases
             # like bans, especially with state res v2.
 
-            state_sets = await self.state_store.get_state_groups(
+            state_sets_d = await self.state_store.get_state_groups(
                 event.room_id, extrem_ids
             )
-            state_sets = list(state_sets.values())
+            state_sets = list(state_sets_d.values())  # type: List[Iterable[EventBase]]
             state_sets.append(state)
             current_states = await self.state_handler.resolve_events(
                 room_version, state_sets, event
@@ -3060,7 +3118,8 @@ class FederationHandler(BaseHandler):
             )
             return result["max_stream_id"]
         else:
-            max_stream_id = await self.storage.persistence.persist_events(
+            assert self.storage.persistence
+            max_stream_token = await self.storage.persistence.persist_events(
                 event_and_contexts, backfilled=backfilled
             )
 
@@ -3071,12 +3130,12 @@ class FederationHandler(BaseHandler):
 
             if not backfilled:  # Never notify for backfilled events
                 for event, _ in event_and_contexts:
-                    await self._notify_persisted_event(event, max_stream_id)
+                    await self._notify_persisted_event(event, max_stream_token)
 
-            return max_stream_id
+            return max_stream_token.stream
 
     async def _notify_persisted_event(
-        self, event: EventBase, max_stream_id: int
+        self, event: EventBase, max_stream_token: RoomStreamToken
     ) -> None:
         """Checks to see if notifier/pushers should be notified about the
         event or not.
@@ -3102,9 +3161,14 @@ class FederationHandler(BaseHandler):
         elif event.internal_metadata.is_outlier():
             return
 
-        event_stream_id = event.internal_metadata.stream_ordering
+        # the event has been persisted so it should have a stream ordering.
+        assert event.internal_metadata.stream_ordering
+
+        event_pos = PersistedEventPosition(
+            self._instance_name, event.internal_metadata.stream_ordering
+        )
         self.notifier.on_new_room_event(
-            event, event_stream_id, max_stream_id, extra_users=extra_users
+            event, event_pos, max_stream_token, extra_users=extra_users
         )
 
     async def _clean_room_for_join(self, room_id: str) -> None:

@@ -60,6 +60,8 @@ class PusherPool:
         self.store = self.hs.get_datastore()
         self.clock = self.hs.get_clock()
 
+        self._account_validity = hs.config.account_validity
+
         # We shard the handling of push notifications by user ID.
         self._pusher_shard_config = hs.config.push.pusher_shard_config
         self._instance_name = hs.get_instance_name()
@@ -202,6 +204,14 @@ class PusherPool:
             )
 
             for u in users_affected:
+                # Don't push if the user account has expired
+                if self._account_validity.enabled:
+                    expired = await self.store.is_account_expired(
+                        u, self.clock.time_msec()
+                    )
+                    if expired:
+                        continue
+
                 if u in self.pushers:
                     for p in self.pushers[u].values():
                         p.on_new_notifications(max_stream_id)
@@ -222,6 +232,14 @@ class PusherPool:
             )
 
             for u in users_affected:
+                # Don't push if the user account has expired
+                if self._account_validity.enabled:
+                    expired = await self.store.is_account_expired(
+                        u, self.clock.time_msec()
+                    )
+                    if expired:
+                        continue
+
                 if u in self.pushers:
                     for p in self.pushers[u].values():
                         p.on_new_receipts(min_stream_id, max_stream_id)

@@ -74,9 +74,10 @@ class SyncRestServlet(RestServlet):
     ALLOWED_PRESENCE = {"online", "offline", "unavailable"}
 
     def __init__(self, hs):
-        super(SyncRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
         self.sync_handler = hs.get_sync_handler()
         self.clock = hs.get_clock()
         self.filtering = hs.get_filtering()
@@ -151,10 +152,9 @@ class SyncRestServlet(RestServlet):
             device_id=device_id,
         )
 
+        since_token = None
         if since is not None:
-            since_token = StreamToken.from_string(since)
-        else:
-            since_token = None
+            since_token = await StreamToken.from_string(self.store, since)
 
         # send any outstanding server notices to the user.
         await self._server_notices_sender.on_user_syncing(user.to_string())
@@ -236,7 +236,8 @@ class SyncRestServlet(RestServlet):
                 "leave": sync_result.groups.leave,
             },
             "device_one_time_keys_count": sync_result.device_one_time_keys_count,
-            "next_batch": sync_result.next_batch.to_string(),
+            "org.matrix.msc2732.device_unused_fallback_key_types": sync_result.device_unused_fallback_key_types,
+            "next_batch": await sync_result.next_batch.to_string(self.store),
         }
 
     @staticmethod
@@ -413,7 +414,7 @@ class SyncRestServlet(RestServlet):
         result = {
             "timeline": {
                 "events": serialized_timeline,
-                "prev_batch": room.timeline.prev_batch.to_string(),
+                "prev_batch": await room.timeline.prev_batch.to_string(self.store),
                 "limited": room.timeline.limited,
             },
             "state": {"events": serialized_state},

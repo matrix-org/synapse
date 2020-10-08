@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 class SearchHandler(BaseHandler):
     def __init__(self, hs):
-        super(SearchHandler, self).__init__(hs)
+        super().__init__(hs)
         self._event_serializer = hs.get_event_client_serializer()
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
@@ -362,13 +362,13 @@ class SearchHandler(BaseHandler):
                     self.storage, user.to_string(), res["events_after"]
                 )
 
-                res["start"] = now_token.copy_and_replace(
+                res["start"] = await now_token.copy_and_replace(
                     "room_key", res["start"]
-                ).to_string()
+                ).to_string(self.store)
 
-                res["end"] = now_token.copy_and_replace(
+                res["end"] = await now_token.copy_and_replace(
                     "room_key", res["end"]
-                ).to_string()
+                ).to_string(self.store)
 
                 if include_profile:
                     senders = {

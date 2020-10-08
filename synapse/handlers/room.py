@@ -70,7 +70,7 @@ FIVE_MINUTES_IN_MS = 5 * 60 * 1000
 
 class RoomCreationHandler(BaseHandler):
     def __init__(self, hs: "HomeServer"):
-        super(RoomCreationHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -185,6 +185,7 @@ class RoomCreationHandler(BaseHandler):
             ShadowBanError if the requester is shadow-banned.
         """
         user_id = requester.user.to_string()
+        assert self.hs.is_mine_id(user_id), "User must be our own: %s" % (user_id,)
 
         # start by allocating a new room id
         r = await self.store.get_room(old_room_id)
@@ -229,8 +230,8 @@ class RoomCreationHandler(BaseHandler):
         )
 
         # now send the tombstone
-        await self.event_creation_handler.send_nonmember_event(
-            requester, tombstone_event, tombstone_context
+        await self.event_creation_handler.handle_new_client_event(
+            requester=requester, event=tombstone_event, context=tombstone_context,
         )
 
         old_room_state = await tombstone_context.get_current_state_ids()
@@ -681,6 +682,15 @@ class RoomCreationHandler(BaseHandler):
             creator_id=user_id, is_public=is_public, room_version=room_version,
         )
 
+        # Check whether this visibility value is blocked by a third party module
+        allowed_by_third_party_rules = await (
+            self.third_party_event_rules.check_visibility_can_be_modified(
+                room_id, visibility
+            )
+        )
+        if not allowed_by_third_party_rules:
+            raise SynapseError(403, "Room visibility value not allowed.")
+
         directory_handler = self.hs.get_handlers().directory_handler
         if room_alias:
             await directory_handler.create_association(
@@ -962,8 +972,6 @@ class RoomCreationHandler(BaseHandler):
             try:
                 random_string = stringutils.random_string(18)
                 gen_room_id = RoomID(random_string, self.hs.hostname).to_string()
-                if isinstance(gen_room_id, bytes):
-                    gen_room_id = gen_room_id.decode("utf-8")
                 await self.store.store_room(
                     room_id=gen_room_id,
                     room_creator_user_id=creator_id,
@@ -1077,11 +1085,13 @@ class RoomContextHandler:
         # the token, which we replace.
         token = StreamToken.START
 
-        results["start"] = token.copy_and_replace(
+        results["start"] = await token.copy_and_replace(
             "room_key", results["start"]
-        ).to_string()
+        ).to_string(self.store)
 
-        results["end"] = token.copy_and_replace("room_key", results["end"]).to_string()
+        results["end"] = await token.copy_and_replace(
+            "room_key", results["end"]
+        ).to_string(self.store)
 
         return results
 
@@ -1134,14 +1144,14 @@ class RoomEventSource:
                 events[:] = events[:limit]
 
             if events:
-                end_key = RoomStreamToken.parse(events[-1].internal_metadata.after)
+                end_key = events[-1].internal_metadata.after
             else:
                 end_key = to_key
 
         return (events, end_key)
 
     def get_current_key(self) -> RoomStreamToken:
-        return RoomStreamToken(None, self.store.get_room_max_stream_ordering())
+        return self.store.get_room_max_token()
 
     def get_current_key_for_room(self, room_id: str) -> Awaitable[str]:
         return self.store.get_room_events_max_id(room_id)

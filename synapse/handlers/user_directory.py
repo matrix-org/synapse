@@ -37,7 +37,7 @@ class UserDirectoryHandler(StateDeltasHandler):
     """
 
     def __init__(self, hs):
-        super(UserDirectoryHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()

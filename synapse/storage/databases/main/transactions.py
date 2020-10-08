@@ -19,7 +19,7 @@ from typing import Iterable, List, Optional, Tuple
 
 from canonicaljson import encode_canonical_json
 
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
@@ -43,14 +43,32 @@ _UpdateTransactionRow = namedtuple(
 SENTINEL = object()
 
 
-class TransactionStore(SQLBaseStore):
+class TransactionWorkerStore(SQLBaseStore):
+    def __init__(self, database: DatabasePool, db_conn, hs):
+        super().__init__(database, db_conn, hs)
+
+        if hs.config.run_background_tasks:
+            self._clock.looping_call(self._cleanup_transactions, 30 * 60 * 1000)
+
+    @wrap_as_background_process("cleanup_transactions")
+    async def _cleanup_transactions(self) -> None:
+        now = self._clock.time_msec()
+        month_ago = now - 30 * 24 * 60 * 60 * 1000
+
+        def _cleanup_transactions_txn(txn):
+            txn.execute("DELETE FROM received_transactions WHERE ts < ?", (month_ago,))
+
+        await self.db_pool.runInteraction(
+            "_cleanup_transactions", _cleanup_transactions_txn
+        )
+
+
+class TransactionStore(TransactionWorkerStore):
     """A collection of queries for handling PDUs.
     """
 
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(TransactionStore, self).__init__(database, db_conn, hs)
-
-        self._clock.looping_call(self._start_cleanup_transactions, 30 * 60 * 1000)
+        super().__init__(database, db_conn, hs)
 
         self._destination_retry_cache = ExpiringCache(
             cache_name="get_destination_retry_timings",
@@ -218,6 +236,7 @@ class TransactionStore(SQLBaseStore):
                         retry_interval = EXCLUDED.retry_interval
                     WHERE
                         EXCLUDED.retry_interval = 0
+                        OR destinations.retry_interval IS NULL
                         OR destinations.retry_interval < EXCLUDED.retry_interval
             """
 
@@ -249,7 +268,11 @@ class TransactionStore(SQLBaseStore):
                     "retry_interval": retry_interval,
                 },
             )
-        elif retry_interval == 0 or prev_row["retry_interval"] < retry_interval:
+        elif (
+            retry_interval == 0
+            or prev_row["retry_interval"] is None
+            or prev_row["retry_interval"] < retry_interval
+        ):
             self.db_pool.simple_update_one_txn(
                 txn,
                 "destinations",
@@ -260,22 +283,6 @@ class TransactionStore(SQLBaseStore):
                     "retry_interval": retry_interval,
                 },
             )
-
-    def _start_cleanup_transactions(self):
-        return run_as_background_process(
-            "cleanup_transactions", self._cleanup_transactions
-        )
-
-    async def _cleanup_transactions(self) -> None:
-        now = self._clock.time_msec()
-        month_ago = now - 30 * 24 * 60 * 60 * 1000
-
-        def _cleanup_transactions_txn(txn):
-            txn.execute("DELETE FROM received_transactions WHERE ts < ?", (month_ago,))
-
-        await self.db_pool.runInteraction(
-            "_cleanup_transactions", _cleanup_transactions_txn
-        )
 
     async def store_destination_rooms_entries(
         self, destinations: Iterable[str], room_id: str, stream_ordering: int,
@@ -397,7 +404,7 @@ class TransactionStore(SQLBaseStore):
 
     @staticmethod
     def _get_catch_up_room_event_ids_txn(
-        txn, destination: str, last_successful_stream_ordering: int,
+        txn: LoggingTransaction, destination: str, last_successful_stream_ordering: int,
     ) -> List[str]:
         q = """
                 SELECT event_id FROM destination_rooms
@@ -412,3 +419,60 @@ class TransactionStore(SQLBaseStore):
         )
         event_ids = [row[0] for row in txn]
         return event_ids
+
+    async def get_catch_up_outstanding_destinations(
+        self, after_destination: Optional[str]
+    ) -> List[str]:
+        """
+        Gets at most 25 destinations which have outstanding PDUs to be caught up,
+        and are not being backed off from
+        Args:
+            after_destination:
+                If provided, all destinations must be lexicographically greater
+                than this one.
+
+        Returns:
+            list of up to 25 destinations with outstanding catch-up.
+                These are the lexicographically first destinations which are
+                lexicographically greater than after_destination (if provided).
+        """
+        time = self.hs.get_clock().time_msec()
+
+        return await self.db_pool.runInteraction(
+            "get_catch_up_outstanding_destinations",
+            self._get_catch_up_outstanding_destinations_txn,
+            time,
+            after_destination,
+        )
+
+    @staticmethod
+    def _get_catch_up_outstanding_destinations_txn(
+        txn: LoggingTransaction, now_time_ms: int, after_destination: Optional[str]
+    ) -> List[str]:
+        q = """
+            SELECT destination FROM destinations
+                WHERE destination IN (
+                    SELECT destination FROM destination_rooms
+                        WHERE destination_rooms.stream_ordering >
+                            destinations.last_successful_stream_ordering
+                )
+                AND destination > ?
+                AND (
+                    retry_last_ts IS NULL OR
+                    retry_last_ts + retry_interval < ?
+                )
+                ORDER BY destination
+                LIMIT 25
+        """
+        txn.execute(
+            q,
+            (
+                # everything is lexicographically greater than "" so this gives
+                # us the first batch of up to 25.
+                after_destination or "",
+                now_time_ms,
+            ),
+        )
+
+        destinations = [row[0] for row in txn]
+        return destinations

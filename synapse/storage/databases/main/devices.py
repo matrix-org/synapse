@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2019,2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ from synapse.storage.database import (
     make_tuple_comparison_clause,
 )
 from synapse.types import Collection, JsonDict, get_verify_key_from_cross_signing_key
-from synapse.util import json_encoder
+from synapse.util import json_decoder, json_encoder
 from synapse.util.caches.descriptors import Cache, cached, cachedList
 from synapse.util.iterutils import batch_iter
 from synapse.util.stringutils import shortstr
@@ -377,7 +377,7 @@ class DeviceWorkerStore(SQLBaseStore):
             THe new stream ID.
         """
 
-        with await self._device_list_id_gen.get_next() as stream_id:
+        async with self._device_list_id_gen.get_next() as stream_id:
             await self.db_pool.runInteraction(
                 "add_user_sig_change_to_streams",
                 self._add_user_signature_change_txn,
@@ -698,10 +698,84 @@ class DeviceWorkerStore(SQLBaseStore):
             _mark_remote_user_device_list_as_unsubscribed_txn,
         )
 
+    async def get_dehydrated_device(
+        self, user_id: str
+    ) -> Optional[Tuple[str, JsonDict]]:
+        """Retrieve the information for a dehydrated device.
+
+        Args:
+            user_id: the user whose dehydrated device we are looking for
+        Returns:
+            a tuple whose first item is the device ID, and the second item is
+            the dehydrated device information
+        """
+        # FIXME: make sure device ID still exists in devices table
+        row = await self.db_pool.simple_select_one(
+            table="dehydrated_devices",
+            keyvalues={"user_id": user_id},
+            retcols=["device_id", "device_data"],
+            allow_none=True,
+        )
+        return (
+            (row["device_id"], json_decoder.decode(row["device_data"])) if row else None
+        )
+
+    def _store_dehydrated_device_txn(
+        self, txn, user_id: str, device_id: str, device_data: str
+    ) -> Optional[str]:
+        old_device_id = self.db_pool.simple_select_one_onecol_txn(
+            txn,
+            table="dehydrated_devices",
+            keyvalues={"user_id": user_id},
+            retcol="device_id",
+            allow_none=True,
+        )
+        self.db_pool.simple_upsert_txn(
+            txn,
+            table="dehydrated_devices",
+            keyvalues={"user_id": user_id},
+            values={"device_id": device_id, "device_data": device_data},
+        )
+        return old_device_id
+
+    async def store_dehydrated_device(
+        self, user_id: str, device_id: str, device_data: JsonDict
+    ) -> Optional[str]:
+        """Store a dehydrated device for a user.
+
+        Args:
+            user_id: the user that we are storing the device for
+            device_id: the ID of the dehydrated device
+            device_data: the dehydrated device information
+        Returns:
+            device id of the user's previous dehydrated device, if any
+        """
+        return await self.db_pool.runInteraction(
+            "store_dehydrated_device_txn",
+            self._store_dehydrated_device_txn,
+            user_id,
+            device_id,
+            json_encoder.encode(device_data),
+        )
+
+    async def remove_dehydrated_device(self, user_id: str, device_id: str) -> bool:
+        """Remove a dehydrated device.
+
+        Args:
+            user_id: the user that the dehydrated device belongs to
+            device_id: the ID of the dehydrated device
+        """
+        count = await self.db_pool.simple_delete(
+            "dehydrated_devices",
+            {"user_id": user_id, "device_id": device_id},
+            desc="remove_dehydrated_device",
+        )
+        return count >= 1
+
 
 class DeviceBackgroundUpdateStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(DeviceBackgroundUpdateStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self.db_pool.updates.register_background_index_update(
             "device_lists_stream_idx",
@@ -826,7 +900,7 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
 
 class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(DeviceStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         # Map of (user_id, device_id) -> bool. If there is an entry that implies
         # the device exists.
@@ -837,7 +911,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         self._clock.looping_call(self._prune_old_outbound_device_pokes, 60 * 60 * 1000)
 
     async def store_device(
-        self, user_id: str, device_id: str, initial_device_display_name: str
+        self, user_id: str, device_id: str, initial_device_display_name: Optional[str]
     ) -> bool:
         """Ensure the given device is known; add it to the store if not
 
@@ -955,7 +1029,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         )
 
     async def update_remote_device_list_cache_entry(
-        self, user_id: str, device_id: str, content: JsonDict, stream_id: int
+        self, user_id: str, device_id: str, content: JsonDict, stream_id: str
     ) -> None:
         """Updates a single device in the cache of a remote user's devicelist.
 
@@ -983,7 +1057,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         user_id: str,
         device_id: str,
         content: JsonDict,
-        stream_id: int,
+        stream_id: str,
     ) -> None:
         if content.get("deleted"):
             self.db_pool.simple_delete_txn(
@@ -1093,7 +1167,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         if not device_ids:
             return
 
-        with await self._device_list_id_gen.get_next_mult(
+        async with self._device_list_id_gen.get_next_mult(
             len(device_ids)
         ) as stream_ids:
             await self.db_pool.runInteraction(
@@ -1108,7 +1182,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             return stream_ids[-1]
 
         context = get_active_span_text_map()
-        with await self._device_list_id_gen.get_next_mult(
+        async with self._device_list_id_gen.get_next_mult(
             len(hosts) * len(device_ids)
         ) as stream_ids:
             await self.db_pool.runInteraction(

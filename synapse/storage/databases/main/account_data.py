@@ -18,6 +18,7 @@ import abc
 import logging
 from typing import Dict, List, Optional, Tuple
 
+from synapse.api.constants import AccountDataTypes
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool
 from synapse.storage.util.id_generators import StreamIdGenerator
@@ -29,14 +30,12 @@ from synapse.util.caches.stream_change_cache import StreamChangeCache
 logger = logging.getLogger(__name__)
 
 
-class AccountDataWorkerStore(SQLBaseStore):
+# The ABCMeta metaclass ensures that it cannot be instantiated without
+# the abstract methods being implemented.
+class AccountDataWorkerStore(SQLBaseStore, metaclass=abc.ABCMeta):
     """This is an abstract base class where subclasses must implement
     `get_max_account_data_stream_id` which can be called in the initializer.
     """
-
-    # This ABCMeta metaclass ensures that we cannot be instantiated without
-    # the abstract methods being implemented.
-    __metaclass__ = abc.ABCMeta
 
     def __init__(self, database: DatabasePool, db_conn, hs):
         account_max = self.get_max_account_data_stream_id()
@@ -44,7 +43,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             "AccountDataAndTagsChangeCache", account_max
         )
 
-        super(AccountDataWorkerStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
     @abc.abstractmethod
     def get_max_account_data_stream_id(self):
@@ -293,14 +292,18 @@ class AccountDataWorkerStore(SQLBaseStore):
         self, ignored_user_id: str, ignorer_user_id: str, cache_context: _CacheContext
     ) -> bool:
         ignored_account_data = await self.get_global_account_data_by_type_for_user(
-            "m.ignored_user_list",
+            AccountDataTypes.IGNORED_USER_LIST,
             ignorer_user_id,
             on_invalidate=cache_context.invalidate,
         )
         if not ignored_account_data:
             return False
 
-        return ignored_user_id in ignored_account_data.get("ignored_users", {})
+        try:
+            return ignored_user_id in ignored_account_data.get("ignored_users", {})
+        except TypeError:
+            # The type of the ignored_users field is invalid.
+            return False
 
 
 class AccountDataStore(AccountDataWorkerStore):
@@ -315,7 +318,7 @@ class AccountDataStore(AccountDataWorkerStore):
             ],
         )
 
-        super(AccountDataStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
     def get_max_account_data_stream_id(self) -> int:
         """Get the current max stream id for the private user data stream
@@ -341,7 +344,7 @@ class AccountDataStore(AccountDataWorkerStore):
         """
         content_json = json_encoder.encode(content)
 
-        with await self._account_data_id_gen.get_next() as next_id:
+        async with self._account_data_id_gen.get_next() as next_id:
             # no need to lock here as room_account_data has a unique constraint
             # on (user_id, room_id, account_data_type) so simple_upsert will
             # retry if there is a conflict.
@@ -389,7 +392,7 @@ class AccountDataStore(AccountDataWorkerStore):
         """
         content_json = json_encoder.encode(content)
 
-        with await self._account_data_id_gen.get_next() as next_id:
+        async with self._account_data_id_gen.get_next() as next_id:
             # no need to lock here as account_data has a unique constraint on
             # (user_id, account_data_type) so simple_upsert will retry if
             # there is a conflict.
