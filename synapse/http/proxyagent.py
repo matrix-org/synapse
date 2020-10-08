@@ -44,8 +44,11 @@ class ProxyAgent(_AgentBase):
             `BrowserLikePolicyForHTTPS`, so unless you have special
             requirements you can leave this as-is.
 
-        connectTimeout (float): The amount of time that this Agent will wait
-            for the peer to accept a connection.
+        connectTimeout (Optional[float]): The amount of time that this Agent will wait
+            for the peer to accept a connection, in seconds. If 'None',
+            HostnameEndpoint's default (30s) will be used.
+
+            This is used for connections to both proxies and destination servers.
 
         bindAddress (bytes): The local address for client sockets to bind to.
 
@@ -108,6 +111,15 @@ class ProxyAgent(_AgentBase):
         Returns:
             Deferred[IResponse]: completes when the header of the response has
                  been received (regardless of the response status code).
+
+                 Can fail with:
+                    SchemeNotSupported: if the uri is not http or https
+
+                    twisted.internet.error.TimeoutError if the server we are connecting
+                        to (proxy or destination) does not accept a connection before
+                        connectTimeout.
+
+                    ... other things too.
         """
         uri = uri.strip()
         if not _VALID_URI.match(uri):

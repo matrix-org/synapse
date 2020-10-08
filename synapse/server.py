@@ -91,6 +91,7 @@ from synapse.handlers.typing import FollowerTypingHandler, TypingWriterHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
 from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpClient
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
+from synapse.module_api import ModuleApi
 from synapse.notifier import Notifier
 from synapse.push.action_generator import ActionGenerator
 from synapse.push.pusherpool import PusherPool
@@ -185,7 +186,10 @@ class HomeServer(metaclass=abc.ABCMeta):
             we are listening on to provide HTTP services.
     """
 
-    REQUIRED_ON_MASTER_STARTUP = ["user_directory_handler", "stats_handler"]
+    REQUIRED_ON_BACKGROUND_TASK_STARTUP = [
+        "auth",
+        "stats",
+    ]
 
     # This is overridden in derived application classes
     # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
@@ -251,14 +255,20 @@ class HomeServer(metaclass=abc.ABCMeta):
         self.datastores = Databases(self.DATASTORE_CLASS, self)
         logger.info("Finished setting up.")
 
-    def setup_master(self) -> None:
+        # Register background tasks required by this server. This must be done
+        # somewhat manually due to the background tasks not being registered
+        # unless handlers are instantiated.
+        if self.config.run_background_tasks:
+            self.setup_background_tasks()
+
+    def setup_background_tasks(self) -> None:
         """
         Some handlers have side effects on instantiation (like registering
         background updates). This function causes them to be fetched, and
         therefore instantiated, to run those side effects.
         """
-        for i in self.REQUIRED_ON_MASTER_STARTUP:
-            getattr(self, "get_" + i)()
+        for i in self.REQUIRED_ON_BACKGROUND_TASK_STARTUP:
+            getattr(self, "get_" + i + "_handler")()
 
     def get_reactor(self) -> twisted.internet.base.ReactorBase:
         """
@@ -646,6 +656,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_federation_ratelimiter(self) -> FederationRateLimiter:
         return FederationRateLimiter(self.clock, config=self.config.rc_federation)
+
+    @cache_in_self
+    def get_module_api(self) -> ModuleApi:
+        return ModuleApi(self, self.get_auth_handler())
 
     async def remove_pusher(self, app_id: str, push_key: str, user_id: str):
         return await self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

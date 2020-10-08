@@ -22,13 +22,12 @@ from typing import (
     Callable,
     Dict,
     List,
-    Match,
     Optional,
     Tuple,
     Union,
 )
 
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Gauge, Histogram
 
 from twisted.internet import defer
 from twisted.internet.abstract import isIPAddress
@@ -88,6 +87,13 @@ pdu_process_time = Histogram(
 )
 
 
+last_pdu_age_metric = Gauge(
+    "synapse_federation_last_received_pdu_age",
+    "The age (in seconds) of the last PDU successfully received from the given domain",
+    labelnames=("server_name",),
+)
+
+
 class FederationServer(FederationBase):
     def __init__(self, hs):
         super().__init__(hs)
@@ -116,6 +122,10 @@ class FederationServer(FederationBase):
         self._state_resp_cache = ResponseCache(hs, "state_resp", timeout_ms=30000)
         self._state_ids_resp_cache = ResponseCache(
             hs, "state_ids_resp", timeout_ms=30000
+        )
+
+        self._federation_metrics_domains = (
+            hs.get_config().federation.federation_metrics_domains
         )
 
     async def on_backfill_request(
@@ -262,7 +272,11 @@ class FederationServer(FederationBase):
 
         pdus_by_room = {}  # type: Dict[str, List[EventBase]]
 
+        newest_pdu_ts = 0
+
         for p in transaction.pdus:  # type: ignore
+            # FIXME (richardv): I don't think this works:
+            #  https://github.com/matrix-org/synapse/issues/8429
             if "unsigned" in p:
                 unsigned = p["unsigned"]
                 if "age" in unsigned:
@@ -299,6 +313,9 @@ class FederationServer(FederationBase):
 
             event = event_from_pdu_json(p, room_version)
             pdus_by_room.setdefault(room_id, []).append(event)
+
+            if event.origin_server_ts > newest_pdu_ts:
+                newest_pdu_ts = event.origin_server_ts
 
         pdu_results = {}
 
@@ -339,6 +356,10 @@ class FederationServer(FederationBase):
         await concurrently_execute(
             process_pdus_for_room, pdus_by_room.keys(), TRANSACTION_CONCURRENCY_LIMIT
         )
+
+        if newest_pdu_ts and origin in self._federation_metrics_domains:
+            newest_pdu_age = self._clock.time_msec() - newest_pdu_ts
+            last_pdu_age_metric.labels(server_name=origin).set(newest_pdu_age / 1000)
 
         return pdu_results
 
@@ -803,14 +824,14 @@ def server_matches_acl_event(server_name: str, acl_event: EventBase) -> bool:
     return False
 
 
-def _acl_entry_matches(server_name: str, acl_entry: str) -> Match:
+def _acl_entry_matches(server_name: str, acl_entry: Any) -> bool:
     if not isinstance(acl_entry, str):
         logger.warning(
             "Ignoring non-str ACL entry '%s' (is %s)", acl_entry, type(acl_entry)
         )
         return False
     regex = glob_to_regex(acl_entry)
-    return regex.match(server_name)
+    return bool(regex.match(server_name))
 
 
 class FederationHandlerRegistry:

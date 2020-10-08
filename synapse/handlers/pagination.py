@@ -25,7 +25,7 @@ from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
-from synapse.types import Requester, RoomStreamToken
+from synapse.types import Requester
 from synapse.util.async_helpers import ReadWriteLock
 from synapse.util.stringutils import random_string
 from synapse.visibility import filter_events_for_client
@@ -373,10 +373,9 @@ class PaginationHandler:
                     # case "JOIN" would have been returned.
                     assert member_event_id
 
-                    leave_token_str = await self.store.get_topological_token_for_event(
+                    leave_token = await self.store.get_topological_token_for_event(
                         member_event_id
                     )
-                    leave_token = RoomStreamToken.parse(leave_token_str)
                     assert leave_token.topological is not None
 
                     if leave_token.topological < curr_topo:
@@ -414,8 +413,8 @@ class PaginationHandler:
         if not events:
             return {
                 "chunk": [],
-                "start": from_token.to_string(),
-                "end": next_token.to_string(),
+                "start": await from_token.to_string(self.store),
+                "end": await next_token.to_string(self.store),
             }
 
         state = None
@@ -443,8 +442,8 @@ class PaginationHandler:
                     events, time_now, as_client_event=as_client_event
                 )
             ),
-            "start": from_token.to_string(),
-            "end": next_token.to_string(),
+            "start": await from_token.to_string(self.store),
+            "end": await next_token.to_string(self.store),
         }
 
         if state:

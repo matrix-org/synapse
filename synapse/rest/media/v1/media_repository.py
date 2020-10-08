@@ -139,7 +139,7 @@ class MediaRepository:
     async def create_content(
         self,
         media_type: str,
-        upload_name: str,
+        upload_name: Optional[str],
         content: IO,
         content_length: int,
         auth_user: str,
@@ -147,8 +147,8 @@ class MediaRepository:
         """Store uploaded content for a local user and return the mxc URL
 
         Args:
-            media_type: The content type of the file
-            upload_name: The name of the file
+            media_type: The content type of the file.
+            upload_name: The name of the file, if provided.
             content: A file like object that is the content to store
             content_length: The length of the content
             auth_user: The user_id of the uploader
@@ -156,6 +156,7 @@ class MediaRepository:
         Returns:
             The mxc url of the stored content
         """
+
         media_id = random_string(24)
 
         file_info = FileInfo(server_name=None, file_id=media_id)
@@ -636,7 +637,7 @@ class MediaRepository:
             thumbnailer = Thumbnailer(input_path)
         except ThumbnailError as e:
             logger.warning(
-                "Unable to generate thumbnails for remote media %s from %s using a method of %s and type of %s: %s",
+                "Unable to generate thumbnails for remote media %s from %s of type %s: %s",
                 media_id,
                 server_name,
                 media_type,

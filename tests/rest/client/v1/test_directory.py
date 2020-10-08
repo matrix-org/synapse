@@ -21,6 +21,7 @@ from synapse.types import RoomAlias
 from synapse.util.stringutils import random_string
 
 from tests import unittest
+from tests.unittest import override_config
 
 
 class DirectoryTestCase(unittest.HomeserverTestCase):
@@ -67,9 +68,17 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         self.ensure_user_joined_room()
         self.set_alias_via_directory(400, alias_length=256)
 
-    def test_state_event_in_room(self):
+    @override_config({"default_room_version": 5})
+    def test_state_event_user_in_v5_room(self):
+        """Test that a regular user can add alias events before room v6"""
         self.ensure_user_joined_room()
         self.set_alias_via_state_event(200)
+
+    @override_config({"default_room_version": 6})
+    def test_state_event_v6_room(self):
+        """Test that a regular user can *not* add alias events from room v6"""
+        self.ensure_user_joined_room()
+        self.set_alias_via_state_event(403)
 
     def test_directory_in_room(self):
         self.ensure_user_joined_room()

@@ -155,3 +155,8 @@ class EventContentFields:
 class RoomEncryptionAlgorithms:
     MEGOLM_V1_AES_SHA2 = "m.megolm.v1.aes-sha2"
     DEFAULT = MEGOLM_V1_AES_SHA2
+
+
+class AccountDataTypes:
+    DIRECT = "m.direct"
+    IGNORED_USER_LIST = "m.ignored_user_list"

@@ -29,7 +29,7 @@ from synapse.replication.tcp.streams.events import (
     EventsStreamEventRow,
     EventsStreamRow,
 )
-from synapse.types import PersistedEventPosition, RoomStreamToken, UserID
+from synapse.types import PersistedEventPosition, UserID
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.metrics import Measure
 
@@ -152,9 +152,7 @@ class ReplicationDataHandler:
                 if event.type == EventTypes.Member:
                     extra_users = (UserID.from_string(event.state_key),)
 
-                max_token = RoomStreamToken(
-                    None, self.store.get_room_max_stream_ordering()
-                )
+                max_token = self.store.get_room_max_token()
                 event_pos = PersistedEventPosition(instance_name, token)
                 self.notifier.on_new_room_event(
                     event, event_pos, max_token, extra_users

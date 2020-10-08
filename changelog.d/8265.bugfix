@@ -1,1 +1,0 @@
-Fix logstanding bug which could lead to incomplete database upgrades on SQLite.
