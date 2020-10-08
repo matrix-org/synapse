@@ -398,6 +398,10 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 desc="set_e2e_fallback_key",
             )
 
+        await self.invalidate_cache_and_stream(
+            "get_e2e_unused_fallback_key_types", (user_id, device_id)
+        )
+
     @cached(max_entries=10000)
     async def get_e2e_unused_fallback_key_types(
         self, user_id: str, device_id: str
