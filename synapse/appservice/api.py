@@ -206,7 +206,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         self,
         service: "ApplicationService",
         events: List[EventBase],
-        ephemeral: Optional[JsonDict] = None,
+        ephemeral: Optional[List[JsonDict]] = None,
         txn_id: Optional[int] = None,
     ):
         if service.url is None:
@@ -221,9 +221,12 @@ class ApplicationServiceApi(SimpleHttpClient):
             txn_id = 0
 
         uri = service.url + ("/transactions/%s" % urllib.parse.quote(str(txn_id)))
-        body = {"events": events}
+
         if ephemeral:
-            body["de.sorunome.msc2409.ephemeral"] = ephemeral
+            body = {"events": events, "de.sorunome.msc2409.ephemeral": ephemeral}
+        else:
+            body = {"events": events}
+
         try:
             await self.put_json(
                 uri=uri, json_body=body, args={"access_token": service.hs_token},

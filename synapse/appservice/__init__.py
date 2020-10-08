@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, List, Optional
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.types import GroupID, JsonDict, RoomAlias, UserID, get_domain_from_id
+from synapse.types import GroupID, JsonDict, UserID, get_domain_from_id
 from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
@@ -138,13 +138,13 @@ class ApplicationService:
                 return regex_obj
         return None
 
-    def _is_exclusive(self, ns_key: str, test_string: str):
+    def _is_exclusive(self, ns_key: str, test_string: str) -> bool:
         regex_obj = self._matches_regex(test_string, ns_key)
         if regex_obj:
             return regex_obj["exclusive"]
         return False
 
-    async def _matches_user(self, event, store: "DataStore"):
+    async def _matches_user(self, event: EventBase, store: "DataStore") -> bool:
         if not event:
             return False
 
@@ -163,12 +163,13 @@ class ApplicationService:
         return does_match
 
     @cached(num_args=1)
-    async def matches_user_in_member_list(self, room_id: str, store: "DataStore"):
+    async def matches_user_in_member_list(
+        self, room_id: str, store: "DataStore"
+    ) -> bool:
         """Check if this service is interested a room based upon it's membership
 
         Args:
-            room_id(RoomId): The room to check.
-            store(DataStore)
+            room_id: The room to check.
         Returns:
             True if this service would like to know about this room.
         """
@@ -180,12 +181,12 @@ class ApplicationService:
                 return True
         return False
 
-    def _matches_room_id(self, event):
+    def _matches_room_id(self, event: EventBase) -> bool:
         if hasattr(event, "room_id"):
             return self.is_interested_in_room(event.room_id)
         return False
 
-    async def _matches_aliases(self, event, store: "DataStore"):
+    async def _matches_aliases(self, event: EventBase, store: "DataStore") -> bool:
         if not store or not event:
             return False
 
@@ -195,12 +196,11 @@ class ApplicationService:
                 return True
         return False
 
-    async def is_interested(self, event, store: "DataStore") -> bool:
+    async def is_interested(self, event: EventBase, store: "DataStore") -> bool:
         """Check if this service is interested in this event.
 
         Args:
-            event(Event): The event to check.
-            store(DataStore)
+            event: The event to check.
         Returns:
             True if this service would like to know about this event.
         """
@@ -217,12 +217,13 @@ class ApplicationService:
         return False
 
     @cached(num_args=1)
-    async def is_interested_in_presence(self, user_id: UserID, store: "DataStore"):
+    async def is_interested_in_presence(
+        self, user_id: UserID, store: "DataStore"
+    ) -> bool:
         """Check if this service is interested a user's presence
 
         Args:
-            user_id(UserID): The user to check.
-            store(DataStore)
+            user_id: The user to check.
         Returns:
             True if this service would like to know about presence for this user.
         """
@@ -237,31 +238,31 @@ class ApplicationService:
                 return True
         return False
 
-    def is_interested_in_user(self, user_id: UserID):
+    def is_interested_in_user(self, user_id: str) -> bool:
         return (
             self._matches_regex(user_id, ApplicationService.NS_USERS)
             or user_id == self.sender
         )
 
-    def is_interested_in_alias(self, alias: RoomAlias):
+    def is_interested_in_alias(self, alias: str) -> bool:
         return bool(self._matches_regex(alias, ApplicationService.NS_ALIASES))
 
-    def is_interested_in_room(self, room_id: UserID):
+    def is_interested_in_room(self, room_id: str) -> bool:
         return bool(self._matches_regex(room_id, ApplicationService.NS_ROOMS))
 
-    def is_exclusive_user(self, user_id: UserID):
+    def is_exclusive_user(self, user_id: str) -> bool:
         return (
             self._is_exclusive(ApplicationService.NS_USERS, user_id)
             or user_id == self.sender
         )
 
-    def is_interested_in_protocol(self, protocol: str):
+    def is_interested_in_protocol(self, protocol: str) -> bool:
         return protocol in self.protocols
 
-    def is_exclusive_alias(self, alias: str):
+    def is_exclusive_alias(self, alias: str) -> bool:
         return self._is_exclusive(ApplicationService.NS_ALIASES, alias)
 
-    def is_exclusive_room(self, room_id: str):
+    def is_exclusive_room(self, room_id: str) -> bool:
         return self._is_exclusive(ApplicationService.NS_ROOMS, room_id)
 
     def get_exclusive_user_regexes(self):
@@ -289,7 +290,7 @@ class ApplicationService:
             if "group_id" in regex_obj and regex_obj["regex"].match(user_id)
         )
 
-    def is_rate_limited(self):
+    def is_rate_limited(self) -> bool:
         return self.rate_limited
 
     def __str__(self):
