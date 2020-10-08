@@ -13,10 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import threading
+from typing import Dict
 
 from mock import Mock
 
 from synapse.events import EventBase
+from synapse.module_api import ModuleApi
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 from synapse.types import Requester, StateMap
@@ -27,10 +29,11 @@ thread_local = threading.local()
 
 
 class ThirdPartyRulesTestModule:
-    def __init__(self, config, module_api):
+    def __init__(self, config: Dict, module_api: ModuleApi):
         # keep a record of the "current" rules module, so that the test can patch
         # it if desired.
         thread_local.rules_module = self
+        self.module_api = module_api
 
     async def on_create_room(
         self, requester: Requester, config: dict, is_requester_admin: bool
@@ -142,3 +145,20 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.result["code"], b"200", channel.result)
         ev = channel.json_body
         self.assertEqual(ev["content"]["x"], "y")
+
+    def test_send_event(self):
+        """Tests that the module can send an event into a room via the module api"""
+        content = {
+            "msgtype": "m.text",
+            "body": "Hello!",
+        }
+        event = self.get_success(
+            current_rules_module().module_api.create_and_send_event_into_room(
+                self.user_id, self.room_id, "m.room.message", content,
+            )
+        )  # type: EventBase
+
+        self.assertEquals(event.sender, self.user_id)
+        self.assertEquals(event.room_id, self.room_id)
+        self.assertEquals(event.type, "m.room.message")
+        self.assertEquals(event.content, content)
