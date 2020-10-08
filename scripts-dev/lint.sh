@@ -73,10 +73,7 @@ if [[ $USING_DIFF -eq 0 && -z ${files+x} ]]; then
   files=("synapse" "tests" "scripts-dev" "scripts" "contrib" "synctl")
 fi
 
-echo "Linting these paths:"
-for path in "${files[@]}"; do
-  echo "-  \"$path\""
-done
+echo "Linting these paths: ${files[*]}"
 echo
 
 # Print out the commands being run
