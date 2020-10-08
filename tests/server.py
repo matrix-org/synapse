@@ -1,6 +1,8 @@
 import json
 import logging
+from collections import deque
 from io import SEEK_END, BytesIO
+from typing import Any, Callable, Deque, List
 
 import attr
 from zope.interface import implementer
@@ -251,6 +253,7 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         self._tcp_callbacks = {}
         self._udp = []
         lookups = self.lookups = {}
+        self._thread_callbacks = deque()  # type: Deque[Callable[[], None]]()
 
         @implementer(IResolverSimple)
         class FakeResolver:
@@ -272,10 +275,10 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         """
         Make the callback fire in the next reactor iteration.
         """
-        d = Deferred()
-        d.addCallback(lambda x: callback(*args, **kwargs))
-        self.callLater(0, d.callback, True)
-        return d
+        cb = lambda: callback(*args, **kwargs)
+        # it's not safe to call callLater() here, so we append the callback to a
+        # separate queue.
+        self._thread_callbacks.append(cb)
 
     def getThreadPool(self):
         return self.threadpool
@@ -302,6 +305,18 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
             callback()
 
         return conn
+
+    def advance(self, amount):
+        # run any "callFromThread" callbacks before anything registered with
+        # "callLater"
+        while True:
+            try:
+                callback = self._thread_callbacks.popleft()
+            except IndexError:
+                break
+            callback()
+
+        super().advance(amount)
 
 
 class ThreadPool:
