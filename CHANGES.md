@@ -4,7 +4,7 @@ Synapse 1.21.0rc3 (2020-10-08)
 Bugfixes
 --------
 
-- Fix duplication of events on high traffic servers, caused by PostgresQL `could not serialize access due to concurrent update` errors. ([\#8456](https://github.com/matrix-org/synapse/issues/8456))
+- Fix duplication of events on high traffic servers, caused by PostgreSQL `could not serialize access due to concurrent update` errors. ([\#8456](https://github.com/matrix-org/synapse/issues/8456))
 
 
 Internal Changes
