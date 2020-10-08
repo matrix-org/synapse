@@ -33,7 +33,7 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         super().__init__(*args, **kwargs)
         self.hs = None  # type: synapse.server.HomeServer
         self.handler = None  # type: synapse.handlers.e2e_keys.E2eKeysHandler
-        self.store = None # type: synapse.storage.Storage
+        self.store = None  # type: synapse.storage.Storage
 
     @defer.inlineCallbacks
     def setUp(self):
