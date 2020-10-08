@@ -320,7 +320,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             txn.execute(
                 sql, (today_start, today_start, self._last_user_visit_update, now)
             )
-            logger.info('today start %s last_user_visit %s now %s' % (today_start, self._last_user_visit_update, now))
+
             # Update _last_user_visit_update to now. The reason to do this
             # rather just clamping to the beginning of the day is to limit
             # the size of the join - meaning that the query can be run more
