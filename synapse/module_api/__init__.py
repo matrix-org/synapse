@@ -368,7 +368,12 @@ class ModuleApi:
         requester = create_requester(sender)
 
         if not self._event_creation_handler:
-            self._event_creation_handler = self._hs.get_event_creation_handler()
+            # Convince mypy that get_event_creation_handler will not return None
+            event_creation_handler = (
+                self._hs.get_event_creation_handler()
+            )  # type: EventCreationHandler
+
+            self._event_creation_handler = event_creation_handler
 
         # Create and send the event
         event, _ = await self._event_creation_handler.create_and_send_nonmember_event(
