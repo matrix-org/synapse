@@ -14,5 +14,5 @@
  */
 
  -- Unused
-DROP table cache_invalidation_stream;
-DROP table account_data_max_stream_id;
+DROP TABLE IF EXISTS cache_invalidation_stream;
+DROP TABLE IF EXISTS account_data_max_stream_id;
