@@ -307,7 +307,11 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         return conn
 
     def advance(self, amount):
-        # first run any "callFromThread" callbacks
+        # first advance our reactor's time, and run any "callLater" callbacks that
+        # makes ready
+        super().advance(amount)
+
+        # now run any "callFromThread" callbacks
         while True:
             try:
                 callback = self._thread_callbacks.popleft()
@@ -315,8 +319,16 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
                 break
             callback()
 
-        # now let MemoryReactorClock run any pending "callLater" callbacks.
-        super().advance(amount)
+            # check for more "callLater" callbacks added by the thread callback
+            # This isn't required in a regular reactor, but it ends up meaning that
+            # our database queries can complete in a single call to `advance` [1] which
+            # simplifies tests.
+            #
+            # [1]: we replace the threadbool backing the db connection pool with a
+            # mock ThreadPool which doesn't really use threads; but still use
+            # reactor.callFromThread to feed results back from the db functions to the
+            # main thread.
+            super().advance(0)
 
 
 class ThreadPool:
