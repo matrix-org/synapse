@@ -100,7 +100,7 @@ class ContentRepositoryConfig(Config):
             "media_instance_running_background_jobs",
         )
 
-        self.max_upload_size = self.parse_size(config.get("max_upload_size", "10M"))
+        self.max_upload_size = self.parse_size(config.get("max_upload_size", "50M"))
         self.max_image_pixels = self.parse_size(config.get("max_image_pixels", "32M"))
         self.max_spider_size = self.parse_size(config.get("max_spider_size", "10M"))
 
@@ -242,7 +242,7 @@ class ContentRepositoryConfig(Config):
 
         # The largest allowed upload size in bytes
         #
-        #max_upload_size: 10M
+        #max_upload_size: 50M
 
         # Maximum number of pixels that will be thumbnailed
         #

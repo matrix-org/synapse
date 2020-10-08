@@ -893,7 +893,7 @@ media_store_path: "DATADIR/media_store"
 
 # The largest allowed upload size in bytes
 #
-#max_upload_size: 10M
+#max_upload_size: 50M
 
 # Maximum number of pixels that will be thumbnailed
 #
