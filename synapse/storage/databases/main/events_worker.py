@@ -1043,7 +1043,7 @@ class EventsWorkerStore(SQLBaseStore):
         return self._stream_id_gen.get_current_token()
 
     async def get_all_new_forward_event_rows(
-        self, last_id: int, current_id: int, limit: int
+        self, instance_name: str, last_id: int, current_id: int, limit: int
     ) -> List[Tuple]:
         """Returns new events, for the Events replication stream
 
@@ -1067,10 +1067,11 @@ class EventsWorkerStore(SQLBaseStore):
                 " LEFT JOIN state_events USING (event_id)"
                 " LEFT JOIN event_relations USING (event_id)"
                 " WHERE ? < stream_ordering AND stream_ordering <= ?"
+                " AND instance_name = ?"
                 " ORDER BY stream_ordering ASC"
                 " LIMIT ?"
             )
-            txn.execute(sql, (last_id, current_id, limit))
+            txn.execute(sql, (last_id, current_id, instance_name, limit))
             return txn.fetchall()
 
         return await self.db_pool.runInteraction(
@@ -1078,7 +1079,7 @@ class EventsWorkerStore(SQLBaseStore):
         )
 
     async def get_ex_outlier_stream_rows(
-        self, last_id: int, current_id: int
+        self, instance_name: str, last_id: int, current_id: int
     ) -> List[Tuple]:
         """Returns de-outliered events, for the Events replication stream
 
@@ -1097,16 +1098,17 @@ class EventsWorkerStore(SQLBaseStore):
                 "SELECT event_stream_ordering, e.event_id, e.room_id, e.type,"
                 " state_key, redacts, relates_to_id"
                 " FROM events AS e"
-                " INNER JOIN ex_outlier_stream USING (event_id)"
+                " INNER JOIN ex_outlier_stream AS out USING (event_id)"
                 " LEFT JOIN redactions USING (event_id)"
                 " LEFT JOIN state_events USING (event_id)"
                 " LEFT JOIN event_relations USING (event_id)"
                 " WHERE ? < event_stream_ordering"
                 " AND event_stream_ordering <= ?"
+                " AND out.instance_name = ?"
                 " ORDER BY event_stream_ordering ASC"
             )
 
-            txn.execute(sql, (last_id, current_id))
+            txn.execute(sql, (last_id, current_id, instance_name))
             return txn.fetchall()
 
         return await self.db_pool.runInteraction(
@@ -1149,10 +1151,11 @@ class EventsWorkerStore(SQLBaseStore):
                 " LEFT JOIN state_events USING (event_id)"
                 " LEFT JOIN event_relations USING (event_id)"
                 " WHERE ? > stream_ordering AND stream_ordering >= ?"
+                "  AND instance_name = ?"
                 " ORDER BY stream_ordering ASC"
                 " LIMIT ?"
             )
-            txn.execute(sql, (-last_id, -current_id, limit))
+            txn.execute(sql, (-last_id, -current_id, instance_name, limit))
             new_event_updates = [(row[0], row[1:]) for row in txn]
 
             limited = False
@@ -1166,15 +1169,16 @@ class EventsWorkerStore(SQLBaseStore):
                 "SELECT -event_stream_ordering, e.event_id, e.room_id, e.type,"
                 " state_key, redacts, relates_to_id"
                 " FROM events AS e"
-                " INNER JOIN ex_outlier_stream USING (event_id)"
+                " INNER JOIN ex_outlier_stream AS out USING (event_id)"
                 " LEFT JOIN redactions USING (event_id)"
                 " LEFT JOIN state_events USING (event_id)"
                 " LEFT JOIN event_relations USING (event_id)"
                 " WHERE ? > event_stream_ordering"
                 " AND event_stream_ordering >= ?"
+                " AND out.instance_name = ?"
                 " ORDER BY event_stream_ordering DESC"
             )
-            txn.execute(sql, (-last_id, -upper_bound))
+            txn.execute(sql, (-last_id, -upper_bound, instance_name))
             new_event_updates.extend((row[0], row[1:]) for row in txn)
 
             if len(new_event_updates) >= limit:
@@ -1188,7 +1192,7 @@ class EventsWorkerStore(SQLBaseStore):
         )
 
     async def get_all_updated_current_state_deltas(
-        self, from_token: int, to_token: int, target_row_count: int
+        self, instance_name: str, from_token: int, to_token: int, target_row_count: int
     ) -> Tuple[List[Tuple], int, bool]:
         """Fetch updates from current_state_delta_stream
 
@@ -1214,9 +1218,10 @@ class EventsWorkerStore(SQLBaseStore):
                 SELECT stream_id, room_id, type, state_key, event_id
                 FROM current_state_delta_stream
                 WHERE ? < stream_id AND stream_id <= ?
+                    AND instance_name = ?
                 ORDER BY stream_id ASC LIMIT ?
             """
-            txn.execute(sql, (from_token, to_token, target_row_count))
+            txn.execute(sql, (from_token, to_token, instance_name, target_row_count))
             return txn.fetchall()
 
         def get_deltas_for_stream_id_txn(txn, stream_id):

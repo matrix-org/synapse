@@ -426,12 +426,12 @@ class PersistEventsStore:
                 # so that async background tasks get told what happened.
                 sql = """
                     INSERT INTO current_state_delta_stream
-                        (stream_id, room_id, type, state_key, event_id, prev_event_id)
-                    SELECT ?, room_id, type, state_key, null, event_id
+                        (stream_id, instance_name, room_id, type, state_key, event_id, prev_event_id)
+                    SELECT ?, ?, room_id, type, state_key, null, event_id
                         FROM current_state_events
                         WHERE room_id = ?
                 """
-                txn.execute(sql, (stream_id, room_id))
+                txn.execute(sql, (stream_id, self._instance_name, room_id))
 
                 self.db_pool.simple_delete_txn(
                     txn, table="current_state_events", keyvalues={"room_id": room_id},
@@ -452,8 +452,8 @@ class PersistEventsStore:
                 #
                 sql = """
                     INSERT INTO current_state_delta_stream
-                    (stream_id, room_id, type, state_key, event_id, prev_event_id)
-                    SELECT ?, ?, ?, ?, ?, (
+                    (stream_id, instance_name, room_id, type, state_key, event_id, prev_event_id)
+                    SELECT ?, ?, ?, ?, ?, ?, (
                         SELECT event_id FROM current_state_events
                         WHERE room_id = ? AND type = ? AND state_key = ?
                     )
@@ -463,6 +463,7 @@ class PersistEventsStore:
                     (
                         (
                             stream_id,
+                            self._instance_name,
                             room_id,
                             etype,
                             state_key,
@@ -755,6 +756,7 @@ class PersistEventsStore:
                         "event_stream_ordering": stream_order,
                         "event_id": event.event_id,
                         "state_group": state_group_id,
+                        "instance_name": self._instance_name,
                     },
                 )
 
