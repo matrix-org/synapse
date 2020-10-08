@@ -282,8 +282,8 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             now = self._clock.time_msec()
 
             sql = """
-                INSERT INTO user_daily_visits (user_id, device_id, timestamp)
-                    SELECT u.user_id, u.device_id, ?
+                INSERT INTO user_daily_visits (user_id, device_id, timestamp, user_agent)
+                    SELECT u.user_id, u.device_id, ?, u.user_agent
                     FROM user_ips AS u
                     LEFT JOIN (
                       SELECT user_id, device_id, timestamp FROM user_daily_visits
@@ -314,11 +314,13 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
                         today_start,
                     ),
                 )
+
                 self._last_user_visit_update = today_start
 
             txn.execute(
                 sql, (today_start, today_start, self._last_user_visit_update, now)
             )
+            logger.info('today start %s last_user_visit %s now %s' % (today_start, self._last_user_visit_update, now))
             # Update _last_user_visit_update to now. The reason to do this
             # rather just clamping to the beginning of the day is to limit
             # the size of the join - meaning that the query can be run more
