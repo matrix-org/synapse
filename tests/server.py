@@ -2,7 +2,7 @@ import json
 import logging
 from collections import deque
 from io import SEEK_END, BytesIO
-from typing import Any, Callable, Deque, List
+from typing import Callable, Deque
 
 import attr
 from zope.interface import implementer
@@ -307,8 +307,7 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         return conn
 
     def advance(self, amount):
-        # run any "callFromThread" callbacks before anything registered with
-        # "callLater"
+        # first run any "callFromThread" callbacks
         while True:
             try:
                 callback = self._thread_callbacks.popleft()
@@ -316,6 +315,7 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
                 break
             callback()
 
+        # now let MemoryReactorClock run any pending "callLater" callbacks.
         super().advance(amount)
 
 
