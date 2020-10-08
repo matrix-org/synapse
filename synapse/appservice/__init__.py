@@ -14,14 +14,15 @@
 # limitations under the License.
 import logging
 import re
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Optional
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.types import GroupID, UserID, get_domain_from_id
-from synapse.util.caches.descriptors import _CacheContext, cached
+from synapse.types import GroupID, JsonDict, RoomAlias, UserID, get_domain_from_id
+from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
+    from synapse.appservice.api import ApplicationServiceApi
     from synapse.storage.databases.main import DataStore
 
 logger = logging.getLogger(__name__)
@@ -131,19 +132,19 @@ class ApplicationService:
                     raise ValueError("Expected string for 'regex' in ns '%s'" % ns)
         return namespaces
 
-    def _matches_regex(self, test_string, namespace_key):
+    def _matches_regex(self, test_string: str, namespace_key: str):
         for regex_obj in self.namespaces[namespace_key]:
             if regex_obj["regex"].match(test_string):
                 return regex_obj
         return None
 
-    def _is_exclusive(self, ns_key, test_string):
+    def _is_exclusive(self, ns_key: str, test_string: str):
         regex_obj = self._matches_regex(test_string, ns_key)
         if regex_obj:
             return regex_obj["exclusive"]
         return False
 
-    async def _matches_user(self, event, store):
+    async def _matches_user(self, event, store: "DataStore"):
         if not event:
             return False
 
@@ -161,10 +162,16 @@ class ApplicationService:
         does_match = await self.matches_user_in_member_list(event.room_id, store)
         return does_match
 
-    @cached(num_args=1, cache_context=True)
-    async def matches_user_in_member_list(
-        self, room_id: str, store, cache_context: _CacheContext
-    ):
+    @cached(num_args=1)
+    async def matches_user_in_member_list(self, room_id: str, store: "DataStore"):
+        """Check if this service is interested a room based upon it's membership
+
+        Args:
+            room_id(RoomId): The room to check.
+            store(DataStore)
+        Returns:
+            True if this service would like to know about this room.
+        """
         member_list = await store.get_users_in_room(room_id)
 
         # check joined member events
@@ -178,7 +185,7 @@ class ApplicationService:
             return self.is_interested_in_room(event.room_id)
         return False
 
-    async def _matches_aliases(self, event, store):
+    async def _matches_aliases(self, event, store: "DataStore"):
         if not store or not event:
             return False
 
@@ -188,7 +195,7 @@ class ApplicationService:
                 return True
         return False
 
-    async def is_interested(self, event, store=None) -> bool:
+    async def is_interested(self, event, store: "DataStore") -> bool:
         """Check if this service is interested in this event.
 
         Args:
@@ -209,10 +216,16 @@ class ApplicationService:
 
         return False
 
-    @cached(num_args=1, cache_context=True)
-    async def is_interested_in_presence(
-        self, user_id: UserID, store, cache_context: _CacheContext
-    ):
+    @cached(num_args=1)
+    async def is_interested_in_presence(self, user_id: UserID, store: "DataStore"):
+        """Check if this service is interested a user's presence
+
+        Args:
+            user_id(UserID): The user to check.
+            store(DataStore)
+        Returns:
+            True if this service would like to know about presence for this user.
+        """
         # Find all the rooms the sender is in
         if self.is_interested_in_user(user_id.to_string()):
             return True
@@ -224,31 +237,31 @@ class ApplicationService:
                 return True
         return False
 
-    def is_interested_in_user(self, user_id):
+    def is_interested_in_user(self, user_id: UserID):
         return (
             self._matches_regex(user_id, ApplicationService.NS_USERS)
             or user_id == self.sender
         )
 
-    def is_interested_in_alias(self, alias):
+    def is_interested_in_alias(self, alias: RoomAlias):
         return bool(self._matches_regex(alias, ApplicationService.NS_ALIASES))
 
-    def is_interested_in_room(self, room_id):
+    def is_interested_in_room(self, room_id: UserID):
         return bool(self._matches_regex(room_id, ApplicationService.NS_ROOMS))
 
-    def is_exclusive_user(self, user_id):
+    def is_exclusive_user(self, user_id: UserID):
         return (
             self._is_exclusive(ApplicationService.NS_USERS, user_id)
             or user_id == self.sender
         )
 
-    def is_interested_in_protocol(self, protocol):
+    def is_interested_in_protocol(self, protocol: str):
         return protocol in self.protocols
 
-    def is_exclusive_alias(self, alias):
+    def is_exclusive_alias(self, alias: str):
         return self._is_exclusive(ApplicationService.NS_ALIASES, alias)
 
-    def is_exclusive_room(self, room_id):
+    def is_exclusive_room(self, room_id: str):
         return self._is_exclusive(ApplicationService.NS_ROOMS, room_id)
 
     def get_exclusive_user_regexes(self):
@@ -261,7 +274,7 @@ class ApplicationService:
             if regex_obj["exclusive"]
         ]
 
-    def get_groups_for_user(self, user_id):
+    def get_groups_for_user(self, user_id: str):
         """Get the groups that this user is associated with by this AS
 
         Args:
@@ -295,18 +308,18 @@ class AppServiceTransaction:
         service: ApplicationService,
         id: int,
         events: List[EventBase],
-        ephemeral=None,
+        ephemeral: Optional[List[JsonDict]] = None,
     ):
         self.service = service
         self.id = id
         self.events = events
         self.ephemeral = ephemeral
 
-    async def send(self, as_api) -> bool:
+    async def send(self, as_api: "ApplicationServiceApi") -> bool:
         """Sends this transaction using the provided AS API interface.
 
         Args:
-            as_api: The API to use to send.
+            as_api(ApplicationServiceApi): The API to use to send.
         Returns:
             True if the transaction was sent.
         """

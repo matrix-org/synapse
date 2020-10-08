@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 import urllib
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from prometheus_client import Counter
 
@@ -206,7 +206,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         self,
         service: "ApplicationService",
         events: List[EventBase],
-        ephemeral: Optional[Any] = None,
+        ephemeral: Optional[JsonDict] = None,
         txn_id: Optional[int] = None,
     ):
         if service.url is None:

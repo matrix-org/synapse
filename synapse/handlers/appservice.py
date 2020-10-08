@@ -52,14 +52,14 @@ class ApplicationServicesHandler:
         self.current_max = 0
         self.is_processing = False
 
-    async def notify_interested_services(self, current_id):
+    async def notify_interested_services(self, current_id: int):
         """Notifies (pushes) all application services interested in this event.
 
         Pushing is done asynchronously, so this method won't block for any
         prolonged length of time.
 
         Args:
-            current_id(int): The current maximum ID.
+            current_id: The current maximum ID.
         """
         services = self.store.get_app_services()
         if not services or not self.notify_appservices:
@@ -169,6 +169,17 @@ class ApplicationServicesHandler:
         new_token: Union[int, RoomStreamToken],
         users: Collection[UserID] = [],
     ):
+        """This is called by the notifier in the background
+        when a ephemeral event handled by the homeserver.
+
+        This will determine which appservices
+        are interested in the event, and submit them.
+
+        Args:
+            stream_key: The stream the event came from.
+            new_token: The latest stream token
+            users: The user(s) involved with the event.
+        """
         services = [
             service
             for service in self.store.get_app_services()
@@ -192,7 +203,7 @@ class ApplicationServicesHandler:
                             service, "read_receipt", new_token
                         )
                 elif stream_key == "presence_key":
-                    events = await self._handle_as_presence(service, users)
+                    events = await self._handle_presence(service, users)
                     if events:
                         self.scheduler.submit_ephemeral_events_for_as(service, events)
                     await self.store.set_type_stream_id_for_appservice(
@@ -211,7 +222,7 @@ class ApplicationServicesHandler:
         )
         return typing
 
-    async def _handle_receipts(self, service: ApplicationService, token: int):
+    async def _handle_receipts(self, service: ApplicationService):
         from_key = await self.store.get_type_stream_id_for_appservice(
             service, "read_receipt"
         )
@@ -221,7 +232,7 @@ class ApplicationServicesHandler:
         )
         return receipts
 
-    async def _handle_as_presence(self, service: ApplicationService, users: List[str]):
+    async def _handle_presence(self, service: ApplicationService, users: List[str]):
         events = []
         presence_source = self.event_sources.sources["presence"]
         from_key = await self.store.get_type_stream_id_for_appservice(

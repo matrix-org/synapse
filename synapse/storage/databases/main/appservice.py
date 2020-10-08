@@ -15,7 +15,7 @@
 # limitations under the License.
 import logging
 import re
-from typing import Any, List, Optional
+from typing import List, Optional
 
 from synapse.appservice import ApplicationService, AppServiceTransaction
 from synapse.config.appservice import load_appservices
@@ -23,6 +23,7 @@ from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
+from synapse.types import JsonDict
 from synapse.util import json_encoder
 
 logger = logging.getLogger(__name__)
@@ -178,16 +179,14 @@ class ApplicationServiceTransactionWorkerStore(
         self,
         service: ApplicationService,
         events: List[EventBase],
-        ephemeral: Optional[Any] = None,
-    ):
+        ephemeral: Optional[JsonDict] = None,
+    ) -> AppServiceTransaction:
         """Atomically creates a new transaction for this application service
         with the given list of events.
 
         Args:
-            service(ApplicationService): The service who the transaction is for.
-            events(list<Event>): A list of events to put in the transaction.
-        Returns:
-            AppServiceTransaction: A new transaction.
+            service: The service who the transaction is for.
+            events: A list of events to put in the transaction.
         """
 
         def _create_appservice_txn(txn):

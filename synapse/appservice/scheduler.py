@@ -55,6 +55,7 @@ from synapse.appservice import ApplicationService, ApplicationServiceState
 from synapse.events import EventBase
 from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
 
@@ -110,29 +111,22 @@ class _ServiceQueuer:
         self.txn_ctrl = txn_ctrl
         self.clock = clock
 
-    def enqueue(self, service, event):
-        self.queued_events.setdefault(service.id, []).append(event)
-
+    def _start_background_request(self, service):
         # start a sender for this appservice if we don't already have one
-
         if service.id in self.requests_in_flight:
             return
 
         run_as_background_process(
             "as-sender-%s" % (service.id,), self._send_request, service
         )
+
+    def enqueue(self, service, event):
+        self.queued_events.setdefault(service.id, []).append(event)
+        self._start_background_request(service)
 
     def enqueue_ephemeral(self, service: ApplicationService, events: List[Any]):
         self.queued_ephemeral.setdefault(service.id, []).extend(events)
-
-        # start a sender for this appservice if we don't already have one
-
-        if service.id in self.requests_in_flight:
-            return
-
-        run_as_background_process(
-            "as-sender-%s" % (service.id,), self._send_request, service
-        )
+        self._start_background_request(service)
 
     async def _send_request(self, service: ApplicationService):
         # sanity-check: we shouldn't get here if this service already has a sender
@@ -183,13 +177,13 @@ class _TransactionController:
         self,
         service: ApplicationService,
         events: List[EventBase],
-        ephemeral: Optional[Any] = None,
+        ephemeral: Optional[JsonDict] = None,
     ):
         try:
             txn = await self.store.create_appservice_txn(
                 service=service, events=events, ephemeral=ephemeral
             )
-            service_is_up = await self.is_service_up(service)
+            service_is_up = await self._is_service_up(service)
             if service_is_up:
                 sent = await txn.send(self.as_api)
                 if sent:
@@ -232,7 +226,7 @@ class _TransactionController:
         recoverer.recover()
         logger.info("Now %i active recoverers", len(self.recoverers))
 
-    async def is_service_up(self, service: ApplicationService):
+    async def _is_service_up(self, service: ApplicationService) -> bool:
         state = await self.store.get_appservice_state(service)
         return state == ApplicationServiceState.UP or state is None
 
