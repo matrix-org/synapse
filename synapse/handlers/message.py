@@ -394,7 +394,9 @@ class EventCreationHandler:
         self.action_generator = hs.get_action_generator()
 
         self.spam_checker = hs.get_spam_checker()
-        self.third_party_event_rules = None  # type: Optional[ThirdPartyEventRules]
+        self.third_party_event_rules = (
+            self.hs.get_third_party_event_rules()
+        )  # type: ThirdPartyEventRules
 
         self._block_events_without_consent_error = (
             self.config.block_events_without_consent_error
@@ -672,8 +674,6 @@ class EventCreationHandler:
         ratelimit: bool = True,
         txn_id: Optional[str] = None,
         ignore_shadow_ban: bool = False,
-        ignore_spam_check: bool = False,
-        ignore_third_party_event_rules: bool = False,
     ) -> Tuple[EventBase, int]:
         """
         Creates an event, then sends it.
@@ -687,9 +687,6 @@ class EventCreationHandler:
             txn_id: The transaction ID.
             ignore_shadow_ban: True if shadow-banned users should be allowed to
                 send this event.
-            ignore_spam_check: True to bypass spam-checking of the event.
-            ignore_third_party_event_rules: True to bypass checking of the event via
-                ThirdPartyEventRules.
 
         Returns:
             The event, and its stream ordering (if state event deduplication happened,
@@ -697,8 +694,6 @@ class EventCreationHandler:
 
         Raises:
             ShadowBanError if the requester has been shadow-banned.
-            SynapseError if ignore_spam_check is False and the event is considered spam, or is
-                not allowed for some other reason.
         """
 
         if event_dict["type"] == EventTypes.Member:
@@ -725,12 +720,11 @@ class EventCreationHandler:
                 event.sender,
             )
 
-            if not ignore_spam_check:
-                spam_error = self.spam_checker.check_event_for_spam(event)
-                if spam_error:
-                    if not isinstance(spam_error, str):
-                        spam_error = "Spam is not permitted here"
-                    raise SynapseError(403, spam_error, Codes.FORBIDDEN)
+            spam_error = self.spam_checker.check_event_for_spam(event)
+            if spam_error:
+                if not isinstance(spam_error, str):
+                    spam_error = "Spam is not permitted here"
+                raise SynapseError(403, spam_error, Codes.FORBIDDEN)
 
             ev = await self.handle_new_client_event(
                 requester=requester,
@@ -738,7 +732,6 @@ class EventCreationHandler:
                 context=context,
                 ratelimit=ratelimit,
                 ignore_shadow_ban=ignore_shadow_ban,
-                ignore_third_party_event_rules=ignore_third_party_event_rules,
             )
 
         # we know it was persisted, so must have a stream ordering
@@ -818,7 +811,6 @@ class EventCreationHandler:
         ratelimit: bool = True,
         extra_users: List[UserID] = [],
         ignore_shadow_ban: bool = False,
-        ignore_third_party_event_rules: bool = False,
     ) -> EventBase:
         """Processes a new event.
 
@@ -834,8 +826,6 @@ class EventCreationHandler:
             context
             ratelimit
             extra_users: Any extra users to notify about event
-            ignore_third_party_event_rules: If True, bypass checking the event against
-                ThirdPartyEventRules.
 
             ignore_shadow_ban: True if shadow-banned users should be allowed to
                 send this event.
@@ -877,13 +867,6 @@ class EventCreationHandler:
             room_version = event.content.get("room_version", RoomVersions.V1.identifier)
         else:
             room_version = await self.store.get_room_version_id(event.room_id)
-
-        if not ignore_third_party_event_rules:
-            if not self.third_party_event_rules:
-                # Only initialise this if necessary. It's possible for ThirdPartyEventRules to call
-                # this function. However, it should not reach this line. If it does, a cyclic
-                # dependency will be created.
-                self.third_party_event_rules = self.hs.get_third_party_event_rules()
 
             event_allowed = await self.third_party_event_rules.check_event_allowed(
                 event, context
@@ -1249,12 +1232,7 @@ class EventCreationHandler:
                 # Since this is a dummy-event it is OK if it is sent by a
                 # shadow-banned user.
                 await self.handle_new_client_event(
-                    requester,
-                    event,
-                    context,
-                    ratelimit=False,
-                    ignore_shadow_ban=True,
-                    ignore_third_party_event_rules=True,
+                    requester, event, context, ratelimit=False, ignore_shadow_ban=True,
                 )
                 return True
             except ConsentNotGivenError:

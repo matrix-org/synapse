@@ -20,6 +20,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
+from synapse.handlers.message import EventCreationHandler
 from synapse.http.client import SimpleHttpClient
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
@@ -54,7 +55,7 @@ class ModuleApi:
         # We expose these as properties below in order to attach a helpful docstring.
         self._http_client = hs.get_simple_http_client()  # type: SimpleHttpClient
         self._public_room_list_manager = PublicRoomListManager(hs)
-        self._event_creation_handler = hs.get_event_creation_handler()
+        self._event_creation_handler = None  # type: Optional[EventCreationHandler]
 
     @property
     def http_client(self):
@@ -367,14 +368,12 @@ class ModuleApi:
         # Create a requester object
         requester = create_requester(sender)
 
+        if not self._event_creation_handler:
+            self._event_creation_handler = self._hs.get_event_creation_handler()
+
         # Create and send the event
         event, _ = await self._event_creation_handler.create_and_send_nonmember_event(
-            requester,
-            event_dict,
-            ratelimit=False,
-            ignore_shadow_ban=True,
-            ignore_spam_check=True,
-            ignore_third_party_event_rules=True,
+            requester, event_dict, ratelimit=False, ignore_shadow_ban=True,
         )
 
         return event

@@ -15,7 +15,6 @@
 from mock import Mock
 
 from synapse.events import EventBase
-from synapse.module_api import ModuleApi
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 from synapse.types import create_requester
@@ -33,6 +32,7 @@ class ModuleApiTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
         self.store = homeserver.get_datastore()
         self.module_api = homeserver.get_module_api()
+        self.event_creation_handler = homeserver.get_event_creation_handler()
 
     def test_can_register_user(self):
         """Tests that an external module can register a user"""
@@ -101,8 +101,6 @@ class ModuleApiTestCase(HomeserverTestCase):
             },
             ratelimit=False,
             ignore_shadow_ban=True,
-            ignore_spam_check=True,
-            ignore_third_party_event_rules=True,
         )
 
         # Create and send a state event
@@ -140,8 +138,6 @@ class ModuleApiTestCase(HomeserverTestCase):
             },
             ratelimit=False,
             ignore_shadow_ban=True,
-            ignore_spam_check=True,
-            ignore_third_party_event_rules=True,
         )
 
         # Check that we can't send membership events
