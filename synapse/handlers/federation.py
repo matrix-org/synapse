@@ -1437,8 +1437,6 @@ class FederationHandler(BaseHandler):
 
             run_in_background(self._handle_queued_pdus, room_queue)
 
-        return True
-
     @log_function
     async def do_knock(
         self, target_hosts: List[str], room_id: str, knockee: str, content: JsonDict,
