@@ -20,7 +20,6 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.handlers.message import EventCreationHandler
 from synapse.http.client import SimpleHttpClient
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
