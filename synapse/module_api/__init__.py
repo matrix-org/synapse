@@ -349,8 +349,7 @@ class ModuleApi:
         """
         if event_type == EventTypes.Member:
             raise Exception(
-                "ThirdPartyEventRules modules are not currently able to send "
-                "m.room.member events"
+                "Synapse modules are not currently able to send m.room.member events"
             )
 
         # Build event dictionary
