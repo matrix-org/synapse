@@ -1034,10 +1034,6 @@ class EventsWorkerStore(SQLBaseStore):
 
         return {"v1": complexity_v1}
 
-    def get_current_backfill_token(self):
-        """The current minimum token that backfilled events have reached"""
-        return -self._backfill_id_gen.get_current_token()
-
     def get_current_events_token(self):
         """The current maximum token that events have reached"""
         return self._stream_id_gen.get_current_token()
@@ -1120,6 +1116,9 @@ class EventsWorkerStore(SQLBaseStore):
     ) -> Tuple[List[Tuple[int, list]], int, bool]:
         """Get updates for backfill replication stream, including all new
         backfilled events and events that have gone from being outliers to not.
+
+        NOTE: The IDs given here are from replication, and so should be
+        *positive*.
 
         Args:
             instance_name: The writer we want to fetch updates from. Unused
