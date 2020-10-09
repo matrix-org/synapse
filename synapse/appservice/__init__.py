@@ -196,7 +196,9 @@ class ApplicationService:
                 return True
         return False
 
-    async def is_interested(self, event: EventBase, store: Optional["DataStore"] = None) -> bool:
+    async def is_interested(
+        self, event: EventBase, store: Optional["DataStore"] = None
+    ) -> bool:
         """Check if this service is interested in this event.
 
         Args:

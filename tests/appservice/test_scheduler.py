@@ -263,6 +263,37 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
     def test_send_single_ephemeral_no_queue(self):
         # Expect the event to be sent immediately.
         service = Mock(id=4, name="service")
-        event = Mock(name="event")
-        self.queuer.enqueue_ephemeral(service, event)
-        self.txn_ctrl.send.assert_called_once_with(service, [], event)
+        event_list = [Mock(name="event")]
+        self.queuer.enqueue_ephemeral(service, event_list)
+        self.txn_ctrl.send.assert_called_once_with(service, [], event_list)
+
+    def test_send_multiple_ephemeral_no_queue(self):
+        # Expect the event to be sent immediately.
+        service = Mock(id=4, name="service")
+        event_list = [Mock(name="event1"), Mock(name="event2"), Mock(name="event3")]
+        self.queuer.enqueue_ephemeral(service, event_list)
+        self.txn_ctrl.send.assert_called_once_with(service, [], event_list)
+
+    def test_send_single_ephemeral_with_queue(self):
+        d = defer.Deferred()
+        self.txn_ctrl.send = Mock(
+            side_effect=lambda x, y, z: make_deferred_yieldable(d)
+        )
+        service = Mock(id=4)
+        event_list_1 = [Mock(event_id="event1"), Mock(event_id="event2")]
+
+        # Send more events: expect send() to NOT be called multiple times.
+        event_list_2 = [Mock(event_id="event3"), Mock(event_id="event4")]
+        event_list_3 = [Mock(event_id="event5"), Mock(event_id="event6")]
+
+        # Send an event and don't resolve it just yet.
+        self.queuer.enqueue_ephemeral(service, event_list_1)
+
+        self.queuer.enqueue_ephemeral(service, event_list_2)
+        self.queuer.enqueue_ephemeral(service, event_list_3)
+        self.txn_ctrl.send.assert_called_with(service, [], event_list_1)
+        self.assertEquals(1, self.txn_ctrl.send.call_count)
+        # Resolve the send event: expect the queued events to be sent
+        d.callback(service)
+        self.txn_ctrl.send.assert_called_with(service, [], event_list_2 + event_list_3)
+        self.assertEquals(2, self.txn_ctrl.send.call_count)
