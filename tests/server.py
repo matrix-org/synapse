@@ -325,8 +325,8 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
             # our database queries can complete in a single call to `advance` [1] which
             # simplifies tests.
             #
-            # [1]: we replace the threadbool backing the db connection pool with a
-            # mock ThreadPool which doesn't really use threads; but still use
+            # [1]: we replace the threadpool backing the db connection pool with a
+            # mock ThreadPool which doesn't really use threads; but we still use
             # reactor.callFromThread to feed results back from the db functions to the
             # main thread.
             super().advance(0)
