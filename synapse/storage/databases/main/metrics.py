@@ -283,7 +283,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
 
             sql = """
                 INSERT INTO user_daily_visits (user_id, device_id, timestamp, user_agent)
-                    SELECT u.user_id, u.device_id, ?, u.user_agent
+                    SELECT u.user_id, u.device_id, ?, MAX(u.user_agent)
                     FROM user_ips AS u
                     LEFT JOIN (
                       SELECT user_id, device_id, timestamp FROM user_daily_visits
@@ -294,7 +294,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
                     WHERE last_seen > ? AND last_seen <= ?
                     AND udv.timestamp IS NULL AND users.is_guest=0
                     AND users.appservice_id IS NULL
-                    GROUP BY u.user_id, u.device_id
+                    GROUP BY u.user_id, u.device_id, u.user_agent
             """
 
             # This means that the day has rolled over but there could still
@@ -314,13 +314,11 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
                         today_start,
                     ),
                 )
-
                 self._last_user_visit_update = today_start
 
             txn.execute(
                 sql, (today_start, today_start, self._last_user_visit_update, now)
             )
-
             # Update _last_user_visit_update to now. The reason to do this
             # rather just clamping to the beginning of the day is to limit
             # the size of the join - meaning that the query can be run more
