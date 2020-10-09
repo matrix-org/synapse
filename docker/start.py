@@ -205,7 +205,8 @@ def main(args, environ):
             config_dir, config_path, environ, ownership
         )
 
-    if mode == "run":
+    if mode != "run":
+        error("Unknown execution mode '%s'" % (mode,))
         args = args[2:]
 
         if "-m" not in args:
