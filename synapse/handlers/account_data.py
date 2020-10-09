@@ -12,16 +12,24 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import TYPE_CHECKING, List, Tuple
+
+from synapse.types import JsonDict, UserID
+
+if TYPE_CHECKING:
+    from synapse.app.homeserver import HomeServer
 
 
 class AccountDataEventSource:
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
 
-    def get_current_key(self, direction="f"):
+    def get_current_key(self, direction: str = "f") -> int:
         return self.store.get_max_account_data_stream_id()
 
-    async def get_new_events(self, user, from_key, **kwargs):
+    async def get_new_events(
+        self, user: UserID, from_key: int, **kwargs
+    ) -> Tuple[List[JsonDict], int]:
         user_id = user.to_string()
         last_stream_id = from_key
 
