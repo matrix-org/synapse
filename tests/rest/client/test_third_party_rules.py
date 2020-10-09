@@ -152,9 +152,15 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
             "msgtype": "m.text",
             "body": "Hello!",
         }
+        event_dict = {
+            "room_id": self.room_id,
+            "type": "m.room.message",
+            "content": content,
+            "sender": self.user_id,
+        }
         event = self.get_success(
             current_rules_module().module_api.create_and_send_event_into_room(
-                self.user_id, self.room_id, "m.room.message", content,
+                event_dict
             )
         )  # type: EventBase
 

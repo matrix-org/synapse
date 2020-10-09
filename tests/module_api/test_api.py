@@ -79,10 +79,14 @@ class ModuleApiTestCase(HomeserverTestCase):
 
         # Create and send a non-state event
         content = {"body": "I am a puppet", "msgtype": "m.text"}
+        event_dict = {
+            "room_id": room_id,
+            "type": "m.room.message",
+            "content": content,
+            "sender": user_id,
+        }
         event = self.get_success(
-            self.module_api.create_and_send_event_into_room(
-                user_id, room_id, event_type="m.room.message", content=content,
-            )
+            self.module_api.create_and_send_event_into_room(event_dict)
         )  # type: EventBase
         self.assertEqual(event.sender, user_id)
         self.assertEqual(event.type, "m.room.message")
@@ -93,12 +97,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         # Check that the event was sent
         self.event_creation_handler.create_and_send_nonmember_event.assert_called_with(
             create_requester(user_id),
-            {
-                "type": "m.room.message",
-                "content": content,
-                "room_id": room_id,
-                "sender": user_id,
-            },
+            event_dict,
             ratelimit=False,
             ignore_shadow_ban=True,
         )
@@ -111,14 +110,15 @@ class ModuleApiTestCase(HomeserverTestCase):
             "users_default": 0,
             "events": {"test.event.type": 25},
         }
+        event_dict = {
+            "room_id": room_id,
+            "type": "m.room.power_levels",
+            "content": content,
+            "sender": user_id,
+            "state_key": "",
+        }
         event = self.get_success(
-            self.module_api.create_and_send_event_into_room(
-                user_id,
-                room_id,
-                event_type="m.room.power_levels",
-                content=content,
-                state_key="",
-            )
+            self.module_api.create_and_send_event_into_room(event_dict)
         )  # type: EventBase
         self.assertEqual(event.sender, user_id)
         self.assertEqual(event.type, "m.room.power_levels")
@@ -144,15 +144,15 @@ class ModuleApiTestCase(HomeserverTestCase):
         content = {
             "membership": "leave",
         }
+        event_dict = {
+            "room_id": room_id,
+            "type": "m.room.member",
+            "content": content,
+            "sender": user_id,
+            "state_key": user_id,
+        }
         self.get_failure(
-            self.module_api.create_and_send_event_into_room(
-                user_id,
-                room_id,
-                event_type="m.room.message",
-                content=content,
-                state_key=user_id,
-            ),
-            Exception,
+            self.module_api.create_and_send_event_into_room(event_dict), Exception
         )
 
     def test_public_rooms(self):
