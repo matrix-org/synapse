@@ -259,3 +259,10 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
         srv_2_defer.callback(srv2)
         self.txn_ctrl.send.assert_called_with(srv2, [srv_2_event2], None)
         self.assertEquals(3, self.txn_ctrl.send.call_count)
+
+    def test_send_single_ephemeral_no_queue(self):
+        # Expect the event to be sent immediately.
+        service = Mock(id=4, name="service")
+        event = Mock(name="event")
+        self.queuer.enqueue_ephemeral(service, event)
+        self.txn_ctrl.send.assert_called_once_with(service, [], event)
