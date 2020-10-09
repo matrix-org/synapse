@@ -32,6 +32,7 @@ from synapse.types import JsonDict, RoomAlias, UserID
 from synapse.util.stringutils import random_string
 
 from tests import unittest
+from tests.test_utils import make_awaitable
 
 PATH_PREFIX = b"/_matrix/client/api/v1"
 
@@ -47,7 +48,10 @@ class RoomBase(unittest.HomeserverTestCase):
             "red", http_client=None, federation_client=Mock(),
         )
 
-        self.hs.get_federation_handler = Mock(return_value=Mock())
+        self.hs.get_federation_handler = Mock()
+        self.hs.get_federation_handler.return_value.maybe_backfill = Mock(
+            return_value=make_awaitable(None)
+        )
 
         async def _insert_client_ip(*args, **kwargs):
             return None
