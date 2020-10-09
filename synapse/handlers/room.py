@@ -120,7 +120,7 @@ class RoomCreationHandler(BaseHandler):
         # subsequent requests
         self._upgrade_response_cache = ResponseCache(
             hs, "room_upgrade", timeout_ms=FIVE_MINUTES_IN_MS
-        )
+        )  # type: ResponseCache[Tuple[str, str]]
         self._server_notices_mxid = hs.config.server_notices_mxid
 
         self.third_party_event_rules = hs.get_third_party_event_rules()
