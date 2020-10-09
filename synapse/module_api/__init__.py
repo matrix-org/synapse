@@ -18,7 +18,6 @@ from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes
 from synapse.events import EventBase
 from synapse.http.client import SimpleHttpClient
 from synapse.http.site import SynapseRequest
@@ -322,22 +321,12 @@ class ModuleApi:
         state = yield defer.ensureDeferred(self._store.get_events(state_ids.values()))
         return state.values()
 
-    async def create_and_send_event_into_room(
-        self,
-        sender: str,
-        room_id: str,
-        event_type: str,
-        content: JsonDict,
-        state_key: Optional[str] = None,
-    ) -> EventBase:
-        """Create and send an event into a room.
+    async def create_and_send_event_into_room(self, event_dict: JsonDict) -> EventBase:
+        """Create and send an event into a room. Membership events are currently not supported.
 
         Args:
-            sender: The user ID of the event sender.
-            room_id: The ID of the room to send the event into.
-            event_type: The type of the event.
-            content: The event content.
-            state_key: The event's state key. None if this is not a state event.
+            event_dict: A dictionary representing the event to send.
+                Required keys are `type`, `room_id`, `sender` and `content`.
 
         Returns:
             The event that was sent. If state event deduplication happened, then
@@ -346,25 +335,8 @@ class ModuleApi:
         Raises:
             SynapseError if the event was not allowed.
         """
-        if event_type == EventTypes.Member:
-            raise Exception(
-                "Synapse modules are not currently able to send m.room.member events"
-            )
-
-        # Build event dictionary
-        event_dict = {
-            "type": event_type,
-            "content": content,
-            "room_id": room_id,
-            "sender": sender,
-        }
-
-        # Check whether this is intended to be a state event
-        if state_key is not None:
-            event_dict["state_key"] = state_key
-
         # Create a requester object
-        requester = create_requester(sender)
+        requester = create_requester(event_dict["sender"])
 
         # Create and send the event
         (
