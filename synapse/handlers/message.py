@@ -59,6 +59,7 @@ from synapse.visibility import filter_events_for_client
 from ._base import BaseHandler
 
 if TYPE_CHECKING:
+    from synapse.events.third_party_rules import ThirdPartyEventRules
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -393,7 +394,9 @@ class EventCreationHandler:
         self.action_generator = hs.get_action_generator()
 
         self.spam_checker = hs.get_spam_checker()
-        self.third_party_event_rules = hs.get_third_party_event_rules()
+        self.third_party_event_rules = (
+            self.hs.get_third_party_event_rules()
+        )  # type: ThirdPartyEventRules
 
         self._block_events_without_consent_error = (
             self.config.block_events_without_consent_error
@@ -1229,11 +1232,7 @@ class EventCreationHandler:
                 # Since this is a dummy-event it is OK if it is sent by a
                 # shadow-banned user.
                 await self.handle_new_client_event(
-                    requester=requester,
-                    event=event,
-                    context=context,
-                    ratelimit=False,
-                    ignore_shadow_ban=True,
+                    requester, event, context, ratelimit=False, ignore_shadow_ban=True,
                 )
                 return True
             except ConsentNotGivenError:
