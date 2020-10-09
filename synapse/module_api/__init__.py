@@ -340,7 +340,8 @@ class ModuleApi:
             state_key: The event's state key. None if this is not a state event.
 
         Returns:
-            The event that was sent.
+            The event that was sent. If state event deduplication happened, then
+                the previous, duplicate event instead.
 
         Raises:
             SynapseError if the event was not allowed.
