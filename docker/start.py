@@ -207,52 +207,50 @@ def main(args, environ):
 
     if mode != "run":
         error("Unknown execution mode '%s'" % (mode,))
-        args = args[2:]
 
-        if "-m" not in args:
-            args = ["-m", synapse_worker] + args
+    args = args[2:]
 
-        # if there are no config files passed to synapse, try adding the default file
-        if not any(p.startswith("--config-path") for p in args):
-            config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
-            config_path = environ.get(
-                "SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml"
-            )
+    if "-m" not in args:
+        args = ["-m", synapse_worker] + args
 
-            if not os.path.exists(config_path):
-                if "SYNAPSE_SERVER_NAME" in environ:
-                    error(
-                        """\
+    # if there are no config files passed to synapse, try adding the default file
+    if not any(p.startswith("--config-path") or p.startswith("-c") for p in args):
+        config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
+        config_path = environ.get(
+            "SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml"
+        )
+
+        if not os.path.exists(config_path):
+            if "SYNAPSE_SERVER_NAME" in environ:
+                error(
+                    """\
 Config file '%s' does not exist.
-   
+
 The synapse docker image no longer supports generating a config file on-the-fly
 based on environment variables. You can migrate to a static config file by
 running with 'migrate_config'. See the README for more details.
 """
-                        % (config_path,)
-                    )
-
-                error(
-                    "Config file '%s' does not exist. You should either create a new "
-                    "config file by running with the `generate` argument (and then edit "
-                    "the resulting file before restarting) or specify the path to an "
-                    "existing config file with the SYNAPSE_CONFIG_PATH variable."
                     % (config_path,)
                 )
 
-            args += ["--config-path", config_path]
+            error(
+                "Config file '%s' does not exist. You should either create a new "
+                "config file by running with the `generate` argument (and then edit "
+                "the resulting file before restarting) or specify the path to an "
+                "existing config file with the SYNAPSE_CONFIG_PATH variable."
+                % (config_path,)
+            )
 
-        log("Starting synapse with args " + " ".join(args))
+        args += ["--config-path", config_path]
 
-        args = ["python"] + args
-        if ownership is not None:
-            args = ["gosu", ownership] + args
-            os.execv("/usr/sbin/gosu", args)
-        else:
-            os.execv("/usr/local/bin/python", args)
-        return
+    log("Starting synapse with args " + " ".join(args))
 
-    error("Unknown execution mode '%s'" % (mode,))
+    args = ["python"] + args
+    if ownership is not None:
+        args = ["gosu", ownership] + args
+        os.execv("/usr/sbin/gosu", args)
+    else:
+        os.execv("/usr/local/bin/python", args)
 
 
 if __name__ == "__main__":
