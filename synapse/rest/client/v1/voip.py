@@ -25,7 +25,7 @@ class VoipRestServlet(RestServlet):
     PATTERNS = client_patterns("/voip/turnServer$", v1=True)
 
     def __init__(self, hs):
-        super(VoipRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
 
@@ -50,7 +50,7 @@ class VoipRestServlet(RestServlet):
             # We need to use standard padded base64 encoding here
             # encode_base64 because we need to add the standard padding to get the
             # same result as the TURN server.
-            password = base64.b64encode(mac.digest())
+            password = base64.b64encode(mac.digest()).decode("ascii")
 
         elif turnUris and turnUsername and turnPassword and userLifetime:
             username = turnUsername

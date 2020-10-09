@@ -45,33 +45,16 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         }
 
         self.hs = self.setup_test_homeserver(config=config)
+
         return self.hs
 
     def prepare(self, reactor, clock, homeserver):
         self.user_id = self.register_user("user", "password")
         self.token = self.login("user", "password")
 
-    def test_retention_state_event(self):
-        """Tests that the server configuration can limit the values a user can set to the
-        room's retention policy.
-        """
-        room_id = self.helper.create_room_as(self.user_id, tok=self.token)
-
-        self.helper.send_state(
-            room_id=room_id,
-            event_type=EventTypes.Retention,
-            body={"max_lifetime": one_day_ms * 4},
-            tok=self.token,
-            expect_code=400,
-        )
-
-        self.helper.send_state(
-            room_id=room_id,
-            event_type=EventTypes.Retention,
-            body={"max_lifetime": one_hour_ms},
-            tok=self.token,
-            expect_code=400,
-        )
+        self.store = self.hs.get_datastore()
+        self.serializer = self.hs.get_event_client_serializer()
+        self.clock = self.hs.get_clock()
 
     def test_retention_event_purged_with_state_event(self):
         """Tests that expired events are correctly purged when the room's retention policy
@@ -89,6 +72,36 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         )
 
         self._test_retention_event_purged(room_id, one_day_ms * 1.5)
+
+    def test_retention_event_purged_with_state_event_outside_allowed(self):
+        """Tests that the server configuration can override the policy for a room when
+        running the purge jobs.
+        """
+        room_id = self.helper.create_room_as(self.user_id, tok=self.token)
+
+        # Set a max_lifetime higher than the maximum allowed value.
+        self.helper.send_state(
+            room_id=room_id,
+            event_type=EventTypes.Retention,
+            body={"max_lifetime": one_day_ms * 4},
+            tok=self.token,
+        )
+
+        # Check that the event is purged after waiting for the maximum allowed duration
+        # instead of the one specified in the room's policy.
+        self._test_retention_event_purged(room_id, one_day_ms * 1.5)
+
+        # Set a max_lifetime lower than the minimum allowed value.
+        self.helper.send_state(
+            room_id=room_id,
+            event_type=EventTypes.Retention,
+            body={"max_lifetime": one_hour_ms},
+            tok=self.token,
+        )
+
+        # Check that the event is purged after waiting for the minimum allowed duration
+        # instead of the one specified in the room's policy.
+        self._test_retention_event_purged(room_id, one_day_ms * 0.5)
 
     def test_retention_event_purged_without_state_event(self):
         """Tests that expired events are correctly purged when the room's retention policy
@@ -126,7 +139,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
 
         events.append(self.get_success(store.get_event(valid_event_id)))
 
-        # Advance the time by anothe 2 days. After this, the first event should be
+        # Advance the time by another 2 days. After this, the first event should be
         # outdated but not the second one.
         self.reactor.advance(one_day_ms * 2 / 1000)
 
@@ -140,11 +153,33 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         # That event should be the second, not outdated event.
         self.assertEqual(filtered_events[0].event_id, valid_event_id, filtered_events)
 
-    def _test_retention_event_purged(self, room_id, increment):
+    def _test_retention_event_purged(self, room_id: str, increment: float):
+        """Run the following test scenario to test the message retention policy support:
+
+        1. Send event 1
+        2. Increment time by `increment`
+        3. Send event 2
+        4. Increment time by `increment`
+        5. Check that event 1 has been purged
+        6. Check that event 2 has not been purged
+        7. Check that state events that were sent before event 1 aren't purged.
+        The main reason for sending a second event is because currently Synapse won't
+        purge the latest message in a room because it would otherwise result in a lack of
+        forward extremities for this room. It's also a good thing to ensure the purge jobs
+        aren't too greedy and purge messages they shouldn't.
+
+        Args:
+            room_id: The ID of the room to test retention in.
+            increment: The number of milliseconds to advance the clock each time. Must be
+                defined so that events in the room aren't purged if they are `increment`
+                old but are purged if they are `increment * 2` old.
+        """
         # Get the create event to, later, check that we can still access it.
         message_handler = self.hs.get_message_handler()
         create_event = self.get_success(
-            message_handler.get_room_data(self.user_id, room_id, EventTypes.Create)
+            message_handler.get_room_data(
+                self.user_id, room_id, EventTypes.Create, state_key=""
+            )
         )
 
         # Send a first event to the room. This is the event we'll want to be purged at the
@@ -154,7 +189,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         expired_event_id = resp.get("event_id")
 
         # Check that we can retrieve the event.
-        expired_event = self.get_event(room_id, expired_event_id)
+        expired_event = self.get_event(expired_event_id)
         self.assertEqual(
             expired_event.get("content", {}).get("body"), "1", expired_event
         )
@@ -172,26 +207,31 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         # one should still be kept.
         self.reactor.advance(increment / 1000)
 
-        # Check that the event has been purged from the database.
-        self.get_event(room_id, expired_event_id, expected_code=404)
+        # Check that the first event has been purged from the database, i.e. that we
+        # can't retrieve it anymore, because it has expired.
+        self.get_event(expired_event_id, expect_none=True)
 
-        # Check that the event that hasn't been purged can still be retrieved.
-        valid_event = self.get_event(room_id, valid_event_id)
+        # Check that the event that hasn't expired can still be retrieved.
+        valid_event = self.get_event(valid_event_id)
         self.assertEqual(valid_event.get("content", {}).get("body"), "2", valid_event)
 
         # Check that we can still access state events that were sent before the event that
         # has been purged.
         self.get_event(room_id, create_event.event_id)
 
-    def get_event(self, room_id, event_id, expected_code=200):
-        url = "/_matrix/client/r0/rooms/%s/event/%s" % (room_id, event_id)
+    def get_event(self, event_id, expect_none=False):
+        event = self.get_success(self.store.get_event(event_id, allow_none=True))
 
-        request, channel = self.make_request("GET", url, access_token=self.token)
-        self.render(request)
+        if expect_none:
+            self.assertIsNone(event)
+            return {}
 
-        self.assertEqual(channel.code, expected_code, channel.result)
+        self.assertIsNotNone(event)
 
-        return channel.json_body
+        time_now = self.clock.time_msec()
+        serialized = self.get_success(self.serializer.serialize_event(event, time_now))
+
+        return serialized
 
 
 class RetentionNoDefaultPolicyTestCase(unittest.HomeserverTestCase):

@@ -17,7 +17,8 @@
 """
 Utilities for running the unit tests
 """
-from typing import Awaitable, TypeVar
+from asyncio import Future
+from typing import Any, Awaitable, TypeVar
 
 TV = TypeVar("TV")
 
@@ -36,3 +37,14 @@ def get_awaitable_result(awaitable: Awaitable[TV]) -> TV:
 
     # if next didn't raise, the awaitable hasn't completed.
     raise Exception("awaitable has not yet completed")
+
+
+def make_awaitable(result: Any) -> Awaitable[Any]:
+    """
+    Makes an awaitable, suitable for mocking an `async` function.
+    This uses Futures as they can be awaited multiple times so can be returned
+    to multiple callers.
+    """
+    future = Future()  # type: ignore
+    future.set_result(result)
+    return future

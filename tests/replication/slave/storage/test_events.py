@@ -20,6 +20,7 @@ from synapse.events import FrozenEvent, _EventInternalMetadata, make_event_from_
 from synapse.handlers.room import RoomEventSource
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.storage.roommember import RoomsForUser
+from synapse.types import PersistedEventPosition
 
 from tests.server import FakeTransport
 
@@ -58,7 +59,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         # Patch up the equality operator for events so that we can check
         # whether lists of events match using assertEquals
         self.unpatches = [patch__eq__(_EventInternalMetadata), patch__eq__(FrozenEvent)]
-        return super(SlavedEventStoreTestCase, self).setUp()
+        return super().setUp()
 
     def prepare(self, *args, **kwargs):
         super().prepare(*args, **kwargs)
@@ -160,7 +161,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.check(
             "get_unread_event_push_actions_by_room_for_user",
             [ROOM_ID, USER_ID_2, event1.event_id],
-            {"highlight_count": 0, "notify_count": 0},
+            {"highlight_count": 0, "unread_count": 0, "notify_count": 0},
         )
 
         self.persist(
@@ -173,7 +174,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.check(
             "get_unread_event_push_actions_by_room_for_user",
             [ROOM_ID, USER_ID_2, event1.event_id],
-            {"highlight_count": 0, "notify_count": 1},
+            {"highlight_count": 0, "unread_count": 0, "notify_count": 1},
         )
 
         self.persist(
@@ -188,7 +189,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.check(
             "get_unread_event_push_actions_by_room_for_user",
             [ROOM_ID, USER_ID_2, event1.event_id],
-            {"highlight_count": 1, "notify_count": 2},
+            {"highlight_count": 1, "unread_count": 0, "notify_count": 2},
         )
 
     def test_get_rooms_for_user_with_stream_ordering(self):
@@ -204,10 +205,14 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             type="m.room.member", sender=USER_ID_2, key=USER_ID_2, membership="join"
         )
         self.replicate()
+
+        expected_pos = PersistedEventPosition(
+            "master", j2.internal_metadata.stream_ordering
+        )
         self.check(
             "get_rooms_for_user_with_stream_ordering",
             (USER_ID_2,),
-            {(ROOM_ID, j2.internal_metadata.stream_ordering)},
+            {(ROOM_ID, expected_pos)},
         )
 
     def test_get_rooms_for_user_with_stream_ordering_with_multi_event_persist(self):
@@ -293,9 +298,10 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             # the membership change is only any use to us if the room is in the
             # joined_rooms list.
             if membership_changes:
-                self.assertEqual(
-                    joined_rooms, {(ROOM_ID, j2.internal_metadata.stream_ordering)}
+                expected_pos = PersistedEventPosition(
+                    "master", j2.internal_metadata.stream_ordering
                 )
+                self.assertEqual(joined_rooms, {(ROOM_ID, expected_pos)})
 
     event_id = 0
 
@@ -366,7 +372,11 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         state_handler = self.hs.get_state_handler()
         context = self.get_success(state_handler.compute_event_context(event))
 
-        self.master_store.add_push_actions_to_staging(
-            event.event_id, {user_id: actions for user_id, actions in push_actions}
+        self.get_success(
+            self.master_store.add_push_actions_to_staging(
+                event.event_id,
+                {user_id: actions for user_id, actions in push_actions},
+                False,
+            )
         )
         return event, context

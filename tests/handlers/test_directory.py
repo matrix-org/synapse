@@ -16,8 +16,6 @@
 
 from mock import Mock
 
-from twisted.internet import defer
-
 import synapse
 import synapse.api.errors
 from synapse.api.constants import EventTypes
@@ -26,6 +24,7 @@ from synapse.rest.client.v1 import directory, login, room
 from synapse.types import RoomAlias, create_requester
 
 from tests import unittest
+from tests.test_utils import make_awaitable
 
 
 class DirectoryTestCase(unittest.HomeserverTestCase):
@@ -49,7 +48,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
             federation_registry=self.mock_registry,
         )
 
-        self.handler = hs.get_handlers().directory_handler
+        self.handler = hs.get_directory_handler()
 
         self.store = hs.get_datastore()
 
@@ -71,7 +70,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEquals({"room_id": "!8765qwer:test", "servers": ["test"]}, result)
 
     def test_get_remote_association(self):
-        self.mock_federation.make_query.return_value = defer.succeed(
+        self.mock_federation.make_query.return_value = make_awaitable(
             {"room_id": "!8765qwer:test", "servers": ["test", "remote"]}
         )
 
@@ -111,7 +110,7 @@ class TestCreateAlias(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        self.handler = hs.get_handlers().directory_handler
+        self.handler = hs.get_directory_handler()
 
         # Create user
         self.admin_user = self.register_user("admin", "pass", admin=True)
@@ -174,7 +173,7 @@ class TestDeleteAlias(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
-        self.handler = hs.get_handlers().directory_handler
+        self.handler = hs.get_directory_handler()
         self.state_handler = hs.get_state_handler()
 
         # Create user
@@ -290,7 +289,7 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
-        self.handler = hs.get_handlers().directory_handler
+        self.handler = hs.get_directory_handler()
         self.state_handler = hs.get_state_handler()
 
         # Create user
@@ -443,7 +442,7 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.result)
 
         self.room_list_handler = hs.get_room_list_handler()
-        self.directory_handler = hs.get_handlers().directory_handler
+        self.directory_handler = hs.get_directory_handler()
 
         return hs
 

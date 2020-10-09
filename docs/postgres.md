@@ -106,6 +106,17 @@ Note that the above may fail with an error about duplicate rows if corruption
 has already occurred, and such duplicate rows will need to be manually removed.
 
 
+## Fixing inconsistent sequences error
+
+Synapse uses Postgres sequences to generate IDs for various tables. A sequence
+and associated table can get out of sync if, for example, Synapse has been
+downgraded and then upgraded again.
+
+To fix the issue shut down Synapse (including any and all workers) and run the
+SQL command included in the error message. Once done Synapse should start
+successfully.
+
+
 ## Tuning Postgres
 
 The default settings should be fine for most deployments. For larger
@@ -187,6 +198,9 @@ there was a delay between taking the previous snapshot and being ready
 to do step 2.
 
 It is safe to at any time kill the port script and restart it.
+
+Note that the database may take up significantly more (25% - 100% more)
+space on disk after porting to Postgres.
 
 ### Using the port script
 

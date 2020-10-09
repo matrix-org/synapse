@@ -24,28 +24,24 @@ import shutil
 import sys
 import traceback
 from typing import Dict, Optional
+from urllib import parse as urlparse
 
-import six
-from six import string_types
-from six.moves import urllib_parse as urlparse
+import attr
 
-from canonicaljson import json
-
-from twisted.internet import defer
 from twisted.internet.error import DNSLookupError
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
 from synapse.http.server import (
-    DirectServeResource,
+    DirectServeJsonResource,
     respond_with_json,
     respond_with_json_bytes,
-    wrap_json_request_handler,
 )
 from synapse.http.servlet import parse_integer, parse_string
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.media.v1._base import get_filename_from_headers
+from synapse.util import json_encoder
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.stringutils import random_string
@@ -60,8 +56,67 @@ _content_type_match = re.compile(r'.*; *charset="?(.*?)"?(;|$)', flags=re.I)
 OG_TAG_NAME_MAXLEN = 50
 OG_TAG_VALUE_MAXLEN = 1000
 
+ONE_HOUR = 60 * 60 * 1000
 
-class PreviewUrlResource(DirectServeResource):
+# A map of globs to API endpoints.
+_oembed_globs = {
+    # Twitter.
+    "https://publish.twitter.com/oembed": [
+        "https://twitter.com/*/status/*",
+        "https://*.twitter.com/*/status/*",
+        "https://twitter.com/*/moments/*",
+        "https://*.twitter.com/*/moments/*",
+        # Include the HTTP versions too.
+        "http://twitter.com/*/status/*",
+        "http://*.twitter.com/*/status/*",
+        "http://twitter.com/*/moments/*",
+        "http://*.twitter.com/*/moments/*",
+    ],
+}
+# Convert the globs to regular expressions.
+_oembed_patterns = {}
+for endpoint, globs in _oembed_globs.items():
+    for glob in globs:
+        # Convert the glob into a sane regular expression to match against. The
+        # rules followed will be slightly different for the domain portion vs.
+        # the rest.
+        #
+        # 1. The scheme must be one of HTTP / HTTPS (and have no globs).
+        # 2. The domain can have globs, but we limit it to characters that can
+        #    reasonably be a domain part.
+        #    TODO: This does not attempt to handle Unicode domain names.
+        # 3. Other parts allow a glob to be any one, or more, characters.
+        results = urlparse.urlparse(glob)
+
+        # Ensure the scheme does not have wildcards (and is a sane scheme).
+        if results.scheme not in {"http", "https"}:
+            raise ValueError("Insecure oEmbed glob scheme: %s" % (results.scheme,))
+
+        pattern = urlparse.urlunparse(
+            [
+                results.scheme,
+                re.escape(results.netloc).replace("\\*", "[a-zA-Z0-9_-]+"),
+            ]
+            + [re.escape(part).replace("\\*", ".+") for part in results[2:]]
+        )
+        _oembed_patterns[re.compile(pattern)] = endpoint
+
+
+@attr.s(slots=True)
+class OEmbedResult:
+    # Either HTML content or URL must be provided.
+    html = attr.ib(type=Optional[str])
+    url = attr.ib(type=Optional[str])
+    title = attr.ib(type=Optional[str])
+    # Number of seconds to cache the content.
+    cache_age = attr.ib(type=int)
+
+
+class OEmbedError(Exception):
+    """An error occurred processing the oEmbed object."""
+
+
+class PreviewUrlResource(DirectServeJsonResource):
     isLeaf = True
 
     def __init__(self, hs, media_repo, media_storage):
@@ -85,6 +140,15 @@ class PreviewUrlResource(DirectServeResource):
         self.primary_base_path = media_repo.primary_base_path
         self.media_storage = media_storage
 
+        # We run the background jobs if we're the instance specified (or no
+        # instance is specified, where we assume there is only one instance
+        # serving media).
+        instance_running_jobs = hs.config.media.media_instance_running_background_jobs
+        self._worker_run_media_background_jobs = (
+            instance_running_jobs is None
+            or instance_running_jobs == hs.get_instance_name()
+        )
+
         self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
         self.url_preview_accept_language = hs.config.url_preview_accept_language
 
@@ -94,18 +158,18 @@ class PreviewUrlResource(DirectServeResource):
             cache_name="url_previews",
             clock=self.clock,
             # don't spider URLs more often than once an hour
-            expiry_ms=60 * 60 * 1000,
+            expiry_ms=ONE_HOUR,
         )
 
-        self._cleaner_loop = self.clock.looping_call(
-            self._start_expire_url_cache_data, 10 * 1000
-        )
+        if self._worker_run_media_background_jobs:
+            self._cleaner_loop = self.clock.looping_call(
+                self._start_expire_url_cache_data, 10 * 1000
+            )
 
-    def render_OPTIONS(self, request):
+    async def _async_render_OPTIONS(self, request):
         request.setHeader(b"Allow", b"OPTIONS, GET")
-        return respond_with_json(request, 200, {}, send_cors=True)
+        respond_with_json(request, 200, {}, send_cors=True)
 
-    @wrap_json_request_handler
     async def _async_render_GET(self, request):
 
         # XXX: if get_user_by_req fails, what should we do in an async render?
@@ -163,19 +227,19 @@ class PreviewUrlResource(DirectServeResource):
         else:
             logger.info("Returning cached response")
 
-        og = await make_deferred_yieldable(defer.maybeDeferred(observable.observe))
+        og = await make_deferred_yieldable(observable.observe())
         respond_with_json_bytes(request, 200, og, send_cors=True)
 
-    async def _do_preview(self, url, user, ts):
+    async def _do_preview(self, url: str, user: str, ts: int) -> bytes:
         """Check the db, and download the URL and build a preview
 
         Args:
-            url (str):
-            user (str):
-            ts (int):
+            url: The URL to preview.
+            user: The user requesting the preview.
+            ts: The timestamp requested for the preview.
 
         Returns:
-            Deferred[bytes]: json-encoded og data
+            json-encoded og data
         """
         # check the URL cache in the DB (which will also provide us with
         # historical previews, if we have any)
@@ -188,7 +252,7 @@ class PreviewUrlResource(DirectServeResource):
             # It may be stored as text in the database, not as bytes (such as
             # PostgreSQL). If so, encode it back before handing it on.
             og = cache_result["og"]
-            if isinstance(og, six.text_type):
+            if isinstance(og, str):
                 og = og.encode("utf8")
             return og
 
@@ -290,7 +354,7 @@ class PreviewUrlResource(DirectServeResource):
 
         logger.debug("Calculated OG for %s as %s", url, og)
 
-        jsonog = json.dumps(og)
+        jsonog = json_encoder.encode(og)
 
         # store OG in history-aware DB cache
         await self.store.store_url_cache(
@@ -305,7 +369,88 @@ class PreviewUrlResource(DirectServeResource):
 
         return jsonog.encode("utf8")
 
-    async def _download_url(self, url, user):
+    def _get_oembed_url(self, url: str) -> Optional[str]:
+        """
+        Check whether the URL should be downloaded as oEmbed content instead.
+
+        Params:
+            url: The URL to check.
+
+        Returns:
+            A URL to use instead or None if the original URL should be used.
+        """
+        for url_pattern, endpoint in _oembed_patterns.items():
+            if url_pattern.fullmatch(url):
+                return endpoint
+
+        # No match.
+        return None
+
+    async def _get_oembed_content(self, endpoint: str, url: str) -> OEmbedResult:
+        """
+        Request content from an oEmbed endpoint.
+
+        Params:
+            endpoint: The oEmbed API endpoint.
+            url: The URL to pass to the API.
+
+        Returns:
+            An object representing the metadata returned.
+
+        Raises:
+            OEmbedError if fetching or parsing of the oEmbed information fails.
+        """
+        try:
+            logger.debug("Trying to get oEmbed content for url '%s'", url)
+            result = await self.client.get_json(
+                endpoint,
+                # TODO Specify max height / width.
+                # Note that only the JSON format is supported.
+                args={"url": url},
+            )
+
+            # Ensure there's a version of 1.0.
+            if result.get("version") != "1.0":
+                raise OEmbedError("Invalid version: %s" % (result.get("version"),))
+
+            oembed_type = result.get("type")
+
+            # Ensure the cache age is None or an int.
+            cache_age = result.get("cache_age")
+            if cache_age:
+                cache_age = int(cache_age)
+
+            oembed_result = OEmbedResult(None, None, result.get("title"), cache_age)
+
+            # HTML content.
+            if oembed_type == "rich":
+                oembed_result.html = result.get("html")
+                return oembed_result
+
+            if oembed_type == "photo":
+                oembed_result.url = result.get("url")
+                return oembed_result
+
+            # TODO Handle link and video types.
+
+            if "thumbnail_url" in result:
+                oembed_result.url = result.get("thumbnail_url")
+                return oembed_result
+
+            raise OEmbedError("Incompatible oEmbed information.")
+
+        except OEmbedError as e:
+            # Trap OEmbedErrors first so we can directly re-raise them.
+            logger.warning("Error parsing oEmbed metadata from %s: %r", url, e)
+            raise
+
+        except Exception as e:
+            # Trap any exception and let the code follow as usual.
+            # FIXME: pass through 404s and other error messages nicely
+            logger.warning("Error downloading oEmbed metadata from %s: %r", url, e)
+            raise OEmbedError() from e
+
+    async def _download_url(self, url: str, user):
         # TODO: we should probably honour robots.txt... except in practice
         # we're most likely being explicitly triggered by a human rather than a
         # bot, so are we really a robot?
@@ -314,54 +459,96 @@ class PreviewUrlResource(DirectServeResource):
 
         file_info = FileInfo(server_name=None, file_id=file_id, url_cache=True)
 
-        with self.media_storage.store_into_file(file_info) as (f, fname, finish):
+        # If this URL can be accessed via oEmbed, use that instead.
+        url_to_download = url  # type: Optional[str]
+        oembed_url = self._get_oembed_url(url)
+        if oembed_url:
+            # The result might be a new URL to download, or it might be HTML content.
             try:
-                logger.debug("Trying to get preview for url '%s'", url)
-                length, headers, uri, code = await self.client.get_file(
-                    url,
-                    output_stream=f,
-                    max_size=self.max_spider_size,
-                    headers={"Accept-Language": self.url_preview_accept_language},
-                )
-            except SynapseError:
-                # Pass SynapseErrors through directly, so that the servlet
-                # handler will return a SynapseError to the client instead of
-                # blank data or a 500.
-                raise
-            except DNSLookupError:
-                # DNS lookup returned no results
-                # Note: This will also be the case if one of the resolved IP
-                # addresses is blacklisted
-                raise SynapseError(
-                    502,
-                    "DNS resolution failure during URL preview generation",
-                    Codes.UNKNOWN,
-                )
-            except Exception as e:
-                # FIXME: pass through 404s and other error messages nicely
-                logger.warning("Error downloading %s: %r", url, e)
+                oembed_result = await self._get_oembed_content(oembed_url, url)
+                if oembed_result.url:
+                    url_to_download = oembed_result.url
+                elif oembed_result.html:
+                    url_to_download = None
+            except OEmbedError:
+                # If an error occurs, try doing a normal preview.
+                pass
 
-                raise SynapseError(
-                    500,
-                    "Failed to download content: %s"
-                    % (traceback.format_exception_only(sys.exc_info()[0], e),),
-                    Codes.UNKNOWN,
+        if url_to_download:
+            with self.media_storage.store_into_file(file_info) as (f, fname, finish):
+                try:
+                    logger.debug("Trying to get preview for url '%s'", url_to_download)
+                    length, headers, uri, code = await self.client.get_file(
+                        url_to_download,
+                        output_stream=f,
+                        max_size=self.max_spider_size,
+                        headers={"Accept-Language": self.url_preview_accept_language},
+                    )
+                except SynapseError:
+                    # Pass SynapseErrors through directly, so that the servlet
+                    # handler will return a SynapseError to the client instead of
+                    # blank data or a 500.
+                    raise
+                except DNSLookupError:
+                    # DNS lookup returned no results
+                    # Note: This will also be the case if one of the resolved IP
+                    # addresses is blacklisted
+                    raise SynapseError(
+                        502,
+                        "DNS resolution failure during URL preview generation",
+                        Codes.UNKNOWN,
+                    )
+                except Exception as e:
+                    # FIXME: pass through 404s and other error messages nicely
+                    logger.warning("Error downloading %s: %r", url_to_download, e)
+
+                    raise SynapseError(
+                        500,
+                        "Failed to download content: %s"
+                        % (traceback.format_exception_only(sys.exc_info()[0], e),),
+                        Codes.UNKNOWN,
+                    )
+                await finish()
+
+                if b"Content-Type" in headers:
+                    media_type = headers[b"Content-Type"][0].decode("ascii")
+                else:
+                    media_type = "application/octet-stream"
+
+                download_name = get_filename_from_headers(headers)
+
+                # FIXME: we should calculate a proper expiration based on the
+                # Cache-Control and Expire headers.  But for now, assume 1 hour.
+                expires = ONE_HOUR
+                etag = (
+                    headers[b"ETag"][0].decode("ascii") if b"ETag" in headers else None
                 )
-            await finish()
+        else:
+            # we can only get here if we did an oembed request and have an oembed_result.html
+            assert oembed_result.html is not None
+            assert oembed_url is not None
+
+            html_bytes = oembed_result.html.encode("utf-8")
+            with self.media_storage.store_into_file(file_info) as (f, fname, finish):
+                f.write(html_bytes)
+                await finish()
+
+            media_type = "text/html"
+            download_name = oembed_result.title
+            length = len(html_bytes)
+            # If a specific cache age was not given, assume 1 hour.
+            expires = oembed_result.cache_age or ONE_HOUR
+            uri = oembed_url
+            code = 200
+            etag = None
 
         try:
-            if b"Content-Type" in headers:
-                media_type = headers[b"Content-Type"][0].decode("ascii")
-            else:
-                media_type = "application/octet-stream"
             time_now_ms = self.clock.time_msec()
-
-            download_name = get_filename_from_headers(headers)
 
             await self.store.store_local_media(
                 media_id=file_id,
                 media_type=media_type,
-                time_now_ms=self.clock.time_msec(),
+                time_now_ms=time_now_ms,
                 upload_name=download_name,
                 media_length=length,
                 user_id=user,
@@ -384,10 +571,8 @@ class PreviewUrlResource(DirectServeResource):
             "filename": fname,
             "uri": uri,
             "response_code": code,
-            # FIXME: we should calculate a proper expiration based on the
-            # Cache-Control and Expire headers.  But for now, assume 1 hour.
-            "expires": 60 * 60 * 1000,
-            "etag": headers["ETag"][0] if "ETag" in headers else None,
+            "expires": expires,
+            "etag": etag,
         }
 
     def _start_expire_url_cache_data(self):
@@ -400,11 +585,13 @@ class PreviewUrlResource(DirectServeResource):
         """
         # TODO: Delete from backup media store
 
+        assert self._worker_run_media_background_jobs
+
         now = self.clock.time_msec()
 
         logger.debug("Running url preview cache expiry")
 
-        if not (await self.store.db.updates.has_completed_background_updates()):
+        if not (await self.store.db_pool.updates.has_completed_background_updates()):
             logger.info("Still running DB updates; skipping expiry")
             return
 
@@ -442,7 +629,7 @@ class PreviewUrlResource(DirectServeResource):
         # These may be cached for a bit on the client (i.e., they
         # may have a room open with a preview url thing open).
         # So we wait a couple of days before deleting, just in case.
-        expire_before = now - 2 * 24 * 60 * 60 * 1000
+        expire_before = now - 2 * 24 * ONE_HOUR
         media_ids = await self.store.get_url_cache_media_before(expire_before)
 
         removed_media = []
@@ -631,7 +818,7 @@ def _iterate_over_text(tree, *tags_to_ignore):
         if el is None:
             return
 
-        if isinstance(el, string_types):
+        if isinstance(el, str):
             yield el
         elif el.tag not in tags_to_ignore:
             # el.text is the text before the first child, so we can immediately

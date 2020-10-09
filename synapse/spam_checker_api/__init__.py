@@ -12,44 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import logging
-
-from twisted.internet import defer
-
-from synapse.storage.state import StateFilter
-
-MYPY = False
-if MYPY:
-    import synapse.server
-
-logger = logging.getLogger(__name__)
+from enum import Enum
 
 
-class SpamCheckerApi(object):
-    """A proxy object that gets passed to spam checkers so they can get
-    access to rooms and other relevant information.
+class RegistrationBehaviour(Enum):
+    """
+    Enum to define whether a registration request should allowed, denied, or shadow-banned.
     """
 
-    def __init__(self, hs: "synapse.server.HomeServer"):
-        self.hs = hs
-
-        self._store = hs.get_datastore()
-
-    @defer.inlineCallbacks
-    def get_state_events_in_room(self, room_id: str, types: tuple) -> defer.Deferred:
-        """Gets state events for the given room.
-
-        Args:
-            room_id: The room ID to get state events in.
-            types: The event type and state key (using None
-                to represent 'any') of the room state to acquire.
-
-        Returns:
-            twisted.internet.defer.Deferred[list(synapse.events.FrozenEvent)]:
-                The filtered state events in the room.
-        """
-        state_ids = yield self._store.get_filtered_current_state_ids(
-            room_id=room_id, state_filter=StateFilter.from_types(types)
-        )
-        state = yield self._store.get_events(state_ids.values())
-        return state.values()
+    ALLOW = "allow"
+    SHADOW_BAN = "shadow_ban"
+    DENY = "deny"

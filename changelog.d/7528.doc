@@ -1,1 +1,0 @@
-Change the systemd worker service to check that the worker config file exists instead of silently failing. Contributed by David Vo.

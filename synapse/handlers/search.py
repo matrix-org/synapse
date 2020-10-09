@@ -15,6 +15,7 @@
 
 import itertools
 import logging
+from typing import Iterable
 
 from unpaddedbase64 import decode_base64, encode_base64
 
@@ -31,13 +32,13 @@ logger = logging.getLogger(__name__)
 
 class SearchHandler(BaseHandler):
     def __init__(self, hs):
-        super(SearchHandler, self).__init__(hs)
+        super().__init__(hs)
         self._event_serializer = hs.get_event_client_serializer()
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
         self.auth = hs.get_auth()
 
-    async def get_old_rooms_from_upgraded_room(self, room_id):
+    async def get_old_rooms_from_upgraded_room(self, room_id: str) -> Iterable[str]:
         """Retrieves room IDs of old rooms in the history of an upgraded room.
 
         We do so by checking the m.room.create event of the room for a
@@ -48,10 +49,10 @@ class SearchHandler(BaseHandler):
         The full list of all found rooms in then returned.
 
         Args:
-            room_id (str): id of the room to search through.
+            room_id: id of the room to search through.
 
         Returns:
-            Deferred[iterable[str]]: predecessor room ids
+            Predecessor room ids
         """
 
         historical_room_ids = []
@@ -339,7 +340,7 @@ class SearchHandler(BaseHandler):
         # If client has asked for "context" for each event (i.e. some surrounding
         # events and state), fetch that
         if event_context is not None:
-            now_token = await self.hs.get_event_sources().get_current_token()
+            now_token = self.hs.get_event_sources().get_current_token()
 
             contexts = {}
             for event in allowed_events:
@@ -361,13 +362,13 @@ class SearchHandler(BaseHandler):
                     self.storage, user.to_string(), res["events_after"]
                 )
 
-                res["start"] = now_token.copy_and_replace(
+                res["start"] = await now_token.copy_and_replace(
                     "room_key", res["start"]
-                ).to_string()
+                ).to_string(self.store)
 
-                res["end"] = now_token.copy_and_replace(
+                res["end"] = await now_token.copy_and_replace(
                     "room_key", res["end"]
-                ).to_string()
+                ).to_string(self.store)
 
                 if include_profile:
                     senders = {

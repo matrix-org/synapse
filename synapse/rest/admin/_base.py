@@ -15,7 +15,11 @@
 
 import re
 
+import twisted.web.server
+
+import synapse.api.auth
 from synapse.api.errors import AuthError
+from synapse.types import UserID
 
 
 def historical_admin_path_patterns(path_regex):
@@ -40,7 +44,7 @@ def historical_admin_path_patterns(path_regex):
     ]
 
 
-def admin_patterns(path_regex: str):
+def admin_patterns(path_regex: str, version: str = "v1"):
     """Returns the list of patterns for an admin endpoint
 
     Args:
@@ -50,46 +54,37 @@ def admin_patterns(path_regex: str):
     Returns:
         A list of regex patterns.
     """
-    admin_prefix = "^/_synapse/admin/v1"
+    admin_prefix = "^/_synapse/admin/" + version
     patterns = [re.compile(admin_prefix + path_regex)]
     return patterns
 
 
-async def assert_requester_is_admin(auth, request):
+async def assert_requester_is_admin(
+    auth: synapse.api.auth.Auth, request: twisted.web.server.Request
+) -> None:
     """Verify that the requester is an admin user
 
-    WARNING: MAKE SURE YOU YIELD ON THE RESULT!
-
     Args:
-        auth (synapse.api.auth.Auth):
-        request (twisted.web.server.Request): incoming request
-
-    Returns:
-        Deferred
+        auth: api.auth.Auth singleton
+        request: incoming request
 
     Raises:
-        AuthError if the requester is not an admin
+        AuthError if the requester is not a server admin
     """
     requester = await auth.get_user_by_req(request)
     await assert_user_is_admin(auth, requester.user)
 
 
-async def assert_user_is_admin(auth, user_id):
+async def assert_user_is_admin(auth: synapse.api.auth.Auth, user_id: UserID) -> None:
     """Verify that the given user is an admin user
 
-    WARNING: MAKE SURE YOU YIELD ON THE RESULT!
-
     Args:
-        auth (synapse.api.auth.Auth):
-        user_id (UserID):
-
-    Returns:
-        Deferred
+        auth: api.auth.Auth singleton
+        user_id: user to check
 
     Raises:
-        AuthError if the user is not an admin
+        AuthError if the user is not a server admin
     """
-
     is_admin = await auth.is_server_admin(user_id)
     if not is_admin:
         raise AuthError(403, "You are not a server admin")

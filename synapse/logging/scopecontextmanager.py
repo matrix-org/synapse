@@ -107,7 +107,7 @@ class _LogContextScope(Scope):
             finish_on_close (Boolean):
                 if True finish the span when the scope is closed
         """
-        super(_LogContextScope, self).__init__(manager, span)
+        super().__init__(manager, span)
         self.logcontext = logcontext
         self._finish_on_close = finish_on_close
         self._enter_logcontext = enter_logcontext
@@ -116,11 +116,13 @@ class _LogContextScope(Scope):
         if self._enter_logcontext:
             self.logcontext.__enter__()
 
+        return self
+
     def __exit__(self, type, value, traceback):
         if type == twisted.internet.defer._DefGen_Return:
-            super(_LogContextScope, self).__exit__(None, None, None)
+            super().__exit__(None, None, None)
         else:
-            super(_LogContextScope, self).__exit__(type, value, traceback)
+            super().__exit__(type, value, traceback)
         if self._enter_logcontext:
             self.logcontext.__exit__(type, value, traceback)
         else:  # the logcontext existed before the creation of the scope

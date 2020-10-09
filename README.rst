@@ -1,10 +1,6 @@
-================
-Synapse |shield|
-================
-
-.. |shield| image:: https://img.shields.io/matrix/synapse:matrix.org?label=support&logo=matrix
-  :alt: (get support on #synapse:matrix.org)
-  :target: https://matrix.to/#/#synapse:matrix.org
+=========================================================
+Synapse |support| |development| |license| |pypi| |python|
+=========================================================
 
 .. contents::
 
@@ -45,7 +41,7 @@ which handle:
 - Eventually-consistent cryptographically secure synchronisation of room
   state across a global open network of federated servers and services
 - Sending and receiving extensible messages in a room with (optional)
-  end-to-end encryption[1]
+  end-to-end encryption
 - Inviting, joining, leaving, kicking, banning room members
 - Managing user accounts (registration, login, logout)
 - Using 3rd Party IDs (3PIDs) such as email addresses, phone numbers,
@@ -82,9 +78,6 @@ at the `Matrix spec <https://matrix.org/docs/spec>`_, and experiment with the
 
 Thanks for using Matrix!
 
-[1] End-to-end encryption is currently in beta: `blog post <https://matrix.org/blog/2016/11/21/matrixs-olm-end-to-end-encryption-security-assessment-released-and-implemented-cross-platform-on-riot-at-last>`_.
-
-
 Support
 =======
 
@@ -115,12 +108,11 @@ Unless you are running a test instance of Synapse on your local machine, in
 general, you will need to enable TLS support before you can successfully
 connect from a client: see `<INSTALL.md#tls-certificates>`_.
 
-An easy way to get started is to login or register via Riot at
-https://riot.im/app/#/login or https://riot.im/app/#/register respectively.
+An easy way to get started is to login or register via Element at
+https://app.element.io/#/login or https://app.element.io/#/register respectively.
 You will need to change the server you are logging into from ``matrix.org``
 and instead specify a Homeserver URL of ``https://<server_name>:8448``
 (or just ``https://<server_name>`` if you are using a reverse proxy).
-(Leave the identity server as the default - see `Identity servers`_.)
 If you prefer to use another client, refer to our
 `client breakdown <https://matrix.org/docs/projects/clients-matrix>`_.
 
@@ -137,7 +129,7 @@ it, specify ``enable_registration: true`` in ``homeserver.yaml``. (It is then
 recommended to also set up CAPTCHA - see `<docs/CAPTCHA_SETUP.md>`_.)
 
 Once ``enable_registration`` is set to ``true``, it is possible to register a
-user via `riot.im <https://riot.im/app/#/register>`_ or other Matrix clients.
+user via a Matrix client.
 
 Your new user name will be formed partly from the ``server_name``, and partly
 from a localpart you specify when you create the account. Your name will take
@@ -183,30 +175,6 @@ versions of synapse.
 
 .. _UPGRADE.rst: UPGRADE.rst
 
-
-Using PostgreSQL
-================
-
-Synapse offers two database engines:
- * `SQLite <https://sqlite.org/>`_
- * `PostgreSQL <https://www.postgresql.org>`_
-
-By default Synapse uses SQLite in and doing so trades performance for convenience.
-SQLite is only recommended in Synapse for testing purposes or for servers with
-light workloads.
-
-Almost all installations should opt to use PostreSQL. Advantages include:
-
-* significant performance improvements due to the superior threading and
-  caching model, smarter query optimiser
-* allowing the DB to be run on separate hardware
-* allowing basic active/backup high-availability with a "hot spare" synapse
-  pointing at the same DB master, as well as enabling DB replication in
-  synapse itself.
-
-For information on how to install and use PostgreSQL, please see
-`docs/postgres.md <docs/postgres.md>`_.
-
 .. _reverse-proxy:
 
 Using a reverse proxy with Synapse
@@ -215,7 +183,7 @@ Using a reverse proxy with Synapse
 It is recommended to put a reverse proxy such as
 `nginx <https://nginx.org/en/docs/http/ngx_http_proxy_module.html>`_,
 `Apache <https://httpd.apache.org/docs/current/mod/mod_proxy_http.html>`_,
-`Caddy <https://caddyserver.com/docs/proxy>`_ or
+`Caddy <https://caddyserver.com/docs/quick-starts/reverse-proxy>`_ or
 `HAProxy <https://www.haproxy.org/>`_ in front of Synapse. One advantage of
 doing so is that it means that you can expose the default https port (443) to
 Matrix clients without needing to run Synapse with root privileges.
@@ -255,10 +223,9 @@ email address.
 Password reset
 ==============
 
-If a user has registered an email address to their account using an identity
-server, they can request a password-reset token via clients such as Riot.
-
-A manual password reset can be done via direct database access as follows.
+Users can reset their password through their client. Alternatively, a server admin
+can reset a users password using the `admin API <docs/admin_api/user_admin_api.rst#reset-password>`_
+or by directly editing the database as shown below.
 
 First calculate the hash of the new password::
 
@@ -267,7 +234,7 @@ First calculate the hash of the new password::
     Confirm password:
     $2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
-Then update the `users` table in the database::
+Then update the ``users`` table in the database::
 
     UPDATE users SET password_hash='$2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
         WHERE name='@test:test.com';
@@ -319,21 +286,11 @@ Testing with SyTest is recommended for verifying that changes related to the
 Client-Server API are functioning correctly. See the `installation instructions
 <https://github.com/matrix-org/sytest#installing>`_ for details.
 
-Building Internal API Documentation
-===================================
-
-Before building internal API documentation install sphinx and
-sphinxcontrib-napoleon::
-
-    pip install sphinx
-    pip install sphinxcontrib-napoleon
-
-Building internal API documentation::
-
-    python setup.py build_sphinx
-
 Troubleshooting
 ===============
+
+Need help? Join our community support room on Matrix:
+`#synapse:matrix.org <https://matrix.to/#/#synapse:matrix.org>`_
 
 Running out of File Handles
 ---------------------------
@@ -413,3 +370,23 @@ something like the following in their logs::
 
 This is normally caused by a misconfiguration in your reverse-proxy. See
 `<docs/reverse_proxy.md>`_ and double-check that your settings are correct.
+
+.. |support| image:: https://img.shields.io/matrix/synapse:matrix.org?label=support&logo=matrix
+  :alt: (get support on #synapse:matrix.org)
+  :target: https://matrix.to/#/#synapse:matrix.org
+
+.. |development| image:: https://img.shields.io/matrix/synapse-dev:matrix.org?label=development&logo=matrix
+  :alt: (discuss development on #synapse-dev:matrix.org)
+  :target: https://matrix.to/#/#synapse-dev:matrix.org
+
+.. |license| image:: https://img.shields.io/github/license/matrix-org/synapse
+  :alt: (check license in LICENSE file)
+  :target: LICENSE
+
+.. |pypi| image:: https://img.shields.io/pypi/v/matrix-synapse
+  :alt: (latest version released on PyPi)
+  :target: https://pypi.org/project/matrix-synapse
+
+.. |python| image:: https://img.shields.io/pypi/pyversions/matrix-synapse
+  :alt: (supported python versions)
+  :target: https://pypi.org/project/matrix-synapse

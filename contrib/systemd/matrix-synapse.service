@@ -15,6 +15,9 @@
 
 [Unit]
 Description=Synapse Matrix homeserver
+# If you are using postgresql to persist data, uncomment this line to make sure
+# synapse starts after the postgresql service.
+# After=postgresql.service
 
 [Service]
 Type=notify

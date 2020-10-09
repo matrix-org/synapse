@@ -15,15 +15,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
-
 # This file can't be called email.py because if it is, we cannot:
 import email.utils
 import os
 from enum import Enum
 from typing import Optional
 
-import pkg_resources
+import attr
 
 from ._base import Config, ConfigError
 
@@ -32,6 +30,33 @@ Password reset emails are enabled on this homeserver due to a partial
 'email' block. However, the following required keys are missing:
     %s
 """
+
+DEFAULT_SUBJECTS = {
+    "message_from_person_in_room": "[%(app)s] You have a message on %(app)s from %(person)s in the %(room)s room...",
+    "message_from_person": "[%(app)s] You have a message on %(app)s from %(person)s...",
+    "messages_from_person": "[%(app)s] You have messages on %(app)s from %(person)s...",
+    "messages_in_room": "[%(app)s] You have messages on %(app)s in the %(room)s room...",
+    "messages_in_room_and_others": "[%(app)s] You have messages on %(app)s in the %(room)s room and others...",
+    "messages_from_person_and_others": "[%(app)s] You have messages on %(app)s from %(person)s and others...",
+    "invite_from_person": "[%(app)s] %(person)s has invited you to chat on %(app)s...",
+    "invite_from_person_to_room": "[%(app)s] %(person)s has invited you to join the %(room)s room on %(app)s...",
+    "password_reset": "[%(server_name)s] Password reset",
+    "email_validation": "[%(server_name)s] Validate your email",
+}
+
+
+@attr.s
+class EmailSubjectConfig:
+    message_from_person_in_room = attr.ib(type=str)
+    message_from_person = attr.ib(type=str)
+    messages_from_person = attr.ib(type=str)
+    messages_in_room = attr.ib(type=str)
+    messages_in_room_and_others = attr.ib(type=str)
+    messages_from_person_and_others = attr.ib(type=str)
+    invite_from_person = attr.ib(type=str)
+    invite_from_person_to_room = attr.ib(type=str)
+    password_reset = attr.ib(type=str)
+    email_validation = attr.ib(type=str)
 
 
 class EmailConfig(Config):
@@ -71,20 +96,17 @@ class EmailConfig(Config):
             if parsed[1] == "":
                 raise RuntimeError("Invalid notif_from address")
 
+        # A user-configurable template directory
         template_dir = email_config.get("template_dir")
-        # we need an absolute path, because we change directory after starting (and
-        # we don't yet know what auxilliary templates like mail.css we will need).
-        # (Note that loading as package_resources with jinja.PackageLoader doesn't
-        # work for the same reason.)
-        if not template_dir:
-            template_dir = pkg_resources.resource_filename("synapse", "res/templates")
-
-        self.email_template_dir = os.path.abspath(template_dir)
+        if isinstance(template_dir, str):
+            # We need an absolute path, because we change directory after starting (and
+            # we don't yet know what auxiliary templates like mail.css we will need).
+            template_dir = os.path.abspath(template_dir)
+        elif template_dir is not None:
+            # If template_dir is something other than a str or None, warn the user
+            raise ConfigError("Config option email.template_dir must be type str")
 
         self.email_enable_notifs = email_config.get("enable_notifs", False)
-
-        account_validity_config = config.get("account_validity") or {}
-        account_validity_renewal_enabled = account_validity_config.get("renew_at")
 
         self.threepid_behaviour_email = (
             # Have Synapse handle the email sending if account_threepid_delegates.email
@@ -139,19 +161,6 @@ class EmailConfig(Config):
             email_config.get("validation_token_lifetime", "1h")
         )
 
-        if (
-            self.email_enable_notifs
-            or account_validity_renewal_enabled
-            or self.threepid_behaviour_email == ThreepidBehaviour.LOCAL
-        ):
-            # make sure we can import the required deps
-            import jinja2
-            import bleach
-
-            # prevent unused warnings
-            jinja2
-            bleach
-
         if self.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             missing = []
             if not self.email_notif_from:
@@ -169,84 +178,90 @@ class EmailConfig(Config):
 
             # These email templates have placeholders in them, and thus must be
             # parsed using a templating engine during a request
-            self.email_password_reset_template_html = email_config.get(
+            password_reset_template_html = email_config.get(
                 "password_reset_template_html", "password_reset.html"
             )
-            self.email_password_reset_template_text = email_config.get(
+            password_reset_template_text = email_config.get(
                 "password_reset_template_text", "password_reset.txt"
             )
-            self.email_registration_template_html = email_config.get(
+            registration_template_html = email_config.get(
                 "registration_template_html", "registration.html"
             )
-            self.email_registration_template_text = email_config.get(
+            registration_template_text = email_config.get(
                 "registration_template_text", "registration.txt"
             )
-            self.email_add_threepid_template_html = email_config.get(
+            add_threepid_template_html = email_config.get(
                 "add_threepid_template_html", "add_threepid.html"
             )
-            self.email_add_threepid_template_text = email_config.get(
+            add_threepid_template_text = email_config.get(
                 "add_threepid_template_text", "add_threepid.txt"
             )
 
-            self.email_password_reset_template_failure_html = email_config.get(
+            password_reset_template_failure_html = email_config.get(
                 "password_reset_template_failure_html", "password_reset_failure.html"
             )
-            self.email_registration_template_failure_html = email_config.get(
+            registration_template_failure_html = email_config.get(
                 "registration_template_failure_html", "registration_failure.html"
             )
-            self.email_add_threepid_template_failure_html = email_config.get(
+            add_threepid_template_failure_html = email_config.get(
                 "add_threepid_template_failure_html", "add_threepid_failure.html"
             )
 
             # These templates do not support any placeholder variables, so we
             # will read them from disk once during setup
-            email_password_reset_template_success_html = email_config.get(
+            password_reset_template_success_html = email_config.get(
                 "password_reset_template_success_html", "password_reset_success.html"
             )
-            email_registration_template_success_html = email_config.get(
+            registration_template_success_html = email_config.get(
                 "registration_template_success_html", "registration_success.html"
             )
-            email_add_threepid_template_success_html = email_config.get(
+            add_threepid_template_success_html = email_config.get(
                 "add_threepid_template_success_html", "add_threepid_success.html"
             )
 
-            # Check templates exist
-            for f in [
+            # Read all templates from disk
+            (
                 self.email_password_reset_template_html,
                 self.email_password_reset_template_text,
                 self.email_registration_template_html,
                 self.email_registration_template_text,
                 self.email_add_threepid_template_html,
                 self.email_add_threepid_template_text,
+                self.email_password_reset_template_confirmation_html,
                 self.email_password_reset_template_failure_html,
                 self.email_registration_template_failure_html,
                 self.email_add_threepid_template_failure_html,
-                email_password_reset_template_success_html,
-                email_registration_template_success_html,
-                email_add_threepid_template_success_html,
-            ]:
-                p = os.path.join(self.email_template_dir, f)
-                if not os.path.isfile(p):
-                    raise ConfigError("Unable to find template file %s" % (p,))
+                password_reset_template_success_html_template,
+                registration_template_success_html_template,
+                add_threepid_template_success_html_template,
+            ) = self.read_templates(
+                [
+                    password_reset_template_html,
+                    password_reset_template_text,
+                    registration_template_html,
+                    registration_template_text,
+                    add_threepid_template_html,
+                    add_threepid_template_text,
+                    "password_reset_confirmation.html",
+                    password_reset_template_failure_html,
+                    registration_template_failure_html,
+                    add_threepid_template_failure_html,
+                    password_reset_template_success_html,
+                    registration_template_success_html,
+                    add_threepid_template_success_html,
+                ],
+                template_dir,
+            )
 
-            # Retrieve content of web templates
-            filepath = os.path.join(
-                self.email_template_dir, email_password_reset_template_success_html
+            # Render templates that do not contain any placeholders
+            self.email_password_reset_template_success_html_content = (
+                password_reset_template_success_html_template.render()
             )
-            self.email_password_reset_template_success_html = self.read_file(
-                filepath, "email.password_reset_template_success_html"
+            self.email_registration_template_success_html_content = (
+                registration_template_success_html_template.render()
             )
-            filepath = os.path.join(
-                self.email_template_dir, email_registration_template_success_html
-            )
-            self.email_registration_template_success_html_content = self.read_file(
-                filepath, "email.registration_template_success_html"
-            )
-            filepath = os.path.join(
-                self.email_template_dir, email_add_threepid_template_success_html
-            )
-            self.email_add_threepid_template_success_html_content = self.read_file(
-                filepath, "email.add_threepid_template_success_html"
+            self.email_add_threepid_template_success_html_content = (
+                add_threepid_template_success_html_template.render()
             )
 
         if self.email_enable_notifs:
@@ -263,17 +278,19 @@ class EmailConfig(Config):
                     % (", ".join(missing),)
                 )
 
-            self.email_notif_template_html = email_config.get(
+            notif_template_html = email_config.get(
                 "notif_template_html", "notif_mail.html"
             )
-            self.email_notif_template_text = email_config.get(
+            notif_template_text = email_config.get(
                 "notif_template_text", "notif_mail.txt"
             )
 
-            for f in self.email_notif_template_text, self.email_notif_template_html:
-                p = os.path.join(self.email_template_dir, f)
-                if not os.path.isfile(p):
-                    raise ConfigError("Unable to find email template file %s" % (p,))
+            (
+                self.email_notif_template_html,
+                self.email_notif_template_text,
+            ) = self.read_templates(
+                [notif_template_html, notif_template_text], template_dir,
+            )
 
             self.email_notif_for_new_users = email_config.get(
                 "notif_for_new_users", True
@@ -282,21 +299,32 @@ class EmailConfig(Config):
                 "client_base_url", email_config.get("riot_base_url", None)
             )
 
-        if account_validity_renewal_enabled:
-            self.email_expiry_template_html = email_config.get(
+        if self.account_validity.renew_by_email_enabled:
+            expiry_template_html = email_config.get(
                 "expiry_template_html", "notice_expiry.html"
             )
-            self.email_expiry_template_text = email_config.get(
+            expiry_template_text = email_config.get(
                 "expiry_template_text", "notice_expiry.txt"
             )
 
-            for f in self.email_expiry_template_text, self.email_expiry_template_html:
-                p = os.path.join(self.email_template_dir, f)
-                if not os.path.isfile(p):
-                    raise ConfigError("Unable to find email template file %s" % (p,))
+            (
+                self.account_validity_template_html,
+                self.account_validity_template_text,
+            ) = self.read_templates(
+                [expiry_template_html, expiry_template_text], template_dir,
+            )
+
+        subjects_config = email_config.get("subjects", {})
+        subjects = {}
+
+        for key, default in DEFAULT_SUBJECTS.items():
+            subjects[key] = subjects_config.get(key, default)
+
+        self.email_subjects = EmailSubjectConfig(**subjects)
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
-        return """\
+        return (
+            """\
         # Configuration for sending emails from Synapse.
         #
         email:
@@ -324,17 +352,17 @@ class EmailConfig(Config):
           # notif_from defines the "From" address to use when sending emails.
           # It must be set if email sending is enabled.
           #
-          # The placeholder '%(app)s' will be replaced by the application name,
+          # The placeholder '%%(app)s' will be replaced by the application name,
           # which is normally 'app_name' (below), but may be overridden by the
           # Matrix client application.
           #
-          # Note that the placeholder must be written '%(app)s', including the
+          # Note that the placeholder must be written '%%(app)s', including the
           # trailing 's'.
           #
-          #notif_from: "Your Friendly %(app)s homeserver <noreply@example.com>"
+          #notif_from: "Your Friendly %%(app)s homeserver <noreply@example.com>"
 
-          # app_name defines the default value for '%(app)s' in notif_from. It
-          # defaults to 'Matrix'.
+          # app_name defines the default value for '%%(app)s' in notif_from and email
+          # subjects. It defaults to 'Matrix'.
           #
           #app_name: my_branded_matrix_server
 
@@ -364,9 +392,7 @@ class EmailConfig(Config):
           # Directory in which Synapse will try to find the template files below.
           # If not set, default templates from within the Synapse package will be used.
           #
-          # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
-          # If you *do* uncomment it, you will need to make sure that all the templates
-          # below are in the directory.
+          # Do not uncomment this setting unless you want to customise the templates.
           #
           # Synapse will look for the following templates in this directory:
           #
@@ -379,9 +405,13 @@ class EmailConfig(Config):
           # * The contents of password reset emails sent by the homeserver:
           #   'password_reset.html' and 'password_reset.txt'
           #
-          # * HTML pages for success and failure that a user will see when they follow
-          #   the link in the password reset email: 'password_reset_success.html' and
-          #   'password_reset_failure.html'
+          # * An HTML page that a user will see when they follow the link in the password
+          #   reset email. The user will be asked to confirm the action before their
+          #   password is reset: 'password_reset_confirmation.html'
+          #
+          # * HTML pages for success and failure that a user will see when they confirm
+          #   the password reset flow using the page above: 'password_reset_success.html'
+          #   and 'password_reset_failure.html'
           #
           # * The contents of address verification emails sent during registration:
           #   'registration.html' and 'registration.txt'
@@ -402,7 +432,76 @@ class EmailConfig(Config):
           # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
           #
           #template_dir: "res/templates"
+
+          # Subjects to use when sending emails from Synapse.
+          #
+          # The placeholder '%%(app)s' will be replaced with the value of the 'app_name'
+          # setting above, or by a value dictated by the Matrix client application.
+          #
+          # If a subject isn't overridden in this configuration file, the value used as
+          # its example will be used.
+          #
+          #subjects:
+
+            # Subjects for notification emails.
+            #
+            # On top of the '%%(app)s' placeholder, these can use the following
+            # placeholders:
+            #
+            #   * '%%(person)s', which will be replaced by the display name of the user(s)
+            #      that sent the message(s), e.g. "Alice and Bob".
+            #   * '%%(room)s', which will be replaced by the name of the room the
+            #      message(s) have been sent to, e.g. "My super room".
+            #
+            # See the example provided for each setting to see which placeholder can be
+            # used and how to use them.
+            #
+            # Subject to use to notify about one message from one or more user(s) in a
+            # room which has a name.
+            #message_from_person_in_room: "%(message_from_person_in_room)s"
+            #
+            # Subject to use to notify about one message from one or more user(s) in a
+            # room which doesn't have a name.
+            #message_from_person: "%(message_from_person)s"
+            #
+            # Subject to use to notify about multiple messages from one or more users in
+            # a room which doesn't have a name.
+            #messages_from_person: "%(messages_from_person)s"
+            #
+            # Subject to use to notify about multiple messages in a room which has a
+            # name.
+            #messages_in_room: "%(messages_in_room)s"
+            #
+            # Subject to use to notify about multiple messages in multiple rooms.
+            #messages_in_room_and_others: "%(messages_in_room_and_others)s"
+            #
+            # Subject to use to notify about multiple messages from multiple persons in
+            # multiple rooms. This is similar to the setting above except it's used when
+            # the room in which the notification was triggered has no name.
+            #messages_from_person_and_others: "%(messages_from_person_and_others)s"
+            #
+            # Subject to use to notify about an invite to a room which has a name.
+            #invite_from_person_to_room: "%(invite_from_person_to_room)s"
+            #
+            # Subject to use to notify about an invite to a room which doesn't have a
+            # name.
+            #invite_from_person: "%(invite_from_person)s"
+
+            # Subject for emails related to account administration.
+            #
+            # On top of the '%%(app)s' placeholder, these one can use the
+            # '%%(server_name)s' placeholder, which will be replaced by the value of the
+            # 'server_name' setting in your Synapse configuration.
+            #
+            # Subject to use when sending a password reset email.
+            #password_reset: "%(password_reset)s"
+            #
+            # Subject to use when sending a verification email to assert an address's
+            # ownership.
+            #email_validation: "%(email_validation)s"
         """
+            % DEFAULT_SUBJECTS
+        )
 
 
 class ThreepidBehaviour(Enum):

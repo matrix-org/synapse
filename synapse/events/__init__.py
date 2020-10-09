@@ -18,14 +18,12 @@
 import abc
 import os
 from distutils.util import strtobool
-from typing import Dict, Optional, Type
-
-import six
+from typing import Dict, Optional, Tuple, Type
 
 from unpaddedbase64 import encode_base64
 
 from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
-from synapse.types import JsonDict
+from synapse.types import JsonDict, RoomStreamToken
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 
@@ -98,13 +96,16 @@ class DefaultDictProperty(DictProperty):
         return instance._dict.get(self.key, self.default)
 
 
-class _EventInternalMetadata(object):
-    __slots__ = ["_dict"]
+class _EventInternalMetadata:
+    __slots__ = ["_dict", "stream_ordering"]
 
     def __init__(self, internal_metadata_dict: JsonDict):
         # we have to copy the dict, because it turns out that the same dict is
         # reused. TODO: fix that
         self._dict = dict(internal_metadata_dict)
+
+        # the stream ordering of this event. None, until it has been persisted.
+        self.stream_ordering = None  # type: Optional[int]
 
     outlier = DictProperty("outlier")  # type: bool
     out_of_band_membership = DictProperty("out_of_band_membership")  # type: bool
@@ -115,14 +116,13 @@ class _EventInternalMetadata(object):
     redacted = DictProperty("redacted")  # type: bool
     txn_id = DictProperty("txn_id")  # type: str
     token_id = DictProperty("token_id")  # type: str
-    stream_ordering = DictProperty("stream_ordering")  # type: int
 
     # XXX: These are set by StreamWorkerStore._set_before_and_after.
     # I'm pretty sure that these are never persisted to the database, so shouldn't
     # be here
-    before = DictProperty("before")  # type: str
-    after = DictProperty("after")  # type: str
-    order = DictProperty("order")  # type: int
+    before = DictProperty("before")  # type: RoomStreamToken
+    after = DictProperty("after")  # type: RoomStreamToken
+    order = DictProperty("order")  # type: Tuple[int, int]
 
     def get_dict(self) -> JsonDict:
         return dict(self._dict)
@@ -135,6 +135,8 @@ class _EventInternalMetadata(object):
         rejection. This is needed as those events are marked as outliers, but
         they still need to be processed as if they're new events (e.g. updating
         invite state in the database, relaying to clients, etc).
+
+        (Added in synapse 0.99.0, so may be unreliable for events received before that)
         """
         return self._dict.get("out_of_band_membership", False)
 
@@ -290,7 +292,7 @@ class EventBase(metaclass=abc.ABCMeta):
         return list(self._dict.items())
 
     def keys(self):
-        return six.iterkeys(self._dict)
+        return self._dict.keys()
 
     def prev_event_ids(self):
         """Returns the list of prev event IDs. The order matches the order

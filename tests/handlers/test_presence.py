@@ -19,6 +19,7 @@ from mock import Mock, call
 from signedjson.key import generate_signing_key
 
 from synapse.api.constants import EventTypes, Membership, PresenceState
+from synapse.api.presence import UserPresenceState
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events.builder import EventBuilder
 from synapse.handlers.presence import (
@@ -32,7 +33,6 @@ from synapse.handlers.presence import (
     handle_update,
 )
 from synapse.rest.client.v1 import room
-from synapse.storage.presence import UserPresenceState
 from synapse.types import UserID, get_domain_from_id
 
 from tests import unittest
@@ -470,7 +470,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.federation_sender = hs.get_federation_sender()
         self.event_builder_factory = hs.get_event_builder_factory()
-        self.federation_handler = hs.get_handlers().federation_handler
+        self.federation_handler = hs.get_federation_handler()
         self.presence_handler = hs.get_presence_handler()
 
         # self.event_builder_for_2 = EventBuilderFactory(hs)

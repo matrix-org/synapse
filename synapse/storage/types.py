@@ -12,11 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from typing import Any, Iterable, Iterator, List, Tuple
 
 from typing_extensions import Protocol
-
 
 """
 Some very basic protocol definitions for the DB-API2 classes specified in PEP-249
@@ -62,4 +60,10 @@ class Connection(Protocol):
         ...
 
     def rollback(self, *args, **kwargs) -> None:
+        ...
+
+    def __enter__(self) -> "Connection":
+        ...
+
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
         ...

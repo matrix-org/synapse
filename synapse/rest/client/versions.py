@@ -19,6 +19,7 @@
 import logging
 import re
 
+from synapse.api.constants import RoomCreationPreset
 from synapse.http.servlet import RestServlet
 
 logger = logging.getLogger(__name__)
@@ -28,8 +29,22 @@ class VersionsRestServlet(RestServlet):
     PATTERNS = [re.compile("^/_matrix/client/versions$")]
 
     def __init__(self, hs):
-        super(VersionsRestServlet, self).__init__()
+        super().__init__()
         self.config = hs.config
+
+        # Calculate these once since they shouldn't change after start-up.
+        self.e2ee_forced_public = (
+            RoomCreationPreset.PUBLIC_CHAT
+            in self.config.encryption_enabled_by_default_for_room_presets
+        )
+        self.e2ee_forced_private = (
+            RoomCreationPreset.PRIVATE_CHAT
+            in self.config.encryption_enabled_by_default_for_room_presets
+        )
+        self.e2ee_forced_trusted_private = (
+            RoomCreationPreset.TRUSTED_PRIVATE_CHAT
+            in self.config.encryption_enabled_by_default_for_room_presets
+        )
 
     def on_GET(self, request):
         return (
@@ -49,24 +64,10 @@ class VersionsRestServlet(RestServlet):
                     "r0.3.0",
                     "r0.4.0",
                     "r0.5.0",
+                    "r0.6.0",
                 ],
                 # as per MSC1497:
                 "unstable_features": {
-                    # as per MSC2190, as amended by MSC2264
-                    # to be removed in r0.6.0
-                    "m.id_access_token": True,
-                    # Advertise to clients that they need not include an `id_server`
-                    # parameter during registration or password reset, as Synapse now decides
-                    # itself which identity server to use (or none at all).
-                    #
-                    # This is also used by a client when they wish to bind a 3PID to their
-                    # account, but not bind it to an identity server, the endpoint for which
-                    # also requires `id_server`. If the homeserver is handling 3PID
-                    # verification itself, there is no need to ask the user for `id_server` to
-                    # be supplied.
-                    "m.require_identity_server": False,
-                    # as per MSC2290
-                    "m.separate_add_and_bind": True,
                     # Implements support for label-based filtering as described in
                     # MSC2326.
                     "org.matrix.label_based_filtering": True,
@@ -74,6 +75,12 @@ class VersionsRestServlet(RestServlet):
                     "org.matrix.e2e_cross_signing": True,
                     # Implements additional endpoints as described in MSC2432
                     "org.matrix.msc2432": True,
+                    # Implements additional endpoints as described in MSC2666
+                    "uk.half-shot.msc2666": True,
+                    # Whether new rooms will be set to encrypted or not (based on presets).
+                    "io.element.e2ee_forced.public": self.e2ee_forced_public,
+                    "io.element.e2ee_forced.private": self.e2ee_forced_private,
+                    "io.element.e2ee_forced.trusted_private": self.e2ee_forced_trusted_private,
                 },
             },
         )

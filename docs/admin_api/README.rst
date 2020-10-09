@@ -4,17 +4,21 @@ Admin APIs
 This directory includes documentation for the various synapse specific admin
 APIs available.
 
-Only users that are server admins can use these APIs. A user can be marked as a
-server admin by updating the database directly, e.g.:
+Authenticating as a server admin
+--------------------------------
 
-``UPDATE users SET admin = 1 WHERE name = '@foo:bar.com'``
+Many of the API calls in the admin api will require an `access_token` for a
+server admin. (Note that a server admin is distinct from a room admin.)
 
-Restarting may be required for the changes to register.
+A user can be marked as a server admin by updating the database directly, e.g.:
 
-Using an admin access_token
-###########################
+.. code-block:: sql
 
-Many of the API calls listed in the documentation here will require to include an admin `access_token`.
+    UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
+
+A new server admin user can also be created using the
+``register_new_matrix_user`` script.
+
 Finding your user's `access_token` is client-dependent, but will usually be shown in the client's settings.
 
 Once you have your `access_token`, to include it in a request, the best option is to add the token to a request header:

@@ -37,13 +37,16 @@ logger = logging.getLogger(__name__)
 # installed when that optional dependency requirement is specified. It is passed
 # to setup() as extras_require in setup.py
 #
+# Note that these both represent runtime dependencies (and the versions
+# installed are checked at runtime).
+#
 # [1] https://pip.pypa.io/en/stable/reference/pip_install/#requirement-specifiers.
 
 REQUIREMENTS = [
     "jsonschema>=2.5.1",
     "frozendict>=1",
     "unpaddedbase64>=1.1.0",
-    "canonicaljson>=1.1.3",
+    "canonicaljson>=1.4.0",
     # we use the type definitions added in signedjson 1.1.
     "signedjson>=1.1.0",
     "pynacl>=1.2.1",
@@ -59,18 +62,21 @@ REQUIREMENTS = [
     "pyyaml>=3.11",
     "pyasn1>=0.1.9",
     "pyasn1-modules>=0.0.7",
-    "daemonize>=2.3.1",
     "bcrypt>=3.1.0",
     "pillow>=4.3.0",
     "sortedcontainers>=1.4.4",
     "pymacaroons>=0.13.0",
     "msgpack>=0.5.2",
     "phonenumbers>=8.2.0",
-    "six>=1.10",
-    "prometheus_client>=0.0.18,<0.8.0",
-    # we use attr.s(slots), which arrived in 16.0.0
-    # Twisted 18.7.0 requires attrs>=17.4.0
-    "attrs>=17.4.0",
+    # we use GaugeHistogramMetric, which was added in prom-client 0.4.0.
+    # prom-client has a history of breaking backwards compatibility between
+    # minor versions (https://github.com/prometheus/client_python/issues/317),
+    # so we also pin the minor version.
+    "prometheus_client>=0.4.0,<0.9.0",
+    # we use attr.validators.deep_iterable, which arrived in 19.1.0 (Note:
+    # Fedora 31 only has 19.1, so if we want to upgrade we should wait until 33
+    # is out in November.)
+    "attrs>=19.1.0",
     "netaddr>=0.7.18",
     "Jinja2>=2.9",
     "bleach>=1.4.3",
@@ -81,8 +87,6 @@ CONDITIONAL_REQUIREMENTS = {
     "matrix-synapse-ldap3": ["matrix-synapse-ldap3>=0.1"],
     # we use execute_batch, which arrived in psycopg 2.7.
     "postgres": ["psycopg2>=2.7"],
-    # ConsentResource uses select_autoescape, which arrived in jinja 2.9
-    "resources.consent": ["Jinja2>=2.9"],
     # ACME support is required to provision TLS certificates from authorities
     # that use the protocol, such as Let's Encrypt.
     "acme": [
@@ -95,7 +99,6 @@ CONDITIONAL_REQUIREMENTS = {
     "oidc": ["authlib>=0.14.0"],
     "systemd": ["systemd-python>=231"],
     "url_preview": ["lxml>=3.5.0"],
-    "test": ["mock>=2.0", "parameterized"],
     "sentry": ["sentry-sdk>=0.7.2"],
     "opentracing": ["jaeger-client>=4.0.0", "opentracing>=2.2.0"],
     "jwt": ["pyjwt>=1.6.4"],
@@ -108,6 +111,7 @@ ALL_OPTIONAL_REQUIREMENTS = set()  # type: Set[str]
 
 for name, optional_deps in CONDITIONAL_REQUIREMENTS.items():
     # Exclude systemd as it's a system-based requirement.
+    # Exclude lint as it's a dev-based requirement.
     if name not in ["systemd"]:
         ALL_OPTIONAL_REQUIREMENTS = set(optional_deps) | ALL_OPTIONAL_REQUIREMENTS
 

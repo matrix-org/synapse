@@ -13,9 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from six import binary_type, text_type
+import json
 
-from canonicaljson import json
 from frozendict import frozendict
 
 
@@ -26,7 +25,7 @@ def freeze(o):
     if isinstance(o, frozendict):
         return o
 
-    if isinstance(o, (binary_type, text_type)):
+    if isinstance(o, (bytes, str)):
         return o
 
     try:
@@ -41,7 +40,7 @@ def unfreeze(o):
     if isinstance(o, (dict, frozendict)):
         return dict({k: unfreeze(v) for k, v in o.items()})
 
-    if isinstance(o, (binary_type, text_type)):
+    if isinstance(o, (bytes, str)):
         return o
 
     try:
@@ -65,5 +64,8 @@ def _handle_frozendict(obj):
     )
 
 
-# A JSONEncoder which is capable of encoding frozendicts without barfing
-frozendict_json_encoder = json.JSONEncoder(default=_handle_frozendict)
+# A JSONEncoder which is capable of encoding frozendicts without barfing.
+# Additionally reduce the whitespace produced by JSON encoding.
+frozendict_json_encoder = json.JSONEncoder(
+    allow_nan=False, separators=(",", ":"), default=_handle_frozendict,
+)

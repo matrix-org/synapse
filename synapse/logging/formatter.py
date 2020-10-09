@@ -16,8 +16,7 @@
 
 import logging
 import traceback
-
-from six import StringIO
+from io import StringIO
 
 
 class LogFormatter(logging.Formatter):
@@ -31,7 +30,7 @@ class LogFormatter(logging.Formatter):
     """
 
     def __init__(self, *args, **kwargs):
-        super(LogFormatter, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def formatException(self, ei):
         sio = StringIO()

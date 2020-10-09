@@ -16,13 +16,12 @@
 
 from mock import Mock
 
-from twisted.internet import defer
-
 import synapse.rest.admin
 from synapse.http.site import XForwardedForRequest
 from synapse.rest.client.v1 import login
 
 from tests import unittest
+from tests.test_utils import make_awaitable
 from tests.unittest import override_config
 
 
@@ -86,7 +85,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         self.pump(0)
 
         result = self.get_success(
-            self.store.db.simple_select_list(
+            self.store.db_pool.simple_select_list(
                 table="user_ips",
                 keyvalues={"user_id": user_id},
                 retcols=["access_token", "ip", "user_agent", "device_id", "last_seen"],
@@ -117,7 +116,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         self.pump(0)
 
         result = self.get_success(
-            self.store.db.simple_select_list(
+            self.store.db_pool.simple_select_list(
                 table="user_ips",
                 keyvalues={"user_id": user_id},
                 retcols=["access_token", "ip", "user_agent", "device_id", "last_seen"],
@@ -155,7 +154,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         user_id = "@user:server"
 
         self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(lots_of_users)
+            return_value=make_awaitable(lots_of_users)
         )
         self.get_success(
             self.store.insert_client_ip(
@@ -204,10 +203,10 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
     def test_devices_last_seen_bg_update(self):
         # First make sure we have completed all updates.
         while not self.get_success(
-            self.store.db.updates.has_completed_background_updates()
+            self.store.db_pool.updates.has_completed_background_updates()
         ):
             self.get_success(
-                self.store.db.updates.do_next_background_update(100), by=0.1
+                self.store.db_pool.updates.do_next_background_update(100), by=0.1
             )
 
         user_id = "@user:id"
@@ -225,7 +224,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 
         # But clear the associated entry in devices table
         self.get_success(
-            self.store.db.simple_update(
+            self.store.db_pool.simple_update(
                 table="devices",
                 keyvalues={"user_id": user_id, "device_id": device_id},
                 updatevalues={"last_seen": None, "ip": None, "user_agent": None},
@@ -252,7 +251,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 
         # Register the background update to run again.
         self.get_success(
-            self.store.db.simple_insert(
+            self.store.db_pool.simple_insert(
                 table="background_updates",
                 values={
                     "update_name": "devices_last_seen",
@@ -263,14 +262,14 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         )
 
         # ... and tell the DataStore that it hasn't finished all updates yet
-        self.store.db.updates._all_done = False
+        self.store.db_pool.updates._all_done = False
 
         # Now let's actually drive the updates to completion
         while not self.get_success(
-            self.store.db.updates.has_completed_background_updates()
+            self.store.db_pool.updates.has_completed_background_updates()
         ):
             self.get_success(
-                self.store.db.updates.do_next_background_update(100), by=0.1
+                self.store.db_pool.updates.do_next_background_update(100), by=0.1
             )
 
         # We should now get the correct result again
@@ -293,10 +292,10 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
     def test_old_user_ips_pruned(self):
         # First make sure we have completed all updates.
         while not self.get_success(
-            self.store.db.updates.has_completed_background_updates()
+            self.store.db_pool.updates.has_completed_background_updates()
         ):
             self.get_success(
-                self.store.db.updates.do_next_background_update(100), by=0.1
+                self.store.db_pool.updates.do_next_background_update(100), by=0.1
             )
 
         user_id = "@user:id"
@@ -315,7 +314,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 
         # We should see that in the DB
         result = self.get_success(
-            self.store.db.simple_select_list(
+            self.store.db_pool.simple_select_list(
                 table="user_ips",
                 keyvalues={"user_id": user_id},
                 retcols=["access_token", "ip", "user_agent", "device_id", "last_seen"],
@@ -341,7 +340,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 
         # We should get no results.
         result = self.get_success(
-            self.store.db.simple_select_list(
+            self.store.db_pool.simple_select_list(
                 table="user_ips",
                 keyvalues={"user_id": user_id},
                 retcols=["access_token", "ip", "user_agent", "device_id", "last_seen"],

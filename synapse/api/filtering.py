@@ -15,19 +15,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 from typing import List
 
-from six import text_type
-
 import jsonschema
-from canonicaljson import json
 from jsonschema import FormatChecker
-
-from twisted.internet import defer
 
 from synapse.api.constants import EventContentFields
 from synapse.api.errors import SynapseError
-from synapse.storage.presence import UserPresenceState
+from synapse.api.presence import UserPresenceState
 from synapse.types import RoomID, UserID
 
 FILTER_SCHEMA = {
@@ -134,14 +130,13 @@ def matrix_user_id_validator(user_id_str):
     return UserID.from_string(user_id_str)
 
 
-class Filtering(object):
+class Filtering:
     def __init__(self, hs):
-        super(Filtering, self).__init__()
+        super().__init__()
         self.store = hs.get_datastore()
 
-    @defer.inlineCallbacks
-    def get_user_filter(self, user_localpart, filter_id):
-        result = yield self.store.get_user_filter(user_localpart, filter_id)
+    async def get_user_filter(self, user_localpart, filter_id):
+        result = await self.store.get_user_filter(user_localpart, filter_id)
         return FilterCollection(result)
 
     def add_user_filter(self, user_localpart, user_filter):
@@ -173,7 +168,7 @@ class Filtering(object):
             raise SynapseError(400, str(e))
 
 
-class FilterCollection(object):
+class FilterCollection:
     def __init__(self, filter_json):
         self._filter_json = filter_json
 
@@ -254,7 +249,7 @@ class FilterCollection(object):
         )
 
 
-class Filter(object):
+class Filter:
     def __init__(self, filter_json):
         self.filter_json = filter_json
 
@@ -313,7 +308,7 @@ class Filter(object):
 
             content = event.get("content", {})
             # check if there is a string url field in the content for filtering purposes
-            contains_url = isinstance(content.get("url"), text_type)
+            contains_url = isinstance(content.get("url"), str)
             labels = content.get(EventContentFields.LABELS, [])
 
         return self.check_fields(room_id, sender, ev_type, labels, contains_url)

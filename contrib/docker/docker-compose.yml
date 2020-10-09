@@ -50,7 +50,7 @@ services:
       - traefik.http.routers.https-synapse.tls.certResolver=le-ssl
 
   db:
-    image: docker.io/postgres:10-alpine
+    image: docker.io/postgres:12-alpine
     # Change that password, of course!
     environment:
       - POSTGRES_USER=synapse

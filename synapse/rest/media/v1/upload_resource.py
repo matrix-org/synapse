@@ -15,20 +15,14 @@
 
 import logging
 
-from twisted.web.server import NOT_DONE_YET
-
 from synapse.api.errors import Codes, SynapseError
-from synapse.http.server import (
-    DirectServeResource,
-    respond_with_json,
-    wrap_json_request_handler,
-)
+from synapse.http.server import DirectServeJsonResource, respond_with_json
 from synapse.http.servlet import parse_string
 
 logger = logging.getLogger(__name__)
 
 
-class UploadResource(DirectServeResource):
+class UploadResource(DirectServeJsonResource):
     isLeaf = True
 
     def __init__(self, hs, media_repo):
@@ -43,11 +37,9 @@ class UploadResource(DirectServeResource):
         self.max_upload_size = hs.config.max_upload_size
         self.clock = hs.get_clock()
 
-    def render_OPTIONS(self, request):
+    async def _async_render_OPTIONS(self, request):
         respond_with_json(request, 200, {}, send_cors=True)
-        return NOT_DONE_YET
 
-    @wrap_json_request_handler
     async def _async_render_POST(self, request):
         requester = await self.auth.get_user_by_req(request)
         # TODO: The checks here are a bit late. The content will have
@@ -70,6 +62,10 @@ class UploadResource(DirectServeResource):
                 raise SynapseError(
                     msg="Invalid UTF-8 filename parameter: %r" % (upload_name), code=400
                 )
+
+        # If the name is falsey (e.g. an empty byte string) ensure it is None.
+        else:
+            upload_name = None
 
         headers = request.requestHeaders
 

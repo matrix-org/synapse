@@ -15,8 +15,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.api.constants import LimitBlockingTypes, UserTypes
 from synapse.api.errors import Codes, ResourceLimitError
 from synapse.config.server import is_threepid_reserved
@@ -24,7 +22,7 @@ from synapse.config.server import is_threepid_reserved
 logger = logging.getLogger(__name__)
 
 
-class AuthBlocking(object):
+class AuthBlocking:
     def __init__(self, hs):
         self.store = hs.get_datastore()
 
@@ -36,8 +34,7 @@ class AuthBlocking(object):
         self._limit_usage_by_mau = hs.config.limit_usage_by_mau
         self._mau_limits_reserved_threepids = hs.config.mau_limits_reserved_threepids
 
-    @defer.inlineCallbacks
-    def check_auth_blocking(self, user_id=None, threepid=None, user_type=None):
+    async def check_auth_blocking(self, user_id=None, threepid=None, user_type=None):
         """Checks if the user should be rejected for some external reason,
         such as monthly active user limiting or global disable flag
 
@@ -60,7 +57,7 @@ class AuthBlocking(object):
         if user_id is not None:
             if user_id == self._server_notices_mxid:
                 return
-            if (yield self.store.is_support_user(user_id)):
+            if await self.store.is_support_user(user_id):
                 return
 
         if self._hs_disabled:
@@ -76,11 +73,11 @@ class AuthBlocking(object):
 
             # If the user is already part of the MAU cohort or a trial user
             if user_id:
-                timestamp = yield self.store.user_last_seen_monthly_active(user_id)
+                timestamp = await self.store.user_last_seen_monthly_active(user_id)
                 if timestamp:
                     return
 
-                is_trial = yield self.store.is_trial_user(user_id)
+                is_trial = await self.store.is_trial_user(user_id)
                 if is_trial:
                     return
             elif threepid:
@@ -93,7 +90,7 @@ class AuthBlocking(object):
                 # allow registration. Support users are excluded from MAU checks.
                 return
             # Else if there is no room in the MAU bucket, bail
-            current_mau = yield self.store.get_monthly_active_count()
+            current_mau = await self.store.get_monthly_active_count()
             if current_mau >= self._max_mau_value:
                 raise ResourceLimitError(
                     403,

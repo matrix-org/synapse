@@ -31,16 +31,24 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
 
         # alice and bob are both in !room_id. bobby is not but shares
         # a homeserver with alice.
-        yield self.store.update_profile_in_user_dir(ALICE, "alice", None)
-        yield self.store.update_profile_in_user_dir(BOB, "bob", None)
-        yield self.store.update_profile_in_user_dir(BOBBY, "bobby", None)
-        yield self.store.add_users_in_public_rooms("!room:id", (ALICE, BOB))
+        yield defer.ensureDeferred(
+            self.store.update_profile_in_user_dir(ALICE, "alice", None)
+        )
+        yield defer.ensureDeferred(
+            self.store.update_profile_in_user_dir(BOB, "bob", None)
+        )
+        yield defer.ensureDeferred(
+            self.store.update_profile_in_user_dir(BOBBY, "bobby", None)
+        )
+        yield defer.ensureDeferred(
+            self.store.add_users_in_public_rooms("!room:id", (ALICE, BOB))
+        )
 
     @defer.inlineCallbacks
     def test_search_user_dir(self):
         # normally when alice searches the directory she should just find
         # bob because bobby doesn't share a room with her.
-        r = yield self.store.search_user_dir(ALICE, "bob", 10)
+        r = yield defer.ensureDeferred(self.store.search_user_dir(ALICE, "bob", 10))
         self.assertFalse(r["limited"])
         self.assertEqual(1, len(r["results"]))
         self.assertDictEqual(
@@ -51,7 +59,7 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
     def test_search_user_dir_all_users(self):
         self.hs.config.user_directory_search_all_users = True
         try:
-            r = yield self.store.search_user_dir(ALICE, "bob", 10)
+            r = yield defer.ensureDeferred(self.store.search_user_dir(ALICE, "bob", 10))
             self.assertFalse(r["limited"])
             self.assertEqual(2, len(r["results"]))
             self.assertDictEqual(

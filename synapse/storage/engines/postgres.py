@@ -15,7 +15,8 @@
 
 import logging
 
-from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
+from synapse.storage.engines._base import BaseDatabaseEngine, IncorrectDatabaseSetup
+from synapse.storage.types import Connection
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +93,7 @@ class PostgresEngine(BaseDatabaseEngine):
             errors.append("    - 'COLLATE' is set to %r. Should be 'C'" % (collation,))
 
         if ctype != "C":
-            errors.append("    - 'CTYPE' is set to %r. Should be 'C'" % (collation,))
+            errors.append("    - 'CTYPE' is set to %r. Should be 'C'" % (ctype,))
 
         if errors:
             raise IncorrectDatabaseSetup(
@@ -119,6 +120,7 @@ class PostgresEngine(BaseDatabaseEngine):
             cursor.execute("SET synchronous_commit TO OFF")
 
         cursor.close()
+        db_conn.commit()
 
     @property
     def can_native_upsert(self):
@@ -154,12 +156,6 @@ class PostgresEngine(BaseDatabaseEngine):
     def lock_table(self, txn, table):
         txn.execute("LOCK TABLE %s in EXCLUSIVE MODE" % (table,))
 
-    def get_next_state_group_id(self, txn):
-        """Returns an int that can be used as a new state_group ID
-        """
-        txn.execute("SELECT nextval('state_group_id_seq')")
-        return txn.fetchone()[0]
-
     @property
     def server_version(self):
         """Returns a string giving the server version. For example: '8.1.5'
@@ -177,3 +173,9 @@ class PostgresEngine(BaseDatabaseEngine):
             return "%i.%i" % (numver / 10000, numver % 10000)
         else:
             return "%i.%i.%i" % (numver / 10000, (numver % 10000) / 100, numver % 100)
+
+    def in_transaction(self, conn: Connection) -> bool:
+        return conn.status != self.module.extensions.STATUS_READY  # type: ignore
+
+    def attempt_to_set_autocommit(self, conn: Connection, autocommit: bool):
+        return conn.set_session(autocommit=autocommit)  # type: ignore

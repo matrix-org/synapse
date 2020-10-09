@@ -65,6 +65,11 @@ except Exception:
         return None
 
 
+# a hook which can be set during testing to assert that we aren't abusing logcontexts.
+def logcontext_error(msg: str):
+    logger.warning(msg)
+
+
 # get an id for the current thread.
 #
 # threading.get_ident doesn't actually return an OS-level tid, and annoyingly,
@@ -74,7 +79,7 @@ except Exception:
 get_thread_id = threading.get_ident
 
 
-class ContextResourceUsage(object):
+class ContextResourceUsage:
     """Object for tracking the resources used by a log context
 
     Attributes:
@@ -179,7 +184,7 @@ class ContextResourceUsage(object):
 LoggingContextOrSentinel = Union["LoggingContext", "_Sentinel"]
 
 
-class _Sentinel(object):
+class _Sentinel:
     """Sentinel to represent the root context"""
 
     __slots__ = ["previous_context", "finished", "request", "scope", "tag"]
@@ -217,16 +222,14 @@ class _Sentinel(object):
     def record_event_fetch(self, event_count):
         pass
 
-    def __nonzero__(self):
+    def __bool__(self):
         return False
-
-    __bool__ = __nonzero__  # python3
 
 
 SENTINEL_CONTEXT = _Sentinel()
 
 
-class LoggingContext(object):
+class LoggingContext:
     """Additional context for log formatting. Contexts are scoped within a
     "with" block.
 
@@ -332,10 +335,9 @@ class LoggingContext(object):
         """Enters this logging context into thread local storage"""
         old_context = set_current_context(self)
         if self.previous_context != old_context:
-            logger.warning(
-                "Expected previous context %r, found %r",
-                self.previous_context,
-                old_context,
+            logcontext_error(
+                "Expected previous context %r, found %r"
+                % (self.previous_context, old_context,)
             )
         return self
 
@@ -348,10 +350,10 @@ class LoggingContext(object):
         current = set_current_context(self.previous_context)
         if current is not self:
             if current is SENTINEL_CONTEXT:
-                logger.warning("Expected logging context %s was lost", self)
+                logcontext_error("Expected logging context %s was lost" % (self,))
             else:
-                logger.warning(
-                    "Expected logging context %s but found %s", self, current
+                logcontext_error(
+                    "Expected logging context %s but found %s" % (self, current)
                 )
 
         # the fact that we are here suggests that the caller thinks that everything
@@ -389,16 +391,16 @@ class LoggingContext(object):
                 support getrusuage.
         """
         if get_thread_id() != self.main_thread:
-            logger.warning("Started logcontext %s on different thread", self)
+            logcontext_error("Started logcontext %s on different thread" % (self,))
             return
 
         if self.finished:
-            logger.warning("Re-starting finished log context %s", self)
+            logcontext_error("Re-starting finished log context %s" % (self,))
 
         # If we haven't already started record the thread resource usage so
         # far
         if self.usage_start:
-            logger.warning("Re-starting already-active log context %s", self)
+            logcontext_error("Re-starting already-active log context %s" % (self,))
         else:
             self.usage_start = rusage
 
@@ -416,7 +418,7 @@ class LoggingContext(object):
 
         try:
             if get_thread_id() != self.main_thread:
-                logger.warning("Stopped logcontext %s on different thread", self)
+                logcontext_error("Stopped logcontext %s on different thread" % (self,))
                 return
 
             if not rusage:
@@ -424,9 +426,9 @@ class LoggingContext(object):
 
             # Record the cpu used since we started
             if not self.usage_start:
-                logger.warning(
-                    "Called stop on logcontext %s without recording a start rusage",
-                    self,
+                logcontext_error(
+                    "Called stop on logcontext %s without recording a start rusage"
+                    % (self,)
                 )
                 return
 
@@ -566,37 +568,33 @@ class LoggingContextFilter(logging.Filter):
         return True
 
 
-class PreserveLoggingContext(object):
-    """Captures the current logging context and restores it when the scope is
-    exited. Used to restore the context after a function using
-    @defer.inlineCallbacks is resumed by a callback from the reactor."""
+class PreserveLoggingContext:
+    """Context manager which replaces the logging context
 
-    __slots__ = ["current_context", "new_context", "has_parent"]
+     The previous logging context is restored on exit."""
+
+    __slots__ = ["_old_context", "_new_context"]
 
     def __init__(
         self, new_context: LoggingContextOrSentinel = SENTINEL_CONTEXT
     ) -> None:
-        self.new_context = new_context
+        self._new_context = new_context
 
     def __enter__(self) -> None:
-        """Captures the current logging context"""
-        self.current_context = set_current_context(self.new_context)
-
-        if self.current_context:
-            self.has_parent = self.current_context.previous_context is not None
+        self._old_context = set_current_context(self._new_context)
 
     def __exit__(self, type, value, traceback) -> None:
-        """Restores the current logging context"""
-        context = set_current_context(self.current_context)
+        context = set_current_context(self._old_context)
 
-        if context != self.new_context:
+        if context != self._new_context:
             if not context:
-                logger.warning("Expected logging context %s was lost", self.new_context)
+                logcontext_error(
+                    "Expected logging context %s was lost" % (self._new_context,)
+                )
             else:
-                logger.warning(
-                    "Expected logging context %s but found %s",
-                    self.new_context,
-                    context,
+                logcontext_error(
+                    "Expected logging context %s but found %s"
+                    % (self._new_context, context,)
                 )
 
 

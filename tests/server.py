@@ -1,10 +1,11 @@
 import json
 import logging
-from io import BytesIO
-
-from six import text_type
+from collections import deque
+from io import SEEK_END, BytesIO
+from typing import Callable
 
 import attr
+from typing_extensions import Deque
 from zope.interface import implementer
 
 from twisted.internet import address, threads, udp
@@ -37,7 +38,7 @@ class TimedOutException(Exception):
 
 
 @attr.s
-class FakeChannel(object):
+class FakeChannel:
     """
     A fake Twisted Web Channel (the part that interfaces with the
     wire).
@@ -137,6 +138,7 @@ def make_request(
     request=SynapseRequest,
     shorthand=True,
     federation_auth_origin=None,
+    content_is_form=False,
 ):
     """
     Make a web request using the given method and path, feed it the
@@ -152,6 +154,8 @@ def make_request(
         with the usual REST API path, if it doesn't contain it.
         federation_auth_origin (bytes|None): if set to not-None, we will add a fake
             Authorization header pretenting to be the given server name.
+        content_is_form: Whether the content is URL encoded form data. Adds the
+            'Content-Type': 'application/x-www-form-urlencoded' header.
 
     Returns:
         Tuple[synapse.http.site.SynapseRequest, channel]
@@ -174,7 +178,7 @@ def make_request(
     if not path.startswith(b"/"):
         path = b"/" + path
 
-    if isinstance(content, text_type):
+    if isinstance(content, str):
         content = content.encode("utf8")
 
     site = FakeSite()
@@ -183,6 +187,8 @@ def make_request(
     req = request(channel)
     req.process = lambda: b""
     req.content = BytesIO(content)
+    # Twisted expects to be at the end of the content when parsing the request.
+    req.content.seek(SEEK_END)
     req.postpath = list(map(unquote, path[1:].split(b"/")))
 
     if access_token:
@@ -197,7 +203,13 @@ def make_request(
         )
 
     if content:
-        req.requestHeaders.addRawHeader(b"Content-Type", b"application/json")
+        if content_is_form:
+            req.requestHeaders.addRawHeader(
+                b"Content-Type", b"application/x-www-form-urlencoded"
+            )
+        else:
+            # Assume the body is JSON
+            req.requestHeaders.addRawHeader(b"Content-Type", b"application/json")
 
     req.requestReceived(method, path, b"1.1")
 
@@ -239,18 +251,20 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
     def __init__(self):
         self.threadpool = ThreadPool(self)
 
+        self._tcp_callbacks = {}
         self._udp = []
         lookups = self.lookups = {}
+        self._thread_callbacks = deque()  # type: Deque[Callable[[], None]]()
 
         @implementer(IResolverSimple)
-        class FakeResolver(object):
+        class FakeResolver:
             def getHostByName(self, name, timeout=None):
                 if name not in lookups:
                     return fail(DNSLookupError("OH NO: unknown %s" % (name,)))
                 return succeed(lookups[name])
 
         self.nameResolver = SimpleResolverComplexifier(FakeResolver())
-        super(ThreadedMemoryReactorClock, self).__init__()
+        super().__init__()
 
     def listenUDP(self, port, protocol, interface="", maxPacketSize=8196):
         p = udp.Port(port, protocol, interface, maxPacketSize, self)
@@ -262,13 +276,60 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         """
         Make the callback fire in the next reactor iteration.
         """
-        d = Deferred()
-        d.addCallback(lambda x: callback(*args, **kwargs))
-        self.callLater(0, d.callback, True)
-        return d
+        cb = lambda: callback(*args, **kwargs)
+        # it's not safe to call callLater() here, so we append the callback to a
+        # separate queue.
+        self._thread_callbacks.append(cb)
 
     def getThreadPool(self):
         return self.threadpool
+
+    def add_tcp_client_callback(self, host, port, callback):
+        """Add a callback that will be invoked when we receive a connection
+        attempt to the given IP/port using `connectTCP`.
+
+        Note that the callback gets run before we return the connection to the
+        client, which means callbacks cannot block while waiting for writes.
+        """
+        self._tcp_callbacks[(host, port)] = callback
+
+    def connectTCP(self, host, port, factory, timeout=30, bindAddress=None):
+        """Fake L{IReactorTCP.connectTCP}.
+        """
+
+        conn = super().connectTCP(
+            host, port, factory, timeout=timeout, bindAddress=None
+        )
+
+        callback = self._tcp_callbacks.get((host, port))
+        if callback:
+            callback()
+
+        return conn
+
+    def advance(self, amount):
+        # first advance our reactor's time, and run any "callLater" callbacks that
+        # makes ready
+        super().advance(amount)
+
+        # now run any "callFromThread" callbacks
+        while True:
+            try:
+                callback = self._thread_callbacks.popleft()
+            except IndexError:
+                break
+            callback()
+
+            # check for more "callLater" callbacks added by the thread callback
+            # This isn't required in a regular reactor, but it ends up meaning that
+            # our database queries can complete in a single call to `advance` [1] which
+            # simplifies tests.
+            #
+            # [1]: we replace the threadpool backing the db connection pool with a
+            # mock ThreadPool which doesn't really use threads; but we still use
+            # reactor.callFromThread to feed results back from the db functions to the
+            # main thread.
+            super().advance(0)
 
 
 class ThreadPool:
@@ -306,8 +367,6 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
     """
     server = _sth(cleanup_func, *args, **kwargs)
 
-    database = server.config.database.get_single_database()
-
     # Make the thread pool synchronous.
     clock = server.get_clock()
 
@@ -339,6 +398,10 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
         pool.threadpool = ThreadPool(clock._reactor)
         pool.running = True
 
+    # We've just changed the Databases to run DB transactions on the same
+    # thread, so we need to disable the dedicated thread behaviour.
+    server.get_datastores().main.USE_DEDICATED_DB_THREADS_FOR_EVENT_FETCHING = False
+
     return server
 
 
@@ -349,7 +412,7 @@ def get_clock():
 
 
 @attr.s(cmp=False)
-class FakeTransport(object):
+class FakeTransport:
     """
     A twisted.internet.interfaces.ITransport implementation which sends all its data
     straight into an IProtocol object: it exists to connect two IProtocols together.
@@ -488,7 +551,7 @@ class FakeTransport(object):
         try:
             self.other.dataReceived(to_write)
         except Exception as e:
-            logger.warning("Exception writing to protocol: %s", e)
+            logger.exception("Exception writing to protocol: %s", e)
             return
 
         self.buffer = self.buffer[len(to_write) :]

@@ -15,6 +15,7 @@
 
 import functools
 import gc
+import itertools
 import logging
 import os
 import platform
@@ -22,15 +23,13 @@ import threading
 import time
 from typing import Callable, Dict, Iterable, Optional, Tuple, Union
 
-import six
-
 import attr
 from prometheus_client import Counter, Gauge, Histogram
 from prometheus_client.core import (
     REGISTRY,
     CounterMetricFamily,
+    GaugeHistogramMetricFamily,
     GaugeMetricFamily,
-    HistogramMetricFamily,
 )
 
 from twisted.internet import reactor
@@ -48,12 +47,12 @@ logger = logging.getLogger(__name__)
 METRICS_PREFIX = "/_synapse/metrics"
 
 running_on_pypy = platform.python_implementation() == "PyPy"
-all_gauges = {}  # type: Dict[str, Union[LaterGauge, InFlightGauge, BucketCollector]]
+all_gauges = {}  # type: Dict[str, Union[LaterGauge, InFlightGauge]]
 
 HAVE_PROC_SELF_STAT = os.path.exists("/proc/self/stat")
 
 
-class RegistryProxy(object):
+class RegistryProxy:
     @staticmethod
     def collect():
         for metric in REGISTRY.collect():
@@ -61,8 +60,8 @@ class RegistryProxy(object):
                 yield metric
 
 
-@attr.s(hash=True)
-class LaterGauge(object):
+@attr.s(slots=True, hash=True)
+class LaterGauge:
 
     name = attr.ib(type=str)
     desc = attr.ib(type=str)
@@ -83,7 +82,7 @@ class LaterGauge(object):
             return
 
         if isinstance(calls, dict):
-            for k, v in six.iteritems(calls):
+            for k, v in calls.items():
                 g.add_metric(k, v)
         else:
             g.add_metric([], calls)
@@ -102,7 +101,7 @@ class LaterGauge(object):
         all_gauges[self.name] = self
 
 
-class InFlightGauge(object):
+class InFlightGauge:
     """Tracks number of things (e.g. requests, Measure blocks, etc) in flight
     at any given time.
 
@@ -194,7 +193,7 @@ class InFlightGauge(object):
             gauge = GaugeMetricFamily(
                 "_".join([self.name, name]), "", labels=self.labels
             )
-            for key, metrics in six.iteritems(metrics_by_key):
+            for key, metrics in metrics_by_key.items():
                 gauge.add_metric(key, getattr(metrics, name))
             yield gauge
 
@@ -207,63 +206,83 @@ class InFlightGauge(object):
         all_gauges[self.name] = self
 
 
-@attr.s(hash=True)
-class BucketCollector(object):
-    """
-    Like a Histogram, but allows buckets to be point-in-time instead of
-    incrementally added to.
+class GaugeBucketCollector:
+    """Like a Histogram, but the buckets are Gauges which are updated atomically.
 
-    Args:
-        name (str): Base name of metric to be exported to Prometheus.
-        data_collector (callable -> dict): A synchronous callable that
-            returns a dict mapping bucket to number of items in the
-            bucket. If these buckets are not the same as the buckets
-            given to this class, they will be remapped into them.
-        buckets (list[float]): List of floats/ints of the buckets to
-            give to Prometheus. +Inf is ignored, if given.
+    The data is updated by calling `update_data` with an iterable of measurements.
 
+    We assume that the data is updated less frequently than it is reported to
+    Prometheus, and optimise for that case.
     """
 
-    name = attr.ib()
-    data_collector = attr.ib()
-    buckets = attr.ib()
+    __slots__ = ("_name", "_documentation", "_bucket_bounds", "_metric")
+
+    def __init__(
+        self,
+        name: str,
+        documentation: str,
+        buckets: Iterable[float],
+        registry=REGISTRY,
+    ):
+        """
+        Args:
+            name: base name of metric to be exported to Prometheus. (a _bucket suffix
+               will be added.)
+            documentation: help text for the metric
+            buckets: The top bounds of the buckets to report
+            registry: metric registry to register with
+        """
+        self._name = name
+        self._documentation = documentation
+
+        # the tops of the buckets
+        self._bucket_bounds = [float(b) for b in buckets]
+        if self._bucket_bounds != sorted(self._bucket_bounds):
+            raise ValueError("Buckets not in sorted order")
+
+        if self._bucket_bounds[-1] != float("inf"):
+            self._bucket_bounds.append(float("inf"))
+
+        self._metric = self._values_to_metric([])
+        registry.register(self)
 
     def collect(self):
+        yield self._metric
 
-        # Fetch the data -- this must be synchronous!
-        data = self.data_collector()
+    def update_data(self, values: Iterable[float]):
+        """Update the data to be reported by the metric
 
-        buckets = {}  # type: Dict[float, int]
+        The existing data is cleared, and each measurement in the input is assigned
+        to the relevant bucket.
+        """
+        self._metric = self._values_to_metric(values)
 
-        res = []
-        for x in data.keys():
-            for i, bound in enumerate(self.buckets):
-                if x <= bound:
-                    buckets[bound] = buckets.get(bound, 0) + data[x]
+    def _values_to_metric(self, values: Iterable[float]) -> GaugeHistogramMetricFamily:
+        total = 0.0
+        bucket_values = [0 for _ in self._bucket_bounds]
 
-        for i in self.buckets:
-            res.append([str(i), buckets.get(i, 0)])
+        for v in values:
+            # assign each value to a bucket
+            for i, bound in enumerate(self._bucket_bounds):
+                if v <= bound:
+                    bucket_values[i] += 1
+                    break
 
-        res.append(["+Inf", sum(data.values())])
+            # ... and increment the sum
+            total += v
 
-        metric = HistogramMetricFamily(
-            self.name, "", buckets=res, sum_value=sum(x * y for x, y in data.items())
+        # now, aggregate the bucket values so that they count the number of entries in
+        # that bucket or below.
+        accumulated_values = itertools.accumulate(bucket_values)
+
+        return GaugeHistogramMetricFamily(
+            self._name,
+            self._documentation,
+            buckets=list(
+                zip((str(b) for b in self._bucket_bounds), accumulated_values)
+            ),
+            gsum_value=total,
         )
-        yield metric
-
-    def __attrs_post_init__(self):
-        self.buckets = [float(x) for x in self.buckets if x != "+Inf"]
-        if self.buckets != sorted(self.buckets):
-            raise ValueError("Buckets not sorted")
-
-        self.buckets = tuple(self.buckets)
-
-        if self.name in all_gauges.keys():
-            logger.warning("%s already registered, reregistering" % (self.name,))
-            REGISTRY.unregister(all_gauges.pop(self.name))
-
-        REGISTRY.register(self)
-        all_gauges[self.name] = self
 
 
 #
@@ -271,7 +290,7 @@ class BucketCollector(object):
 #
 
 
-class CPUMetrics(object):
+class CPUMetrics:
     def __init__(self):
         ticks_per_sec = 100
         try:
@@ -331,7 +350,7 @@ gc_time = Histogram(
 )
 
 
-class GCCounts(object):
+class GCCounts:
     def collect(self):
         cm = GaugeMetricFamily("python_gc_counts", "GC object counts", labels=["gen"])
         for n, m in enumerate(gc.get_count()):
@@ -349,7 +368,7 @@ if not running_on_pypy:
 #
 
 
-class PyPyGCStats(object):
+class PyPyGCStats:
     def collect(self):
 
         # @stats is a pretty-printer object with __str__() returning a nice table,
@@ -465,6 +484,12 @@ event_processing_last_ts = Gauge("synapse_event_processing_last_ts", "", ["name"
 # finished being processed.
 event_processing_lag = Gauge("synapse_event_processing_lag", "", ["name"])
 
+event_processing_lag_by_event = Histogram(
+    "synapse_event_processing_lag_by_event",
+    "Time between an event being persisted and it being queued up to be sent to the relevant remote servers",
+    ["name"],
+)
+
 # Build info of the running server.
 build_info = Gauge(
     "synapse_build_info", "Build information", ["pythonversion", "version", "osversion"]
@@ -478,7 +503,7 @@ build_info.labels(
 last_ticked = time.time()
 
 
-class ReactorLastSeenMetric(object):
+class ReactorLastSeenMetric:
     def collect(self):
         cm = GaugeMetricFamily(
             "python_twisted_reactor_last_seen",

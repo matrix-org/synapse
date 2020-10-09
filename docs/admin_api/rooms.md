@@ -275,6 +275,8 @@ The following fields are possible in the JSON response body:
 
 * `room_id` - The ID of the room.
 * `name` - The name of the room.
+* `topic` - The topic of the room.
+* `avatar` - The `mxc` URI to the avatar of the room.
 * `canonical_alias` - The canonical (main) alias address of the room.
 * `joined_members` - How many users are currently in the room.
 * `joined_local_members` - How many local users are currently in the room.
@@ -304,6 +306,8 @@ Response:
 {
   "room_id": "!mscvqgqpHYjBGDxNym:matrix.org",
   "name": "Music Theory",
+  "avatar": "mxc://matrix.org/AQDaVFlbkQoErdOgqWRgiGSV",
+  "topic": "Theory, Composition, Notation, Analysis",
   "canonical_alias": "#musictheory:matrix.org",
   "joined_members": 127
   "joined_local_members": 2,
@@ -318,3 +322,134 @@ Response:
   "state_events": 93534
 }
 ```
+
+# Room Members API
+
+The Room Members admin API allows server admins to get a list of all members of a room.
+
+The response includes the following fields:
+
+* `members` - A list of all the members that are present in the room, represented by their ids.
+* `total` - Total number of members in the room.
+
+## Usage
+
+A standard request:
+
+```
+GET /_synapse/admin/v1/rooms/<room_id>/members
+
+{}
+```
+
+Response:
+
+```
+{
+  "members": [
+    "@foo:matrix.org",
+    "@bar:matrix.org",
+    "@foobar:matrix.org
+    ],
+  "total": 3
+}
+```
+
+# Delete Room API
+
+The Delete Room admin API allows server admins to remove rooms from server
+and block these rooms.
+It is a combination and improvement of "[Shutdown room](shutdown_room.md)"
+and "[Purge room](purge_room.md)" API.
+
+Shuts down a room. Moves all local users and room aliases automatically to a
+new room if `new_room_user_id` is set. Otherwise local users only
+leave the room without any information.
+
+The new room will be created with the user specified by the `new_room_user_id` parameter
+as room administrator and will contain a message explaining what happened. Users invited
+to the new room will have power level `-10` by default, and thus be unable to speak.
+
+If `block` is `True` it prevents new joins to the old room.
+
+This API will remove all trace of the old room from your database after removing
+all local users. If `purge` is `true` (the default), all traces of the old room will
+be removed from your database after removing all local users. If you do not want
+this to happen, set `purge` to `false`.
+Depending on the amount of history being purged a call to the API may take
+several minutes or longer.
+
+The local server will only have the power to move local user and room aliases to
+the new room. Users on other servers will be unaffected.
+
+The API is:
+
+```json
+POST /_synapse/admin/v1/rooms/<room_id>/delete
+```
+
+with a body of:
+```json
+{
+    "new_room_user_id": "@someuser:example.com",
+    "room_name": "Content Violation Notification",
+    "message": "Bad Room has been shutdown due to content violations on this server. Please review our Terms of Service.",
+    "block": true,
+    "purge": true
+}
+```
+
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see [README.rst](README.rst).
+
+A response body like the following is returned:
+
+```json
+{
+    "kicked_users": [
+        "@foobar:example.com"
+    ],
+    "failed_to_kick_users": [],
+    "local_aliases": [
+        "#badroom:example.com",
+        "#evilsaloon:example.com"
+    ],
+    "new_room_id": "!newroomid:example.com"
+}
+```
+
+## Parameters
+
+The following parameters should be set in the URL:
+
+* `room_id` - The ID of the room.
+
+The following JSON body parameters are available:
+
+* `new_room_user_id` - Optional. If set, a new room will be created with this user ID
+      as the creator and admin, and all users in the old room will be moved into that
+      room. If not set, no new room will be created and the users will just be removed
+      from the old room. The user ID must be on the local server, but does not necessarily
+      have to belong to a registered user.
+* `room_name` - Optional. A string representing the name of the room that new users will be
+                invited to. Defaults to `Content Violation Notification`
+* `message` - Optional. A string containing the first message that will be sent as
+              `new_room_user_id` in the new room. Ideally this will clearly convey why the
+               original room was shut down. Defaults to `Sharing illegal content on this server
+               is not permitted and rooms in violation will be blocked.`
+* `block` - Optional. If set to `true`, this room will be added to a blocking list, preventing
+            future attempts to join the room. Defaults to `false`.
+* `purge` - Optional. If set to `true`, it will remove all traces of the room from your database.
+            Defaults to `true`.
+
+The JSON body must not be empty. The body must be at least `{}`.
+
+## Response
+
+The following fields are returned in the JSON response body:
+
+* `kicked_users` - An array of users (`user_id`) that were kicked.
+* `failed_to_kick_users` - An array of users (`user_id`) that that were not kicked.
+* `local_aliases` - An array of strings representing the local aliases that were migrated from
+                    the old room to the new.
+* `new_room_id` - A string representing the room ID of the new room.

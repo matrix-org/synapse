@@ -20,8 +20,6 @@ import logging
 import re
 from typing import Optional, Tuple, Type
 
-from twisted.internet.defer import maybeDeferred
-
 import synapse
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.room_versions import RoomVersions
@@ -47,7 +45,6 @@ from synapse.logging.opentracing import (
 )
 from synapse.server import HomeServer
 from synapse.types import ThirdPartyInstanceID, get_domain_from_id
-from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger(__name__)
@@ -71,12 +68,10 @@ class TransportLayerServer(JsonResource):
         self.clock = hs.get_clock()
         self.servlet_groups = servlet_groups
 
-        super(TransportLayerServer, self).__init__(hs, canonical_json=False)
+        super().__init__(hs, canonical_json=False)
 
         self.authenticator = Authenticator(hs)
-        self.ratelimiter = FederationRateLimiter(
-            self.clock, config=hs.config.rc_federation
-        )
+        self.ratelimiter = hs.get_federation_ratelimiter()
 
         self.register_servlets()
 
@@ -102,14 +97,14 @@ class NoAuthenticationError(AuthenticationError):
     pass
 
 
-class Authenticator(object):
+class Authenticator:
     def __init__(self, hs: HomeServer):
         self._clock = hs.get_clock()
         self.keyring = hs.get_keyring()
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
         self.federation_domain_whitelist = hs.config.federation_domain_whitelist
-        self.notifer = hs.get_notifier()
+        self.notifier = hs.get_notifier()
 
         self.replication_client = None
         if hs.config.worker.worker_app:
@@ -175,7 +170,7 @@ class Authenticator(object):
             await self.store.set_destination_retry_timings(origin, None, 0, 0)
 
             # Inform the relevant places that the remote server is back up.
-            self.notifer.notify_remote_server_up(origin)
+            self.notifier.notify_remote_server_up(origin)
             if self.replication_client:
                 # If we're on a worker we try and inform master about this. The
                 # replication client doesn't hook into the notifier to avoid
@@ -230,7 +225,7 @@ def _parse_auth_header(header_bytes):
         )
 
 
-class BaseFederationServlet(object):
+class BaseFederationServlet:
     """Abstract base class for federation servlet classes.
 
     The servlet object should have a PATH attribute which takes the form of a regexp to
@@ -273,6 +268,8 @@ class BaseFederationServlet(object):
     REQUIRE_AUTH = True
 
     PREFIX = FEDERATION_V1_PREFIX  # Allows specifying the API version
+
+    RATELIMIT = True  # Whether to rate limit requests or not
 
     def __init__(self, handler, authenticator, ratelimiter, server_name):
         self.handler = handler
@@ -337,9 +334,15 @@ class BaseFederationServlet(object):
                 )
 
             with scope:
-                if origin:
+                if origin and self.RATELIMIT:
                     with ratelimiter.ratelimit(origin) as d:
                         await d
+                        if request._disconnected:
+                            logger.warning(
+                                "client disconnected before we started processing "
+                                "request"
+                            )
+                            return -1, None
                         response = await func(
                             origin, content, request.args, *args, **kwargs
                         )
@@ -361,21 +364,19 @@ class BaseFederationServlet(object):
                 continue
 
             server.register_paths(
-                method,
-                (pattern,),
-                self._wrap(code),
-                self.__class__.__name__,
-                trace=False,
+                method, (pattern,), self._wrap(code), self.__class__.__name__,
             )
 
 
 class FederationSendServlet(BaseFederationServlet):
     PATH = "/send/(?P<transaction_id>[^/]*)/?"
 
+    # We ratelimit manually in the handler as we queue up the requests and we
+    # don't want to fill up the ratelimiter with blocked requests.
+    RATELIMIT = False
+
     def __init__(self, handler, server_name, **kwargs):
-        super(FederationSendServlet, self).__init__(
-            handler, server_name=server_name, **kwargs
-        )
+        super().__init__(handler, server_name=server_name, **kwargs)
         self.server_name = server_name
 
     # This is when someone is trying to send us a bunch of data.
@@ -770,9 +771,7 @@ class PublicRoomList(BaseFederationServlet):
     PATH = "/publicRooms"
 
     def __init__(self, handler, authenticator, ratelimiter, server_name, allow_access):
-        super(PublicRoomList, self).__init__(
-            handler, authenticator, ratelimiter, server_name
-        )
+        super().__init__(handler, authenticator, ratelimiter, server_name)
         self.allow_access = allow_access
 
     async def on_GET(self, origin, content, query):
@@ -799,12 +798,8 @@ class PublicRoomList(BaseFederationServlet):
             # zero is a special value which corresponds to no limit.
             limit = None
 
-        data = await maybeDeferred(
-            self.handler.get_local_public_room_list,
-            limit,
-            since_token,
-            network_tuple=network_tuple,
-            from_federation=True,
+        data = await self.handler.get_local_public_room_list(
+            limit, since_token, network_tuple=network_tuple, from_federation=True
         )
         return 200, data
 

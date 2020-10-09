@@ -23,6 +23,7 @@ from .cas import CasConfig
 from .consent_config import ConsentConfig
 from .database import DatabaseConfig
 from .emailconfig import EmailConfig
+from .federation import FederationConfig
 from .groups import GroupsConfig
 from .jwt_config import JWTConfig
 from .key import KeyConfig
@@ -36,6 +37,7 @@ from .ratelimiting import RatelimitConfig
 from .redis import RedisConfig
 from .registration import RegistrationConfig
 from .repository import ContentRepositoryConfig
+from .room import RoomConfig
 from .room_directory import RoomDirectoryConfig
 from .saml2_config import SAML2Config
 from .server import ServerConfig
@@ -56,6 +58,7 @@ class HomeServerConfig(RootConfig):
     config_classes = [
         ServerConfig,
         TlsConfig,
+        FederationConfig,
         CacheConfig,
         DatabaseConfig,
         LoggingConfig,
@@ -75,10 +78,10 @@ class HomeServerConfig(RootConfig):
         JWTConfig,
         PasswordConfig,
         EmailConfig,
-        WorkerConfig,
         PasswordAuthProviderConfig,
         PushConfig,
         SpamCheckerConfig,
+        RoomConfig,
         GroupsConfig,
         UserDirectoryConfig,
         ConsentConfig,
@@ -87,5 +90,6 @@ class HomeServerConfig(RootConfig):
         RoomDirectoryConfig,
         ThirdPartyRulesConfig,
         TracerConfig,
+        WorkerConfig,
         RedisConfig,
     ]

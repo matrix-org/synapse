@@ -17,6 +17,7 @@ from typing import List, Optional
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.events import EventBase
+from synapse.replication.tcp.commands import RdataCommand
 from synapse.replication.tcp.streams._base import _STREAM_UPDATE_TARGET_ROW_COUNT
 from synapse.replication.tcp.streams.events import (
     EventsStreamCurrentStateRow,
@@ -65,11 +66,6 @@ class EventsStreamTestCase(BaseStreamTestCase):
 
         # also one state event
         state_event = self._inject_state_event()
-
-        # tell the notifier to catch up to avoid duplicate rows.
-        # workaround for https://github.com/matrix-org/synapse/issues/7360
-        # FIXME remove this when the above is fixed
-        self.replicate()
 
         # check we're testing what we think we are: no rows should yet have been
         # received
@@ -123,7 +119,9 @@ class EventsStreamTestCase(BaseStreamTestCase):
         OTHER_USER = "@other_user:localhost"
 
         # have the user join
-        inject_member_event(self.hs, self.room_id, OTHER_USER, Membership.JOIN)
+        self.get_success(
+            inject_member_event(self.hs, self.room_id, OTHER_USER, Membership.JOIN)
+        )
 
         # Update existing power levels with mod at PL50
         pls = self.helper.get_state(
@@ -161,23 +159,20 @@ class EventsStreamTestCase(BaseStreamTestCase):
         # roll back all the state by de-modding the user
         prev_events = fork_point
         pls["users"][OTHER_USER] = 0
-        pl_event = inject_event(
-            self.hs,
-            prev_event_ids=prev_events,
-            type=EventTypes.PowerLevels,
-            state_key="",
-            sender=self.user_id,
-            room_id=self.room_id,
-            content=pls,
+        pl_event = self.get_success(
+            inject_event(
+                self.hs,
+                prev_event_ids=prev_events,
+                type=EventTypes.PowerLevels,
+                state_key="",
+                sender=self.user_id,
+                room_id=self.room_id,
+                content=pls,
+            )
         )
 
         # one more bit of state that doesn't get rolled back
         state2 = self._inject_state_event()
-
-        # tell the notifier to catch up to avoid duplicate rows.
-        # workaround for https://github.com/matrix-org/synapse/issues/7360
-        # FIXME remove this when the above is fixed
-        self.replicate()
 
         # check we're testing what we think we are: no rows should yet have been
         # received
@@ -277,7 +272,9 @@ class EventsStreamTestCase(BaseStreamTestCase):
 
         # have the users join
         for u in user_ids:
-            inject_member_event(self.hs, self.room_id, u, Membership.JOIN)
+            self.get_success(
+                inject_member_event(self.hs, self.room_id, u, Membership.JOIN)
+            )
 
         # Update existing power levels with mod at PL50
         pls = self.helper.get_state(
@@ -315,22 +312,19 @@ class EventsStreamTestCase(BaseStreamTestCase):
         pl_events = []
         for u in user_ids:
             pls["users"][u] = 0
-            e = inject_event(
-                self.hs,
-                prev_event_ids=prev_events,
-                type=EventTypes.PowerLevels,
-                state_key="",
-                sender=self.user_id,
-                room_id=self.room_id,
-                content=pls,
+            e = self.get_success(
+                inject_event(
+                    self.hs,
+                    prev_event_ids=prev_events,
+                    type=EventTypes.PowerLevels,
+                    state_key="",
+                    sender=self.user_id,
+                    room_id=self.room_id,
+                    content=pls,
+                )
             )
             prev_events = [e.event_id]
             pl_events.append(e)
-
-        # tell the notifier to catch up to avoid duplicate rows.
-        # workaround for https://github.com/matrix-org/synapse/issues/7360
-        # FIXME remove this when the above is fixed
-        self.replicate()
 
         # check we're testing what we think we are: no rows should yet have been
         # received
@@ -378,6 +372,64 @@ class EventsStreamTestCase(BaseStreamTestCase):
 
         self.assertEqual([], received_rows)
 
+    def test_backwards_stream_id(self):
+        """
+        Test that RDATA that comes after the current position should be discarded.
+        """
+        # disconnect, so that we can stack up some changes
+        self.disconnect()
+
+        # Generate an events. We inject them using inject_event so that they are
+        # not send out over replication until we call self.replicate().
+        event = self._inject_test_event()
+
+        # check we're testing what we think we are: no rows should yet have been
+        # received
+        self.assertEqual([], self.test_handler.received_rdata_rows)
+
+        # now reconnect to pull the updates
+        self.reconnect()
+        self.replicate()
+
+        # We should have received the expected single row (as well as various
+        # cache invalidation updates which we ignore).
+        received_rows = [
+            row for row in self.test_handler.received_rdata_rows if row[0] == "events"
+        ]
+
+        # There should be a single received row.
+        self.assertEqual(len(received_rows), 1)
+
+        stream_name, token, row = received_rows[0]
+        self.assertEqual("events", stream_name)
+        self.assertIsInstance(row, EventsStreamRow)
+        self.assertEqual(row.type, "ev")
+        self.assertIsInstance(row.data, EventsStreamEventRow)
+        self.assertEqual(row.data.event_id, event.event_id)
+
+        # Reset the data.
+        self.test_handler.received_rdata_rows = []
+
+        # Save the current token for later.
+        worker_events_stream = self.worker_hs.get_replication_streams()["events"]
+        prev_token = worker_events_stream.current_token("master")
+
+        # Manually send an old RDATA command, which should get dropped. This
+        # re-uses the row from above, but with an earlier stream token.
+        self.hs.get_tcp_replication().send_command(
+            RdataCommand("events", "master", 1, row)
+        )
+
+        # No updates have been received (because it was discard as old).
+        received_rows = [
+            row for row in self.test_handler.received_rdata_rows if row[0] == "events"
+        ]
+        self.assertEqual(len(received_rows), 0)
+
+        # Ensure the stream has not gone backwards.
+        current_token = worker_events_stream.current_token("master")
+        self.assertGreaterEqual(current_token, prev_token)
+
     event_count = 0
 
     def _inject_test_event(
@@ -390,13 +442,15 @@ class EventsStreamTestCase(BaseStreamTestCase):
             body = "event %i" % (self.event_count,)
             self.event_count += 1
 
-        return inject_event(
-            self.hs,
-            room_id=self.room_id,
-            sender=sender,
-            type="test_event",
-            content={"body": body},
-            **kwargs
+        return self.get_success(
+            inject_event(
+                self.hs,
+                room_id=self.room_id,
+                sender=sender,
+                type="test_event",
+                content={"body": body},
+                **kwargs
+            )
         )
 
     def _inject_state_event(
@@ -415,11 +469,13 @@ class EventsStreamTestCase(BaseStreamTestCase):
         if body is None:
             body = "state event %s" % (state_key,)
 
-        return inject_event(
-            self.hs,
-            room_id=self.room_id,
-            sender=sender,
-            type="test_state_event",
-            state_key=state_key,
-            content={"body": body},
+        return self.get_success(
+            inject_event(
+                self.hs,
+                room_id=self.room_id,
+                sender=sender,
+                type="test_state_event",
+                state_key=state_key,
+                content={"body": body},
+            )
         )

@@ -70,6 +70,7 @@ def parse_thumbnail_requirements(thumbnail_sizes):
         jpeg_thumbnail = ThumbnailRequirement(width, height, method, "image/jpeg")
         png_thumbnail = ThumbnailRequirement(width, height, method, "image/png")
         requirements.setdefault("image/jpeg", []).append(jpeg_thumbnail)
+        requirements.setdefault("image/webp", []).append(jpeg_thumbnail)
         requirements.setdefault("image/gif", []).append(png_thumbnail)
         requirements.setdefault("image/png", []).append(png_thumbnail)
     return {
@@ -93,7 +94,13 @@ class ContentRepositoryConfig(Config):
         else:
             self.can_load_media_repo = True
 
-        self.max_upload_size = self.parse_size(config.get("max_upload_size", "10M"))
+        # Whether this instance should be the one to run the background jobs to
+        # e.g clean up old URL previews.
+        self.media_instance_running_background_jobs = config.get(
+            "media_instance_running_background_jobs",
+        )
+
+        self.max_upload_size = self.parse_size(config.get("max_upload_size", "50M"))
         self.max_image_pixels = self.parse_size(config.get("max_image_pixels", "32M"))
         self.max_spider_size = self.parse_size(config.get("max_spider_size", "10M"))
 
@@ -235,7 +242,7 @@ class ContentRepositoryConfig(Config):
 
         # The largest allowed upload size in bytes
         #
-        #max_upload_size: 10M
+        #max_upload_size: 50M
 
         # Maximum number of pixels that will be thumbnailed
         #

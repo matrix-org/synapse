@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, Optional, TypeVar
 
 from twisted.internet import defer
 
@@ -20,10 +21,15 @@ from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches import register_cache
 
+if TYPE_CHECKING:
+    from synapse.app.homeserver import HomeServer
+
 logger = logging.getLogger(__name__)
 
+T = TypeVar("T")
 
-class ResponseCache(object):
+
+class ResponseCache(Generic[T]):
     """
     This caches a deferred response. Until the deferred completes it will be
     returned from the cache. This means that if the client retries the request
@@ -31,8 +37,9 @@ class ResponseCache(object):
     used rather than trying to compute a new response.
     """
 
-    def __init__(self, hs, name, timeout_ms=0):
-        self.pending_result_cache = {}  # Requests that haven't finished yet.
+    def __init__(self, hs: "HomeServer", name: str, timeout_ms: float = 0):
+        # Requests that haven't finished yet.
+        self.pending_result_cache = {}  # type: Dict[T, ObservableDeferred]
 
         self.clock = hs.get_clock()
         self.timeout_sec = timeout_ms / 1000.0
@@ -40,13 +47,13 @@ class ResponseCache(object):
         self._name = name
         self._metrics = register_cache("response_cache", name, self, resizable=False)
 
-    def size(self):
+    def size(self) -> int:
         return len(self.pending_result_cache)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.size()
 
-    def get(self, key):
+    def get(self, key: T) -> Optional[defer.Deferred]:
         """Look up the given key.
 
         Can return either a new Deferred (which also doesn't follow the synapse
@@ -58,12 +65,11 @@ class ResponseCache(object):
         from an absent cache entry.
 
         Args:
-            key (hashable):
+            key: key to get/set in the cache
 
         Returns:
-            twisted.internet.defer.Deferred|None|E: None if there is no entry
-            for this key; otherwise either a deferred result or the result
-            itself.
+            None if there is no entry for this key; otherwise a deferred which
+            resolves to the result.
         """
         result = self.pending_result_cache.get(key)
         if result is not None:
@@ -73,7 +79,7 @@ class ResponseCache(object):
             self._metrics.inc_misses()
             return None
 
-    def set(self, key, deferred):
+    def set(self, key: T, deferred: defer.Deferred) -> defer.Deferred:
         """Set the entry for the given key to the given deferred.
 
         *deferred* should run its callbacks in the sentinel logcontext (ie,
@@ -85,12 +91,11 @@ class ResponseCache(object):
         result. You will probably want to make_deferred_yieldable the result.
 
         Args:
-            key (hashable):
-            deferred (twisted.internet.defer.Deferred[T):
+            key: key to get/set in the cache
+            deferred: The deferred which resolves to the result.
 
         Returns:
-            twisted.internet.defer.Deferred[T]|T: a new deferred, or the actual
-                result.
+            A new deferred which resolves to the actual result.
         """
         result = ObservableDeferred(deferred, consumeErrors=True)
         self.pending_result_cache[key] = result
@@ -107,7 +112,9 @@ class ResponseCache(object):
         result.addBoth(remove)
         return result.observe()
 
-    def wrap(self, key, callback, *args, **kwargs):
+    def wrap(
+        self, key: T, callback: "Callable[..., Any]", *args: Any, **kwargs: Any
+    ) -> defer.Deferred:
         """Wrap together a *get* and *set* call, taking care of logcontexts
 
         First looks up the key in the cache, and if it is present makes it
@@ -118,21 +125,20 @@ class ResponseCache(object):
 
         Example usage:
 
-            @defer.inlineCallbacks
-            def handle_request(request):
+            async def handle_request(request):
                 # etc
                 return result
 
-            result = yield response_cache.wrap(
+            result = await response_cache.wrap(
                 key,
                 handle_request,
                 request,
             )
 
         Args:
-            key (hashable): key to get/set in the cache
+            key: key to get/set in the cache
 
-            callback (callable): function to call if the key is not found in
+            callback: function to call if the key is not found in
                 the cache
 
             *args: positional parameters to pass to the callback, if it is used
@@ -140,7 +146,7 @@ class ResponseCache(object):
             **kwargs: named parameters to pass to the callback, if it is used
 
         Returns:
-            twisted.internet.defer.Deferred: yieldable result
+            Deferred which resolves to the result
         """
         result = self.get(key)
         if not result:

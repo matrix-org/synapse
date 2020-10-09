@@ -14,12 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
+import json
 import logging
 import os
 import sys
 import tempfile
-
-from canonicaljson import json
 
 from twisted.internet import defer, task
 
@@ -79,8 +78,7 @@ class AdminCmdServer(HomeServer):
         pass
 
 
-@defer.inlineCallbacks
-def export_data_command(hs, args):
+async def export_data_command(hs, args):
     """Export data for a user.
 
     Args:
@@ -91,10 +89,8 @@ def export_data_command(hs, args):
     user_id = args.user_id
     directory = args.output_directory
 
-    res = yield defer.ensureDeferred(
-        hs.get_handlers().admin_handler.export_user_data(
-            user_id, FileExfiltrationWriter(user_id, directory=directory)
-        )
+    res = await hs.get_admin_handler().export_user_data(
+        user_id, FileExfiltrationWriter(user_id, directory=directory)
     )
     print(res)
 
@@ -212,6 +208,7 @@ def start(config_options):
 
     # Explicitly disable background processes
     config.update_user_directory = False
+    config.run_background_tasks = False
     config.start_pushers = False
     config.send_federation = False
 
@@ -232,14 +229,15 @@ def start(config_options):
     # We also make sure that `_base.start` gets run before we actually run the
     # command.
 
-    @defer.inlineCallbacks
-    def run(_reactor):
+    async def run():
         with LoggingContext("command"):
-            yield _base.start(ss, [])
-            yield args.func(ss, args)
+            _base.start(ss, [])
+            await args.func(ss, args)
 
     _base.start_worker_reactor(
-        "synapse-admin-cmd", config, run_command=lambda: task.react(run)
+        "synapse-admin-cmd",
+        config,
+        run_command=lambda: task.react(lambda _reactor: defer.ensureDeferred(run())),
     )
 
 

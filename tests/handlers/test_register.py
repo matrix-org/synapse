@@ -15,19 +15,17 @@
 
 from mock import Mock
 
-from twisted.internet import defer
-
+from synapse.api.auth import Auth
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, ResourceLimitError, SynapseError
-from synapse.handlers.register import RegistrationHandler
+from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.types import RoomAlias, UserID, create_requester
 
+from tests.test_utils import make_awaitable
+from tests.unittest import override_config
+from tests.utils import mock_getRawHeaders
+
 from .. import unittest
-
-
-class RegistrationHandlers(object):
-    def __init__(self, hs):
-        self.registration_handler = RegistrationHandler(hs)
 
 
 class RegistrationTestCase(unittest.HomeserverTestCase):
@@ -96,7 +94,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     def test_get_or_create_user_mau_not_blocked(self):
         self.hs.config.limit_usage_by_mau = True
         self.store.count_monthly_users = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value - 1)
+            return_value=make_awaitable(self.hs.config.max_mau_value - 1)
         )
         # Ensure does not throw exception
         self.get_success(self.get_or_create_user(self.requester, "c", "User"))
@@ -104,7 +102,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     def test_get_or_create_user_mau_blocked(self):
         self.hs.config.limit_usage_by_mau = True
         self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.lots_of_users)
+            return_value=make_awaitable(self.lots_of_users)
         )
         self.get_failure(
             self.get_or_create_user(self.requester, "b", "display_name"),
@@ -112,7 +110,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         )
 
         self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value)
+            return_value=make_awaitable(self.hs.config.max_mau_value)
         )
         self.get_failure(
             self.get_or_create_user(self.requester, "b", "display_name"),
@@ -122,25 +120,35 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     def test_register_mau_blocked(self):
         self.hs.config.limit_usage_by_mau = True
         self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.lots_of_users)
+            return_value=make_awaitable(self.lots_of_users)
         )
         self.get_failure(
             self.handler.register_user(localpart="local_part"), ResourceLimitError
         )
 
         self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value)
+            return_value=make_awaitable(self.hs.config.max_mau_value)
         )
         self.get_failure(
             self.handler.register_user(localpart="local_part"), ResourceLimitError
         )
 
-    def test_auto_create_auto_join_rooms(self):
+    def test_auto_join_rooms_for_guests(self):
         room_alias_str = "#room:test"
         self.hs.config.auto_join_rooms = [room_alias_str]
+        self.hs.config.auto_join_rooms_for_guests = False
+        user_id = self.get_success(
+            self.handler.register_user(localpart="jeff", make_guest=True),
+        )
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        self.assertEqual(len(rooms), 0)
+
+    @override_config({"auto_join_rooms": ["#room:test"]})
+    def test_auto_create_auto_join_rooms(self):
+        room_alias_str = "#room:test"
         user_id = self.get_success(self.handler.register_user(localpart="jeff"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
-        directory_handler = self.hs.get_handlers().directory_handler
+        directory_handler = self.hs.get_directory_handler()
         room_alias = RoomAlias.from_string(room_alias_str)
         room_id = self.get_success(directory_handler.get_association(room_alias))
 
@@ -175,23 +183,23 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         room_alias_str = "#room:test"
         self.hs.config.auto_join_rooms = [room_alias_str]
 
-        self.store.is_real_user = Mock(return_value=defer.succeed(False))
+        self.store.is_real_user = Mock(return_value=make_awaitable(False))
         user_id = self.get_success(self.handler.register_user(localpart="support"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
-        directory_handler = self.hs.get_handlers().directory_handler
+        directory_handler = self.hs.get_directory_handler()
         room_alias = RoomAlias.from_string(room_alias_str)
         self.get_failure(directory_handler.get_association(room_alias), SynapseError)
 
+    @override_config({"auto_join_rooms": ["#room:test"]})
     def test_auto_create_auto_join_rooms_when_user_is_the_first_real_user(self):
         room_alias_str = "#room:test"
-        self.hs.config.auto_join_rooms = [room_alias_str]
 
-        self.store.count_real_users = Mock(return_value=defer.succeed(1))
-        self.store.is_real_user = Mock(return_value=defer.succeed(True))
+        self.store.count_real_users = Mock(return_value=make_awaitable(1))
+        self.store.is_real_user = Mock(return_value=make_awaitable(True))
         user_id = self.get_success(self.handler.register_user(localpart="real"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
-        directory_handler = self.hs.get_handlers().directory_handler
+        directory_handler = self.hs.get_directory_handler()
         room_alias = RoomAlias.from_string(room_alias_str)
         room_id = self.get_success(directory_handler.get_association(room_alias))
 
@@ -202,11 +210,217 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         room_alias_str = "#room:test"
         self.hs.config.auto_join_rooms = [room_alias_str]
 
-        self.store.count_real_users = Mock(return_value=defer.succeed(2))
-        self.store.is_real_user = Mock(return_value=defer.succeed(True))
+        self.store.count_real_users = Mock(return_value=make_awaitable(2))
+        self.store.is_real_user = Mock(return_value=make_awaitable(True))
         user_id = self.get_success(self.handler.register_user(localpart="real"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
+
+    @override_config(
+        {
+            "auto_join_rooms": ["#room:test"],
+            "autocreate_auto_join_rooms_federated": False,
+        }
+    )
+    def test_auto_create_auto_join_rooms_federated(self):
+        """
+        Auto-created rooms that are private require an invite to go to the user
+        (instead of directly joining it).
+        """
+        room_alias_str = "#room:test"
+        user_id = self.get_success(self.handler.register_user(localpart="jeff"))
+
+        # Ensure the room was created.
+        directory_handler = self.hs.get_directory_handler()
+        room_alias = RoomAlias.from_string(room_alias_str)
+        room_id = self.get_success(directory_handler.get_association(room_alias))
+
+        # Ensure the room is properly not federated.
+        room = self.get_success(self.store.get_room_with_stats(room_id["room_id"]))
+        self.assertFalse(room["federatable"])
+        self.assertFalse(room["public"])
+        self.assertEqual(room["join_rules"], "public")
+        self.assertIsNone(room["guest_access"])
+
+        # The user should be in the room.
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        self.assertIn(room_id["room_id"], rooms)
+
+    @override_config(
+        {"auto_join_rooms": ["#room:test"], "auto_join_mxid_localpart": "support"}
+    )
+    def test_auto_join_mxid_localpart(self):
+        """
+        Ensure the user still needs up in the room created by a different user.
+        """
+        # Ensure the support user exists.
+        inviter = "@support:test"
+
+        room_alias_str = "#room:test"
+        user_id = self.get_success(self.handler.register_user(localpart="jeff"))
+
+        # Ensure the room was created.
+        directory_handler = self.hs.get_directory_handler()
+        room_alias = RoomAlias.from_string(room_alias_str)
+        room_id = self.get_success(directory_handler.get_association(room_alias))
+
+        # Ensure the room is properly a public room.
+        room = self.get_success(self.store.get_room_with_stats(room_id["room_id"]))
+        self.assertEqual(room["join_rules"], "public")
+
+        # Both users should be in the room.
+        rooms = self.get_success(self.store.get_rooms_for_user(inviter))
+        self.assertIn(room_id["room_id"], rooms)
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        self.assertIn(room_id["room_id"], rooms)
+
+        # Register a second user, which should also end up in the room.
+        user_id = self.get_success(self.handler.register_user(localpart="bob"))
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        self.assertIn(room_id["room_id"], rooms)
+
+    @override_config(
+        {
+            "auto_join_rooms": ["#room:test"],
+            "autocreate_auto_join_room_preset": "private_chat",
+            "auto_join_mxid_localpart": "support",
+        }
+    )
+    def test_auto_create_auto_join_room_preset(self):
+        """
+        Auto-created rooms that are private require an invite to go to the user
+        (instead of directly joining it).
+        """
+        # Ensure the support user exists.
+        inviter = "@support:test"
+
+        room_alias_str = "#room:test"
+        user_id = self.get_success(self.handler.register_user(localpart="jeff"))
+
+        # Ensure the room was created.
+        directory_handler = self.hs.get_directory_handler()
+        room_alias = RoomAlias.from_string(room_alias_str)
+        room_id = self.get_success(directory_handler.get_association(room_alias))
+
+        # Ensure the room is properly a private room.
+        room = self.get_success(self.store.get_room_with_stats(room_id["room_id"]))
+        self.assertFalse(room["public"])
+        self.assertEqual(room["join_rules"], "invite")
+        self.assertEqual(room["guest_access"], "can_join")
+
+        # Both users should be in the room.
+        rooms = self.get_success(self.store.get_rooms_for_user(inviter))
+        self.assertIn(room_id["room_id"], rooms)
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        self.assertIn(room_id["room_id"], rooms)
+
+        # Register a second user, which should also end up in the room.
+        user_id = self.get_success(self.handler.register_user(localpart="bob"))
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        self.assertIn(room_id["room_id"], rooms)
+
+    @override_config(
+        {
+            "auto_join_rooms": ["#room:test"],
+            "autocreate_auto_join_room_preset": "private_chat",
+            "auto_join_mxid_localpart": "support",
+        }
+    )
+    def test_auto_create_auto_join_room_preset_guest(self):
+        """
+        Auto-created rooms that are private require an invite to go to the user
+        (instead of directly joining it).
+
+        This should also work for guests.
+        """
+        inviter = "@support:test"
+
+        room_alias_str = "#room:test"
+        user_id = self.get_success(
+            self.handler.register_user(localpart="jeff", make_guest=True)
+        )
+
+        # Ensure the room was created.
+        directory_handler = self.hs.get_directory_handler()
+        room_alias = RoomAlias.from_string(room_alias_str)
+        room_id = self.get_success(directory_handler.get_association(room_alias))
+
+        # Ensure the room is properly a private room.
+        room = self.get_success(self.store.get_room_with_stats(room_id["room_id"]))
+        self.assertFalse(room["public"])
+        self.assertEqual(room["join_rules"], "invite")
+        self.assertEqual(room["guest_access"], "can_join")
+
+        # Both users should be in the room.
+        rooms = self.get_success(self.store.get_rooms_for_user(inviter))
+        self.assertIn(room_id["room_id"], rooms)
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        self.assertIn(room_id["room_id"], rooms)
+
+    @override_config(
+        {
+            "auto_join_rooms": ["#room:test"],
+            "autocreate_auto_join_room_preset": "private_chat",
+            "auto_join_mxid_localpart": "support",
+        }
+    )
+    def test_auto_create_auto_join_room_preset_invalid_permissions(self):
+        """
+        Auto-created rooms that are private require an invite, check that
+        registration doesn't completely break if the inviter doesn't have proper
+        permissions.
+        """
+        inviter = "@support:test"
+
+        # Register an initial user to create the room and such (essentially this
+        # is a subset of test_auto_create_auto_join_room_preset).
+        room_alias_str = "#room:test"
+        user_id = self.get_success(self.handler.register_user(localpart="jeff"))
+
+        # Ensure the room was created.
+        directory_handler = self.hs.get_directory_handler()
+        room_alias = RoomAlias.from_string(room_alias_str)
+        room_id = self.get_success(directory_handler.get_association(room_alias))
+
+        # Ensure the room exists.
+        self.get_success(self.store.get_room_with_stats(room_id["room_id"]))
+
+        # Both users should be in the room.
+        rooms = self.get_success(self.store.get_rooms_for_user(inviter))
+        self.assertIn(room_id["room_id"], rooms)
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        self.assertIn(room_id["room_id"], rooms)
+
+        # Lower the permissions of the inviter.
+        event_creation_handler = self.hs.get_event_creation_handler()
+        requester = create_requester(inviter)
+        event, context = self.get_success(
+            event_creation_handler.create_event(
+                requester,
+                {
+                    "type": "m.room.power_levels",
+                    "state_key": "",
+                    "room_id": room_id["room_id"],
+                    "content": {"invite": 100, "users": {inviter: 0}},
+                    "sender": inviter,
+                },
+            )
+        )
+        self.get_success(
+            event_creation_handler.handle_new_client_event(requester, event, context)
+        )
+
+        # Register a second user, which won't be be in the room (or even have an invite)
+        # since the inviter no longer has the proper permissions.
+        user_id = self.get_success(self.handler.register_user(localpart="bob"))
+
+        # This user should not be in any rooms.
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        invited_rooms = self.get_success(
+            self.store.get_invited_rooms_for_local_user(user_id)
+        )
+        self.assertEqual(rooms, set())
+        self.assertEqual(invited_rooms, [])
 
     def test_auto_create_auto_join_where_no_consent(self):
         """Test to ensure that the first user is not auto-joined to a room if
@@ -255,6 +469,53 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.get_failure(
             self.handler.register_user(localpart=invalid_user_id), SynapseError
         )
+
+    def test_spam_checker_deny(self):
+        """A spam checker can deny registration, which results in an error."""
+
+        class DenyAll:
+            def check_registration_for_spam(
+                self, email_threepid, username, request_info
+            ):
+                return RegistrationBehaviour.DENY
+
+        # Configure a spam checker that denies all users.
+        spam_checker = self.hs.get_spam_checker()
+        spam_checker.spam_checkers = [DenyAll()]
+
+        self.get_failure(self.handler.register_user(localpart="user"), SynapseError)
+
+    def test_spam_checker_shadow_ban(self):
+        """A spam checker can choose to shadow-ban a user, which allows registration to succeed."""
+
+        class BanAll:
+            def check_registration_for_spam(
+                self, email_threepid, username, request_info
+            ):
+                return RegistrationBehaviour.SHADOW_BAN
+
+        # Configure a spam checker that denies all users.
+        spam_checker = self.hs.get_spam_checker()
+        spam_checker.spam_checkers = [BanAll()]
+
+        user_id = self.get_success(self.handler.register_user(localpart="user"))
+
+        # Get an access token.
+        token = self.macaroon_generator.generate_access_token(user_id)
+        self.get_success(
+            self.store.add_access_token_to_user(
+                user_id=user_id, token=token, device_id=None, valid_until_ms=None
+            )
+        )
+
+        # Ensure the user was marked as shadow-banned.
+        request = Mock(args={})
+        request.args[b"access_token"] = [token.encode("ascii")]
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
+        auth = Auth(self.hs)
+        requester = self.get_success(auth.get_user_by_req(request))
+
+        self.assertTrue(requester.shadow_banned)
 
     async def get_or_create_user(
         self, requester, localpart, displayname, password_hash=None

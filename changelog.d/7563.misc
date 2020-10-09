@@ -1,1 +1,0 @@
-Stop logging some expected HTTP request errors as exceptions.
