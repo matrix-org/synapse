@@ -184,17 +184,24 @@ class ReplicationStreamer:
                             # The token has advanced but there is no data to
                             # send, so we send a `POSITION` to inform other
                             # workers of the updated position.
-                            logger.info(
-                                "Sending position: %s -> %s", stream.NAME, current_token
-                            )
-                            self.command_handler.send_command(
-                                PositionCommand(
+                            if stream.NAME == EventsStream.NAME:
+                                # XXX: We only do this for the EventStream as it
+                                # turns out that e.g. account data streams share
+                                # their "current token" with each other, meaning
+                                # that it is *not* safe to send a POSITION.
+                                logger.info(
+                                    "Sending position: %s -> %s",
                                     stream.NAME,
-                                    self._instance_name,
-                                    last_token,
                                     current_token,
                                 )
-                            )
+                                self.command_handler.send_command(
+                                    PositionCommand(
+                                        stream.NAME,
+                                        self._instance_name,
+                                        last_token,
+                                        current_token,
+                                    )
+                                )
                             continue
 
                         # Some streams return multiple rows with the same stream IDs,
