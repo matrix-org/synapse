@@ -120,7 +120,7 @@ class RoomCreationHandler(BaseHandler):
         # subsequent requests
         self._upgrade_response_cache = ResponseCache(
             hs, "room_upgrade", timeout_ms=FIVE_MINUTES_IN_MS
-        )
+        )  # type: ResponseCache[Tuple[str, str]]
         self._server_notices_mxid = hs.config.server_notices_mxid
 
         self.third_party_event_rules = hs.get_third_party_event_rules()
@@ -147,9 +147,6 @@ class RoomCreationHandler(BaseHandler):
 
         # Check if this room is already being upgraded by another person
         for key in self._upgrade_response_cache.pending_result_cache:
-            # The keys of pending_result_cache just need to be hashable, but in
-            # this case we know that it is a tuple.
-            assert isinstance(key, tuple)
             if key[0] == old_room_id and key[1] != user_id:
                 # Two different people are trying to upgrade the same room.
                 # Send the second an error.

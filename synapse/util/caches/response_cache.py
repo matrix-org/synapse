@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Dict, Hashable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, Optional, TypeVar
 
 from twisted.internet import defer
 
@@ -26,8 +26,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+T = TypeVar("T")
 
-class ResponseCache:
+
+class ResponseCache(Generic[T]):
     """
     This caches a deferred response. Until the deferred completes it will be
     returned from the cache. This means that if the client retries the request
@@ -37,7 +39,7 @@ class ResponseCache:
 
     def __init__(self, hs: "HomeServer", name: str, timeout_ms: float = 0):
         # Requests that haven't finished yet.
-        self.pending_result_cache = {}  # type: Dict[Hashable, ObservableDeferred]
+        self.pending_result_cache = {}  # type: Dict[T, ObservableDeferred]
 
         self.clock = hs.get_clock()
         self.timeout_sec = timeout_ms / 1000.0
@@ -51,7 +53,7 @@ class ResponseCache:
     def __len__(self) -> int:
         return self.size()
 
-    def get(self, key: Hashable) -> Optional[defer.Deferred]:
+    def get(self, key: T) -> Optional[defer.Deferred]:
         """Look up the given key.
 
         Can return either a new Deferred (which also doesn't follow the synapse
@@ -77,7 +79,7 @@ class ResponseCache:
             self._metrics.inc_misses()
             return None
 
-    def set(self, key: Hashable, deferred: defer.Deferred) -> defer.Deferred:
+    def set(self, key: T, deferred: defer.Deferred) -> defer.Deferred:
         """Set the entry for the given key to the given deferred.
 
         *deferred* should run its callbacks in the sentinel logcontext (ie,
@@ -111,7 +113,7 @@ class ResponseCache:
         return result.observe()
 
     def wrap(
-        self, key: Hashable, callback: "Callable[..., Any]", *args: Any, **kwargs: Any
+        self, key: T, callback: "Callable[..., Any]", *args: Any, **kwargs: Any
     ) -> defer.Deferred:
         """Wrap together a *get* and *set* call, taking care of logcontexts
 
