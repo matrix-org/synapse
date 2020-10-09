@@ -106,6 +106,8 @@ docker run -d --name synapse \
     --config-path=/data/generic_worker.yaml
 ```
 
+If you do not provide `-m`, the value of the `SYNAPSE_WORKER` environment variable is used. If you do not provide at least one `--config-path` or `-c`, the value of the `SYNAPSE_CONFIG_PATH` environment variable is used instead.
+
 ## Generating an (admin) user
 
 After synapse is running, you may wish to create a user via `register_new_matrix_user`.
