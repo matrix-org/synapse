@@ -144,7 +144,9 @@ class ApplicationService:
             return regex_obj["exclusive"]
         return False
 
-    async def _matches_user(self, event: EventBase, store: "DataStore") -> bool:
+    async def _matches_user(
+        self, event: EventBase, store: Optional["DataStore"] = None
+    ) -> bool:
         if not event:
             return False
 
@@ -186,7 +188,9 @@ class ApplicationService:
             return self.is_interested_in_room(event.room_id)
         return False
 
-    async def _matches_aliases(self, event: EventBase, store: "DataStore") -> bool:
+    async def _matches_aliases(
+        self, event: EventBase, store: Optional["DataStore"] = None
+    ) -> bool:
         if not store or not event:
             return False
 
