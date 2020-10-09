@@ -196,7 +196,7 @@ class ApplicationService:
                 return True
         return False
 
-    async def is_interested(self, event: EventBase, store: "DataStore") -> bool:
+    async def is_interested(self, event: EventBase, store: Optional["DataStore"] = None) -> bool:
         """Check if this service is interested in this event.
 
         Args:
@@ -208,10 +208,13 @@ class ApplicationService:
         if self._matches_room_id(event):
             return True
 
-        if await self._matches_aliases(event, store):
+        # This will check the namespaces first before
+        # checking the store, so should be run before _matches_aliases
+        if await self._matches_user(event, store):
             return True
 
-        if await self._matches_user(event, store):
+        # This will check the store, so should be run last
+        if await self._matches_aliases(event, store):
             return True
 
         return False
