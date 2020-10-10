@@ -26,7 +26,7 @@ from tests.unittest import HomeserverTestCase
 class FederationReaderOpenIDListenerTests(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(
-            http_client=None, homeserverToUse=GenericWorkerServer
+            http_client=None, homeserver_to_use=GenericWorkerServer
         )
         return hs
 
@@ -84,7 +84,7 @@ class FederationReaderOpenIDListenerTests(HomeserverTestCase):
 class SynapseHomeserverOpenIDListenerTests(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(
-            http_client=None, homeserverToUse=SynapseHomeServer
+            http_client=None, homeserver_to_use=SynapseHomeServer
         )
         return hs
 

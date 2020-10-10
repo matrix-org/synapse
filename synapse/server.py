@@ -200,7 +200,13 @@ class HomeServer(metaclass=abc.ABCMeta):
     # instantiated during setup() for future return by get_datastore()
     DATASTORE_CLASS = abc.abstractproperty()
 
-    def __init__(self, hostname: str, config: HomeServerConfig, reactor=None, **kwargs):
+    def __init__(
+        self,
+        hostname: str,
+        config: HomeServerConfig,
+        reactor=None,
+        version_string="Synapse",
+    ):
         """
         Args:
             hostname : The hostname for the server.
@@ -231,11 +237,9 @@ class HomeServer(metaclass=abc.ABCMeta):
             burst_count=config.rc_registration.burst_count,
         )
 
-        self.datastores = None  # type: Optional[Databases]
+        self.version_string = version_string
 
-        # Other kwargs are explicit dependencies
-        for depname in kwargs:
-            setattr(self, depname, kwargs[depname])
+        self.datastores = None  # type: Optional[Databases]
 
     def get_instance_id(self) -> str:
         """A unique ID for this synapse process instance.
