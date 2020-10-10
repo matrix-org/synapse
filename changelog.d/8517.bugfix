@@ -1,0 +1,1 @@
+Use correct M_BAD_JSON error code for /profile/{userId}/displayname.
