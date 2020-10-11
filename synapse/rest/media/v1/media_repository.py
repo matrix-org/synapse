@@ -767,6 +767,36 @@ class MediaRepository:
 
         return {"deleted": deleted}
 
+    async def delete_local_media(self, media_id: str) -> int:
+        """
+        Delete the given media_id from this server
+
+        Args:
+            media_id: The media ID to delete.
+        Returns:
+            Number of deleted files.
+            In this case 1 or 0
+        """
+        logger.info("Deleting local media: %s", media_id)
+
+        full_path = self.filepaths.local_media_filepath(media_id)
+        try:
+            os.remove(full_path)
+        except OSError as e:
+            logger.warning("Failed to remove file: %r: %s", full_path, e)
+            if e.errno != errno.ENOENT:
+                return 0
+
+        thumbnail_dir = self.filepaths.local_media_thumbnail_dir(media_id)
+        shutil.rmtree(thumbnail_dir, ignore_errors=True)
+
+        await self.store.delete_remote_media(self.server_name, media_id)
+
+        await self.store.delete_url_cache((media_id,))
+        await self.store.delete_url_cache_media((media_id,))
+
+        return 1
+
 
 class MediaRepositoryResource(Resource):
     """File uploading and downloading.

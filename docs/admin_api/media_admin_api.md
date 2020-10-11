@@ -100,3 +100,27 @@ Response:
   "num_quarantined": 10  # The number of media items successfully quarantined
 }
 ```
+
+# Draft: Delete local media
+This API deletes the *local* media from the disc of your own server.
+
+Request:
+
+```
+DELETE /_synapse/admin/v1/media/<server_name>/<media_id>
+
+{}
+```
+
+URL Parameters
+
+* `server_name` - The name of your local server (e.g `matrix.org`)
+* `media_id` - The ID of the media (e.g `abcdefghijklmnopqrstuvwx`)
+
+Response:
+
+```
+{
+  "deleted": 1  # The number of media items successfully deleted
+}
+```

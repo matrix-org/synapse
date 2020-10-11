@@ -16,9 +16,10 @@
 
 import logging
 
-from synapse.api.errors import AuthError
+from synapse.api.errors import AuthError, NotFoundError, SynapseError
 from synapse.http.servlet import RestServlet, parse_integer
 from synapse.rest.admin._base import (
+    admin_patterns,
     assert_requester_is_admin,
     assert_user_is_admin,
     historical_admin_path_patterns,
@@ -150,6 +151,33 @@ class PurgeMediaCacheRestServlet(RestServlet):
         return 200, ret
 
 
+class DeleteMediaByID(RestServlet):
+    """Delete local media by a given ID. Removes it from this server.
+    """
+
+    PATTERNS = admin_patterns("/media/(?P<server_name>[^/]+)/(?P<media_id>[^/]+)", "v1")
+
+    def __init__(self, hs):
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.server_name = hs.hostname
+        self.media_repository = hs.get_media_repository()
+
+    async def on_DELETE(self, request, server_name: str, media_id: str):
+        await assert_requester_is_admin(self.auth, request)
+
+        if self.server_name != server_name:
+            raise SynapseError(400, "Can only delete local media")
+
+        if await self.store.get_local_media(media_id) is None:
+            raise NotFoundError("Unknown media")
+
+        logging.info("Deleting local media by ID: %s", media_id)
+
+        ret = await self.media_repository.delete_local_media(media_id)
+        return 200, {"deleted": ret}
+
+
 def register_servlets_for_media_repo(hs, http_server):
     """
     Media repo specific APIs.
@@ -159,3 +187,4 @@ def register_servlets_for_media_repo(hs, http_server):
     QuarantineMediaByID(hs).register(http_server)
     QuarantineMediaByUser(hs).register(http_server)
     ListMediaInRoom(hs).register(http_server)
+    DeleteMediaByID(hs).register(http_server)
