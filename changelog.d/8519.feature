@@ -1,0 +1,1 @@
+Add an admin api `DELETE /_synapse/admin/v1/media/<server_name>/<media_id>` to delete a single file from server. Contributed by @dklimpel.
