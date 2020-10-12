@@ -1,3 +1,16 @@
+Synapse 1.21.0 (2020-10-12)
+===========================
+
+No significant changes since v1.21.0rc3.
+
+As [noted in
+v1.20.0](https://github.com/matrix-org/synapse/blob/release-v1.21.0/CHANGES.md#synapse-1200-2020-09-22),
+a future release will drop support for accessing Synapse's
+[Admin API](https://github.com/matrix-org/synapse/tree/master/docs/admin_api) under the
+`/_matrix/client/*` endpoint prefixes. At that point, the Admin API will only
+be accessible under `/_synapse/admin`.
+
+
 Synapse 1.21.0rc3 (2020-10-08)
 ==============================
 
@@ -154,9 +167,11 @@ API](https://github.com/matrix-org/synapse/tree/master/docs) has been
 accessible under the `/_matrix/client/api/v1/admin`,
 `/_matrix/client/unstable/admin`, `/_matrix/client/r0/admin` and
 `/_synapse/admin` prefixes. In a future release, we will be dropping support
-for accessing Synapse's Admin API using the `/_matrix/client/*` prefixes. This
-makes it easier for homeserver admins to lock down external access to the Admin
-API endpoints.
+for accessing Synapse's Admin API using the `/_matrix/client/*` prefixes.
+
+From that point, the Admin API will only be accessible under `/_synapse/admin`.
+This makes it easier for homeserver admins to lock down external access to the
+Admin API endpoints.
 
 Synapse 1.20.0rc5 (2020-09-18)
 ==============================
