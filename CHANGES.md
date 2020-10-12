@@ -3,6 +3,14 @@ Synapse 1.21.0 (2020-10-12)
 
 No significant changes since v1.21.0rc3.
 
+As [noted in
+v1.20.0](https://github.com/matrix-org/synapse/blob/release-v1.21.0/CHANGES.md#synapse-1200-2020-09-22),
+a future release will drop support for accessing Synapse's
+[Admin API](https://github.com/matrix-org/synapse/tree/master/docs/admin_api) under the
+`/_matrix/client/*` endpoint prefixes. Please update your
+[reverse proxy configuration](https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.md)
+accordingly.
+
 
 Synapse 1.21.0rc3 (2020-10-08)
 ==============================
