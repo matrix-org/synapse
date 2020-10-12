@@ -44,11 +44,14 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         access_token = self.login("tester", "foobar")
         room_id = self.helper.create_room_as(user_id, tok=access_token)
 
-        # We make the IDs up here, which is fine.
-        token_id = 4957834
-        txn_id = "something_suitably_random"
+        info = self.get_success(
+            self.hs.get_datastore().get_user_by_access_token(access_token,)
+        )
+        token_id = info["token_id"]
 
         requester = create_requester(user_id, access_token_id=token_id)
+
+        txn_id = "something_suitably_random"
 
         def create_duplicate_event():
             return self.get_success(
