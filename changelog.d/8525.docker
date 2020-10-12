@@ -1,0 +1,1 @@
+Ensure config_dir is also handled by docker startup fixing directory permissions. Contributed by @maquis196.
