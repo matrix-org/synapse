@@ -19,7 +19,7 @@ usage() {
   echo
   echo "  If no paths are provided and this option is not set, all files will be linted."
   echo
-  echo "  Note that paths will be excluded if they both have a file extension, and it is not 'py'."
+  echo "  Note that paths with a file extension that is not '.py' will be excluded."
   echo "-h"
   echo "  Display this help text."
 }
