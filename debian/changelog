@@ -1,3 +1,9 @@
+matrix-synapse-py3 (1.21.0+nmu1) UNRELEASED; urgency=medium
+
+  * Explicitly install "test" python dependencies.
+
+ -- Andrew Morgan <andrewm@matrix.org>  Mon, 12 Oct 2020 17:30:30 +0100
+
 matrix-synapse-py3 (1.21.0) stable; urgency=medium
 
   * New synapse release 1.21.0.
