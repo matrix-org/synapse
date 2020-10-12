@@ -116,14 +116,17 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             "Got event to send with ID: %s into room: %s", event.event_id, event.room_id
         )
 
-        (
-            event,
-            stream_id,
-        ) = await self.event_creation_handler.persist_and_notify_client_event(
+        event = await self.event_creation_handler.persist_and_notify_client_event(
             requester, event, context, ratelimit=ratelimit, extra_users=extra_users
         )
 
-        return 200, {"stream_id": stream_id, "event_id": event.event_id}
+        return (
+            200,
+            {
+                "stream_id": event.internal_metadata.stream_ordering,
+                "event_id": event.event_id,
+            },
+        )
 
 
 def register_servlets(hs, http_server):
