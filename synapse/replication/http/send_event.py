@@ -49,7 +49,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
 
         200 OK
 
-        { "stream_id": ..., "event_id": ... }
+        { "stream_id": 12345, "event_id": "$abcdef..." }
 
     The returned event ID may not match the sent event if it was deduplicated.
     """
