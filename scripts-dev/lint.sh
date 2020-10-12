@@ -66,11 +66,20 @@ shift "$((OPTIND-1))"
 # Append any remaining arguments as files to lint
 files+=("$@")
 
-# If we were not asked to lint changed files, and no paths were found as a result,
-# then lint everything!
-if [[ $USING_DIFF -eq 0 && -z ${files+x} ]]; then
-  # Lint all source code files and directories
-  files=("synapse" "tests" "scripts-dev" "scripts" "contrib" "synctl")
+if [[ $USING_DIFF -eq 1 ]]; then
+  # If we were asked to lint changed files, and no paths were found as a result...
+  if [ ${#files[@]} -eq 0 ]; then
+    # Then print and exit
+    echo "No files found to lint."
+    exit 0
+  fi
+else
+  # If we were not asked to lint changed files, and no paths were found as a result,
+  # then lint everything!
+  if [[ -z ${files+x} ]]; then
+    # Lint all source code files and directories
+    files=("synapse" "tests" "scripts-dev" "scripts" "contrib" "synctl")
+  fi
 fi
 
 echo "Linting these paths: ${files[*]}"
