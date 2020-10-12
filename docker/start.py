@@ -170,7 +170,7 @@ def run_generate_config(environ, ownership):
 
     if ownership is not None:
         # make sure that synapse has perms to write to the data dir.
-        subprocess.check_output(["chown", ownership, data_dir])
+        subprocess.check_output(["chown", ownership, data_dir, config_dir])
 
         args = ["gosu", ownership] + args
         os.execv("/usr/sbin/gosu", args)
