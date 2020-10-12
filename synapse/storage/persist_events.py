@@ -96,7 +96,9 @@ class _EventPeristenceQueue:
 
         Returns:
             defer.Deferred: a deferred which will resolve once the events are
-                persisted. Runs its callbacks *without* a logcontext.
+            persisted. Runs its callbacks *without* a logcontext. The result
+            is the same as that returned by the callback passed to
+            `handle_queue`.
         """
         queue = self._event_persist_queues.setdefault(room_id, deque())
         if queue:
@@ -229,7 +231,7 @@ class EventsPersistenceStorage:
         for room_id in partitioned:
             self._maybe_start_persisting(room_id)
 
-        # The deferred returns a map from event ID to existing event ID if the
+        # Each deferred returns a map from event ID to existing event ID if the
         # event was deduplicated. (The dict may also include other entries if
         # the event was persisted in a batch with other events).
         #
@@ -324,7 +326,8 @@ class EventsPersistenceStorage:
         #
         # We should have checked this a long time before we get here, but it's
         # possible that different send event requests race in such a way that
-        # they both pass the earlier checks.
+        # they both pass the earlier checks. Checking here isn't racey as we can
+        # have only one `_persist_events` per room being called at a time.
         replaced_events = await self.main_store.get_already_persisted_events(
             (event for event, _ in events_and_contexts)
         )
