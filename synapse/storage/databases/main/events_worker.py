@@ -1314,7 +1314,7 @@ class EventsWorkerStore(SQLBaseStore):
         )
 
     async def get_event_id_from_transaction_id(
-        self, user_id: str, token_id: str, txn_id: str
+        self, user_id: str, token_id: int, txn_id: str
     ) -> Optional[str]:
         """Look up if we have already persisted an event for the transaction ID,
         returning the event ID if so.
