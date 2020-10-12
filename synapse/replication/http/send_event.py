@@ -46,6 +46,12 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             "ratelimit": true,
             "extra_users": [],
         }
+
+        200 OK
+
+        { "stream_id": ..., "event_id": ... }
+
+    The returned event ID may not match the sent event if it was deduplicated.
     """
 
     NAME = "send_event"
