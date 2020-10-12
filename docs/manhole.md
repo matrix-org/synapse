@@ -18,6 +18,9 @@ listeners:
 (`bind_addresses` in the above is important: it ensures that access to the
 manhole is only possible for local users).
 
+**Docker Note**
+If you are using docker, you will need to use 0.0.0.0 for the bind_addresses above. This is so docker can forward traffic to synapse. 
+
 Note that this will give administrative access to synapse to **all users** with
 shell access to the server. It should therefore **not** be enabled in
 environments where untrusted users have shell access.
