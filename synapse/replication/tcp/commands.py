@@ -155,7 +155,7 @@ class PositionCommand(Command):
         POSITION <stream_name> <instance_name> <prev_token> <new_token>
 
     On receipt of a POSITION command instances should check if they have missed
-    any updates, and if so then fetch them out of band. Instance can check this
+    any updates, and if so then fetch them out of band. Instances can check this
     by comparing their view of the current token for the sending instance with
     the included `prev_token`.
 

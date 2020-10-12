@@ -185,7 +185,7 @@ client (C):
    updates via HTTP API, rather than via the DB, then processes should make the
    request to the appropriate process.
 
-   Two positions are included, the "new" position and the last position sent.
+   Two positions are included, the "new" position and the last position sent respectively.
    This allows servers to tell instances that the positions have advanced but no
    data has been written, without clients needlessly checking to see if they
    have missed any updates.
