@@ -423,6 +423,7 @@ class PersistEventsStore:
                 to_insert.append(
                     {
                         "event_id": event.event_id,
+                        "room_id": event.room_id,
                         "user_id": event.sender,
                         "token_id": token_id,
                         "txn_id": txn_id,

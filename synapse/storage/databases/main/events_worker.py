@@ -1314,14 +1314,19 @@ class EventsWorkerStore(SQLBaseStore):
         )
 
     async def get_event_id_from_transaction_id(
-        self, user_id: str, token_id: int, txn_id: str
+        self, room_id: str, user_id: str, token_id: int, txn_id: str
     ) -> Optional[str]:
         """Look up if we have already persisted an event for the transaction ID,
         returning the event ID if so.
         """
         return await self.db_pool.simple_select_one_onecol(
             table="event_txn_id",
-            keyvalues={"user_id": user_id, "token_id": token_id, "txn_id": txn_id},
+            keyvalues={
+                "room_id": room_id,
+                "user_id": user_id,
+                "token_id": token_id,
+                "txn_id": txn_id,
+            },
             retcol="event_id",
             allow_none=True,
             desc="get_event_id_from_transaction_id",
@@ -1342,7 +1347,7 @@ class EventsWorkerStore(SQLBaseStore):
             txn_id = getattr(event.internal_metadata, "txn_id", None)
             if token_id and txn_id:
                 existing = await self.get_event_id_from_transaction_id(
-                    event.sender, token_id, txn_id
+                    event.room_id, event.sender, token_id, txn_id
                 )
                 if existing:
                     mapping[event.event_id] = existing

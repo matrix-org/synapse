@@ -24,6 +24,7 @@
 -- events or access token we don't want to try and de-duplicate the event.
 CREATE TABLE IF NOT EXISTS event_txn_id (
     event_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
     token_id BIGINT NOT NULL,
     txn_id TEXT NOT NULL,
@@ -35,5 +36,5 @@ CREATE TABLE IF NOT EXISTS event_txn_id (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS event_txn_id_event_id ON event_txn_id(event_id);
-CREATE UNIQUE INDEX IF NOT EXISTS event_txn_id_txn_id ON event_txn_id(user_id, token_id, txn_id);
+CREATE UNIQUE INDEX IF NOT EXISTS event_txn_id_txn_id ON event_txn_id(room_id, user_id, token_id, txn_id);
 CREATE INDEX IF NOT EXISTS event_txn_id_ts ON event_txn_id(inserted_ts);
