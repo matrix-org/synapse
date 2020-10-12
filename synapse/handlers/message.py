@@ -922,8 +922,14 @@ class EventCreationHandler:
                 stream_id = result["stream_id"]
                 event_id = result["event_id"]
                 if event_id != event.event_id:
+                    # If we get a different event back then it means that its
+                    # been de-duplicated, so we replace the given event with the
+                    # one already persisted.
                     event = await self.store.get_event(event_id)
                 else:
+                    # If we newly persisted the event then we need to update its
+                    # stream_ordering entry manually (as it was persisted on
+                    # another worker).
                     event.internal_metadata.stream_ordering = stream_id
                 return event
 
