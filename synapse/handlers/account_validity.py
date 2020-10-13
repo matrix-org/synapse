@@ -70,7 +70,8 @@ class AccountValidityHandler:
                     "send_renewals", self._send_renewal_emails
                 )
 
-            self.clock.looping_call(send_emails, 30 * 60 * 1000)
+            if hs.config.run_background_tasks:
+                self.clock.looping_call(send_emails, 30 * 60 * 1000)
 
     async def _send_renewal_emails(self):
         """Gets the list of users whose account is expiring in the amount of time
