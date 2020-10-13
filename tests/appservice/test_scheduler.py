@@ -203,7 +203,7 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
         service = Mock(id=4)
         event = Mock()
         self.queuer.enqueue_event(service, event)
-        self.txn_ctrl.send.assert_called_once_with(service, [event], None)
+        self.txn_ctrl.send.assert_called_once_with(service, [event], [])
 
     def test_send_single_event_with_queue(self):
         d = defer.Deferred()
@@ -219,11 +219,11 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
         # Send more events: expect send() to NOT be called multiple times.
         self.queuer.enqueue_event(service, event2)
         self.queuer.enqueue_event(service, event3)
-        self.txn_ctrl.send.assert_called_with(service, [event], None)
+        self.txn_ctrl.send.assert_called_with(service, [event], [])
         self.assertEquals(1, self.txn_ctrl.send.call_count)
         # Resolve the send event: expect the queued events to be sent
         d.callback(service)
-        self.txn_ctrl.send.assert_called_with(service, [event2, event3], None)
+        self.txn_ctrl.send.assert_called_with(service, [event2, event3], [])
         self.assertEquals(2, self.txn_ctrl.send.call_count)
 
     def test_multiple_service_queues(self):
@@ -249,15 +249,15 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
         # send events for different ASes and make sure they are sent
         self.queuer.enqueue_event(srv1, srv_1_event)
         self.queuer.enqueue_event(srv1, srv_1_event2)
-        self.txn_ctrl.send.assert_called_with(srv1, [srv_1_event], None)
+        self.txn_ctrl.send.assert_called_with(srv1, [srv_1_event], [])
         self.queuer.enqueue_event(srv2, srv_2_event)
         self.queuer.enqueue_event(srv2, srv_2_event2)
-        self.txn_ctrl.send.assert_called_with(srv2, [srv_2_event], None)
+        self.txn_ctrl.send.assert_called_with(srv2, [srv_2_event], [])
 
         # make sure callbacks for a service only send queued events for THAT
         # service
         srv_2_defer.callback(srv2)
-        self.txn_ctrl.send.assert_called_with(srv2, [srv_2_event2], None)
+        self.txn_ctrl.send.assert_called_with(srv2, [srv_2_event2], [])
         self.assertEquals(3, self.txn_ctrl.send.call_count)
 
     def test_send_single_ephemeral_no_queue(self):
@@ -281,19 +281,18 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
         )
         service = Mock(id=4)
         event_list_1 = [Mock(event_id="event1"), Mock(event_id="event2")]
-
-        # Send more events: expect send() to NOT be called multiple times.
         event_list_2 = [Mock(event_id="event3"), Mock(event_id="event4")]
         event_list_3 = [Mock(event_id="event5"), Mock(event_id="event6")]
 
         # Send an event and don't resolve it just yet.
         self.queuer.enqueue_ephemeral(service, event_list_1)
-
+        # Send more events: expect send() to NOT be called multiple times.
         self.queuer.enqueue_ephemeral(service, event_list_2)
         self.queuer.enqueue_ephemeral(service, event_list_3)
         self.txn_ctrl.send.assert_called_with(service, [], event_list_1)
         self.assertEquals(1, self.txn_ctrl.send.call_count)
-        # Resolve the send event: expect the queued events to be sent
+        # Resolve txn_ctrl.send
         d.callback(service)
+        # Expect the queued events to be sent
         self.txn_ctrl.send.assert_called_with(service, [], event_list_2 + event_list_3)
         self.assertEquals(2, self.txn_ctrl.send.call_count)

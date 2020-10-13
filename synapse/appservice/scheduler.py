@@ -49,7 +49,7 @@ This is all tied together by the AppServiceScheduler which DIs the required
 components.
 """
 import logging
-from typing import Any, List, Optional
+from typing import List, Optional
 
 from synapse.appservice import ApplicationService, ApplicationServiceState
 from synapse.events import EventBase

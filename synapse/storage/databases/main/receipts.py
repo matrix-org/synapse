@@ -123,15 +123,6 @@ class ReceiptsWorkerStore(SQLBaseStore, metaclass=abc.ABCMeta):
             for row in rows
         }
 
-    async def get_linearized_receipts_for_all_rooms(
-        self, to_key: int, from_key: Optional[int] = None
-    ) -> List[dict]:
-        results = await self._get_linearized_receipts_for_all_rooms(
-            to_key, from_key=from_key
-        )
-
-        return results
-
     async def get_linearized_receipts_for_rooms(
         self, room_ids: List[str], to_key: int, from_key: Optional[int] = None
     ) -> List[dict]:
@@ -284,7 +275,7 @@ class ReceiptsWorkerStore(SQLBaseStore, metaclass=abc.ABCMeta):
         return results
 
     @cached(num_args=2,)
-    async def _get_linearized_receipts_for_all_rooms(
+    async def get_linearized_receipts_for_all_rooms(
         self, to_key: int, from_key: Optional[int] = None
     ):
         def f(txn):
@@ -305,7 +296,7 @@ class ReceiptsWorkerStore(SQLBaseStore, metaclass=abc.ABCMeta):
             return self.db_pool.cursor_to_dict(txn)
 
         txn_results = await self.db_pool.runInteraction(
-            "_get_linearized_receipts_for_all_rooms", f
+            "get_linearized_receipts_for_all_rooms", f
         )
 
         results = {}

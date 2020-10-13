@@ -206,7 +206,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         self,
         service: "ApplicationService",
         events: List[EventBase],
-        ephemeral: Optional[List[JsonDict]] = None,
+        ephemeral: List[JsonDict],
         txn_id: Optional[int] = None,
     ):
         if service.url is None:

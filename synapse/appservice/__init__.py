@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 import re
-from typing import TYPE_CHECKING, List, Optional, Match, Iterable
+from typing import TYPE_CHECKING, Iterable, List, Match, Optional
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
@@ -132,7 +132,7 @@ class ApplicationService:
                     raise ValueError("Expected string for 'regex' in ns '%s'" % ns)
         return namespaces
 
-    def _matches_regex(self, test_string: str, namespace_key: str)-> Optional[Match]:
+    def _matches_regex(self, test_string: str, namespace_key: str) -> Optional[Match]:
         for regex_obj in self.namespaces[namespace_key]:
             if regex_obj["regex"].match(test_string):
                 return regex_obj
@@ -255,7 +255,7 @@ class ApplicationService:
 
     def is_interested_in_user(self, user_id: str) -> bool:
         return (
-            self._matches_regex(user_id, ApplicationService.NS_USERS)
+            bool(self._matches_regex(user_id, ApplicationService.NS_USERS))
             or user_id == self.sender
         )
 
@@ -290,7 +290,7 @@ class ApplicationService:
             if regex_obj["exclusive"]
         ]
 
-    def get_groups_for_user(self, user_id: str)-> Iterable[str]:
+    def get_groups_for_user(self, user_id: str) -> Iterable[str]:
         """Get the groups that this user is associated with by this AS
 
         Args:
@@ -324,7 +324,7 @@ class AppServiceTransaction:
         service: ApplicationService,
         id: int,
         events: List[EventBase],
-        ephemeral: Optional[List[JsonDict]] = None,
+        ephemeral: List[JsonDict],
     ):
         self.service = service
         self.id = id
@@ -335,7 +335,7 @@ class AppServiceTransaction:
         """Sends this transaction using the provided AS API interface.
 
         Args:
-            as_api(ApplicationServiceApi): The API to use to send.
+            as_api: The API to use to send.
         Returns:
             True if the transaction was sent.
         """

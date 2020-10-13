@@ -15,7 +15,7 @@
 # limitations under the License.
 import logging
 import re
-from typing import List, Optional
+from typing import List
 
 from synapse.appservice import ApplicationService, AppServiceTransaction
 from synapse.config.appservice import load_appservices
@@ -179,14 +179,16 @@ class ApplicationServiceTransactionWorkerStore(
         self,
         service: ApplicationService,
         events: List[EventBase],
-        ephemeral: Optional[JsonDict] = None,
+        ephemeral: List[JsonDict],
     ) -> AppServiceTransaction:
         """Atomically creates a new transaction for this application service
-        with the given list of events.
+        with the given list of events. Ephemeral events are NOT persisted to the
+        database and are not resent if a transaction is retried.
 
         Args:
             service: The service who the transaction is for.
-            events: A list of events to put in the transaction.
+            events: A list of persistent events to put in the transaction.
+            ephemeral: A list of ephemeral events to put in the transaction.
 
         Returns:
             A new transaction.
