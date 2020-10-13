@@ -113,7 +113,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
             "synapse.app.generic_worker", {"worker_name": "worker1"},
         )
 
-        self.make_worker_hs(
+        worker_hs2 = self.make_worker_hs(
             "synapse.app.generic_worker", {"worker_name": "worker2"},
         )
 
@@ -160,20 +160,16 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         self.render_on_worker(sync_hs, request)
         next_batch = channel.json_body["next_batch"]
 
-        # We now fetch and throw away a stream ID so that there will be a gap in
-        # the stream orderings. This means that the MultiWriterIdGenerators
-        # won't be able to intelligently "roll foward" the persisted upto
-        # position, resulting in a RoomStreamToken that has non-empty instance
-        # map component.
+        # We now gut wrench into the events stream MultiWriterIdGenerator on
+        # worker2 to mimic it getting stuck persisting an event. This ensures
+        # that when we send an event on worker1 we end up in a state where
+        # worker2 events stream position lags that on worker1, resulting in a
+        # RoomStreamToken with a non-empty instance map component.
         #
-        # Note: ideally we'd try to simulate one event persister getting behind
-        # in a more realistic way, but that involves adding quite a bit of code
-        # to support doing that.
-        self.get_success(
-            store.db_pool.execute(
-                "test", None, "SELECT nextval(?)", "events_stream_seq"
-            )
-        )
+        # Worker2's event stream position will not advance until we call
+        # __aexit__ again.
+        actx = worker_hs2.get_datastore()._stream_id_gen.get_next()
+        self.get_success(actx.__aenter__())
 
         response = self.helper.send(room_id1, body="Hi!", tok=self.other_access_token)
         first_event_in_room1 = response["event_id"]
@@ -202,6 +198,10 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         # Get the next batch and makes sure its a vector clock style token.
         vector_clock_token = channel.json_body["next_batch"]
         self.assertTrue(vector_clock_token.startswith("m"))
+
+        # Now that we've got a vector clock token we finish the fake persisting
+        # an event we started above.
+        self.get_success(actx.__aexit__(None, None, None))
 
         # Now try and send an event to the other rooom so that we can test that
         # the vector clock style token works as a `since` token.
