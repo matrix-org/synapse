@@ -893,6 +893,12 @@ class DatabasePool:
         attempts = 0
         while True:
             try:
+                # We can autocommit if we are going to use native upserts
+                autocommit = (
+                    self.engine.can_native_upsert
+                    and table not in self._unsafe_to_upsert_tables
+                )
+
                 return await self.runInteraction(
                     desc,
                     self.simple_upsert_txn,
@@ -901,6 +907,7 @@ class DatabasePool:
                     values,
                     insertion_values,
                     lock=lock,
+                    db_autocommit=autocommit,
                 )
             except self.engine.module.IntegrityError as e:
                 attempts += 1
