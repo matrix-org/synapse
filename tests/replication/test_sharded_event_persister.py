@@ -271,3 +271,27 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         self.assertEqual(
             channel.json_body["chunk"][0]["event_id"], first_event_in_room2
         )
+
+        # Paginating forwards should give the same results
+        request, channel = self.make_request(
+            "GET",
+            "/rooms/{}/messages?from={}&to={}&dir=f".format(
+                room_id1, vector_clock_token, prev_batch1
+            ),
+            access_token=access_token,
+        )
+        self.render_on_worker(sync_hs, request)
+        self.assertListEqual([], channel.json_body["chunk"])
+
+        request, channel = self.make_request(
+            "GET",
+            "/rooms/{}/messages?from={}&to={}&dir=f".format(
+                room_id2, vector_clock_token, prev_batch2,
+            ),
+            access_token=access_token,
+        )
+        self.render_on_worker(sync_hs, request)
+        self.assertEqual(len(channel.json_body["chunk"]), 1)
+        self.assertEqual(
+            channel.json_body["chunk"][0]["event_id"], first_event_in_room2
+        )
