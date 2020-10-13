@@ -795,6 +795,17 @@ class EventCreationHandler:
         if requester:
             context.app_service = requester.app_service
 
+        event_allowed = await self.third_party_event_rules.check_event_allowed(
+            event, context
+        )
+        if not event_allowed:
+            logger.info(
+                "Event %s forbidden by third-party rules", event,
+            )
+            raise SynapseError(
+                403, "This event is not allowed in this context", Codes.FORBIDDEN
+            )
+
         self.validator.validate_new(event, self.config)
 
         # If this event is an annotation then we check that that the sender
@@ -880,14 +891,6 @@ class EventCreationHandler:
             room_version = event.content.get("room_version", RoomVersions.V1.identifier)
         else:
             room_version = await self.store.get_room_version_id(event.room_id)
-
-        event_allowed = await self.third_party_event_rules.check_event_allowed(
-            event, context
-        )
-        if not event_allowed:
-            raise SynapseError(
-                403, "This event is not allowed in this context", Codes.FORBIDDEN
-            )
 
         if event.internal_metadata.is_out_of_band_membership():
             # the only sort of out-of-band-membership events we expect to see here
