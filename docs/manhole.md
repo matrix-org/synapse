@@ -19,7 +19,14 @@ listeners:
 manhole is only possible for local users).
 
 **Docker Note**
-If you are using docker, you will need to use 0.0.0.0 for the bind_addresses above. This is so docker can forward traffic to synapse. 
+If you are using docker, please ensure you use the following example;
+
+```yaml
+listeners:
+  - port: 9000
+    bind_addresses: ['0.0.0.0']
+    type: manhole
+```
 
 Note that this will give administrative access to synapse to **all users** with
 shell access to the server. It should therefore **not** be enabled in
