@@ -14,10 +14,12 @@
 # limitations under the License.
 import logging
 
+from mock import patch
+
+from synapse.api.room_versions import RoomVersion
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import sync
-from synapse.types import create_requester
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.utils import USE_POSTGRES_FOR_TESTS
@@ -46,6 +48,9 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         self.other_user_id = self.register_user("otheruser", "pass")
         self.other_access_token = self.login("otheruser", "pass")
 
+        self.room_creator = self.hs.get_room_creation_handler()
+        self.store = hs.get_datastore()
+
     def default_config(self):
         conf = super().default_config()
         conf["redis"] = {"enabled": "true"}
@@ -55,6 +60,29 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
             "worker2": {"host": "testserv", "port": 1002},
         }
         return conf
+
+    def _create_room(self, room_id: str, user_id: str, tok: str):
+        """Create a room with given room_id
+        """
+
+        # We control the room ID generation by patching out the
+        # `_generate_room_id` method
+        async def generate_room(
+            creator_id: str, is_public: bool, room_version: RoomVersion
+        ):
+            await self.store.store_room(
+                room_id=room_id,
+                room_creator_user_id=creator_id,
+                is_public=is_public,
+                room_version=room_version,
+            )
+            return room_id
+
+        with patch(
+            "synapse.handlers.room.RoomCreationHandler._generate_room_id"
+        ) as mock:
+            mock.side_effect = generate_room
+            self.helper.create_room_as(user_id, tok=tok)
 
     def test_basic(self):
         """Simple test to ensure that multiple rooms can be created and joined,
@@ -134,18 +162,12 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
 
         user_id = self.register_user("user", "pass")
         access_token = self.login("user", "pass")
-        requester = create_requester(user_id, access_token)
 
         store = self.hs.get_datastore()
 
         # Create two room on the different workers.
-        room_creator = self.hs.get_room_creation_handler()
-        self.get_success(
-            room_creator.create_room(requester, {}, requested_room_id=room_id1), by=0.1
-        )
-        self.get_success(
-            room_creator.create_room(requester, {}, requested_room_id=room_id2), by=0.1
-        )
+        self._create_room(room_id1, user_id, access_token)
+        self._create_room(room_id2, user_id, access_token)
 
         # The other user joins
         self.helper.join(
