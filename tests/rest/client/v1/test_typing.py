@@ -44,7 +44,7 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
 
         self.event_source = hs.get_event_sources().sources["typing"]
 
-        hs.get_handlers().federation_handler = Mock()
+        hs.get_federation_handler = Mock()
 
         async def get_user_by_access_token(token=None, allow_guest=False):
             return {

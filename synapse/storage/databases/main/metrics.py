@@ -18,7 +18,7 @@ import time
 from typing import Dict
 
 from synapse.metrics import GaugeBucketCollector
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.event_push_actions import (
@@ -57,18 +57,13 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
         super().__init__(database, db_conn, hs)
 
         # Read the extrems every 60 minutes
-        def read_forward_extremities():
-            # run as a background process to make sure that the database transactions
-            # have a logcontext to report to
-            return run_as_background_process(
-                "read_forward_extremities", self._read_forward_extremities
-            )
-
-        hs.get_clock().looping_call(read_forward_extremities, 60 * 60 * 1000)
+        if hs.config.run_background_tasks:
+            self._clock.looping_call(self._read_forward_extremities, 60 * 60 * 1000)
 
         # Used in _generate_user_daily_visits to keep track of progress
         self._last_user_visit_update = self._get_start_of_day()
 
+    @wrap_as_background_process("read_forward_extremities")
     async def _read_forward_extremities(self):
         def fetch(txn):
             txn.execute(
@@ -274,6 +269,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
         today_start = calendar.timegm((now.tm_year, now.tm_mon, now.tm_mday, 0, 0, 0))
         return today_start * 1000
 
+    @wrap_as_background_process("generate_user_daily_visits")
     async def generate_user_daily_visits(self) -> None:
         """
         Generates daily visit data for use in cohort/ retention analysis

@@ -11,7 +11,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
 import logging
 import math
 import resource
@@ -19,7 +18,7 @@ import sys
 
 from prometheus_client import Gauge
 
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.metrics.background_process_metrics import wrap_as_background_process
 
 logger = logging.getLogger("synapse.app.homeserver")
 
@@ -41,6 +40,7 @@ registered_reserved_users_mau_gauge = Gauge(
 )
 
 
+@wrap_as_background_process("phone_stats_home")
 async def phone_stats_home(hs, stats, stats_process=_stats_process):
     logger.info("Gathering stats for reporting")
     now = int(hs.get_clock().time())
@@ -113,6 +113,13 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
     stats["database_engine"] = hs.get_datastore().db_pool.engine.module.__name__
     stats["database_server_version"] = hs.get_datastore().db_pool.engine.server_version
 
+    #
+    # Logging configuration
+    #
+    synapse_logger = logging.getLogger("synapse")
+    log_level = synapse_logger.getEffectiveLevel()
+    stats["log_level"] = logging.getLevelName(log_level)
+
     logger.info("Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats))
     try:
         await hs.get_proxied_http_client().put_json(
@@ -136,30 +143,16 @@ def start_phone_stats_home(hs):
             (int(hs.get_clock().time()), resource.getrusage(resource.RUSAGE_SELF))
         )
 
-    def start_phone_stats_home():
-        return run_as_background_process(
-            "phone_stats_home", phone_stats_home, hs, stats
-        )
-
-    def generate_user_daily_visit_stats():
-        return run_as_background_process(
-            "generate_user_daily_visits", hs.get_datastore().generate_user_daily_visits
-        )
-
     # Rather than update on per session basis, batch up the requests.
     # If you increase the loop period, the accuracy of user_daily_visits
     # table will decrease
-    clock.looping_call(generate_user_daily_visit_stats, 5 * 60 * 1000)
+    clock.looping_call(hs.get_datastore().generate_user_daily_visits, 5 * 60 * 1000)
 
     # monthly active user limiting functionality
-    def reap_monthly_active_users():
-        return run_as_background_process(
-            "reap_monthly_active_users", hs.get_datastore().reap_monthly_active_users
-        )
+    clock.looping_call(hs.get_datastore().reap_monthly_active_users, 1000 * 60 * 60)
+    hs.get_datastore().reap_monthly_active_users()
 
-    clock.looping_call(reap_monthly_active_users, 1000 * 60 * 60)
-    reap_monthly_active_users()
-
+    @wrap_as_background_process("generate_monthly_active_users")
     async def generate_monthly_active_users():
         current_mau_count = 0
         current_mau_count_by_service = {}
@@ -179,19 +172,14 @@ def start_phone_stats_home(hs):
         registered_reserved_users_mau_gauge.set(float(len(reserved_users)))
         max_mau_gauge.set(float(hs.config.max_mau_value))
 
-    def start_generate_monthly_active_users():
-        return run_as_background_process(
-            "generate_monthly_active_users", generate_monthly_active_users
-        )
-
     if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
-        start_generate_monthly_active_users()
-        clock.looping_call(start_generate_monthly_active_users, 5 * 60 * 1000)
+        generate_monthly_active_users()
+        clock.looping_call(generate_monthly_active_users, 5 * 60 * 1000)
     # End of monthly active user settings
 
     if hs.config.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")
-        clock.looping_call(start_phone_stats_home, 3 * 60 * 60 * 1000)
+        clock.looping_call(phone_stats_home, 3 * 60 * 60 * 1000, hs, stats)
 
         # We need to defer this init for the cases that we daemonize
         # otherwise the process ID we get is that of the non-daemon process
@@ -199,4 +187,4 @@ def start_phone_stats_home(hs):
 
         # We wait 5 minutes to send the first set of stats as the server can
         # be quite busy the first few minutes
-        clock.call_later(5 * 60, start_phone_stats_home)
+        clock.call_later(5 * 60, phone_stats_home, hs, stats)

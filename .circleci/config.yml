@@ -1,22 +1,36 @@
-version: 2
+version: 2.1
 jobs:
   dockerhubuploadrelease:
-    machine: true
+    docker:
+      - image: docker:git
     steps:
       - checkout
-      - run: docker build -f docker/Dockerfile --label gitsha1=${CIRCLE_SHA1} -t matrixdotorg/synapse:${CIRCLE_TAG} .
+      - setup_remote_docker
+      - docker_prepare
       - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
-      - run: docker push matrixdotorg/synapse:${CIRCLE_TAG}
+      - docker_build:
+          tag: -t matrixdotorg/synapse:${CIRCLE_TAG}
+          platforms: linux/amd64
+      - docker_build:
+          tag: -t matrixdotorg/synapse:${CIRCLE_TAG}
+          platforms: linux/amd64,linux/arm/v7,linux/arm64
+
   dockerhubuploadlatest:
-    machine: true
+    docker:
+      - image: docker:git
     steps:
       - checkout
-      - run: docker build -f docker/Dockerfile --label gitsha1=${CIRCLE_SHA1} -t matrixdotorg/synapse:latest .
+      - setup_remote_docker
+      - docker_prepare
       - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
-      - run: docker push matrixdotorg/synapse:latest
+      - docker_build:
+          tag: -t matrixdotorg/synapse:latest
+          platforms: linux/amd64
+      - docker_build:
+          tag: -t matrixdotorg/synapse:latest
+          platforms: linux/amd64,linux/arm/v7,linux/arm64
 
 workflows:
-  version: 2
   build:
     jobs:
       - dockerhubuploadrelease:
@@ -29,3 +43,33 @@ workflows:
           filters:
             branches:
               only: master
+
+commands:
+  docker_prepare:
+    description: Downloads the buildx cli plugin and enables multiarch images
+    parameters:
+      buildx_version:
+        type: string
+        default: "v0.4.1"
+    steps:
+      - run: apk add --no-cache curl
+      - run: mkdir -vp ~/.docker/cli-plugins/ ~/dockercache
+      - run: curl --silent -L "https://github.com/docker/buildx/releases/download/<< parameters.buildx_version >>/buildx-<< parameters.buildx_version >>.linux-amd64" > ~/.docker/cli-plugins/docker-buildx
+      - run: chmod a+x ~/.docker/cli-plugins/docker-buildx
+      # install qemu links in /proc/sys/fs/binfmt_misc on the docker instance running the circleci job
+      - run: docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+      # create a context named `builder` for the builds
+      - run: docker context create builder
+      # create a buildx builder using the new context, and set it as the default
+      - run: docker buildx create builder --use
+
+  docker_build:
+    description: Builds and pushed images to dockerhub using buildx
+    parameters:
+      platforms:
+        type: string
+        default: linux/amd64
+      tag:
+        type: string
+    steps:
+      - run: docker buildx build -f docker/Dockerfile --push --platform << parameters.platforms >> --label gitsha1=${CIRCLE_SHA1} << parameters.tag >> --progress=plain .

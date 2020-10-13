@@ -25,6 +25,7 @@ DISTS = (
     "ubuntu:xenial",
     "ubuntu:bionic",
     "ubuntu:focal",
+    "ubuntu:groovy",
 )
 
 DESC = '''\

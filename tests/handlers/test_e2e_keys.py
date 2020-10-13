@@ -33,13 +33,15 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         super().__init__(*args, **kwargs)
         self.hs = None  # type: synapse.server.HomeServer
         self.handler = None  # type: synapse.handlers.e2e_keys.E2eKeysHandler
+        self.store = None  # type: synapse.storage.Storage
 
     @defer.inlineCallbacks
     def setUp(self):
         self.hs = yield utils.setup_test_homeserver(
-            self.addCleanup, handlers=None, federation_client=mock.Mock()
+            self.addCleanup, federation_client=mock.Mock()
         )
         self.handler = synapse.handlers.e2e_keys.E2eKeysHandler(self.hs)
+        self.store = self.hs.get_datastore()
 
     @defer.inlineCallbacks
     def test_query_local_devices_no_devices(self):
@@ -178,6 +180,12 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         fallback_key = {"alg1:k1": "key1"}
         otk = {"alg1:k2": "key2"}
 
+        # we shouldn't have any unused fallback keys yet
+        res = yield defer.ensureDeferred(
+            self.store.get_e2e_unused_fallback_key_types(local_user, device_id)
+        )
+        self.assertEqual(res, [])
+
         yield defer.ensureDeferred(
             self.handler.upload_keys_for_user(
                 local_user,
@@ -185,6 +193,12 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
                 {"org.matrix.msc2732.fallback_keys": fallback_key},
             )
         )
+
+        # we should now have an unused alg1 key
+        res = yield defer.ensureDeferred(
+            self.store.get_e2e_unused_fallback_key_types(local_user, device_id)
+        )
+        self.assertEqual(res, ["alg1"])
 
         # claiming an OTK when no OTKs are available should return the fallback
         # key
@@ -197,6 +211,12 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
             res,
             {"failures": {}, "one_time_keys": {local_user: {device_id: fallback_key}}},
         )
+
+        # we shouldn't have any unused fallback keys again
+        res = yield defer.ensureDeferred(
+            self.store.get_e2e_unused_fallback_key_types(local_user, device_id)
+        )
+        self.assertEqual(res, [])
 
         # claiming an OTK again should return the same fallback key
         res = yield defer.ensureDeferred(

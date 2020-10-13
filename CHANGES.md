@@ -1,3 +1,37 @@
+Synapse 1.21.1 (2020-10-13)
+===========================
+
+This release fixes a regression in v1.21.0 that prevented debian packages from being built.
+It is otherwise identical to v1.21.0.
+
+Synapse 1.21.0 (2020-10-12)
+===========================
+
+No significant changes since v1.21.0rc3.
+
+As [noted in
+v1.20.0](https://github.com/matrix-org/synapse/blob/release-v1.21.0/CHANGES.md#synapse-1200-2020-09-22),
+a future release will drop support for accessing Synapse's
+[Admin API](https://github.com/matrix-org/synapse/tree/master/docs/admin_api) under the
+`/_matrix/client/*` endpoint prefixes. At that point, the Admin API will only
+be accessible under `/_synapse/admin`.
+
+
+Synapse 1.21.0rc3 (2020-10-08)
+==============================
+
+Bugfixes
+--------
+
+- Fix duplication of events on high traffic servers, caused by PostgreSQL `could not serialize access due to concurrent update` errors. ([\#8456](https://github.com/matrix-org/synapse/issues/8456))
+
+
+Internal Changes
+----------------
+
+- Add Groovy Gorilla to the list of distributions we build `.deb`s for. ([\#8475](https://github.com/matrix-org/synapse/issues/8475))
+
+
 Synapse 1.21.0rc2 (2020-10-02)
 ==============================
 
@@ -139,9 +173,11 @@ API](https://github.com/matrix-org/synapse/tree/master/docs) has been
 accessible under the `/_matrix/client/api/v1/admin`,
 `/_matrix/client/unstable/admin`, `/_matrix/client/r0/admin` and
 `/_synapse/admin` prefixes. In a future release, we will be dropping support
-for accessing Synapse's Admin API using the `/_matrix/client/*` prefixes. This
-makes it easier for homeserver admins to lock down external access to the Admin
-API endpoints.
+for accessing Synapse's Admin API using the `/_matrix/client/*` prefixes.
+
+From that point, the Admin API will only be accessible under `/_synapse/admin`.
+This makes it easier for homeserver admins to lock down external access to the
+Admin API endpoints.
 
 Synapse 1.20.0rc5 (2020-09-18)
 ==============================
