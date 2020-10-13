@@ -47,7 +47,7 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
     def __init__(self, hs):
         super().__init__(hs)
 
-        self.federation_handler = hs.get_handlers().federation_handler
+        self.federation_handler = hs.get_federation_handler()
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
 

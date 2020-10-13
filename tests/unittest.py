@@ -241,7 +241,7 @@ class HomeserverTestCase(TestCase):
         # create a site to wrap the resource.
         self.site = SynapseSite(
             logger_name="synapse.access.http.fake",
-            site_tag="test",
+            site_tag=self.hs.config.server.server_name,
             config=self.hs.config.server.listeners[0],
             resource=self.resource,
             server_version_string="1",
@@ -254,17 +254,24 @@ class HomeserverTestCase(TestCase):
         if hasattr(self, "user_id"):
             if self.hijack_auth:
 
+                # We need a valid token ID to satisfy foreign key constraints.
+                token_id = self.get_success(
+                    self.hs.get_datastore().add_access_token_to_user(
+                        self.helper.auth_user_id, "some_fake_token", None, None,
+                    )
+                )
+
                 async def get_user_by_access_token(token=None, allow_guest=False):
                     return {
                         "user": UserID.from_string(self.helper.auth_user_id),
-                        "token_id": 1,
+                        "token_id": token_id,
                         "is_guest": False,
                     }
 
                 async def get_user_by_req(request, allow_guest=False, rights="access"):
                     return create_requester(
                         UserID.from_string(self.helper.auth_user_id),
-                        1,
+                        token_id,
                         False,
                         False,
                         None,
@@ -608,7 +615,9 @@ class HomeserverTestCase(TestCase):
         if soft_failed:
             event.internal_metadata.soft_failed = True
 
-        self.get_success(event_creator.send_nonmember_event(requester, event, context))
+        self.get_success(
+            event_creator.handle_new_client_event(requester, event, context)
+        )
 
         return event.event_id
 

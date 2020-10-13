@@ -21,24 +21,17 @@ from twisted.internet import defer
 import synapse
 import synapse.api.errors
 from synapse.api.errors import ResourceLimitError
-from synapse.handlers.auth import AuthHandler
 
 from tests import unittest
 from tests.test_utils import make_awaitable
 from tests.utils import setup_test_homeserver
 
 
-class AuthHandlers:
-    def __init__(self, hs):
-        self.auth_handler = AuthHandler(hs)
-
-
 class AuthTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        self.hs = yield setup_test_homeserver(self.addCleanup, handlers=None)
-        self.hs.handlers = AuthHandlers(self.hs)
-        self.auth_handler = self.hs.handlers.auth_handler
+        self.hs = yield setup_test_homeserver(self.addCleanup)
+        self.auth_handler = self.hs.get_auth_handler()
         self.macaroon_generator = self.hs.get_macaroon_generator()
 
         # MAU tests

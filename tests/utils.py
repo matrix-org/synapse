@@ -38,6 +38,7 @@ from synapse.http.server import HttpServer
 from synapse.logging.context import current_context, set_current_context
 from synapse.server import HomeServer
 from synapse.storage import DataStore
+from synapse.storage.database import LoggingDatabaseConnection
 from synapse.storage.engines import PostgresEngine, create_engine
 from synapse.storage.prepare_database import prepare_database
 from synapse.util.ratelimitutils import FederationRateLimiter
@@ -88,6 +89,7 @@ def setupdb():
             host=POSTGRES_HOST,
             password=POSTGRES_PASSWORD,
         )
+        db_conn = LoggingDatabaseConnection(db_conn, db_engine, "tests")
         prepare_database(db_conn, db_engine, None)
         db_conn.close()
 
@@ -190,7 +192,6 @@ class TestHomeServer(HomeServer):
 def setup_test_homeserver(
     cleanup_func,
     name="test",
-    datastore=None,
     config=None,
     reactor=None,
     homeserverToUse=TestHomeServer,
@@ -247,7 +248,7 @@ def setup_test_homeserver(
 
     # Create the database before we actually try and connect to it, based off
     # the template database we generate in setupdb()
-    if datastore is None and isinstance(db_engine, PostgresEngine):
+    if isinstance(db_engine, PostgresEngine):
         db_conn = db_engine.module.connect(
             database=POSTGRES_BASE_DB,
             user=POSTGRES_USER,
@@ -263,79 +264,66 @@ def setup_test_homeserver(
         cur.close()
         db_conn.close()
 
-    if datastore is None:
-        hs = homeserverToUse(
-            name,
-            config=config,
-            version_string="Synapse/tests",
-            tls_server_context_factory=Mock(),
-            tls_client_options_factory=Mock(),
-            reactor=reactor,
-            **kargs
-        )
+    hs = homeserverToUse(
+        name,
+        config=config,
+        version_string="Synapse/tests",
+        tls_server_context_factory=Mock(),
+        tls_client_options_factory=Mock(),
+        reactor=reactor,
+        **kargs
+    )
 
-        hs.setup()
-        if homeserverToUse.__name__ == "TestHomeServer":
-            hs.setup_master()
+    hs.setup()
+    if homeserverToUse.__name__ == "TestHomeServer":
+        hs.setup_background_tasks()
 
-        if isinstance(db_engine, PostgresEngine):
-            database = hs.get_datastores().databases[0]
+    if isinstance(db_engine, PostgresEngine):
+        database = hs.get_datastores().databases[0]
 
-            # We need to do cleanup on PostgreSQL
-            def cleanup():
-                import psycopg2
+        # We need to do cleanup on PostgreSQL
+        def cleanup():
+            import psycopg2
 
-                # Close all the db pools
-                database._db_pool.close()
+            # Close all the db pools
+            database._db_pool.close()
 
-                dropped = False
+            dropped = False
 
-                # Drop the test database
-                db_conn = db_engine.module.connect(
-                    database=POSTGRES_BASE_DB,
-                    user=POSTGRES_USER,
-                    host=POSTGRES_HOST,
-                    password=POSTGRES_PASSWORD,
-                )
-                db_conn.autocommit = True
-                cur = db_conn.cursor()
+            # Drop the test database
+            db_conn = db_engine.module.connect(
+                database=POSTGRES_BASE_DB,
+                user=POSTGRES_USER,
+                host=POSTGRES_HOST,
+                password=POSTGRES_PASSWORD,
+            )
+            db_conn.autocommit = True
+            cur = db_conn.cursor()
 
-                # Try a few times to drop the DB. Some things may hold on to the
-                # database for a few more seconds due to flakiness, preventing
-                # us from dropping it when the test is over. If we can't drop
-                # it, warn and move on.
-                for x in range(5):
-                    try:
-                        cur.execute("DROP DATABASE IF EXISTS %s;" % (test_db,))
-                        db_conn.commit()
-                        dropped = True
-                    except psycopg2.OperationalError as e:
-                        warnings.warn(
-                            "Couldn't drop old db: " + str(e), category=UserWarning
-                        )
-                        time.sleep(0.5)
+            # Try a few times to drop the DB. Some things may hold on to the
+            # database for a few more seconds due to flakiness, preventing
+            # us from dropping it when the test is over. If we can't drop
+            # it, warn and move on.
+            for x in range(5):
+                try:
+                    cur.execute("DROP DATABASE IF EXISTS %s;" % (test_db,))
+                    db_conn.commit()
+                    dropped = True
+                except psycopg2.OperationalError as e:
+                    warnings.warn(
+                        "Couldn't drop old db: " + str(e), category=UserWarning
+                    )
+                    time.sleep(0.5)
 
-                cur.close()
-                db_conn.close()
+            cur.close()
+            db_conn.close()
 
-                if not dropped:
-                    warnings.warn("Failed to drop old DB.", category=UserWarning)
+            if not dropped:
+                warnings.warn("Failed to drop old DB.", category=UserWarning)
 
-            if not LEAVE_DB:
-                # Register the cleanup hook
-                cleanup_func(cleanup)
-
-    else:
-        hs = homeserverToUse(
-            name,
-            datastore=datastore,
-            config=config,
-            version_string="Synapse/tests",
-            tls_server_context_factory=Mock(),
-            tls_client_options_factory=Mock(),
-            reactor=reactor,
-            **kargs
-        )
+        if not LEAVE_DB:
+            # Register the cleanup hook
+            cleanup_func(cleanup)
 
     # bcrypt is far too slow to be doing in unit tests
     # Need to let the HS build an auth handler and then mess with it

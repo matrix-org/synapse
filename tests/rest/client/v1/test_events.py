@@ -42,7 +42,7 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
 
         hs = self.setup_test_homeserver(config=config)
 
-        hs.get_handlers().federation_handler = Mock()
+        hs.get_federation_handler = Mock()
 
         return hs
 

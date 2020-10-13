@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional, Set, Tup
 import attr
 from prometheus_client import Counter
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import AccountDataTypes, EventTypes, Membership
 from synapse.api.filtering import FilterCollection
 from synapse.events import EventBase
 from synapse.logging.context import current_context
@@ -202,6 +202,8 @@ class SyncResult:
         device_lists: List of user_ids whose devices have changed
         device_one_time_keys_count: Dict of algorithm to count for one time keys
             for this device
+        device_unused_fallback_key_types: List of key types that have an unused fallback
+            key
         groups: Group updates, if any
     """
 
@@ -214,6 +216,7 @@ class SyncResult:
     to_device = attr.ib(type=List[JsonDict])
     device_lists = attr.ib(type=DeviceLists)
     device_one_time_keys_count = attr.ib(type=JsonDict)
+    device_unused_fallback_key_types = attr.ib(type=List[str])
     groups = attr.ib(type=Optional[GroupsSyncResult])
 
     def __bool__(self) -> bool:
@@ -243,7 +246,7 @@ class SyncHandler:
         self.clock = hs.get_clock()
         self.response_cache = ResponseCache(
             hs, "sync", timeout_ms=SYNC_RESPONSE_CACHE_MS
-        )
+        )  # type: ResponseCache[Tuple[Any, ...]]
         self.state = hs.get_state_handler()
         self.auth = hs.get_auth()
         self.storage = hs.get_storage()
@@ -460,8 +463,13 @@ class SyncHandler:
                 recents = []
 
             if not limited or block_all_timeline:
+                prev_batch_token = now_token
+                if recents:
+                    room_key = recents[0].internal_metadata.before
+                    prev_batch_token = now_token.copy_and_replace("room_key", room_key)
+
                 return TimelineBatch(
-                    events=recents, prev_batch=now_token, limited=False
+                    events=recents, prev_batch=prev_batch_token, limited=False
                 )
 
             filtering_factor = 2
@@ -1017,8 +1025,12 @@ class SyncHandler:
         logger.debug("Fetching OTK data")
         device_id = sync_config.device_id
         one_time_key_counts = {}  # type: JsonDict
+        unused_fallback_key_types = []  # type: List[str]
         if device_id:
             one_time_key_counts = await self.store.count_e2e_one_time_keys(
+                user_id, device_id
+            )
+            unused_fallback_key_types = await self.store.get_e2e_unused_fallback_key_types(
                 user_id, device_id
             )
 
@@ -1044,6 +1056,7 @@ class SyncHandler:
             device_lists=device_lists,
             groups=sync_result_builder.groups,
             device_one_time_keys_count=one_time_key_counts,
+            device_unused_fallback_key_types=unused_fallback_key_types,
             next_batch=sync_result_builder.now_token,
         )
 
@@ -1381,13 +1394,16 @@ class SyncHandler:
                         return set(), set(), set(), set()
 
         ignored_account_data = await self.store.get_global_account_data_by_type_for_user(
-            "m.ignored_user_list", user_id=user_id
+            AccountDataTypes.IGNORED_USER_LIST, user_id=user_id
         )
 
+        # If there is ignored users account data and it matches the proper type,
+        # then use it.
+        ignored_users = frozenset()  # type: FrozenSet[str]
         if ignored_account_data:
-            ignored_users = ignored_account_data.get("ignored_users", {}).keys()
-        else:
-            ignored_users = frozenset()
+            ignored_users_data = ignored_account_data.get("ignored_users", {})
+            if isinstance(ignored_users_data, dict):
+                ignored_users = frozenset(ignored_users_data.keys())
 
         if since_token:
             room_changes = await self._get_rooms_changed(
@@ -1481,7 +1497,7 @@ class SyncHandler:
         return False
 
     async def _get_rooms_changed(
-        self, sync_result_builder: "SyncResultBuilder", ignored_users: Set[str]
+        self, sync_result_builder: "SyncResultBuilder", ignored_users: FrozenSet[str]
     ) -> _RoomChanges:
         """Gets the the changes that have happened since the last sync.
         """
@@ -1693,7 +1709,7 @@ class SyncHandler:
         return _RoomChanges(room_entries, invited, newly_joined_rooms, newly_left_rooms)
 
     async def _get_all_rooms(
-        self, sync_result_builder: "SyncResultBuilder", ignored_users: Set[str]
+        self, sync_result_builder: "SyncResultBuilder", ignored_users: FrozenSet[str]
     ) -> _RoomChanges:
         """Returns entries for all rooms for the user.
 
@@ -1767,7 +1783,7 @@ class SyncHandler:
     async def _generate_room_entry(
         self,
         sync_result_builder: "SyncResultBuilder",
-        ignored_users: Set[str],
+        ignored_users: FrozenSet[str],
         room_builder: "RoomSyncResultBuilder",
         ephemeral: List[JsonDict],
         tags: Optional[Dict[str, Dict[str, Any]]],

@@ -19,7 +19,6 @@ import pymacaroons
 
 from twisted.internet import defer
 
-import synapse.handlers.auth
 from synapse.api.auth import Auth
 from synapse.api.constants import UserTypes
 from synapse.api.errors import (
@@ -36,20 +35,15 @@ from tests import unittest
 from tests.utils import mock_getRawHeaders, setup_test_homeserver
 
 
-class TestHandlers:
-    def __init__(self, hs):
-        self.auth_handler = synapse.handlers.auth.AuthHandler(hs)
-
-
 class AuthTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         self.state_handler = Mock()
         self.store = Mock()
 
-        self.hs = yield setup_test_homeserver(self.addCleanup, handlers=None)
+        self.hs = yield setup_test_homeserver(self.addCleanup)
         self.hs.get_datastore = Mock(return_value=self.store)
-        self.hs.handlers = TestHandlers(self.hs)
+        self.hs.get_auth_handler().store = self.store
         self.auth = Auth(self.hs)
 
         # AuthBlocking reads from the hs' config on initialization. We need to
@@ -283,7 +277,7 @@ class AuthTestCase(unittest.TestCase):
         self.store.get_device = Mock(return_value=defer.succeed(None))
 
         token = yield defer.ensureDeferred(
-            self.hs.handlers.auth_handler.get_access_token_for_user_id(
+            self.hs.get_auth_handler().get_access_token_for_user_id(
                 USER_ID, "DEVICE", valid_until_ms=None
             )
         )

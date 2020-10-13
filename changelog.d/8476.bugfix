@@ -1,0 +1,1 @@
+Fix message duplication if something goes wrong after persisting the event.

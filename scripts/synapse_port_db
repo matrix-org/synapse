@@ -90,6 +90,7 @@ BOOLEAN_COLUMNS = {
     "room_stats_state": ["is_federatable"],
     "local_media_repository": ["safe_from_quarantine"],
     "users": ["shadow_banned"],
+    "e2e_fallback_keys_json": ["used"],
 }
 
 
@@ -489,7 +490,7 @@ class Porter(object):
 
         hs = MockHomeserver(self.hs_config)
 
-        with make_conn(db_config, engine) as db_conn:
+        with make_conn(db_config, engine, "portdb") as db_conn:
             engine.check_database(
                 db_conn, allow_outdated_version=allow_outdated_version
             )

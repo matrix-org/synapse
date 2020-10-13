@@ -119,7 +119,7 @@ pid_file: DATADIR/homeserver.pid
 # For example, for room version 1, default_room_version should be set
 # to "1".
 #
-#default_room_version: "5"
+#default_room_version: "6"
 
 # The GC threshold parameters to pass to `gc.set_threshold`, if defined
 #
@@ -893,7 +893,7 @@ media_store_path: "DATADIR/media_store"
 
 # The largest allowed upload size in bytes
 #
-#max_upload_size: 10M
+#max_upload_size: 50M
 
 # Maximum number of pixels that will be thumbnailed
 #
@@ -1714,6 +1714,14 @@ oidc_config:
   #
   #skip_verification: true
 
+  # Whether to fetch the user profile from the userinfo endpoint. Valid
+  # values are: "auto" or "userinfo_endpoint".
+  #
+  # Defaults to "auto", which fetches the userinfo endpoint if "openid" is included
+  # in `scopes`. Uncomment the following to always fetch the userinfo endpoint.
+  #
+  #user_profile_method: "userinfo_endpoint"
+
   # Uncomment to allow a user logging in via OIDC to match a pre-existing account instead
   # of failing. This could be used if switching from password logins to OIDC. Defaults to false.
   #
@@ -2495,6 +2503,11 @@ opentracing:
 #stream_writers:
 #  events: worker1
 #  typing: worker1
+
+# The worker that is used to run background tasks (e.g. cleaning up expired
+# data). If not provided this defaults to the main process.
+#
+#run_background_tasks_on: worker1
 
 
 # Configuration for Redis when using workers. This *must* be enabled when
