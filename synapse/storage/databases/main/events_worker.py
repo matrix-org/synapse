@@ -1338,19 +1338,35 @@ class EventsWorkerStore(SQLBaseStore):
         """Look up if we have already persisted an event for the transaction ID,
         returning a mapping from event ID in the given list to the event ID of
         an existing event.
+
+        Also checks if there are duplicates in the given events, if there are
+        will map duplicates to the *first* event.
         """
 
         mapping = {}
+        txn_id_to_event = {}  # type: Dict[Tuple[str, int, str], str]
 
         for event in events:
             token_id = getattr(event.internal_metadata, "token_id", None)
             txn_id = getattr(event.internal_metadata, "txn_id", None)
+
             if token_id and txn_id:
+                # Check if this is a duplicate of an event in the given events.
+                existing = txn_id_to_event.get((event.room_id, token_id, txn_id))
+                if existing:
+                    mapping[event.event_id] = existing
+                    continue
+
+                # Check if this is a duplicate of an event we've already
+                # persisted.
                 existing = await self.get_event_id_from_transaction_id(
                     event.room_id, event.sender, token_id, txn_id
                 )
                 if existing:
                     mapping[event.event_id] = existing
+                    txn_id_to_event[(event.room_id, token_id, txn_id)] = existing
+                else:
+                    txn_id_to_event[(event.room_id, token_id, txn_id)] = event.event_id
 
         return mapping
 
