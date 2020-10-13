@@ -175,6 +175,9 @@ class ApplicationServicesHandler:
         This will determine which appservices
         are interested in the event, and submit them.
 
+        Events will only be pushed to appservices
+        that have opted into ephemeral events
+
         Args:
             stream_key: The stream the event came from.
             new_token: The latest stream token
