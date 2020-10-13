@@ -30,7 +30,7 @@ from synapse.metrics import (
     event_processing_loop_room_count,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import Collection, RoomStreamToken, UserID
+from synapse.types import Collection, RoomStreamToken, UserID, JsonDict
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
@@ -260,6 +260,27 @@ class ApplicationServicesHandler:
                 for event in presence_events
             ]
             events = events + presence_events
+
+    def on_event_report(self, room_id: str, event_id: str, user_id: str, body: JsonDict, recieved_ts: int):
+        services = [
+            service
+            for service in self.store.get_app_services()
+            if service.supports_ephemeral and service.push_reports
+        ]
+
+        if not services or not self.notify_appservices:
+            return
+
+        for service in services:
+            event = {
+                "room_id": room_id,
+                "event_id": event_id,
+                "sender": user_id,
+                "content": body,
+                "ts": recieved_ts,
+            }
+            self.scheduler.submit_ephemeral_events_for_as(service, [event])
+
 
     async def query_user_exists(self, user_id):
         """Check if any application service knows this user_id exists.

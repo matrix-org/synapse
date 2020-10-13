@@ -61,6 +61,7 @@ class ApplicationService:
         rate_limited=True,
         ip_range_whitelist=None,
         supports_ephemeral=False,
+        push_reports=False,
     ):
         self.token = token
         self.url = (
@@ -73,6 +74,7 @@ class ApplicationService:
         self.id = id
         self.ip_range_whitelist = ip_range_whitelist
         self.supports_ephemeral = supports_ephemeral
+        self.push_reports = push_reports
 
         if "|" in self.id:
             raise Exception("application service ID cannot contain '|' character")

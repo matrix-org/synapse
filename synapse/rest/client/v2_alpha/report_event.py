@@ -37,8 +37,11 @@ class ReportEventRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
+        self.appservice_handler = hs.get_application_service_handler()
+
 
     async def on_POST(self, request, room_id, event_id):
+        received_ts = self.clock.time_msec()
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
@@ -64,7 +67,15 @@ class ReportEventRestServlet(RestServlet):
             user_id=user_id,
             reason=body["reason"],
             content=body,
-            received_ts=self.clock.time_msec(),
+            received_ts=received_ts,
+        )
+
+        self.appservice_handler.on_event_report(
+            room_id=room_id,
+            event_id=event_id,
+            user_id=user_id,
+            body=body,
+            received_ts=received_ts,
         )
 
         return 200, {}

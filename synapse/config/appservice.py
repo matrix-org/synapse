@@ -161,6 +161,7 @@ def _load_appservice(hostname, as_info, config_filename):
         ip_range_whitelist = IPSet(as_info.get("ip_range_whitelist"))
 
     supports_ephemeral = as_info.get("de.sorunome.msc2409.push_ephemeral", False)
+    send_reports = as_info.get("uk.half-shot.msc???.push_reports", False)
 
     return ApplicationService(
         token=as_info["as_token"],
@@ -171,6 +172,7 @@ def _load_appservice(hostname, as_info, config_filename):
         sender=user_id,
         id=as_info["id"],
         supports_ephemeral=supports_ephemeral,
+        push_reports=send_reports,
         protocols=protocols,
         rate_limited=rate_limited,
         ip_range_whitelist=ip_range_whitelist,
