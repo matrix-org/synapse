@@ -209,9 +209,9 @@ class ApplicationServicesHandler:
                     events = await self._handle_presence(service, users)
                     if events:
                         self.scheduler.submit_ephemeral_events_for_as(service, events)
-                    await self.store.set_type_stream_id_for_appservice(
-                        service, "presence", new_token
-                    )
+                        await self.store.set_type_stream_id_for_appservice(
+                            service, "presence", new_token
+                        )
 
     async def _handle_typing(self, service: ApplicationService, new_token: int):
         typing_source = self.event_sources.sources["typing"]
