@@ -202,7 +202,7 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
         # Expect the event to be sent immediately.
         service = Mock(id=4)
         event = Mock()
-        self.queuer.enqueue(service, event)
+        self.queuer.enqueue_event(service, event)
         self.txn_ctrl.send.assert_called_once_with(service, [event], None)
 
     def test_send_single_event_with_queue(self):
@@ -215,10 +215,10 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
         event2 = Mock(event_id="second")
         event3 = Mock(event_id="third")
         # Send an event and don't resolve it just yet.
-        self.queuer.enqueue(service, event)
+        self.queuer.enqueue_event(service, event)
         # Send more events: expect send() to NOT be called multiple times.
-        self.queuer.enqueue(service, event2)
-        self.queuer.enqueue(service, event3)
+        self.queuer.enqueue_event(service, event2)
+        self.queuer.enqueue_event(service, event3)
         self.txn_ctrl.send.assert_called_with(service, [event], None)
         self.assertEquals(1, self.txn_ctrl.send.call_count)
         # Resolve the send event: expect the queued events to be sent
@@ -247,11 +247,11 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
         self.txn_ctrl.send = Mock(side_effect=do_send)
 
         # send events for different ASes and make sure they are sent
-        self.queuer.enqueue(srv1, srv_1_event)
-        self.queuer.enqueue(srv1, srv_1_event2)
+        self.queuer.enqueue_event(srv1, srv_1_event)
+        self.queuer.enqueue_event(srv1, srv_1_event2)
         self.txn_ctrl.send.assert_called_with(srv1, [srv_1_event], None)
-        self.queuer.enqueue(srv2, srv_2_event)
-        self.queuer.enqueue(srv2, srv_2_event2)
+        self.queuer.enqueue_event(srv2, srv_2_event)
+        self.queuer.enqueue_event(srv2, srv_2_event2)
         self.txn_ctrl.send.assert_called_with(srv2, [srv_2_event], None)
 
         # make sure callbacks for a service only send queued events for THAT

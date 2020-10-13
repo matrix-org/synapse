@@ -86,7 +86,7 @@ class ApplicationServiceScheduler:
             self.txn_ctrl.start_recoverer(service)
 
     def submit_event_for_as(self, service: ApplicationService, event: EventBase):
-        self.queuer.enqueue(service, event)
+        self.queuer.enqueue_event(service, event)
 
     def submit_ephemeral_events_for_as(
         self, service: ApplicationService, events: List[JsonDict]
@@ -120,7 +120,7 @@ class _ServiceQueuer:
             "as-sender-%s" % (service.id,), self._send_request, service
         )
 
-    def enqueue(self, service, event):
+    def enqueue_event(self, service, event):
         self.queued_events.setdefault(service.id, []).append(event)
         self._start_background_request(service)
 
@@ -137,7 +137,7 @@ class _ServiceQueuer:
         try:
             while True:
                 events = self.queued_events.pop(service.id, [])
-                ephemeral = self.queued_ephemeral.pop(service.id, None)
+                ephemeral = self.queued_ephemeral.pop(service.id, [])
                 if not events and not ephemeral:
                     return
                 try:

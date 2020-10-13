@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 import re
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, Match, Iterable
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
@@ -132,7 +132,7 @@ class ApplicationService:
                     raise ValueError("Expected string for 'regex' in ns '%s'" % ns)
         return namespaces
 
-    def _matches_regex(self, test_string: str, namespace_key: str):
+    def _matches_regex(self, test_string: str, namespace_key: str)-> Optional[Match]:
         for regex_obj in self.namespaces[namespace_key]:
             if regex_obj["regex"].match(test_string):
                 return regex_obj
@@ -145,7 +145,7 @@ class ApplicationService:
         return False
 
     async def _matches_user(
-        self, event: EventBase, store: Optional["DataStore"] = None
+        self, event: Optional[EventBase], store: Optional["DataStore"] = None
     ) -> bool:
         if not event:
             return False
@@ -290,14 +290,14 @@ class ApplicationService:
             if regex_obj["exclusive"]
         ]
 
-    def get_groups_for_user(self, user_id: str):
+    def get_groups_for_user(self, user_id: str)-> Iterable[str]:
         """Get the groups that this user is associated with by this AS
 
         Args:
-            user_id (str): The ID of the user.
+            user_id: The ID of the user.
 
         Returns:
-            iterable[str]: an iterable that yields group_id strings.
+            iterable: an iterable that yields group_id strings.
         """
         return (
             regex_obj["group_id"]

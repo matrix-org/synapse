@@ -222,7 +222,8 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         uri = service.url + ("/transactions/%s" % urllib.parse.quote(str(txn_id)))
 
-        if ephemeral:
+        # Never send ephemeral events to appservices that do not support it
+        if service.supports_ephemeral:
             body = {"events": events, "de.sorunome.msc2409.ephemeral": ephemeral}
         else:
             body = {"events": events}
