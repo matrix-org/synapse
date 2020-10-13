@@ -18,6 +18,7 @@ from mock import Mock
 from twisted.internet import defer
 
 from synapse.handlers.appservice import ApplicationServicesHandler
+from synapse.types import RoomStreamToken
 
 from tests.test_utils import make_awaitable
 from tests.utils import MockClock
@@ -61,7 +62,9 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             defer.succeed((0, [event])),
             defer.succeed((0, [])),
         ]
-        yield defer.ensureDeferred(self.handler.notify_interested_services(0))
+        yield defer.ensureDeferred(
+            self.handler.notify_interested_services(RoomStreamToken(None, 0))
+        )
         self.mock_scheduler.submit_event_for_as.assert_called_once_with(
             interested_service, event
         )
@@ -80,7 +83,9 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             defer.succeed((0, [event])),
             defer.succeed((0, [])),
         ]
-        yield defer.ensureDeferred(self.handler.notify_interested_services(0))
+        yield defer.ensureDeferred(
+            self.handler.notify_interested_services(RoomStreamToken(None, 0))
+        )
         self.mock_as_api.query_user.assert_called_once_with(services[0], user_id)
 
     @defer.inlineCallbacks
@@ -97,7 +102,9 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             defer.succeed((0, [event])),
             defer.succeed((0, [])),
         ]
-        yield defer.ensureDeferred(self.handler.notify_interested_services(0))
+        yield defer.ensureDeferred(
+            self.handler.notify_interested_services(RoomStreamToken(None, 0))
+        )
         self.assertFalse(
             self.mock_as_api.query_user.called,
             "query_user called when it shouldn't have been.",
