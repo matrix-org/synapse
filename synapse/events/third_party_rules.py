@@ -12,7 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Callable
+
+from typing import Callable, Union
 
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
@@ -44,15 +45,20 @@ class ThirdPartyEventRules:
 
     async def check_event_allowed(
         self, event: EventBase, context: EventContext
-    ) -> bool:
+    ) -> Union[bool, dict]:
         """Check if a provided event should be allowed in the given context.
+
+        The module can return:
+            * True: the event is allowed.
+            * False: the event is not allowed, and should be rejected with M_FORBIDDEN.
+            * a dict: replacement event data.
 
         Args:
             event: The event to be checked.
             context: The context of the event.
 
         Returns:
-            True if the event should be allowed, False if not.
+            The result from the ThirdPartyRules module, as above
         """
         if self.third_party_rules is None:
             return True

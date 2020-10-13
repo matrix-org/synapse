@@ -115,12 +115,12 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"403", channel.result)
 
     def test_modify_event(self):
-        """Tests that the module can successfully tweak an event before it is persisted.
-        """
+        """The module can return a modified version of the event"""
         # first patch the event checker so that it will modify the event
         async def check(ev: EventBase, state):
-            ev.content = {"x": "y"}
-            return True
+            d = ev.get_dict()
+            d["content"] = {"x": "y"}
+            return d
 
         current_rules_module().check_event_allowed = check
 
