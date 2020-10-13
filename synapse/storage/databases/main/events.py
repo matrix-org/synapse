@@ -1239,6 +1239,10 @@ class PersistEventsStore:
             )
 
     def _store_retention_policy_for_room_txn(self, txn, event):
+        if not event.is_state():
+            logger.debug("Ignoring non-state m.room.retention event")
+            return
+
         if hasattr(event, "content") and (
             "min_lifetime" in event.content or "max_lifetime" in event.content
         ):
