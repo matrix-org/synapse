@@ -107,7 +107,7 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
 
         request, channel = self.make_request(
             "PUT",
-            "/_matrix/client/r0/rooms/%s/send/foo.bar.forbidden/1" % self.room_id,
+            "/_matrix/client/r0/rooms/%s/send/foo.bar.forbidden/2" % self.room_id,
             {},
             access_token=self.tok,
         )

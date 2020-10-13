@@ -689,7 +689,7 @@ class EventCreationHandler:
                 send this event.
 
         Returns:
-            The event, and its stream ordering (if state event deduplication happened,
+            The event, and its stream ordering (if deduplication happened,
             the previous, duplicate event).
 
         Raises:
@@ -712,6 +712,19 @@ class EventCreationHandler:
         # extremities to pile up, which in turn leads to state resolution
         # taking longer.
         with (await self.limiter.queue(event_dict["room_id"])):
+            if txn_id and requester.access_token_id:
+                existing_event_id = await self.store.get_event_id_from_transaction_id(
+                    event_dict["room_id"],
+                    requester.user.to_string(),
+                    requester.access_token_id,
+                    txn_id,
+                )
+                if existing_event_id:
+                    event = await self.store.get_event(existing_event_id)
+                    # we know it was persisted, so must have a stream ordering
+                    assert event.internal_metadata.stream_ordering
+                    return event, event.internal_metadata.stream_ordering
+
             event, context = await self.create_event(
                 requester, event_dict, token_id=requester.access_token_id, txn_id=txn_id
             )
@@ -913,10 +926,20 @@ class EventCreationHandler:
                     extra_users=extra_users,
                 )
                 stream_id = result["stream_id"]
-                event.internal_metadata.stream_ordering = stream_id
+                event_id = result["event_id"]
+                if event_id != event.event_id:
+                    # If we get a different event back then it means that its
+                    # been de-duplicated, so we replace the given event with the
+                    # one already persisted.
+                    event = await self.store.get_event(event_id)
+                else:
+                    # If we newly persisted the event then we need to update its
+                    # stream_ordering entry manually (as it was persisted on
+                    # another worker).
+                    event.internal_metadata.stream_ordering = stream_id
                 return event
 
-            stream_id = await self.persist_and_notify_client_event(
+            event = await self.persist_and_notify_client_event(
                 requester, event, context, ratelimit=ratelimit, extra_users=extra_users
             )
 
@@ -965,11 +988,16 @@ class EventCreationHandler:
         context: EventContext,
         ratelimit: bool = True,
         extra_users: List[UserID] = [],
-    ) -> int:
+    ) -> EventBase:
         """Called when we have fully built the event, have already
         calculated the push actions for the event, and checked auth.
 
         This should only be run on the instance in charge of persisting events.
+
+        Returns:
+            The persisted event. This may be different than the given event if
+            it was de-duplicated (e.g. because we had already persisted an
+            event with the same transaction ID.)
         """
         assert self.storage.persistence is not None
         assert self._events_shard_config.should_handle(
@@ -1137,9 +1165,13 @@ class EventCreationHandler:
             if prev_state_ids:
                 raise AuthError(403, "Changing the room create event is forbidden")
 
-        event_pos, max_stream_token = await self.storage.persistence.persist_event(
-            event, context=context
-        )
+        # Note that this returns the event that was persisted, which may not be
+        # the same as we passed in if it was deduplicated due transaction IDs.
+        (
+            event,
+            event_pos,
+            max_stream_token,
+        ) = await self.storage.persistence.persist_event(event, context=context)
 
         if self._ephemeral_events_enabled:
             # If there's an expiry timestamp on the event, schedule its expiry.
@@ -1160,7 +1192,7 @@ class EventCreationHandler:
             # matters as sometimes presence code can take a while.
             run_in_background(self._bump_active_time, requester.user)
 
-        return event_pos.stream
+        return event
 
     async def _bump_active_time(self, user: UserID) -> None:
         try:
