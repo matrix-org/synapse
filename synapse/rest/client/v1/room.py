@@ -290,8 +290,6 @@ class JoinRoomAliasServlet(TransactionRestServlet):
 
     async def on_POST(self, request, room_identifier, txn_id=None):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        if requester.app_service and requester.app_service.id == "irc-freenode":
-            raise SynapseError(400, "too much spam")
 
         try:
             content = parse_json_object_from_request(request)
@@ -721,8 +719,6 @@ class RoomMembershipRestServlet(TransactionRestServlet):
 
     async def on_POST(self, request, room_id, membership_action, txn_id=None):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        if requester.app_service and requester.app_service.id == "irc-freenode":
-            raise SynapseError(400, "too much spam")
 
         if requester.is_guest and membership_action not in {
             Membership.JOIN,
