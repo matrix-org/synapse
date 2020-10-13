@@ -1,3 +1,9 @@
+Synapse 1.21.1 (2020-10-13)
+===========================
+
+This release fixes a regression in v1.21.0 that prevented debian packages from being built.
+It is otherwise identical to v1.21.0.
+
 Synapse 1.21.0 (2020-10-12)
 ===========================
 
