@@ -27,7 +27,7 @@ listeners:
     type: manhole
 ```
 
-You will then need to change the docker command to the following to include the
+When using `docker run` to start the server, you will then need to change the command to the following to include the
 `manhole` port forwarding. The `-p 127.0.0.1:9000:9000` below is important: it 
 ensures that access to the `manhole` is only possible for local users.
 
