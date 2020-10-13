@@ -187,6 +187,9 @@ class ApplicationServiceTransactionWorkerStore(
         Args:
             service: The service who the transaction is for.
             events: A list of events to put in the transaction.
+
+        Returns:
+            A new transaction.
         """
 
         def _create_appservice_txn(txn):

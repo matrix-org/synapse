@@ -172,6 +172,8 @@ class ApplicationService:
 
         Args:
             room_id: The room to check.
+            store: The datastore to query.
+
         Returns:
             True if this service would like to know about this room.
         """
@@ -207,6 +209,8 @@ class ApplicationService:
 
         Args:
             event: The event to check.
+            store: The datastore to query.
+
         Returns:
             True if this service would like to know about this event.
         """
@@ -233,6 +237,8 @@ class ApplicationService:
 
         Args:
             user_id: The user to check.
+            store: The datastore to query.
+
         Returns:
             True if this service would like to know about presence for this user.
         """

@@ -213,7 +213,7 @@ class ApplicationServicesHandler:
     async def _handle_typing(self, service: ApplicationService, new_token: int):
         typing_source = self.event_sources.sources["typing"]
         # Get the typing events from just before current
-        typing, _key = await typing_source.get_new_events_as(
+        typing, _ = await typing_source.get_new_events_as(
             service=service,
             # For performance reasons, we don't persist the previous
             # token in the DB and instead fetch the latest typing information
@@ -242,7 +242,7 @@ class ApplicationServicesHandler:
             interested = await service.is_interested_in_presence(user, self.store)
             if not interested:
                 continue
-            presence_events, _key = await presence_source.get_new_events(
+            presence_events, _ = await presence_source.get_new_events(
                 user=user, service=service, from_key=from_key,
             )
             time_now = self.clock.time_msec()

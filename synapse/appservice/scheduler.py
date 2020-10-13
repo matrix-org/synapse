@@ -89,7 +89,7 @@ class ApplicationServiceScheduler:
         self.queuer.enqueue(service, event)
 
     def submit_ephemeral_events_for_as(
-        self, service: ApplicationService, events: List[Any]
+        self, service: ApplicationService, events: List[JsonDict]
     ):
         self.queuer.enqueue_ephemeral(service, events)
 
@@ -124,7 +124,7 @@ class _ServiceQueuer:
         self.queued_events.setdefault(service.id, []).append(event)
         self._start_background_request(service)
 
-    def enqueue_ephemeral(self, service: ApplicationService, events: List[Any]):
+    def enqueue_ephemeral(self, service: ApplicationService, events: List[JsonDict]):
         self.queued_ephemeral.setdefault(service.id, []).extend(events)
         self._start_background_request(service)
 
