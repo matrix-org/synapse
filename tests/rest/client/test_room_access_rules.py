@@ -15,6 +15,7 @@
 import json
 import random
 import string
+from typing import Optional
 
 from mock import Mock
 
@@ -28,7 +29,7 @@ from synapse.third_party_rules.access_rules import (
     AccessRules,
     RoomAccessRules,
 )
-from synapse.types import create_requester
+from synapse.types import JsonDict, create_requester
 
 from tests import unittest
 
@@ -839,6 +840,134 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             )
         )
         self.assertTrue(can_join)
+
+    def test_freezing_a_room(self):
+        """Tests that the power levels in a room change to prevent new events from
+        non-admin users when the last admin of a room leaves.
+        """
+
+        def freeze_room_with_id_and_power_levels(
+            room_id: str, custom_power_levels_content: Optional[JsonDict] = None,
+        ):
+            # Invite a user to the room, they join with PL 0
+            self.helper.invite(
+                room=room_id, src=self.user_id, targ=self.invitee_id, tok=self.tok,
+            )
+
+            # Invitee joins the room
+            self.helper.join(
+                room=room_id, user=self.invitee_id, tok=self.invitee_tok,
+            )
+
+            if not custom_power_levels_content:
+                # Retrieve the room's current power levels event content
+                power_levels = self.helper.get_state(
+                    room_id=room_id, event_type="m.room.power_levels", tok=self.tok,
+                )
+            else:
+                power_levels = custom_power_levels_content
+
+                # Override the room's power levels with the given power levels content
+                self.helper.send_state(
+                    room_id=room_id,
+                    event_type="m.room.power_levels",
+                    body=custom_power_levels_content,
+                    tok=self.tok,
+                )
+
+            # Ensure that the invitee leaving the room does not change the power levels
+            self.helper.leave(
+                room=room_id, user=self.invitee_id, tok=self.invitee_tok,
+            )
+
+            # Retrieve the new power levels of the room
+            new_power_levels = self.helper.get_state(
+                room_id=room_id, event_type="m.room.power_levels", tok=self.tok,
+            )
+
+            # Ensure they have not changed
+            self.assertDictEqual(power_levels, new_power_levels)
+
+            # Invite the user back again
+            self.helper.invite(
+                room=room_id, src=self.user_id, targ=self.invitee_id, tok=self.tok,
+            )
+
+            # Invitee joins the room
+            self.helper.join(
+                room=room_id, user=self.invitee_id, tok=self.invitee_tok,
+            )
+
+            # Now the admin leaves the room
+            self.helper.leave(
+                room=room_id, user=self.user_id, tok=self.tok,
+            )
+
+            # Check the power levels again
+            new_power_levels = self.helper.get_state(
+                room_id=room_id, event_type="m.room.power_levels", tok=self.invitee_tok,
+            )
+
+            # Ensure that the new power levels prevent anyone but admins from sending
+            # certain events
+            self.assertEquals(new_power_levels["state_default"], 100)
+            self.assertEquals(new_power_levels["events_default"], 100)
+            self.assertEquals(new_power_levels["kick"], 100)
+            self.assertEquals(new_power_levels["invite"], 100)
+            self.assertEquals(new_power_levels["ban"], 100)
+            self.assertEquals(new_power_levels["redact"], 100)
+            self.assertDictEqual(new_power_levels["events"], {})
+            self.assertDictEqual(new_power_levels["users"], {self.user_id: 100})
+
+            # Ensure new users entering the room aren't going to immediately become admins
+            self.assertEquals(new_power_levels["users_default"], 0)
+
+        # Test that freezing a room with the default power level state event content works
+        room1 = self.create_room()
+        freeze_room_with_id_and_power_levels(room1)
+
+        # Test that freezing a room with a power level state event that is missing
+        # `state_default` and `event_default` keys behaves as expected
+        room2 = self.create_room()
+        freeze_room_with_id_and_power_levels(
+            room2,
+            {
+                "ban": 50,
+                "events": {
+                    "m.room.avatar": 50,
+                    "m.room.canonical_alias": 50,
+                    "m.room.history_visibility": 100,
+                    "m.room.name": 50,
+                    "m.room.power_levels": 100,
+                },
+                "invite": 0,
+                "kick": 50,
+                "redact": 50,
+                "users": {self.user_id: 100},
+                "users_default": 0,
+                # Explicitly remove `state_default` and `event_default` keys
+            },
+        )
+
+        # Test that freezing a room with a power level state event that is *additionally*
+        # missing `ban`, `invite`, `kick` and `redact` keys behaves as expected
+        room3 = self.create_room()
+        freeze_room_with_id_and_power_levels(
+            room3,
+            {
+                "events": {
+                    "m.room.avatar": 50,
+                    "m.room.canonical_alias": 50,
+                    "m.room.history_visibility": 100,
+                    "m.room.name": 50,
+                    "m.room.power_levels": 100,
+                },
+                "users": {self.user_id: 100},
+                "users_default": 0,
+                # Explicitly remove `state_default` and `event_default` keys
+                # Explicitly remove `ban`, `invite`, `kick` and `redact` keys
+            },
+        )
 
     def create_room(
         self,

@@ -1,0 +1,1 @@
+Freeze a room when the last administrator in the room leaves.
