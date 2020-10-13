@@ -1,0 +1,1 @@
+Fix not sending events over federation when using sharded event writers.
