@@ -18,11 +18,12 @@ from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 
 from twisted.internet import defer
 
+from synapse.events import EventBase
 from synapse.http.client import SimpleHttpClient
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.storage.state import StateFilter
-from synapse.types import UserID
+from synapse.types import JsonDict, UserID, create_requester
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -319,6 +320,33 @@ class ModuleApi:
         )
         state = yield defer.ensureDeferred(self._store.get_events(state_ids.values()))
         return state.values()
+
+    async def create_and_send_event_into_room(self, event_dict: JsonDict) -> EventBase:
+        """Create and send an event into a room. Membership events are currently not supported.
+
+        Args:
+            event_dict: A dictionary representing the event to send.
+                Required keys are `type`, `room_id`, `sender` and `content`.
+
+        Returns:
+            The event that was sent. If state event deduplication happened, then
+                the previous, duplicate event instead.
+
+        Raises:
+            SynapseError if the event was not allowed.
+        """
+        # Create a requester object
+        requester = create_requester(event_dict["sender"])
+
+        # Create and send the event
+        (
+            event,
+            _,
+        ) = await self._hs.get_event_creation_handler().create_and_send_nonmember_event(
+            requester, event_dict, ratelimit=False, ignore_shadow_ban=True,
+        )
+
+        return event
 
 
 class PublicRoomListManager:

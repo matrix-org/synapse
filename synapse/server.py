@@ -54,19 +54,22 @@ from synapse.federation.sender import FederationSender
 from synapse.federation.transport.client import TransportLayerClient
 from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
 from synapse.groups.groups_server import GroupsServerHandler, GroupsServerWorkerHandler
-from synapse.handlers import Handlers
 from synapse.handlers.account_validity import AccountValidityHandler
 from synapse.handlers.acme import AcmeHandler
+from synapse.handlers.admin import AdminHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler, MacaroonGenerator
 from synapse.handlers.cas_handler import CasHandler
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
 from synapse.handlers.device import DeviceHandler, DeviceWorkerHandler
 from synapse.handlers.devicemessage import DeviceMessageHandler
+from synapse.handlers.directory import DirectoryHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.e2e_room_keys import E2eRoomKeysHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
+from synapse.handlers.federation import FederationHandler
 from synapse.handlers.groups_local import GroupsLocalHandler, GroupsLocalWorkerHandler
+from synapse.handlers.identity import IdentityHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.message import EventCreationHandler, MessageHandler
 from synapse.handlers.pagination import PaginationHandler
@@ -84,6 +87,7 @@ from synapse.handlers.room import (
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
+from synapse.handlers.search import SearchHandler
 from synapse.handlers.set_password import SetPasswordHandler
 from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
@@ -319,10 +323,6 @@ class HomeServer(metaclass=abc.ABCMeta):
         return FederationServer(self)
 
     @cache_in_self
-    def get_handlers(self) -> Handlers:
-        return Handlers(self)
-
-    @cache_in_self
     def get_notifier(self) -> Notifier:
         return Notifier(self)
 
@@ -409,6 +409,10 @@ class HomeServer(metaclass=abc.ABCMeta):
         return DeviceMessageHandler(self)
 
     @cache_in_self
+    def get_directory_handler(self) -> DirectoryHandler:
+        return DirectoryHandler(self)
+
+    @cache_in_self
     def get_e2e_keys_handler(self) -> E2eKeysHandler:
         return E2eKeysHandler(self)
 
@@ -419,6 +423,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_acme_handler(self) -> AcmeHandler:
         return AcmeHandler(self)
+
+    @cache_in_self
+    def get_admin_handler(self) -> AdminHandler:
+        return AdminHandler(self)
 
     @cache_in_self
     def get_application_service_api(self) -> ApplicationServiceApi:
@@ -441,6 +449,14 @@ class HomeServer(metaclass=abc.ABCMeta):
         return EventStreamHandler(self)
 
     @cache_in_self
+    def get_federation_handler(self) -> FederationHandler:
+        return FederationHandler(self)
+
+    @cache_in_self
+    def get_identity_handler(self) -> IdentityHandler:
+        return IdentityHandler(self)
+
+    @cache_in_self
     def get_initial_sync_handler(self) -> InitialSyncHandler:
         return InitialSyncHandler(self)
 
@@ -458,6 +474,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_deactivate_account_handler(self) -> DeactivateAccountHandler:
         return DeactivateAccountHandler(self)
+
+    @cache_in_self
+    def get_search_handler(self) -> SearchHandler:
+        return SearchHandler(self)
 
     @cache_in_self
     def get_set_password_handler(self) -> SetPasswordHandler:

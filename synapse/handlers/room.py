@@ -120,7 +120,7 @@ class RoomCreationHandler(BaseHandler):
         # subsequent requests
         self._upgrade_response_cache = ResponseCache(
             hs, "room_upgrade", timeout_ms=FIVE_MINUTES_IN_MS
-        )
+        )  # type: ResponseCache[Tuple[str, str]]
         self._server_notices_mxid = hs.config.server_notices_mxid
 
         self.third_party_event_rules = hs.get_third_party_event_rules()
@@ -691,7 +691,7 @@ class RoomCreationHandler(BaseHandler):
         if not allowed_by_third_party_rules:
             raise SynapseError(403, "Room visibility value not allowed.")
 
-        directory_handler = self.hs.get_handlers().directory_handler
+        directory_handler = self.hs.get_directory_handler()
         if room_alias:
             await directory_handler.create_association(
                 requester=requester,

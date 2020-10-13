@@ -126,6 +126,8 @@ class PostgresSequenceGenerator(SequenceGenerator):
         if max_stream_id > last_value:
             logger.warning(
                 "Postgres sequence %s is behind table %s: %d < %d",
+                self._sequence_name,
+                table,
                 last_value,
                 max_stream_id,
             )

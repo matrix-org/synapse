@@ -18,10 +18,7 @@ import sys
 
 from prometheus_client import Gauge
 
-from synapse.metrics.background_process_metrics import (
-    run_as_background_process,
-    wrap_as_background_process,
-)
+from synapse.metrics.background_process_metrics import wrap_as_background_process
 
 logger = logging.getLogger("synapse.app.homeserver")
 
@@ -152,13 +149,8 @@ def start_phone_stats_home(hs):
     clock.looping_call(hs.get_datastore().generate_user_daily_visits, 5 * 60 * 1000)
 
     # monthly active user limiting functionality
-    def reap_monthly_active_users():
-        return run_as_background_process(
-            "reap_monthly_active_users", hs.get_datastore().reap_monthly_active_users
-        )
-
-    clock.looping_call(reap_monthly_active_users, 1000 * 60 * 60)
-    reap_monthly_active_users()
+    clock.looping_call(hs.get_datastore().reap_monthly_active_users, 1000 * 60 * 60)
+    hs.get_datastore().reap_monthly_active_users()
 
     @wrap_as_background_process("generate_monthly_active_users")
     async def generate_monthly_active_users():

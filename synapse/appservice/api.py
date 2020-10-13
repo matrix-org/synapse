@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 import urllib
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from prometheus_client import Counter
 
@@ -94,7 +94,7 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         self.protocol_meta_cache = ResponseCache(
             hs, "as_protocol_meta", timeout_ms=HOUR_IN_MS
-        )
+        )  # type: ResponseCache[Tuple[str, str]]
 
     async def query_user(self, service, user_id):
         if service.url is None:
