@@ -20,81 +20,9 @@ from mock import Mock
 from twisted.internet import defer
 
 from synapse.util.async_helpers import ObservableDeferred
-from synapse.util.caches.deferred_cache import DeferredCache
 from synapse.util.caches.descriptors import cached
 
 from tests import unittest
-
-
-class DeferredCacheTestCase(unittest.HomeserverTestCase):
-    def prepare(self, reactor, clock, homeserver):
-        self.cache = DeferredCache("test")
-
-    def test_empty(self):
-        failed = False
-        try:
-            self.cache.get("foo")
-        except KeyError:
-            failed = True
-
-        self.assertTrue(failed)
-
-    def test_hit(self):
-        self.cache.prefill("foo", 123)
-
-        self.assertEquals(self.cache.get("foo"), 123)
-
-    def test_invalidate(self):
-        self.cache.prefill(("foo",), 123)
-        self.cache.invalidate(("foo",))
-
-        failed = False
-        try:
-            self.cache.get(("foo",))
-        except KeyError:
-            failed = True
-
-        self.assertTrue(failed)
-
-    def test_eviction(self):
-        cache = DeferredCache("test", max_entries=2)
-
-        cache.prefill(1, "one")
-        cache.prefill(2, "two")
-        cache.prefill(3, "three")  # 1 will be evicted
-
-        failed = False
-        try:
-            cache.get(1)
-        except KeyError:
-            failed = True
-
-        self.assertTrue(failed)
-
-        cache.get(2)
-        cache.get(3)
-
-    def test_eviction_lru(self):
-        cache = DeferredCache("test", max_entries=2)
-
-        cache.prefill(1, "one")
-        cache.prefill(2, "two")
-
-        # Now access 1 again, thus causing 2 to be least-recently used
-        cache.get(1)
-
-        cache.prefill(3, "three")
-
-        failed = False
-        try:
-            cache.get(2)
-        except KeyError:
-            failed = True
-
-        self.assertTrue(failed)
-
-        cache.get(1)
-        cache.get(3)
 
 
 class CacheDecoratorTestCase(unittest.HomeserverTestCase):

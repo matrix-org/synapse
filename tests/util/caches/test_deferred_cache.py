@@ -18,12 +18,41 @@ from functools import partial
 
 from twisted.internet import defer
 
-import synapse.util.caches.deferred_cache
+from synapse.util.caches.deferred_cache import DeferredCache
 
 
 class DeferredCacheTestCase(unittest.TestCase):
+    def test_empty(self):
+        cache = DeferredCache("test")
+        failed = False
+        try:
+            cache.get("foo")
+        except KeyError:
+            failed = True
+
+        self.assertTrue(failed)
+
+    def test_hit(self):
+        cache = DeferredCache("test")
+        cache.prefill("foo", 123)
+
+        self.assertEquals(cache.get("foo"), 123)
+
+    def test_invalidate(self):
+        cache = DeferredCache("test")
+        cache.prefill(("foo",), 123)
+        cache.invalidate(("foo",))
+
+        failed = False
+        try:
+            cache.get(("foo",))
+        except KeyError:
+            failed = True
+
+        self.assertTrue(failed)
+
     def test_invalidate_all(self):
-        cache = synapse.util.caches.deferred_cache.DeferredCache("testcache")
+        cache = DeferredCache("testcache")
 
         callback_record = [False, False]
 
@@ -62,3 +91,47 @@ class DeferredCacheTestCase(unittest.TestCase):
         # letting the other lookup complete should do nothing
         d1.callback("result1")
         self.assertIsNone(cache.get("key1", None))
+
+    def test_eviction(self):
+        cache = DeferredCache(
+            "test", max_entries=2, apply_cache_factor_from_config=False
+        )
+
+        cache.prefill(1, "one")
+        cache.prefill(2, "two")
+        cache.prefill(3, "three")  # 1 will be evicted
+
+        failed = False
+        try:
+            cache.get(1)
+        except KeyError:
+            failed = True
+
+        self.assertTrue(failed)
+
+        cache.get(2)
+        cache.get(3)
+
+    def test_eviction_lru(self):
+        cache = DeferredCache(
+            "test", max_entries=2, apply_cache_factor_from_config=False
+        )
+
+        cache.prefill(1, "one")
+        cache.prefill(2, "two")
+
+        # Now access 1 again, thus causing 2 to be least-recently used
+        cache.get(1)
+
+        cache.prefill(3, "three")
+
+        failed = False
+        try:
+            cache.get(2)
+        except KeyError:
+            failed = True
+
+        self.assertTrue(failed)
+
+        cache.get(1)
+        cache.get(3)
