@@ -1411,6 +1411,54 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             desc="add_event_report",
         )
 
+    async def get_event_report(self, report_id: int) -> Dict[str, Any]:
+        """Retrieve a an event report
+
+        Args:
+            report_id: ID of reported event in database
+        Returns:
+            event_report: json list of information from event report
+        """
+
+        def _get_event_report_txn(txn, report_id):
+
+            sql = """
+                SELECT
+                    er.id,
+                    er.received_ts,
+                    er.room_id,
+                    er.event_id,
+                    er.user_id,
+                    er.reason,
+                    er.content,
+                    events.sender,
+                    room_aliases.room_alias,
+                    event_json.json AS event_json
+                FROM event_reports AS er
+                LEFT JOIN room_aliases
+                    ON room_aliases.room_id = er.room_id
+                JOIN events
+                    ON events.event_id = er.event_id
+                JOIN event_json
+                    ON event_json.event_id = er.event_id
+                WHERE er.id = ?
+            """
+
+            txn.execute(sql, [report_id])
+            event_report = self.db_pool.cursor_to_dict(txn)
+
+            try:
+                event_report["content"] = db_to_json(event_report["content"])
+                event_report["event_json"] = db_to_json(event_report["event_json"])
+            except Exception:
+                pass
+
+            return event_report
+
+        return await self.db_pool.runInteraction(
+            "get_event_report", _get_event_report_txn, report_id
+        )
+
     async def get_event_reports_paginate(
         self,
         start: int,
@@ -1471,15 +1519,12 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                     er.reason,
                     er.content,
                     events.sender,
-                    room_aliases.room_alias,
-                    event_json.json AS event_json
+                    room_aliases.room_alias
                 FROM event_reports AS er
                 LEFT JOIN room_aliases
                     ON room_aliases.room_id = er.room_id
                 JOIN events
                     ON events.event_id = er.event_id
-                JOIN event_json
-                    ON event_json.event_id = er.event_id
                 {where_clause}
                 ORDER BY er.received_ts {order}
                 LIMIT ?
@@ -1496,7 +1541,6 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                 for row in event_reports:
                     try:
                         row["content"] = db_to_json(row["content"])
-                        row["event_json"] = db_to_json(row["event_json"])
                     except Exception:
                         continue
 
