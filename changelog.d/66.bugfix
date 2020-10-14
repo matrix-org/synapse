@@ -1,0 +1,1 @@
+Create a mapping between user ID and threepid when binding via the internal Sydent bind API.

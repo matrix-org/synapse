@@ -1066,6 +1066,9 @@ class IdentityHandler(BaseHandler):
         Raises:
             HTTPResponseException: On a non-2xx HTTP response.
         """
+        # Extract the domain name from the IS URL as we store IS domains instead of URLs
+        id_server = urllib.parse.urlparse(id_server_url).hostname
+
         # id_server_url is assumed to have no trailing slashes
         url = id_server_url + "/_matrix/identity/internal/bind"
         body = {
@@ -1074,7 +1077,13 @@ class IdentityHandler(BaseHandler):
             "mxid": user_id,
         }
 
+        # Bind the threepid
         await self.http_client.post_json_get_json(url, body)
+
+        # Remember where we bound the threepid
+        await self.store.add_user_bound_threepid(
+            user_id=user_id, medium="email", address=email, id_server=id_server,
+        )
 
 
 def create_id_access_token_header(id_access_token: str) -> List[str]:

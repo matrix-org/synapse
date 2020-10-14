@@ -566,6 +566,12 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             {"address": "alice@example.com", "medium": "email", "mxid": "@alice:test"},
         )
 
+        # Check that we stored a mapping of this bind
+        bound_threepids = self.get_success(
+            self.store.user_get_bound_threepids("@alice:test")
+        )
+        self.assertListEqual(bound_threepids, [{"medium": "email", "address": email}])
+
     def uia_register(self, expected_response: int, body: dict) -> FakeChannel:
         """Make a register request."""
         request, channel = self.make_request(
