@@ -145,14 +145,14 @@ purging old events in a room. These limits can be defined as such in the
   allowed_lifetime_max: 1y
 ```
 
-The limits are considered when running purge jobs, to adjust the
-effective value of `max_lifetime`, and make sure it's within the
-`[allowed_lifetime_min, allowed_lifetime_max]` range. If the value of
-`max_lifetime` defined in the room's state is lower than
-`allowed_lifetime_min`, the value of `allowed_lifetime_min` will be used
-instead. Likewise, if the value of `max_lifetime` is higher than
-`allowed_lifetime_max`, the value of `allowed_lifetime_max` will be used
-instead.
+The limits are considered when running purge jobs. If necessary, the
+effective value of `max_lifetime` will be brought between
+`allowed_lifetime_min` and `allowed_lifetime_max` (inclusive).
+This means that, if the value of `max_lifetime` defined in the room's state
+is lower than `allowed_lifetime_min`, the value of `allowed_lifetime_min`
+will be used instead. Likewise, if the value of `max_lifetime` is higher
+than `allowed_lifetime_max`, the value of `allowed_lifetime_max` will be
+used instead.
 
 In the example above, we ensure Synapse never deletes events that are less
 than one day old, and that it always deletes events that are over a year
