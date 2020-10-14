@@ -83,6 +83,9 @@ class EventValidator:
         Args:
             event (FrozenEvent): The event to validate.
         """
+        if not event.is_state():
+            raise SynapseError(code=400, msg="must be a state event")
+
         min_lifetime = event.content.get("min_lifetime")
         max_lifetime = event.content.get("max_lifetime")
 
