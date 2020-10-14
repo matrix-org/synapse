@@ -1,1 +1,1 @@
-Use correct M_BAD_JSON error code for /profile/{userId}/displayname.
+Fix error code for `/profile/{userId}/displayname` to be `M_BAD_JSON`.
