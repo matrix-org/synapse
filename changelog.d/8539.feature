@@ -1,0 +1,1 @@
+Split admin API for reported events (`GET /_synapse/admin/v1/event_reports`) in detail und list view. Contributed by @dklimpel.
