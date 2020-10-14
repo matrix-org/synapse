@@ -26,7 +26,7 @@ class SlavedClientIpStore(BaseSlavedStore):
 
         self.client_ip_last_seen = Cache(
             name="client_ip_last_seen", keylen=4, max_entries=50000
-        )
+        )  # type: Cache[tuple, int]
 
     async def insert_client_ip(self, user_id, access_token, ip, user_agent, device_id):
         now = int(self._clock.time_msec())
