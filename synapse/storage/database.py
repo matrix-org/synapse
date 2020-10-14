@@ -1070,6 +1070,43 @@ class DatabasePool:
         )
         txn.execute(sql, list(allvalues.values()))
 
+    async def simple_upsert_many(
+        self,
+        table: str,
+        key_names: Collection[str],
+        key_values: Collection[Iterable[Any]],
+        value_names: Collection[str],
+        value_values: Iterable[Iterable[Any]],
+        desc: str,
+    ) -> None:
+        """
+        Upsert, many times.
+
+        Args:
+            table: The table to upsert into
+            key_names: The key column names.
+            key_values: A list of each row's key column values.
+            value_names: The value column names
+            value_values: A list of each row's value column values.
+                Ignored if value_names is empty.
+        """
+
+        # We can autocommit if we are going to use native upserts
+        autocommit = (
+            self.engine.can_native_upsert and table not in self._unsafe_to_upsert_tables
+        )
+
+        return await self.runInteraction(
+            desc,
+            self.simple_upsert_many_txn,
+            table,
+            key_names,
+            key_values,
+            value_names,
+            value_values,
+            db_autocommit=autocommit,
+        )
+
     def simple_upsert_many_txn(
         self,
         txn: LoggingTransaction,
