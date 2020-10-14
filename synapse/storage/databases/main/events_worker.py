@@ -42,7 +42,7 @@ from synapse.storage.database import DatabasePool
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator, StreamIdGenerator
 from synapse.types import Collection, get_domain_from_id
-from synapse.util.caches.descriptors import Cache, cached
+from synapse.util.caches.descriptors import DeferredCache, cached
 from synapse.util.iterutils import batch_iter
 from synapse.util.metrics import Measure
 
@@ -145,7 +145,7 @@ class EventsWorkerStore(SQLBaseStore):
                 self._cleanup_old_transaction_ids,
             )
 
-        self._get_event_cache = Cache(
+        self._get_event_cache = DeferredCache(
             "*getEvent*",
             keylen=3,
             max_entries=hs.config.caches.event_cache_size,

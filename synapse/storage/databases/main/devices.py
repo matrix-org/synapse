@@ -34,7 +34,7 @@ from synapse.storage.database import (
 )
 from synapse.types import Collection, JsonDict, get_verify_key_from_cross_signing_key
 from synapse.util import json_decoder, json_encoder
-from synapse.util.caches.descriptors import Cache, cached, cachedList
+from synapse.util.caches.descriptors import DeferredCache, cached, cachedList
 from synapse.util.iterutils import batch_iter
 from synapse.util.stringutils import shortstr
 
@@ -1004,7 +1004,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
 
         # Map of (user_id, device_id) -> bool. If there is an entry that implies
         # the device exists.
-        self.device_id_exists_cache = Cache(
+        self.device_id_exists_cache = DeferredCache(
             name="device_id_exists", keylen=2, max_entries=10000
         )
 

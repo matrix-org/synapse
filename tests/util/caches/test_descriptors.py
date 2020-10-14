@@ -42,9 +42,9 @@ def run_on_reactor():
     return make_deferred_yieldable(d)
 
 
-class CacheTestCase(unittest.TestCase):
+class DeferredCacheTestCase(unittest.TestCase):
     def test_invalidate_all(self):
-        cache = descriptors.Cache("testcache")
+        cache = descriptors.DeferredCache("testcache")
 
         callback_record = [False, False]
 

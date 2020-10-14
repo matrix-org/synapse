@@ -99,7 +99,7 @@ class CacheEntry:
             self.callbacks.clear()
 
 
-class Cache(Generic[KT, VT]):
+class DeferredCache(Generic[KT, VT]):
     """Wraps an LruCache, adding support for Deferred results.
 
     It expects that each entry added with set() will be a Deferred; likewise get()
@@ -225,7 +225,10 @@ class Cache(Generic[KT, VT]):
             return default
 
     def set(
-        self, key: KT, value: defer.Deferred, callback: Optional[Callable[[], None]] = None
+        self,
+        key: KT,
+        value: defer.Deferred,
+        callback: Optional[Callable[[], None]] = None,
     ) -> ObservableDeferred:
         if not isinstance(value, defer.Deferred):
             raise TypeError("not a Deferred")
@@ -427,13 +430,13 @@ class CacheDescriptor(_CacheDescriptorBase):
         self.iterable = iterable
 
     def __get__(self, obj, owner):
-        cache = Cache(
+        cache = DeferredCache(
             name=self.orig.__name__,
             max_entries=self.max_entries,
             keylen=self.num_args,
             tree=self.tree,
             iterable=self.iterable,
-        )  # type: Cache[Tuple, Any]
+        )  # type: DeferredCache[Tuple, Any]
 
         def get_cache_key_gen(args, kwargs):
             """Given some args/kwargs return a generator that resolves into
@@ -677,9 +680,9 @@ class _CacheContext:
 
     _cache_context_objects = (
         WeakValueDictionary()
-    )  # type: WeakValueDictionary[Tuple[Cache, CacheKey], _CacheContext]
+    )  # type: WeakValueDictionary[Tuple[DeferredCache, CacheKey], _CacheContext]
 
-    def __init__(self, cache, cache_key):  # type: (Cache, CacheKey) -> None
+    def __init__(self, cache, cache_key):  # type: (DeferredCache, CacheKey) -> None
         self._cache = cache
         self._cache_key = cache_key
 
@@ -688,7 +691,9 @@ class _CacheContext:
         self._cache.invalidate(self._cache_key)
 
     @classmethod
-    def get_instance(cls, cache, cache_key):  # type: (Cache, CacheKey) -> _CacheContext
+    def get_instance(
+        cls, cache, cache_key
+    ):  # type: (DeferredCache, CacheKey) -> _CacheContext
         """Returns an instance constructed with the given arguments.
 
         A new instance is only created if none already exists.

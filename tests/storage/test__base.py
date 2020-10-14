@@ -20,14 +20,14 @@ from mock import Mock
 from twisted.internet import defer
 
 from synapse.util.async_helpers import ObservableDeferred
-from synapse.util.caches.descriptors import Cache, cached
+from synapse.util.caches.descriptors import DeferredCache, cached
 
 from tests import unittest
 
 
-class CacheTestCase(unittest.HomeserverTestCase):
+class DeferredCacheTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
-        self.cache = Cache("test")
+        self.cache = DeferredCache("test")
 
     def test_empty(self):
         failed = False
@@ -56,7 +56,7 @@ class CacheTestCase(unittest.HomeserverTestCase):
         self.assertTrue(failed)
 
     def test_eviction(self):
-        cache = Cache("test", max_entries=2)
+        cache = DeferredCache("test", max_entries=2)
 
         cache.prefill(1, "one")
         cache.prefill(2, "two")
@@ -74,7 +74,7 @@ class CacheTestCase(unittest.HomeserverTestCase):
         cache.get(3)
 
     def test_eviction_lru(self):
-        cache = Cache("test", max_entries=2)
+        cache = DeferredCache("test", max_entries=2)
 
         cache.prefill(1, "one")
         cache.prefill(2, "two")

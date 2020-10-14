@@ -15,7 +15,7 @@
 
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.client_ips import LAST_SEEN_GRANULARITY
-from synapse.util.caches.descriptors import Cache
+from synapse.util.caches.descriptors import DeferredCache
 
 from ._base import BaseSlavedStore
 
@@ -24,9 +24,9 @@ class SlavedClientIpStore(BaseSlavedStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
 
-        self.client_ip_last_seen = Cache(
+        self.client_ip_last_seen = DeferredCache(
             name="client_ip_last_seen", keylen=4, max_entries=50000
-        )  # type: Cache[tuple, int]
+        )  # type: DeferredCache[tuple, int]
 
     async def insert_client_ip(self, user_id, access_token, ip, user_agent, device_id):
         now = int(self._clock.time_msec())
