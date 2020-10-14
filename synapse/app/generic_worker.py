@@ -790,10 +790,6 @@ class FederationSenderHandler:
             send_queue.process_rows_for_federation(self.federation_sender, rows)
             await self.update_token(token)
 
-        # We also need to poke the federation sender when new events happen
-        elif stream_name == "events":
-            self.federation_sender.notify_new_events(token)
-
         # ... and when new receipts happen
         elif stream_name == ReceiptsStream.NAME:
             await self._on_new_receipts(rows)

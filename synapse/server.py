@@ -75,7 +75,7 @@ from synapse.handlers.message import EventCreationHandler, MessageHandler
 from synapse.handlers.pagination import PaginationHandler
 from synapse.handlers.password_policy import PasswordPolicyHandler
 from synapse.handlers.presence import PresenceHandler
-from synapse.handlers.profile import BaseProfileHandler, MasterProfileHandler
+from synapse.handlers.profile import ProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.receipts import ReceiptsHandler
 from synapse.handlers.register import RegistrationHandler
@@ -191,7 +191,12 @@ class HomeServer(metaclass=abc.ABCMeta):
     """
 
     REQUIRED_ON_BACKGROUND_TASK_STARTUP = [
+        "account_validity",
         "auth",
+        "deactivate_account",
+        "message",
+        "pagination",
+        "profile",
         "stats",
     ]
 
@@ -462,10 +467,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_profile_handler(self):
-        if self.config.worker_app:
-            return BaseProfileHandler(self)
-        else:
-            return MasterProfileHandler(self)
+        return ProfileHandler(self)
 
     @cache_in_self
     def get_event_creation_handler(self) -> EventCreationHandler:

@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import itertools
 import logging
 import threading
@@ -136,6 +135,15 @@ class EventsWorkerStore(SQLBaseStore):
                 self._backfill_id_gen = SlavedIdTracker(
                     db_conn, "events", "stream_ordering", step=-1
                 )
+
+        if not hs.config.worker.worker_app:
+            # We periodically clean out old transaction ID mappings
+            self._clock.looping_call(
+                run_as_background_process,
+                5 * 60 * 1000,
+                "_cleanup_old_transaction_ids",
+                self._cleanup_old_transaction_ids,
+            )
 
         self._get_event_cache = Cache(
             "*getEvent*",
@@ -1307,4 +1315,77 @@ class EventsWorkerStore(SQLBaseStore):
 
         return await self.db_pool.runInteraction(
             desc="get_next_event_to_expire", func=get_next_event_to_expire_txn
+        )
+
+    async def get_event_id_from_transaction_id(
+        self, room_id: str, user_id: str, token_id: int, txn_id: str
+    ) -> Optional[str]:
+        """Look up if we have already persisted an event for the transaction ID,
+        returning the event ID if so.
+        """
+        return await self.db_pool.simple_select_one_onecol(
+            table="event_txn_id",
+            keyvalues={
+                "room_id": room_id,
+                "user_id": user_id,
+                "token_id": token_id,
+                "txn_id": txn_id,
+            },
+            retcol="event_id",
+            allow_none=True,
+            desc="get_event_id_from_transaction_id",
+        )
+
+    async def get_already_persisted_events(
+        self, events: Iterable[EventBase]
+    ) -> Dict[str, str]:
+        """Look up if we have already persisted an event for the transaction ID,
+        returning a mapping from event ID in the given list to the event ID of
+        an existing event.
+
+        Also checks if there are duplicates in the given events, if there are
+        will map duplicates to the *first* event.
+        """
+
+        mapping = {}
+        txn_id_to_event = {}  # type: Dict[Tuple[str, int, str], str]
+
+        for event in events:
+            token_id = getattr(event.internal_metadata, "token_id", None)
+            txn_id = getattr(event.internal_metadata, "txn_id", None)
+
+            if token_id and txn_id:
+                # Check if this is a duplicate of an event in the given events.
+                existing = txn_id_to_event.get((event.room_id, token_id, txn_id))
+                if existing:
+                    mapping[event.event_id] = existing
+                    continue
+
+                # Check if this is a duplicate of an event we've already
+                # persisted.
+                existing = await self.get_event_id_from_transaction_id(
+                    event.room_id, event.sender, token_id, txn_id
+                )
+                if existing:
+                    mapping[event.event_id] = existing
+                    txn_id_to_event[(event.room_id, token_id, txn_id)] = existing
+                else:
+                    txn_id_to_event[(event.room_id, token_id, txn_id)] = event.event_id
+
+        return mapping
+
+    async def _cleanup_old_transaction_ids(self):
+        """Cleans out transaction id mappings older than 24hrs.
+        """
+
+        def _cleanup_old_transaction_ids_txn(txn):
+            sql = """
+                DELETE FROM event_txn_id
+                WHERE inserted_ts < ?
+            """
+            one_day_ago = self._clock.time_msec() - 24 * 60 * 60 * 1000
+            txn.execute(sql, (one_day_ago,))
+
+        return await self.db_pool.runInteraction(
+            "_cleanup_old_transaction_ids", _cleanup_old_transaction_ids_txn,
         )

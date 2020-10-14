@@ -91,27 +91,6 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="set_profile_avatar_url",
         )
 
-
-class ProfileStore(ProfileWorkerStore):
-    async def add_remote_profile_cache(
-        self, user_id: str, displayname: str, avatar_url: str
-    ) -> None:
-        """Ensure we are caching the remote user's profiles.
-
-        This should only be called when `is_subscribed_remote_profile_for_user`
-        would return true for the user.
-        """
-        await self.db_pool.simple_upsert(
-            table="remote_profile_cache",
-            keyvalues={"user_id": user_id},
-            values={
-                "displayname": displayname,
-                "avatar_url": avatar_url,
-                "last_check": self._clock.time_msec(),
-            },
-            desc="add_remote_profile_cache",
-        )
-
     async def update_remote_profile_cache(
         self, user_id: str, displayname: str, avatar_url: str
     ) -> int:
@@ -138,28 +117,6 @@ class ProfileStore(ProfileWorkerStore):
                 desc="delete_remote_profile_cache",
             )
 
-    async def get_remote_profile_cache_entries_that_expire(
-        self, last_checked: int
-    ) -> Dict[str, str]:
-        """Get all users who haven't been checked since `last_checked`
-        """
-
-        def _get_remote_profile_cache_entries_that_expire_txn(txn):
-            sql = """
-                SELECT user_id, displayname, avatar_url
-                FROM remote_profile_cache
-                WHERE last_check < ?
-            """
-
-            txn.execute(sql, (last_checked,))
-
-            return self.db_pool.cursor_to_dict(txn)
-
-        return await self.db_pool.runInteraction(
-            "get_remote_profile_cache_entries_that_expire",
-            _get_remote_profile_cache_entries_that_expire_txn,
-        )
-
     async def is_subscribed_remote_profile_for_user(self, user_id):
         """Check whether we are interested in a remote user's profile.
         """
@@ -184,3 +141,46 @@ class ProfileStore(ProfileWorkerStore):
 
         if res:
             return True
+
+    async def get_remote_profile_cache_entries_that_expire(
+        self, last_checked: int
+    ) -> Dict[str, str]:
+        """Get all users who haven't been checked since `last_checked`
+        """
+
+        def _get_remote_profile_cache_entries_that_expire_txn(txn):
+            sql = """
+                SELECT user_id, displayname, avatar_url
+                FROM remote_profile_cache
+                WHERE last_check < ?
+            """
+
+            txn.execute(sql, (last_checked,))
+
+            return self.db_pool.cursor_to_dict(txn)
+
+        return await self.db_pool.runInteraction(
+            "get_remote_profile_cache_entries_that_expire",
+            _get_remote_profile_cache_entries_that_expire_txn,
+        )
+
+
+class ProfileStore(ProfileWorkerStore):
+    async def add_remote_profile_cache(
+        self, user_id: str, displayname: str, avatar_url: str
+    ) -> None:
+        """Ensure we are caching the remote user's profiles.
+
+        This should only be called when `is_subscribed_remote_profile_for_user`
+        would return true for the user.
+        """
+        await self.db_pool.simple_upsert(
+            table="remote_profile_cache",
+            keyvalues={"user_id": user_id},
+            values={
+                "displayname": displayname,
+                "avatar_url": avatar_url,
+                "last_check": self._clock.time_msec(),
+            },
+            desc="add_remote_profile_cache",
+        )

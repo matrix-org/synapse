@@ -319,12 +319,12 @@ class Notifier:
         )
 
         if self.federation_sender:
-            self.federation_sender.notify_new_events(max_room_stream_token.stream)
+            self.federation_sender.notify_new_events(max_room_stream_token)
 
     async def _notify_app_services(self, max_room_stream_token: RoomStreamToken):
         try:
             await self.appservice_handler.notify_interested_services(
-                max_room_stream_token.stream
+                max_room_stream_token
             )
         except Exception:
             logger.exception("Error notifying application services of event")
@@ -344,7 +344,7 @@ class Notifier:
 
     async def _notify_pusher_pool(self, max_room_stream_token: RoomStreamToken):
         try:
-            await self._pusher_pool.on_new_notifications(max_room_stream_token.stream)
+            await self._pusher_pool.on_new_notifications(max_room_stream_token)
         except Exception:
             logger.exception("Error pusher pool of event")
 
