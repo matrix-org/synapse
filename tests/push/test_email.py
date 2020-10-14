@@ -166,9 +166,7 @@ class EmailPusherTests(HomeserverTestCase):
         self.helper.join(room=room, user=self.others[0].id, tok=self.others[0].token)
 
         # The other user sends some messages
-        self.helper.send_event(
-            room, "m.room.encrypted", {}, tok=self.others[0].token
-        )
+        self.helper.send_event(room, "m.room.encrypted", {}, tok=self.others[0].token)
 
         # We should get emailed about that message
         self._check_for_mail()
