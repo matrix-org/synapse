@@ -145,7 +145,7 @@ purging old events in a room. These limits can be defined as such in the
   allowed_lifetime_max: 1y
 ```
 
-These values are evaluated when running purge jobs, to adjust the
+The limits are considered when running purge jobs, to adjust the
 effective value of `max_lifetime`, and make sure it's within the
 `[allowed_lifetime_min, allowed_lifetime_max]` range. If the value of
 `max_lifetime` defined in the room's state is lower than
