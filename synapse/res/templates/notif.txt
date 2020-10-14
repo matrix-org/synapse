@@ -1,4 +1,7 @@
 {% for message in notif.messages %}
+{% if message.event_type == "m.room.encrypted" %}
+An encrypted message.
+{% elif message.event_type == "m.room.message" %}
 {% if message.msgtype == "m.emote" %}* {% endif %}{{ message.sender_name }} ({{ message.ts|format_ts("%H:%M") }})
 {% if message.msgtype == "m.text" %}
 {{ message.body_text_plain }}
@@ -10,6 +13,10 @@
 {{ message.body_text_plain }}
 {% elif message.msgtype == "m.file" %}
 {{ message.body_text_plain }}
+{% elif message.msgtype == "m.room.encrypted" %}
+{% else %}
+An unknown event.
+{% endif %}
 {% endif %}
 {% endfor %}
 

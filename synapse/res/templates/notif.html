@@ -20,16 +20,22 @@
                 <div class="sender_name">{% if message.msgtype == "m.emote" %}*{% endif %} {{ message.sender_name }}</div>
             {% endif %}
             <div class="message_body">
-                {% if message.msgtype == "m.text" %}
-                    {{ message.body_text_html }}
-                {% elif message.msgtype == "m.emote" %}
-                    {{ message.body_text_html }}
-                {% elif message.msgtype == "m.notice" %}
-                    {{ message.body_text_html }}
-                {% elif message.msgtype == "m.image" %}
-                    <img src="{{ message.image_url|mxc_to_http(640, 480, scale) }}" />
-                {% elif message.msgtype == "m.file" %}
-                    <span class="filename">{{ message.body_text_plain }}</span>
+                {% if message.event_type == "m.room.encrypted" %}
+                    An encrypted message.
+                {% elif message.event_type == "m.room.message" %}
+                    {% if message.msgtype == "m.text" %}
+                        {{ message.body_text_html }}
+                    {% elif message.msgtype == "m.emote" %}
+                        {{ message.body_text_html }}
+                    {% elif message.msgtype == "m.notice" %}
+                        {{ message.body_text_html }}
+                    {% elif message.msgtype == "m.image" %}
+                        <img src="{{ message.image_url|mxc_to_http(640, 480, scale) }}" />
+                    {% elif message.msgtype == "m.file" %}
+                        <span class="filename">{{ message.body_text_plain }}</span>
+                    {% else %}
+                        An unknown event.
+                    {% endif %}
                 {% endif %}
             </div>
         </td>
