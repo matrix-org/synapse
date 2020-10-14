@@ -15,7 +15,7 @@
 # limitations under the License.
 
 from synapse.metrics import REGISTRY, InFlightGauge, generate_latest
-from synapse.util.caches.descriptors import DeferredCache
+from synapse.util.caches.deferred_cache import DeferredCache
 
 from tests import unittest
 

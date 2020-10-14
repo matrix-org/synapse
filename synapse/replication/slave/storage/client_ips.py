@@ -15,7 +15,7 @@
 
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.client_ips import LAST_SEEN_GRANULARITY
-from synapse.util.caches.descriptors import DeferredCache
+from synapse.util.caches.deferred_cache import DeferredCache
 
 from ._base import BaseSlavedStore
 

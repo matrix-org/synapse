@@ -42,7 +42,8 @@ from synapse.storage.database import DatabasePool
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator, StreamIdGenerator
 from synapse.types import Collection, get_domain_from_id
-from synapse.util.caches.descriptors import DeferredCache, cached
+from synapse.util.caches.deferred_cache import DeferredCache
+from synapse.util.caches.descriptors import cached
 from synapse.util.iterutils import batch_iter
 from synapse.util.metrics import Measure
 

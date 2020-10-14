@@ -34,7 +34,8 @@ from synapse.storage.database import (
 )
 from synapse.types import Collection, JsonDict, get_verify_key_from_cross_signing_key
 from synapse.util import json_decoder, json_encoder
-from synapse.util.caches.descriptors import DeferredCache, cached, cachedList
+from synapse.util.caches.deferred_cache import DeferredCache
+from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.iterutils import batch_iter
 from synapse.util.stringutils import shortstr
 
