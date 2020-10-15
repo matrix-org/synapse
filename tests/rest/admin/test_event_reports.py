@@ -378,12 +378,11 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             self.assertIn("room_id", c)
             self.assertIn("event_id", c)
             self.assertIn("user_id", c)
-            self.assertIn("reason", c)
-            self.assertIn("content", c)
             self.assertIn("sender", c)
-            self.assertIn("room_alias", c)
-            self.assertIn("score", c["content"])
-            self.assertIn("reason", c["content"])
+            self.assertIn("canonical_alias", c)
+            self.assertIn("name", c)
+            self.assertIn("score", c)
+            self.assertIn("reason", c)
 
 
 class EventReportDetailTestCase(unittest.HomeserverTestCase):
@@ -467,7 +466,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(
-            "The report_id parameter must be a positive integer.",
+            "The report_id parameter must be a string representing a positive integer.",
             channel.json_body["error"],
         )
 
@@ -482,7 +481,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(
-            "The report_id parameter must be a positive integer.",
+            "The report_id parameter must be a string representing a positive integer.",
             channel.json_body["error"],
         )
 
@@ -497,7 +496,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(
-            "The report_id parameter must be a positive integer.",
+            "The report_id parameter must be a string representing a positive integer.",
             channel.json_body["error"],
         )
 
@@ -535,21 +534,19 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
     def _check_fields(self, content):
         """Checks that all attributes are present in a event report
         """
-        for c in content:
-            self.assertIn("id", c)
-            self.assertIn("received_ts", c)
-            self.assertIn("room_id", c)
-            self.assertIn("event_id", c)
-            self.assertIn("user_id", c)
-            self.assertIn("reason", c)
-            self.assertIn("content", c)
-            self.assertIn("sender", c)
-            self.assertIn("room_alias", c)
-            self.assertIn("event_json", c)
-            self.assertIn("score", c["content"])
-            self.assertIn("reason", c["content"])
-            self.assertIn("auth_events", c["event_json"])
-            self.assertIn("type", c["event_json"])
-            self.assertIn("room_id", c["event_json"])
-            self.assertIn("sender", c["event_json"])
-            self.assertIn("content", c["event_json"])
+        self.assertIn("id", content)
+        self.assertIn("received_ts", content)
+        self.assertIn("room_id", content)
+        self.assertIn("event_id", content)
+        self.assertIn("user_id", content)
+        self.assertIn("sender", content)
+        self.assertIn("canonical_alias", content)
+        self.assertIn("name", content)
+        self.assertIn("event_json", content)
+        self.assertIn("score", content)
+        self.assertIn("reason", content)
+        self.assertIn("auth_events", content["event_json"])
+        self.assertIn("type", content["event_json"])
+        self.assertIn("room_id", content["event_json"])
+        self.assertIn("sender", content["event_json"])
+        self.assertIn("content", content["event_json"])

@@ -119,7 +119,7 @@ class EventReportDetailRestServlet(RestServlet):
         )
         try:
             report_id = int(report_id)
-        except Exception:
+        except ValueError:
             raise SynapseError(400, message, errcode=Codes.INVALID_PARAM)
 
         if report_id < 0:

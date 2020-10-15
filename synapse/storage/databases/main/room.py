@@ -1429,34 +1429,40 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                     er.room_id,
                     er.event_id,
                     er.user_id,
-                    er.reason,
                     er.content,
                     events.sender,
-                    room_aliases.room_alias,
+                    room_stats_state.canonical_alias,
+                    room_stats_state.name,
                     event_json.json AS event_json
                 FROM event_reports AS er
-                LEFT JOIN room_aliases
-                    ON room_aliases.room_id = er.room_id
-                JOIN events
+                LEFT JOIN events
                     ON events.event_id = er.event_id
                 JOIN event_json
                     ON event_json.event_id = er.event_id
+                JOIN room_stats_state
+                    ON room_stats_state.room_id = er.room_id
                 WHERE er.id = ?
             """
 
             txn.execute(sql, [report_id])
-            rows = self.db_pool.cursor_to_dict(txn)
+            row = txn.fetchone()
 
-            if not rows:
+            if not row:
                 return None
 
-            event_report = rows[0]
-
-            try:
-                event_report["content"] = db_to_json(event_report["content"])
-                event_report["event_json"] = db_to_json(event_report["event_json"])
-            except Exception:
-                pass
+            event_report = {
+                "id": row[0],
+                "received_ts": row[1],
+                "room_id": row[2],
+                "event_id": row[3],
+                "user_id": row[4],
+                "score": db_to_json(row[5]).get("score"),
+                "reason": db_to_json(row[5]).get("reason"),
+                "sender": row[6],
+                "canonical_alias": row[7],
+                "name": row[8],
+                "event_json": db_to_json(row[9]),
+            }
 
             return event_report
 
@@ -1521,15 +1527,15 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                     er.room_id,
                     er.event_id,
                     er.user_id,
-                    er.reason,
                     er.content,
                     events.sender,
-                    room_aliases.room_alias
+                    room_stats_state.canonical_alias,
+                    room_stats_state.name
                 FROM event_reports AS er
-                LEFT JOIN room_aliases
-                    ON room_aliases.room_id = er.room_id
-                JOIN events
+                LEFT JOIN events
                     ON events.event_id = er.event_id
+                JOIN room_stats_state
+                    ON room_stats_state.room_id = er.room_id
                 {where_clause}
                 ORDER BY er.received_ts {order}
                 LIMIT ?
@@ -1540,14 +1546,24 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
 
             args += [limit, start]
             txn.execute(sql, args)
-            event_reports = self.db_pool.cursor_to_dict(txn)
 
+            event_reports = []
             if count > 0:
-                for row in event_reports:
-                    try:
-                        row["content"] = db_to_json(row["content"])
-                    except Exception:
-                        continue
+                for row in txn:
+                    event_reports.append(
+                        {
+                            "id": row[0],
+                            "received_ts": row[1],
+                            "room_id": row[2],
+                            "event_id": row[3],
+                            "user_id": row[4],
+                            "score": db_to_json(row[5]).get("score"),
+                            "reason": db_to_json(row[5]).get("reason"),
+                            "sender": row[6],
+                            "canonical_alias": row[7],
+                            "name": row[8],
+                        }
+                    )
 
             return event_reports, count
 

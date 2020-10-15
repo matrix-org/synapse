@@ -17,30 +17,26 @@ It returns a JSON body like the following:
     {
         "event_reports": [
             {
-                "content": {
-                    "reason": "foo",
-                    "score": -100
-                },
                 "event_id": "$bNUFCwGzWca1meCGkjp-zwslF-GfVcXukvRLI1_FaVY",
                 "id": 2,
                 "reason": "foo",
+                "score": -100,
                 "received_ts": 1570897107409,
-                "room_alias": "#alias1:matrix.org",
+                "canonical_alias": "#alias1:matrix.org",
                 "room_id": "!ERAgBpSOcCCuTJqQPk:matrix.org",
+                "name": "Matrix HQ",
                 "sender": "@foobar:matrix.org",
                 "user_id": "@foo:matrix.org"
             },
             {
-                "content": {
-                    "reason": "bar",
-                    "score": -100
-                },
                 "event_id": "$3IcdZsDaN_En-S1DF4EMCy3v4gNRKeOJs8W5qTOKj4I",
                 "id": 3,
                 "reason": "bar",
+                "score": -100,
                 "received_ts": 1598889612059,
-                "room_alias": "#alias2:matrix.org",
+                "canonical_alias": "#alias2:matrix.org",
                 "room_id": "!eGvUQuTCkHGVwNMOjv:matrix.org",
+                "name": "Your room name here",
                 "sender": "@foobar:matrix.org",
                 "user_id": "@bar:matrix.org"
             }
@@ -76,16 +72,13 @@ The following fields are returned in the JSON response body:
 - ``id``: integer - ID of event report.
 - ``received_ts``: integer - The timestamp (in milliseconds since the unix epoch) when this report was sent.
 - ``room_id``: string - The ID of the room in which the event being reported is located.
+- ``name``: string - The name of the room.
 - ``event_id``: string - The ID of the reported event.
 - ``user_id``: string - This is the user who reported the event and wrote the reason.
 - ``reason``: string - Comment made by the ``user_id`` in this report. May be blank.
-- ``content``: object - Content of reported event.
-
-  - ``reason``: string - Comment made by the ``user_id`` in this report. May be blank.
-  - ``score``: integer - Content is reported based upon a negative score, where -100 is "most offensive" and 0 is "inoffensive".
-
+- ``score``: integer - Content is reported based upon a negative score, where -100 is "most offensive" and 0 is "inoffensive".
 - ``sender``: string - This is the ID of the user who sent the original message/event that was reported.
-- ``room_alias``: string - The alias of the room. ``null`` if the room does not have a canonical alias set.
+- ``canonical_alias``: string - The canonical alias of the room. ``null`` if the room does not have a canonical alias set.
 - ``next_token``: integer - Indication for pagination. See above.
 - ``total``: integer - Total number of event reports related to the query (``user_id`` and ``room_id``).
 
@@ -106,10 +99,6 @@ It returns a JSON body like the following:
 .. code:: jsonc
 
     {
-        "content": {
-            "reason": "foo",
-            "score": -100
-        },
         "event_id": "$bNUFCwGzWca1meCGkjp-zwslF-GfVcXukvRLI1_FaVY",
         "event_json": {
             "auth_events": [
@@ -146,9 +135,11 @@ It returns a JSON body like the following:
         },
         "id": <report_id>,
         "reason": "foo",
+        "score": -100,
         "received_ts": 1570897107409,
-        "room_alias": "#alias1:matrix.org",
+        "canonical_alias": "#alias1:matrix.org",
         "room_id": "!ERAgBpSOcCCuTJqQPk:matrix.org",
+        "name": "Matrix HQ",
         "sender": "@foobar:matrix.org",
         "user_id": "@foo:matrix.org"
     }
@@ -164,14 +155,11 @@ The following fields are returned in the JSON response body:
 - ``id``: integer - ID of event report.
 - ``received_ts``: integer - The timestamp (in milliseconds since the unix epoch) when this report was sent.
 - ``room_id``: string - The ID of the room in which the event being reported is located.
+- ``name``: string - The name of the room.
 - ``event_id``: string - The ID of the reported event.
 - ``user_id``: string - This is the user who reported the event and wrote the reason.
 - ``reason``: string - Comment made by the ``user_id`` in this report. May be blank.
-- ``content``: object - Content of the event report.
-
-  - ``reason``: string - Comment made by the ``user_id`` in this report. May be blank.
-  - ``score``: integer - Content is reported based upon a negative score, where -100 is "most offensive" and 0 is "inoffensive".
-
+- ``score``: integer - Content is reported based upon a negative score, where -100 is "most offensive" and 0 is "inoffensive".
 - ``sender``: string - This is the ID of the user who sent the original message/event that was reported.
-- ``room_alias``: string - The alias of the room. ``null`` if the room does not have a canonical alias set.
+- ``canonical_alias``: string - The canonical alias of the room. ``null`` if the room does not have a canonical alias set.
 - ``event_json``: object - Details of the original event that was reported.
