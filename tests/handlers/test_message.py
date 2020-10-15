@@ -66,7 +66,6 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
                     "sender": self.requester.user.to_string(),
                     "content": {"msgtype": "m.text", "body": random_string(5)},
                 },
-                token_id=self.token_id,
                 txn_id=txn_id,
             )
         )
