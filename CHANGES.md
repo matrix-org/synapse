@@ -1,10 +1,23 @@
 Synapse 1.21.2 (2020-10-15)
 ===========================
 
+Security advisory
+-----------------
+
+* HTML pages served via Synapse were vulernable to cross-site scripting (XSS)
+  attacks. All server administrators are encouraged to upgrade.
+  ([34ff8da8](https://github.com/matrix-org/synapse/commit/34ff8da83b54024289f515c6d73e6b486574d699))
+  ([CVE-2020-26891](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2020-26891))
+
+  This fix was originally included in v1.21.0 but was missing a security advisory.
+
+  This was reported by [Denis Kasak](https://github.com/dkasak).
+
 Bugfixes
 --------
 
 - Fix rare bug where sending an event would fail due to a racey assertion. ([\#8530](https://github.com/matrix-org/synapse/issues/8530))
+- Fix issues introduced in the packaging of v1.21.1 when using OpenID Connect with the Docker or Debian packages by including an updated version of the authlib dependency.
 
 
 Synapse 1.21.1 (2020-10-13)
