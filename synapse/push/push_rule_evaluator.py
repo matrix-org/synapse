@@ -20,7 +20,6 @@ from typing import Any, Dict, List, Optional, Pattern, Union
 
 from synapse.events import EventBase
 from synapse.types import UserID
-from synapse.util.caches import register_cache
 from synapse.util.caches.lrucache import LruCache
 
 logger = logging.getLogger(__name__)
@@ -186,8 +185,7 @@ class PushRuleEvaluatorForEvent:
 
 
 # Caches (string, is_glob, word_boundary) -> regex for push. See _glob_matches
-regex_cache = LruCache(50000)
-register_cache("cache", "regex_push_cache", regex_cache)
+regex_cache = LruCache(50000, "regex_push_cache")
 
 
 def _glob_matches(glob: str, value: str, word_boundary: bool = False) -> bool:

@@ -19,8 +19,6 @@ from collections import namedtuple
 
 from synapse.util.caches.lrucache import LruCache
 
-from . import register_cache
-
 logger = logging.getLogger(__name__)
 
 
@@ -46,18 +44,16 @@ class DictionaryCache:
     """
 
     def __init__(self, name, max_entries=1000):
-        self.cache = LruCache(max_size=max_entries, size_callback=len)
+        self.cache = LruCache(max_size=max_entries, cache_name=name, size_callback=len)
 
         self.name = name
         self.sequence = 0
         self.thread = None
-        # caches_by_name[name] = self.cache
 
         class Sentinel:
             __slots__ = []
 
         self.sentinel = Sentinel()
-        self.metrics = register_cache("dictionary", name, self.cache)
 
     def check_thread(self):
         expected_thread = self.thread
@@ -82,8 +78,6 @@ class DictionaryCache:
         """
         entry = self.cache.get(key, self.sentinel)
         if entry is not self.sentinel:
-            self.metrics.inc_hits()
-
             if dict_keys is None:
                 return DictionaryEntry(
                     entry.full, entry.known_absent, dict(entry.value)
@@ -95,7 +89,6 @@ class DictionaryCache:
                     {k: entry.value[k] for k in dict_keys if k in entry.value},
                 )
 
-        self.metrics.inc_misses()
         return DictionaryEntry(False, set(), {})
 
     def invalidate(self, key):
