@@ -239,7 +239,7 @@ class ApplicationServicesHandler:
     async def _handle_presence(
         self, service: ApplicationService, users: Collection[UserID]
     ):
-        events = [] # type: List[JsonDict]
+        events = []  # type: List[JsonDict]
         presence_source = self.event_sources.sources["presence"]
         from_key = await self.store.get_type_stream_id_for_appservice(
             service, "presence"
@@ -326,7 +326,7 @@ class ApplicationServicesHandler:
 
     async def get_3pe_protocols(self, only_protocol=None):
         services = self.store.get_app_services()
-        protocols = {} # type: Dict[str, List[JsonDict]]
+        protocols = {}  # type: Dict[str, List[JsonDict]]
 
         # Collect up all the individual protocol responses out of the ASes
         for s in services:
