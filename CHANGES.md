@@ -1,3 +1,12 @@
+Synapse 1.21.2 (2020-10-15)
+===========================
+
+Bugfixes
+--------
+
+- Fix rare bug where sending an event would fail due to a racey assertion. ([\#8530](https://github.com/matrix-org/synapse/issues/8530))
+
+
 Synapse 1.21.1 (2020-10-13)
 ===========================
 
