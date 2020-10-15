@@ -762,22 +762,29 @@ class RoomCreationHandler(BaseHandler):
                 ratelimit=False,
             )
 
-        for invitee in invite_list:
+        # we avoid dropping the lock between invites, as otherwise joins can
+        # start coming in and making the createRoom slow.
+        #
+        # we also don't need to check the requester's shadow-ban here, as we
+        # have already done so above (and potentially emptied invite_list).
+        with (await self.room_member_handler.member_linearizer.queue((room_id,))):
             content = {}
             is_direct = config.get("is_direct", None)
             if is_direct:
                 content["is_direct"] = is_direct
 
-            # Note that update_membership with an action of "invite" can raise a
-            # ShadowBanError, but this was handled above by emptying invite_list.
-            _, last_stream_id = await self.room_member_handler.update_membership(
-                requester,
-                UserID.from_string(invitee),
-                room_id,
-                "invite",
-                ratelimit=False,
-                content=content,
-            )
+            for invitee in invite_list:
+                (
+                    _,
+                    last_stream_id,
+                ) = await self.room_member_handler.update_membership_locked(
+                    requester,
+                    UserID.from_string(invitee),
+                    room_id,
+                    "invite",
+                    ratelimit=False,
+                    content=content,
+                )
 
         for invite_3pid in invite_3pid_list:
             id_server = invite_3pid["id_server"]
