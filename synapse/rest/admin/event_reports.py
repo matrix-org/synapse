@@ -114,7 +114,9 @@ class EventReportDetailRestServlet(RestServlet):
     async def on_GET(self, request, report_id):
         await assert_requester_is_admin(self.auth, request)
 
-        message = "The report_id parameter must be a string representing a positive integer."
+        message = (
+            "The report_id parameter must be a string representing a positive integer."
+        )
         try:
             report_id = int(report_id)
         except Exception:

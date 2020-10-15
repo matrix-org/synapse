@@ -1446,10 +1446,10 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
 
             txn.execute(sql, [report_id])
             rows = self.db_pool.cursor_to_dict(txn)
-            
+
             if not rows:
                 return None
-            
+
             event_report = rows[0]
 
             try:
