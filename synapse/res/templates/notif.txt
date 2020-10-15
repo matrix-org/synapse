@@ -13,7 +13,6 @@ An encrypted message.
 {{ message.body_text_plain }}
 {%- elif message.msgtype == "m.file" %}
 {{ message.body_text_plain }}
-{%- elif message.msgtype == "m.room.encrypted" %}
 {%- else %}
 An unknown event.
 {%- endif %}
