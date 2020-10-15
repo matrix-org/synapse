@@ -222,7 +222,7 @@ class ApplicationServicesHandler:
             # For performance reasons, we don't persist the previous
             # token in the DB and instead fetch the latest typing information
             # for appservices.
-            from_key=int(new_token) - 1,
+            from_key=new_token - 1,
         )
         return typing
 
