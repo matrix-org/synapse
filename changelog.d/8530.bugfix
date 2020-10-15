@@ -1,1 +1,0 @@
-Fix rare bug where sending an event would fail due to a racey assertion.
