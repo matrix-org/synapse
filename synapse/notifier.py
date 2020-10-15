@@ -336,8 +336,11 @@ class Notifier:
         users: Collection[UserID] = [],
     ):
         try:
+            stream_token = None
+            if isinstance(new_token, int):
+                stream_token = new_token
             await self.appservice_handler.notify_interested_services_ephemeral(
-                stream_key, new_token, users
+                stream_key, stream_token, users
             )
         except Exception:
             logger.exception("Error notifying application services of event")
