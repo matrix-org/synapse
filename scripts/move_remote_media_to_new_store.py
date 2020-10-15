@@ -32,8 +32,6 @@ To use, pipe the above into::
     PYTHON_PATH=. ./scripts/move_remote_media_to_new_store.py <source repo> <dest repo>
 """
 
-from __future__ import print_function
-
 import argparse
 import logging
 import os

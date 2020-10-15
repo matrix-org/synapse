@@ -42,7 +42,6 @@ from synapse.api.errors import (
 )
 from synapse.logging.context import (
     PreserveLoggingContext,
-    current_context,
     make_deferred_yieldable,
     preserve_fn,
     run_in_background,
@@ -233,8 +232,6 @@ class Keyring:
         """
 
         try:
-            ctx = current_context()
-
             # map from server name to a set of outstanding request ids
             server_to_request_ids = {}
 
@@ -265,12 +262,8 @@ class Keyring:
 
                 # if there are no more requests for this server, we can drop the lock.
                 if not server_requests:
-                    with PreserveLoggingContext(ctx):
-                        logger.debug("Releasing key lookup lock on %s", server_name)
-
-                    # ... but not immediately, as that can cause stack explosions if
-                    # we get a long queue of lookups.
-                    self.clock.call_later(0, drop_server_lock, server_name)
+                    logger.debug("Releasing key lookup lock on %s", server_name)
+                    drop_server_lock(server_name)
 
                 return res
 
@@ -335,20 +328,32 @@ class Keyring:
                         )
 
                     # look for any requests which weren't satisfied
-                    with PreserveLoggingContext():
-                        for verify_request in remaining_requests:
-                            verify_request.key_ready.errback(
-                                SynapseError(
-                                    401,
-                                    "No key for %s with ids in %s (min_validity %i)"
-                                    % (
-                                        verify_request.server_name,
-                                        verify_request.key_ids,
-                                        verify_request.minimum_valid_until_ts,
-                                    ),
-                                    Codes.UNAUTHORIZED,
-                                )
+                    while remaining_requests:
+                        verify_request = remaining_requests.pop()
+                        rq_str = (
+                            "VerifyJsonRequest(server=%s, key_ids=%s, min_valid=%i)"
+                            % (
+                                verify_request.server_name,
+                                verify_request.key_ids,
+                                verify_request.minimum_valid_until_ts,
                             )
+                        )
+
+                        # If we run the errback immediately, it may cancel our
+                        # loggingcontext while we are still in it, so instead we
+                        # schedule it for the next time round the reactor.
+                        #
+                        # (this also ensures that we don't get a stack overflow if we
+                        # has a massive queue of lookups waiting for this server).
+                        self.clock.call_later(
+                            0,
+                            verify_request.key_ready.errback,
+                            SynapseError(
+                                401,
+                                "Failed to find any key to satisfy %s" % (rq_str,),
+                                Codes.UNAUTHORIZED,
+                            ),
+                        )
             except Exception as err:
                 # we don't really expect to get here, because any errors should already
                 # have been caught and logged. But if we do, let's log the error and make
@@ -410,10 +415,23 @@ class Keyring:
                     # key was not valid at this point
                     continue
 
-                with PreserveLoggingContext():
-                    verify_request.key_ready.callback(
-                        (server_name, key_id, fetch_key_result.verify_key)
-                    )
+                # we have a valid key for this request. If we run the callback
+                # immediately, it may cancel our loggingcontext while we are still in
+                # it, so instead we schedule it for the next time round the reactor.
+                #
+                # (this also ensures that we don't get a stack overflow if we had
+                # a massive queue of lookups waiting for this server).
+                logger.debug(
+                    "Found key %s:%s for %s",
+                    server_name,
+                    key_id,
+                    verify_request.request_name,
+                )
+                self.clock.call_later(
+                    0,
+                    verify_request.key_ready.callback,
+                    (server_name, key_id, fetch_key_result.verify_key),
+                )
                 completed.append(verify_request)
                 break
 
@@ -558,7 +576,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
     """KeyFetcher impl which fetches keys from the "perspectives" servers"""
 
     def __init__(self, hs):
-        super(PerspectivesKeyFetcher, self).__init__(hs)
+        super().__init__(hs)
         self.clock = hs.get_clock()
         self.client = hs.get_http_client()
         self.key_servers = self.config.key_servers
@@ -728,7 +746,7 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
     """KeyFetcher impl which fetches keys from the origin servers"""
 
     def __init__(self, hs):
-        super(ServerKeyFetcher, self).__init__(hs)
+        super().__init__(hs)
         self.clock = hs.get_clock()
         self.client = hs.get_http_client()
 

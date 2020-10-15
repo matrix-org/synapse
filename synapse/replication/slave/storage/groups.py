@@ -23,7 +23,7 @@ from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 class SlavedGroupServerStore(GroupServerWorkerStore, BaseSlavedStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(SlavedGroupServerStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self.hs = hs
 

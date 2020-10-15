@@ -73,6 +73,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
                 "delivered_txn",
                 "get_received_txn_response",
                 "set_received_txn_response",
+                "get_destination_last_successful_stream_ordering",
                 "get_destination_retry_timings",
                 "get_devices_by_remote",
                 "maybe_store_room_on_invite",
@@ -80,6 +81,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
                 "get_user_directory_stream_pos",
                 "get_current_state_deltas",
                 "get_device_updates_by_remote",
+                "get_room_max_stream_ordering",
             ]
         )
 
@@ -116,8 +118,12 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             retry_timings_res
         )
 
-        self.datastore.get_device_updates_by_remote.side_effect = lambda destination, from_stream_id, limit: make_awaitable(
+        self.datastore.get_device_updates_by_remote.return_value = make_awaitable(
             (0, [])
+        )
+
+        self.datastore.get_destination_last_successful_stream_ordering.return_value = make_awaitable(
+            None
         )
 
         def get_received_txn_response(*args):

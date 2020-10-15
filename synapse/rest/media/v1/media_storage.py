@@ -141,17 +141,34 @@ class MediaStorage:
         Returns:
             Returns a Responder if the file was found, otherwise None.
         """
+        paths = [self._file_info_to_path(file_info)]
 
-        path = self._file_info_to_path(file_info)
-        local_path = os.path.join(self.local_media_directory, path)
-        if os.path.exists(local_path):
-            return FileResponder(open(local_path, "rb"))
+        # fallback for remote thumbnails with no method in the filename
+        if file_info.thumbnail and file_info.server_name:
+            paths.append(
+                self.filepaths.remote_media_thumbnail_rel_legacy(
+                    server_name=file_info.server_name,
+                    file_id=file_info.file_id,
+                    width=file_info.thumbnail_width,
+                    height=file_info.thumbnail_height,
+                    content_type=file_info.thumbnail_type,
+                )
+            )
+
+        for path in paths:
+            local_path = os.path.join(self.local_media_directory, path)
+            if os.path.exists(local_path):
+                logger.debug("responding with local file %s", local_path)
+                return FileResponder(open(local_path, "rb"))
+            logger.debug("local file %s did not exist", local_path)
 
         for provider in self.storage_providers:
-            res = await provider.fetch(path, file_info)  # type: Any
-            if res:
-                logger.debug("Streaming %s from %s", path, provider)
-                return res
+            for path in paths:
+                res = await provider.fetch(path, file_info)  # type: Any
+                if res:
+                    logger.debug("Streaming %s from %s", path, provider)
+                    return res
+                logger.debug("%s not found on %s", path, provider)
 
         return None
 
@@ -169,6 +186,20 @@ class MediaStorage:
         local_path = os.path.join(self.local_media_directory, path)
         if os.path.exists(local_path):
             return local_path
+
+        # Fallback for paths without method names
+        # Should be removed in the future
+        if file_info.thumbnail and file_info.server_name:
+            legacy_path = self.filepaths.remote_media_thumbnail_rel_legacy(
+                server_name=file_info.server_name,
+                file_id=file_info.file_id,
+                width=file_info.thumbnail_width,
+                height=file_info.thumbnail_height,
+                content_type=file_info.thumbnail_type,
+            )
+            legacy_local_path = os.path.join(self.local_media_directory, legacy_path)
+            if os.path.exists(legacy_local_path):
+                return legacy_local_path
 
         dirname = os.path.dirname(local_path)
         if not os.path.exists(dirname):

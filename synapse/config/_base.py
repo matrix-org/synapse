@@ -242,12 +242,11 @@ class Config:
         env = jinja2.Environment(loader=loader, autoescape=autoescape)
 
         # Update the environment with our custom filters
-        env.filters.update(
-            {
-                "format_ts": _format_ts_filter,
-                "mxc_to_http": _create_mxc_to_http_filter(self.public_baseurl),
-            }
-        )
+        env.filters.update({"format_ts": _format_ts_filter})
+        if self.public_baseurl:
+            env.filters.update(
+                {"mxc_to_http": _create_mxc_to_http_filter(self.public_baseurl)}
+            )
 
         for filename in filenames:
             # Load the template
@@ -838,10 +837,25 @@ class ShardedWorkerHandlingConfig:
     def should_handle(self, instance_name: str, key: str) -> bool:
         """Whether this instance is responsible for handling the given key.
         """
-
-        # If multiple instances are not defined we always return true.
+        # If multiple instances are not defined we always return true
         if not self.instances or len(self.instances) == 1:
             return True
+
+        return self.get_instance(key) == instance_name
+
+    def get_instance(self, key: str) -> str:
+        """Get the instance responsible for handling the given key.
+
+        Note: For things like federation sending the config for which instance
+        is sending is known only to the sender instance if there is only one.
+        Therefore `should_handle` should be used where possible.
+        """
+
+        if not self.instances:
+            return "master"
+
+        if len(self.instances) == 1:
+            return self.instances[0]
 
         # We shard by taking the hash, modulo it by the number of instances and
         # then checking whether this instance matches the instance at that
@@ -852,7 +866,7 @@ class ShardedWorkerHandlingConfig:
         dest_hash = sha256(key.encode("utf8")).digest()
         dest_int = int.from_bytes(dest_hash, byteorder="little")
         remainder = dest_int % (len(self.instances))
-        return self.instances[remainder] == instance_name
+        return self.instances[remainder]
 
 
 __all__ = ["Config", "RootConfig", "ShardedWorkerHandlingConfig"]

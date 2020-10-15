@@ -76,7 +76,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(EmailRegisterRequestTokenRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
         self.config = hs.config
@@ -174,7 +174,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(MsisdnRegisterRequestTokenRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
 
@@ -249,7 +249,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(RegistrationSubmitTokenServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.config = hs.config
@@ -319,7 +319,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(UsernameAvailabilityRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.registration_handler = hs.get_registration_handler()
         self.ratelimiter = FederationRateLimiter(
@@ -363,7 +363,7 @@ class RegisterRestServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(RegisterRestServlet, self).__init__()
+        super().__init__()
 
         self.hs = hs
         self.auth = hs.get_auth()
@@ -431,11 +431,14 @@ class RegisterRestServlet(RestServlet):
 
             access_token = self.auth.get_access_token_from_request(request)
 
-            if isinstance(desired_username, str):
-                result = await self._do_appservice_registration(
-                    desired_username, access_token, body
-                )
-            return 200, result  # we throw for non 200 responses
+            if not isinstance(desired_username, str):
+                raise SynapseError(400, "Desired Username is missing or not a string")
+
+            result = await self._do_appservice_registration(
+                desired_username, access_token, body
+            )
+
+            return 200, result
 
         # == Normal User Registration == (everyone else)
         if not self._registration_enabled:

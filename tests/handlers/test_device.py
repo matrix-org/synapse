@@ -35,6 +35,17 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         # These tests assume that it starts 1000 seconds in.
         self.reactor.advance(1000)
 
+    def test_device_is_created_with_invalid_name(self):
+        self.get_failure(
+            self.handler.check_device_registered(
+                user_id="@boris:foo",
+                device_id="foo",
+                initial_device_display_name="a"
+                * (synapse.handlers.device.MAX_DEVICE_DISPLAY_NAME_LEN + 1),
+            ),
+            synapse.api.errors.SynapseError,
+        )
+
     def test_device_is_created_if_doesnt_exist(self):
         res = self.get_success(
             self.handler.check_device_registered(

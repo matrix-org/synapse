@@ -28,7 +28,7 @@ LAST_SEEN_GRANULARITY = 60 * 60 * 1000
 
 class MonthlyActiveUsersWorkerStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(MonthlyActiveUsersWorkerStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
         self._clock = hs.get_clock()
         self.hs = hs
 
@@ -41,7 +41,14 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
         """
 
         def _count_users(txn):
-            sql = "SELECT COALESCE(count(*), 0) FROM monthly_active_users"
+            # Exclude app service users
+            sql = """
+                SELECT COALESCE(count(*), 0)
+                FROM monthly_active_users
+                    LEFT JOIN users
+                    ON monthly_active_users.user_id=users.name
+                WHERE (users.appservice_id IS NULL OR users.appservice_id = '');
+            """
             txn.execute(sql)
             (count,) = txn.fetchone()
             return count
@@ -120,7 +127,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
 
 class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(MonthlyActiveUsersStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self._limit_usage_by_mau = hs.config.limit_usage_by_mau
         self._mau_stats_only = hs.config.mau_stats_only

@@ -19,7 +19,7 @@ import logging
 import os.path
 import re
 from textwrap import indent
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Set
 
 import attr
 import yaml
@@ -542,6 +542,19 @@ class ServerConfig(Config):
             users_new_default_push_rules
         )  # type: set
 
+        # Whitelist of domain names that given next_link parameters must have
+        next_link_domain_whitelist = config.get(
+            "next_link_domain_whitelist"
+        )  # type: Optional[List[str]]
+
+        self.next_link_domain_whitelist = None  # type: Optional[Set[str]]
+        if next_link_domain_whitelist is not None:
+            if not isinstance(next_link_domain_whitelist, list):
+                raise ConfigError("'next_link_domain_whitelist' must be a list")
+
+            # Turn the list into a set to improve lookup speed.
+            self.next_link_domain_whitelist = set(next_link_domain_whitelist)
+
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)
 
@@ -628,10 +641,23 @@ class ServerConfig(Config):
             """\
         ## Server ##
 
-        # The domain name of the server, with optional explicit port.
-        # This is used by remote servers to connect to this server,
-        # e.g. matrix.org, localhost:8080, etc.
-        # This is also the last part of your UserID.
+        # The public-facing domain of the server
+        #
+        # The server_name name will appear at the end of usernames and room addresses
+        # created on this server. For example if the server_name was example.com,
+        # usernames on this server would be in the format @user:example.com
+        #
+        # In most cases you should avoid using a matrix specific subdomain such as
+        # matrix.example.com or synapse.example.com as the server_name for the same
+        # reasons you wouldn't use user@email.example.com as your email address.
+        # See https://github.com/matrix-org/synapse/blob/master/docs/delegate.md
+        # for information on how to host Synapse on a subdomain while preserving
+        # a clean server_name.
+        #
+        # The server_name cannot be changed later so it is important to
+        # configure this correctly before you start Synapse. It should be all
+        # lowercase and may contain an explicit port.
+        # Examples: matrix.org, localhost:8080
         #
         server_name: "%(server_name)s"
 
@@ -1014,6 +1040,24 @@ class ServerConfig(Config):
         # act as if no error happened and return a fake session ID ('sid') to clients.
         #
         #request_token_inhibit_3pid_errors: true
+
+        # A list of domains that the domain portion of 'next_link' parameters
+        # must match.
+        #
+        # This parameter is optionally provided by clients while requesting
+        # validation of an email or phone number, and maps to a link that
+        # users will be automatically redirected to after validation
+        # succeeds. Clients can make use this parameter to aid the validation
+        # process.
+        #
+        # The whitelist is applied whether the homeserver or an
+        # identity server is handling validation.
+        #
+        # The default value is no whitelist functionality; all domains are
+        # allowed. Setting this value to an empty list will instead disallow
+        # all domains.
+        #
+        #next_link_domain_whitelist: ["matrix.org"]
         """
             % locals()
         )

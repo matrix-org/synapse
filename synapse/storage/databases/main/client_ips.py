@@ -31,7 +31,7 @@ LAST_SEEN_GRANULARITY = 120 * 1000
 
 class ClientIpBackgroundUpdateStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(ClientIpBackgroundUpdateStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self.db_pool.updates.register_background_index_update(
             "user_ips_device_index",
@@ -358,7 +358,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
             name="client_ip_last_seen", keylen=4, max_entries=50000
         )
 
-        super(ClientIpStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self.user_ips_max_age = hs.config.user_ips_max_age
 

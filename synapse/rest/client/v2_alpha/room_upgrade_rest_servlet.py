@@ -53,7 +53,7 @@ class RoomUpgradeRestServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(RoomUpgradeRestServlet, self).__init__()
+        super().__init__()
         self._hs = hs
         self._room_creation_handler = hs.get_room_creation_handler()
         self._auth = hs.get_auth()

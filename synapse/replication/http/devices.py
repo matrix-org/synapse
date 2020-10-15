@@ -53,7 +53,7 @@ class ReplicationUserDevicesResyncRestServlet(ReplicationEndpoint):
     CACHE = False
 
     def __init__(self, hs):
-        super(ReplicationUserDevicesResyncRestServlet, self).__init__(hs)
+        super().__init__(hs)
 
         self.device_list_updater = hs.get_device_handler().device_list_updater
         self.store = hs.get_datastore()

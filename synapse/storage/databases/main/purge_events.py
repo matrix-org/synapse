@@ -42,17 +42,17 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
             The set of state groups that are referenced by deleted events.
         """
 
+        parsed_token = await RoomStreamToken.parse(self, token)
+
         return await self.db_pool.runInteraction(
             "purge_history",
             self._purge_history_txn,
             room_id,
-            token,
+            parsed_token,
             delete_local_events,
         )
 
-    def _purge_history_txn(self, txn, room_id, token_str, delete_local_events):
-        token = RoomStreamToken.parse(token_str)
-
+    def _purge_history_txn(self, txn, room_id, token, delete_local_events):
         # Tables that should be pruned:
         #     event_auth
         #     event_backward_extremities
@@ -69,6 +69,7 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
         #     room_depth
         #     state_groups
         #     state_groups_state
+        #     destination_rooms
 
         # we will build a temporary table listing the events so that we don't
         # have to keep shovelling the list back and forth across the
@@ -336,6 +337,7 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
         # and finally, the tables with an index on room_id (or no useful index)
         for table in (
             "current_state_events",
+            "destination_rooms",
             "event_backward_extremities",
             "event_forward_extremities",
             "event_json",

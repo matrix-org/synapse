@@ -20,6 +20,7 @@ from synapse.events import FrozenEvent, _EventInternalMetadata, make_event_from_
 from synapse.handlers.room import RoomEventSource
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.storage.roommember import RoomsForUser
+from synapse.types import PersistedEventPosition
 
 from tests.server import FakeTransport
 
@@ -58,7 +59,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         # Patch up the equality operator for events so that we can check
         # whether lists of events match using assertEquals
         self.unpatches = [patch__eq__(_EventInternalMetadata), patch__eq__(FrozenEvent)]
-        return super(SlavedEventStoreTestCase, self).setUp()
+        return super().setUp()
 
     def prepare(self, *args, **kwargs):
         super().prepare(*args, **kwargs)
@@ -204,10 +205,14 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             type="m.room.member", sender=USER_ID_2, key=USER_ID_2, membership="join"
         )
         self.replicate()
+
+        expected_pos = PersistedEventPosition(
+            "master", j2.internal_metadata.stream_ordering
+        )
         self.check(
             "get_rooms_for_user_with_stream_ordering",
             (USER_ID_2,),
-            {(ROOM_ID, j2.internal_metadata.stream_ordering)},
+            {(ROOM_ID, expected_pos)},
         )
 
     def test_get_rooms_for_user_with_stream_ordering_with_multi_event_persist(self):
@@ -293,9 +298,10 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             # the membership change is only any use to us if the room is in the
             # joined_rooms list.
             if membership_changes:
-                self.assertEqual(
-                    joined_rooms, {(ROOM_ID, j2.internal_metadata.stream_ordering)}
+                expected_pos = PersistedEventPosition(
+                    "master", j2.internal_metadata.stream_ordering
                 )
+                self.assertEqual(joined_rooms, {(ROOM_ID, expected_pos)})
 
     event_id = 0
 
