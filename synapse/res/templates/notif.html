@@ -34,7 +34,7 @@
                     {%- elif message.msgtype == "m.file" %}
                         <span class="filename">{{ message.body_text_plain }}</span>
                     {%- else %}
-                        An unknown event.
+                        A message with unrecognised content.
                     {%- endif %}
                 {%- endif %}
             </div>

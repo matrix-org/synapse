@@ -14,7 +14,7 @@ An encrypted message.
 {%- elif message.msgtype == "m.file" %}
 {{ message.body_text_plain }}
 {%- else %}
-An unknown event.
+A message with unrecognised content.
 {%- endif %}
 {%- endif %}
 {%- endfor %}
