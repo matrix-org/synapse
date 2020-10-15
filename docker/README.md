@@ -205,3 +205,14 @@ healthcheck:
   timeout: 10s
   retries: 3
 ```
+
+## Using jemalloc
+
+Jemalloc is embedded in the image and can be used instead of the default allocator
+(cf main README for more infos).
+
+To do so you can add this to your `docker run` commands:
+
+```
+-e LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
+```
