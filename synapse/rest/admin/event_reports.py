@@ -90,7 +90,7 @@ class EventReportsRestServlet(RestServlet):
 
 class EventReportDetailRestServlet(RestServlet):
     """
-    Get a specific reported event that are known to the homeserver. Results are returned
+    Get a specific reported event that is known to the homeserver. Results are returned
     in a dictionary containing report information.
     The requester must have administrator access in Synapse.
 
@@ -99,9 +99,9 @@ class EventReportDetailRestServlet(RestServlet):
         200 OK with details report if success otherwise an error.
 
     Args:
-        The parameter `report_id` is the ID of reported event in database.
+        The parameter `report_id` is the ID of the event report in the database.
     Returns:
-        json list of information from event report
+        JSON blob of information about the event report
     """
 
     PATTERNS = admin_patterns("/event_reports/(?P<report_id>[^/]*)$")
@@ -114,7 +114,7 @@ class EventReportDetailRestServlet(RestServlet):
     async def on_GET(self, request, report_id):
         await assert_requester_is_admin(self.auth, request)
 
-        message = "The report_id parameter must be a positive integer."
+        message = "The report_id parameter must be a string representing a positive integer."
         try:
             report_id = int(report_id)
         except Exception:

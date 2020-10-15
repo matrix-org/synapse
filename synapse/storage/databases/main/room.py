@@ -1411,8 +1411,8 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             desc="add_event_report",
         )
 
-    async def get_event_report(self, report_id: int) -> Dict[str, Any]:
-        """Retrieve a an event report
+    async def get_event_report(self, report_id: int) -> Optional[Dict[str, Any]]:
+        """Retrieve an event report
 
         Args:
             report_id: ID of reported event in database
@@ -1445,7 +1445,12 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             """
 
             txn.execute(sql, [report_id])
-            event_report = self.db_pool.cursor_to_dict(txn)
+            rows = self.db_pool.cursor_to_dict(txn)
+            
+            if not rows:
+                return None
+            
+            event_report = rows[0]
 
             try:
                 event_report["content"] = db_to_json(event_report["content"])

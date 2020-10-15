@@ -72,7 +72,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
     def test_no_auth(self):
         """
-        Try to get event report without authentication.
+        Try to get an event report without authentication.
         """
         request, channel = self.make_request("GET", self.url, b"{}")
         self.render(request)
@@ -370,7 +370,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
     def _check_fields(self, content):
-        """Checks that all attributes are present in a event report
+        """Checks that all attributes are present in an event report
         """
         for c in content:
             self.assertIn("id", c)
@@ -453,7 +453,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
 
     def test_invalid_report_id(self):
         """
-        Testing that a invalid `report_id` returns a 400.
+        Testing that an invalid `report_id` returns a 400.
         """
 
         # `report_id` is negative
@@ -471,7 +471,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
             channel.json_body["error"],
         )
 
-        # `report_id` is  a string
+        # `report_id` is a non-numerical string
         request, channel = self.make_request(
             "GET",
             "/_synapse/admin/v1/event_reports/abcdef",
@@ -486,7 +486,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
             channel.json_body["error"],
         )
 
-        # `report_id` is undefinied
+        # `report_id` is undefined
         request, channel = self.make_request(
             "GET",
             "/_synapse/admin/v1/event_reports/",

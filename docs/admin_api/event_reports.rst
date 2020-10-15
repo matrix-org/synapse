@@ -92,7 +92,7 @@ The following fields are returned in the JSON response body:
 Show details of a specific event
 ================================
 
-This API returns information about a specific reported event.
+This API returns information about a specific event report.
 
 The api is::
 
@@ -106,7 +106,7 @@ It returns a JSON body like the following:
 .. code:: jsonc
 
     {
-    "content": {
+        "content": {
             "reason": "foo",
             "score": -100
         },
@@ -153,15 +153,9 @@ It returns a JSON body like the following:
         "user_id": "@foo:matrix.org"
     }
 
-To paginate, check for ``next_token`` and if present, call the endpoint again
-with ``from`` set to the value of ``next_token``. This will return a new page.
-
-If the endpoint does not return a ``next_token`` then there are no more
-reports to paginate through.
-
 **URL parameters:**
 
-- ``report_id``: string - The ID of the reported event.
+- ``report_id``: string - The ID of the event report.
 
 **Response**
 
@@ -173,7 +167,7 @@ The following fields are returned in the JSON response body:
 - ``event_id``: string - The ID of the reported event.
 - ``user_id``: string - This is the user who reported the event and wrote the reason.
 - ``reason``: string - Comment made by the ``user_id`` in this report. May be blank.
-- ``content``: object - Content of reported event.
+- ``content``: object - Content of the event report.
 
   - ``reason``: string - Comment made by the ``user_id`` in this report. May be blank.
   - ``score``: integer - Content is reported based upon a negative score, where -100 is "most offensive" and 0 is "inoffensive".
