@@ -87,7 +87,7 @@ class ApplicationServicesHandler:
                     if not events:
                         break
 
-                    events_by_room: Dict[str, List[EventBase]] = {}
+                    events_by_room = {}  # type: Dict[str, List[EventBase]]
                     for event in events:
                         events_by_room.setdefault(event.room_id, []).append(event)
 
