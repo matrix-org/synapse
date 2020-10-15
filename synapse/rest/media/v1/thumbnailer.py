@@ -15,7 +15,7 @@
 import logging
 from io import BytesIO
 
-from PIL import Image as Image
+from PIL import Image
 
 logger = logging.getLogger(__name__)
 
@@ -31,12 +31,22 @@ EXIF_TRANSPOSE_MAPPINGS = {
 }
 
 
-class Thumbnailer(object):
+class ThumbnailError(Exception):
+    """An error occurred generating a thumbnail."""
+
+
+class Thumbnailer:
 
     FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG"}
 
     def __init__(self, input_path):
-        self.image = Image.open(input_path)
+        try:
+            self.image = Image.open(input_path)
+        except OSError as e:
+            # If an error occurs opening the image, a thumbnail won't be able to
+            # be generated.
+            raise ThumbnailError from e
+
         self.width, self.height = self.image.size
         self.transpose_method = None
         try:
@@ -73,7 +83,7 @@ class Thumbnailer(object):
 
         Args:
             max_width: The largest possible width.
-            max_height: The larget possible height.
+            max_height: The largest possible height.
         """
 
         if max_width * self.height < max_height * self.width:
@@ -107,7 +117,7 @@ class Thumbnailer(object):
 
         Args:
             max_width: The largest possible width.
-            max_height: The larget possible height.
+            max_height: The largest possible height.
 
         Returns:
             BytesIO: the bytes of the encoded image ready to be written to disk

@@ -42,7 +42,7 @@ dh_virtualenv \
     --preinstall="mock" \
     --extra-pip-arg="--no-cache-dir" \
     --extra-pip-arg="--compile" \
-    --extras="all,systemd"
+    --extras="all,systemd,test"
 
 PACKAGE_BUILD_DIR="debian/matrix-synapse-py3"
 VIRTUALENV_DIR="${PACKAGE_BUILD_DIR}${DH_VIRTUALENV_INSTALL_ROOT}/matrix-synapse"

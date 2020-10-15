@@ -17,7 +17,8 @@ from typing import Optional
 
 from netaddr import IPSet
 
-from ._base import Config, ConfigError
+from synapse.config._base import Config, ConfigError
+from synapse.config._util import validate_config
 
 
 class FederationConfig(Config):
@@ -52,8 +53,18 @@ class FederationConfig(Config):
                 "Invalid range(s) provided in federation_ip_range_blacklist: %s" % e
             )
 
+        federation_metrics_domains = config.get("federation_metrics_domains") or []
+        validate_config(
+            _METRICS_FOR_DOMAINS_SCHEMA,
+            federation_metrics_domains,
+            ("federation_metrics_domains",),
+        )
+        self.federation_metrics_domains = set(federation_metrics_domains)
+
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
+        ## Federation ##
+
         # Restrict federation to the following whitelist of domains.
         # N.B. we recommend also firewalling your federation listener to limit
         # inbound federation traffic as early as possible, rather than relying
@@ -85,4 +96,18 @@ class FederationConfig(Config):
           - '::1/128'
           - 'fe80::/64'
           - 'fc00::/7'
+
+        # Report prometheus metrics on the age of PDUs being sent to and received from
+        # the following domains. This can be used to give an idea of "delay" on inbound
+        # and outbound federation, though be aware that any delay can be due to problems
+        # at either end or with the intermediate network.
+        #
+        # By default, no domains are monitored in this way.
+        #
+        #federation_metrics_domains:
+        #  - matrix.org
+        #  - example.com
         """
+
+
+_METRICS_FOR_DOMAINS_SCHEMA = {"type": "array", "items": {"type": "string"}}

@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 class RoomMemberWorkerHandler(RoomMemberHandler):
     def __init__(self, hs):
-        super(RoomMemberWorkerHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self._remote_join_client = ReplRemoteJoin.make_client(hs)
         self._remote_reject_client = ReplRejectInvite.make_client(hs)
@@ -57,8 +57,6 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
             content=content,
         )
 
-        await self._user_joined_room(user, room_id)
-
         return ret["event_id"], ret["stream_id"]
 
     async def remote_reject_invite(
@@ -80,13 +78,6 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
             content=content,
         )
         return ret["event_id"], ret["stream_id"]
-
-    async def _user_joined_room(self, target: UserID, room_id: str) -> None:
-        """Implements RoomMemberHandler._user_joined_room
-        """
-        await self._notify_change_client(
-            user_id=target.to_string(), room_id=room_id, change="joined"
-        )
 
     async def _user_left_room(self, target: UserID, room_id: str) -> None:
         """Implements RoomMemberHandler._user_left_room

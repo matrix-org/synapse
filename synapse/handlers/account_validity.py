@@ -26,15 +26,10 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import UserID
 from synapse.util import stringutils
 
-try:
-    from synapse.push.mailer import load_jinja2_templates
-except ImportError:
-    load_jinja2_templates = None
-
 logger = logging.getLogger(__name__)
 
 
-class AccountValidityHandler(object):
+class AccountValidityHandler:
     def __init__(self, hs):
         self.hs = hs
         self.config = hs.config
@@ -47,9 +42,11 @@ class AccountValidityHandler(object):
         if (
             self._account_validity.enabled
             and self._account_validity.renew_by_email_enabled
-            and load_jinja2_templates
         ):
             # Don't do email-specific configuration if renewal by email is disabled.
+            self._template_html = self.config.account_validity_template_html
+            self._template_text = self.config.account_validity_template_text
+
             try:
                 app_name = self.hs.config.email_app_name
 
@@ -64,17 +61,6 @@ class AccountValidityHandler(object):
                 self._from_string = self.hs.config.email_notif_from
 
             self._raw_from = email.utils.parseaddr(self._from_string)[1]
-
-            self._template_html, self._template_text = load_jinja2_templates(
-                self.config.email_template_dir,
-                [
-                    self.config.email_expiry_template_html,
-                    self.config.email_expiry_template_text,
-                ],
-                apply_format_ts_filter=True,
-                apply_mxc_to_http_filter=True,
-                public_baseurl=self.config.public_baseurl,
-            )
 
             # Check the renewal emails to send and send them every 30min.
             def send_emails():

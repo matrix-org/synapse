@@ -30,7 +30,7 @@ class AccountValidityConfig(Config):
     def __init__(self, config, synapse_config):
         if config is None:
             return
-        super(AccountValidityConfig, self).__init__()
+        super().__init__()
         self.enabled = config.get("enabled", False)
         self.renew_by_email_enabled = "renew_at" in config
 
@@ -186,6 +186,11 @@ class RegistrationConfig(Config):
         if session_lifetime is not None:
             session_lifetime = self.parse_duration(session_lifetime)
         self.session_lifetime = session_lifetime
+
+        # The success template used during fallback auth.
+        self.fallback_success_template = self.read_templates(
+            ["auth_success.html"], autoescape=True
+        )[0]
 
     def generate_config_section(self, generate_secrets=False, **kwargs):
         if generate_secrets:

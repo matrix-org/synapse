@@ -20,13 +20,16 @@ These actions are mostly only used by the :py:mod:`.replication` module.
 """
 
 import logging
+from typing import Optional, Tuple
 
+from synapse.federation.units import Transaction
 from synapse.logging.utils import log_function
+from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
 
 
-class TransactionActions(object):
+class TransactionActions:
     """ Defines persistence actions that relate to handling Transactions.
     """
 
@@ -34,30 +37,32 @@ class TransactionActions(object):
         self.store = datastore
 
     @log_function
-    def have_responded(self, origin, transaction):
-        """ Have we already responded to a transaction with the same id and
+    async def have_responded(
+        self, origin: str, transaction: Transaction
+    ) -> Optional[Tuple[int, JsonDict]]:
+        """Have we already responded to a transaction with the same id and
         origin?
 
         Returns:
-            Deferred: Results in `None` if we have not previously responded to
-            this transaction or a 2-tuple of `(int, dict)` representing the
-            response code and response body.
+            `None` if we have not previously responded to this transaction or a
+            2-tuple of `(int, dict)` representing the response code and response body.
         """
-        if not transaction.transaction_id:
+        transaction_id = transaction.transaction_id  # type: ignore
+        if not transaction_id:
             raise RuntimeError("Cannot persist a transaction with no transaction_id")
 
-        return self.store.get_received_txn_response(transaction.transaction_id, origin)
+        return await self.store.get_received_txn_response(transaction_id, origin)
 
     @log_function
-    def set_response(self, origin, transaction, code, response):
-        """ Persist how we responded to a transaction.
-
-        Returns:
-            Deferred
+    async def set_response(
+        self, origin: str, transaction: Transaction, code: int, response: JsonDict
+    ) -> None:
+        """Persist how we responded to a transaction.
         """
-        if not transaction.transaction_id:
+        transaction_id = transaction.transaction_id  # type: ignore
+        if not transaction_id:
             raise RuntimeError("Cannot persist a transaction with no transaction_id")
 
-        return self.store.set_received_txn_response(
-            transaction.transaction_id, origin, code, response
+        await self.store.set_received_txn_response(
+            transaction_id, origin, code, response
         )

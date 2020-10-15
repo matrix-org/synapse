@@ -14,10 +14,11 @@
 # limitations under the License.
 
 import logging
+import random
 from collections import namedtuple
 from typing import TYPE_CHECKING, List, Set, Tuple
 
-from synapse.api.errors import AuthError, SynapseError
+from synapse.api.errors import AuthError, ShadowBanError, SynapseError
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.tcp.streams import TypingStream
 from synapse.types import UserID, get_domain_from_id
@@ -227,15 +228,20 @@ class TypingWriterHandler(FollowerTypingHandler):
             self._stopped_typing(member)
             return
 
-    async def started_typing(self, target_user, auth_user, room_id, timeout):
+    async def started_typing(self, target_user, requester, room_id, timeout):
         target_user_id = target_user.to_string()
-        auth_user_id = auth_user.to_string()
+        auth_user_id = requester.user.to_string()
 
         if not self.is_mine_id(target_user_id):
             raise SynapseError(400, "User is not hosted on this homeserver")
 
         if target_user_id != auth_user_id:
             raise AuthError(400, "Cannot set another user's typing state")
+
+        if requester.shadow_banned:
+            # We randomly sleep a bit just to annoy the requester.
+            await self.clock.sleep(random.randint(1, 10))
+            raise ShadowBanError()
 
         await self.auth.check_user_in_room(room_id, target_user_id)
 
@@ -256,15 +262,20 @@ class TypingWriterHandler(FollowerTypingHandler):
 
         self._push_update(member=member, typing=True)
 
-    async def stopped_typing(self, target_user, auth_user, room_id):
+    async def stopped_typing(self, target_user, requester, room_id):
         target_user_id = target_user.to_string()
-        auth_user_id = auth_user.to_string()
+        auth_user_id = requester.user.to_string()
 
         if not self.is_mine_id(target_user_id):
             raise SynapseError(400, "User is not hosted on this homeserver")
 
         if target_user_id != auth_user_id:
             raise AuthError(400, "Cannot set another user's typing state")
+
+        if requester.shadow_banned:
+            # We randomly sleep a bit just to annoy the requester.
+            await self.clock.sleep(random.randint(1, 10))
+            raise ShadowBanError()
 
         await self.auth.check_user_in_room(room_id, target_user_id)
 
@@ -401,7 +412,7 @@ class TypingWriterHandler(FollowerTypingHandler):
         raise Exception("Typing writer instance got typing info over replication")
 
 
-class TypingNotificationEventSource(object):
+class TypingNotificationEventSource:
     def __init__(self, hs):
         self.hs = hs
         self.clock = hs.get_clock()

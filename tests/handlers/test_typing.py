@@ -21,7 +21,7 @@ from mock import ANY, Mock, call
 from twisted.internet import defer
 
 from synapse.api.errors import AuthError
-from synapse.types import UserID
+from synapse.types import UserID, create_requester
 
 from tests import unittest
 from tests.test_utils import make_awaitable
@@ -73,6 +73,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
                 "delivered_txn",
                 "get_received_txn_response",
                 "set_received_txn_response",
+                "get_destination_last_successful_stream_ordering",
                 "get_destination_retry_timings",
                 "get_devices_by_remote",
                 "maybe_store_room_on_invite",
@@ -80,6 +81,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
                 "get_user_directory_stream_pos",
                 "get_current_state_deltas",
                 "get_device_updates_by_remote",
+                "get_room_max_stream_ordering",
             ]
         )
 
@@ -116,8 +118,12 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             retry_timings_res
         )
 
-        self.datastore.get_device_updates_by_remote.side_effect = lambda destination, from_stream_id, limit: make_awaitable(
+        self.datastore.get_device_updates_by_remote.return_value = make_awaitable(
             (0, [])
+        )
+
+        self.datastore.get_destination_last_successful_stream_ordering.return_value = make_awaitable(
+            None
         )
 
         def get_received_txn_response(*args):
@@ -144,9 +150,9 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.datastore.get_users_in_room = get_users_in_room
 
-        self.datastore.get_user_directory_stream_pos.return_value = (
+        self.datastore.get_user_directory_stream_pos.side_effect = (
             # we deliberately return a non-None stream pos to avoid doing an initial_spam
-            defer.succeed(1)
+            lambda: make_awaitable(1)
         )
 
         self.datastore.get_current_state_deltas.return_value = (0, None)
@@ -155,8 +161,10 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         self.datastore.get_new_device_msgs_for_remote = lambda *args, **kargs: make_awaitable(
             ([], 0)
         )
-        self.datastore.delete_device_msgs_for_remote = lambda *args, **kargs: None
-        self.datastore.set_received_txn_response = lambda *args, **kwargs: defer.succeed(
+        self.datastore.delete_device_msgs_for_remote = lambda *args, **kargs: make_awaitable(
+            None
+        )
+        self.datastore.set_received_txn_response = lambda *args, **kwargs: make_awaitable(
             None
         )
 
@@ -167,7 +175,10 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.get_success(
             self.handler.started_typing(
-                target_user=U_APPLE, auth_user=U_APPLE, room_id=ROOM_ID, timeout=20000
+                target_user=U_APPLE,
+                requester=create_requester(U_APPLE),
+                room_id=ROOM_ID,
+                timeout=20000,
             )
         )
 
@@ -194,7 +205,10 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.get_success(
             self.handler.started_typing(
-                target_user=U_APPLE, auth_user=U_APPLE, room_id=ROOM_ID, timeout=20000
+                target_user=U_APPLE,
+                requester=create_requester(U_APPLE),
+                room_id=ROOM_ID,
+                timeout=20000,
             )
         )
 
@@ -269,7 +283,9 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.get_success(
             self.handler.stopped_typing(
-                target_user=U_APPLE, auth_user=U_APPLE, room_id=ROOM_ID
+                target_user=U_APPLE,
+                requester=create_requester(U_APPLE),
+                room_id=ROOM_ID,
             )
         )
 
@@ -309,7 +325,10 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.get_success(
             self.handler.started_typing(
-                target_user=U_APPLE, auth_user=U_APPLE, room_id=ROOM_ID, timeout=10000
+                target_user=U_APPLE,
+                requester=create_requester(U_APPLE),
+                room_id=ROOM_ID,
+                timeout=10000,
             )
         )
 
@@ -348,7 +367,10 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.get_success(
             self.handler.started_typing(
-                target_user=U_APPLE, auth_user=U_APPLE, room_id=ROOM_ID, timeout=10000
+                target_user=U_APPLE,
+                requester=create_requester(U_APPLE),
+                room_id=ROOM_ID,
+                timeout=10000,
             )
         )
 

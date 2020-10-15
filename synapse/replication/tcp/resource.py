@@ -58,7 +58,7 @@ class ReplicationStreamProtocolFactory(Factory):
         )
 
 
-class ReplicationStreamer(object):
+class ReplicationStreamer:
     """Handles replication connections.
 
     This needs to be poked when new replication data may be available. When new
@@ -93,7 +93,7 @@ class ReplicationStreamer(object):
         """
         if not self.command_handler.connected():
             # Don't bother if nothing is listening. We still need to advance
-            # the stream tokens otherwise they'll fall beihind forever
+            # the stream tokens otherwise they'll fall behind forever
             for stream in self.streams:
                 stream.discard_updates_and_advance()
             return

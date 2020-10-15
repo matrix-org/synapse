@@ -16,6 +16,7 @@
 from mock import Mock
 
 from netaddr import IPSet
+from parameterized import parameterized
 
 from twisted.internet import defer
 from twisted.internet.defer import TimeoutError
@@ -317,14 +318,14 @@ class FederationClientTests(HomeserverTestCase):
         r = self.successResultOf(d)
         self.assertEqual(r.code, 200)
 
-    def test_client_headers_no_body(self):
+    @parameterized.expand(["get_json", "post_json", "delete_json", "put_json"])
+    def test_timeout_reading_body(self, method_name: str):
         """
         If the HTTP request is connected, but gets no response before being
-        timed out, it'll give a ResponseNeverReceived.
+        timed out, it'll give a RequestSendFailed with can_retry.
         """
-        d = defer.ensureDeferred(
-            self.cl.post_json("testserv:8008", "foo/bar", timeout=10000)
-        )
+        method = getattr(self.cl, method_name)
+        d = defer.ensureDeferred(method("testserv:8008", "foo/bar", timeout=10000))
 
         self.pump()
 
@@ -348,7 +349,9 @@ class FederationClientTests(HomeserverTestCase):
         self.reactor.advance(10.5)
         f = self.failureResultOf(d)
 
-        self.assertIsInstance(f.value, TimeoutError)
+        self.assertIsInstance(f.value, RequestSendFailed)
+        self.assertTrue(f.value.can_retry)
+        self.assertIsInstance(f.value.inner_exception, defer.TimeoutError)
 
     def test_client_requires_trailing_slashes(self):
         """
@@ -508,6 +511,53 @@ class FederationClientTests(HomeserverTestCase):
         self.assertFalse(conn.disconnecting)
 
         # wait for a while
-        self.pump(120)
+        self.reactor.advance(120)
 
         self.assertTrue(conn.disconnecting)
+
+    @parameterized.expand([(b"",), (b"foo",), (b'{"a": Infinity}',)])
+    def test_json_error(self, return_value):
+        """
+        Test what happens if invalid JSON is returned from the remote endpoint.
+        """
+
+        test_d = defer.ensureDeferred(self.cl.get_json("testserv:8008", "foo/bar"))
+
+        self.pump()
+
+        # Nothing happened yet
+        self.assertNoResult(test_d)
+
+        # Make sure treq is trying to connect
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, factory, _timeout, _bindAddress) = clients[0]
+        self.assertEqual(host, "1.2.3.4")
+        self.assertEqual(port, 8008)
+
+        # complete the connection and wire it up to a fake transport
+        protocol = factory.buildProtocol(None)
+        transport = StringTransport()
+        protocol.makeConnection(transport)
+
+        # that should have made it send the request to the transport
+        self.assertRegex(transport.value(), b"^GET /foo/bar")
+        self.assertRegex(transport.value(), b"Host: testserv:8008")
+
+        # Deferred is still without a result
+        self.assertNoResult(test_d)
+
+        # Send it the HTTP response
+        protocol.dataReceived(
+            b"HTTP/1.1 200 OK\r\n"
+            b"Server: Fake\r\n"
+            b"Content-Type: application/json\r\n"
+            b"Content-Length: %i\r\n"
+            b"\r\n"
+            b"%s" % (len(return_value), return_value)
+        )
+
+        self.pump()
+
+        f = self.failureResultOf(test_d)
+        self.assertIsInstance(f.value, ValueError)

@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Optional
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import attr
 from nacl.signing import SigningKey
@@ -36,7 +36,7 @@ from synapse.util.stringutils import random_string
 
 
 @attr.s(slots=True, cmp=False, frozen=True)
-class EventBuilder(object):
+class EventBuilder:
     """A format independent event builder used to build up the event content
     before signing the event.
 
@@ -97,14 +97,14 @@ class EventBuilder(object):
     def is_state(self):
         return self._state_key is not None
 
-    async def build(self, prev_event_ids):
+    async def build(self, prev_event_ids: List[str]) -> EventBase:
         """Transform into a fully signed and hashed event
 
         Args:
-            prev_event_ids (list[str]): The event IDs to use as the prev events
+            prev_event_ids: The event IDs to use as the prev events
 
         Returns:
-            FrozenEvent
+            The signed and hashed event.
         """
 
         state_ids = await self._state.get_current_state_ids(
@@ -114,8 +114,13 @@ class EventBuilder(object):
 
         format_version = self.room_version.event_format
         if format_version == EventFormatVersions.V1:
-            auth_events = await self._store.add_event_hashes(auth_ids)
-            prev_events = await self._store.add_event_hashes(prev_event_ids)
+            # The types of auth/prev events changes between event versions.
+            auth_events = await self._store.add_event_hashes(
+                auth_ids
+            )  # type: Union[List[str], List[Tuple[str, Dict[str, str]]]]
+            prev_events = await self._store.add_event_hashes(
+                prev_event_ids
+            )  # type: Union[List[str], List[Tuple[str, Dict[str, str]]]]
         else:
             auth_events = auth_ids
             prev_events = prev_event_ids
@@ -138,7 +143,7 @@ class EventBuilder(object):
             "unsigned": self.unsigned,
             "depth": depth,
             "prev_state": [],
-        }
+        }  # type: Dict[str, Any]
 
         if self.is_state():
             event_dict["state_key"] = self._state_key
@@ -159,7 +164,7 @@ class EventBuilder(object):
         )
 
 
-class EventBuilderFactory(object):
+class EventBuilderFactory:
     def __init__(self, hs):
         self.clock = hs.get_clock()
         self.hostname = hs.hostname

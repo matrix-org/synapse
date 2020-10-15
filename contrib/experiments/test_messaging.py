@@ -55,7 +55,7 @@ def excpetion_errback(failure):
     logging.exception(failure)
 
 
-class InputOutput(object):
+class InputOutput:
     """ This is responsible for basic I/O so that a user can interact with
     the example app.
     """
@@ -132,7 +132,7 @@ class IOLoggerHandler(logging.Handler):
         self.io.print_log(msg)
 
 
-class Room(object):
+class Room:
     """ Used to store (in memory) the current membership state of a room, and
     which home servers we should send PDUs associated with the room to.
     """

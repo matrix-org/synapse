@@ -29,7 +29,7 @@ from synapse.logging.context import (
 logger = logging.getLogger(__name__)
 
 
-class FederationRateLimiter(object):
+class FederationRateLimiter:
     def __init__(self, clock, config):
         """
         Args:
@@ -60,7 +60,7 @@ class FederationRateLimiter(object):
         return self.ratelimiters[host].ratelimit()
 
 
-class _PerHostRatelimiter(object):
+class _PerHostRatelimiter:
     def __init__(self, clock, config):
         """
         Args:

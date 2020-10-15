@@ -47,6 +47,18 @@ you invite them to. This can be caused by an incorrectly-configured reverse
 proxy: see [reverse_proxy.md](<reverse_proxy.md>) for instructions on how to correctly
 configure a reverse proxy.
 
+### Known issues
+
+**HTTP `308 Permanent Redirect` redirects are not followed**: Due to missing features
+in the HTTP library used by Synapse, 308 redirects are currently not followed by
+federating servers, which can cause `M_UNKNOWN` or `401 Unauthorized` errors. This
+may affect users who are redirecting apex-to-www (e.g. `example.com` -> `www.example.com`),
+and especially users of the Kubernetes *Nginx Ingress* module, which uses 308 redirect
+codes by default. For those Kubernetes users, [this Stackoverflow post](https://stackoverflow.com/a/52617528/5096871) 
+might be helpful. For other users, switching to a `301 Moved Permanently` code may be
+an option. 308 redirect codes will be supported properly in a future
+release of Synapse.
+
 ## Running a demo federation of Synapses
 
 If you want to get up and running quickly with a trio of homeservers in a

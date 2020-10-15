@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
+
 from synapse.api.errors import Codes
 from synapse.rest.client.v2_alpha import filter
 
@@ -73,8 +75,10 @@ class FilterTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.json_body["errcode"], Codes.FORBIDDEN)
 
     def test_get_filter(self):
-        filter_id = self.filtering.add_user_filter(
-            user_localpart="apple", user_filter=self.EXAMPLE_FILTER
+        filter_id = defer.ensureDeferred(
+            self.filtering.add_user_filter(
+                user_localpart="apple", user_filter=self.EXAMPLE_FILTER
+            )
         )
         self.reactor.advance(1)
         filter_id = filter_id.result

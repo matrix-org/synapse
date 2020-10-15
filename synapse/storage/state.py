@@ -20,7 +20,7 @@ import attr
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.types import StateMap
+from synapse.types import MutableStateMap, StateMap
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ T = TypeVar("T")
 
 
 @attr.s(slots=True)
-class StateFilter(object):
+class StateFilter:
     """A filter used when querying for state.
 
     Attributes:
@@ -326,14 +326,14 @@ class StateFilter(object):
         return member_filter, non_member_filter
 
 
-class StateGroupStorage(object):
+class StateGroupStorage:
     """High level interface to fetching state for event.
     """
 
     def __init__(self, hs, stores):
         self.stores = stores
 
-    def get_state_group_delta(self, state_group: int):
+    async def get_state_group_delta(self, state_group: int):
         """Given a state group try to return a previous group and a delta between
         the old and the new.
 
@@ -341,15 +341,15 @@ class StateGroupStorage(object):
             state_group: The state group used to retrieve state deltas.
 
         Returns:
-            Deferred[Tuple[Optional[int], Optional[StateMap[str]]]]:
+            Tuple[Optional[int], Optional[StateMap[str]]]:
                 (prev_group, delta_ids)
         """
 
-        return self.stores.state.get_state_group_delta(state_group)
+        return await self.stores.state.get_state_group_delta(state_group)
 
     async def get_state_groups_ids(
         self, _room_id: str, event_ids: Iterable[str]
-    ) -> Dict[int, StateMap[str]]:
+    ) -> Dict[int, MutableStateMap[str]]:
         """Get the event IDs of all the state for the state groups for the given events
 
         Args:
@@ -525,14 +525,14 @@ class StateGroupStorage(object):
             state_filter: The state filter used to fetch state from the database.
 
         Returns:
-            A deferred dict from (type, state_key) -> state_event
+            A dict from (type, state_key) -> state_event
         """
         state_map = await self.get_state_ids_for_events([event_id], state_filter)
         return state_map[event_id]
 
     def _get_state_for_groups(
         self, groups: Iterable[int], state_filter: StateFilter = StateFilter.all()
-    ) -> Awaitable[Dict[int, StateMap[str]]]:
+    ) -> Awaitable[Dict[int, MutableStateMap[str]]]:
         """Gets the state at each of a list of state groups, optionally
         filtering by type/state_key
 
@@ -546,14 +546,14 @@ class StateGroupStorage(object):
         """
         return self.stores.state._get_state_for_groups(groups, state_filter)
 
-    def store_state_group(
+    async def store_state_group(
         self,
         event_id: str,
         room_id: str,
         prev_group: Optional[int],
         delta_ids: Optional[dict],
         current_state_ids: dict,
-    ):
+    ) -> int:
         """Store a new set of state, returning a newly assigned state group.
 
         Args:
@@ -567,8 +567,8 @@ class StateGroupStorage(object):
                 to event_id.
 
         Returns:
-            Deferred[int]: The state group ID
+            The state group ID
         """
-        return self.stores.state.store_state_group(
+        return await self.stores.state.store_state_group(
             event_id, room_id, prev_group, delta_ids, current_state_ids
         )

@@ -17,11 +17,10 @@
 import logging
 from typing import Dict, List, Tuple
 
-from canonicaljson import json
-
 from synapse.storage._base import db_to_json
 from synapse.storage.databases.main.account_data import AccountDataWorkerStore
 from synapse.types import JsonDict
+from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
@@ -44,7 +43,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
             "room_tags", {"user_id": user_id}, ["room_id", "tag", "content"]
         )
 
-        tags_by_room = {}
+        tags_by_room = {}  # type: Dict[str, Dict[str, JsonDict]]
         for row in rows:
             room_tags = tags_by_room.setdefault(row["room_id"], {})
             room_tags[row["tag"]] = db_to_json(row["content"])
@@ -98,7 +97,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
                 txn.execute(sql, (user_id, room_id))
                 tags = []
                 for tag, content in txn:
-                    tags.append(json.dumps(tag) + ":" + content)
+                    tags.append(json_encoder.encode(tag) + ":" + content)
                 tag_json = "{" + ",".join(tags) + "}"
                 results.append((stream_id, (user_id, room_id, tag_json)))
 
@@ -124,7 +123,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
 
     async def get_updated_tags(
         self, user_id: str, stream_id: int
-    ) -> Dict[str, List[str]]:
+    ) -> Dict[str, Dict[str, JsonDict]]:
         """Get all the tags for the rooms where the tags have changed since the
         given version
 
@@ -200,7 +199,7 @@ class TagsStore(TagsWorkerStore):
         Returns:
             The next account data ID.
         """
-        content_json = json.dumps(content)
+        content_json = json_encoder.encode(content)
 
         def add_tag_txn(txn, next_id):
             self.db_pool.simple_upsert_txn(
@@ -211,7 +210,7 @@ class TagsStore(TagsWorkerStore):
             )
             self._update_revision_txn(txn, user_id, room_id, next_id)
 
-        with self._account_data_id_gen.get_next() as next_id:
+        async with self._account_data_id_gen.get_next() as next_id:
             await self.db_pool.runInteraction("add_tag", add_tag_txn, next_id)
 
         self.get_tags_for_user.invalidate((user_id,))
@@ -233,7 +232,7 @@ class TagsStore(TagsWorkerStore):
             txn.execute(sql, (user_id, room_id, tag))
             self._update_revision_txn(txn, user_id, room_id, next_id)
 
-        with self._account_data_id_gen.get_next() as next_id:
+        async with self._account_data_id_gen.get_next() as next_id:
             await self.db_pool.runInteraction("remove_tag", remove_tag_txn, next_id)
 
         self.get_tags_for_user.invalidate((user_id,))
