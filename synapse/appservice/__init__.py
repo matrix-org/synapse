@@ -297,7 +297,7 @@ class ApplicationService:
             user_id: The ID of the user.
 
         Returns:
-            iterable: an iterable that yields group_id strings.
+            An iterable that yields group_id strings.
         """
         return (
             regex_obj["group_id"]

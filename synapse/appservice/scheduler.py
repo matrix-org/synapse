@@ -49,7 +49,7 @@ This is all tied together by the AppServiceScheduler which DIs the required
 components.
 """
 import logging
-from typing import List, Optional
+from typing import List
 
 from synapse.appservice import ApplicationService, ApplicationServiceState
 from synapse.events import EventBase
@@ -120,7 +120,7 @@ class _ServiceQueuer:
             "as-sender-%s" % (service.id,), self._send_request, service
         )
 
-    def enqueue_event(self, service, event):
+    def enqueue_event(self, service: ApplicationService, event: EventBase):
         self.queued_events.setdefault(service.id, []).append(event)
         self._start_background_request(service)
 
@@ -177,7 +177,7 @@ class _TransactionController:
         self,
         service: ApplicationService,
         events: List[EventBase],
-        ephemeral: Optional[JsonDict] = None,
+        ephemeral: List[JsonDict] = [],
     ):
         try:
             txn = await self.store.create_appservice_txn(

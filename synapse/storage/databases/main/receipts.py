@@ -23,6 +23,7 @@ from twisted.internet import defer
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool
 from synapse.storage.util.id_generators import StreamIdGenerator
+from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.descriptors import cached, cachedList
@@ -277,7 +278,18 @@ class ReceiptsWorkerStore(SQLBaseStore, metaclass=abc.ABCMeta):
     @cached(num_args=2,)
     async def get_linearized_receipts_for_all_rooms(
         self, to_key: int, from_key: Optional[int] = None
-    ):
+    ) -> Dict[str, JsonDict]:
+        """Get receipts for all rooms between two stream_ids.
+
+        Args:
+            to_key: Max stream id to fetch receipts upto.
+            from_key: Min stream id to fetch receipts from. None fetches
+                from the start.
+
+        Returns:
+            A dictionary of roomids to a list of receipts.
+        """
+
         def f(txn):
             if from_key:
                 sql = """
