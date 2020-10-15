@@ -38,6 +38,22 @@ class DeferredCacheTestCase(unittest.TestCase):
 
         self.assertEquals(cache.get("foo"), 123)
 
+    def test_get_immediate(self):
+        cache = DeferredCache("test")
+        d1 = defer.Deferred()
+        cache.set("key1", d1)
+
+        # get_immediate should return default
+        v = cache.get_immediate("key1", 1)
+        self.assertEqual(v, 1)
+
+        # now complete the set
+        d1.callback(2)
+
+        # get_immediate should return result
+        v = cache.get_immediate("key1", 1)
+        self.assertEqual(v, 2)
+
     def test_invalidate(self):
         cache = DeferredCache("test")
         cache.prefill(("foo",), 123)

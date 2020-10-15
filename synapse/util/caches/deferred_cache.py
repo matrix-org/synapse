@@ -17,7 +17,16 @@
 
 import enum
 import threading
-from typing import Callable, Generic, Iterable, MutableMapping, Optional, TypeVar, cast
+from typing import (
+    Callable,
+    Generic,
+    Iterable,
+    MutableMapping,
+    Optional,
+    TypeVar,
+    Union,
+    cast,
+)
 
 from prometheus_client import Gauge
 
@@ -33,7 +42,7 @@ cache_pending_metric = Gauge(
     ["name"],
 )
 
-
+T = TypeVar("T")
 KT = TypeVar("KT")
 VT = TypeVar("VT")
 
@@ -152,6 +161,12 @@ class DeferredCache(Generic[KT, VT]):
             raise KeyError()
         else:
             return val
+
+    def get_immediate(
+        self, key: KT, default: T, update_metrics: bool = True
+    ) -> Union[VT, T]:
+        """If we have a *completed* cached value, return it."""
+        return self.cache.get(key, default, update_metrics=update_metrics)
 
     def set(
         self,
