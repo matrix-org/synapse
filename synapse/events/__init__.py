@@ -312,6 +312,12 @@ class EventBase(metaclass=abc.ABCMeta):
         """
         return [e for e, _ in self.auth_events]
 
+    def freeze(self):
+        """'Freeze' the event dict, so it cannot be modified by accident"""
+
+        # this will be a no-op if the event dict is already frozen.
+        self._dict = freeze(self._dict)
+
 
 class FrozenEvent(EventBase):
     format_version = EventFormatVersions.V1  # All events of this type are V1
