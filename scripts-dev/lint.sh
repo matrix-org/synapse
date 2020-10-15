@@ -31,21 +31,6 @@ while getopts ":dh" opt; do
   case $opt in
     d)
       USING_DIFF=1
-
-      # Check both staged and non-staged changes
-      for path in $(git diff HEAD --name-only); do
-        filename=$(basename "$path")
-        file_extension="${filename##*.}"
-
-        # If an extension is present, and it's something other than 'py',
-        # then ignore this file
-        if [[ -n ${file_extension+x} && $file_extension != "py" ]]; then
-          continue
-        fi
-
-        # Append this path to our list of files to lint
-        files+=("$path")
-      done
       ;;
     h)
       usage
@@ -62,6 +47,23 @@ done
 # Strip any options from the command line arguments now that
 # we've finished processing them
 shift "$((OPTIND-1))"
+
+if [ $USING_DIFF -eq 1 ]; then
+  # Check both staged and non-staged changes
+  for path in $(git diff HEAD --name-only); do
+    filename=$(basename "$path")
+    file_extension="${filename##*.}"
+
+    # If an extension is present, and it's something other than 'py',
+    # then ignore this file
+    if [[ -n ${file_extension+x} && $file_extension != "py" ]]; then
+      continue
+    fi
+
+    # Append this path to our list of files to lint
+    files+=("$path")
+  done
+fi
 
 # Append any remaining arguments as files to lint
 files+=("$@")
