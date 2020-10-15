@@ -4,7 +4,7 @@ Synapse 1.21.2 (2020-10-15)
 Security advisory
 -----------------
 
-* HTML pages served via Synapse were vulernable to cross-site scripting (XSS)
+* HTML pages served via Synapse were vulnerable to cross-site scripting (XSS)
   attacks. All server administrators are encouraged to upgrade.
   ([34ff8da8](https://github.com/matrix-org/synapse/commit/34ff8da83b54024289f515c6d73e6b486574d699))
   ([CVE-2020-26891](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2020-26891))
