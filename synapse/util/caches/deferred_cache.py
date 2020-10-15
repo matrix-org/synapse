@@ -128,21 +128,21 @@ class DeferredCache(Generic[KT, VT]):
     def get(
         self,
         key: KT,
-        default=_Sentinel.sentinel,
         callback: Optional[Callable[[], None]] = None,
         update_metrics: bool = True,
-    ):
+    ) -> Union[ObservableDeferred, VT]:
         """Looks the key up in the caches.
 
         Args:
             key(tuple)
-            default: What is returned if key is not in the caches. If not
-                specified then function throws KeyError instead
             callback(fn): Gets called when the entry in the cache is invalidated
             update_metrics (bool): whether to update the cache hit rate metrics
 
         Returns:
             Either an ObservableDeferred or the result itself
+
+        Raises:
+            KeyError if the key is not found in the cache
         """
         callbacks = [callback] if callback else []
         val = self._pending_deferred_cache.get(key, _Sentinel.sentinel)
@@ -154,13 +154,13 @@ class DeferredCache(Generic[KT, VT]):
                 m.inc_hits()
             return val.deferred
 
-        val = self.cache.get(
-            key, default, callbacks=callbacks, update_metrics=update_metrics
+        val2 = self.cache.get(
+            key, _Sentinel.sentinel, callbacks=callbacks, update_metrics=update_metrics
         )
-        if val is _Sentinel.sentinel:
+        if val2 is _Sentinel.sentinel:
             raise KeyError()
         else:
-            return val
+            return val2
 
     def get_immediate(
         self, key: KT, default: T, update_metrics: bool = True
