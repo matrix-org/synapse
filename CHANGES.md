@@ -1,14 +1,14 @@
 Synapse 1.21.2 (2020-10-15)
 ===========================
 
-Debian packages and Docker images are rebuilt using the latest versions of dependency libraries, including authlib 0.15.1. Please see bugfixes below.
+Debian packages and Docker images have been rebuilt using the latest versions of dependency libraries, including authlib 0.15.1. Please see bugfixes below.
 
 Security advisory
 -----------------
 
 * HTML pages served via Synapse were vulnerable to cross-site scripting (XSS)
   attacks. All server administrators are encouraged to upgrade.
-  ([34ff8da8](https://github.com/matrix-org/synapse/commit/34ff8da83b54024289f515c6d73e6b486574d699))
+  ([\#8444](https://github.com/matrix-org/synapse/pull/8444))
   ([CVE-2020-26891](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2020-26891))
 
   This fix was originally included in v1.21.0 but was missing a security advisory.
@@ -19,7 +19,7 @@ Bugfixes
 --------
 
 - Fix rare bug where sending an event would fail due to a racey assertion. ([\#8530](https://github.com/matrix-org/synapse/issues/8530))
-- An updated version of the authlib dependency is included in the Docker and Debian release to fix an issue using OpenID Connect.
+- An updated version of the authlib dependency is included in the Docker and Debian images to fix an issue using OpenID Connect. See [\#8534](https://github.com/matrix-org/synapse/issues/8534) for details.
 
 
 Synapse 1.21.1 (2020-10-13)
