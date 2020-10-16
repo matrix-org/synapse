@@ -1,1 +1,1 @@
-(Internal) Add virtualenv-generated folders to `.gitignore`.
+Add virtualenv-generated folders to `.gitignore`.
