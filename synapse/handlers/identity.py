@@ -22,9 +22,6 @@ import urllib.parse
 from typing import Awaitable, Callable, Dict, List, Optional, Tuple
 
 from canonicaljson import json
-from signedjson.key import decode_verify_key_bytes
-from signedjson.sign import verify_signed_json
-from unpaddedbase64 import decode_base64
 
 from twisted.internet import defer
 from twisted.internet.error import TimeoutError
@@ -770,9 +767,9 @@ class IdentityHandler(BaseHandler):
             )
 
             if "mxid" in data:
-                if "signatures" not in data:
-                    raise AuthError(401, "No signatures on 3pid binding")
-                await self._verify_any_signature(data, id_server)
+                # note: we used to verify the identity server's signature here, but no longer
+                # require or validate it. See the following for context:
+                # https://github.com/matrix-org/synapse/issues/5253#issuecomment-666246950
                 return data["mxid"]
         except TimeoutError:
             raise SynapseError(500, "Timed out contacting identity server")
@@ -890,31 +887,6 @@ class IdentityHandler(BaseHandler):
         # Return the MXID if it's available, or None otherwise
         mxid = lookup_results["mappings"].get(lookup_value)
         return mxid
-
-    async def _verify_any_signature(self, data, id_server):
-        if id_server not in data["signatures"]:
-            raise AuthError(401, "No signature from server %s" % (id_server,))
-
-        for key_name, signature in data["signatures"][id_server].items():
-            id_server_url = self.rewrite_id_server_url(id_server, add_https=True)
-
-            key_data = await self.http_client.get_json(
-                "%s/_matrix/identity/api/v1/pubkey/%s" % (id_server_url, key_name)
-            )
-            if "public_key" not in key_data:
-                raise AuthError(
-                    401, "No public key named %s from %s" % (key_name, id_server)
-                )
-            verify_signed_json(
-                data,
-                id_server,
-                decode_verify_key_bytes(
-                    key_name, decode_base64(key_data["public_key"])
-                ),
-            )
-            return
-
-        raise AuthError(401, "No signature from server %s" % (id_server,))
 
     async def ask_id_server_for_third_party_invite(
         self,
