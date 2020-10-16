@@ -34,10 +34,15 @@ from synapse.config import cache as cache_config
 from synapse.util.caches import CacheMetric, register_cache
 from synapse.util.caches.treecache import TreeCache
 
-T = TypeVar("T")
+# Function type: the type used for invalidation callbacks
 FT = TypeVar("FT", bound=Callable[..., Any])
+
+# Key and Value type for the cache
 KT = TypeVar("KT")
 VT = TypeVar("VT")
+
+# a general type var, distinct from either KT or VT
+T = TypeVar("T")
 
 
 def enumerate_leaves(node, depth):
@@ -227,7 +232,7 @@ class LruCache(Generic[KT, VT]):
         @synchronized
         def cache_get(
             key: KT,
-            default=None,
+            default: Optional[T] = None,
             callbacks: Iterable[Callable[[], None]] = [],
             update_metrics: bool = True,
         ):
@@ -291,7 +296,7 @@ class LruCache(Generic[KT, VT]):
             ...
 
         @synchronized
-        def cache_pop(key: KT, default=None):
+        def cache_pop(key: KT, default: Optional[T] = None):
             node = cache.get(key, None)
             if node:
                 delete_node(node)
