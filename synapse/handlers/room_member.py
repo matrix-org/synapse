@@ -500,25 +500,38 @@ class RoomMemberHandler(object):
                     user_id=target.to_string(), room_id=room_id
                 )  # type: Optional[RoomsForUser]
                 if not invite:
+                    logger.info(
+                        "%s sent a leave request to %s, but that is not an active room "
+                        "on this server, and there is no pending invite",
+                        target,
+                        room_id,
+                    )
+
                     raise SynapseError(404, "Not a known room")
 
                 logger.info(
                     "%s rejects invite to %s from %s", target, room_id, invite.sender
                 )
 
-                if self.hs.is_mine_id(invite.sender):
-                    # the inviter was on our server, but has now left. Carry on
-                    # with the normal rejection codepath.
-                    #
-                    # This is a bit of a hack, because the room might still be
-                    # active on other servers.
-                    pass
-                else:
+                if not self.hs.is_mine_id(invite.sender):
                     # send the rejection to the inviter's HS (with fallback to
                     # local event)
                     return await self.remote_reject_invite(
                         invite.event_id, txn_id, requester, content,
                     )
+
+                # the inviter was on our server, but has now left. Carry on
+                # with the normal rejection codepath, which will also send the
+                # rejection out to any other servers we believe are still in the room.
+
+                # thanks to overzealous cleaning up of event_forward_extremities in
+                # `delete_old_current_state_events`, it's possible to end up with no
+                # forward extremities here. If that happens, let's just hang the
+                # rejection off the invite event.
+                #
+                # see: https://github.com/matrix-org/synapse/issues/7139
+                if len(latest_event_ids) == 0:
+                    latest_event_ids = [invite.event_id]
 
         return await self._local_membership_update(
             requester=requester,
