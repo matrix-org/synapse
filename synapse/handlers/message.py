@@ -437,9 +437,9 @@ class EventCreationHandler:
         self,
         requester: Requester,
         event_dict: dict,
-        token_id: Optional[str] = None,
         txn_id: Optional[str] = None,
         prev_event_ids: Optional[List[str]] = None,
+        auth_event_ids: Optional[List[str]] = None,
         require_consent: bool = True,
     ) -> Tuple[EventBase, EventContext]:
         """
@@ -453,13 +453,18 @@ class EventCreationHandler:
         Args:
             requester
             event_dict: An entire event
-            token_id
             txn_id
             prev_event_ids:
                 the forward extremities to use as the prev_events for the
                 new event.
 
                 If None, they will be requested from the database.
+
+            auth_event_ids:
+                The event ids to use as the auth_events for the new event.
+                Should normally be left as None, which will cause them to be calculated
+                based on the room state at the prev_events.
+
             require_consent: Whether to check if the requester has
                 consented to the privacy policy.
         Raises:
@@ -511,14 +516,17 @@ class EventCreationHandler:
         if require_consent and not is_exempt:
             await self.assert_accepted_privacy_policy(requester)
 
-        if token_id is not None:
-            builder.internal_metadata.token_id = token_id
+        if requester.access_token_id is not None:
+            builder.internal_metadata.token_id = requester.access_token_id
 
         if txn_id is not None:
             builder.internal_metadata.txn_id = txn_id
 
         event, context = await self.create_new_client_event(
-            builder=builder, requester=requester, prev_event_ids=prev_event_ids,
+            builder=builder,
+            requester=requester,
+            prev_event_ids=prev_event_ids,
+            auth_event_ids=auth_event_ids,
         )
 
         # In an ideal world we wouldn't need the second part of this condition. However,
@@ -726,7 +734,7 @@ class EventCreationHandler:
                     return event, event.internal_metadata.stream_ordering
 
             event, context = await self.create_event(
-                requester, event_dict, token_id=requester.access_token_id, txn_id=txn_id
+                requester, event_dict, txn_id=txn_id
             )
 
             assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
@@ -757,6 +765,7 @@ class EventCreationHandler:
         builder: EventBuilder,
         requester: Optional[Requester] = None,
         prev_event_ids: Optional[List[str]] = None,
+        auth_event_ids: Optional[List[str]] = None,
     ) -> Tuple[EventBase, EventContext]:
         """Create a new event for a local client
 
@@ -768,6 +777,11 @@ class EventCreationHandler:
                 new event.
 
                 If None, they will be requested from the database.
+
+            auth_event_ids:
+                The event ids to use as the auth_events for the new event.
+                Should normally be left as None, which will cause them to be calculated
+                based on the room state at the prev_events.
 
         Returns:
             Tuple of created event, context
@@ -790,10 +804,29 @@ class EventCreationHandler:
             builder.type == EventTypes.Create or len(prev_event_ids) > 0
         ), "Attempting to create an event with no prev_events"
 
-        event = await builder.build(prev_event_ids=prev_event_ids)
+        event = await builder.build(
+            prev_event_ids=prev_event_ids, auth_event_ids=auth_event_ids
+        )
         context = await self.state.compute_event_context(event)
         if requester:
             context.app_service = requester.app_service
+
+        third_party_result = await self.third_party_event_rules.check_event_allowed(
+            event, context
+        )
+        if not third_party_result:
+            logger.info(
+                "Event %s forbidden by third-party rules", event,
+            )
+            raise SynapseError(
+                403, "This event is not allowed in this context", Codes.FORBIDDEN
+            )
+        elif isinstance(third_party_result, dict):
+            # the third-party rules want to replace the event. We'll need to build a new
+            # event.
+            event, context = await self._rebuild_event_after_third_party_rules(
+                third_party_result, event
+            )
 
         self.validator.validate_new(event, self.config)
 
@@ -880,14 +913,6 @@ class EventCreationHandler:
             room_version = event.content.get("room_version", RoomVersions.V1.identifier)
         else:
             room_version = await self.store.get_room_version_id(event.room_id)
-
-        event_allowed = await self.third_party_event_rules.check_event_allowed(
-            event, context
-        )
-        if not event_allowed:
-            raise SynapseError(
-                403, "This event is not allowed in this context", Codes.FORBIDDEN
-            )
 
         if event.internal_metadata.is_out_of_band_membership():
             # the only sort of out-of-band-membership events we expect to see here
@@ -1291,3 +1316,57 @@ class EventCreationHandler:
                 room_id,
             )
             del self._rooms_to_exclude_from_dummy_event_insertion[room_id]
+
+    async def _rebuild_event_after_third_party_rules(
+        self, third_party_result: dict, original_event: EventBase
+    ) -> Tuple[EventBase, EventContext]:
+        # the third_party_event_rules want to replace the event.
+        # we do some basic checks, and then return the replacement event and context.
+
+        # Construct a new EventBuilder and validate it, which helps with the
+        # rest of these checks.
+        try:
+            builder = self.event_builder_factory.for_room_version(
+                original_event.room_version, third_party_result
+            )
+            self.validator.validate_builder(builder)
+        except SynapseError as e:
+            raise Exception(
+                "Third party rules module created an invalid event: " + e.msg,
+            )
+
+        immutable_fields = [
+            # changing the room is going to break things: we've already checked that the
+            # room exists, and are holding a concurrency limiter token for that room.
+            # Also, we might need to use a different room version.
+            "room_id",
+            # changing the type or state key might work, but we'd need to check that the
+            # calling functions aren't making assumptions about them.
+            "type",
+            "state_key",
+        ]
+
+        for k in immutable_fields:
+            if getattr(builder, k, None) != original_event.get(k):
+                raise Exception(
+                    "Third party rules module created an invalid event: "
+                    "cannot change field " + k
+                )
+
+        # check that the new sender belongs to this HS
+        if not self.hs.is_mine_id(builder.sender):
+            raise Exception(
+                "Third party rules module created an invalid event: "
+                "invalid sender " + builder.sender
+            )
+
+        # copy over the original internal metadata
+        for k, v in original_event.internal_metadata.get_dict().items():
+            setattr(builder.internal_metadata, k, v)
+
+        event = await builder.build(prev_event_ids=original_event.prev_event_ids())
+
+        # we rebuild the event context, to be on the safe side. If nothing else,
+        # delta_ids might need an update.
+        context = await self.state.compute_event_context(event)
+        return event, context

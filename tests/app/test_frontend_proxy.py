@@ -22,7 +22,7 @@ class FrontendProxyTests(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         hs = self.setup_test_homeserver(
-            http_client=None, homeserverToUse=GenericWorkerServer
+            http_client=None, homeserver_to_use=GenericWorkerServer
         )
 
         return hs
