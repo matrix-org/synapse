@@ -78,7 +78,9 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
         """
         event_payloads = []
         for event, context in event_and_contexts:
-            serialized_context = yield context.serialize(event, store)
+            serialized_context = yield defer.ensureDeferred(
+                context.serialize(event, store)
+            )
 
             event_payloads.append(
                 {

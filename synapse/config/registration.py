@@ -412,24 +412,6 @@ class RegistrationConfig(Config):
         #
         #default_identity_server: https://matrix.org
 
-        # The list of identity servers trusted to verify third party
-        # identifiers by this server.
-        #
-        # Also defines the ID server which will be called when an account is
-        # deactivated (one will be picked arbitrarily).
-        #
-        # Note: This option is deprecated. Since v0.99.4, Synapse has tracked which identity
-        # server a 3PID has been bound to. For 3PIDs bound before then, Synapse runs a
-        # background migration script, informing itself that the identity server all of its
-        # 3PIDs have been bound to is likely one of the below.
-        #
-        # As of Synapse v1.4.0, all other functionality of this option has been deprecated, and
-        # it is now solely used for the purposes of the background migration script, and can be
-        # removed once it has run.
-        #trusted_third_party_id_servers:
-        #  - matrix.org
-        #  - vector.im
-
         # If enabled, user IDs, display names and avatar URLs will be replicated
         # to this server whenever they change.
         # This is an experimental API currently implemented by sydent to support

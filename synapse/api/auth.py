@@ -82,7 +82,7 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def check_from_context(self, room_version: str, event, context, do_sig_check=True):
-        prev_state_ids = yield context.get_prev_state_ids()
+        prev_state_ids = yield defer.ensureDeferred(context.get_prev_state_ids())
         auth_events_ids = yield self.compute_auth_events(
             event, prev_state_ids, for_verification=True
         )
