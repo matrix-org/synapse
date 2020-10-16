@@ -175,7 +175,7 @@ class ApplicationServiceApi(SimpleHttpClient):
                 urllib.parse.quote(protocol),
             )
             try:
-                info = yield self.get_json(uri, {})
+                info = yield defer.ensureDeferred(self.get_json(uri, {}))
 
                 if not _is_valid_3pe_metadata(info):
                     logger.warning(
