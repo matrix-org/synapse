@@ -23,6 +23,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from canonicaljson import json
 
+from twisted.internet import defer
+
 from synapse.api.constants import EventTypes
 from synapse.api.errors import StoreError
 from synapse.api.room_versions import RoomVersion, RoomVersions

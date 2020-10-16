@@ -22,7 +22,8 @@ from unpaddedbase64 import encode_base64
 
 from synapse import types
 from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
-from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.errors import AuthError, Codes, LimitExceededError, SynapseError
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.room_versions import EventFormatVersions
 from synapse.crypto.event_signing import compute_event_reference_hash
 from synapse.events import EventBase
@@ -77,6 +78,17 @@ class RoomMemberHandler(object):
         )
         if self._is_on_event_persistence_instance:
             self.persist_event_storage = hs.get_storage().persistence
+
+        self._join_rate_limiter_local = Ratelimiter(
+            clock=self.clock,
+            rate_hz=hs.config.ratelimiting.rc_joins_local.per_second,
+            burst_count=hs.config.ratelimiting.rc_joins_local.burst_count,
+        )
+        self._join_rate_limiter_remote = Ratelimiter(
+            clock=self.clock,
+            rate_hz=hs.config.ratelimiting.rc_joins_remote.per_second,
+            burst_count=hs.config.ratelimiting.rc_joins_remote.burst_count,
+        )
 
         # This is only used to get at ratelimit function, and
         # maybe_kick_guest_users. It's fine there are multiple of these as
@@ -472,7 +484,28 @@ class RoomMemberHandler(object):
                 ):
                     raise SynapseError(403, "Not allowed to join this room")
 
-            if not is_host_in_room:
+            if is_host_in_room:
+                time_now_s = self.clock.time()
+                allowed, time_allowed = self._join_rate_limiter_local.can_do_action(
+                    requester.user.to_string(),
+                )
+
+                if not allowed:
+                    raise LimitExceededError(
+                        retry_after_ms=int(1000 * (time_allowed - time_now_s))
+                    )
+
+            else:
+                time_now_s = self.clock.time()
+                allowed, time_allowed = self._join_rate_limiter_remote.can_do_action(
+                    requester.user.to_string(),
+                )
+
+                if not allowed:
+                    raise LimitExceededError(
+                        retry_after_ms=int(1000 * (time_allowed - time_now_s))
+                    )
+
                 inviter = await self._get_inviter(target.to_string(), room_id)
                 if inviter and not self.hs.is_mine(inviter):
                     remote_room_hosts.append(inviter.domain)
