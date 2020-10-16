@@ -214,15 +214,24 @@ class DeferredCache(Generic[KT, VT]):
 
         callbacks = [callback] if callback else []
         self.check_thread()
-        observable = ObservableDeferred(value, consumeErrors=True)
-        observer = observable.observe()
-        entry = CacheEntry(deferred=observable, callbacks=callbacks)
 
         existing_entry = self._pending_deferred_cache.pop(key, None)
         if existing_entry:
             existing_entry.invalidate()
 
         # XXX: why don't we invalidate the entry in `self.cache` yet?
+
+        # we can save a whole load of effort if the deferred is ready.
+        if value.called:
+            self.cache.set(key, value.result, callbacks)
+            return value
+
+        # otherwise, we'll add an entry to the _pending_deferred_cache for now,
+        # and add callbacks to add it to the cache properly later.
+
+        observable = ObservableDeferred(value, consumeErrors=True)
+        observer = observable.observe()
+        entry = CacheEntry(deferred=observable, callbacks=callbacks)
 
         self._pending_deferred_cache[key] = entry
 
