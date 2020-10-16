@@ -15,8 +15,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import make_event_from_dict
 from synapse.events.snapshot import EventContext
@@ -67,8 +65,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
         self.federation_handler = hs.get_handlers().federation_handler
 
     @staticmethod
-    @defer.inlineCallbacks
-    def _serialize_payload(store, event_and_contexts, backfilled):
+    async def _serialize_payload(store, event_and_contexts, backfilled):
         """
         Args:
             store
@@ -78,9 +75,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
         """
         event_payloads = []
         for event, context in event_and_contexts:
-            serialized_context = yield defer.ensureDeferred(
-                context.serialize(event, store)
-            )
+            serialized_context = await context.serialize(event, store)
 
             event_payloads.append(
                 {
@@ -156,7 +151,7 @@ class ReplicationFederationSendEduRestServlet(ReplicationEndpoint):
         self.registry = hs.get_federation_registry()
 
     @staticmethod
-    def _serialize_payload(edu_type, origin, content):
+    async def _serialize_payload(edu_type, origin, content):
         return {"origin": origin, "content": content}
 
     async def _handle_request(self, request, edu_type):
@@ -199,7 +194,7 @@ class ReplicationGetQueryRestServlet(ReplicationEndpoint):
         self.registry = hs.get_federation_registry()
 
     @staticmethod
-    def _serialize_payload(query_type, args):
+    async def _serialize_payload(query_type, args):
         """
         Args:
             query_type (str)
@@ -240,7 +235,7 @@ class ReplicationCleanRoomRestServlet(ReplicationEndpoint):
         self.store = hs.get_datastore()
 
     @staticmethod
-    def _serialize_payload(room_id, args):
+    async def _serialize_payload(room_id, args):
         """
         Args:
             room_id (str)
@@ -275,7 +270,7 @@ class ReplicationStoreRoomOnInviteRestServlet(ReplicationEndpoint):
         self.store = hs.get_datastore()
 
     @staticmethod
-    def _serialize_payload(room_id, room_version):
+    async def _serialize_payload(room_id, room_version):
         return {"room_version": room_version.identifier}
 
     async def _handle_request(self, request, room_id):

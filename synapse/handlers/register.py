@@ -639,7 +639,7 @@ class RegistrationHandler(BaseHandler):
             address (str|None): the IP address used to perform the registration.
 
         Returns:
-            Deferred
+            Awaitable
         """
         if self.hs.config.worker_app:
             return self._register_client(
