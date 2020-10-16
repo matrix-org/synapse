@@ -98,7 +98,7 @@ class DeferredCache(Generic[KT, VT]):
             size_callback=(lambda d: len(d)) if iterable else None,
             metrics_collection_callback=metrics_cb,
             apply_cache_factor_from_config=apply_cache_factor_from_config,
-        )
+        )  # type: LruCache[KT, VT]
 
         self.thread = None  # type: Optional[threading.Thread]
 
@@ -240,11 +240,12 @@ class DeferredCache(Generic[KT, VT]):
         self.check_thread()
         if not isinstance(key, tuple):
             raise TypeError("The cache key must be a tuple not %r" % (type(key),))
+        key = cast(KT, key)
         self.cache.del_multi(key)
 
         # if we have a pending lookup for this key, remove it from the
         # _pending_deferred_cache, as above
-        entry_dict = self._pending_deferred_cache.pop(cast(KT, key), None)
+        entry_dict = self._pending_deferred_cache.pop(key, None)
         if entry_dict is not None:
             for entry in iterate_tree_cache_entry(entry_dict):
                 entry.invalidate()
