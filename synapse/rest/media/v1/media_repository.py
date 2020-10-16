@@ -779,7 +779,7 @@ class MediaRepository:
         """
         logger.info("Deleting local media: %s", media_id)
 
-        return await self._remove_local_media_from_disk((media_id,))
+        return await self._remove_local_media_from_disk([media_id])
 
     async def delete_old_local_media(
         self, before_ts: int, size_gt: int = 0, keep_profiles: bool = True,
