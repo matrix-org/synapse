@@ -283,7 +283,7 @@ class LruCache(Generic[KT, VT]):
                 return value
 
         @overload
-        def cache_pop(key: KT, default: Literal[None] = None) -> Union[None, VT]:
+        def cache_pop(key: KT, default: Literal[None] = None) -> Optional[VT]:
             ...
 
         @overload
