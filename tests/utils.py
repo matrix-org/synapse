@@ -21,6 +21,7 @@ import time
 import uuid
 import warnings
 from inspect import getcallargs
+from typing import Type
 from urllib import parse as urlparse
 
 from mock import Mock, patch
@@ -194,8 +195,8 @@ def setup_test_homeserver(
     name="test",
     config=None,
     reactor=None,
-    homeserverToUse=TestHomeServer,
-    **kargs
+    homeserver_to_use: Type[HomeServer] = TestHomeServer,
+    **kwargs
 ):
     """
     Setup a homeserver suitable for running tests against.  Keyword arguments
@@ -218,8 +219,8 @@ def setup_test_homeserver(
 
     config.ldap_enabled = False
 
-    if "clock" not in kargs:
-        kargs["clock"] = MockClock()
+    if "clock" not in kwargs:
+        kwargs["clock"] = MockClock()
 
     if USE_POSTGRES_FOR_TESTS:
         test_db = "synapse_test_%s" % uuid.uuid4().hex
@@ -264,18 +265,20 @@ def setup_test_homeserver(
         cur.close()
         db_conn.close()
 
-    hs = homeserverToUse(
-        name,
-        config=config,
-        version_string="Synapse/tests",
-        tls_server_context_factory=Mock(),
-        tls_client_options_factory=Mock(),
-        reactor=reactor,
-        **kargs
+    hs = homeserver_to_use(
+        name, config=config, version_string="Synapse/tests", reactor=reactor,
     )
 
+    # Install @cache_in_self attributes
+    for key, val in kwargs.items():
+        setattr(hs, key, val)
+
+    # Mock TLS
+    hs.tls_server_context_factory = Mock()
+    hs.tls_client_options_factory = Mock()
+
     hs.setup()
-    if homeserverToUse.__name__ == "TestHomeServer":
+    if homeserver_to_use == TestHomeServer:
         hs.setup_background_tasks()
 
     if isinstance(db_engine, PostgresEngine):
@@ -339,7 +342,7 @@ def setup_test_homeserver(
 
     hs.get_auth_handler().validate_hash = validate_hash
 
-    fed = kargs.get("resource_for_federation", None)
+    fed = kwargs.get("resource_for_federation", None)
     if fed:
         register_federation_servlets(hs, fed)
 

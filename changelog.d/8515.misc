@@ -1,0 +1,1 @@
+Apply some internal fixes to the `HomeServer` class to make its code more idiomatic and statically-verifiable.

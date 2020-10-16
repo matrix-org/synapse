@@ -244,7 +244,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         service = Mock(id=self.as_list[0]["id"])
         events = [Mock(event_id="e1"), Mock(event_id="e2")]
         txn = yield defer.ensureDeferred(
-            self.store.create_appservice_txn(service, events)
+            self.store.create_appservice_txn(service, events, [])
         )
         self.assertEquals(txn.id, 1)
         self.assertEquals(txn.events, events)
@@ -258,7 +258,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         yield self._insert_txn(service.id, 9644, events)
         yield self._insert_txn(service.id, 9645, events)
         txn = yield defer.ensureDeferred(
-            self.store.create_appservice_txn(service, events)
+            self.store.create_appservice_txn(service, events, [])
         )
         self.assertEquals(txn.id, 9646)
         self.assertEquals(txn.events, events)
@@ -270,7 +270,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         events = [Mock(event_id="e1"), Mock(event_id="e2")]
         yield self._set_last_txn(service.id, 9643)
         txn = yield defer.ensureDeferred(
-            self.store.create_appservice_txn(service, events)
+            self.store.create_appservice_txn(service, events, [])
         )
         self.assertEquals(txn.id, 9644)
         self.assertEquals(txn.events, events)
@@ -293,7 +293,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         yield self._insert_txn(self.as_list[3]["id"], 9643, events)
 
         txn = yield defer.ensureDeferred(
-            self.store.create_appservice_txn(service, events)
+            self.store.create_appservice_txn(service, events, [])
         )
         self.assertEquals(txn.id, 9644)
         self.assertEquals(txn.events, events)

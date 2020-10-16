@@ -893,6 +893,12 @@ class DatabasePool:
         attempts = 0
         while True:
             try:
+                # We can autocommit if we are going to use native upserts
+                autocommit = (
+                    self.engine.can_native_upsert
+                    and table not in self._unsafe_to_upsert_tables
+                )
+
                 return await self.runInteraction(
                     desc,
                     self.simple_upsert_txn,
@@ -901,6 +907,7 @@ class DatabasePool:
                     values,
                     insertion_values,
                     lock=lock,
+                    db_autocommit=autocommit,
                 )
             except self.engine.module.IntegrityError as e:
                 attempts += 1
@@ -1063,6 +1070,43 @@ class DatabasePool:
         )
         txn.execute(sql, list(allvalues.values()))
 
+    async def simple_upsert_many(
+        self,
+        table: str,
+        key_names: Collection[str],
+        key_values: Collection[Iterable[Any]],
+        value_names: Collection[str],
+        value_values: Iterable[Iterable[Any]],
+        desc: str,
+    ) -> None:
+        """
+        Upsert, many times.
+
+        Args:
+            table: The table to upsert into
+            key_names: The key column names.
+            key_values: A list of each row's key column values.
+            value_names: The value column names
+            value_values: A list of each row's value column values.
+                Ignored if value_names is empty.
+        """
+
+        # We can autocommit if we are going to use native upserts
+        autocommit = (
+            self.engine.can_native_upsert and table not in self._unsafe_to_upsert_tables
+        )
+
+        return await self.runInteraction(
+            desc,
+            self.simple_upsert_many_txn,
+            table,
+            key_names,
+            key_values,
+            value_names,
+            value_values,
+            db_autocommit=autocommit,
+        )
+
     def simple_upsert_many_txn(
         self,
         txn: LoggingTransaction,
@@ -1214,7 +1258,13 @@ class DatabasePool:
             desc: description of the transaction, for logging and metrics
         """
         return await self.runInteraction(
-            desc, self.simple_select_one_txn, table, keyvalues, retcols, allow_none
+            desc,
+            self.simple_select_one_txn,
+            table,
+            keyvalues,
+            retcols,
+            allow_none,
+            db_autocommit=True,
         )
 
     @overload
@@ -1265,6 +1315,7 @@ class DatabasePool:
             keyvalues,
             retcol,
             allow_none=allow_none,
+            db_autocommit=True,
         )
 
     @overload
@@ -1346,7 +1397,12 @@ class DatabasePool:
             Results in a list
         """
         return await self.runInteraction(
-            desc, self.simple_select_onecol_txn, table, keyvalues, retcol
+            desc,
+            self.simple_select_onecol_txn,
+            table,
+            keyvalues,
+            retcol,
+            db_autocommit=True,
         )
 
     async def simple_select_list(
@@ -1371,7 +1427,12 @@ class DatabasePool:
             A list of dictionaries.
         """
         return await self.runInteraction(
-            desc, self.simple_select_list_txn, table, keyvalues, retcols
+            desc,
+            self.simple_select_list_txn,
+            table,
+            keyvalues,
+            retcols,
+            db_autocommit=True,
         )
 
     @classmethod
@@ -1450,6 +1511,7 @@ class DatabasePool:
                 chunk,
                 keyvalues,
                 retcols,
+                db_autocommit=True,
             )
 
             results.extend(rows)
@@ -1548,7 +1610,12 @@ class DatabasePool:
             desc: description of the transaction, for logging and metrics
         """
         await self.runInteraction(
-            desc, self.simple_update_one_txn, table, keyvalues, updatevalues
+            desc,
+            self.simple_update_one_txn,
+            table,
+            keyvalues,
+            updatevalues,
+            db_autocommit=True,
         )
 
     @classmethod
@@ -1607,7 +1674,9 @@ class DatabasePool:
             keyvalues: dict of column names and values to select the row with
             desc: description of the transaction, for logging and metrics
         """
-        await self.runInteraction(desc, self.simple_delete_one_txn, table, keyvalues)
+        await self.runInteraction(
+            desc, self.simple_delete_one_txn, table, keyvalues, db_autocommit=True,
+        )
 
     @staticmethod
     def simple_delete_one_txn(
@@ -1646,7 +1715,9 @@ class DatabasePool:
         Returns:
             The number of deleted rows.
         """
-        return await self.runInteraction(desc, self.simple_delete_txn, table, keyvalues)
+        return await self.runInteraction(
+            desc, self.simple_delete_txn, table, keyvalues, db_autocommit=True
+        )
 
     @staticmethod
     def simple_delete_txn(
@@ -1694,7 +1765,13 @@ class DatabasePool:
             Number rows deleted
         """
         return await self.runInteraction(
-            desc, self.simple_delete_many_txn, table, column, iterable, keyvalues
+            desc,
+            self.simple_delete_many_txn,
+            table,
+            column,
+            iterable,
+            keyvalues,
+            db_autocommit=True,
         )
 
     @staticmethod
@@ -1860,7 +1937,13 @@ class DatabasePool:
         """
 
         return await self.runInteraction(
-            desc, self.simple_search_list_txn, table, term, col, retcols
+            desc,
+            self.simple_search_list_txn,
+            table,
+            term,
+            col,
+            retcols,
+            db_autocommit=True,
         )
 
     @classmethod

@@ -281,9 +281,14 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             a_day_in_milliseconds = 24 * 60 * 60 * 1000
             now = self._clock.time_msec()
 
+            # A note on user_agent. Technically a given device can have multiple
+            # user agents, so we need to decide which one to pick. We could have handled this
+            # in number of ways, but given that we don't _that_ much have gone for MAX()
+            # For more details of the other options considered see
+            # https://github.com/matrix-org/synapse/pull/8503#discussion_r502306111
             sql = """
-                INSERT INTO user_daily_visits (user_id, device_id, timestamp)
-                    SELECT u.user_id, u.device_id, ?
+                INSERT INTO user_daily_visits (user_id, device_id, timestamp, user_agent)
+                    SELECT u.user_id, u.device_id, ?, MAX(u.user_agent)
                     FROM user_ips AS u
                     LEFT JOIN (
                       SELECT user_id, device_id, timestamp FROM user_daily_visits
@@ -294,7 +299,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
                     WHERE last_seen > ? AND last_seen <= ?
                     AND udv.timestamp IS NULL AND users.is_guest=0
                     AND users.appservice_id IS NULL
-                    GROUP BY u.user_id, u.device_id
+                    GROUP BY u.user_id, u.device_id, u.user_agent
             """
 
             # This means that the day has rolled over but there could still

@@ -319,19 +319,35 @@ class Notifier:
         )
 
         if self.federation_sender:
-            self.federation_sender.notify_new_events(max_room_stream_token.stream)
+            self.federation_sender.notify_new_events(max_room_stream_token)
 
     async def _notify_app_services(self, max_room_stream_token: RoomStreamToken):
         try:
             await self.appservice_handler.notify_interested_services(
-                max_room_stream_token.stream
+                max_room_stream_token
+            )
+        except Exception:
+            logger.exception("Error notifying application services of event")
+
+    async def _notify_app_services_ephemeral(
+        self,
+        stream_key: str,
+        new_token: Union[int, RoomStreamToken],
+        users: Collection[UserID] = [],
+    ):
+        try:
+            stream_token = None
+            if isinstance(new_token, int):
+                stream_token = new_token
+            await self.appservice_handler.notify_interested_services_ephemeral(
+                stream_key, stream_token, users
             )
         except Exception:
             logger.exception("Error notifying application services of event")
 
     async def _notify_pusher_pool(self, max_room_stream_token: RoomStreamToken):
         try:
-            await self._pusher_pool.on_new_notifications(max_room_stream_token.stream)
+            await self._pusher_pool.on_new_notifications(max_room_stream_token)
         except Exception:
             logger.exception("Error pusher pool of event")
 
@@ -366,6 +382,15 @@ class Notifier:
                         logger.exception("Failed to notify listener")
 
                 self.notify_replication()
+
+                # Notify appservices
+                run_as_background_process(
+                    "_notify_app_services_ephemeral",
+                    self._notify_app_services_ephemeral,
+                    stream_key,
+                    new_token,
+                    users,
+                )
 
     def on_new_replication_data(self) -> None:
         """Used to inform replication listeners that something has happend

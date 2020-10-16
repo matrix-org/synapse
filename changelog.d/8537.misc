@@ -1,0 +1,1 @@
+Factor out common code between `RoomMemberHandler._locally_reject_invite` and `EventCreationHandler.create_event`.
