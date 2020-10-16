@@ -24,7 +24,6 @@ from prometheus_client import Gauge
 from twisted.internet import defer
 
 from synapse.util.async_helpers import ObservableDeferred
-from synapse.util.caches import register_cache
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.treecache import TreeCache, iterate_tree_cache_entry
 
@@ -54,10 +53,7 @@ class DeferredCache(Generic[KT, VT]):
 
     __slots__ = (
         "cache",
-        "name",
-        "keylen",
         "thread",
-        "metrics",
         "_pending_deferred_cache",
     )
 
@@ -89,36 +85,26 @@ class DeferredCache(Generic[KT, VT]):
             cache_type()
         )  # type: MutableMapping[KT, CacheEntry]
 
+        def metrics_cb():
+            cache_pending_metric.labels(name).set(len(self._pending_deferred_cache))
+
         # cache is used for completed results and maps to the result itself, rather than
         # a Deferred.
         self.cache = LruCache(
             max_size=max_entries,
             keylen=keylen,
+            cache_name=name,
             cache_type=cache_type,
             size_callback=(lambda d: len(d)) if iterable else None,
-            evicted_callback=self._on_evicted,
+            metrics_collection_callback=metrics_cb,
             apply_cache_factor_from_config=apply_cache_factor_from_config,
         )
 
-        self.name = name
-        self.keylen = keylen
         self.thread = None  # type: Optional[threading.Thread]
-        self.metrics = register_cache(
-            "cache",
-            name,
-            self.cache,
-            collect_callback=self._metrics_collection_callback,
-        )
 
     @property
     def max_entries(self):
         return self.cache.max_size
-
-    def _on_evicted(self, evicted_count):
-        self.metrics.inc_evictions(evicted_count)
-
-    def _metrics_collection_callback(self):
-        cache_pending_metric.labels(self.name).set(len(self._pending_deferred_cache))
 
     def check_thread(self):
         expected_thread = self.thread
@@ -154,21 +140,18 @@ class DeferredCache(Generic[KT, VT]):
         if val is not _Sentinel.sentinel:
             val.callbacks.update(callbacks)
             if update_metrics:
-                self.metrics.inc_hits()
+                m = self.cache.metrics
+                assert m  # we always have a name, so should always have metrics
+                m.inc_hits()
             return val.deferred
 
-        val = self.cache.get(key, _Sentinel.sentinel, callbacks=callbacks)
-        if val is not _Sentinel.sentinel:
-            self.metrics.inc_hits()
-            return val
-
-        if update_metrics:
-            self.metrics.inc_misses()
-
-        if default is _Sentinel.sentinel:
+        val = self.cache.get(
+            key, default, callbacks=callbacks, update_metrics=update_metrics
+        )
+        if val is _Sentinel.sentinel:
             raise KeyError()
         else:
-            return default
+            return val
 
     def set(
         self,
