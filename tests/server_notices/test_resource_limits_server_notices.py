@@ -275,7 +275,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
             self.server_notices_manager.get_or_create_notice_room_for_user(self.user_id)
         )
 
-        token = self.get_success(self.event_source.get_current_token())
+        token = self.event_source.get_current_token()
         events, _ = self.get_success(
             self.store.get_recent_events_for_room(
                 room_id, limit=100, end_token=token.room_key
