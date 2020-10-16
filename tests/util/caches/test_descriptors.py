@@ -27,7 +27,6 @@ from synapse.logging.context import (
     current_context,
     make_deferred_yieldable,
 )
-from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches import descriptors
 from synapse.util.caches.descriptors import cached
 
@@ -419,9 +418,9 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
 
         a = A()
 
-        a.func.prefill(("foo",), ObservableDeferred(d))
+        a.func.prefill(("foo",), 456)
 
-        self.assertEquals(a.func("foo").result, d.result)
+        self.assertEquals(a.func("foo").result, 456)
         self.assertEquals(callcount[0], 0)
 
     @defer.inlineCallbacks

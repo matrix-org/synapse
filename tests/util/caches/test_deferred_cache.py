@@ -13,15 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
 from functools import partial
 
 from twisted.internet import defer
 
 from synapse.util.caches.deferred_cache import DeferredCache
 
+from tests.unittest import TestCase
 
-class DeferredCacheTestCase(unittest.TestCase):
+
+class DeferredCacheTestCase(TestCase):
     def test_empty(self):
         cache = DeferredCache("test")
         failed = False
@@ -36,7 +37,7 @@ class DeferredCacheTestCase(unittest.TestCase):
         cache = DeferredCache("test")
         cache.prefill("foo", 123)
 
-        self.assertEquals(cache.get("foo"), 123)
+        self.assertEquals(self.successResultOf(cache.get("foo")), 123)
 
     def test_get_immediate(self):
         cache = DeferredCache("test")
@@ -82,16 +83,15 @@ class DeferredCacheTestCase(unittest.TestCase):
         d2 = defer.Deferred()
         cache.set("key2", d2, partial(record_callback, 1))
 
-        # lookup should return observable deferreds
-        self.assertFalse(cache.get("key1").has_called())
-        self.assertFalse(cache.get("key2").has_called())
+        # lookup should return pending deferreds
+        self.assertFalse(cache.get("key1").called)
+        self.assertFalse(cache.get("key2").called)
 
         # let one of the lookups complete
         d2.callback("result2")
 
-        # for now at least, the cache will return real results rather than an
-        # observabledeferred
-        self.assertEqual(cache.get("key2"), "result2")
+        # now the cache will return a completed deferred
+        self.assertEqual(self.successResultOf(cache.get("key2")), "result2")
 
         # now do the invalidation
         cache.invalidate_all()
