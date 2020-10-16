@@ -1,0 +1,1 @@
+Fix mypy typing assertion error in `handlers/auth.py`.
