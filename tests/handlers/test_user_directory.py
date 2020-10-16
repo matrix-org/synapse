@@ -339,7 +339,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
     def get_users_in_public_rooms(self):
         r = self.get_success(
-            self.store.db.simple_select_list(
+            self.store.db_pool.simple_select_list(
                 "users_in_public_rooms", None, ("user_id", "room_id")
             )
         )
@@ -350,7 +350,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
     def get_users_who_share_private_rooms(self):
         return self.get_success(
-            self.store.db.simple_select_list(
+            self.store.db_pool.simple_select_list(
                 "users_who_share_private_rooms",
                 None,
                 ["user_id", "other_user_id", "room_id"],
@@ -362,10 +362,10 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         Add the background updates we need to run.
         """
         # Ugh, have to reset this flag
-        self.store.db.updates._all_done = False
+        self.store.db_pool.updates._all_done = False
 
         self.get_success(
-            self.store.db.simple_insert(
+            self.store.db_pool.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_user_directory_createtables",
@@ -374,7 +374,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             )
         )
         self.get_success(
-            self.store.db.simple_insert(
+            self.store.db_pool.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_user_directory_process_rooms",
@@ -384,7 +384,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             )
         )
         self.get_success(
-            self.store.db.simple_insert(
+            self.store.db_pool.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_user_directory_process_users",
@@ -394,7 +394,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             )
         )
         self.get_success(
-            self.store.db.simple_insert(
+            self.store.db_pool.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_user_directory_cleanup",
@@ -437,10 +437,10 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self._add_background_updates()
 
         while not self.get_success(
-            self.store.db.updates.has_completed_background_updates()
+            self.store.db_pool.updates.has_completed_background_updates()
         ):
             self.get_success(
-                self.store.db.updates.do_next_background_update(100), by=0.1
+                self.store.db_pool.updates.do_next_background_update(100), by=0.1
             )
 
         shares_private = self.get_users_who_share_private_rooms()
@@ -476,10 +476,10 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self._add_background_updates()
 
         while not self.get_success(
-            self.store.db.updates.has_completed_background_updates()
+            self.store.db_pool.updates.has_completed_background_updates()
         ):
             self.get_success(
-                self.store.db.updates.do_next_background_update(100), by=0.1
+                self.store.db_pool.updates.do_next_background_update(100), by=0.1
             )
 
         shares_private = self.get_users_who_share_private_rooms()

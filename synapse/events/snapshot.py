@@ -23,7 +23,7 @@ from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.types import StateMap
 
 if TYPE_CHECKING:
-    from synapse.storage.data_stores.main import DataStore
+    from synapse.storage.databases.main import DataStore
 
 
 @attr.s(slots=True)

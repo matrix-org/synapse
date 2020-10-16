@@ -105,7 +105,7 @@ from synapse.server_notices.worker_server_notices_sender import (
     WorkerServerNoticesSender,
 )
 from synapse.state import StateHandler, StateResolutionHandler
-from synapse.storage import DataStore, DataStores, Storage
+from synapse.storage import Databases, DataStore, Storage
 from synapse.streams.events import EventSources
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
@@ -282,7 +282,7 @@ class HomeServer(object):
     def setup(self):
         logger.info("Setting up.")
         self.start_time = int(self.get_clock().time())
-        self.datastores = DataStores(self.DATASTORE_CLASS, self)
+        self.datastores = Databases(self.DATASTORE_CLASS, self)
         logger.info("Finished setting up.")
 
     def setup_master(self):
