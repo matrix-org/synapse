@@ -39,6 +39,101 @@ class DeferredCacheTestCase(TestCase):
 
         self.assertEquals(self.successResultOf(cache.get("foo")), 123)
 
+    def test_hit_deferred(self):
+        cache = DeferredCache("test")
+        origin_d = defer.Deferred()
+        set_d = cache.set("k1", origin_d)
+
+        # get should return an incomplete deferred
+        get_d = cache.get("k1")
+        self.assertFalse(get_d.called)
+
+        # add a callback that will make sure that the set_d gets called before the get_d
+        def check1(r):
+            self.assertTrue(set_d.called)
+            return r
+
+        # TODO: Actually ObservableDeferred *doesn't* run its tests in order on py3.8.
+        #   maybe we should fix that?
+        # get_d.addCallback(check1)
+
+        # now fire off all the deferreds
+        origin_d.callback(99)
+        self.assertEqual(self.successResultOf(origin_d), 99)
+        self.assertEqual(self.successResultOf(set_d), 99)
+        self.assertEqual(self.successResultOf(get_d), 99)
+
+    def test_callbacks(self):
+        """Invalidation callbacks are called at the right time"""
+        cache = DeferredCache("test")
+        callbacks = set()
+
+        # start with an entry, with a callback
+        cache.prefill("k1", 10, callback=lambda: callbacks.add("prefill"))
+
+        # now replace that entry with a pending result
+        origin_d = defer.Deferred()
+        set_d = cache.set("k1", origin_d, callback=lambda: callbacks.add("set"))
+
+        # ... and also make a get request
+        get_d = cache.get("k1", callback=lambda: callbacks.add("get"))
+
+        # we don't expect the invalidation callback for the original value to have
+        # been called yet, even though get() will now return a different result.
+        # I'm not sure if that is by design or not.
+        self.assertEqual(callbacks, set())
+
+        # now fire off all the deferreds
+        origin_d.callback(20)
+        self.assertEqual(self.successResultOf(set_d), 20)
+        self.assertEqual(self.successResultOf(get_d), 20)
+
+        # now the original invalidation callback should have been called, but none of
+        # the others
+        self.assertEqual(callbacks, {"prefill"})
+        callbacks.clear()
+
+        # another update should invalidate both the previous results
+        cache.prefill("k1", 30)
+        self.assertEqual(callbacks, {"set", "get"})
+
+    def test_set_fail(self):
+        cache = DeferredCache("test")
+        callbacks = set()
+
+        # start with an entry, with a callback
+        cache.prefill("k1", 10, callback=lambda: callbacks.add("prefill"))
+
+        # now replace that entry with a pending result
+        origin_d = defer.Deferred()
+        set_d = cache.set("k1", origin_d, callback=lambda: callbacks.add("set"))
+
+        # ... and also make a get request
+        get_d = cache.get("k1", callback=lambda: callbacks.add("get"))
+
+        # none of the callbacks should have been called yet
+        self.assertEqual(callbacks, set())
+
+        # oh noes! fails!
+        e = Exception("oops")
+        origin_d.errback(e)
+        self.assertIs(self.failureResultOf(set_d, Exception).value, e)
+        self.assertIs(self.failureResultOf(get_d, Exception).value, e)
+
+        # the callbacks for the failed requests should have been called.
+        # I'm not sure if this is deliberate or not.
+        self.assertEqual(callbacks, {"get", "set"})
+        callbacks.clear()
+
+        # the old value should still be returned now?
+        get_d2 = cache.get("k1", callback=lambda: callbacks.add("get2"))
+        self.assertEqual(self.successResultOf(get_d2), 10)
+
+        # replacing the value now should run the callbacks for those requests
+        # which got the original result
+        cache.prefill("k1", 30)
+        self.assertEqual(callbacks, {"prefill", "get2"})
+
     def test_get_immediate(self):
         cache = DeferredCache("test")
         d1 = defer.Deferred()
