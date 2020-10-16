@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
 import logging
 import os
 import shutil
@@ -88,12 +89,18 @@ class StorageProviderWrapper(StorageProvider):
             return None
 
         if self.store_synchronous:
-            return await self.backend.store_file(path, file_info)
+            # store_file is supposed to return an Awaitable, but guard
+            # against improper implementations.
+            result = self.backend.store_file(path, file_info)
+            if inspect.isawaitable(result):
+                return await result
         else:
             # TODO: Handle errors.
-            def store():
+            async def store():
                 try:
-                    return self.backend.store_file(path, file_info)
+                    result = self.backend.store_file(path, file_info)
+                    if inspect.isawaitable(result):
+                        return await result
                 except Exception:
                     logger.exception("Error storing file")
 
@@ -101,7 +108,11 @@ class StorageProviderWrapper(StorageProvider):
             return None
 
     async def fetch(self, path, file_info):
-        return await self.backend.fetch(path, file_info)
+        # store_file is supposed to return an Awaitable, but guard
+        # against improper implementations.
+        result = self.backend.fetch(path, file_info)
+        if inspect.isawaitable(result):
+            return await result
 
 
 class FileStorageProviderBackend(StorageProvider):
