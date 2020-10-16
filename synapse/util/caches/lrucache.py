@@ -15,7 +15,7 @@
 
 import threading
 from functools import wraps
-from typing import Callable, Iterable, Optional, Type, Union
+from typing import Callable, Optional, Type, Union
 
 from synapse.config import cache as cache_config
 from synapse.util.caches import CacheMetric, register_cache
