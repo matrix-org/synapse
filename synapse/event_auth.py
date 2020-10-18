@@ -47,7 +47,7 @@ def check(
     Args:
         room_version_obj: the version of the room
         event: the event being checked.
-        auth_events (dict: event-key -> event): the existing room state.
+        auth_events: the existing room state.
 
     Raises:
         AuthError if the checks fail

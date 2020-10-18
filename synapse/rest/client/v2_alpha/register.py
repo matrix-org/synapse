@@ -16,6 +16,7 @@
 
 import hmac
 import logging
+import random
 from typing import List, Union
 
 import synapse
@@ -44,7 +45,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
-from synapse.push.mailer import load_jinja2_templates
+from synapse.push.mailer import Mailer
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import assert_valid_client_secret, random_string
@@ -75,29 +76,17 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(EmailRegisterRequestTokenRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
         self.config = hs.config
 
         if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            from synapse.push.mailer import Mailer, load_jinja2_templates
-
-            template_html, template_text = load_jinja2_templates(
-                self.config.email_template_dir,
-                [
-                    self.config.email_registration_template_html,
-                    self.config.email_registration_template_text,
-                ],
-                apply_format_ts_filter=True,
-                apply_mxc_to_http_filter=True,
-                public_baseurl=self.config.public_baseurl,
-            )
             self.mailer = Mailer(
                 hs=self.hs,
                 app_name=self.config.email_app_name,
-                template_html=template_html,
-                template_text=template_text,
+                template_html=self.config.email_registration_template_html,
+                template_text=self.config.email_registration_template_text,
             )
 
     async def on_POST(self, request):
@@ -143,6 +132,9 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             if self.hs.config.request_token_inhibit_3pid_errors:
                 # Make the client think the operation succeeded. See the rationale in the
                 # comments for request_token_inhibit_3pid_errors.
+                # Also wait for some random amount of time between 100ms and 1s to make it
+                # look like we did something.
+                await self.hs.clock.sleep(random.randint(1, 10) / 10)
                 return 200, {"sid": random_string(16)}
 
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
@@ -182,7 +174,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(MsisdnRegisterRequestTokenRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
 
@@ -215,6 +207,9 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
             if self.hs.config.request_token_inhibit_3pid_errors:
                 # Make the client think the operation succeeded. See the rationale in the
                 # comments for request_token_inhibit_3pid_errors.
+                # Also wait for some random amount of time between 100ms and 1s to make it
+                # look like we did something.
+                await self.hs.clock.sleep(random.randint(1, 10) / 10)
                 return 200, {"sid": random_string(16)}
 
             raise SynapseError(
@@ -254,7 +249,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(RegistrationSubmitTokenServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.config = hs.config
@@ -262,15 +257,8 @@ class RegistrationSubmitTokenServlet(RestServlet):
         self.store = hs.get_datastore()
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            (self.failure_email_template,) = load_jinja2_templates(
-                self.config.email_template_dir,
-                [self.config.email_registration_template_failure_html],
-            )
-
-        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            (self.failure_email_template,) = load_jinja2_templates(
-                self.config.email_template_dir,
-                [self.config.email_registration_template_failure_html],
+            self._failure_email_template = (
+                self.config.email_registration_template_failure_html
             )
 
     async def on_GET(self, request, medium):
@@ -318,7 +306,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
 
             # Show a failure page with a reason
             template_vars = {"failure_reason": e.msg}
-            html = self.failure_email_template.render(**template_vars)
+            html = self._failure_email_template.render(**template_vars)
 
         respond_with_html(request, status_code, html)
 
@@ -331,7 +319,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(UsernameAvailabilityRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.registration_handler = hs.get_registration_handler()
         self.ratelimiter = FederationRateLimiter(
@@ -375,7 +363,7 @@ class RegisterRestServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(RegisterRestServlet, self).__init__()
+        super().__init__()
 
         self.hs = hs
         self.auth = hs.get_auth()
@@ -443,11 +431,14 @@ class RegisterRestServlet(RestServlet):
 
             access_token = self.auth.get_access_token_from_request(request)
 
-            if isinstance(desired_username, str):
-                result = await self._do_appservice_registration(
-                    desired_username, access_token, body
-                )
-            return 200, result  # we throw for non 200 responses
+            if not isinstance(desired_username, str):
+                raise SynapseError(400, "Desired Username is missing or not a string")
+
+            result = await self._do_appservice_registration(
+                desired_username, access_token, body
+            )
+
+            return 200, result
 
         # == Normal User Registration == (everyone else)
         if not self._registration_enabled:
@@ -610,12 +601,17 @@ class RegisterRestServlet(RestServlet):
                                 Codes.THREEPID_IN_USE,
                             )
 
+            entries = await self.store.get_user_agents_ips_to_ui_auth_session(
+                session_id
+            )
+
             registered_user_id = await self.registration_handler.register_user(
                 localpart=desired_username,
                 password_hash=password_hash,
                 guest_access_token=guest_access_token,
                 threepid=threepid,
                 address=client_addr,
+                user_agent_ips=entries,
             )
             # Necessary due to auth checks prior to the threepid being
             # written to the db
@@ -665,7 +661,7 @@ class RegisterRestServlet(RestServlet):
             (object) params: registration parameters, from which we pull
                 device_id, initial_device_name and inhibit_login
         Returns:
-            (object) dictionary for response from /register
+             dictionary for response from /register
         """
         result = {"user_id": user_id, "home_server": self.hs.hostname}
         if not params.get("inhibit_login", False):

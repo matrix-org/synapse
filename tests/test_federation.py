@@ -15,8 +15,9 @@
 
 from mock import Mock
 
-from twisted.internet.defer import ensureDeferred, maybeDeferred, succeed
+from twisted.internet.defer import succeed
 
+from synapse.api.errors import FederationError
 from synapse.events import make_event_from_dict
 from synapse.logging.context import LoggingContext
 from synapse.types import Requester, UserID
@@ -42,24 +43,19 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         )
 
         user_id = UserID("us", "test")
-        our_user = Requester(user_id, None, False, None, None)
+        our_user = Requester(user_id, None, False, False, None, None)
         room_creator = self.homeserver.get_room_creation_handler()
-        room_deferred = ensureDeferred(
+        self.room_id = self.get_success(
             room_creator.create_room(
                 our_user, room_creator._presets_dict["public_chat"], ratelimit=False
             )
-        )
-        self.reactor.advance(0.1)
-        self.room_id = self.successResultOf(room_deferred)[0]["room_id"]
+        )[0]["room_id"]
 
         self.store = self.homeserver.get_datastore()
 
         # Figure out what the most recent event is
-        most_recent = self.successResultOf(
-            maybeDeferred(
-                self.homeserver.get_datastore().get_latest_event_ids_in_room,
-                self.room_id,
-            )
+        most_recent = self.get_success(
+            self.homeserver.get_datastore().get_latest_event_ids_in_room(self.room_id)
         )[0]
 
         join_event = make_event_from_dict(
@@ -89,19 +85,18 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         )
 
         # Send the join, it should return None (which is not an error)
-        d = ensureDeferred(
-            self.handler.on_receive_pdu(
-                "test.serv", join_event, sent_to_us_directly=True
-            )
+        self.assertEqual(
+            self.get_success(
+                self.handler.on_receive_pdu(
+                    "test.serv", join_event, sent_to_us_directly=True
+                )
+            ),
+            None,
         )
-        self.reactor.advance(1)
-        self.assertEqual(self.successResultOf(d), None)
 
         # Make sure we actually joined the room
         self.assertEqual(
-            self.successResultOf(
-                maybeDeferred(self.store.get_latest_event_ids_in_room, self.room_id)
-            )[0],
+            self.get_success(self.store.get_latest_event_ids_in_room(self.room_id))[0],
             "$join:test.serv",
         )
 
@@ -119,8 +114,8 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         self.http_client.post_json = post_json
 
         # Figure out what the most recent event is
-        most_recent = self.successResultOf(
-            maybeDeferred(self.store.get_latest_event_ids_in_room, self.room_id)
+        most_recent = self.get_success(
+            self.store.get_latest_event_ids_in_room(self.room_id)
         )[0]
 
         # Now lie about an event
@@ -140,17 +135,14 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         )
 
         with LoggingContext(request="lying_event"):
-            d = ensureDeferred(
+            failure = self.get_failure(
                 self.handler.on_receive_pdu(
                     "test.serv", lying_event, sent_to_us_directly=True
-                )
+                ),
+                FederationError,
             )
 
-            # Step the reactor, so the database fetches come back
-            self.reactor.advance(1)
-
         # on_receive_pdu should throw an error
-        failure = self.failureResultOf(d)
         self.assertEqual(
             failure.value.args[0],
             (
@@ -160,8 +152,8 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         )
 
         # Make sure the invalid event isn't there
-        extrem = maybeDeferred(self.store.get_latest_event_ids_in_room, self.room_id)
-        self.assertEqual(self.successResultOf(extrem)[0], "$join:test.serv")
+        extrem = self.get_success(self.store.get_latest_event_ids_in_room(self.room_id))
+        self.assertEqual(extrem[0], "$join:test.serv")
 
     def test_retry_device_list_resync(self):
         """Tests that device lists are marked as stale if they couldn't be synced, and

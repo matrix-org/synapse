@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-class _Entry(object):
+class _Entry:
     __slots__ = ["end_key", "queue"]
 
     def __init__(self, end_key):
@@ -22,7 +22,7 @@ class _Entry(object):
         self.queue = []
 
 
-class WheelTimer(object):
+class WheelTimer:
     """Stores arbitrary objects that will be returned after their timers have
     expired.
     """

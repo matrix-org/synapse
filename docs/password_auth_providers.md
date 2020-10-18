@@ -14,6 +14,7 @@ password auth provider module implementations:
 
 * [matrix-synapse-ldap3](https://github.com/matrix-org/matrix-synapse-ldap3/)
 * [matrix-synapse-shared-secret-auth](https://github.com/devture/matrix-synapse-shared-secret-auth)
+* [matrix-synapse-rest-password-provider](https://github.com/ma1uta/matrix-synapse-rest-password-provider)
 
 ## Required methods
 

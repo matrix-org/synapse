@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 @implementer(IAgent)
-class MatrixFederationAgent(object):
+class MatrixFederationAgent:
     """An Agent-like thing which provides a `request` method which correctly
     handles resolving matrix server names when using matrix://. Handles standard
     https URIs as normal.
@@ -134,8 +134,8 @@ class MatrixFederationAgent(object):
             and not _is_ip_literal(parsed_uri.hostname)
             and not parsed_uri.port
         ):
-            well_known_result = yield self._well_known_resolver.get_well_known(
-                parsed_uri.hostname
+            well_known_result = yield defer.ensureDeferred(
+                self._well_known_resolver.get_well_known(parsed_uri.hostname)
             )
             delegated_server = well_known_result.delegated_server
 
@@ -175,7 +175,7 @@ class MatrixFederationAgent(object):
 
 
 @implementer(IAgentEndpointFactory)
-class MatrixHostnameEndpointFactory(object):
+class MatrixHostnameEndpointFactory:
     """Factory for MatrixHostnameEndpoint for parsing to an Agent.
     """
 
@@ -198,7 +198,7 @@ class MatrixHostnameEndpointFactory(object):
 
 
 @implementer(IStreamClientEndpoint)
-class MatrixHostnameEndpoint(object):
+class MatrixHostnameEndpoint:
     """An endpoint that resolves matrix:// URLs using Matrix server name
     resolution (i.e. via SRV). Does not check for well-known delegation.
 

@@ -15,15 +15,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 from typing import List
 
 import jsonschema
-from canonicaljson import json
 from jsonschema import FormatChecker
 
 from synapse.api.constants import EventContentFields
 from synapse.api.errors import SynapseError
-from synapse.storage.presence import UserPresenceState
+from synapse.api.presence import UserPresenceState
 from synapse.types import RoomID, UserID
 
 FILTER_SCHEMA = {
@@ -130,9 +130,9 @@ def matrix_user_id_validator(user_id_str):
     return UserID.from_string(user_id_str)
 
 
-class Filtering(object):
+class Filtering:
     def __init__(self, hs):
-        super(Filtering, self).__init__()
+        super().__init__()
         self.store = hs.get_datastore()
 
     async def get_user_filter(self, user_localpart, filter_id):
@@ -168,7 +168,7 @@ class Filtering(object):
             raise SynapseError(400, str(e))
 
 
-class FilterCollection(object):
+class FilterCollection:
     def __init__(self, filter_json):
         self._filter_json = filter_json
 
@@ -249,7 +249,7 @@ class FilterCollection(object):
         )
 
 
-class Filter(object):
+class Filter:
     def __init__(self, filter_json):
         self.filter_json = filter_json
 

@@ -145,7 +145,7 @@ LaterGauge(
 )
 
 
-class RequestMetrics(object):
+class RequestMetrics:
     def start(self, time_sec, name, method):
         self.start = time_sec
         self.start_context = current_context()

@@ -17,9 +17,7 @@
 
 import logging
 import re
-from typing import Dict, List, Optional
-
-from twisted.internet.defer import Deferred
+from typing import Any, Dict, List, Optional, Tuple
 
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, StoreError, SynapseError, ThreepidValidationError
@@ -38,18 +36,21 @@ logger = logging.getLogger(__name__)
 
 class RegistrationWorkerStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(RegistrationWorkerStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self.config = hs.config
         self.clock = hs.get_clock()
 
+        # Note: we don't check this sequence for consistency as we'd have to
+        # call `find_max_generated_user_id_localpart` each time, which is
+        # expensive if there are many entries.
         self._user_id_seq = build_sequence_generator(
             database.engine, find_max_generated_user_id_localpart, "user_id_seq",
         )
 
     @cached()
-    def get_user_by_id(self, user_id):
-        return self.db_pool.simple_select_one(
+    async def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+        return await self.db_pool.simple_select_one(
             table="users",
             keyvalues={"name": user_id},
             retcols=[
@@ -86,22 +87,22 @@ class RegistrationWorkerStore(SQLBaseStore):
         return is_trial
 
     @cached()
-    def get_user_by_access_token(self, token):
+    async def get_user_by_access_token(self, token: str) -> Optional[dict]:
         """Get a user from the given access token.
 
         Args:
-            token (str): The access token of a user.
+            token: The access token of a user.
         Returns:
-            defer.Deferred: None, if the token did not match, otherwise dict
-                including the keys `name`, `is_guest`, `device_id`, `token_id`,
-                `valid_until_ms`.
+            None, if the token did not match, otherwise dict
+            including the keys `name`, `is_guest`, `device_id`, `token_id`,
+            `valid_until_ms`.
         """
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_user_by_access_token", self._query_for_auth, token
         )
 
     @cached()
-    async def get_expiration_ts_for_user(self, user_id: str) -> Optional[None]:
+    async def get_expiration_ts_for_user(self, user_id: str) -> Optional[int]:
         """Get the expiration timestamp for the account bearing a given user ID.
 
         Args:
@@ -117,6 +118,20 @@ class RegistrationWorkerStore(SQLBaseStore):
             allow_none=True,
             desc="get_expiration_ts_for_user",
         )
+
+    async def is_account_expired(self, user_id: str, current_ts: int) -> bool:
+        """
+        Returns whether an user account is expired.
+
+        Args:
+            user_id: The user's ID
+            current_ts: The current timestamp
+
+        Returns:
+            Whether the user account has expired
+        """
+        expiration_ts = await self.get_expiration_ts_for_user(user_id)
+        return expiration_ts is not None and current_ts >= expiration_ts
 
     async def set_account_validity_for_user(
         self,
@@ -283,13 +298,12 @@ class RegistrationWorkerStore(SQLBaseStore):
 
         return bool(res) if res else False
 
-    def set_server_admin(self, user, admin):
+    async def set_server_admin(self, user: UserID, admin: bool) -> None:
         """Sets whether a user is an admin of this homeserver.
 
         Args:
-            user (UserID): user ID of the user to test
-            admin (bool): true iff the user is to be a server admin,
-                false otherwise.
+            user: user ID of the user to test
+            admin: true iff the user is to be a server admin, false otherwise.
         """
 
         def set_server_admin_txn(txn):
@@ -300,11 +314,11 @@ class RegistrationWorkerStore(SQLBaseStore):
                 txn, self.get_user_by_id, (user.to_string(),)
             )
 
-        return self.db_pool.runInteraction("set_server_admin", set_server_admin_txn)
+        await self.db_pool.runInteraction("set_server_admin", set_server_admin_txn)
 
     def _query_for_auth(self, txn, token):
         sql = (
-            "SELECT users.name, users.is_guest, access_tokens.id as token_id,"
+            "SELECT users.name, users.is_guest, users.shadow_banned, access_tokens.id as token_id,"
             " access_tokens.device_id, access_tokens.valid_until_ms"
             " FROM users"
             " INNER JOIN access_tokens on users.name = access_tokens.user_id"
@@ -366,9 +380,11 @@ class RegistrationWorkerStore(SQLBaseStore):
         )
         return True if res == UserTypes.SUPPORT else False
 
-    def get_users_by_id_case_insensitive(self, user_id):
+    async def get_users_by_id_case_insensitive(self, user_id: str) -> Dict[str, str]:
         """Gets users that match user_id case insensitively.
-        Returns a mapping of user_id -> password_hash.
+
+        Returns:
+             A mapping of user_id -> password_hash.
         """
 
         def f(txn):
@@ -376,11 +392,11 @@ class RegistrationWorkerStore(SQLBaseStore):
             txn.execute(sql, (user_id,))
             return dict(txn)
 
-        return self.db_pool.runInteraction("get_users_by_id_case_insensitive", f)
+        return await self.db_pool.runInteraction("get_users_by_id_case_insensitive", f)
 
     async def get_user_by_external_id(
         self, auth_provider: str, external_id: str
-    ) -> str:
+    ) -> Optional[str]:
         """Look up a user by their external auth id
 
         Args:
@@ -388,7 +404,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             external_id: id on that system
 
         Returns:
-            str|None: the mxid of the user, or None if they are not known
+            the mxid of the user, or None if they are not known
         """
         return await self.db_pool.simple_select_one_onecol(
             table="user_external_ids",
@@ -410,7 +426,7 @@ class RegistrationWorkerStore(SQLBaseStore):
 
         return await self.db_pool.runInteraction("count_users", _count_users)
 
-    def count_daily_user_type(self):
+    async def count_daily_user_type(self) -> Dict[str, int]:
         """
         Counts 1) native non guest users
                2) native guests users
@@ -439,7 +455,7 @@ class RegistrationWorkerStore(SQLBaseStore):
                 results[row[0]] = row[1]
             return results
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "count_daily_user_type", _count_daily_user_type
         )
 
@@ -531,43 +547,42 @@ class RegistrationWorkerStore(SQLBaseStore):
             "user_get_threepids",
         )
 
-    def user_delete_threepid(self, user_id, medium, address):
-        return self.db_pool.simple_delete(
+    async def user_delete_threepid(self, user_id, medium, address) -> None:
+        await self.db_pool.simple_delete(
             "user_threepids",
             keyvalues={"user_id": user_id, "medium": medium, "address": address},
             desc="user_delete_threepid",
         )
 
-    def user_delete_threepids(self, user_id: str):
+    async def user_delete_threepids(self, user_id: str) -> None:
         """Delete all threepid this user has bound
 
         Args:
              user_id: The user id to delete all threepids of
 
         """
-        return self.db_pool.simple_delete(
+        await self.db_pool.simple_delete(
             "user_threepids",
             keyvalues={"user_id": user_id},
             desc="user_delete_threepids",
         )
 
-    def add_user_bound_threepid(self, user_id, medium, address, id_server):
+    async def add_user_bound_threepid(
+        self, user_id: str, medium: str, address: str, id_server: str
+    ):
         """The server proxied a bind request to the given identity server on
         behalf of the given user. We need to remember this in case the user
         asks us to unbind the threepid.
 
         Args:
-            user_id (str)
-            medium (str)
-            address (str)
-            id_server (str)
-
-        Returns:
-            Deferred
+            user_id
+            medium
+            address
+            id_server
         """
         # We need to use an upsert, in case they user had already bound the
         # threepid
-        return self.db_pool.simple_upsert(
+        await self.db_pool.simple_upsert(
             table="user_threepid_id_server",
             keyvalues={
                 "user_id": user_id,
@@ -580,41 +595,40 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="add_user_bound_threepid",
         )
 
-    def user_get_bound_threepids(self, user_id):
+    async def user_get_bound_threepids(self, user_id: str) -> List[Dict[str, Any]]:
         """Get the threepids that a user has bound to an identity server through the homeserver
         The homeserver remembers where binds to an identity server occurred. Using this
         method can retrieve those threepids.
 
         Args:
-            user_id (str): The ID of the user to retrieve threepids for
+            user_id: The ID of the user to retrieve threepids for
 
         Returns:
-            Deferred[list[dict]]: List of dictionaries containing the following:
+            List of dictionaries containing the following keys:
                 medium (str): The medium of the threepid (e.g "email")
                 address (str): The address of the threepid (e.g "bob@example.com")
         """
-        return self.db_pool.simple_select_list(
+        return await self.db_pool.simple_select_list(
             table="user_threepid_id_server",
             keyvalues={"user_id": user_id},
             retcols=["medium", "address"],
             desc="user_get_bound_threepids",
         )
 
-    def remove_user_bound_threepid(self, user_id, medium, address, id_server):
+    async def remove_user_bound_threepid(
+        self, user_id: str, medium: str, address: str, id_server: str
+    ) -> None:
         """The server proxied an unbind request to the given identity server on
         behalf of the given user, so we remove the mapping of threepid to
         identity server.
 
         Args:
-            user_id (str)
-            medium (str)
-            address (str)
-            id_server (str)
-
-        Returns:
-            Deferred
+            user_id
+            medium
+            address
+            id_server
         """
-        return self.db_pool.simple_delete(
+        await self.db_pool.simple_delete(
             table="user_threepid_id_server",
             keyvalues={
                 "user_id": user_id,
@@ -625,19 +639,21 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="remove_user_bound_threepid",
         )
 
-    def get_id_servers_user_bound(self, user_id, medium, address):
+    async def get_id_servers_user_bound(
+        self, user_id: str, medium: str, address: str
+    ) -> List[str]:
         """Get the list of identity servers that the server proxied bind
         requests to for given user and threepid
 
         Args:
-            user_id (str)
-            medium (str)
-            address (str)
+            user_id: The user to query for identity servers.
+            medium: The medium to query for identity servers.
+            address: The address to query for identity servers.
 
         Returns:
-            Deferred[list[str]]: Resolves to a list of identity servers
+            A list of identity servers
         """
-        return self.db_pool.simple_select_onecol(
+        return await self.db_pool.simple_select_onecol(
             table="user_threepid_id_server",
             keyvalues={"user_id": user_id, "medium": medium, "address": address},
             retcol="id_server",
@@ -665,24 +681,29 @@ class RegistrationWorkerStore(SQLBaseStore):
         # Convert the integer into a boolean.
         return res == 1
 
-    def get_threepid_validation_session(
-        self, medium, client_secret, address=None, sid=None, validated=True
-    ):
+    async def get_threepid_validation_session(
+        self,
+        medium: Optional[str],
+        client_secret: str,
+        address: Optional[str] = None,
+        sid: Optional[str] = None,
+        validated: Optional[bool] = True,
+    ) -> Optional[Dict[str, Any]]:
         """Gets a session_id and last_send_attempt (if available) for a
         combination of validation metadata
 
         Args:
-            medium (str|None): The medium of the 3PID
-            address (str|None): The address of the 3PID
-            sid (str|None): The ID of the validation session
-            client_secret (str): A unique string provided by the client to help identify this
+            medium: The medium of the 3PID
+            client_secret: A unique string provided by the client to help identify this
                 validation attempt
-            validated (bool|None): Whether sessions should be filtered by
+            address: The address of the 3PID
+            sid: The ID of the validation session
+            validated: Whether sessions should be filtered by
                 whether they have been validated already or not. None to
                 perform no filtering
 
         Returns:
-            Deferred[dict|None]: A dict containing the following:
+            A dict containing the following:
                 * address - address of the 3pid
                 * medium - medium of the 3pid
                 * client_secret - a secret provided by the client for this validation session
@@ -728,17 +749,17 @@ class RegistrationWorkerStore(SQLBaseStore):
 
             return rows[0]
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_threepid_validation_session", get_threepid_validation_session_txn
         )
 
-    def delete_threepid_session(self, session_id):
+    async def delete_threepid_session(self, session_id: str) -> None:
         """Removes a threepid validation session from the database. This can
         be done after validation has been performed and whatever action was
         waiting on it has been carried out
 
         Args:
-            session_id (str): The ID of the session to delete
+            session_id: The ID of the session to delete
         """
 
         def delete_threepid_session_txn(txn):
@@ -753,14 +774,14 @@ class RegistrationWorkerStore(SQLBaseStore):
                 keyvalues={"session_id": session_id},
             )
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "delete_threepid_session", delete_threepid_session_txn
         )
 
 
 class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(RegistrationBackgroundUpdateStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self.clock = hs.get_clock()
         self.config = hs.config
@@ -888,9 +909,10 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
 
 class RegistrationStore(RegistrationBackgroundUpdateStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(RegistrationStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self._account_validity = hs.config.account_validity
+        self._ignore_unknown_session_error = hs.config.request_token_inhibit_3pid_errors
 
         if self._account_validity.enabled:
             self._clock.call_later(
@@ -942,40 +964,40 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             desc="add_access_token_to_user",
         )
 
-    def register_user(
+    async def register_user(
         self,
-        user_id,
-        password_hash=None,
-        was_guest=False,
-        make_guest=False,
-        appservice_id=None,
-        create_profile_with_displayname=None,
-        admin=False,
-        user_type=None,
-    ):
+        user_id: str,
+        password_hash: Optional[str] = None,
+        was_guest: bool = False,
+        make_guest: bool = False,
+        appservice_id: Optional[str] = None,
+        create_profile_with_displayname: Optional[str] = None,
+        admin: bool = False,
+        user_type: Optional[str] = None,
+        shadow_banned: bool = False,
+    ) -> None:
         """Attempts to register an account.
 
         Args:
-            user_id (str): The desired user ID to register.
-            password_hash (str|None): Optional. The password hash for this user.
-            was_guest (bool): Optional. Whether this is a guest account being
-                upgraded to a non-guest account.
-            make_guest (boolean): True if the the new user should be guest,
-                false to add a regular user account.
-            appservice_id (str): The ID of the appservice registering the user.
-            create_profile_with_displayname (unicode): Optionally create a profile for
+            user_id: The desired user ID to register.
+            password_hash: Optional. The password hash for this user.
+            was_guest: Whether this is a guest account being upgraded to a
+                non-guest account.
+            make_guest: True if the the new user should be guest, false to add a
+                regular user account.
+            appservice_id: The ID of the appservice registering the user.
+            create_profile_with_displayname: Optionally create a profile for
                 the user, setting their displayname to the given value
-            admin (boolean): is an admin user?
-            user_type (str|None): type of user. One of the values from
-                api.constants.UserTypes, or None for a normal user.
+            admin: is an admin user?
+            user_type: type of user. One of the values from api.constants.UserTypes,
+                or None for a normal user.
+            shadow_banned: Whether the user is shadow-banned, i.e. they may be
+                told their requests succeeded but we ignore them.
 
         Raises:
             StoreError if the user_id could not be registered.
-
-        Returns:
-            Deferred
         """
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "register_user",
             self._register_user,
             user_id,
@@ -986,6 +1008,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             create_profile_with_displayname,
             admin,
             user_type,
+            shadow_banned,
         )
 
     def _register_user(
@@ -999,6 +1022,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
         create_profile_with_displayname,
         admin,
         user_type,
+        shadow_banned,
     ):
         user_id_obj = UserID.from_string(user_id)
 
@@ -1028,6 +1052,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
                         "appservice_id": appservice_id,
                         "admin": 1 if admin else 0,
                         "user_type": user_type,
+                        "shadow_banned": shadow_banned,
                     },
                 )
             else:
@@ -1042,6 +1067,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
                         "appservice_id": appservice_id,
                         "admin": 1 if admin else 0,
                         "user_type": user_type,
+                        "shadow_banned": shadow_banned,
                     },
                 )
 
@@ -1075,9 +1101,9 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
 
         self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 
-    def record_user_external_id(
+    async def record_user_external_id(
         self, auth_provider: str, external_id: str, user_id: str
-    ) -> Deferred:
+    ) -> None:
         """Record a mapping from an external user id to a mxid
 
         Args:
@@ -1085,7 +1111,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             external_id: id on that system
             user_id: complete mxid that it is mapped to
         """
-        return self.db_pool.simple_insert(
+        await self.db_pool.simple_insert(
             table="user_external_ids",
             values={
                 "auth_provider": auth_provider,
@@ -1095,7 +1121,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             desc="record_user_external_id",
         )
 
-    def user_set_password_hash(self, user_id, password_hash):
+    async def user_set_password_hash(self, user_id: str, password_hash: str) -> None:
         """
         NB. This does *not* evict any cache because the one use for this
             removes most of the entries subsequently anyway so it would be
@@ -1108,17 +1134,18 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             )
             self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "user_set_password_hash", user_set_password_hash_txn
         )
 
-    def user_set_consent_version(self, user_id, consent_version):
+    async def user_set_consent_version(
+        self, user_id: str, consent_version: str
+    ) -> None:
         """Updates the user table to record privacy policy consent
 
         Args:
-            user_id (str): full mxid of the user to update
-            consent_version (str): version of the policy the user has consented
-                to
+            user_id: full mxid of the user to update
+            consent_version: version of the policy the user has consented to
 
         Raises:
             StoreError(404) if user not found
@@ -1133,16 +1160,17 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             )
             self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 
-        return self.db_pool.runInteraction("user_set_consent_version", f)
+        await self.db_pool.runInteraction("user_set_consent_version", f)
 
-    def user_set_consent_server_notice_sent(self, user_id, consent_version):
+    async def user_set_consent_server_notice_sent(
+        self, user_id: str, consent_version: str
+    ) -> None:
         """Updates the user table to record that we have sent the user a server
         notice about privacy policy consent
 
         Args:
-            user_id (str): full mxid of the user to update
-            consent_version (str): version of the policy we have notified the
-                user about
+            user_id: full mxid of the user to update
+            consent_version: version of the policy we have notified the user about
 
         Raises:
             StoreError(404) if user not found
@@ -1157,22 +1185,25 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             )
             self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 
-        return self.db_pool.runInteraction("user_set_consent_server_notice_sent", f)
+        await self.db_pool.runInteraction("user_set_consent_server_notice_sent", f)
 
-    def user_delete_access_tokens(self, user_id, except_token_id=None, device_id=None):
+    async def user_delete_access_tokens(
+        self,
+        user_id: str,
+        except_token_id: Optional[str] = None,
+        device_id: Optional[str] = None,
+    ) -> List[Tuple[str, int, Optional[str]]]:
         """
         Invalidate access tokens belonging to a user
 
         Args:
-            user_id (str):  ID of user the tokens belong to
-            except_token_id (str): list of access_tokens IDs which should
-                *not* be deleted
-            device_id (str|None):  ID of device the tokens are associated with.
+            user_id: ID of user the tokens belong to
+            except_token_id: access_tokens ID which should *not* be deleted
+            device_id: ID of device the tokens are associated with.
                 If None, tokens associated with any device (or no device) will
                 be deleted
         Returns:
-            defer.Deferred[list[str, int, str|None, int]]: a list of
-                (token, token id, device id) for each of the deleted tokens
+            A tuple of (token, token id, device id) for each of the deleted tokens
         """
 
         def f(txn):
@@ -1203,9 +1234,9 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
 
             return tokens_and_devices
 
-        return self.db_pool.runInteraction("user_delete_access_tokens", f)
+        return await self.db_pool.runInteraction("user_delete_access_tokens", f)
 
-    def delete_access_token(self, access_token):
+    async def delete_access_token(self, access_token: str) -> None:
         def f(txn):
             self.db_pool.simple_delete_one_txn(
                 txn, table="access_tokens", keyvalues={"token": access_token}
@@ -1215,7 +1246,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
                 txn, self.get_user_by_access_token, (access_token,)
             )
 
-        return self.db_pool.runInteraction("delete_access_token", f)
+        await self.db_pool.runInteraction("delete_access_token", f)
 
     @cached()
     async def is_guest(self, user_id: str) -> bool:
@@ -1229,36 +1260,36 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
 
         return res if res else False
 
-    def add_user_pending_deactivation(self, user_id):
+    async def add_user_pending_deactivation(self, user_id: str) -> None:
         """
         Adds a user to the table of users who need to be parted from all the rooms they're
         in
         """
-        return self.db_pool.simple_insert(
+        await self.db_pool.simple_insert(
             "users_pending_deactivation",
             values={"user_id": user_id},
             desc="add_user_pending_deactivation",
         )
 
-    def del_user_pending_deactivation(self, user_id):
+    async def del_user_pending_deactivation(self, user_id: str) -> None:
         """
         Removes the given user to the table of users who need to be parted from all the
         rooms they're in, effectively marking that user as fully deactivated.
         """
         # XXX: This should be simple_delete_one but we failed to put a unique index on
         # the table, so somehow duplicate entries have ended up in it.
-        return self.db_pool.simple_delete(
+        await self.db_pool.simple_delete(
             "users_pending_deactivation",
             keyvalues={"user_id": user_id},
             desc="del_user_pending_deactivation",
         )
 
-    def get_user_pending_deactivation(self):
+    async def get_user_pending_deactivation(self) -> Optional[str]:
         """
         Gets one user from the table of users waiting to be parted from all the rooms
         they're in.
         """
-        return self.db_pool.simple_select_one_onecol(
+        return await self.db_pool.simple_select_one_onecol(
             "users_pending_deactivation",
             keyvalues={},
             retcol="user_id",
@@ -1266,24 +1297,25 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             desc="get_users_pending_deactivation",
         )
 
-    def validate_threepid_session(self, session_id, client_secret, token, current_ts):
+    async def validate_threepid_session(
+        self, session_id: str, client_secret: str, token: str, current_ts: int
+    ) -> Optional[str]:
         """Attempt to validate a threepid session using a token
 
         Args:
-            session_id (str): The id of a validation session
-            client_secret (str): A unique string provided by the client to
-                help identify this validation attempt
-            token (str): A validation token
-            current_ts (int): The current unix time in milliseconds. Used for
-                checking token expiry status
+            session_id: The id of a validation session
+            client_secret: A unique string provided by the client to help identify
+                this validation attempt
+            token: A validation token
+            current_ts: The current unix time in milliseconds. Used for checking
+                token expiry status
 
         Raises:
             ThreepidValidationError: if a matching validation token was not found or has
                 expired
 
         Returns:
-            deferred str|None: A str representing a link to redirect the user
-            to if there is one.
+            A str representing a link to redirect the user to if there is one.
         """
 
         # Insert everything into a transaction in order to run atomically
@@ -1297,14 +1329,21 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             )
 
             if not row:
-                raise ThreepidValidationError(400, "Unknown session_id")
+                if self._ignore_unknown_session_error:
+                    # If we need to inhibit the error caused by an incorrect session ID,
+                    # use None as placeholder values for the client secret and the
+                    # validation timestamp.
+                    # It shouldn't be an issue because they're both only checked after
+                    # the token check, which should fail. And if it doesn't for some
+                    # reason, the next check is on the client secret, which is NOT NULL,
+                    # so we don't have to worry about the client secret matching by
+                    # accident.
+                    row = {"client_secret": None, "validated_at": None}
+                else:
+                    raise ThreepidValidationError(400, "Unknown session_id")
+
             retrieved_client_secret = row["client_secret"]
             validated_at = row["validated_at"]
-
-            if retrieved_client_secret != client_secret:
-                raise ThreepidValidationError(
-                    400, "This client_secret does not match the provided session_id"
-                )
 
             row = self.db_pool.simple_select_one_txn(
                 txn,
@@ -1320,6 +1359,11 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
                 )
             expires = row["expires"]
             next_link = row["next_link"]
+
+            if retrieved_client_secret != client_secret:
+                raise ThreepidValidationError(
+                    400, "This client_secret does not match the provided session_id"
+                )
 
             # If the session is already validated, no need to revalidate
             if validated_at:
@@ -1341,73 +1385,35 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             return next_link
 
         # Return next_link if it exists
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "validate_threepid_session_txn", validate_threepid_session_txn
         )
 
-    def upsert_threepid_validation_session(
+    async def start_or_continue_validation_session(
         self,
-        medium,
-        address,
-        client_secret,
-        send_attempt,
-        session_id,
-        validated_at=None,
-    ):
-        """Upsert a threepid validation session
-        Args:
-            medium (str): The medium of the 3PID
-            address (str): The address of the 3PID
-            client_secret (str): A unique string provided by the client to
-                help identify this validation attempt
-            send_attempt (int): The latest send_attempt on this session
-            session_id (str): The id of this validation session
-            validated_at (int|None): The unix timestamp in milliseconds of
-                when the session was marked as valid
-        """
-        insertion_values = {
-            "medium": medium,
-            "address": address,
-            "client_secret": client_secret,
-        }
-
-        if validated_at:
-            insertion_values["validated_at"] = validated_at
-
-        return self.db_pool.simple_upsert(
-            table="threepid_validation_session",
-            keyvalues={"session_id": session_id},
-            values={"last_send_attempt": send_attempt},
-            insertion_values=insertion_values,
-            desc="upsert_threepid_validation_session",
-        )
-
-    def start_or_continue_validation_session(
-        self,
-        medium,
-        address,
-        session_id,
-        client_secret,
-        send_attempt,
-        next_link,
-        token,
-        token_expires,
-    ):
+        medium: str,
+        address: str,
+        session_id: str,
+        client_secret: str,
+        send_attempt: int,
+        next_link: Optional[str],
+        token: str,
+        token_expires: int,
+    ) -> None:
         """Creates a new threepid validation session if it does not already
         exist and associates a new validation token with it
 
         Args:
-            medium (str): The medium of the 3PID
-            address (str): The address of the 3PID
-            session_id (str): The id of this validation session
-            client_secret (str): A unique string provided by the client to
-                help identify this validation attempt
-            send_attempt (int): The latest send_attempt on this session
-            next_link (str|None): The link to redirect the user to upon
-                successful validation
-            token (str): The validation token
-            token_expires (int): The timestamp for which after the token
-                will no longer be valid
+            medium: The medium of the 3PID
+            address: The address of the 3PID
+            session_id: The id of this validation session
+            client_secret: A unique string provided by the client to help
+                identify this validation attempt
+            send_attempt: The latest send_attempt on this session
+            next_link: The link to redirect the user to upon successful validation
+            token: The validation token
+            token_expires: The timestamp for which after the token will no
+                longer be valid
         """
 
         def start_or_continue_validation_session_txn(txn):
@@ -1436,12 +1442,12 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
                 },
             )
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "start_or_continue_validation_session",
             start_or_continue_validation_session_txn,
         )
 
-    def cull_expired_threepid_validation_tokens(self):
+    async def cull_expired_threepid_validation_tokens(self) -> None:
         """Remove threepid validation tokens with expiry dates that have passed"""
 
         def cull_expired_threepid_validation_tokens_txn(txn, ts):
@@ -1449,9 +1455,9 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             DELETE FROM threepid_validation_token WHERE
             expires < ?
             """
-            return txn.execute(sql, (ts,))
+            txn.execute(sql, (ts,))
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "cull_expired_threepid_validation_tokens",
             cull_expired_threepid_validation_tokens_txn,
             self.clock.time_msec(),

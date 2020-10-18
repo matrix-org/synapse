@@ -141,7 +141,7 @@ class CursesStdIO:
         curses.endwin()
 
 
-class Callback(object):
+class Callback:
     def __init__(self, stdio):
         self.stdio = stdio
 

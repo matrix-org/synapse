@@ -32,7 +32,7 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
     PATH_ARGS = ("user_id",)
 
     def __init__(self, hs):
-        super(RegisterDeviceReplicationServlet, self).__init__(hs)
+        super().__init__(hs)
         self.registration_handler = hs.get_registration_handler()
 
     @staticmethod

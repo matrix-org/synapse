@@ -22,8 +22,8 @@ from synapse.api.errors import SynapseError
 logger = logging.getLogger(__name__)
 
 
-@attr.s
-class PaginationChunk(object):
+@attr.s(slots=True)
+class PaginationChunk:
     """Returned by relation pagination APIs.
 
     Attributes:
@@ -51,7 +51,7 @@ class PaginationChunk(object):
 
 
 @attr.s(frozen=True, slots=True)
-class RelationPaginationToken(object):
+class RelationPaginationToken:
     """Pagination token for relation pagination API.
 
     As the results are in topological order, we can use the
@@ -82,7 +82,7 @@ class RelationPaginationToken(object):
 
 
 @attr.s(frozen=True, slots=True)
-class AggregationPaginationToken(object):
+class AggregationPaginationToken:
     """Pagination token for relation aggregation pagination API.
 
     As the results are order by count and then MAX(stream_ordering) of the

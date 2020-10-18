@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Optional
+
 from synapse.api.errors import StoreError
 from synapse.logging.opentracing import log_kv, trace
 from synapse.storage._base import SQLBaseStore, db_to_json
@@ -149,7 +151,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
         return sessions
 
-    def get_e2e_room_keys_multi(self, user_id, version, room_keys):
+    async def get_e2e_room_keys_multi(self, user_id, version, room_keys):
         """Get multiple room keys at a time.  The difference between this function and
         get_e2e_room_keys is that this function can be used to retrieve
         multiple specific keys at a time, whereas get_e2e_room_keys is used for
@@ -164,10 +166,10 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 that we want to query
 
         Returns:
-           Deferred[dict[str, dict[str, dict]]]: a map of room IDs to session IDs to room key
+           dict[str, dict[str, dict]]: a map of room IDs to session IDs to room key
         """
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_e2e_room_keys_multi",
             self._get_e2e_room_keys_multi_txn,
             user_id,
@@ -223,15 +225,15 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
         return ret
 
-    def count_e2e_room_keys(self, user_id, version):
+    async def count_e2e_room_keys(self, user_id: str, version: str) -> int:
         """Get the number of keys in a backup version.
 
         Args:
-            user_id (str): the user whose backup we're querying
-            version (str): the version ID of the backup we're querying about
+            user_id: the user whose backup we're querying
+            version: the version ID of the backup we're querying about
         """
 
-        return self.db_pool.simple_select_one_onecol(
+        return await self.db_pool.simple_select_one_onecol(
             table="e2e_room_keys",
             keyvalues={"user_id": user_id, "version": version},
             retcol="COUNT(*)",
@@ -281,7 +283,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             raise StoreError(404, "No current backup version")
         return row[0]
 
-    def get_e2e_room_keys_version_info(self, user_id, version=None):
+    async def get_e2e_room_keys_version_info(self, user_id, version=None):
         """Get info metadata about a version of our room_keys backup.
 
         Args:
@@ -291,7 +293,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         Raises:
             StoreError: with code 404 if there are no e2e_room_keys_versions present
         Returns:
-            A deferred dict giving the info metadata for this backup version, with
+            A dict giving the info metadata for this backup version, with
             fields including:
                 version(str)
                 algorithm(str)
@@ -322,12 +324,12 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 result["etag"] = 0
             return result
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_e2e_room_keys_version_info", _get_e2e_room_keys_version_info_txn
         )
 
     @trace
-    def create_e2e_room_keys_version(self, user_id, info):
+    async def create_e2e_room_keys_version(self, user_id: str, info: dict) -> str:
         """Atomically creates a new version of this user's e2e_room_keys store
         with the given version info.
 
@@ -336,7 +338,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             info(dict): the info about the backup version to be created
 
         Returns:
-            A deferred string for the newly created version ID
+            The newly created version ID
         """
 
         def _create_e2e_room_keys_version_txn(txn):
@@ -363,23 +365,27 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
             return new_version
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "create_e2e_room_keys_version_txn", _create_e2e_room_keys_version_txn
         )
 
     @trace
-    def update_e2e_room_keys_version(
-        self, user_id, version, info=None, version_etag=None
-    ):
+    async def update_e2e_room_keys_version(
+        self,
+        user_id: str,
+        version: str,
+        info: Optional[dict] = None,
+        version_etag: Optional[int] = None,
+    ) -> None:
         """Update a given backup version
 
         Args:
-            user_id(str): the user whose backup version we're updating
-            version(str): the version ID of the backup version we're updating
-            info (dict): the new backup version info to store.  If None, then
-                the backup version info is not updated
-            version_etag (Optional[int]): etag of the keys in the backup.  If
-                None, then the etag is not updated
+            user_id: the user whose backup version we're updating
+            version: the version ID of the backup version we're updating
+            info: the new backup version info to store. If None, then the backup
+                version info is not updated.
+            version_etag: etag of the keys in the backup. If None, then the etag
+                is not updated.
         """
         updatevalues = {}
 
@@ -389,7 +395,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             updatevalues["etag"] = version_etag
 
         if updatevalues:
-            return self.db_pool.simple_update(
+            await self.db_pool.simple_update(
                 table="e2e_room_keys_versions",
                 keyvalues={"user_id": user_id, "version": version},
                 updatevalues=updatevalues,
@@ -397,13 +403,15 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             )
 
     @trace
-    def delete_e2e_room_keys_version(self, user_id, version=None):
+    async def delete_e2e_room_keys_version(
+        self, user_id: str, version: Optional[str] = None
+    ) -> None:
         """Delete a given backup version of the user's room keys.
         Doesn't delete their actual key data.
 
         Args:
-            user_id(str): the user whose backup version we're deleting
-            version(str): Optional. the version ID of the backup version we're deleting
+            user_id: the user whose backup version we're deleting
+            version: Optional. the version ID of the backup version we're deleting
                 If missing, we delete the current backup version info.
         Raises:
             StoreError: with code 404 if there are no e2e_room_keys_versions present,
@@ -424,13 +432,13 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 keyvalues={"user_id": user_id, "version": this_version},
             )
 
-            return self.db_pool.simple_update_one_txn(
+            self.db_pool.simple_update_one_txn(
                 txn,
                 table="e2e_room_keys_versions",
                 keyvalues={"user_id": user_id, "version": this_version},
                 updatevalues={"deleted": 1},
             )
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "delete_e2e_room_keys_version", _delete_e2e_room_keys_version_txn
         )

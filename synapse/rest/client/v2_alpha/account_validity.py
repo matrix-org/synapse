@@ -32,7 +32,7 @@ class AccountValidityRenewServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(AccountValidityRenewServlet, self).__init__()
+        super().__init__()
 
         self.hs = hs
         self.account_activity_handler = hs.get_account_validity_handler()
@@ -67,7 +67,7 @@ class AccountValiditySendMailServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(AccountValiditySendMailServlet, self).__init__()
+        super().__init__()
 
         self.hs = hs
         self.account_activity_handler = hs.get_account_validity_handler()

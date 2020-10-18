@@ -31,7 +31,7 @@ __all__ = ["errors", "make_deferred_yieldable", "run_in_background", "ModuleApi"
 logger = logging.getLogger(__name__)
 
 
-class ModuleApi(object):
+class ModuleApi:
     """A proxy object that gets passed to various plugin modules so they
     can register new users etc if necessary.
     """
@@ -167,8 +167,10 @@ class ModuleApi(object):
             external_id: id on that system
             user_id: complete mxid that it is mapped to
         """
-        return self._store.record_user_external_id(
-            auth_provider_id, remote_user_id, registered_user_id
+        return defer.ensureDeferred(
+            self._store.record_user_external_id(
+                auth_provider_id, remote_user_id, registered_user_id
+            )
         )
 
     def generate_short_term_login_token(
@@ -223,7 +225,9 @@ class ModuleApi(object):
         Returns:
             Deferred[object]: result of func
         """
-        return self._store.db_pool.runInteraction(desc, func, *args, **kwargs)
+        return defer.ensureDeferred(
+            self._store.db_pool.runInteraction(desc, func, *args, **kwargs)
+        )
 
     def complete_sso_login(
         self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str

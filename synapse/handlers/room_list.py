@@ -38,7 +38,7 @@ EMPTY_THIRD_PARTY_ID = ThirdPartyInstanceID(None, None)
 
 class RoomListHandler(BaseHandler):
     def __init__(self, hs):
-        super(RoomListHandler, self).__init__(hs)
+        super().__init__(hs)
         self.enable_room_list_search = hs.config.enable_room_list_search
         self.response_cache = ResponseCache(hs, "room_list")
         self.remote_response_cache = ResponseCache(

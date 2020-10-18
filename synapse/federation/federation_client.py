@@ -24,10 +24,12 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Mapping,
     Optional,
     Sequence,
     Tuple,
     TypeVar,
+    Union,
 )
 
 from prometheus_client import Counter
@@ -79,7 +81,7 @@ class InvalidResponseError(RuntimeError):
 
 class FederationClient(FederationBase):
     def __init__(self, hs):
-        super(FederationClient, self).__init__(hs)
+        super().__init__(hs)
 
         self.pdu_destination_tried = {}
         self._clock.looping_call(self._clear_tried_cache, 60 * 1000)
@@ -501,7 +503,7 @@ class FederationClient(FederationBase):
         user_id: str,
         membership: str,
         content: dict,
-        params: Dict[str, str],
+        params: Optional[Mapping[str, Union[str, Iterable[str]]]],
     ) -> Tuple[str, EventBase, RoomVersion]:
         """
         Creates an m.room.member event, with context, without participating in the room.

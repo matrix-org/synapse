@@ -37,7 +37,6 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         self.hs = yield setup_test_homeserver(self.addCleanup)
         self.event_creation_handler = self.hs.get_event_creation_handler()
         self.event_builder_factory = self.hs.get_event_builder_factory()
-        self.store = self.hs.get_datastore()
         self.storage = self.hs.get_storage()
 
         yield defer.ensureDeferred(create_room(self.hs, TEST_ROOM_ID, "@someone:ROOM"))
@@ -99,7 +98,9 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         events_to_filter.append(evt)
 
         # the erasey user gets erased
-        yield self.hs.get_datastore().mark_user_erased("@erased:local_hs")
+        yield defer.ensureDeferred(
+            self.hs.get_datastore().mark_user_erased("@erased:local_hs")
+        )
 
         # ... and the filtering happens.
         filtered = yield defer.ensureDeferred(
@@ -293,7 +294,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
     test_large_room.skip = "Disabled by default because it's slow"
 
 
-class _TestStore(object):
+class _TestStore:
     """Implements a few methods of the DataStore, so that we can test
     filter_events_for_server
 

@@ -21,14 +21,13 @@ import re
 from typing import List, Optional
 from urllib import parse as urlparse
 
-from canonicaljson import json
-
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
     HttpResponseException,
     InvalidClientCredentialsError,
+    ShadowBanError,
     SynapseError,
 )
 from synapse.api.filtering import Filter
@@ -46,6 +45,8 @@ from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
+from synapse.util import json_decoder
+from synapse.util.stringutils import random_string
 
 MYPY = False
 if MYPY:
@@ -56,7 +57,7 @@ logger = logging.getLogger(__name__)
 
 class TransactionRestServlet(RestServlet):
     def __init__(self, hs):
-        super(TransactionRestServlet, self).__init__()
+        super().__init__()
         self.txns = HttpTransactionCache(hs)
 
 
@@ -64,7 +65,7 @@ class RoomCreateRestServlet(TransactionRestServlet):
     # No PATTERN; we have custom dispatch rules here
 
     def __init__(self, hs):
-        super(RoomCreateRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self._room_creation_handler = hs.get_room_creation_handler()
         self.auth = hs.get_auth()
 
@@ -110,7 +111,7 @@ class RoomCreateRestServlet(TransactionRestServlet):
 # TODO: Needs unit testing for generic events
 class RoomStateEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
-        super(RoomStateEventRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self.handlers = hs.get_handlers()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
@@ -170,7 +171,6 @@ class RoomStateEventRestServlet(TransactionRestServlet):
             room_id=room_id,
             event_type=event_type,
             state_key=state_key,
-            is_guest=requester.is_guest,
         )
 
         if not data:
@@ -200,23 +200,26 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         if state_key is not None:
             event_dict["state_key"] = state_key
 
-        if event_type == EventTypes.Member:
-            membership = content.get("membership", None)
-            event_id, _ = await self.room_member_handler.update_membership(
-                requester,
-                target=UserID.from_string(state_key),
-                room_id=room_id,
-                action=membership,
-                content=content,
-            )
-        else:
-            (
-                event,
-                _,
-            ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                requester, event_dict, txn_id=txn_id
-            )
-            event_id = event.event_id
+        try:
+            if event_type == EventTypes.Member:
+                membership = content.get("membership", None)
+                event_id, _ = await self.room_member_handler.update_membership(
+                    requester,
+                    target=UserID.from_string(state_key),
+                    room_id=room_id,
+                    action=membership,
+                    content=content,
+                )
+            else:
+                (
+                    event,
+                    _,
+                ) = await self.event_creation_handler.create_and_send_nonmember_event(
+                    requester, event_dict, txn_id=txn_id
+                )
+                event_id = event.event_id
+        except ShadowBanError:
+            event_id = "$" + random_string(43)
 
         set_tag("event_id", event_id)
         ret = {"event_id": event_id}
@@ -226,7 +229,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 # TODO: Needs unit testing for generic events + feedback
 class RoomSendEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
-        super(RoomSendEventRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
 
@@ -249,12 +252,19 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         if b"ts" in request.args:
             event_dict["origin_server_ts"] = parse_integer(request, "ts", 0)
 
-        event, _ = await self.event_creation_handler.create_and_send_nonmember_event(
-            requester, event_dict, txn_id=txn_id
-        )
+        try:
+            (
+                event,
+                _,
+            ) = await self.event_creation_handler.create_and_send_nonmember_event(
+                requester, event_dict, txn_id=txn_id
+            )
+            event_id = event.event_id
+        except ShadowBanError:
+            event_id = "$" + random_string(43)
 
-        set_tag("event_id", event.event_id)
-        return 200, {"event_id": event.event_id}
+        set_tag("event_id", event_id)
+        return 200, {"event_id": event_id}
 
     def on_GET(self, request, room_id, event_type, txn_id):
         return 200, "Not implemented"
@@ -270,7 +280,7 @@ class RoomSendEventRestServlet(TransactionRestServlet):
 # TODO: Needs unit testing for room ID + alias joins
 class JoinRoomAliasServlet(TransactionRestServlet):
     def __init__(self, hs):
-        super(JoinRoomAliasServlet, self).__init__(hs)
+        super().__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
@@ -333,7 +343,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
     PATTERNS = client_patterns("/publicRooms$", v1=True)
 
     def __init__(self, hs):
-        super(PublicRoomListRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self.hs = hs
         self.auth = hs.get_auth()
 
@@ -438,9 +448,10 @@ class RoomMemberListRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/members$", v1=True)
 
     def __init__(self, hs):
-        super(RoomMemberListRestServlet, self).__init__()
+        super().__init__()
         self.message_handler = hs.get_message_handler()
         self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
 
     async def on_GET(self, request, room_id):
         # TODO support Pagination stream API (limit/tokens)
@@ -455,7 +466,7 @@ class RoomMemberListRestServlet(RestServlet):
         if at_token_string is None:
             at_token = None
         else:
-            at_token = StreamToken.from_string(at_token_string)
+            at_token = await StreamToken.from_string(self.store, at_token_string)
 
         # let you filter down on particular memberships.
         # XXX: this may not be the best shape for this API - we could pass in a filter
@@ -489,7 +500,7 @@ class JoinedRoomMemberListRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/joined_members$", v1=True)
 
     def __init__(self, hs):
-        super(JoinedRoomMemberListRestServlet, self).__init__()
+        super().__init__()
         self.message_handler = hs.get_message_handler()
         self.auth = hs.get_auth()
 
@@ -508,18 +519,23 @@ class RoomMessageListRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/messages$", v1=True)
 
     def __init__(self, hs):
-        super(RoomMessageListRestServlet, self).__init__()
+        super().__init__()
         self.pagination_handler = hs.get_pagination_handler()
         self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
 
     async def on_GET(self, request, room_id):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        pagination_config = PaginationConfig.from_request(request, default_limit=10)
+        pagination_config = await PaginationConfig.from_request(
+            self.store, request, default_limit=10
+        )
         as_client_event = b"raw" not in request.args
         filter_str = parse_string(request, b"filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
-            event_filter = Filter(json.loads(filter_json))  # type: Optional[Filter]
+            event_filter = Filter(
+                json_decoder.decode(filter_json)
+            )  # type: Optional[Filter]
             if (
                 event_filter
                 and event_filter.filter_json.get("event_format", "client")
@@ -545,7 +561,7 @@ class RoomStateRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/state$", v1=True)
 
     def __init__(self, hs):
-        super(RoomStateRestServlet, self).__init__()
+        super().__init__()
         self.message_handler = hs.get_message_handler()
         self.auth = hs.get_auth()
 
@@ -565,13 +581,14 @@ class RoomInitialSyncRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/initialSync$", v1=True)
 
     def __init__(self, hs):
-        super(RoomInitialSyncRestServlet, self).__init__()
+        super().__init__()
         self.initial_sync_handler = hs.get_initial_sync_handler()
         self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
 
     async def on_GET(self, request, room_id):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        pagination_config = PaginationConfig.from_request(request)
+        pagination_config = await PaginationConfig.from_request(self.store, request)
         content = await self.initial_sync_handler.room_initial_sync(
             room_id=room_id, requester=requester, pagin_config=pagination_config
         )
@@ -584,7 +601,7 @@ class RoomEventServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(RoomEventServlet, self).__init__()
+        super().__init__()
         self.clock = hs.get_clock()
         self.event_handler = hs.get_event_handler()
         self._event_serializer = hs.get_event_client_serializer()
@@ -616,7 +633,7 @@ class RoomEventContextServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(RoomEventContextServlet, self).__init__()
+        super().__init__()
         self.clock = hs.get_clock()
         self.room_context_handler = hs.get_room_context_handler()
         self._event_serializer = hs.get_event_client_serializer()
@@ -631,7 +648,9 @@ class RoomEventContextServlet(RestServlet):
         filter_str = parse_string(request, b"filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
-            event_filter = Filter(json.loads(filter_json))  # type: Optional[Filter]
+            event_filter = Filter(
+                json_decoder.decode(filter_json)
+            )  # type: Optional[Filter]
         else:
             event_filter = None
 
@@ -661,7 +680,7 @@ class RoomEventContextServlet(RestServlet):
 
 class RoomForgetRestServlet(TransactionRestServlet):
     def __init__(self, hs):
-        super(RoomForgetRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
@@ -687,7 +706,7 @@ class RoomForgetRestServlet(TransactionRestServlet):
 # TODO: Needs unit testing
 class RoomMembershipRestServlet(TransactionRestServlet):
     def __init__(self, hs):
-        super(RoomMembershipRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
@@ -716,16 +735,20 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             content = {}
 
         if membership_action == "invite" and self._has_3pid_invite_keys(content):
-            await self.room_member_handler.do_3pid_invite(
-                room_id,
-                requester.user,
-                content["medium"],
-                content["address"],
-                content["id_server"],
-                requester,
-                txn_id,
-                content.get("id_access_token"),
-            )
+            try:
+                await self.room_member_handler.do_3pid_invite(
+                    room_id,
+                    requester.user,
+                    content["medium"],
+                    content["address"],
+                    content["id_server"],
+                    requester,
+                    txn_id,
+                    content.get("id_access_token"),
+                )
+            except ShadowBanError:
+                # Pretend the request succeeded.
+                pass
             return 200, {}
 
         target = requester.user
@@ -737,15 +760,19 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         if "reason" in content:
             event_content = {"reason": content["reason"]}
 
-        await self.room_member_handler.update_membership(
-            requester=requester,
-            target=target,
-            room_id=room_id,
-            action=membership_action,
-            txn_id=txn_id,
-            third_party_signed=content.get("third_party_signed", None),
-            content=event_content,
-        )
+        try:
+            await self.room_member_handler.update_membership(
+                requester=requester,
+                target=target,
+                room_id=room_id,
+                action=membership_action,
+                txn_id=txn_id,
+                third_party_signed=content.get("third_party_signed", None),
+                content=event_content,
+            )
+        except ShadowBanError:
+            # Pretend the request succeeded.
+            pass
 
         return_value = {}
 
@@ -770,7 +797,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
 
 class RoomRedactEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
-        super(RoomRedactEventRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self.handlers = hs.get_handlers()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
@@ -783,20 +810,27 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         requester = await self.auth.get_user_by_req(request)
         content = parse_json_object_from_request(request)
 
-        event, _ = await self.event_creation_handler.create_and_send_nonmember_event(
-            requester,
-            {
-                "type": EventTypes.Redaction,
-                "content": content,
-                "room_id": room_id,
-                "sender": requester.user.to_string(),
-                "redacts": event_id,
-            },
-            txn_id=txn_id,
-        )
+        try:
+            (
+                event,
+                _,
+            ) = await self.event_creation_handler.create_and_send_nonmember_event(
+                requester,
+                {
+                    "type": EventTypes.Redaction,
+                    "content": content,
+                    "room_id": room_id,
+                    "sender": requester.user.to_string(),
+                    "redacts": event_id,
+                },
+                txn_id=txn_id,
+            )
+            event_id = event.event_id
+        except ShadowBanError:
+            event_id = "$" + random_string(43)
 
-        set_tag("event_id", event.event_id)
-        return 200, {"event_id": event.event_id}
+        set_tag("event_id", event_id)
+        return 200, {"event_id": event_id}
 
     def on_PUT(self, request, room_id, event_id, txn_id):
         set_tag("txn_id", txn_id)
@@ -812,7 +846,7 @@ class RoomTypingRestServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(RoomTypingRestServlet, self).__init__()
+        super().__init__()
         self.presence_handler = hs.get_presence_handler()
         self.typing_handler = hs.get_typing_handler()
         self.auth = hs.get_auth()
@@ -839,17 +873,21 @@ class RoomTypingRestServlet(RestServlet):
         # Limit timeout to stop people from setting silly typing timeouts.
         timeout = min(content.get("timeout", 30000), 120000)
 
-        if content["typing"]:
-            await self.typing_handler.started_typing(
-                target_user=target_user,
-                auth_user=requester.user,
-                room_id=room_id,
-                timeout=timeout,
-            )
-        else:
-            await self.typing_handler.stopped_typing(
-                target_user=target_user, auth_user=requester.user, room_id=room_id
-            )
+        try:
+            if content["typing"]:
+                await self.typing_handler.started_typing(
+                    target_user=target_user,
+                    requester=requester,
+                    room_id=room_id,
+                    timeout=timeout,
+                )
+            else:
+                await self.typing_handler.stopped_typing(
+                    target_user=target_user, requester=requester, room_id=room_id
+                )
+        except ShadowBanError:
+            # Pretend this worked without error.
+            pass
 
         return 200, {}
 
@@ -881,7 +919,7 @@ class SearchRestServlet(RestServlet):
     PATTERNS = client_patterns("/search$", v1=True)
 
     def __init__(self, hs):
-        super(SearchRestServlet, self).__init__()
+        super().__init__()
         self.handlers = hs.get_handlers()
         self.auth = hs.get_auth()
 
@@ -902,7 +940,7 @@ class JoinedRoomsRestServlet(RestServlet):
     PATTERNS = client_patterns("/joined_rooms$", v1=True)
 
     def __init__(self, hs):
-        super(JoinedRoomsRestServlet, self).__init__()
+        super().__init__()
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 

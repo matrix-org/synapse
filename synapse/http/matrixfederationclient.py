@@ -54,6 +54,7 @@ from synapse.logging.opentracing import (
     start_active_span,
     tags,
 )
+from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.metrics import Measure
 
@@ -75,8 +76,8 @@ MAXINT = sys.maxsize
 _next_id = 1
 
 
-@attr.s(frozen=True)
-class MatrixFederationRequest(object):
+@attr.s(slots=True, frozen=True)
+class MatrixFederationRequest:
     method = attr.ib()
     """HTTP method
     :type: str
@@ -164,11 +165,13 @@ async def _handle_json_response(
     try:
         check_content_type_is_json(response.headers)
 
-        d = treq.json_content(response)
+        # Use the custom JSON decoder (partially re-implements treq.json_content).
+        d = treq.text_content(response, encoding="utf-8")
+        d.addCallback(json_decoder.decode)
         d = timeout_deferred(d, timeout=timeout_sec, reactor=reactor)
 
         body = await make_deferred_yieldable(d)
-    except TimeoutError as e:
+    except defer.TimeoutError as e:
         logger.warning(
             "{%s} [%s] Timed out reading response - %s %s",
             request.txn_id,
@@ -203,7 +206,7 @@ async def _handle_json_response(
     return body
 
 
-class MatrixFederationHttpClient(object):
+class MatrixFederationHttpClient:
     """HTTP client used to talk to other homeservers over the federation
     protocol. Send client certificates and signs requests.
 
@@ -226,7 +229,7 @@ class MatrixFederationHttpClient(object):
         )
 
         @implementer(IReactorPluggableNameResolver)
-        class Reactor(object):
+        class Reactor:
             def __getattr__(_self, attr):
                 if attr == "nameResolver":
                     return nameResolver
@@ -470,8 +473,6 @@ class MatrixFederationHttpClient(object):
                             )
 
                             response = await request_deferred
-                    except TimeoutError as e:
-                        raise RequestSendFailed(e, can_retry=True) from e
                     except DNSLookupError as e:
                         raise RequestSendFailed(e, can_retry=retry_on_dns_fail) from e
                     except Exception as e:
@@ -654,9 +655,13 @@ class MatrixFederationHttpClient(object):
             long_retries (bool): whether to use the long retry algorithm. See
                 docs on _send_request for details.
 
-            timeout (int|None): number of milliseconds to wait for the response headers
-                (including connecting to the server), *for each attempt*.
+            timeout (int|None): number of milliseconds to wait for the response.
                 self._default_timeout (60s) by default.
+
+                Note that we may make several attempts to send the request; this
+                timeout applies to the time spent waiting for response headers for
+                *each* attempt (including connection time) as well as the time spent
+                reading the response body after a 200 response.
 
             ignore_backoff (bool): true to ignore the historical backoff data
                 and try the request anyway.
@@ -703,8 +708,13 @@ class MatrixFederationHttpClient(object):
             timeout=timeout,
         )
 
+        if timeout is not None:
+            _sec_timeout = timeout / 1000
+        else:
+            _sec_timeout = self.default_timeout
+
         body = await _handle_json_response(
-            self.reactor, self.default_timeout, request, response, start_ms
+            self.reactor, _sec_timeout, request, response, start_ms
         )
 
         return body
@@ -733,9 +743,13 @@ class MatrixFederationHttpClient(object):
             long_retries (bool): whether to use the long retry algorithm. See
                 docs on _send_request for details.
 
-            timeout (int|None): number of milliseconds to wait for the response headers
-                (including connecting to the server), *for each attempt*.
+            timeout (int|None): number of milliseconds to wait for the response.
                 self._default_timeout (60s) by default.
+
+                Note that we may make several attempts to send the request; this
+                timeout applies to the time spent waiting for response headers for
+                *each* attempt (including connection time) as well as the time spent
+                reading the response body after a 200 response.
 
             ignore_backoff (bool): true to ignore the historical backoff data and
                 try the request anyway.
@@ -800,9 +814,13 @@ class MatrixFederationHttpClient(object):
             args (dict|None): A dictionary used to create query strings, defaults to
                 None.
 
-            timeout (int|None): number of milliseconds to wait for the response headers
-                (including connecting to the server), *for each attempt*.
+            timeout (int|None): number of milliseconds to wait for the response.
                 self._default_timeout (60s) by default.
+
+                Note that we may make several attempts to send the request; this
+                timeout applies to the time spent waiting for response headers for
+                *each* attempt (including connection time) as well as the time spent
+                reading the response body after a 200 response.
 
             ignore_backoff (bool): true to ignore the historical backoff data
                 and try the request anyway.
@@ -839,8 +857,13 @@ class MatrixFederationHttpClient(object):
             timeout=timeout,
         )
 
+        if timeout is not None:
+            _sec_timeout = timeout / 1000
+        else:
+            _sec_timeout = self.default_timeout
+
         body = await _handle_json_response(
-            self.reactor, self.default_timeout, request, response, start_ms
+            self.reactor, _sec_timeout, request, response, start_ms
         )
 
         return body
@@ -864,9 +887,13 @@ class MatrixFederationHttpClient(object):
             long_retries (bool): whether to use the long retry algorithm. See
                 docs on _send_request for details.
 
-            timeout (int|None): number of milliseconds to wait for the response headers
-                (including connecting to the server), *for each attempt*.
+            timeout (int|None): number of milliseconds to wait for the response.
                 self._default_timeout (60s) by default.
+
+                Note that we may make several attempts to send the request; this
+                timeout applies to the time spent waiting for response headers for
+                *each* attempt (including connection time) as well as the time spent
+                reading the response body after a 200 response.
 
             ignore_backoff (bool): true to ignore the historical backoff data and
                 try the request anyway.
@@ -899,8 +926,13 @@ class MatrixFederationHttpClient(object):
             ignore_backoff=ignore_backoff,
         )
 
+        if timeout is not None:
+            _sec_timeout = timeout / 1000
+        else:
+            _sec_timeout = self.default_timeout
+
         body = await _handle_json_response(
-            self.reactor, self.default_timeout, request, response, start_ms
+            self.reactor, _sec_timeout, request, response, start_ms
         )
         return body
 
