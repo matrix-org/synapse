@@ -92,11 +92,11 @@ class ProfileHandler(BaseHandler):
                 if e.code < 500 and e.code != 404:
                     # Other codes are not allowed in c2s API
                     logger.error(
-                        "Server replied with wrong response: %s %s", str(e.code), e.msg
+                        "Server replied with wrong response: %s %s", e.code, e.msg
                     )
                     # Change to 500 not to confuse clients
                     e.code = 500
-                    e.msg = "Remote server replied: {} {}".format(str(e.code), e.msg)
+                    e.msg = "Remote server replied: {} {}".format(e.code, e.msg)
                 raise e.to_synapse_error()
 
     async def get_profile_from_cache(self, user_id):
