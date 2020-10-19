@@ -1,0 +1,1 @@
+Synapse now correctly enforces the valid characters in the `client_secret` parameter used in various endpoints.

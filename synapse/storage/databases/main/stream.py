@@ -582,6 +582,19 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             )
             return "t%d-%d" % (topo, token)
 
+    async def get_stream_id_for_event(self, event_id: str) -> int:
+        """The stream ID for an event
+        Args:
+            event_id: The id of the event to look up a stream token for.
+        Raises:
+            StoreError if the event wasn't in the database.
+        Returns:
+            A stream ID.
+        """
+        return await self.db_pool.simple_select_one_onecol(
+            table="events", keyvalues={"event_id": event_id}, retcol="stream_ordering"
+        )
+
     async def get_stream_token_for_event(self, event_id: str) -> str:
         """The stream token for an event
         Args:
@@ -591,10 +604,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         Returns:
             A "s%d" stream token.
         """
-        row = await self.db_pool.simple_select_one_onecol(
-            table="events", keyvalues={"event_id": event_id}, retcol="stream_ordering"
-        )
-        return "s%d" % (row,)
+        stream_id = await self.get_stream_id_for_event(event_id)
+        return "s%d" % (stream_id,)
 
     async def get_topological_token_for_event(self, event_id: str) -> str:
         """The stream token for an event
