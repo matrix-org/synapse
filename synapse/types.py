@@ -52,7 +52,15 @@ JsonDict = Dict[str, Any]
 
 class Requester(
     namedtuple(
-        "Requester", ["user", "access_token_id", "is_guest", "device_id", "app_service"]
+        "Requester",
+        [
+            "user",
+            "access_token_id",
+            "is_guest",
+            "shadow_banned",
+            "device_id",
+            "app_service",
+        ],
     )
 ):
     """
@@ -63,6 +71,7 @@ class Requester(
         access_token_id (int|None):  *ID* of the access token used for this
             request, or None if it came via the appservice API or similar
         is_guest (bool):  True if the user making this request is a guest user
+        shadow_banned (bool):  True if the user making this request has been shadow-banned.
         device_id (str|None):  device_id which was set at authentication time
         app_service (ApplicationService|None):  the AS requesting on behalf of the user
     """
@@ -78,6 +87,7 @@ class Requester(
             "user_id": self.user.to_string(),
             "access_token_id": self.access_token_id,
             "is_guest": self.is_guest,
+            "shadow_banned": self.shadow_banned,
             "device_id": self.device_id,
             "app_server_id": self.app_service.id if self.app_service else None,
         }
@@ -102,13 +112,19 @@ class Requester(
             user=UserID.from_string(input["user_id"]),
             access_token_id=input["access_token_id"],
             is_guest=input["is_guest"],
+            shadow_banned=input["shadow_banned"],
             device_id=input["device_id"],
             app_service=appservice,
         )
 
 
 def create_requester(
-    user_id, access_token_id=None, is_guest=False, device_id=None, app_service=None
+    user_id,
+    access_token_id=None,
+    is_guest=False,
+    shadow_banned=False,
+    device_id=None,
+    app_service=None,
 ):
     """
     Create a new ``Requester`` object
@@ -118,6 +134,7 @@ def create_requester(
         access_token_id (int|None):  *ID* of the access token used for this
             request, or None if it came via the appservice API or similar
         is_guest (bool):  True if the user making this request is a guest user
+        shadow_banned (bool):  True if the user making this request is shadow-banned.
         device_id (str|None):  device_id which was set at authentication time
         app_service (ApplicationService|None):  the AS requesting on behalf of the user
 
@@ -126,7 +143,9 @@ def create_requester(
     """
     if not isinstance(user_id, UserID):
         user_id = UserID.from_string(user_id)
-    return Requester(user_id, access_token_id, is_guest, device_id, app_service)
+    return Requester(
+        user_id, access_token_id, is_guest, shadow_banned, device_id, app_service
+    )
 
 
 def get_domain_from_id(string):

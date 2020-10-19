@@ -213,6 +213,7 @@ class Auth(object):
             user = user_info["user"]
             token_id = user_info["token_id"]
             is_guest = user_info["is_guest"]
+            shadow_banned = user_info["shadow_banned"]
 
             # Deny the request if the user account has expired.
             if self._account_validity.enabled and not allow_expired:
@@ -252,7 +253,12 @@ class Auth(object):
                 opentracing.set_tag("device_id", device_id)
 
             return synapse.types.create_requester(
-                user, token_id, is_guest, device_id, app_service=app_service
+                user,
+                token_id,
+                is_guest,
+                shadow_banned,
+                device_id,
+                app_service=app_service,
             )
         except KeyError:
             raise MissingClientTokenError()
@@ -302,6 +308,7 @@ class Auth(object):
             dict that includes:
                `user` (UserID)
                `is_guest` (bool)
+               `shadow_banned` (bool)
                `token_id` (int|None): access token id. May be None if guest
                `device_id` (str|None): device corresponding to access token
         Raises:
@@ -361,6 +368,7 @@ class Auth(object):
                 ret = {
                     "user": user,
                     "is_guest": True,
+                    "shadow_banned": False,
                     "token_id": None,
                     # all guests get the same device id
                     "device_id": GUEST_DEVICE_ID,
@@ -370,6 +378,7 @@ class Auth(object):
                 ret = {
                     "user": user,
                     "is_guest": False,
+                    "shadow_banned": False,
                     "token_id": None,
                     "device_id": None,
                 }
@@ -493,6 +502,7 @@ class Auth(object):
             "user": UserID.from_string(ret.get("name")),
             "token_id": ret.get("token_id", None),
             "is_guest": False,
+            "shadow_banned": ret.get("shadow_banned"),
             "device_id": ret.get("device_id"),
             "valid_until_ms": ret.get("valid_until_ms"),
         }

@@ -157,6 +157,7 @@ class RegistrationHandler(BaseHandler):
         address=None,
         bind_emails=[],
         by_admin=False,
+        shadow_banned=False,
     ):
         """Registers a new client on the server.
 
@@ -174,6 +175,7 @@ class RegistrationHandler(BaseHandler):
             bind_emails (List[str]): list of emails to bind to this account.
             by_admin (bool): True if this registration is being made via the
               admin api, otherwise False.
+            shadow_banned (bool): Shadow-ban the created user.
         Returns:
             str: user_id
         Raises:
@@ -209,6 +211,7 @@ class RegistrationHandler(BaseHandler):
                 admin=admin,
                 user_type=user_type,
                 address=address,
+                shadow_banned=shadow_banned,
             )
 
             if default_display_name:
@@ -244,6 +247,7 @@ class RegistrationHandler(BaseHandler):
                         make_guest=make_guest,
                         create_profile_with_displayname=default_display_name,
                         address=address,
+                        shadow_banned=shadow_banned,
                     )
 
                     await self.profile_handler.set_displayname(
@@ -620,6 +624,7 @@ class RegistrationHandler(BaseHandler):
         admin=False,
         user_type=None,
         address=None,
+        shadow_banned=False,
     ):
         """Register user in the datastore.
 
@@ -637,6 +642,7 @@ class RegistrationHandler(BaseHandler):
             user_type (str|None): type of user. One of the values from
                 api.constants.UserTypes, or None for a normal user.
             address (str|None): the IP address used to perform the registration.
+            shadow_banned (bool): Whether to shadow-ban the user
 
         Returns:
             Awaitable
@@ -652,6 +658,7 @@ class RegistrationHandler(BaseHandler):
                 admin=admin,
                 user_type=user_type,
                 address=address,
+                shadow_banned=shadow_banned,
             )
         else:
             return self.store.register_user(
@@ -663,6 +670,7 @@ class RegistrationHandler(BaseHandler):
                 create_profile_with_displayname=create_profile_with_displayname,
                 admin=admin,
                 user_type=user_type,
+                shadow_banned=shadow_banned,
             )
 
     async def register_device(
