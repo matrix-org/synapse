@@ -20,8 +20,6 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import List
 
-from twisted.internet import defer
-
 from synapse.api.errors import StoreError
 from synapse.logging.context import make_deferred_yieldable
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -90,12 +88,17 @@ class AccountValidityHandler(object):
 
             self.clock.looping_call(send_emails, 30 * 60 * 1000)
 
-        # If account_validity is enabled,check every hour to remove expired users from
-        # the user directory
+        # Mark users as inactive when they expired. Check once every hour
         if self._account_validity.enabled:
-            self.clock.looping_call(
-                self._mark_expired_users_as_inactive, 60 * 60 * 1000
-            )
+
+            def mark_expired_users_as_inactive():
+                # run as a background process to allow async functions to work
+                return run_as_background_process(
+                    "_mark_expired_users_as_inactive",
+                    self._mark_expired_users_as_inactive,
+                )
+
+            self.clock.looping_call(mark_expired_users_as_inactive, 60 * 60 * 1000)
 
     async def _send_renewal_emails(self):
         """Gets the list of users whose account is expiring in the amount of time
@@ -286,8 +289,7 @@ class AccountValidityHandler(object):
 
         return expiration_ts
 
-    @defer.inlineCallbacks
-    def _mark_expired_users_as_inactive(self):
+    async def _mark_expired_users_as_inactive(self):
         """Iterate over active, expired users. Mark them as inactive in order to hide them
         from the user directory.
 
@@ -295,7 +297,7 @@ class AccountValidityHandler(object):
             Deferred
         """
         # Get active, expired users
-        active_expired_users = yield self.store.get_expired_users()
+        active_expired_users = await self.store.get_expired_users()
 
         # Mark each as non-active
-        yield self.profile_handler.set_active(active_expired_users, False, True)
+        await self.profile_handler.set_active(active_expired_users, False, True)

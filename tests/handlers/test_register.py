@@ -28,6 +28,7 @@ from synapse.rest.client.v2_alpha.register import (
 from synapse.types import RoomAlias, UserID, create_requester
 
 from tests.server import FakeChannel
+from tests.test_utils import make_awaitable
 from tests.unittest import override_config
 
 from .. import unittest
@@ -197,7 +198,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         room_alias_str = "#room:test"
         self.hs.config.auto_join_rooms = [room_alias_str]
 
-        self.store.is_real_user = Mock(return_value=defer.succeed(False))
+        self.store.is_real_user = Mock(return_value=make_awaitable(False))
         user_id = self.get_success(self.handler.register_user(localpart="support"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
@@ -209,8 +210,8 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     def test_auto_create_auto_join_rooms_when_user_is_the_first_real_user(self):
         room_alias_str = "#room:test"
 
-        self.store.count_real_users = Mock(return_value=defer.succeed(1))
-        self.store.is_real_user = Mock(return_value=defer.succeed(True))
+        self.store.count_real_users = Mock(return_value=make_awaitable(1))
+        self.store.is_real_user = Mock(return_value=make_awaitable(True))
         user_id = self.get_success(self.handler.register_user(localpart="real"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         directory_handler = self.hs.get_handlers().directory_handler
@@ -224,8 +225,8 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         room_alias_str = "#room:test"
         self.hs.config.auto_join_rooms = [room_alias_str]
 
-        self.store.count_real_users = Mock(return_value=defer.succeed(2))
-        self.store.is_real_user = Mock(return_value=defer.succeed(True))
+        self.store.count_real_users = Mock(return_value=make_awaitable(2))
+        self.store.is_real_user = Mock(return_value=make_awaitable(True))
         user_id = self.get_success(self.handler.register_user(localpart="real"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)

@@ -192,14 +192,6 @@ class PusherPool:
 
             for u in users_affected:
                 if u in self.pushers:
-                    # Don't push if the user account has expired
-                    if self._account_validity.enabled:
-                        expired = await self.store.is_account_expired(
-                            u, self.clock.time_msec()
-                        )
-                        if expired:
-                            continue
-
                     for p in self.pushers[u].values():
                         p.on_new_notifications(min_stream_id, max_stream_id)
 
@@ -220,14 +212,6 @@ class PusherPool:
 
             for u in users_affected:
                 if u in self.pushers:
-                    # Don't push if the user account has expired
-                    if self._account_validity.enabled:
-                        expired = yield self.store.is_account_expired(
-                            u, self.clock.time_msec()
-                        )
-                        if expired:
-                            continue
-
                     for p in self.pushers[u].values():
                         p.on_new_receipts(min_stream_id, max_stream_id)
 
