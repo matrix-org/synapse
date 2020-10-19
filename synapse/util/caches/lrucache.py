@@ -124,6 +124,10 @@ class LruCache(Generic[KT, VT]):
         else:
             self.max_size = int(max_size)
 
+        # register_cache might call our "set_cache_factor" callback; there's nothing to
+        # do yet when we get resized.
+        self._on_resize = None  # type: Optional[Callable[[],None]]
+
         if cache_name is not None:
             metrics = register_cache(
                 "lru_cache",
@@ -332,7 +336,10 @@ class LruCache(Generic[KT, VT]):
             return key in cache
 
         self.sentinel = object()
+
+        # make sure that we clear out any excess entries after we get resized.
         self._on_resize = evict
+
         self.get = cache_get
         self.set = cache_set
         self.setdefault = cache_set_default
@@ -383,6 +390,7 @@ class LruCache(Generic[KT, VT]):
         new_size = int(self._original_max_size * factor)
         if new_size != self.max_size:
             self.max_size = new_size
-            self._on_resize()
+            if self._on_resize:
+                self._on_resize()
             return True
         return False
