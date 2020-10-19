@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Tuple
 
 from canonicaljson import json
 
@@ -54,7 +54,10 @@ class TransactionManager(object):
 
     @measure_func("_send_new_transaction")
     async def send_new_transaction(
-        self, destination: str, pending_pdus: List[EventBase], pending_edus: List[Edu]
+        self,
+        destination: str,
+        pending_pdus: List[Tuple[EventBase, int]],
+        pending_edus: List[Edu],
     ):
 
         # Make a transaction-sending opentracing span. This span follows on from
