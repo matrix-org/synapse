@@ -1548,22 +1548,29 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             txn.execute(sql, args)
 
             event_reports = []
-            if count > 0:
-                for row in txn:
-                    event_reports.append(
-                        {
-                            "id": row[0],
-                            "received_ts": row[1],
-                            "room_id": row[2],
-                            "event_id": row[3],
-                            "user_id": row[4],
-                            "score": db_to_json(row[5]).get("score"),
-                            "reason": db_to_json(row[5]).get("reason"),
-                            "sender": row[6],
-                            "canonical_alias": row[7],
-                            "name": row[8],
-                        }
+            for row in txn:
+                try:
+                    s = db_to_json(row[5]).get("score")
+                    r = db_to_json(row[5]).get("reason")
+                except Exception:
+                    logger.error(
+                        "Unable to parse json from event_reports: %s", row[0]
                     )
+                    continue
+                event_reports.append(
+                    {
+                        "id": row[0],
+                        "received_ts": row[1],
+                        "room_id": row[2],
+                        "event_id": row[3],
+                        "user_id": row[4],
+                        "score": s,
+                        "reason": r,
+                        "sender": row[6],
+                        "canonical_alias": row[7],
+                        "name": row[8],
+                    }
+                )
 
             return event_reports, count
 
