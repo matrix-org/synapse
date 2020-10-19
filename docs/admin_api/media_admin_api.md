@@ -129,7 +129,7 @@ Response:
 
 ```json
     {
-       "deleted_media":[
+       "deleted_media": [
           "abcdefghijklmnopqrstuvwx"
        ],
        "total": 1
@@ -138,7 +138,7 @@ Response:
 
 The following fields are returned in the JSON response body:
 
-* ``deleted_media``: list of strings - List of deleted ``media_id``
+* ``deleted_media``: an array of strings - List of deleted ``media_id``
 * ``total``: integer - Total number of deleted ``media_id``
 
 ## Delete local media by date or size
@@ -153,21 +153,21 @@ POST /_synapse/admin/v1/media/<server_name>/delete?before_ts=<before_ts>
 
 URL Parameters
 
-* ``server_name``: string - The name of your local server (e.g ``matrix.org``)
+* ``server_name``: string - The name of your local server (e.g ``matrix.org``).
 * ``before_ts``: string representing a positive integer - Unix timestamp in ms.
 Files that were last used before this timestamp will be deleted. It is the timestamp of
 last access and not the timestamp creation. 
 * ``size_gt``: Optional - string representing a positive integer - Size of the media in bytes.
 Files that are larger will be deleted. Defaults to ``0``.
-* ``keep_profiles``: Optional- string representing a boolean - Switch to delete also files
+* ``keep_profiles``: Optional - string representing a boolean - Switch to also delete files
 that are still used in image data (e.g user profile, room avatar).
-If ``false`` thse files will be deleted. Defaults to ``true``.
+If ``false`` these files will be deleted. Defaults to ``true``.
 
 Response:
 
 ```json
     {
-       "deleted_media":[
+       "deleted_media": [
           "abcdefghijklmnopqrstuvwx",
           "abcdefghijklmnopqrstuvwz"
        ],
@@ -177,5 +177,5 @@ Response:
 
 The following fields are returned in the JSON response body:
 
-* ``deleted_media``: list of strings - List of deleted ``media_id``
+* ``deleted_media``: an array of strings - List of deleted ``media_id``
 * ``total``: integer - Total number of deleted ``media_id``

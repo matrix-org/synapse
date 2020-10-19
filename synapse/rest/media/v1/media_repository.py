@@ -769,7 +769,7 @@ class MediaRepository:
 
     async def delete_local_media(self, media_id: str) -> Tuple[List[str], int]:
         """
-        Delete the given media_id from this server
+        Delete the given local or remote media ID from this server
 
         Args:
             media_id: The media ID to delete.
@@ -785,7 +785,8 @@ class MediaRepository:
         self, before_ts: int, size_gt: int = 0, keep_profiles: bool = True,
     ) -> Tuple[List[str], int]:
         """
-        Delete old media_id from this server
+        Delete local or remote media from this server by size and timestamp. Removes
+        media files, any thumbnails and cached URLs.
 
         Args:
             before_ts: Unix timestamp in ms.
@@ -793,7 +794,7 @@ class MediaRepository:
             size_gt: Size of the media in bytes. Files that are larger will be deleted
             keep_profiles: Switch to delete also files that are still used in image data
                            (e.g user profile, room avatar)
-                           If false thse files will be deleted
+                           If false these files will be deleted
         Returns:
             List of deleted media_id
             Number of deleted media_id
@@ -808,7 +809,8 @@ class MediaRepository:
         self, media_ids: List[str]
     ) -> Tuple[List[str], int]:
         """
-        Delete old media_id from this server
+        Delete local or remote media from this server. Removes media files,
+        any thumbnails and cached URLs.
 
         Args:
             media_ids: List of media_id to delete

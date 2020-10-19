@@ -179,8 +179,8 @@ class DeleteMediaByID(RestServlet):
 
 
 class DeleteMediaByDateSize(RestServlet):
-    """Delete local media by timestamp and size.
-    Removes it from this server.
+    """Delete local media and local copies of remote media by
+    timestamp and size.
     """
 
     PATTERNS = admin_patterns("/media/(?P<server_name>[^/]+)/delete")
