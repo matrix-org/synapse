@@ -16,8 +16,6 @@
 import logging
 from typing import TYPE_CHECKING
 
-from twisted.internet import defer
-
 from synapse.events.utils import prune_event_dict
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore
@@ -148,17 +146,16 @@ class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBase
             updatevalues={"json": pruned_json},
         )
 
-    @defer.inlineCallbacks
-    def expire_event(self, event_id):
+    async def expire_event(self, event_id: str) -> None:
         """Retrieve and expire an event that has expired, and delete its associated
         expiry timestamp. If the event can't be retrieved, delete its associated
         timestamp so we don't try to expire it again in the future.
 
         Args:
-             event_id (str): The ID of the event to delete.
+             event_id: The ID of the event to delete.
         """
         # Try to retrieve the event's content from the database or the event cache.
-        event = yield self.get_event(event_id)
+        event = await self.get_event(event_id)
 
         def delete_expired_event_txn(txn):
             # Delete the expiry timestamp associated with this event from the database.
@@ -193,7 +190,7 @@ class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBase
                 txn, "_get_event_cache", (event.event_id,)
             )
 
-        yield self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "delete_expired_event", delete_expired_event_txn
         )
 
