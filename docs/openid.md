@@ -55,10 +55,11 @@ Here are a few configs for providers that should work with Synapse.
 ### Microsoft Azure Active Directory
 Azure AD can act as an OpenID Connect Provider. Register a new application under 
 *App registrations* in the Azure AD management console. The RedirectURI for your
-application should be set to your matrix server: `https://matrix.example.com/_synapse/oidc/callback`
+application should point to your matrix server: `[synapse public baseurl]/_synapse/oidc/callback`
 
-Go to Certificates & secrets and register a new client secret. Make not of your Directory (tenant) ID.
-Edit your /etc/matrix-synapse/homeserver.yaml file and change the oidc_config section:
+Go to Certificates & secrets and register a new client secret. Make note of your 
+Directory (tenant) ID as it will be used in the Azure links.
+Edit your Synapse config file and change the oidc_config section:
 
 ```yaml
 oidc_config:
@@ -73,7 +74,7 @@ oidc_config:
 
    user_mapping_provider:
      config:
-       localpart_template: ""{% set mid = user.preferred_username.split('@')[0] %}{{mid}}""
+       localpart_template: ""{{ user.preferred_username.split('@')[0] }}""
        display_name_template: "{{ user.name }}"
 ```
 
