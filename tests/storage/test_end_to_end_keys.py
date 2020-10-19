@@ -30,7 +30,7 @@ class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
         now = 1470174257070
         json = {"key": "value"}
 
-        yield self.store.store_device("user", "device", None)
+        yield defer.ensureDeferred(self.store.store_device("user", "device", None))
 
         yield self.store.set_e2e_device_keys("user", "device", now, json)
 
@@ -47,7 +47,7 @@ class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
         now = 1470174257070
         json = {"key": "value"}
 
-        yield self.store.store_device("user", "device", None)
+        yield defer.ensureDeferred(self.store.store_device("user", "device", None))
 
         changed = yield self.store.set_e2e_device_keys("user", "device", now, json)
         self.assertTrue(changed)
@@ -63,7 +63,9 @@ class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
         json = {"key": "value"}
 
         yield self.store.set_e2e_device_keys("user", "device", now, json)
-        yield self.store.store_device("user", "device", "display_name")
+        yield defer.ensureDeferred(
+            self.store.store_device("user", "device", "display_name")
+        )
 
         res = yield defer.ensureDeferred(
             self.store.get_e2e_device_keys((("user", "device"),))
@@ -79,10 +81,10 @@ class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
     def test_multiple_devices(self):
         now = 1470174257070
 
-        yield self.store.store_device("user1", "device1", None)
-        yield self.store.store_device("user1", "device2", None)
-        yield self.store.store_device("user2", "device1", None)
-        yield self.store.store_device("user2", "device2", None)
+        yield defer.ensureDeferred(self.store.store_device("user1", "device1", None))
+        yield defer.ensureDeferred(self.store.store_device("user1", "device2", None))
+        yield defer.ensureDeferred(self.store.store_device("user2", "device1", None))
+        yield defer.ensureDeferred(self.store.store_device("user2", "device2", None))
 
         yield self.store.set_e2e_device_keys("user1", "device1", now, {"key": "json11"})
         yield self.store.set_e2e_device_keys("user1", "device2", now, {"key": "json12"})
