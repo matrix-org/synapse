@@ -352,7 +352,6 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEqual(request.code, 401)
 
-    @unittest.INFO
     def test_pending_invites(self):
         """Tests that deactivating a user rejects every pending invite for them."""
         store = self.hs.get_datastore()
