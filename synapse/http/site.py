@@ -286,7 +286,9 @@ class SynapseRequest(Request):
             # the connection dropped)
             code += "!"
 
-        self.site.access_logger.info(
+        log_level = logging.INFO if self._should_log_request() else logging.DEBUG
+        self.site.access_logger.log(
+            log_level,
             "%s - %s - {%s}"
             " Processed request: %.3fsec/%.3fsec (%.3fsec, %.3fsec) (%.3fsec/%.3fsec/%d)"
             ' %sB %s "%s %s %s" "%s" [%d dbevts]',
@@ -313,6 +315,11 @@ class SynapseRequest(Request):
             self.request_metrics.stop(self.finish_time, self.code, self.sentLength)
         except Exception as e:
             logger.warning("Failed to stop metrics: %r", e)
+
+    def _should_log_request(self) -> bool:
+        """Whether we should log at INFO that we processed the request.
+        """
+        return self.path != b"/health"
 
 
 class XForwardedForRequest(SynapseRequest):
