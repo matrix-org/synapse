@@ -14,30 +14,29 @@
 # limitations under the License.
 
 from collections import namedtuple
-from typing import Optional
-
-from twisted.internet import defer
+from typing import Iterable, Optional
 
 from synapse.api.errors import SynapseError
 from synapse.storage._base import SQLBaseStore
+from synapse.types import RoomAlias
 from synapse.util.caches.descriptors import cached
 
 RoomAliasMapping = namedtuple("RoomAliasMapping", ("room_id", "room_alias", "servers"))
 
 
 class DirectoryWorkerStore(SQLBaseStore):
-    @defer.inlineCallbacks
-    def get_association_from_room_alias(self, room_alias):
-        """ Get's the room_id and server list for a given room_alias
+    async def get_association_from_room_alias(
+        self, room_alias: RoomAlias
+    ) -> Optional[RoomAliasMapping]:
+        """Gets the room_id and server list for a given room_alias
 
         Args:
-            room_alias (RoomAlias)
+            room_alias: The alias to translate to an ID.
 
         Returns:
-            Deferred: results in namedtuple with keys "room_id" and
-            "servers" or None if no association can be found
+            The room alias mapping or None if no association can be found.
         """
-        room_id = yield self.db_pool.simple_select_one_onecol(
+        room_id = await self.db_pool.simple_select_one_onecol(
             "room_aliases",
             {"room_alias": room_alias.to_string()},
             "room_id",
@@ -48,7 +47,7 @@ class DirectoryWorkerStore(SQLBaseStore):
         if not room_id:
             return None
 
-        servers = yield self.db_pool.simple_select_onecol(
+        servers = await self.db_pool.simple_select_onecol(
             "room_alias_servers",
             {"room_alias": room_alias.to_string()},
             "server",
@@ -79,18 +78,20 @@ class DirectoryWorkerStore(SQLBaseStore):
 
 
 class DirectoryStore(DirectoryWorkerStore):
-    @defer.inlineCallbacks
-    def create_room_alias_association(self, room_alias, room_id, servers, creator=None):
+    async def create_room_alias_association(
+        self,
+        room_alias: RoomAlias,
+        room_id: str,
+        servers: Iterable[str],
+        creator: Optional[str] = None,
+    ) -> None:
         """ Creates an association between a room alias and room_id/servers
 
         Args:
-            room_alias (RoomAlias)
-            room_id (str)
-            servers (list)
-            creator (str): Optional user_id of creator.
-
-        Returns:
-            Deferred
+            room_alias: The alias to create.
+            room_id: The target of the alias.
+            servers: A list of servers through which it may be possible to join the room
+            creator: Optional user_id of creator.
         """
 
         def alias_txn(txn):
@@ -118,24 +119,22 @@ class DirectoryStore(DirectoryWorkerStore):
             )
 
         try:
-            ret = yield self.db_pool.runInteraction(
+            await self.db_pool.runInteraction(
                 "create_room_alias_association", alias_txn
             )
         except self.database_engine.module.IntegrityError:
             raise SynapseError(
                 409, "Room alias %s already exists" % room_alias.to_string()
             )
-        return ret
 
-    @defer.inlineCallbacks
-    def delete_room_alias(self, room_alias):
-        room_id = yield self.db_pool.runInteraction(
+    async def delete_room_alias(self, room_alias: RoomAlias) -> str:
+        room_id = await self.db_pool.runInteraction(
             "delete_room_alias", self._delete_room_alias_txn, room_alias
         )
 
         return room_id
 
-    def _delete_room_alias_txn(self, txn, room_alias):
+    def _delete_room_alias_txn(self, txn, room_alias: RoomAlias) -> str:
         txn.execute(
             "SELECT room_id FROM room_aliases WHERE room_alias = ?",
             (room_alias.to_string(),),
