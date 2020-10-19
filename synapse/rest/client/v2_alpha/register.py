@@ -768,7 +768,7 @@ class RegisterRestServlet(RestServlet):
             (object) params: registration parameters, from which we pull
                 device_id, initial_device_name and inhibit_login
         Returns:
-            defer.Deferred: (object) dictionary for response from /register
+            (object) dictionary for response from /register
         """
         result = {"user_id": user_id, "home_server": self.hs.hostname}
         if not params.get("inhibit_login", False):
