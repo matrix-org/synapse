@@ -41,7 +41,7 @@ async def make_homeserver(reactor, config=None):
     config_obj = HomeServerConfig()
     config_obj.parse_config_dict(config, "", "")
 
-    hs = await setup_test_homeserver(
+    hs = setup_test_homeserver(
         cleanup_tasks.append, config=config_obj, reactor=reactor, clock=clock
     )
     stor = hs.get_datastore()

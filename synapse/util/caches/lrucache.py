@@ -337,6 +337,9 @@ class LruCache(Generic[KT, VT]):
         self.set = cache_set
         self.setdefault = cache_set_default
         self.pop = cache_pop
+        # `invalidate` is exposed for consistency with DeferredCache, so that it can be
+        # invalidated by the cache invalidation replication stream.
+        self.invalidate = cache_pop
         if cache_type is TreeCache:
             self.del_multi = cache_del_multi
         self.len = synchronized(cache_len)
