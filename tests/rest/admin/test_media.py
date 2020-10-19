@@ -232,7 +232,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
     def test_media_is_not_local(self):
         """
-        Tests that a lookup for a media that is not a local returns a 400
+        Tests that a lookup for media that is not local returns a 400
         """
         url = "/_synapse/admin/v1/media/%s/delete" % "unknown_domain"
 
@@ -305,7 +305,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
     def test_keep_media_by_date(self):
         """
-        Tests that do not delete a media if is newer than `before_ts`
+        Tests that media is not deleted if it is newer than `before_ts`
         """
 
         # timestamp before upload
@@ -343,7 +343,8 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
     def test_keep_media_by_size(self):
         """
-        Tests that do not delete a media if is smaller or equal than `size_gt`
+        Tests that media is not deleted if its size is smaller than or equal
+        to `size_gt`
         """
         server_and_media_id = self._create_media()
 
@@ -378,7 +379,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
     def test_keep_media_by_user_avatar(self):
         """
-        Tests that do not delete a media if is used as user avatar
+        Tests that we do not delete media if is used as a user avatar
         Tests parameter `keep_profiles`
         """
         server_and_media_id = self._create_media()
@@ -424,7 +425,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
     def test_keep_media_by_room_avatar(self):
         """
-        Tests that do not delete a media if is used as room avatar
+        Tests that we do not delete media if it is used as a room avatar
         Tests parameter `keep_profiles`
         """
         server_and_media_id = self._create_media()

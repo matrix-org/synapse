@@ -774,11 +774,8 @@ class MediaRepository:
         Args:
             media_id: The media ID to delete.
         Returns:
-            List of deleted media_id
-            Number of deleted media_id
+            A tuple of (list of deleted media IDs, total deleted media IDs).
         """
-        logger.info("Deleting local media: %s", media_id)
-
         return await self._remove_local_media_from_disk([media_id])
 
     async def delete_old_local_media(
@@ -796,13 +793,11 @@ class MediaRepository:
                            (e.g user profile, room avatar)
                            If false these files will be deleted
         Returns:
-            List of deleted media_id
-            Number of deleted media_id
+            A tuple of (list of deleted media IDs, total deleted media IDs).
         """
         old_media = await self.store.get_local_media_before(
             before_ts, size_gt, keep_profiles,
         )
-        logger.info("Deleting local media: %s", old_media)
         return await self._remove_local_media_from_disk(old_media)
 
     async def _remove_local_media_from_disk(
@@ -815,8 +810,7 @@ class MediaRepository:
         Args:
             media_ids: List of media_id to delete
         Returns:
-            List of deleted media_id
-            Number of deleted media_id
+            A tuple of (list of deleted media IDs, total deleted media IDs).
         """
         removed_media = []
         for media_id in media_ids:
