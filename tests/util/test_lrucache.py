@@ -19,7 +19,8 @@ from mock import Mock
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.treecache import TreeCache
 
-from .. import unittest
+from tests import unittest
+from tests.unittest import override_config
 
 
 class LruCacheTestCase(unittest.HomeserverTestCase):
@@ -82,6 +83,11 @@ class LruCacheTestCase(unittest.HomeserverTestCase):
         cache["key"] = 1
         cache.clear()
         self.assertEquals(len(cache), 0)
+
+    @override_config({"caches": {"per_cache_factors": {"mycache": 10}}})
+    def test_special_size(self):
+        cache = LruCache(10, "mycache")
+        self.assertEqual(cache.max_size, 100)
 
 
 class LruCacheCallbacksTestCase(unittest.HomeserverTestCase):
