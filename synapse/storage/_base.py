@@ -76,14 +76,16 @@ class SQLBaseStore(metaclass=ABCMeta):
         """
 
         try:
-            if key is None:
-                getattr(self, cache_name).invalidate_all()
-            else:
-                getattr(self, cache_name).invalidate(tuple(key))
+            cache = getattr(self, cache_name)
         except AttributeError:
             # We probably haven't pulled in the cache in this worker,
             # which is fine.
-            pass
+            return
+
+        if key is None:
+            cache.invalidate_all()
+        else:
+            cache.invalidate(tuple(key))
 
 
 def db_to_json(db_content):
