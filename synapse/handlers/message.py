@@ -1064,7 +1064,7 @@ class EventCreationHandler(object):
                     raise SynapseError(400, "Cannot redact event from a different room")
 
             prev_state_ids = await context.get_prev_state_ids()
-            auth_events_ids = await self.auth.compute_auth_events(
+            auth_events_ids = self.auth.compute_auth_events(
                 event, prev_state_ids, for_verification=True
             )
             auth_events = await self.store.get_events(auth_events_ids)

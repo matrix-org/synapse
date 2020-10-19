@@ -380,8 +380,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
         if self.user_ips_max_age:
             self._clock.looping_call(self._prune_old_user_ips, 5 * 1000)
 
-    @defer.inlineCallbacks
-    def insert_client_ip(
+    async def insert_client_ip(
         self, user_id, access_token, ip, user_agent, device_id, now=None
     ):
         if not now:
@@ -392,7 +391,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
             last_seen = self.client_ip_last_seen.get(key)
         except KeyError:
             last_seen = None
-        yield self.populate_monthly_active_users(user_id)
+        await self.populate_monthly_active_users(user_id)
         # Rate-limited inserts
         if last_seen is not None and (now - last_seen) < LAST_SEEN_GRANULARITY:
             return

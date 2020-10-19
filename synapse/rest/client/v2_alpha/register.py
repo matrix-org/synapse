@@ -426,7 +426,7 @@ class RegisterRestServlet(RestServlet):
 
         appservice = None
         if self.auth.has_access_token(request):
-            appservice = await self.auth.get_appservice_by_req(request)
+            appservice = self.auth.get_appservice_by_req(request)
 
         # We need to retrieve the password early in order to pass it to
         # application service registration
