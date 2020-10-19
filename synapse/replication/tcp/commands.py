@@ -18,11 +18,12 @@ The VALID_SERVER_COMMANDS and VALID_CLIENT_COMMANDS define which commands are
 allowed to be sent by which side.
 """
 import abc
-import json
 import logging
 from typing import Tuple, Type
 
-_json_encoder = json.JSONEncoder()
+from canonicaljson import json
+
+from synapse.util import json_encoder as _json_encoder
 
 logger = logging.getLogger(__name__)
 

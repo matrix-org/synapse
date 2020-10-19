@@ -18,13 +18,12 @@ import abc
 import logging
 from typing import List, Tuple
 
-from canonicaljson import json
-
 from twisted.internet import defer
 
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool
 from synapse.storage.util.id_generators import StreamIdGenerator
+from synapse.util import json_encoder
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
 from synapse.util.caches.stream_change_cache import StreamChangeCache
@@ -459,7 +458,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
             values={
                 "stream_id": stream_id,
                 "event_id": event_id,
-                "data": json.dumps(data),
+                "data": json_encoder.encode(data),
             },
             # receipts_linearized has a unique constraint on
             # (user_id, room_id, receipt_type), so no need to lock
@@ -585,7 +584,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
                 "room_id": room_id,
                 "receipt_type": receipt_type,
                 "user_id": user_id,
-                "event_ids": json.dumps(event_ids),
-                "data": json.dumps(data),
+                "event_ids": json_encoder.encode(event_ids),
+                "data": json_encoder.encode(data),
             },
         )

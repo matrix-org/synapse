@@ -14,13 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from canonicaljson import json
-
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
 from synapse.logging.opentracing import log_kv, trace
 from synapse.storage._base import SQLBaseStore, db_to_json
+from synapse.util import json_encoder
 
 
 class EndToEndRoomKeyStore(SQLBaseStore):
@@ -50,7 +49,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 "first_message_index": room_key["first_message_index"],
                 "forwarded_count": room_key["forwarded_count"],
                 "is_verified": room_key["is_verified"],
-                "session_data": json.dumps(room_key["session_data"]),
+                "session_data": json_encoder.encode(room_key["session_data"]),
             },
             desc="update_e2e_room_key",
         )
@@ -77,7 +76,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                     "first_message_index": room_key["first_message_index"],
                     "forwarded_count": room_key["forwarded_count"],
                     "is_verified": room_key["is_verified"],
-                    "session_data": json.dumps(room_key["session_data"]),
+                    "session_data": json_encoder.encode(room_key["session_data"]),
                 }
             )
             log_kv(
@@ -360,7 +359,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                     "user_id": user_id,
                     "version": new_version,
                     "algorithm": info["algorithm"],
-                    "auth_data": json.dumps(info["auth_data"]),
+                    "auth_data": json_encoder.encode(info["auth_data"]),
                 },
             )
 
@@ -387,7 +386,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         updatevalues = {}
 
         if info is not None and "auth_data" in info:
-            updatevalues["auth_data"] = json.dumps(info["auth_data"])
+            updatevalues["auth_data"] = json_encoder.encode(info["auth_data"])
         if version_etag is not None:
             updatevalues["etag"] = version_etag
 
