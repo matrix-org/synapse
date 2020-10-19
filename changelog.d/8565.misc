@@ -1,1 +1,1 @@
-Apply some internal changes to the way the `HomeServer` caches it's internal attributes, to make it more idiomatic.
+Apply some internal changes to the way the `HomeServer` caches its internal attributes, to make it more idiomatic.
