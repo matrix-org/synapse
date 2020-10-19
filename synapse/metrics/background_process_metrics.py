@@ -24,6 +24,7 @@ from prometheus_client.core import REGISTRY, Counter, Gauge
 from twisted.internet import defer
 
 from synapse.logging.context import LoggingContext, PreserveLoggingContext
+from synapse.logging.opentracing import start_active_span
 
 if TYPE_CHECKING:
     import resource
@@ -197,14 +198,14 @@ def run_as_background_process(desc: str, func, *args, **kwargs):
 
         with BackgroundProcessLoggingContext(desc) as context:
             context.request = "%s-%i" % (desc, count)
-
             try:
-                result = func(*args, **kwargs)
+                with start_active_span(desc, tags={"request_id": context.request}):
+                    result = func(*args, **kwargs)
 
-                if inspect.isawaitable(result):
-                    result = await result
+                    if inspect.isawaitable(result):
+                        result = await result
 
-                return result
+                    return result
             except Exception:
                 logger.exception(
                     "Background process '%s' threw an exception", desc,
