@@ -18,7 +18,7 @@ import traceback
 from collections import deque
 from ipaddress import IPv4Address, IPv6Address, ip_address
 from math import floor
-from typing import Callable, Optional, Union
+from typing import Callable, Optional
 
 import attr
 from zope.interface import implementer
@@ -49,7 +49,7 @@ class LogProducer:
     """
 
     transport = attr.ib(type=ITransport)
-    format_event = attr.ib(type=Callable[[dict], Union[bytes, str]])
+    format_event = attr.ib(type=Callable[[dict], str])
     _buffer = attr.ib(type=deque)
     _paused = attr.ib(default=False, type=bool, init=False)
 
@@ -95,7 +95,7 @@ class TCPLogObserver:
     hs = attr.ib()
     host = attr.ib(type=str)
     port = attr.ib(type=int)
-    format_event = attr.ib(type=Callable[[dict], Union[str, bytes]])
+    format_event = attr.ib(type=Callable[[dict], str])
     maximum_buffer = attr.ib(type=int)
     _buffer = attr.ib(default=attr.Factory(deque), type=deque)
     _connection_waiter = attr.ib(default=None, type=Optional[Deferred])
