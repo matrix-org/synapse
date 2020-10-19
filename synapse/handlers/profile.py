@@ -133,8 +133,12 @@ class BaseProfileHandler(BaseHandler):
         body = {"batchnum": batchnum, "batch": batch, "origin_server": self.hs.hostname}
         signed_body = sign_json(body, self.hs.hostname, self.hs.config.signing_key[0])
         try:
-            yield self.http_client.post_json_get_json(url, signed_body)
-            yield self.store.update_replication_batch_for_host(host, batchnum)
+            yield defer.ensureDeferred(
+                self.http_client.post_json_get_json(url, signed_body)
+            )
+            yield defer.ensureDeferred(
+                self.store.update_replication_batch_for_host(host, batchnum)
+            )
             logger.info("Sucessfully replicated profile batch %d to %s", batchnum, host)
         except Exception:
             # This will get retried when the looping call next comes around

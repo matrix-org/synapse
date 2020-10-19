@@ -1005,12 +1005,11 @@ class ThreepidLookupRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.identity_handler = hs.get_handlers().identity_handler
 
-    @defer.inlineCallbacks
-    def on_GET(self, request):
+    async def on_GET(self, request):
         """Proxy a /_matrix/identity/api/v1/lookup request to an identity
         server
         """
-        yield self.auth.get_user_by_req(request)
+        await self.auth.get_user_by_req(request)
 
         # Verify query parameters
         query_params = request.args
@@ -1023,9 +1022,9 @@ class ThreepidLookupRestServlet(RestServlet):
 
         # Proxy the request to the identity server. lookup_3pid handles checking
         # if the lookup is allowed so we don't need to do it here.
-        ret = yield self.identity_handler.proxy_lookup_3pid(id_server, medium, address)
+        ret = await self.identity_handler.proxy_lookup_3pid(id_server, medium, address)
 
-        defer.returnValue((200, ret))
+        return 200, ret
 
 
 class ThreepidBulkLookupRestServlet(RestServlet):
@@ -1036,12 +1035,11 @@ class ThreepidBulkLookupRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.identity_handler = hs.get_handlers().identity_handler
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
+    async def on_POST(self, request):
         """Proxy a /_matrix/identity/api/v1/bulk_lookup request to an identity
         server
         """
-        yield self.auth.get_user_by_req(request)
+        await self.auth.get_user_by_req(request)
 
         body = parse_json_object_from_request(request)
 
@@ -1049,11 +1047,11 @@ class ThreepidBulkLookupRestServlet(RestServlet):
 
         # Proxy the request to the identity server. lookup_3pid handles checking
         # if the lookup is allowed so we don't need to do it here.
-        ret = yield self.identity_handler.proxy_bulk_lookup_3pid(
+        ret = await self.identity_handler.proxy_bulk_lookup_3pid(
             body["id_server"], body["threepids"]
         )
 
-        defer.returnValue((200, ret))
+        return 200, ret
 
 
 def assert_valid_next_link(hs: "HomeServer", next_link: str):

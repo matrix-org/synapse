@@ -21,9 +21,6 @@ import logging
 import urllib.parse
 from typing import Awaitable, Callable, Dict, List, Optional, Tuple
 
-from canonicaljson import json
-
-from twisted.internet import defer
 from twisted.internet.error import TimeoutError
 
 from synapse.api.errors import (
@@ -37,6 +34,7 @@ from synapse.api.errors import (
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.client import SimpleHttpClient
 from synapse.types import JsonDict, Requester
+from synapse.util import json_decoder
 from synapse.util.hash import sha256_and_url_safe_base64
 from synapse.util.stringutils import assert_valid_client_secret, random_string
 
@@ -197,7 +195,7 @@ class IdentityHandler(BaseHandler):
         except TimeoutError:
             raise SynapseError(500, "Timed out contacting identity server")
         except CodeMessageException as e:
-            data = json.loads(e.msg)  # XXX WAT?
+            data = json_decoder.decode(e.msg)  # XXX WAT?
             return data
 
         logger.info("Got 404 when POSTing JSON %s, falling back to v1 URL", bind_url)
@@ -620,18 +618,19 @@ class IdentityHandler(BaseHandler):
     # the CS API. They should be consolidated with those in RoomMemberHandler
     # https://github.com/matrix-org/synapse-dinsic/issues/25
 
-    @defer.inlineCallbacks
-    def proxy_lookup_3pid(self, id_server, medium, address):
+    async def proxy_lookup_3pid(
+        self, id_server: str, medium: str, address: str
+    ) -> JsonDict:
         """Looks up a 3pid in the passed identity server.
 
         Args:
-            id_server (str): The server name (including port, if required)
+            id_server: The server name (including port, if required)
                 of the identity server to use.
-            medium (str): The type of the third party identifier (e.g. "email").
-            address (str): The third party identifier (e.g. "foo@example.com").
+            medium: The type of the third party identifier (e.g. "email").
+            address: The third party identifier (e.g. "foo@example.com").
 
         Returns:
-            Deferred[dict]: The result of the lookup. See
+            The result of the lookup. See
             https://matrix.org/docs/spec/identity_service/r0.1.0.html#association-lookup
             for details
         """
@@ -643,15 +642,10 @@ class IdentityHandler(BaseHandler):
         id_server_url = self.rewrite_id_server_url(id_server, add_https=True)
 
         try:
-            data = yield self.http_client.get_json(
+            data = await self.http_client.get_json(
                 "%s/_matrix/identity/api/v1/lookup" % (id_server_url,),
                 {"medium": medium, "address": address},
             )
-
-            if "mxid" in data:
-                if "signatures" not in data:
-                    raise AuthError(401, "No signatures on 3pid binding")
-                yield self._verify_any_signature(data, id_server)
 
         except HttpResponseException as e:
             logger.info("Proxied lookup failed: %r", e)
@@ -662,18 +656,19 @@ class IdentityHandler(BaseHandler):
 
         return data
 
-    @defer.inlineCallbacks
-    def proxy_bulk_lookup_3pid(self, id_server, threepids):
+    async def proxy_bulk_lookup_3pid(
+        self, id_server: str, threepids: List[List[str]]
+    ) -> JsonDict:
         """Looks up given 3pids in the passed identity server.
 
         Args:
-            id_server (str): The server name (including port, if required)
+            id_server: The server name (including port, if required)
                 of the identity server to use.
-            threepids ([[str, str]]): The third party identifiers to lookup, as
+            threepids: The third party identifiers to lookup, as
                 a list of 2-string sized lists ([medium, address]).
 
         Returns:
-            Deferred[dict]: The result of the lookup. See
+            The result of the lookup. See
             https://matrix.org/docs/spec/identity_service/r0.1.0.html#association-lookup
             for details
         """
@@ -685,7 +680,7 @@ class IdentityHandler(BaseHandler):
         id_server_url = self.rewrite_id_server_url(id_server, add_https=True)
 
         try:
-            data = yield self.http_client.post_json_get_json(
+            data = await self.http_client.post_json_get_json(
                 "%s/_matrix/identity/api/v1/bulk_lookup" % (id_server_url,),
                 {"threepids": threepids},
             )
@@ -697,7 +692,7 @@ class IdentityHandler(BaseHandler):
             logger.info("Failed to contact %s: %s", id_server, e)
             raise ProxiedRequestError(503, "Failed to contact identity server")
 
-        defer.returnValue(data)
+        return data
 
     async def lookup_3pid(
         self,

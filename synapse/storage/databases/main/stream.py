@@ -379,7 +379,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         limit: int = 0,
         order: str = "DESC",
     ) -> Tuple[List[EventBase], str]:
-
         """Get new room events in stream ordering since `from_key`.
 
         Args:
