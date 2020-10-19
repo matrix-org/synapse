@@ -120,10 +120,15 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         self, before_ts: int, size_gt: int, keep_profiles: bool,
     ) -> Optional[List[str]]:
 
+        # to find files that have never been accessed (last_access_ts IS NULL)
+        # compare with `created_ts`
         sql = """
             SELECT media_id
             FROM local_media_repository AS lmr
-            WHERE last_access_ts < ? and media_length > ?
+            WHERE
+                ( last_access_ts < ?
+                OR ( created_ts < ? AND last_access_ts IS NULL ) )
+                AND media_length > ?
         """
 
         if keep_profiles:
@@ -156,7 +161,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             sql += sql_keep
 
         def _get_local_media_before_txn(txn):
-            txn.execute(sql, (before_ts, size_gt))
+            txn.execute(sql, (before_ts, before_ts, size_gt))
             return [row[0] for row in txn]
 
         return await self.db_pool.runInteraction(

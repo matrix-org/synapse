@@ -303,6 +303,37 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             channel.json_body["error"],
         )
 
+    def test_delete_media_never_accessed(self):
+        """
+        Tests that media deleted if it is older than `before_ts` and never accessed
+        `last_access_ts` is `NULL` and `created_ts` < `before_ts`
+        """
+
+        # upload an do not access
+        server_and_media_id = self._create_media()
+        self.pump(1.0)
+
+        # test that the file exists
+        media_id = server_and_media_id.split("/")[1]
+        local_path = self.filepaths.local_media_filepath(media_id)
+        self.assertTrue(os.path.exists(local_path))
+
+        # timestamp after upload/create
+        now_ms = self.clock.time_msec()
+        request, channel = self.make_request(
+            "POST",
+            self.url + "?before_ts=" + str(now_ms),
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(1, channel.json_body["total"])
+        self.assertEqual(
+            media_id, channel.json_body["deleted_media"][0],
+        )
+
+        self._access_media(server_and_media_id, False)
+
     def test_keep_media_by_date(self):
         """
         Tests that media is not deleted if it is newer than `before_ts`
