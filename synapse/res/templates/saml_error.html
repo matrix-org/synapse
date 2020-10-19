@@ -2,10 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>SSO error</title>
+    <title>SSO login error</title>
 </head>
 <body>
-    <p>Oops! Something went wrong during authentication<span id="errormsg"></span>.</p>
+{# a 403 means we have actively rejected their login #}
+{% if code == 403 %}
+    <p>You are not allowed to log in here.</p>
+{% else %}
+    <p>
+        There was an error during authentication:
+    </p>
+    <div id="errormsg" style="margin:20px 80px">{{ msg }}</div>
     <p>
         If you are seeing this page after clicking a link sent to you via email, make
         sure you only click the confirmation link once, and that you open the
@@ -37,9 +44,9 @@
         // to print one.
         let errorDesc = new URLSearchParams(searchStr).get("error_description")
         if (errorDesc) {
-
-            document.getElementById("errormsg").innerText = ` ("${errorDesc}")`;
+            document.getElementById("errormsg").innerText = errorDesc;
         }
     </script>
+{% endif %}
 </body>
 </html>
