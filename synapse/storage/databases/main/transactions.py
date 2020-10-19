@@ -18,8 +18,6 @@ from collections import namedtuple
 
 from canonicaljson import encode_canonical_json
 
-from twisted.internet import defer
-
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool
@@ -126,8 +124,7 @@ class TransactionStore(SQLBaseStore):
             desc="set_received_txn_response",
         )
 
-    @defer.inlineCallbacks
-    def get_destination_retry_timings(self, destination):
+    async def get_destination_retry_timings(self, destination):
         """Gets the current retry timings (if any) for a given destination.
 
         Args:
@@ -142,7 +139,7 @@ class TransactionStore(SQLBaseStore):
         if result is not SENTINEL:
             return result
 
-        result = yield self.db_pool.runInteraction(
+        result = await self.db_pool.runInteraction(
             "get_destination_retry_timings",
             self._get_destination_retry_timings,
             destination,
