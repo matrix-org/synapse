@@ -340,6 +340,74 @@ limit_remote_rooms:
 #
 #allow_per_room_profiles: false
 
+# Whether to show the users on this homeserver in the user directory. Defaults to
+# 'true'.
+#
+#show_users_in_user_directory: false
+
+# Message retention policy at the server level.
+#
+# Room admins and mods can define a retention period for their rooms using the
+# 'm.room.retention' state event, and server admins can cap this period by setting
+# the 'allowed_lifetime_min' and 'allowed_lifetime_max' config options.
+#
+# If this feature is enabled, Synapse will regularly look for and purge events
+# which are older than the room's maximum retention period. Synapse will also
+# filter events received over federation so that events that should have been
+# purged are ignored and not stored again.
+#
+retention:
+  # The message retention policies feature is disabled by default. Uncomment the
+  # following line to enable it.
+  #
+  #enabled: true
+
+  # Default retention policy. If set, Synapse will apply it to rooms that lack the
+  # 'm.room.retention' state event. Currently, the value of 'min_lifetime' doesn't
+  # matter much because Synapse doesn't take it into account yet.
+  #
+  #default_policy:
+  #  min_lifetime: 1d
+  #  max_lifetime: 1y
+
+  # Retention policy limits. If set, a user won't be able to send a
+  # 'm.room.retention' event which features a 'min_lifetime' or a 'max_lifetime'
+  # that's not within this range. This is especially useful in closed federations,
+  # in which server admins can make sure every federating server applies the same
+  # rules.
+  #
+  #allowed_lifetime_min: 1d
+  #allowed_lifetime_max: 1y
+
+  # Server admins can define the settings of the background jobs purging the
+  # events which lifetime has expired under the 'purge_jobs' section.
+  #
+  # If no configuration is provided, a single job will be set up to delete expired
+  # events in every room daily.
+  #
+  # Each job's configuration defines which range of message lifetimes the job
+  # takes care of. For example, if 'shortest_max_lifetime' is '2d' and
+  # 'longest_max_lifetime' is '3d', the job will handle purging expired events in
+  # rooms whose state defines a 'max_lifetime' that's both higher than 2 days, and
+  # lower than or equal to 3 days. Both the minimum and the maximum value of a
+  # range are optional, e.g. a job with no 'shortest_max_lifetime' and a
+  # 'longest_max_lifetime' of '3d' will handle every room with a retention policy
+  # which 'max_lifetime' is lower than or equal to three days.
+  #
+  # The rationale for this per-job configuration is that some rooms might have a
+  # retention policy with a low 'max_lifetime', where history needs to be purged
+  # of outdated messages on a very frequent basis (e.g. every 5min), but not want
+  # that purge to be performed by a job that's iterating over every room it knows,
+  # which would be quite heavy on the server.
+  #
+  #purge_jobs:
+  #  - shortest_max_lifetime: 1d
+  #    longest_max_lifetime: 3d
+  #    interval: 5m:
+  #  - shortest_max_lifetime: 3d
+  #    longest_max_lifetime: 1y
+  #    interval: 24h
+
 # How long to keep redacted events in unredacted form in the database. After
 # this period redacted events get replaced with their redacted form in the DB.
 #
@@ -425,6 +493,24 @@ retention:
 # act as if no error happened and return a fake session ID ('sid') to clients.
 #
 #request_token_inhibit_3pid_errors: true
+
+# A list of domains that the domain portion of 'next_link' parameters
+# must match.
+#
+# This parameter is optionally provided by clients while requesting
+# validation of an email or phone number, and maps to a link that
+# users will be automatically redirected to after validation
+# succeeds. Clients can make use this parameter to aid the validation
+# process.
+#
+# The whitelist is applied whether the homeserver or an
+# identity server is handling validation.
+#
+# The default value is no whitelist functionality; all domains are
+# allowed. Setting this value to an empty list will instead disallow
+# all domains.
+#
+#next_link_domain_whitelist: ["matrix.org"]
 
 
 ## TLS ##
@@ -743,6 +829,8 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #   - one for login that ratelimits login requests based on the account the
 #     client is attempting to log into, based on the amount of failed login
 #     attempts for this account.
+#   - one that ratelimits third-party invites requests based on the account
+#     that's making the requests.
 #   - one for ratelimiting redactions by room admins. If this is not explicitly
 #     set then it uses the same ratelimiting as per rc_message. This is useful
 #     to allow room admins to deal with abuse quickly.
@@ -771,6 +859,10 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #  failed_attempts:
 #    per_second: 0.17
 #    burst_count: 3
+#
+#rc_third_party_invite:
+#  per_second: 0.2
+#  burst_count: 10
 #
 #rc_admin_redaction:
 #  per_second: 1
@@ -845,6 +937,30 @@ media_store_path: "DATADIR/media_store"
 # The largest allowed upload size in bytes
 #
 #max_upload_size: 10M
+
+# The largest allowed size for a user avatar. If not defined, no
+# restriction will be imposed.
+#
+# Note that this only applies when an avatar is changed globally.
+# Per-room avatar changes are not affected. See allow_per_room_profiles
+# for disabling that functionality.
+#
+# Note that user avatar changes will not work if this is set without
+# using Synapse's local media repo.
+#
+#max_avatar_size: 10M
+
+# Allow mimetypes for a user avatar. If not defined, no restriction will
+# be imposed.
+#
+# Note that this only applies when an avatar is changed globally.
+# Per-room avatar changes are not affected. See allow_per_room_profiles
+# for disabling that functionality.
+#
+# Note that user avatar changes will not work if this is set without
+# using Synapse's local media repo.
+#
+#allowed_avatar_mimetypes: ["image/png", "image/jpeg", "image/gif"]
 
 # Maximum number of pixels that will be thumbnailed
 #
@@ -1130,8 +1246,31 @@ account_validity:
 #
 #disable_msisdn_registration: true
 
+# Derive the user's matrix ID from a type of 3PID used when registering.
+# This overrides any matrix ID the user proposes when calling /register
+# The 3PID type should be present in registrations_require_3pid to avoid
+# users failing to register if they don't specify the right kind of 3pid.
+#
+#register_mxid_from_3pid: email
+
+# Uncomment to set the display name of new users to their email address,
+# rather than using the default heuristic.
+#
+#register_just_use_email_for_display_name: true
+
 # Mandate that users are only allowed to associate certain formats of
 # 3PIDs with accounts on this server.
+#
+# Use an Identity Server to establish which 3PIDs are allowed to register?
+# Overrides allowed_local_3pids below.
+#
+#check_is_for_allowed_local_3pids: matrix.org
+#
+# If you are using an IS you can also check whether that IS registers
+# pending invites for the given 3PID (and then allow it to sign up on
+# the platform):
+#
+#allow_invited_3pids: false
 #
 #allowed_local_3pids:
 #  - medium: email
@@ -1140,6 +1279,11 @@ account_validity:
 #    pattern: '.*@vector\.im'
 #  - medium: msisdn
 #    pattern: '\+44'
+
+# If true, stop users from trying to change the 3PIDs associated with
+# their accounts.
+#
+#disable_3pid_changes: false
 
 # Enable 3PIDs lookup requests to identity servers from this server.
 #
@@ -1171,6 +1315,30 @@ account_validity:
 # This setting is ignored unless public_baseurl is also set.)
 #
 #default_identity_server: https://matrix.org
+
+# If enabled, user IDs, display names and avatar URLs will be replicated
+# to this server whenever they change.
+# This is an experimental API currently implemented by sydent to support
+# cross-homeserver user directories.
+#
+#replicate_user_profiles_to: example.com
+
+# If specified, attempt to replay registrations, profile changes & 3pid
+# bindings on the given target homeserver via the AS API. The HS is authed
+# via a given AS token.
+#
+#shadow_server:
+#  hs_url: https://shadow.example.com
+#  hs: shadow.example.com
+#  as_token: 12u394refgbdhivsia
+
+# If enabled, don't let users set their own display names/avatars
+# other than for the very first time (unless they are a server admin).
+# Useful when provisioning users based on the contents of a 3rd party
+# directory and to avoid ambiguities.
+#
+#disable_set_displayname: false
+#disable_set_avatar_url: false
 
 # Handle threepid (email/phone etc) registration and password resets through a set of
 # *trusted* identity servers. Note that this allows the configured identity server to
@@ -1297,6 +1465,31 @@ account_threepid_delegates:
 # Defaults to true.
 #
 #auto_join_rooms_for_guests: false
+
+# Rewrite identity server URLs with a map from one URL to another. Applies to URLs
+# provided by clients (which have https:// prepended) and those specified
+# in `account_threepid_delegates`. URLs should not feature a trailing slash.
+#
+#rewrite_identity_server_urls:
+#   "https://somewhere.example.com": "https://somewhereelse.example.com"
+
+# When a user registers an account with an email address, it can be useful to
+# bind that email address to their mxid on an identity server. Typically, this
+# requires the user to validate their email address with the identity server.
+# However if Synapse itself is handling email validation on registration, the
+# user ends up needing to validate their email twice, which leads to poor UX.
+#
+# It is possible to force Sydent, one identity server implementation, to bind
+# threepids using its internal, unauthenticated bind API:
+# https://github.com/matrix-org/sydent/#internal-bind-and-unbind-api
+#
+# Configure the address of a Sydent server here to have Synapse attempt
+# to automatically bind users' emails following registration. The
+# internal bind API must be reachable from Synapse, but should NOT be
+# exposed to any third party, as it allows the creation of bindings
+# without validation.
+#
+#bind_new_user_emails_to_sydent: https://example.com:8091
 
 
 ## Metrics ###
@@ -2213,6 +2406,11 @@ spam_checker:
 #user_directory:
 #  enabled: true
 #  search_all_users: false
+#
+#  # If this is set, user search will be delegated to this ID server instead
+#  # of synapse performing the search itself.
+#  # This is an experimental API.
+#  defer_to_id_server: https://id.example.com
 
 
 # User Consent configuration
@@ -2418,3 +2616,57 @@ opentracing:
     #
     #  logging:
     #    false
+
+
+## Workers ##
+
+# Disables sending of outbound federation transactions on the main process.
+# Uncomment if using a federation sender worker.
+#
+#send_federation: false
+
+# It is possible to run multiple federation sender workers, in which case the
+# work is balanced across them.
+#
+# This configuration must be shared between all federation sender workers, and if
+# changed all federation sender workers must be stopped at the same time and then
+# started, to ensure that all instances are running with the same config (otherwise
+# events may be dropped).
+#
+#federation_sender_instances:
+#  - federation_sender1
+
+# When using workers this should be a map from `worker_name` to the
+# HTTP replication listener of the worker, if configured.
+#
+#instance_map:
+#  worker1:
+#    host: localhost
+#    port: 8034
+
+# Experimental: When using workers you can define which workers should
+# handle event persistence and typing notifications. Any worker
+# specified here must also be in the `instance_map`.
+#
+#stream_writers:
+#  events: worker1
+#  typing: worker1
+
+
+# Configuration for Redis when using workers. This *must* be enabled when
+# using workers (unless using old style direct TCP configuration).
+#
+redis:
+  # Uncomment the below to enable Redis support.
+  #
+  #enabled: true
+
+  # Optional host and port to use to connect to redis. Defaults to
+  # localhost and 6379
+  #
+  #host: localhost
+  #port: 6379
+
+  # Optional password if configured on the Redis instance
+  #
+  #password: <secret_password>
