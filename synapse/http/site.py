@@ -146,10 +146,9 @@ class SynapseRequest(Request):
 
         Returns a context manager; the correct way to use this is:
 
-        @defer.inlineCallbacks
-        def handle_request(request):
+        async def handle_request(request):
             with request.processing("FooServlet"):
-                yield really_handle_the_request()
+                await really_handle_the_request()
 
         Once the context manager is closed, the completion of the request will be logged,
         and the various metrics will be updated.
