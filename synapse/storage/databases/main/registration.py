@@ -1424,43 +1424,6 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             "validate_threepid_session_txn", validate_threepid_session_txn
         )
 
-    def upsert_threepid_validation_session(
-        self,
-        medium,
-        address,
-        client_secret,
-        send_attempt,
-        session_id,
-        validated_at=None,
-    ):
-        """Upsert a threepid validation session
-        Args:
-            medium (str): The medium of the 3PID
-            address (str): The address of the 3PID
-            client_secret (str): A unique string provided by the client to
-                help identify this validation attempt
-            send_attempt (int): The latest send_attempt on this session
-            session_id (str): The id of this validation session
-            validated_at (int|None): The unix timestamp in milliseconds of
-                when the session was marked as valid
-        """
-        insertion_values = {
-            "medium": medium,
-            "address": address,
-            "client_secret": client_secret,
-        }
-
-        if validated_at:
-            insertion_values["validated_at"] = validated_at
-
-        return self.db_pool.simple_upsert(
-            table="threepid_validation_session",
-            keyvalues={"session_id": session_id},
-            values={"last_send_attempt": send_attempt},
-            insertion_values=insertion_values,
-            desc="upsert_threepid_validation_session",
-        )
-
     def start_or_continue_validation_session(
         self,
         medium,

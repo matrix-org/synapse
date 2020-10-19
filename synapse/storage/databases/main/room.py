@@ -37,10 +37,6 @@ from synapse.util.caches.descriptors import cached
 logger = logging.getLogger(__name__)
 
 
-OpsLevel = collections.namedtuple(
-    "OpsLevel", ("ban_level", "kick_level", "redact_level")
-)
-
 RatelimitOverride = collections.namedtuple(
     "RatelimitOverride", ("messages_per_second", "burst_count")
 )
