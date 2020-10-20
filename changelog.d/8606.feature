@@ -1,1 +1,1 @@
-Appservice transactions are limited to 100 persistent and 100 ephemeral events.
+Limit appservice transactions to 100 persistent and 100 ephemeral events.
