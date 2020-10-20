@@ -54,6 +54,7 @@ from synapse.logging.opentracing import (
     start_active_span,
     tags,
 )
+from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.metrics import Measure
 
@@ -164,7 +165,9 @@ async def _handle_json_response(
     try:
         check_content_type_is_json(response.headers)
 
-        d = treq.json_content(response)
+        # Use the custom JSON decoder (partially re-implements treq.json_content).
+        d = treq.text_content(response, encoding="utf-8")
+        d.addCallback(json_decoder.decode)
         d = timeout_deferred(d, timeout=timeout_sec, reactor=reactor)
 
         body = await make_deferred_yieldable(d)
