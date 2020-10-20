@@ -17,6 +17,7 @@
 import abc
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
 
+import attr
 from canonicaljson import encode_canonical_json
 
 from twisted.enterprise.adbapi import Connection
@@ -33,14 +34,31 @@ if TYPE_CHECKING:
     from synapse.handlers.e2e_keys import SignatureListItem
 
 
+@attr.s
+class DeviceKeyLookupResult:
+    """The type returned by _get_e2e_device_keys_and_signatures_txn"""
+
+    display_name = attr.ib(type=Optional[str])
+
+    # the key data from e2e_device_keys_json. Typically includes fields like
+    # "algorithm", "keys" (including the curve25519 identity key and the ed25519 signing
+    # key) and "signatures" (a signature of the structure by the ed25519 key)
+    key_json = attr.ib(type=Optional[str])
+
+    # cross-signing sigs
+    signatures = attr.ib(type=Optional[Dict], default=None)
+
+
 class EndToEndKeyWorkerStore(SQLBaseStore):
-    def get_e2e_device_keys_for_federation_query(self, user_id: str):
+    async def get_e2e_device_keys_for_federation_query(
+        self, user_id: str
+    ) -> Tuple[int, List[JsonDict]]:
         """Get all devices (with any device keys) for a user
 
         Returns:
-            Deferred which resolves to (stream_id, devices)
+            (stream_id, devices)
         """
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_e2e_device_keys_for_federation_query",
             self._get_e2e_device_keys_for_federation_query_txn,
             user_id,
@@ -51,7 +69,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
     ) -> Tuple[int, List[JsonDict]]:
         now_stream_id = self.get_device_stream_token()
 
-        devices = self._get_e2e_device_keys_txn(txn, [(user_id, None)])
+        devices = self._get_e2e_device_keys_and_signatures_txn(txn, [(user_id, None)])
 
         if devices:
             user_devices = devices[user_id]
@@ -59,17 +77,17 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             for device_id, device in user_devices.items():
                 result = {"device_id": device_id}
 
-                key_json = device.get("key_json", None)
+                key_json = device.key_json
                 if key_json:
                     result["keys"] = db_to_json(key_json)
 
-                    if "signatures" in device:
-                        for sig_user_id, sigs in device["signatures"].items():
+                    if device.signatures:
+                        for sig_user_id, sigs in device.signatures.items():
                             result["keys"].setdefault("signatures", {}).setdefault(
                                 sig_user_id, {}
                             ).update(sigs)
 
-                device_display_name = device.get("device_display_name", None)
+                device_display_name = device.display_name
                 if device_display_name:
                     result["device_display_name"] = device_display_name
 
@@ -96,7 +114,9 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             return {}
 
         results = await self.db_pool.runInteraction(
-            "get_e2e_device_keys", self._get_e2e_device_keys_txn, query_list,
+            "get_e2e_device_keys_and_signatures_txn",
+            self._get_e2e_device_keys_and_signatures_txn,
+            query_list,
         )
 
         # Build the result structure, un-jsonify the results, and add the
@@ -105,13 +125,13 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         for user_id, device_keys in results.items():
             rv[user_id] = {}
             for device_id, device_info in device_keys.items():
-                r = db_to_json(device_info.pop("key_json"))
+                r = db_to_json(device_info.key_json)
                 r["unsigned"] = {}
-                display_name = device_info["device_display_name"]
+                display_name = device_info.display_name
                 if display_name is not None:
                     r["unsigned"]["device_display_name"] = display_name
-                if "signatures" in device_info:
-                    for sig_user_id, sigs in device_info["signatures"].items():
+                if device_info.signatures:
+                    for sig_user_id, sigs in device_info.signatures.items():
                         r.setdefault("signatures", {}).setdefault(
                             sig_user_id, {}
                         ).update(sigs)
@@ -120,9 +140,9 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         return rv
 
     @trace
-    def _get_e2e_device_keys_txn(
+    def _get_e2e_device_keys_and_signatures_txn(
         self, txn, query_list, include_all_devices=False, include_deleted_devices=False
-    ):
+    ) -> Dict[str, Dict[str, Optional[DeviceKeyLookupResult]]]:
         set_tag("include_all_devices", include_all_devices)
         set_tag("include_deleted_devices", include_deleted_devices)
 
@@ -157,7 +177,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
 
         sql = (
             "SELECT user_id, device_id, "
-            "    d.display_name AS device_display_name, "
+            "    d.display_name, "
             "    k.key_json"
             " FROM devices d"
             "    %s JOIN e2e_device_keys_json k USING (user_id, device_id)"
@@ -168,13 +188,14 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         )
 
         txn.execute(sql, query_params)
-        rows = self.db_pool.cursor_to_dict(txn)
 
-        result = {}
-        for row in rows:
+        result = {}  # type: Dict[str, Dict[str, Optional[DeviceKeyLookupResult]]]
+        for (user_id, device_id, display_name, key_json) in txn:
             if include_deleted_devices:
-                deleted_devices.remove((row["user_id"], row["device_id"]))
-            result.setdefault(row["user_id"], {})[row["device_id"]] = row
+                deleted_devices.remove((user_id, device_id))
+            result.setdefault(user_id, {})[device_id] = DeviceKeyLookupResult(
+                display_name, key_json
+            )
 
         if include_deleted_devices:
             for user_id, device_id in deleted_devices:
@@ -205,7 +226,10 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 # note that target_device_result will be None for deleted devices.
                 continue
 
-            target_device_signatures = target_device_result.setdefault("signatures", {})
+            target_device_signatures = target_device_result.signatures
+            if target_device_signatures is None:
+                target_device_signatures = target_device_result.signatures = {}
+
             signing_user_signatures = target_device_signatures.setdefault(
                 signing_user_id, {}
             )
@@ -290,10 +314,12 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         )
 
     @cached(max_entries=10000)
-    def count_e2e_one_time_keys(self, user_id, device_id):
+    async def count_e2e_one_time_keys(
+        self, user_id: str, device_id: str
+    ) -> Dict[str, int]:
         """ Count the number of one time keys the server has for a device
         Returns:
-            Dict mapping from algorithm to number of keys for that algorithm.
+            A mapping from algorithm to number of keys for that algorithm.
         """
 
         def _count_e2e_one_time_keys(txn):
@@ -308,7 +334,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 result[algorithm] = key_count
             return result
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "count_e2e_one_time_keys", _count_e2e_one_time_keys
         )
 
@@ -346,7 +372,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         list_name="user_ids",
         num_args=1,
     )
-    def _get_bare_e2e_cross_signing_keys_bulk(
+    async def _get_bare_e2e_cross_signing_keys_bulk(
         self, user_ids: List[str]
     ) -> Dict[str, Dict[str, dict]]:
         """Returns the cross-signing keys for a set of users.  The output of this
@@ -354,16 +380,15 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         the signatures for the calling user need to be fetched.
 
         Args:
-            user_ids (list[str]): the users whose keys are being requested
+            user_ids: the users whose keys are being requested
 
         Returns:
-            dict[str, dict[str, dict]]: mapping from user ID to key type to key
-                data.  If a user's cross-signing keys were not found, either
-                their user ID will not be in the dict, or their user ID will map
-                to None.
+            A mapping from user ID to key type to key data. If a user's cross-signing
+            keys were not found, either their user ID will not be in the dict, or
+            their user ID will map to None.
 
         """
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_bare_e2e_cross_signing_keys_bulk",
             self._get_bare_e2e_cross_signing_keys_bulk_txn,
             user_ids,
@@ -586,7 +611,9 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
 
 
 class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
-    def set_e2e_device_keys(self, user_id, device_id, time_now, device_keys):
+    async def set_e2e_device_keys(
+        self, user_id: str, device_id: str, time_now: int, device_keys: JsonDict
+    ) -> bool:
         """Stores device keys for a device. Returns whether there was a change
         or the keys were already in the database.
         """
@@ -622,12 +649,21 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             log_kv({"message": "Device keys stored."})
             return True
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "set_e2e_device_keys", _set_e2e_device_keys_txn
         )
 
-    def claim_e2e_one_time_keys(self, query_list):
-        """Take a list of one time keys out of the database"""
+    async def claim_e2e_one_time_keys(
+        self, query_list: Iterable[Tuple[str, str, str]]
+    ) -> Dict[str, Dict[str, Dict[str, bytes]]]:
+        """Take a list of one time keys out of the database.
+
+        Args:
+            query_list: An iterable of tuples of (user ID, device ID, algorithm).
+
+        Returns:
+            A map of user ID -> a map device ID -> a map of key ID -> JSON bytes.
+        """
 
         @trace
         def _claim_e2e_one_time_keys(txn):
@@ -663,11 +699,11 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 )
             return result
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "claim_e2e_one_time_keys", _claim_e2e_one_time_keys
         )
 
-    def delete_e2e_keys_by_device(self, user_id, device_id):
+    async def delete_e2e_keys_by_device(self, user_id: str, device_id: str) -> None:
         def delete_e2e_keys_by_device_txn(txn):
             log_kv(
                 {
@@ -690,7 +726,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 txn, self.count_e2e_one_time_keys, (user_id, device_id)
             )
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "delete_e2e_keys_by_device", delete_e2e_keys_by_device_txn
         )
 

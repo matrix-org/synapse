@@ -256,8 +256,8 @@ class DeviceWorkerStore(SQLBaseStore):
         """
         devices = (
             await self.db_pool.runInteraction(
-                "_get_e2e_device_keys_txn",
-                self._get_e2e_device_keys_txn,
+                "get_e2e_device_keys_and_signatures_txn",
+                self._get_e2e_device_keys_and_signatures_txn,
                 query_map.keys(),
                 include_all_devices=True,
                 include_deleted_devices=True,
@@ -293,17 +293,17 @@ class DeviceWorkerStore(SQLBaseStore):
                 prev_id = stream_id
 
                 if device is not None:
-                    key_json = device.get("key_json", None)
+                    key_json = device.key_json
                     if key_json:
                         result["keys"] = db_to_json(key_json)
 
-                        if "signatures" in device:
-                            for sig_user_id, sigs in device["signatures"].items():
+                        if device.signatures:
+                            for sig_user_id, sigs in device.signatures.items():
                                 result["keys"].setdefault("signatures", {}).setdefault(
                                     sig_user_id, {}
                                 ).update(sigs)
 
-                    device_display_name = device.get("device_display_name", None)
+                    device_display_name = device.display_name
                     if device_display_name:
                         result["device_display_name"] = device_display_name
                 else:
