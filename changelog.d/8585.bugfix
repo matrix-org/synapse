@@ -1,0 +1,1 @@
+Fix a bug that prevented errors encountered during execution of the `synapse_port_db` from being correctly printed.
