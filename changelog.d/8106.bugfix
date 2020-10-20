@@ -1,1 +1,0 @@
-Fix a long-standing bug where invalid JSON would be accepted by Synapse.

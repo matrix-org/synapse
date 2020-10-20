@@ -15,6 +15,7 @@
 
 import contextlib
 import heapq
+import logging
 import threading
 from collections import deque
 from typing import Dict, List, Set
@@ -23,6 +24,8 @@ from typing_extensions import Deque
 
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.util.sequence import PostgresSequenceGenerator
+
+logger = logging.getLogger(__name__)
 
 
 class IdGenerator:
@@ -48,6 +51,8 @@ def _load_current_id(db_conn, table, column, step=1):
     Returns:
         int
     """
+    # debug logging for https://github.com/matrix-org/synapse/issues/7968
+    logger.info("initialising stream generator for %s(%s)", table, column)
     cur = db_conn.cursor()
     if step == 1:
         cur.execute("SELECT MAX(%s) FROM %s" % (column, table))
