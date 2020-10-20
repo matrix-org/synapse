@@ -22,7 +22,7 @@ from typing import List
 
 from synapse.api.errors import StoreError
 from synapse.logging.context import make_deferred_yieldable
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.types import UserID
 from synapse.util import stringutils
 
@@ -63,16 +63,10 @@ class AccountValidityHandler:
             self._raw_from = email.utils.parseaddr(self._from_string)[1]
 
             # Check the renewal emails to send and send them every 30min.
-            def send_emails():
-                # run as a background process to make sure that the database transactions
-                # have a logcontext to report to
-                return run_as_background_process(
-                    "send_renewals", self._send_renewal_emails
-                )
-
             if hs.config.run_background_tasks:
-                self.clock.looping_call(send_emails, 30 * 60 * 1000)
+                self.clock.looping_call(self._send_renewal_emails, 30 * 60 * 1000)
 
+    @wrap_as_background_process("send_renewals")
     async def _send_renewal_emails(self):
         """Gets the list of users whose account is expiring in the amount of time
         configured in the ``renew_at`` parameter from the ``account_validity``
