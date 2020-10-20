@@ -44,7 +44,7 @@ def historical_admin_path_patterns(path_regex):
     ]
 
 
-def admin_patterns(path_regex: str):
+def admin_patterns(path_regex: str, version: str = "v1"):
     """Returns the list of patterns for an admin endpoint
 
     Args:
@@ -54,7 +54,7 @@ def admin_patterns(path_regex: str):
     Returns:
         A list of regex patterns.
     """
-    admin_prefix = "^/_synapse/admin/v1"
+    admin_prefix = "^/_synapse/admin/" + version
     patterns = [re.compile(admin_prefix + path_regex)]
     return patterns
 

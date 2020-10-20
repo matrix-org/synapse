@@ -169,10 +169,6 @@ class SAML2Config(Config):
             saml2_config.get("saml_session_lifetime", "15m")
         )
 
-        self.saml2_error_html_template = self.read_templates(
-            ["saml_error.html"], saml2_config.get("template_dir")
-        )[0]
-
     def _default_saml_config_dict(
         self, required_attributes: set, optional_attributes: set
     ):
@@ -225,10 +221,13 @@ class SAML2Config(Config):
         # At least one of `sp_config` or `config_path` must be set in this section to
         # enable SAML login.
         #
-        # (You will probably also want to set the following options to `false` to
+        # You will probably also want to set the following options to `false` to
         # disable the regular login/registration flows:
         #   * enable_registration
         #   * password_config.enabled
+        #
+        # You will also want to investigate the settings under the "sso" configuration
+        # section below.
         #
         # Once SAML support is enabled, a metadata file will be exposed at
         # https://<server>:<port>/_matrix/saml2/metadata.xml, which you may be able to
@@ -351,31 +350,6 @@ class SAML2Config(Config):
           #    value: "staff"
           #  - attribute: department
           #    value: "sales"
-
-          # Directory in which Synapse will try to find the template files below.
-          # If not set, default templates from within the Synapse package will be used.
-          #
-          # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
-          # If you *do* uncomment it, you will need to make sure that all the templates
-          # below are in the directory.
-          #
-          # Synapse will look for the following templates in this directory:
-          #
-          # * HTML page to display to users if something goes wrong during the
-          #   authentication process: 'saml_error.html'.
-          #
-          #   When rendering, this template is given the following variables:
-          #     * code: an HTML error code corresponding to the error that is being
-          #       returned (typically 400 or 500)
-          #
-          #     * msg: a textual message describing the error.
-          #
-          #   The variables will automatically be HTML-escaped.
-          #
-          # You can see the default templates at:
-          # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
-          #
-          #template_dir: "res/templates"
         """ % {
             "config_dir_path": config_dir_path
         }

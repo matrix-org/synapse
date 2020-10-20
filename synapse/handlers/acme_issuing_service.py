@@ -76,7 +76,7 @@ def create_issuing_service(reactor, acme_url, account_key_file, well_known_resou
     )
 
 
-@attr.s
+@attr.s(slots=True)
 @implementer(ICertificateStore)
 class ErsatzStore:
     """

@@ -45,7 +45,7 @@ def unwrapFirstError(failure):
     return failure.value.subFailure
 
 
-@attr.s
+@attr.s(slots=True)
 class Clock:
     """
     A Clock wraps a Twisted reactor and provides utilities on top of it.

@@ -217,10 +217,8 @@ class _Sentinel:
     def record_event_fetch(self, event_count):
         pass
 
-    def __nonzero__(self):
+    def __bool__(self):
         return False
-
-    __bool__ = __nonzero__  # python3
 
 
 SENTINEL_CONTEXT = _Sentinel()

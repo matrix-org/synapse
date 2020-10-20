@@ -33,7 +33,7 @@ from synapse.util.stringutils import random_string
 logger = logging.getLogger(__name__)
 
 
-class ReplicationEndpoint:
+class ReplicationEndpoint(metaclass=abc.ABCMeta):
     """Helper base class for defining new replication HTTP endpoints.
 
     This creates an endpoint under `/_synapse/replication/:NAME/:PATH_ARGS..`
@@ -71,8 +71,6 @@ class ReplicationEndpoint:
         RETRY_ON_TIMEOUT(bool): Whether or not to retry the request when a 504
             is received.
     """
-
-    __metaclass__ = abc.ABCMeta
 
     NAME = abc.abstractproperty()  # type: str  # type: ignore
     PATH_ARGS = abc.abstractproperty()  # type: Tuple[str, ...]  # type: ignore
