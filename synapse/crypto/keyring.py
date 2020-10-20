@@ -757,9 +757,8 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
             except Exception:
                 logger.exception("Error getting keys %s from %s", key_ids, server_name)
 
-        return await yieldable_gather_results(
-            get_key, keys_to_fetch.items()
-        ).addCallback(lambda _: results)
+        await yieldable_gather_results(get_key, keys_to_fetch.items())
+        return results
 
     async def get_server_verify_key_v2_direct(self, server_name, key_ids):
         """
@@ -769,7 +768,7 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
             key_ids (iterable[str]):
 
         Returns:
-            Deferred[dict[str, FetchKeyResult]]: map from key ID to lookup result
+            dict[str, FetchKeyResult]: map from key ID to lookup result
 
         Raises:
             KeyLookupError if there was a problem making the lookup
