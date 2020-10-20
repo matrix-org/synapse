@@ -224,14 +224,32 @@ class StatsStore(StateDeltasStore):
         )
 
     async def update_room_state(self, room_id: str, fields: Dict[str, Any]) -> None:
-        """
-        Args:
-            room_id
-            fields
-        """
+        """Update the state of a room.
 
-        # For whatever reason some of the fields may contain null bytes, which
-        # postgres isn't a fan of, so we replace those fields with null.
+        fields can contain the following keys with string values:
+        * join_rules
+        * history_visibility
+        * encryption
+        * name
+        * topic
+        * avatar
+        * canonical_alias
+
+        A is_federatable key can also be included with a boolean value.
+
+        Args:
+            room_id: The room ID to update the state of.
+            fields: The fields to update. This can include a partial list of the
+                above fields to only update some room information.
+        """
+        # Ensure that the values to update are valid, they should be strings and
+        # not contain any null bytes.
+        #
+        # Invalid data gets overwritten with null.
+        #
+        # Note that a missing value should not be overwritten (it keeps the
+        # previous value).
+        sentinel = object()
         for col in (
             "join_rules",
             "history_visibility",
@@ -241,8 +259,8 @@ class StatsStore(StateDeltasStore):
             "avatar",
             "canonical_alias",
         ):
-            field = fields.get(col)
-            if field and "\0" in field:
+            field = fields.get(col, sentinel)
+            if field is not sentinel and (not isinstance(field, str) or "\0" in field):
                 fields[col] = None
 
         await self.db_pool.simple_upsert(

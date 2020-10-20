@@ -576,16 +576,16 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
         # Mock Synapse's threepid validator
         get_threepid_validation_session = Mock(
-            return_value=defer.succeed(
+            return_value=make_awaitable(
                 {"medium": "email", "address": email, "validated_at": 0}
             )
         )
         self.store.get_threepid_validation_session = get_threepid_validation_session
-        delete_threepid_session = Mock(return_value=defer.succeed(None))
+        delete_threepid_session = Mock(return_value=make_awaitable(None))
         self.store.delete_threepid_session = delete_threepid_session
 
         # Mock Synapse's http json post method to check for the internal bind call
-        post_json_get_json = Mock(return_value=defer.succeed(None))
+        post_json_get_json = Mock(return_value=make_awaitable(None))
         self.hs.get_simple_http_client().post_json_get_json = post_json_get_json
 
         # Retrieve a UIA session ID

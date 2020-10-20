@@ -24,7 +24,7 @@ from twisted.enterprise.adbapi import Connection
 
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.database import LoggingTransaction, make_in_list_sql_clause
+from synapse.storage.database import make_in_list_sql_clause
 from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
@@ -58,18 +58,13 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         Returns:
             (stream_id, devices)
         """
-        return await self.db_pool.runInteraction(
-            "get_e2e_device_keys_for_federation_query",
-            self._get_e2e_device_keys_for_federation_query_txn,
-            user_id,
-        )
-
-    def _get_e2e_device_keys_for_federation_query_txn(
-        self, txn: LoggingTransaction, user_id: str
-    ) -> Tuple[int, List[JsonDict]]:
         now_stream_id = self.get_device_stream_token()
 
-        devices = self._get_e2e_device_keys_and_signatures_txn(txn, [(user_id, None)])
+        devices = await self.db_pool.runInteraction(
+            "get_e2e_device_keys_and_signatures_txn",
+            self._get_e2e_device_keys_and_signatures_txn,
+            [(user_id, None)],
+        )
 
         if devices:
             user_devices = devices[user_id]

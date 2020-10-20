@@ -63,6 +63,8 @@ class VersionsRestServlet(RestServlet):
                     # Tchap does not currently assume this rule for r0.5.0
                     # XXX: Remove this when it does
                     "m.lazy_load_members": True,
+                    # Implements additional endpoints as described in MSC2666
+                    "uk.half-shot.msc2666": True,
                 },
             },
         )

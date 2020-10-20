@@ -1,0 +1,1 @@
+Fix a longstanding bug where stats updates could break when unexpected profile data was included in events.
