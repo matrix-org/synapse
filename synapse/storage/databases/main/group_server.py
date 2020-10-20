@@ -742,7 +742,13 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="remove_room_from_summary",
         )
 
-    def upsert_group_category(self, group_id, category_id, profile, is_public):
+    async def upsert_group_category(
+        self,
+        group_id: str,
+        category_id: str,
+        profile: Optional[JsonDict],
+        is_public: Optional[bool],
+    ) -> None:
         """Add/update room category for group
         """
         insertion_values = {}
@@ -758,7 +764,7 @@ class GroupServerStore(GroupServerWorkerStore):
         else:
             update_values["is_public"] = is_public
 
-        return self.db_pool.simple_upsert(
+        await self.db_pool.simple_upsert(
             table="group_room_categories",
             keyvalues={"group_id": group_id, "category_id": category_id},
             values=update_values,
@@ -773,7 +779,13 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="remove_group_category",
         )
 
-    def upsert_group_role(self, group_id, role_id, profile, is_public):
+    async def upsert_group_role(
+        self,
+        group_id: str,
+        role_id: str,
+        profile: Optional[JsonDict],
+        is_public: Optional[bool],
+    ) -> None:
         """Add/remove user role
         """
         insertion_values = {}
@@ -789,7 +801,7 @@ class GroupServerStore(GroupServerWorkerStore):
         else:
             update_values["is_public"] = is_public
 
-        return self.db_pool.simple_upsert(
+        await self.db_pool.simple_upsert(
             table="group_roles",
             keyvalues={"group_id": group_id, "role_id": role_id},
             values=update_values,
@@ -938,10 +950,10 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="remove_user_from_summary",
         )
 
-    def add_group_invite(self, group_id, user_id):
+    async def add_group_invite(self, group_id: str, user_id: str) -> None:
         """Record that the group server has invited a user
         """
-        return self.db_pool.simple_insert(
+        await self.db_pool.simple_insert(
             table="group_invites",
             values={"group_id": group_id, "user_id": user_id},
             desc="add_group_invite",
@@ -1044,8 +1056,10 @@ class GroupServerStore(GroupServerWorkerStore):
             "remove_user_from_group", _remove_user_from_group_txn
         )
 
-    def add_room_to_group(self, group_id, room_id, is_public):
-        return self.db_pool.simple_insert(
+    async def add_room_to_group(
+        self, group_id: str, room_id: str, is_public: bool
+    ) -> None:
+        await self.db_pool.simple_insert(
             table="group_rooms",
             values={"group_id": group_id, "room_id": room_id, "is_public": is_public},
             desc="add_room_to_group",

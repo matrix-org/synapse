@@ -16,7 +16,7 @@
 
 import logging
 from itertools import chain
-from typing import Tuple
+from typing import Any, Dict, Tuple
 
 from twisted.internet.defer import DeferredLock
 
@@ -222,11 +222,11 @@ class StatsStore(StateDeltasStore):
             desc="stats_incremental_position",
         )
 
-    def update_room_state(self, room_id, fields):
+    async def update_room_state(self, room_id: str, fields: Dict[str, Any]) -> None:
         """
         Args:
-            room_id (str)
-            fields (dict[str:Any])
+            room_id
+            fields
         """
 
         # For whatever reason some of the fields may contain null bytes, which
@@ -244,7 +244,7 @@ class StatsStore(StateDeltasStore):
             if field and "\0" in field:
                 fields[col] = None
 
-        return self.db_pool.simple_upsert(
+        await self.db_pool.simple_upsert(
             table="room_stats_state",
             keyvalues={"room_id": room_id},
             values=fields,
