@@ -19,6 +19,7 @@ import os
 import re
 from email.parser import Parser
 from typing import Optional
+from urllib.parse import urlencode
 
 import pkg_resources
 
@@ -27,6 +28,7 @@ from synapse.api.constants import LoginType, Membership
 from synapse.api.errors import Codes
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import account, register
+from synapse.rest.synapse.client.password_reset import PasswordResetSubmitTokenResource
 
 from tests import unittest
 from tests.unittest import override_config
@@ -70,6 +72,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
+        self.submit_token_resource = PasswordResetSubmitTokenResource(hs)
 
     def test_basic_password_reset(self):
         """Test basic password reset flow
@@ -251,8 +254,32 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         # Remove the host
         path = link.replace("https://example.com", "")
 
+        # Load the password reset confirmation page
         request, channel = self.make_request("GET", path, shorthand=False)
-        self.render(request)
+        request.render(self.submit_token_resource)
+        self.pump()
+        self.assertEquals(200, channel.code, channel.result)
+
+        # Now POST to the same endpoint, mimicking the same behaviour as clicking the
+        # password reset confirm button
+
+        # Send arguments as url-encoded form data, matching the template's behaviour
+        form_args = []
+        for key, value_list in request.args.items():
+            for value in value_list:
+                arg = (key, value)
+                form_args.append(arg)
+
+        # Confirm the password reset
+        request, channel = self.make_request(
+            "POST",
+            path,
+            content=urlencode(form_args).encode("utf8"),
+            shorthand=False,
+            content_is_form=True,
+        )
+        request.render(self.submit_token_resource)
+        self.pump()
         self.assertEquals(200, channel.code, channel.result)
 
     def _get_link_from_email(self):

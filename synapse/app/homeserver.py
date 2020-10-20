@@ -48,6 +48,7 @@ from synapse.api.urls import (
 from synapse.app import _base
 from synapse.app._base import listen_ssl, listen_tcp, quit_with_error
 from synapse.config._base import ConfigError
+from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import ListenerConfig
 from synapse.federation.transport.server import TransportLayerServer
@@ -208,6 +209,15 @@ class SynapseHomeServer(HomeServer):
                 from synapse.rest.saml2 import SAML2Resource
 
                 resources["/_matrix/saml2"] = SAML2Resource(self)
+
+            if self.get_config().threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+                from synapse.rest.synapse.client.password_reset import (
+                    PasswordResetSubmitTokenResource,
+                )
+
+                resources[
+                    "/_synapse/client/password_reset/email/submit_token"
+                ] = PasswordResetSubmitTokenResource(self)
 
         if name == "consent":
             from synapse.rest.consent.consent_resource import ConsentResource
