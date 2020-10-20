@@ -1,15 +1,11 @@
-For the next release
-====================
+Synapse 1.19.1rc1 (2020-08-25)
+==============================
 
-Removal warning
----------------
+Bugfixes
+--------
 
-Some older clients used a
-[disallowed character](https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-register-email-requesttoken)
-(`:`) in the `client_secret` parameter of various endpoints. The incorrect
-behaviour was allowed for backwards compatibility, but is now being removed
-from Synapse as most users have updated their client. Further context can be
-found at [\#6766](https://github.com/matrix-org/synapse/issues/6766).
+- Fixes a bug where appservices with ratelimiting disabled would still be ratelimited when joining rooms. This bug was introduced in v1.19.0. ([\#8139](https://github.com/matrix-org/synapse/issues/8139))
+- Fix a bug introduced in v1.19.0 that would cause e.g. profile updates to fail due to incorrect application of rate limits on join requests. ([\#8153](https://github.com/matrix-org/synapse/issues/8153))
 
 
 Synapse 1.19.0 (2020-08-17)
