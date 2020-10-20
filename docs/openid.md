@@ -74,7 +74,7 @@ oidc_config:
 
    user_mapping_provider:
      config:
-       localpart_template: ""{{ user.preferred_username.split('@')[0] }}""
+       localpart_template: "{{ user.preferred_username.split('@')[0] }}"
        display_name_template: "{{ user.name }}"
 ```
 
