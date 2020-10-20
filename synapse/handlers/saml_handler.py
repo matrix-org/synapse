@@ -54,6 +54,7 @@ class Saml2SessionData:
 
 class SamlHandler:
     def __init__(self, hs: "synapse.server.HomeServer"):
+        self.hs = hs
         self._saml_client = Saml2Client(hs.config.saml2_sp_config)
         self._auth = hs.get_auth()
         self._auth_handler = hs.get_auth_handler()
@@ -133,8 +134,14 @@ class SamlHandler:
         # the dict.
         self.expire_sessions()
 
+        # Pull out the user-agent and IP from the request.
+        user_agent = request.requestHeaders.getRawHeaders(b"User-Agent", default=[b""])[
+            0
+        ].decode("ascii", "surrogateescape")
+        ip_address = self.hs.get_ip_from_request(request)
+
         user_id, current_session = await self._map_saml_response_to_user(
-            resp_bytes, relay_state
+            resp_bytes, relay_state, user_agent, ip_address
         )
 
         # Complete the interactive auth session or the login.
@@ -147,7 +154,11 @@ class SamlHandler:
             await self._auth_handler.complete_sso_login(user_id, request, relay_state)
 
     async def _map_saml_response_to_user(
-        self, resp_bytes: str, client_redirect_url: str
+        self,
+        resp_bytes: str,
+        client_redirect_url: str,
+        user_agent: str,
+        ip_address: str,
     ) -> Tuple[str, Optional[Saml2SessionData]]:
         """
         Given a sample response, retrieve the cached session and user for it.
@@ -155,6 +166,8 @@ class SamlHandler:
         Args:
             resp_bytes: The SAML response.
             client_redirect_url: The redirect URL passed in by the client.
+            user_agent: The user agent of the client making the request.
+            ip_address: The IP address of the client making the request.
 
         Returns:
              Tuple of the user ID and SAML session associated with this response.
@@ -291,6 +304,7 @@ class SamlHandler:
                 localpart=localpart,
                 default_display_name=displayname,
                 bind_emails=emails,
+                user_agent_ips=(user_agent, ip_address),
             )
 
             await self._datastore.record_user_external_id(

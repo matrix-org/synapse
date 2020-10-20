@@ -16,13 +16,12 @@
 import logging
 import re
 
-from canonicaljson import json
-
 from synapse.appservice import AppServiceTransaction
 from synapse.config.appservice import load_appservices
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
+from synapse.util import json_encoder
 
 logger = logging.getLogger(__name__)
 
@@ -204,7 +203,7 @@ class ApplicationServiceTransactionWorkerStore(
             new_txn_id = max(highest_txn_id, last_txn_id) + 1
 
             # Insert new txn into txn table
-            event_ids = json.dumps([e.event_id for e in events])
+            event_ids = json_encoder.encode([e.event_id for e in events])
             txn.execute(
                 "INSERT INTO application_services_txns(as_id, txn_id, event_ids) "
                 "VALUES(?,?,?)",

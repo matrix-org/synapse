@@ -21,10 +21,6 @@ from abc import abstractmethod
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
-from canonicaljson import json
-
-from twisted.internet import defer
-
 from synapse.api.constants import EventTypes
 from synapse.api.errors import StoreError
 from synapse.api.room_versions import RoomVersion, RoomVersions
@@ -32,6 +28,7 @@ from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.search import SearchStore
 from synapse.types import ThirdPartyInstanceID
+from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
@@ -342,23 +339,22 @@ class RoomWorkerStore(SQLBaseStore):
             desc="is_room_blocked",
         )
 
-    @defer.inlineCallbacks
-    def is_room_published(self, room_id):
+    async def is_room_published(self, room_id: str) -> bool:
         """Check whether a room has been published in the local public room
         directory.
 
         Args:
-            room_id (str)
+            room_id
         Returns:
-            bool: Whether the room is currently published in the room directory
+            Whether the room is currently published in the room directory
         """
         # Get room information
-        room_info = yield self.get_room(room_id)
+        room_info = await self.get_room(room_id)
         if not room_info:
-            defer.returnValue(False)
+            return False
 
         # Check the is_public value
-        defer.returnValue(room_info.get("is_public", False))
+        return room_info.get("is_public", False)
 
     async def get_rooms_paginate(
         self,
@@ -572,7 +568,7 @@ class RoomWorkerStore(SQLBaseStore):
         # maximum, in order not to filter out events we should filter out when sending to
         # the client.
         if not self.config.retention_enabled:
-            defer.returnValue({"min_lifetime": None, "max_lifetime": None})
+            return {"min_lifetime": None, "max_lifetime": None}
 
         def get_retention_policy_for_room_txn(txn):
             txn.execute(
@@ -1155,7 +1151,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                         },
                     )
 
-            with self._public_room_id_gen.get_next() as next_id:
+            with await self._public_room_id_gen.get_next() as next_id:
                 await self.db_pool.runInteraction(
                     "store_room_txn", store_room_txn, next_id
                 )
@@ -1222,7 +1218,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                     },
                 )
 
-        with self._public_room_id_gen.get_next() as next_id:
+        with await self._public_room_id_gen.get_next() as next_id:
             await self.db_pool.runInteraction(
                 "set_room_is_public", set_room_is_public_txn, next_id
             )
@@ -1302,7 +1298,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                     },
                 )
 
-        with self._public_room_id_gen.get_next() as next_id:
+        with await self._public_room_id_gen.get_next() as next_id:
             await self.db_pool.runInteraction(
                 "set_room_is_public_appservice",
                 set_room_is_public_appservice_txn,
@@ -1335,7 +1331,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                 "event_id": event_id,
                 "user_id": user_id,
                 "reason": reason,
-                "content": json.dumps(content),
+                "content": json_encoder.encode(content),
             },
             desc="add_event_report",
         )

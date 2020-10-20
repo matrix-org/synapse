@@ -374,12 +374,16 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.handler._fetch_userinfo = simple_async_mock(return_value=userinfo)
         self.handler._map_userinfo_to_user = simple_async_mock(return_value=user_id)
         self.handler._auth_handler.complete_sso_login = simple_async_mock()
-        request = Mock(spec=["args", "getCookie", "addCookie"])
+        request = Mock(
+            spec=["args", "getCookie", "addCookie", "requestHeaders", "getClientIP"]
+        )
 
         code = "code"
         state = "state"
         nonce = "nonce"
         client_redirect_url = "http://client/redirect"
+        user_agent = "Browser"
+        ip_address = "10.0.0.1"
         session = self.handler._generate_oidc_session_token(
             state=state,
             nonce=nonce,
@@ -392,6 +396,10 @@ class OidcHandlerTestCase(HomeserverTestCase):
         request.args[b"code"] = [code.encode("utf-8")]
         request.args[b"state"] = [state.encode("utf-8")]
 
+        request.requestHeaders = Mock(spec=["getRawHeaders"])
+        request.requestHeaders.getRawHeaders.return_value = [user_agent.encode("ascii")]
+        request.getClientIP.return_value = ip_address
+
         yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
 
         self.handler._auth_handler.complete_sso_login.assert_called_once_with(
@@ -399,7 +407,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
         )
         self.handler._exchange_code.assert_called_once_with(code)
         self.handler._parse_id_token.assert_called_once_with(token, nonce=nonce)
-        self.handler._map_userinfo_to_user.assert_called_once_with(userinfo, token)
+        self.handler._map_userinfo_to_user.assert_called_once_with(
+            userinfo, token, user_agent, ip_address
+        )
         self.handler._fetch_userinfo.assert_not_called()
         self.handler._render_error.assert_not_called()
 
@@ -431,7 +441,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
         )
         self.handler._exchange_code.assert_called_once_with(code)
         self.handler._parse_id_token.assert_not_called()
-        self.handler._map_userinfo_to_user.assert_called_once_with(userinfo, token)
+        self.handler._map_userinfo_to_user.assert_called_once_with(
+            userinfo, token, user_agent, ip_address
+        )
         self.handler._fetch_userinfo.assert_called_once_with(token)
         self.handler._render_error.assert_not_called()
 

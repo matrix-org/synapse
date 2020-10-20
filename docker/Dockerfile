@@ -55,6 +55,7 @@ RUN pip install --prefix="/install" --no-warn-script-location \
 FROM docker.io/python:${PYTHON_VERSION}-slim
 
 RUN apt-get update && apt-get install -y \
+    curl \
     libpq5 \
     xmlsec1 \
     gosu \
@@ -69,3 +70,6 @@ VOLUME ["/data"]
 EXPOSE 8008/tcp 8009/tcp 8448/tcp
 
 ENTRYPOINT ["/start.py"]
+
+HEALTHCHECK --interval=1m --timeout=5s \
+  CMD curl -fSs http://localhost:8008/health || exit 1

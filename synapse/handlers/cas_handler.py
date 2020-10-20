@@ -35,6 +35,7 @@ class CasHandler:
     """
 
     def __init__(self, hs):
+        self.hs = hs
         self._hostname = hs.hostname
         self._auth_handler = hs.get_auth_handler()
         self._registration_handler = hs.get_registration_handler()
@@ -210,8 +211,16 @@ class CasHandler:
 
         else:
             if not registered_user_id:
+                # Pull out the user-agent and IP from the request.
+                user_agent = request.requestHeaders.getRawHeaders(
+                    b"User-Agent", default=[b""]
+                )[0].decode("ascii", "surrogateescape")
+                ip_address = self.hs.get_ip_from_request(request)
+
                 registered_user_id = await self._registration_handler.register_user(
-                    localpart=localpart, default_display_name=user_display_name
+                    localpart=localpart,
+                    default_display_name=user_display_name,
+                    user_agent_ips=(user_agent, ip_address),
                 )
 
             await self._auth_handler.complete_sso_login(

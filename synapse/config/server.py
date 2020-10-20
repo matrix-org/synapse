@@ -1048,11 +1048,10 @@ class ServerConfig(Config):
           #  min_lifetime: 1d
           #  max_lifetime: 1y
 
-          # Retention policy limits. If set, a user won't be able to send a
-          # 'm.room.retention' event which features a 'min_lifetime' or a 'max_lifetime'
-          # that's not within this range. This is especially useful in closed federations,
-          # in which server admins can make sure every federating server applies the same
-          # rules.
+          # Retention policy limits. If set, and the state of a room contains a
+          # 'm.room.retention' event in its state which contains a 'min_lifetime' or a
+          # 'max_lifetime' that's out of these bounds, Synapse will cap the room's policy
+          # to these limits when running purge jobs.
           #
           #allowed_lifetime_min: 1d
           #allowed_lifetime_max: 1y
@@ -1078,12 +1077,19 @@ class ServerConfig(Config):
           # (e.g. every 12h), but not want that purge to be performed by a job that's
           # iterating over every room it knows, which could be heavy on the server.
           #
+          # If any purge job is configured, it is strongly recommended to have at least
+          # a single job with neither 'shortest_max_lifetime' nor 'longest_max_lifetime'
+          # set, or one job without 'shortest_max_lifetime' and one job without
+          # 'longest_max_lifetime' set. Otherwise some rooms might be ignored, even if
+          # 'allowed_lifetime_min' and 'allowed_lifetime_max' are set, because capping a
+          # room's policy to these values is done after the policies are retrieved from
+          # Synapse's database (which is done using the range specified in a purge job's
+          # configuration).
+          #
           #purge_jobs:
-          #  - shortest_max_lifetime: 1d
-          #    longest_max_lifetime: 3d
+          #  - longest_max_lifetime: 3d
           #    interval: 12h
           #  - shortest_max_lifetime: 3d
-          #    longest_max_lifetime: 1y
           #    interval: 1d
 
         # Inhibits the /requestToken endpoints from returning an error that might leak

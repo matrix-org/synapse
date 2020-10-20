@@ -238,7 +238,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
     def test_spam_checker(self):
         """
-        A user which fails to the spam checks will not appear in search results.
+        A user which fails the spam checks will not appear in search results.
         """
         u1 = self.register_user("user1", "pass")
         u1_token = self.login(u1, "pass")
@@ -269,7 +269,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         # Configure a spam checker that does not filter any users.
         spam_checker = self.hs.get_spam_checker()
 
-        class AllowAll(object):
+        class AllowAll:
             def check_username_for_spam(self, user_profile):
                 # Allow all users.
                 return False
@@ -282,7 +282,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(s["results"]), 1)
 
         # Configure a spam checker that filters all users.
-        class BlockAll(object):
+        class BlockAll:
             def check_username_for_spam(self, user_profile):
                 # All users are spammy.
                 return True
