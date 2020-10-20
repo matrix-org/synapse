@@ -40,7 +40,12 @@ class ProfileStoreTestCase(unittest.TestCase):
         )
 
         self.assertEquals(
-            "Frank", (yield self.store.get_profile_displayname(self.u_frank.localpart))
+            "Frank",
+            (
+                yield defer.ensureDeferred(
+                    self.store.get_profile_displayname(self.u_frank.localpart)
+                )
+            ),
         )
 
     @defer.inlineCallbacks
@@ -55,5 +60,9 @@ class ProfileStoreTestCase(unittest.TestCase):
 
         self.assertEquals(
             "http://my.site/here",
-            (yield self.store.get_profile_avatar_url(self.u_frank.localpart)),
+            (
+                yield defer.ensureDeferred(
+                    self.store.get_profile_avatar_url(self.u_frank.localpart)
+                )
+            ),
         )

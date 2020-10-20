@@ -96,12 +96,7 @@ class MessageHandler(object):
             )
 
     async def get_room_data(
-        self,
-        user_id: str,
-        room_id: str,
-        event_type: str,
-        state_key: str,
-        is_guest: bool,
+        self, user_id: str, room_id: str, event_type: str, state_key: str,
     ) -> dict:
         """ Get data from a room.
 
@@ -110,11 +105,10 @@ class MessageHandler(object):
             room_id
             event_type
             state_key
-            is_guest
         Returns:
             The path data content.
         Raises:
-            SynapseError if something went wrong.
+            SynapseError or AuthError if the user is not in the room
         """
         (
             membership,
@@ -131,6 +125,16 @@ class MessageHandler(object):
                 [membership_event_id], StateFilter.from_types([key])
             )
             data = room_state[membership_event_id].get(key)
+        else:
+            # check_user_in_room_or_world_readable, if it doesn't raise an AuthError, should
+            # only ever return a Membership.JOIN/LEAVE object
+            #
+            # Safeguard in case it returned something else
+            logger.error(
+                "Attempted to retrieve data from a room for a user that has never been in it. "
+                "This should not have happened."
+            )
+            raise SynapseError(403, "User not in room", errcode=Codes.FORBIDDEN)
 
         return data
 

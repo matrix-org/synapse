@@ -13,8 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from typing import List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
@@ -26,7 +25,7 @@ BATCH_SIZE = 100
 
 
 class ProfileWorkerStore(SQLBaseStore):
-    async def get_profileinfo(self, user_localpart):
+    async def get_profileinfo(self, user_localpart: str) -> ProfileInfo:
         try:
             profile = await self.db_pool.simple_select_one(
                 table="profiles",
@@ -46,8 +45,8 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     @cached(max_entries=5000)
-    def get_profile_displayname(self, user_localpart):
-        return self.db_pool.simple_select_one_onecol(
+    async def get_profile_displayname(self, user_localpart: str) -> str:
+        return await self.db_pool.simple_select_one_onecol(
             table="profiles",
             keyvalues={"user_id": user_localpart},
             retcol="displayname",
@@ -55,33 +54,33 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     @cached(max_entries=5000)
-    def get_profile_avatar_url(self, user_localpart):
-        return self.db_pool.simple_select_one_onecol(
+    async def get_profile_avatar_url(self, user_localpart: str) -> str:
+        return await self.db_pool.simple_select_one_onecol(
             table="profiles",
             keyvalues={"user_id": user_localpart},
             retcol="avatar_url",
             desc="get_profile_avatar_url",
         )
 
-    def get_latest_profile_replication_batch_number(self):
+    async def get_latest_profile_replication_batch_number(self):
         def f(txn):
             txn.execute("SELECT MAX(batch) as maxbatch FROM profiles")
             rows = self.db_pool.cursor_to_dict(txn)
             return rows[0]["maxbatch"]
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_latest_profile_replication_batch_number", f
         )
 
-    def get_profile_batch(self, batchnum):
-        return self.db_pool.simple_select_list(
+    async def get_profile_batch(self, batchnum):
+        return await self.db_pool.simple_select_list(
             table="profiles",
             keyvalues={"batch": batchnum},
             retcols=("user_id", "displayname", "avatar_url", "active"),
             desc="get_profile_batch",
         )
 
-    def assign_profile_batch(self):
+    async def assign_profile_batch(self):
         def f(txn):
             sql = (
                 "UPDATE profiles SET batch = "
@@ -93,9 +92,9 @@ class ProfileWorkerStore(SQLBaseStore):
             txn.execute(sql, (BATCH_SIZE,))
             return txn.rowcount
 
-        return self.db_pool.runInteraction("assign_profile_batch", f)
+        return await self.db_pool.runInteraction("assign_profile_batch", f)
 
-    def get_replication_hosts(self):
+    async def get_replication_hosts(self):
         def f(txn):
             txn.execute(
                 "SELECT host, last_synced_batch FROM profile_replication_status"
@@ -103,18 +102,22 @@ class ProfileWorkerStore(SQLBaseStore):
             rows = self.db_pool.cursor_to_dict(txn)
             return {r["host"]: r["last_synced_batch"] for r in rows}
 
-        return self.db_pool.runInteraction("get_replication_hosts", f)
+        return await self.db_pool.runInteraction("get_replication_hosts", f)
 
-    def update_replication_batch_for_host(self, host, last_synced_batch):
-        return self.db_pool.simple_upsert(
+    async def update_replication_batch_for_host(
+        self, host: str, last_synced_batch: int
+    ):
+        return await self.db_pool.simple_upsert(
             table="profile_replication_status",
             keyvalues={"host": host},
             values={"last_synced_batch": last_synced_batch},
             desc="update_replication_batch_for_host",
         )
 
-    def get_from_remote_profile_cache(self, user_id):
-        return self.db_pool.simple_select_one(
+    async def get_from_remote_profile_cache(
+        self, user_id: str
+    ) -> Optional[Dict[str, Any]]:
+        return await self.db_pool.simple_select_one(
             table="remote_profile_cache",
             keyvalues={"user_id": user_id},
             retcols=("displayname", "avatar_url"),
@@ -151,9 +154,9 @@ class ProfileWorkerStore(SQLBaseStore):
             lock=False,  # we can do this because user_id has a unique index
         )
 
-    def set_profiles_active(
+    async def set_profiles_active(
         self, users: List[UserID], active: bool, hide: bool, batchnum: int,
-    ):
+    ) -> None:
         """Given a set of users, set active and hidden flags on them.
 
         Args:
@@ -163,9 +166,6 @@ class ProfileWorkerStore(SQLBaseStore):
                 False and active is False, users will have their profiles
                 erased
             batchnum: The batch number, used for profile replication
-
-        Returns:
-            Deferred
         """
         # Convert list of localparts to list of tuples containing localparts
         user_localparts = [(user.localpart,) for user in users]
@@ -180,7 +180,7 @@ class ProfileWorkerStore(SQLBaseStore):
             value_names += ("avatar_url", "displayname")
             values = [v + (None, None) for v in values]
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "set_profiles_active",
             self.db_pool.simple_upsert_many_txn,
             table="profiles",
@@ -225,7 +225,7 @@ class ProfileStore(ProfileWorkerStore):
         return self.db_pool.simple_upsert(
             table="remote_profile_cache",
             keyvalues={"user_id": user_id},
-            updatevalues={
+            values={
                 "displayname": displayname,
                 "avatar_url": avatar_url,
                 "last_check": self._clock.time_msec(),

@@ -87,7 +87,7 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         self.inject_room_member(self.room, self.u_bob, Membership.JOIN)
         self.inject_room_member(self.room, self.u_charlie.to_string(), Membership.JOIN)
 
-        self.pump(20)
+        self.pump()
 
         self.assertTrue("_known_servers_count" not in self.store.__dict__.keys())
 
@@ -101,7 +101,7 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         # Initialises to 1 -- itself
         self.assertEqual(self.store._known_servers_count, 1)
 
-        self.pump(20)
+        self.pump()
 
         # No rooms have been joined, so technically the SQL returns 0, but it
         # will still say it knows about itself.
@@ -111,7 +111,7 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         self.inject_room_member(self.room, self.u_bob, Membership.JOIN)
         self.inject_room_member(self.room, self.u_charlie.to_string(), Membership.JOIN)
 
-        self.pump(20)
+        self.pump(1)
 
         # It now knows about Charlie's server.
         self.assertEqual(self.store._known_servers_count, 2)

@@ -179,7 +179,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         message_handler = self.hs.get_message_handler()
         create_event = self.get_success(
             message_handler.get_room_data(
-                self.user_id, room_id, EventTypes.Create, state_key="", is_guest=False
+                self.user_id, room_id, EventTypes.Create, state_key=""
             )
         )
 

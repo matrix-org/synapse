@@ -33,6 +33,6 @@ class RoomStore(RoomWorkerStore, BaseSlavedStore):
 
     def process_replication_rows(self, stream_name, instance_name, token, rows):
         if stream_name == PublicRoomsStream.NAME:
-            self._public_room_id_gen.advance(token)
+            self._public_room_id_gen.advance(instance_name, token)
 
         return super().process_replication_rows(stream_name, instance_name, token, rows)
