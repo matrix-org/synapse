@@ -57,9 +57,9 @@ Azure AD can act as an OpenID Connect Provider. Register a new application under
 *App registrations* in the Azure AD management console. The RedirectURI for your
 application should point to your matrix server: `[synapse public baseurl]/_synapse/oidc/callback`
 
-Go to Certificates & secrets and register a new client secret. Make note of your 
+Go to *Certificates & secrets* and register a new client secret. Make note of your 
 Directory (tenant) ID as it will be used in the Azure links.
-Edit your Synapse config file and change the oidc_config section:
+Edit your Synapse config file and change the `oidc_config` section:
 
 ```yaml
 oidc_config:
