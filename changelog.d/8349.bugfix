@@ -1,0 +1,1 @@
+Fix a longstanding bug where back pagination over federation could get stuck if it failed to handle a received event.
