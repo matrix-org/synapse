@@ -59,6 +59,8 @@ from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
 
+MAX_EVENTS_PER_TRANSACTION = 100
+
 
 class ApplicationServiceScheduler:
     """ Public facing API for this module. Does the required DI to tie the
@@ -136,10 +138,17 @@ class _ServiceQueuer:
         self.requests_in_flight.add(service.id)
         try:
             while True:
-                events = self.queued_events.pop(service.id, [])
-                ephemeral = self.queued_ephemeral.pop(service.id, [])
+                all_events = self.queued_events.get(service.id, [])
+                events = all_events[:MAX_EVENTS_PER_TRANSACTION]
+                del all_events[MAX_EVENTS_PER_TRANSACTION:]
+
+                all_events_ephemeral = self.queued_ephemeral.get(service.id, [])
+                ephemeral = all_events_ephemeral[:MAX_EVENTS_PER_TRANSACTION]
+                del all_events_ephemeral[MAX_EVENTS_PER_TRANSACTION:]
+
                 if not events and not ephemeral:
                     return
+
                 try:
                     await self.txn_ctrl.send(service, events, ephemeral)
                 except Exception:
