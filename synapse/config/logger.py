@@ -23,7 +23,6 @@ from string import Template
 import yaml
 
 from twisted.logger import (
-    ILogObserver,
     LogBeginner,
     STDLibLogObserver,
     eventAsText,
@@ -172,9 +171,9 @@ class LoggingConfig(Config):
                 log_config_file.write(DEFAULT_LOG_CONFIG.substitute(log_file=log_file))
 
 
-def _setup_stdlib_logging(config, log_config, logBeginner: LogBeginner):
+def _setup_stdlib_logging(config, log_config, logBeginner: LogBeginner) -> None:
     """
-    Set up Python stdlib logging.
+    Set up Python standard library logging.
     """
     if log_config is None:
         log_format = (
@@ -251,8 +250,6 @@ def _setup_stdlib_logging(config, log_config, logBeginner: LogBeginner):
     if not config.no_redirect_stdio:
         print("Redirected stdout/stderr to logs")
 
-    return observer
-
 
 def _reload_stdlib_logging(*args, log_config=None):
     logger = logging.getLogger("")
@@ -265,7 +262,7 @@ def _reload_stdlib_logging(*args, log_config=None):
 
 def setup_logging(
     hs, config, use_worker_options=False, logBeginner: LogBeginner = globalLogBeginner
-) -> ILogObserver:
+) -> None:
     """
     Set up the logging subsystem.
 
@@ -278,9 +275,6 @@ def setup_logging(
 
         logBeginner: The Twisted logBeginner to use.
 
-    Returns:
-        The "root" Twisted Logger observer, suitable for sending logs to from a
-        Logger instance.
     """
     log_config = config.worker_log_config if use_worker_options else config.log_config
 
@@ -299,7 +293,7 @@ def setup_logging(
 
     log_config_body = read_config()
 
-    logger = _setup_stdlib_logging(config, log_config_body, logBeginner=logBeginner)
+    _setup_stdlib_logging(config, log_config_body, logBeginner=logBeginner)
     appbase.register_sighup(read_config, callback=_reload_stdlib_logging)
 
     # make sure that the first thing we log is a thing we can grep backwards
@@ -308,5 +302,3 @@ def setup_logging(
     logging.warning("Server %s version %s", sys.argv[0], get_version_string(synapse))
     logging.info("Server hostname: %s", config.server_name)
     logging.info("Instance name: %s", hs.get_instance_name())
-
-    return logger
