@@ -59,7 +59,12 @@ from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
 
-MAX_EVENTS_PER_TRANSACTION = 100
+
+# Maximum number of events to provide in a AS transaction.
+MAX_PERSISTENT_EVENTS_PER_TRANSACTION = 100
+
+# Maximum number of ephemeral events to provide in a AS transaction.
+MAX_EPHEMERAL_EVENTS_PER_TRANSACTION = 100
 
 
 class ApplicationServiceScheduler:
@@ -139,12 +144,12 @@ class _ServiceQueuer:
         try:
             while True:
                 all_events = self.queued_events.get(service.id, [])
-                events = all_events[:MAX_EVENTS_PER_TRANSACTION]
-                del all_events[MAX_EVENTS_PER_TRANSACTION:]
+                events = all_events[:MAX_PERSISTENT_EVENTS_PER_TRANSACTION]
+                del all_events[:MAX_PERSISTENT_EVENTS_PER_TRANSACTION]
 
                 all_events_ephemeral = self.queued_ephemeral.get(service.id, [])
-                ephemeral = all_events_ephemeral[:MAX_EVENTS_PER_TRANSACTION]
-                del all_events_ephemeral[MAX_EVENTS_PER_TRANSACTION:]
+                ephemeral = all_events_ephemeral[:MAX_EPHEMERAL_EVENTS_PER_TRANSACTION]
+                del all_events_ephemeral[:MAX_EPHEMERAL_EVENTS_PER_TRANSACTION]
 
                 if not events and not ephemeral:
                     return
