@@ -1149,6 +1149,30 @@ class DatabasePool(object):
             allow_none=allow_none,
         )
 
+    @overload
+    @classmethod
+    def simple_select_one_onecol_txn(
+        cls,
+        txn: LoggingTransaction,
+        table: str,
+        keyvalues: Dict[str, Any],
+        retcol: Iterable[str],
+        allow_none: Literal[False] = False,
+    ) -> Any:
+        ...
+
+    @overload
+    @classmethod
+    def simple_select_one_onecol_txn(
+        cls,
+        txn: LoggingTransaction,
+        table: str,
+        keyvalues: Dict[str, Any],
+        retcol: Iterable[str],
+        allow_none: Literal[True] = True,
+    ) -> Optional[Any]:
+        ...
+
     @classmethod
     def simple_select_one_onecol_txn(
         cls,
