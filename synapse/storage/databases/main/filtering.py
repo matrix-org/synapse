@@ -17,6 +17,7 @@ from canonicaljson import encode_canonical_json
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.storage._base import SQLBaseStore, db_to_json
+from synapse.types import JsonDict
 from synapse.util.caches.descriptors import cached
 
 
@@ -40,7 +41,7 @@ class FilteringStore(SQLBaseStore):
 
         return db_to_json(def_json)
 
-    def add_user_filter(self, user_localpart, user_filter):
+    async def add_user_filter(self, user_localpart: str, user_filter: JsonDict) -> str:
         def_json = encode_canonical_json(user_filter)
 
         # Need an atomic transaction to SELECT the maximal ID so far then
@@ -71,4 +72,4 @@ class FilteringStore(SQLBaseStore):
 
             return filter_id
 
-        return self.db_pool.runInteraction("add_user_filter", _do_txn)
+        return await self.db_pool.runInteraction("add_user_filter", _do_txn)
