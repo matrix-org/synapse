@@ -67,9 +67,6 @@ class EventStreamRestServlet(RestServlet):
 
         return 200, chunk
 
-    def on_OPTIONS(self, request):
-        return 200, {}
-
 
 class EventRestServlet(RestServlet):
     PATTERNS = client_patterns("/events/(?P<event_id>[^/]*)$", v1=True)
