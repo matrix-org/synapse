@@ -16,7 +16,7 @@
 
 import abc
 import logging
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from twisted.internet import defer
 
@@ -62,8 +62,10 @@ class ReceiptsWorkerStore(SQLBaseStore):
         return {r["user_id"] for r in receipts}
 
     @cached(num_args=2)
-    def get_receipts_for_room(self, room_id, receipt_type):
-        return self.db_pool.simple_select_list(
+    async def get_receipts_for_room(
+        self, room_id: str, receipt_type: str
+    ) -> List[Dict[str, Any]]:
+        return await self.db_pool.simple_select_list(
             table="receipts_linearized",
             keyvalues={"room_id": room_id, "receipt_type": receipt_type},
             retcols=("user_id", "event_id"),

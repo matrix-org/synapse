@@ -87,8 +87,8 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             )
         )
 
-    def get_all_room_state(self):
-        return self.store.db_pool.simple_select_list(
+    async def get_all_room_state(self):
+        return await self.store.db_pool.simple_select_list(
             "room_stats_state", None, retcols=("name", "topic", "canonical_alias")
         )
 

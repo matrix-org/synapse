@@ -148,8 +148,10 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_txn.__iter__ = Mock(return_value=iter([(1,), (2,), (3,)]))
         self.mock_txn.description = (("colA", None, None, None, None, None, None),)
 
-        ret = yield self.datastore.db_pool.simple_select_list(
-            table="tablename", keyvalues={"keycol": "A set"}, retcols=["colA"]
+        ret = yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_select_list(
+                table="tablename", keyvalues={"keycol": "A set"}, retcols=["colA"]
+            )
         )
 
         self.assertEquals([{"colA": 1}, {"colA": 2}, {"colA": 3}], ret)
@@ -161,10 +163,12 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     def test_update_one_1col(self):
         self.mock_txn.rowcount = 1
 
-        yield self.datastore.db_pool.simple_update_one(
-            table="tablename",
-            keyvalues={"keycol": "TheKey"},
-            updatevalues={"columnname": "New Value"},
+        yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_update_one(
+                table="tablename",
+                keyvalues={"keycol": "TheKey"},
+                updatevalues={"columnname": "New Value"},
+            )
         )
 
         self.mock_txn.execute.assert_called_with(
@@ -176,10 +180,12 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     def test_update_one_4cols(self):
         self.mock_txn.rowcount = 1
 
-        yield self.datastore.db_pool.simple_update_one(
-            table="tablename",
-            keyvalues=OrderedDict([("colA", 1), ("colB", 2)]),
-            updatevalues=OrderedDict([("colC", 3), ("colD", 4)]),
+        yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_update_one(
+                table="tablename",
+                keyvalues=OrderedDict([("colA", 1), ("colB", 2)]),
+                updatevalues=OrderedDict([("colC", 3), ("colD", 4)]),
+            )
         )
 
         self.mock_txn.execute.assert_called_with(

@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from collections import namedtuple
-from typing import Iterable, Optional
+from typing import Iterable, List, Optional
 
 from synapse.api.errors import SynapseError
 from synapse.storage._base import SQLBaseStore
@@ -68,8 +68,8 @@ class DirectoryWorkerStore(SQLBaseStore):
         )
 
     @cached(max_entries=5000)
-    def get_aliases_for_room(self, room_id):
-        return self.db_pool.simple_select_onecol(
+    async def get_aliases_for_room(self, room_id: str) -> List[str]:
+        return await self.db_pool.simple_select_onecol(
             "room_aliases",
             {"room_id": room_id},
             "room_alias",

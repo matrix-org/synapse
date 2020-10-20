@@ -130,11 +130,13 @@ class ProfileWorkerStore(SQLBaseStore):
             table="profiles", values={"user_id": user_localpart}, desc="create_profile"
         )
 
-    def set_profile_displayname(self, user_localpart, new_displayname, batchnum):
+    async def set_profile_displayname(
+        self, user_localpart: str, new_displayname: str, batchnum: int
+    ) -> None:
         # Invalidate the read cache for this user
         self.get_profile_displayname.invalidate((user_localpart,))
 
-        return self.db_pool.simple_upsert(
+        await self.db_pool.simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},
             values={"displayname": new_displayname, "batch": batchnum},
@@ -142,11 +144,13 @@ class ProfileWorkerStore(SQLBaseStore):
             lock=False,  # we can do this because user_id has a unique index
         )
 
-    def set_profile_avatar_url(self, user_localpart, new_avatar_url, batchnum):
+    async def set_profile_avatar_url(
+        self, user_localpart: str, new_avatar_url: str, batchnum: int
+    ) -> None:
         # Invalidate the read cache for this user
         self.get_profile_avatar_url.invalidate((user_localpart,))
 
-        return self.db_pool.simple_upsert(
+        await self.db_pool.simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},
             values={"avatar_url": new_avatar_url, "batch": batchnum},
@@ -221,8 +225,10 @@ class ProfileStore(ProfileWorkerStore):
             desc="add_remote_profile_cache",
         )
 
-    def update_remote_profile_cache(self, user_id, displayname, avatar_url):
-        return self.db_pool.simple_upsert(
+    async def update_remote_profile_cache(
+        self, user_id: str, displayname: str, avatar_url: str
+    ) -> int:
+        return await self.db_pool.simple_upsert(
             table="remote_profile_cache",
             keyvalues={"user_id": user_id},
             values={
