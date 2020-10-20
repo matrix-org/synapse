@@ -42,8 +42,8 @@ class DataStoreTestCase(unittest.TestCase):
             self.store.set_profile_displayname(self.user.localpart, self.displayname, 1)
         )
 
-        users, total = yield self.store.get_users_paginate(
-            0, 10, name="bc", guests=False
+        users, total = yield defer.ensureDeferred(
+            self.store.get_users_paginate(0, 10, name="bc", guests=False)
         )
 
         self.assertEquals(1, total)

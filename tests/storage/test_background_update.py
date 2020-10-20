@@ -1,7 +1,5 @@
 from mock import Mock
 
-from twisted.internet import defer
-
 from synapse.storage.background_updates import BackgroundUpdater
 
 from tests import unittest
@@ -38,11 +36,10 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         )
 
         # first step: make a bit of progress
-        @defer.inlineCallbacks
-        def update(progress, count):
-            yield self.clock.sleep((count * duration_ms) / 1000)
+        async def update(progress, count):
+            await self.clock.sleep((count * duration_ms) / 1000)
             progress = {"my_key": progress["my_key"] + 1}
-            yield store.db_pool.runInteraction(
+            await store.db_pool.runInteraction(
                 "update_progress",
                 self.updates._background_update_progress_txn,
                 "test_update",

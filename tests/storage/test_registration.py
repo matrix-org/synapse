@@ -37,7 +37,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_register(self):
-        yield self.store.register_user(self.user_id, self.pwhash)
+        yield defer.ensureDeferred(self.store.register_user(self.user_id, self.pwhash))
 
         self.assertEquals(
             {
@@ -58,14 +58,16 @@ class RegistrationStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_add_tokens(self):
-        yield self.store.register_user(self.user_id, self.pwhash)
+        yield defer.ensureDeferred(self.store.register_user(self.user_id, self.pwhash))
         yield defer.ensureDeferred(
             self.store.add_access_token_to_user(
                 self.user_id, self.tokens[1], self.device_id, valid_until_ms=None
             )
         )
 
-        result = yield self.store.get_user_by_access_token(self.tokens[1])
+        result = yield defer.ensureDeferred(
+            self.store.get_user_by_access_token(self.tokens[1])
+        )
 
         self.assertDictContainsSubset(
             {"name": self.user_id, "device_id": self.device_id}, result
@@ -76,7 +78,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_user_delete_access_tokens(self):
         # add some tokens
-        yield self.store.register_user(self.user_id, self.pwhash)
+        yield defer.ensureDeferred(self.store.register_user(self.user_id, self.pwhash))
         yield defer.ensureDeferred(
             self.store.add_access_token_to_user(
                 self.user_id, self.tokens[0], device_id=None, valid_until_ms=None
@@ -89,22 +91,28 @@ class RegistrationStoreTestCase(unittest.TestCase):
         )
 
         # now delete some
-        yield self.store.user_delete_access_tokens(
-            self.user_id, device_id=self.device_id
+        yield defer.ensureDeferred(
+            self.store.user_delete_access_tokens(self.user_id, device_id=self.device_id)
         )
 
         # check they were deleted
-        user = yield self.store.get_user_by_access_token(self.tokens[1])
+        user = yield defer.ensureDeferred(
+            self.store.get_user_by_access_token(self.tokens[1])
+        )
         self.assertIsNone(user, "access token was not deleted by device_id")
 
         # check the one not associated with the device was not deleted
-        user = yield self.store.get_user_by_access_token(self.tokens[0])
+        user = yield defer.ensureDeferred(
+            self.store.get_user_by_access_token(self.tokens[0])
+        )
         self.assertEqual(self.user_id, user["name"])
 
         # now delete the rest
-        yield self.store.user_delete_access_tokens(self.user_id)
+        yield defer.ensureDeferred(self.store.user_delete_access_tokens(self.user_id))
 
-        user = yield self.store.get_user_by_access_token(self.tokens[0])
+        user = yield defer.ensureDeferred(
+            self.store.get_user_by_access_token(self.tokens[0])
+        )
         self.assertIsNone(user, "access token was not deleted without device_id")
 
     @defer.inlineCallbacks
@@ -112,16 +120,20 @@ class RegistrationStoreTestCase(unittest.TestCase):
         TEST_USER = "@test:test"
         SUPPORT_USER = "@support:test"
 
-        res = yield self.store.is_support_user(None)
+        res = yield defer.ensureDeferred(self.store.is_support_user(None))
         self.assertFalse(res)
-        yield self.store.register_user(user_id=TEST_USER, password_hash=None)
-        res = yield self.store.is_support_user(TEST_USER)
+        yield defer.ensureDeferred(
+            self.store.register_user(user_id=TEST_USER, password_hash=None)
+        )
+        res = yield defer.ensureDeferred(self.store.is_support_user(TEST_USER))
         self.assertFalse(res)
 
-        yield self.store.register_user(
-            user_id=SUPPORT_USER, password_hash=None, user_type=UserTypes.SUPPORT
+        yield defer.ensureDeferred(
+            self.store.register_user(
+                user_id=SUPPORT_USER, password_hash=None, user_type=UserTypes.SUPPORT
+            )
         )
-        res = yield self.store.is_support_user(SUPPORT_USER)
+        res = yield defer.ensureDeferred(self.store.is_support_user(SUPPORT_USER))
         self.assertTrue(res)
 
     @defer.inlineCallbacks

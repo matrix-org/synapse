@@ -155,7 +155,9 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         self.datastore.get_new_device_msgs_for_remote = lambda *args, **kargs: make_awaitable(
             ([], 0)
         )
-        self.datastore.delete_device_msgs_for_remote = lambda *args, **kargs: None
+        self.datastore.delete_device_msgs_for_remote = lambda *args, **kargs: make_awaitable(
+            None
+        )
         self.datastore.set_received_txn_response = lambda *args, **kwargs: make_awaitable(
             None
         )
