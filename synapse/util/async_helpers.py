@@ -36,7 +36,7 @@ from synapse.util import Clock, unwrapFirstError
 logger = logging.getLogger(__name__)
 
 
-class ObservableDeferred(object):
+class ObservableDeferred:
     """Wraps a deferred object so that we can add observer deferreds. These
     observer deferreds do not affect the callback chain of the original
     deferred.
@@ -188,7 +188,7 @@ def yieldable_gather_results(func, iter, *args, **kwargs):
     ).addErrback(unwrapFirstError)
 
 
-class Linearizer(object):
+class Linearizer:
     """Limits concurrent access to resources based on a key. Useful to ensure
     only a few things happen at a time on a given resource.
 
@@ -338,7 +338,7 @@ class Linearizer(object):
         return new_defer
 
 
-class ReadWriteLock(object):
+class ReadWriteLock:
     """An async read write lock.
 
     Example:
@@ -502,7 +502,7 @@ def timeout_deferred(deferred, timeout, reactor, on_timeout_cancel=None):
 
 
 @attr.s(slots=True, frozen=True)
-class DoneAwaitable(object):
+class DoneAwaitable:
     """Simple awaitable that returns the provided value.
     """
 

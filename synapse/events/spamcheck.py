@@ -25,7 +25,7 @@ if MYPY:
     import synapse.server
 
 
-class SpamChecker(object):
+class SpamChecker:
     def __init__(self, hs: "synapse.server.HomeServer"):
         self.spam_checkers = []  # type: List[Any]
 

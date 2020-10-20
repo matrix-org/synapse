@@ -33,7 +33,7 @@ from synapse.util.stringutils import random_string
 logger = logging.getLogger(__name__)
 
 
-class ReplicationEndpoint(object):
+class ReplicationEndpoint:
     """Helper base class for defining new replication HTTP endpoints.
 
     This creates an endpoint under `/_synapse/replication/:NAME/:PATH_ARGS..`

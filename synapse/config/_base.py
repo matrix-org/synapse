@@ -89,7 +89,7 @@ def path_exists(file_path):
         return False
 
 
-class Config(object):
+class Config:
     """
     A configuration section, containing configuration keys and values.
 
@@ -284,7 +284,7 @@ def _create_mxc_to_http_filter(public_baseurl: str) -> Callable:
     return mxc_to_http_filter
 
 
-class RootConfig(object):
+class RootConfig:
     """
     Holder of an application's configuration.
 

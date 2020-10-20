@@ -81,7 +81,7 @@ class PublicRoomListManager:
         await self._store.set_room_is_public(room_id, False)
 
 
-class ModuleApi(object):
+class ModuleApi:
     """A proxy object that gets passed to various plugin modules so they
     can register new users etc if necessary.
     """

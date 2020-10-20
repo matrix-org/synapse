@@ -17,7 +17,7 @@ from typing import Dict
 from ._base import Config
 
 
-class RateLimitConfig(object):
+class RateLimitConfig:
     def __init__(
         self,
         config: Dict[str, float],
@@ -27,7 +27,7 @@ class RateLimitConfig(object):
         self.burst_count = config.get("burst_count", defaults["burst_count"])
 
 
-class FederationRateLimitConfig(object):
+class FederationRateLimitConfig:
     _items_and_default = {
         "window_size": 1000,
         "sleep_limit": 10,

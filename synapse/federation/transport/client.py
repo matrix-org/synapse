@@ -30,7 +30,7 @@ from synapse.logging.utils import log_function
 logger = logging.getLogger(__name__)
 
 
-class TransportLayerClient(object):
+class TransportLayerClient:
     """Sends federation HTTP requests to other servers"""
 
     def __init__(self, hs):

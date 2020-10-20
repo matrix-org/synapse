@@ -29,7 +29,7 @@ from synapse.util import stringutils
 logger = logging.getLogger(__name__)
 
 
-class AccountValidityHandler(object):
+class AccountValidityHandler:
     def __init__(self, hs):
         self.hs = hs
         self.config = hs.config

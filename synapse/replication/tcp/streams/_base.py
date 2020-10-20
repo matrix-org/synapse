@@ -79,7 +79,7 @@ StreamUpdateResult = Tuple[List[Tuple[Token, StreamRow]], Token, bool]
 UpdateFunction = Callable[[str, Token, Token, int], Awaitable[StreamUpdateResult]]
 
 
-class Stream(object):
+class Stream:
     """Base class for the streams.
 
     Provides a `get_updates()` function that returns new updates since the last

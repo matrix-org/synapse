@@ -68,7 +68,7 @@ def count(func: Callable[[T], bool], it: Iterable[T]) -> int:
     return n
 
 
-class _NotificationListener(object):
+class _NotificationListener:
     """ This represents a single client connection to the events stream.
     The events stream handler will have yielded to the deferred, so to
     notify the handler it is sufficient to resolve the deferred.
@@ -80,7 +80,7 @@ class _NotificationListener(object):
         self.deferred = deferred
 
 
-class _NotifierUserStream(object):
+class _NotifierUserStream:
     """This represents a user connected to the event stream.
     It tracks the most recent stream token for that user.
     At a given point a user may have a number of streams listening for
@@ -168,7 +168,7 @@ class EventStreamResult(namedtuple("EventStreamResult", ("events", "tokens"))):
     __bool__ = __nonzero__  # python3
 
 
-class Notifier(object):
+class Notifier:
     """ This class is responsible for notifying any listeners when there are
     new events available for it.
 

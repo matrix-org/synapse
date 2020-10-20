@@ -55,7 +55,7 @@ def stdlib_log_level_to_twisted(level: str) -> LogLevel:
 
 @attr.s
 @implementer(ILogObserver)
-class LogContextObserver(object):
+class LogContextObserver:
     """
     An ILogObserver which adds Synapse-specific log context information.
 
@@ -169,7 +169,7 @@ class OutputPipeType(Values):
 
 
 @attr.s
-class DrainConfiguration(object):
+class DrainConfiguration:
     name = attr.ib()
     type = attr.ib()
     location = attr.ib()
@@ -177,7 +177,7 @@ class DrainConfiguration(object):
 
 
 @attr.s
-class NetworkJSONTerseOptions(object):
+class NetworkJSONTerseOptions:
     maximum_buffer = attr.ib(type=int)
 
 

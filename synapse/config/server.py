@@ -430,7 +430,7 @@ class ServerConfig(Config):
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
 
         @attr.s
-        class LimitRemoteRoomsConfig(object):
+        class LimitRemoteRoomsConfig:
             enabled = attr.ib(
                 validator=attr.validators.instance_of(bool), default=False
             )

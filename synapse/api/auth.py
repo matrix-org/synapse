@@ -58,7 +58,7 @@ class _InvalidMacaroonException(Exception):
     pass
 
 
-class Auth(object):
+class Auth:
     """
     FIXME: This class contains a mix of functions for authenticating users
     of our client-server API and authenticating events added to room graphs.

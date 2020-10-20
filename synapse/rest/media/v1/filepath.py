@@ -33,7 +33,7 @@ def _wrap_in_base_path(func):
     return _wrapped
 
 
-class MediaFilePaths(object):
+class MediaFilePaths:
     """Describes where files are stored on disk.
 
     Most of the functions have a `*_rel` variant which returns a file path that

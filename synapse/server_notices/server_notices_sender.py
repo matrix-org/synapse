@@ -20,7 +20,7 @@ from synapse.server_notices.resource_limits_server_notices import (
 )
 
 
-class ServerNoticesSender(object):
+class ServerNoticesSender:
     """A centralised place which sends server notices automatically when
     Certain Events take place
     """

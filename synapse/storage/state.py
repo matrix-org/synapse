@@ -29,7 +29,7 @@ T = TypeVar("T")
 
 
 @attr.s(slots=True)
-class StateFilter(object):
+class StateFilter:
     """A filter used when querying for state.
 
     Attributes:
@@ -326,7 +326,7 @@ class StateFilter(object):
         return member_filter, non_member_filter
 
 
-class StateGroupStorage(object):
+class StateGroupStorage:
     """High level interface to fetching state for event.
     """
 

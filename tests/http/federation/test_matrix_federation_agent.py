@@ -1264,7 +1264,7 @@ def _log_request(request):
 
 
 @implementer(IPolicyForHTTPS)
-class TrustingTLSPolicyForHTTPS(object):
+class TrustingTLSPolicyForHTTPS:
     """An IPolicyForHTTPS which checks that the certificate belongs to the
     right server, but doesn't check the certificate chain."""
 

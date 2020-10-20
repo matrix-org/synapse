@@ -34,7 +34,7 @@ def user_joined_room(distributor, user, room_id):
     distributor.fire("user_joined_room", user=user, room_id=room_id)
 
 
-class Distributor(object):
+class Distributor:
     """A central dispatch point for loosely-connected pieces of code to
     register, observe, and fire signals.
 
@@ -103,7 +103,7 @@ def maybeAwaitableDeferred(f, *args, **kw):
         return succeed(result)
 
 
-class Signal(object):
+class Signal:
     """A Signal is a dispatch point that stores a list of callables as
     observers of it.
 

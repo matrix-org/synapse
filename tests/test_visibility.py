@@ -294,7 +294,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
     test_large_room.skip = "Disabled by default because it's slow"
 
 
-class _TestStore(object):
+class _TestStore:
     """Implements a few methods of the DataStore, so that we can test
     filter_events_for_server
 

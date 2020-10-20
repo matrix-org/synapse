@@ -1004,7 +1004,7 @@ class RoomCreationHandler(BaseHandler):
         raise StoreError(500, "Couldn't generate a room ID.")
 
 
-class RoomContextHandler(object):
+class RoomContextHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.store = hs.get_datastore()
@@ -1114,7 +1114,7 @@ class RoomContextHandler(object):
         return results
 
 
-class RoomEventSource(object):
+class RoomEventSource:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
 
@@ -1176,7 +1176,7 @@ class RoomEventSource(object):
         return self.store.get_room_events_max_id(room_id)
 
 
-class RoomShutdownHandler(object):
+class RoomShutdownHandler:
 
     DEFAULT_MESSAGE = (
         "Sharing illegal content on this server is not permitted and rooms in"
