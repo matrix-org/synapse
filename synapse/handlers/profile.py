@@ -24,7 +24,7 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.types import UserID, create_requester, get_domain_from_id
 
 from ._base import BaseHandler
@@ -57,7 +57,7 @@ class ProfileHandler(BaseHandler):
 
         if hs.config.run_background_tasks:
             self.clock.looping_call(
-                self._start_update_remote_profile_cache, self.PROFILE_UPDATE_MS
+                self._update_remote_profile_cache, self.PROFILE_UPDATE_MS
             )
 
     async def get_profile(self, user_id):
@@ -370,11 +370,7 @@ class ProfileHandler(BaseHandler):
                 raise SynapseError(403, "Profile isn't available", Codes.FORBIDDEN)
             raise
 
-    def _start_update_remote_profile_cache(self):
-        return run_as_background_process(
-            "Update remote profile", self._update_remote_profile_cache
-        )
-
+    @wrap_as_background_process("Update remote profile")
     async def _update_remote_profile_cache(self):
         """Called periodically to check profiles of remote users we haven't
         checked in a while.
