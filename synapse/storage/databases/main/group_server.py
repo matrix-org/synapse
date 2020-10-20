@@ -728,11 +728,13 @@ class GroupServerStore(GroupServerWorkerStore):
                 },
             )
 
-    def remove_room_from_summary(self, group_id, room_id, category_id):
+    async def remove_room_from_summary(
+        self, group_id: str, room_id: str, category_id: str
+    ) -> int:
         if category_id is None:
             category_id = _DEFAULT_CATEGORY_ID
 
-        return self.db_pool.simple_delete(
+        return await self.db_pool.simple_delete(
             table="group_summary_rooms",
             keyvalues={
                 "group_id": group_id,
@@ -772,8 +774,8 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="upsert_group_category",
         )
 
-    def remove_group_category(self, group_id, category_id):
-        return self.db_pool.simple_delete(
+    async def remove_group_category(self, group_id: str, category_id: str) -> int:
+        return await self.db_pool.simple_delete(
             table="group_room_categories",
             keyvalues={"group_id": group_id, "category_id": category_id},
             desc="remove_group_category",
@@ -809,8 +811,8 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="upsert_group_role",
         )
 
-    def remove_group_role(self, group_id, role_id):
-        return self.db_pool.simple_delete(
+    async def remove_group_role(self, group_id: str, role_id: str) -> int:
+        return await self.db_pool.simple_delete(
             table="group_roles",
             keyvalues={"group_id": group_id, "role_id": role_id},
             desc="remove_group_role",
@@ -940,11 +942,13 @@ class GroupServerStore(GroupServerWorkerStore):
                 },
             )
 
-    def remove_user_from_summary(self, group_id, user_id, role_id):
+    async def remove_user_from_summary(
+        self, group_id: str, user_id: str, role_id: str
+    ) -> int:
         if role_id is None:
             role_id = _DEFAULT_ROLE_ID
 
-        return self.db_pool.simple_delete(
+        return await self.db_pool.simple_delete(
             table="group_summary_users",
             keyvalues={"group_id": group_id, "role_id": role_id, "user_id": user_id},
             desc="remove_user_from_summary",
@@ -1264,16 +1268,16 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="update_remote_attestion",
         )
 
-    def remove_attestation_renewal(self, group_id, user_id):
+    async def remove_attestation_renewal(self, group_id: str, user_id: str) -> int:
         """Remove an attestation that we thought we should renew, but actually
         shouldn't. Ideally this would never get called as we would never
         incorrectly try and do attestations for local users on local groups.
 
         Args:
-            group_id (str)
-            user_id (str)
+            group_id
+            user_id
         """
-        return self.db_pool.simple_delete(
+        return await self.db_pool.simple_delete(
             table="group_attestations_renewals",
             keyvalues={"group_id": group_id, "user_id": user_id},
             desc="remove_attestation_renewal",
