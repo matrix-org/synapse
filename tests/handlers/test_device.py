@@ -289,7 +289,7 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         # make sure that our device ID has changed
         user_info = self.get_success(self.auth.get_user_by_access_token(access_token))
 
-        self.assertEqual(user_info["device_id"], retrieved_device_id)
+        self.assertEqual(user_info.device_id, retrieved_device_id)
 
         # make sure the device has the display name that was set from the login
         res = self.get_success(self.handler.get_device(user_id, retrieved_device_id))

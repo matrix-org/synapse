@@ -29,6 +29,7 @@ from synapse.api.errors import (
     MissingClientTokenError,
     ResourceLimitError,
 )
+from synapse.storage.databases.main.registration import TokenLookupResult
 from synapse.types import UserID
 
 from tests import unittest
@@ -61,7 +62,9 @@ class AuthTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_user_by_req_user_valid_token(self):
-        user_info = {"name": self.test_user, "token_id": "ditto", "device_id": "device"}
+        user_info = TokenLookupResult(
+            user_id=self.test_user, token_id=5, device_id="device"
+        )
         self.store.get_user_by_access_token = Mock(
             return_value=defer.succeed(user_info)
         )
@@ -84,7 +87,7 @@ class AuthTestCase(unittest.TestCase):
         self.assertEqual(f.errcode, "M_UNKNOWN_TOKEN")
 
     def test_get_user_by_req_user_missing_token(self):
-        user_info = {"name": self.test_user, "token_id": "ditto"}
+        user_info = TokenLookupResult(user_id=self.test_user, token_id=5)
         self.store.get_user_by_access_token = Mock(
             return_value=defer.succeed(user_info)
         )
@@ -221,7 +224,7 @@ class AuthTestCase(unittest.TestCase):
     def test_get_user_from_macaroon(self):
         self.store.get_user_by_access_token = Mock(
             return_value=defer.succeed(
-                {"name": "@baldrick:matrix.org", "device_id": "device"}
+                TokenLookupResult(user_id="@baldrick:matrix.org", device_id="device")
             )
         )
 
@@ -237,12 +240,11 @@ class AuthTestCase(unittest.TestCase):
         user_info = yield defer.ensureDeferred(
             self.auth.get_user_by_access_token(macaroon.serialize())
         )
-        user = user_info["user"]
-        self.assertEqual(UserID.from_string(user_id), user)
+        self.assertEqual(user_id, user_info.user_id)
 
         # TODO: device_id should come from the macaroon, but currently comes
         # from the db.
-        self.assertEqual(user_info["device_id"], "device")
+        self.assertEqual(user_info.device_id, "device")
 
     @defer.inlineCallbacks
     def test_get_guest_user_from_macaroon(self):
@@ -264,10 +266,8 @@ class AuthTestCase(unittest.TestCase):
         user_info = yield defer.ensureDeferred(
             self.auth.get_user_by_access_token(serialized)
         )
-        user = user_info["user"]
-        is_guest = user_info["is_guest"]
-        self.assertEqual(UserID.from_string(user_id), user)
-        self.assertTrue(is_guest)
+        self.assertEqual(user_id, user_info.user_id)
+        self.assertTrue(user_info.is_guest)
         self.store.get_user_by_id.assert_called_with(user_id)
 
     @defer.inlineCallbacks
@@ -289,12 +289,9 @@ class AuthTestCase(unittest.TestCase):
             if token != tok:
                 return defer.succeed(None)
             return defer.succeed(
-                {
-                    "name": USER_ID,
-                    "is_guest": False,
-                    "token_id": 1234,
-                    "device_id": "DEVICE",
-                }
+                TokenLookupResult(
+                    user_id=USER_ID, is_guest=False, token_id=1234, device_id="DEVICE",
+                )
             )
 
         self.store.get_user_by_access_token = get_user
