@@ -864,20 +864,14 @@ class OidcHandler(BaseHandler):
         # to be strings.
         remote_user_id = str(remote_user_id)
 
-        logger.info(
-            "Looking for existing mapping for user %s:%s",
-            self._auth_provider_id,
-            remote_user_id,
-        )
-
-        registered_user_id = await self.store.get_user_by_external_id(
+        # first of all, check if we already have a mapping for this user
+        registered_user_id = await self._sso_handler.get_sso_user_by_remote_user_id(
             self._auth_provider_id, remote_user_id,
         )
-
-        if registered_user_id is not None:
-            logger.info("Found existing mapping %s", registered_user_id)
+        if registered_user_id:
             return registered_user_id
 
+        # Otherwise, generate a new user.
         try:
             attributes = await self._user_mapping_provider.map_user_attributes(
                 userinfo, token

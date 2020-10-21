@@ -52,3 +52,39 @@ class SsoHandler(BaseHandler):
             error=error, error_description=error_description
         )
         respond_with_html(request, 400, html)
+
+    async def get_sso_user_by_remote_user_id(
+        self, auth_provider_id: str, remote_user_id: str
+    ) -> Optional[str]:
+        """
+        Maps the user ID of a remote IdP to a mxid for a previously seen user.
+
+        If the user has not been seen yet, this will return None.
+
+        Args:
+            auth_provider_id: A unique identifier for this SSO provider, e.g.
+                "oidc" or "saml".
+            remote_user_id: The user ID according to the remote IdP. This might
+                be an e-mail address, a GUID, or some other form. It must be
+                unique and immutable.
+
+        Returns:
+            The mxid of a previously seen user.
+        """
+        # Check if we already have a mapping for this user.
+        logger.info(
+            "Looking for existing mapping for user %s:%s",
+            auth_provider_id,
+            remote_user_id,
+        )
+        registered_user_id = await self.store.get_user_by_external_id(
+            auth_provider_id, remote_user_id,
+        )
+
+        # A match was found, return the user ID.
+        if registered_user_id is not None:
+            logger.info("Found existing mapping %s", registered_user_id)
+            return registered_user_id
+
+        # No match.
+        return None

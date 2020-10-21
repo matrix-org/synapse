@@ -250,16 +250,10 @@ class SamlHandler(BaseHandler):
 
         with (await self._mapping_lock.queue(self._auth_provider_id)):
             # first of all, check if we already have a mapping for this user
-            logger.info(
-                "Looking for existing mapping for user %s:%s",
-                self._auth_provider_id,
-                remote_user_id,
+            registered_user_id = await self._sso_handler.get_sso_user_by_remote_user_id(
+                self._auth_provider_id, remote_user_id,
             )
-            registered_user_id = await self.store.get_user_by_external_id(
-                self._auth_provider_id, remote_user_id
-            )
-            if registered_user_id is not None:
-                logger.info("Found existing mapping %s", registered_user_id)
+            if registered_user_id:
                 return registered_user_id
 
             # backwards-compatibility hack: see if there is an existing user with a
