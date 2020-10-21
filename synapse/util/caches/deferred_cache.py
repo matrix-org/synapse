@@ -31,6 +31,7 @@ from typing import (
 from prometheus_client import Gauge
 
 from twisted.internet import defer
+from twisted.python import failure
 
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.lrucache import LruCache
@@ -223,7 +224,9 @@ class DeferredCache(Generic[KT, VT]):
 
         # we can save a whole load of effort if the deferred is ready.
         if value.called:
-            self.cache.set(key, value.result, callbacks)
+            result = value.result
+            if not isinstance(result, failure.Failure):
+                self.cache.set(key, result, callbacks)
             return value
 
         # otherwise, we'll add an entry to the _pending_deferred_cache for now,
