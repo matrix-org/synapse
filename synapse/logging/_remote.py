@@ -34,7 +34,8 @@ from twisted.internet.endpoints import (
 )
 from twisted.internet.interfaces import IPushProducer, ITransport
 from twisted.internet.protocol import Factory, Protocol
-from twisted.logger import Logger
+
+logger = logging.getLogger(__name__)
 
 
 @attr.s
@@ -108,7 +109,6 @@ class RemoteHandler(logging.Handler):
 
         self._buffer = deque()  # type: Deque[logging.LogRecord]
         self._connection_waiter = None  # type: Optional[Deferred]
-        self._logger = Logger()
         self._producer = None  # type: Optional[LogProducer]
 
         # Connect without DNS lookups if it's a direct IP.
@@ -226,7 +226,7 @@ class RemoteHandler(logging.Handler):
             # If handling backpressure fails, clear the buffer and log the
             # exception.
             self._buffer.clear()
-            self._logger.failure("Failed clearing backpressure")
+            logger.warning("Failed clearing backpressure")
 
         # Try and write immediately.
         self._connect()
