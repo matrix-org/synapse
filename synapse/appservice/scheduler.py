@@ -60,10 +60,10 @@ from synapse.types import JsonDict
 logger = logging.getLogger(__name__)
 
 
-# Maximum number of events to provide in a AS transaction.
+# Maximum number of events to provide in an AS transaction.
 MAX_PERSISTENT_EVENTS_PER_TRANSACTION = 100
 
-# Maximum number of ephemeral events to provide in a AS transaction.
+# Maximum number of ephemeral events to provide in an AS transaction.
 MAX_EPHEMERAL_EVENTS_PER_TRANSACTION = 100
 
 
