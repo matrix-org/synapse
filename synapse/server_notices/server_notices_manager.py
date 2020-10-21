@@ -39,6 +39,7 @@ class ServerNoticesManager:
         self._room_member_handler = hs.get_room_member_handler()
         self._event_creation_handler = hs.get_event_creation_handler()
         self._is_mine_id = hs.is_mine_id
+        self._server_name = hs.hostname
 
         self._notifier = hs.get_notifier()
         self.server_notices_mxid = self._config.server_notices_mxid
@@ -72,7 +73,9 @@ class ServerNoticesManager:
         await self.maybe_invite_user_to_room(user_id, room_id)
 
         system_mxid = self._config.server_notices_mxid
-        requester = create_requester(system_mxid)
+        requester = create_requester(
+            system_mxid, authenticated_entity=self._server_name
+        )
 
         logger.info("Sending server notice to %s", user_id)
 
@@ -145,7 +148,9 @@ class ServerNoticesManager:
                 "avatar_url": self._config.server_notices_mxid_avatar_url,
             }
 
-        requester = create_requester(self.server_notices_mxid)
+        requester = create_requester(
+            self.server_notices_mxid, authenticated_entity=self._server_name
+        )
         info, _ = await self._room_creation_handler.create_room(
             requester,
             config={
@@ -174,7 +179,9 @@ class ServerNoticesManager:
             user_id: The ID of the user to invite.
             room_id: The ID of the room to invite the user to.
         """
-        requester = create_requester(self.server_notices_mxid)
+        requester = create_requester(
+            self.server_notices_mxid, authenticated_entity=self._server_name
+        )
 
         # Check whether the user has already joined or been invited to this room. If
         # that's the case, there is no need to re-invite them.
