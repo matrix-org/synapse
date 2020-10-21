@@ -31,7 +31,7 @@ class TerseJsonTestCase(HomeserverTestCase):
         output = StringIO()
 
         handler = logging.StreamHandler(output)
-        handler.setFormatter(TerseJsonFormatter(metadata={"server_name": "foo"}))
+        handler.setFormatter(TerseJsonFormatter())
 
         logger = logging.getLogger()
         logger.addHandler(handler)
@@ -51,7 +51,8 @@ class TerseJsonTestCase(HomeserverTestCase):
             "time",
             "level",
             "namespace",
-            "server_name",
+            # Added via LoggingContextFilter, configured in tests.test_utils.logging_setup.setup_logging.
+            "request",
         ]
         self.assertCountEqual(log.keys(), expected_log_keys)
         self.assertEqual(log["log"], "Hello there, wally!")

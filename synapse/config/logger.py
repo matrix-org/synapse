@@ -32,6 +32,7 @@ from twisted.logger import (
 import synapse
 from synapse.app import _base as appbase
 from synapse.logging.context import LoggingContextFilter
+from synapse.logging.filter import MetadataFilter
 from synapse.util.versionstring import get_version_string
 
 from ._base import Config, ConfigError
@@ -199,12 +200,14 @@ def _setup_stdlib_logging(config, log_config, logBeginner: LogBeginner) -> None:
     # filter options, but care must when using e.g. MemoryHandler to buffer
     # writes.
 
-    log_filter = LoggingContextFilter(request="")
+    log_context_filter = LoggingContextFilter(request="")
+    log_metadata_filter = MetadataFilter({"server_name": config.server_name})
     old_factory = logging.getLogRecordFactory()
 
     def factory(*args, **kwargs):
         record = old_factory(*args, **kwargs)
-        log_filter.filter(record)
+        log_context_filter.filter(record)
+        log_metadata_filter.filter(record)
         return record
 
     logging.setLogRecordFactory(factory)
