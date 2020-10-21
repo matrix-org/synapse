@@ -55,6 +55,7 @@ class SynapseRequest(Request):
         self.site = channel.site
         self._channel = channel  # this is used by the tests
         self.authenticated_entity = None
+        self.target_user = None
         self.start_time = 0.0
 
         # we can't yet create the logcontext, as we don't know the method.
@@ -268,6 +269,11 @@ class SynapseRequest(Request):
         authenticated_entity = self.authenticated_entity
         if authenticated_entity is not None and isinstance(authenticated_entity, bytes):
             authenticated_entity = authenticated_entity.decode("utf-8", "replace")
+
+        if self.target_user:
+            authenticated_entity = "{} as {}".format(
+                authenticated_entity, self.target_user,
+            )
 
         # ...or could be raw utf-8 bytes in the User-Agent header.
         # N.B. if you don't do this, the logger explodes cryptically

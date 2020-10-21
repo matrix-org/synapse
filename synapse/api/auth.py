@@ -195,6 +195,7 @@ class Auth:
             if user_id:
                 request.authenticated_entity = user_id
                 opentracing.set_tag("authenticated_entity", user_id)
+                opentracing.set_tag("target_user", user_id)
                 opentracing.set_tag("appservice_id", app_service.id)
 
                 if ip_addr and self._track_appservice_user_ips:
@@ -218,8 +219,9 @@ class Auth:
 
             # Deny the request if the user account has expired.
             if self._account_validity.enabled and not allow_expired:
-                user_id = user.to_string()
-                if await self.store.is_account_expired(user_id, self.clock.time_msec()):
+                if await self.store.is_account_expired(
+                    user_info.user_id, self.clock.time_msec()
+                ):
                     raise AuthError(
                         403, "User account has expired", errcode=Codes.EXPIRED_ACCOUNT
                     )
@@ -228,7 +230,7 @@ class Auth:
 
             if access_token and ip_addr:
                 await self.store.insert_client_ip(
-                    user_id=user.to_string(),
+                    user_id=user_info.token_owner,
                     access_token=access_token,
                     ip=ip_addr,
                     user_agent=user_agent,
@@ -242,8 +244,10 @@ class Auth:
                     errcode=Codes.GUEST_ACCESS_FORBIDDEN,
                 )
 
-            request.authenticated_entity = user.to_string()
-            opentracing.set_tag("authenticated_entity", user.to_string())
+            request.authenticated_entity = user_info.token_owner
+            request.target_user = user_info.user_id
+            opentracing.set_tag("authenticated_entity", user_info.token_owner)
+            opentracing.set_tag("target_user", user_info.user_id)
             if device_id:
                 opentracing.set_tag("device_id", device_id)
 
@@ -254,6 +258,7 @@ class Auth:
                 shadow_banned,
                 device_id,
                 app_service=app_service,
+                authenticated_entity=user_info.token_owner,
             )
         except KeyError:
             raise MissingClientTokenError()

@@ -51,6 +51,11 @@ class TokenLookupResult:
     token_id = attr.ib(type=Optional[int], default=None)
     device_id = attr.ib(type=Optional[str], default=None)
     valid_until_ms = attr.ib(type=Optional[int], default=None)
+    token_owner = attr.ib(type=str)
+
+    @token_owner.default
+    def _default_token_owner(self):
+        return self.user_id
 
 
 class RegistrationWorkerStore(CacheInvalidationWorkerStore):
@@ -353,9 +358,10 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 users.shadow_banned,
                 access_tokens.id as token_id,
                 access_tokens.device_id,
-                access_tokens.valid_until_ms
+                access_tokens.valid_until_ms,
+                access_tokens.user_id as token_owner
             FROM users
-            INNER JOIN access_tokens on users.name = access_tokens.user_id
+            INNER JOIN access_tokens on users.name = COALESCE(puppets_user_id, access_tokens.user_id)
             WHERE token = ?
         """
 

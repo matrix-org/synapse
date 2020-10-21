@@ -74,6 +74,7 @@ class Requester(
             "shadow_banned",
             "device_id",
             "app_service",
+            "authenticated_entity",
         ],
     )
 ):
@@ -104,6 +105,7 @@ class Requester(
             "shadow_banned": self.shadow_banned,
             "device_id": self.device_id,
             "app_server_id": self.app_service.id if self.app_service else None,
+            "authenticated_entity": self.authenticated_entity,
         }
 
     @staticmethod
@@ -129,6 +131,7 @@ class Requester(
             shadow_banned=input["shadow_banned"],
             device_id=input["device_id"],
             app_service=appservice,
+            authenticated_entity=input["authenticated_entity"],
         )
 
 
@@ -139,6 +142,7 @@ def create_requester(
     shadow_banned=False,
     device_id=None,
     app_service=None,
+    authenticated_entity=None,
 ):
     """
     Create a new ``Requester`` object
@@ -151,14 +155,27 @@ def create_requester(
         shadow_banned (bool):  True if the user making this request is shadow-banned.
         device_id (str|None):  device_id which was set at authentication time
         app_service (ApplicationService|None):  the AS requesting on behalf of the user
+        authenticated_entity: The entity that authenticatd when making the request,
+            this is different than the user_id when an admin user or the server is
+            "puppeting" the user.
 
     Returns:
         Requester
     """
     if not isinstance(user_id, UserID):
         user_id = UserID.from_string(user_id)
+
+    if authenticated_entity is None:
+        authenticated_entity = user_id.to_string()
+
     return Requester(
-        user_id, access_token_id, is_guest, shadow_banned, device_id, app_service
+        user_id,
+        access_token_id,
+        is_guest,
+        shadow_banned,
+        device_id,
+        app_service,
+        authenticated_entity,
     )
 
 
