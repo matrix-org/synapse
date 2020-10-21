@@ -32,10 +32,6 @@ from twisted.logger import (
 
 import synapse
 from synapse.app import _base as appbase
-from synapse.logging._structured import (
-    reload_structured_logging,
-    setup_structured_logging,
-)
 from synapse.logging.context import LoggingContextFilter
 from synapse.util.versionstring import get_version_string
 
@@ -303,14 +299,8 @@ def setup_logging(
 
     log_config_body = read_config()
 
-    if log_config_body and log_config_body.get("structured") is True:
-        logger = setup_structured_logging(
-            hs, config, log_config_body, logBeginner=logBeginner
-        )
-        appbase.register_sighup(read_config, callback=reload_structured_logging)
-    else:
-        logger = _setup_stdlib_logging(config, log_config_body, logBeginner=logBeginner)
-        appbase.register_sighup(read_config, callback=_reload_stdlib_logging)
+    logger = _setup_stdlib_logging(config, log_config_body, logBeginner=logBeginner)
+    appbase.register_sighup(read_config, callback=_reload_stdlib_logging)
 
     # make sure that the first thing we log is a thing we can grep backwards
     # for
