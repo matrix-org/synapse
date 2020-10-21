@@ -1,0 +1,38 @@
+<html>
+<head>
+<title>Authentication</title>
+<meta name='viewport' content='width=device-width, initial-scale=1,
+    user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
+<script src="https://www.recaptcha.net/recaptcha/api.js"
+    async defer></script>
+<script src="//code.jquery.com/jquery-1.11.2.min.js"></script>
+<link rel="stylesheet" href="/_matrix/static/client/register/style.css">
+<script>
+function captchaDone() {
+    $('#registrationForm').submit();
+}
+</script>
+</head>
+<body>
+<form id="registrationForm" method="post" action="{{ myurl }}">
+    <div>
+        <p>
+        Hello! We need to prevent computer programs and other automated
+        things from creating accounts on this server.
+        </p>
+        <p>
+        Please verify that you're not a robot.
+        </p>
+        <input type="hidden" name="session" value="{{ session }}" />
+        <div class="g-recaptcha"
+            data-sitekey="{{ sitekey }}"
+            data-callback="captchaDone">
+        </div>
+        <noscript>
+        <input type="submit" value="All Done" />
+        </noscript>
+        </div>
+    </div>
+</form>
+</body>
+</html>

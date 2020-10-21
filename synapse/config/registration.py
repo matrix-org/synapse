@@ -221,6 +221,11 @@ class RegistrationConfig(Config):
             session_lifetime = self.parse_duration(session_lifetime)
         self.session_lifetime = session_lifetime
 
+        # The success template used during fallback auth.
+        self.fallback_success_template = self.read_templates(
+            ["auth_success.html"], autoescape=True
+        )[0]
+
         self.bind_new_user_emails_to_sydent = config.get(
             "bind_new_user_emails_to_sydent"
         )
