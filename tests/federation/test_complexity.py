@@ -15,14 +15,13 @@
 
 from mock import Mock
 
-from twisted.internet import defer
-
 from synapse.api.errors import Codes, SynapseError
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 from synapse.types import UserID
 
 from tests import unittest
+from tests.test_utils import make_awaitable
 
 
 class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
@@ -59,7 +58,7 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
 
         # Artificially raise the complexity
         store = self.hs.get_datastore()
-        store.get_current_state_event_counts = lambda x: defer.succeed(500 * 1.23)
+        store.get_current_state_event_counts = lambda x: make_awaitable(500 * 1.23)
 
         # Get the room complexity again -- make sure it's our artificial value
         request, channel = self.make_request(
@@ -78,9 +77,40 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         fed_transport = self.hs.get_federation_transport_client()
 
         # Mock out some things, because we don't want to test the whole join
-        fed_transport.client.get_json = Mock(return_value=defer.succeed({"v1": 9999}))
+        fed_transport.client.get_json = Mock(return_value=make_awaitable({"v1": 9999}))
         handler.federation_handler.do_invite_join = Mock(
-            return_value=defer.succeed(("", 1))
+            return_value=make_awaitable(("", 1))
+        )
+
+        d = handler._remote_join(
+            None,
+            ["other.example.com"],
+            "roomid",
+            UserID.from_string(u1),
+            {"membership": "join"},
+        )
+
+        self.pump()
+
+        # The request failed with a SynapseError saying the resource limit was
+        # exceeded.
+        f = self.get_failure(d, SynapseError)
+        self.assertEqual(f.value.code, 400, f.value)
+        self.assertEqual(f.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
+
+    def test_join_too_large_admin(self):
+        # Check whether an admin can join if option "admins_can_join" is undefined,
+        # this option defaults to false, so the join should fail.
+
+        u1 = self.register_user("u1", "pass", admin=True)
+
+        handler = self.hs.get_room_member_handler()
+        fed_transport = self.hs.get_federation_transport_client()
+
+        # Mock out some things, because we don't want to test the whole join
+        fed_transport.client.get_json = Mock(return_value=make_awaitable({"v1": 9999}))
+        handler.federation_handler.do_invite_join = Mock(
+            return_value=make_awaitable(("", 1))
         )
 
         d = handler._remote_join(
@@ -116,13 +146,13 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         fed_transport = self.hs.get_federation_transport_client()
 
         # Mock out some things, because we don't want to test the whole join
-        fed_transport.client.get_json = Mock(return_value=defer.succeed(None))
+        fed_transport.client.get_json = Mock(return_value=make_awaitable(None))
         handler.federation_handler.do_invite_join = Mock(
-            return_value=defer.succeed(("", 1))
+            return_value=make_awaitable(("", 1))
         )
 
         # Artificially raise the complexity
-        self.hs.get_datastore().get_current_state_event_counts = lambda x: defer.succeed(
+        self.hs.get_datastore().get_current_state_event_counts = lambda x: make_awaitable(
             600
         )
 
@@ -141,3 +171,81 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         f = self.get_failure(d, SynapseError)
         self.assertEqual(f.value.code, 400)
         self.assertEqual(f.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
+
+
+class RoomComplexityAdminTests(unittest.FederatingHomeserverTestCase):
+    # Test the behavior of joining rooms which exceed the complexity if option
+    # limit_remote_rooms.admins_can_join is True.
+
+    servlets = [
+        admin.register_servlets,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def default_config(self):
+        config = super().default_config()
+        config["limit_remote_rooms"] = {
+            "enabled": True,
+            "complexity": 0.05,
+            "admins_can_join": True,
+        }
+        return config
+
+    def test_join_too_large_no_admin(self):
+        # A user which is not an admin should not be able to join a remote room
+        # which is too complex.
+
+        u1 = self.register_user("u1", "pass")
+
+        handler = self.hs.get_room_member_handler()
+        fed_transport = self.hs.get_federation_transport_client()
+
+        # Mock out some things, because we don't want to test the whole join
+        fed_transport.client.get_json = Mock(return_value=make_awaitable({"v1": 9999}))
+        handler.federation_handler.do_invite_join = Mock(
+            return_value=make_awaitable(("", 1))
+        )
+
+        d = handler._remote_join(
+            None,
+            ["other.example.com"],
+            "roomid",
+            UserID.from_string(u1),
+            {"membership": "join"},
+        )
+
+        self.pump()
+
+        # The request failed with a SynapseError saying the resource limit was
+        # exceeded.
+        f = self.get_failure(d, SynapseError)
+        self.assertEqual(f.value.code, 400, f.value)
+        self.assertEqual(f.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
+
+    def test_join_too_large_admin(self):
+        # An admin should be able to join rooms where a complexity check fails.
+
+        u1 = self.register_user("u1", "pass", admin=True)
+
+        handler = self.hs.get_room_member_handler()
+        fed_transport = self.hs.get_federation_transport_client()
+
+        # Mock out some things, because we don't want to test the whole join
+        fed_transport.client.get_json = Mock(return_value=make_awaitable({"v1": 9999}))
+        handler.federation_handler.do_invite_join = Mock(
+            return_value=make_awaitable(("", 1))
+        )
+
+        d = handler._remote_join(
+            None,
+            ["other.example.com"],
+            "roomid",
+            UserID.from_string(u1),
+            {"membership": "join"},
+        )
+
+        self.pump()
+
+        # The request success since the user is an admin
+        self.get_success(d)

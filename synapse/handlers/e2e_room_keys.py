@@ -29,7 +29,7 @@ from synapse.util.async_helpers import Linearizer
 logger = logging.getLogger(__name__)
 
 
-class E2eRoomKeysHandler(object):
+class E2eRoomKeysHandler:
     """
     Implements an optional realtime backup mechanism for encrypted E2E megolm room keys.
     This gives a way for users to store and recover their megolm keys if they lose all

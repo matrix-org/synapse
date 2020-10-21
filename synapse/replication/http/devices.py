@@ -53,14 +53,14 @@ class ReplicationUserDevicesResyncRestServlet(ReplicationEndpoint):
     CACHE = False
 
     def __init__(self, hs):
-        super(ReplicationUserDevicesResyncRestServlet, self).__init__(hs)
+        super().__init__(hs)
 
         self.device_list_updater = hs.get_device_handler().device_list_updater
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
 
     @staticmethod
-    def _serialize_payload(user_id):
+    async def _serialize_payload(user_id):
         return {}
 
     async def _handle_request(self, request, user_id):

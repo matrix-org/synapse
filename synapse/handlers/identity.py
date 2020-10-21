@@ -21,14 +21,6 @@ import logging
 import urllib.parse
 from typing import Awaitable, Callable, Dict, List, Optional, Tuple
 
-from canonicaljson import json
-from signedjson.key import decode_verify_key_bytes
-from signedjson.sign import verify_signed_json
-from unpaddedbase64 import decode_base64
-
-from twisted.internet import defer
-from twisted.internet.error import TimeoutError
-
 from synapse.api.errors import (
     AuthError,
     CodeMessageException,
@@ -38,8 +30,10 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.config.emailconfig import ThreepidBehaviour
+from synapse.http import RequestTimedOutError
 from synapse.http.client import SimpleHttpClient
 from synapse.types import JsonDict, Requester
+from synapse.util import json_decoder
 from synapse.util.hash import sha256_and_url_safe_base64
 from synapse.util.stringutils import assert_valid_client_secret, random_string
 
@@ -50,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 class IdentityHandler(BaseHandler):
     def __init__(self, hs):
-        super(IdentityHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.hs = hs
         self.http_client = hs.get_simple_http_client()
@@ -112,7 +106,7 @@ class IdentityHandler(BaseHandler):
 
         try:
             data = await self.http_client.get_json(url, query_params)
-        except TimeoutError:
+        except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
         except HttpResponseException as e:
             logger.info(
@@ -197,10 +191,10 @@ class IdentityHandler(BaseHandler):
             if e.code != 404 or not use_v2:
                 logger.error("3PID bind failed with Matrix error: %r", e)
                 raise e.to_synapse_error()
-        except TimeoutError:
+        except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
         except CodeMessageException as e:
-            data = json.loads(e.msg)  # XXX WAT?
+            data = json_decoder.decode(e.msg)  # XXX WAT?
             return data
 
         logger.info("Got 404 when POSTing JSON %s, falling back to v1 URL", bind_url)
@@ -304,7 +298,7 @@ class IdentityHandler(BaseHandler):
             else:
                 logger.error("Failed to unbind threepid on identity server: %s", e)
                 raise SynapseError(500, "Failed to contact identity server")
-        except TimeoutError:
+        except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
 
         await self.store.remove_user_bound_threepid(
@@ -475,7 +469,7 @@ class IdentityHandler(BaseHandler):
         except HttpResponseException as e:
             logger.info("Proxied requestToken failed: %r", e)
             raise e.to_synapse_error()
-        except TimeoutError:
+        except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
 
     async def requestMsisdnToken(
@@ -531,7 +525,7 @@ class IdentityHandler(BaseHandler):
         except HttpResponseException as e:
             logger.info("Proxied requestToken failed: %r", e)
             raise e.to_synapse_error()
-        except TimeoutError:
+        except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
 
         assert self.hs.config.public_baseurl
@@ -613,7 +607,7 @@ class IdentityHandler(BaseHandler):
                 id_server + "/_matrix/identity/api/v1/validate/msisdn/submitToken",
                 body,
             )
-        except TimeoutError:
+        except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
         except HttpResponseException as e:
             logger.warning("Error contacting msisdn account_threepid_delegate: %s", e)
@@ -623,18 +617,19 @@ class IdentityHandler(BaseHandler):
     # the CS API. They should be consolidated with those in RoomMemberHandler
     # https://github.com/matrix-org/synapse-dinsic/issues/25
 
-    @defer.inlineCallbacks
-    def proxy_lookup_3pid(self, id_server, medium, address):
+    async def proxy_lookup_3pid(
+        self, id_server: str, medium: str, address: str
+    ) -> JsonDict:
         """Looks up a 3pid in the passed identity server.
 
         Args:
-            id_server (str): The server name (including port, if required)
+            id_server: The server name (including port, if required)
                 of the identity server to use.
-            medium (str): The type of the third party identifier (e.g. "email").
-            address (str): The third party identifier (e.g. "foo@example.com").
+            medium: The type of the third party identifier (e.g. "email").
+            address: The third party identifier (e.g. "foo@example.com").
 
         Returns:
-            Deferred[dict]: The result of the lookup. See
+            The result of the lookup. See
             https://matrix.org/docs/spec/identity_service/r0.1.0.html#association-lookup
             for details
         """
@@ -646,15 +641,10 @@ class IdentityHandler(BaseHandler):
         id_server_url = self.rewrite_id_server_url(id_server, add_https=True)
 
         try:
-            data = yield self.http_client.get_json(
+            data = await self.http_client.get_json(
                 "%s/_matrix/identity/api/v1/lookup" % (id_server_url,),
                 {"medium": medium, "address": address},
             )
-
-            if "mxid" in data:
-                if "signatures" not in data:
-                    raise AuthError(401, "No signatures on 3pid binding")
-                yield self._verify_any_signature(data, id_server)
 
         except HttpResponseException as e:
             logger.info("Proxied lookup failed: %r", e)
@@ -665,18 +655,19 @@ class IdentityHandler(BaseHandler):
 
         return data
 
-    @defer.inlineCallbacks
-    def proxy_bulk_lookup_3pid(self, id_server, threepids):
+    async def proxy_bulk_lookup_3pid(
+        self, id_server: str, threepids: List[List[str]]
+    ) -> JsonDict:
         """Looks up given 3pids in the passed identity server.
 
         Args:
-            id_server (str): The server name (including port, if required)
+            id_server: The server name (including port, if required)
                 of the identity server to use.
-            threepids ([[str, str]]): The third party identifiers to lookup, as
+            threepids: The third party identifiers to lookup, as
                 a list of 2-string sized lists ([medium, address]).
 
         Returns:
-            Deferred[dict]: The result of the lookup. See
+            The result of the lookup. See
             https://matrix.org/docs/spec/identity_service/r0.1.0.html#association-lookup
             for details
         """
@@ -688,7 +679,7 @@ class IdentityHandler(BaseHandler):
         id_server_url = self.rewrite_id_server_url(id_server, add_https=True)
 
         try:
-            data = yield self.http_client.post_json_get_json(
+            data = await self.http_client.post_json_get_json(
                 "%s/_matrix/identity/api/v1/bulk_lookup" % (id_server_url,),
                 {"threepids": threepids},
             )
@@ -700,7 +691,7 @@ class IdentityHandler(BaseHandler):
             logger.info("Failed to contact %s: %s", id_server, e)
             raise ProxiedRequestError(503, "Failed to contact identity server")
 
-        defer.returnValue(data)
+        return data
 
     async def lookup_3pid(
         self,
@@ -770,11 +761,11 @@ class IdentityHandler(BaseHandler):
             )
 
             if "mxid" in data:
-                if "signatures" not in data:
-                    raise AuthError(401, "No signatures on 3pid binding")
-                await self._verify_any_signature(data, id_server)
+                # note: we used to verify the identity server's signature here, but no longer
+                # require or validate it. See the following for context:
+                # https://github.com/matrix-org/synapse/issues/5253#issuecomment-666246950
                 return data["mxid"]
-        except TimeoutError:
+        except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
         except IOError as e:
             logger.warning("Error from v1 identity server lookup: %s" % (e,))
@@ -801,7 +792,7 @@ class IdentityHandler(BaseHandler):
                 "%s/_matrix/identity/v2/hash_details" % (id_server_url,),
                 {"access_token": id_access_token},
             )
-        except TimeoutError:
+        except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
 
         if not isinstance(hash_details, dict):
@@ -872,7 +863,7 @@ class IdentityHandler(BaseHandler):
                 },
                 headers=headers,
             )
-        except TimeoutError:
+        except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
         except Exception as e:
             logger.warning("Error when performing a v2 3pid lookup: %s", e)
@@ -890,31 +881,6 @@ class IdentityHandler(BaseHandler):
         # Return the MXID if it's available, or None otherwise
         mxid = lookup_results["mappings"].get(lookup_value)
         return mxid
-
-    async def _verify_any_signature(self, data, id_server):
-        if id_server not in data["signatures"]:
-            raise AuthError(401, "No signature from server %s" % (id_server,))
-
-        for key_name, signature in data["signatures"][id_server].items():
-            id_server_url = self.rewrite_id_server_url(id_server, add_https=True)
-
-            key_data = await self.http_client.get_json(
-                "%s/_matrix/identity/api/v1/pubkey/%s" % (id_server_url, key_name)
-            )
-            if "public_key" not in key_data:
-                raise AuthError(
-                    401, "No public key named %s from %s" % (key_name, id_server)
-                )
-            verify_signed_json(
-                data,
-                id_server,
-                decode_verify_key_bytes(
-                    key_name, decode_base64(key_data["public_key"])
-                ),
-            )
-            return
-
-        raise AuthError(401, "No signature from server %s" % (id_server,))
 
     async def ask_id_server_for_third_party_invite(
         self,
@@ -995,7 +961,7 @@ class IdentityHandler(BaseHandler):
                     invite_config,
                     {"Authorization": create_id_access_token_header(id_access_token)},
                 )
-            except TimeoutError:
+            except RequestTimedOutError:
                 raise SynapseError(500, "Timed out contacting identity server")
             except HttpResponseException as e:
                 if e.code != 404:
@@ -1012,7 +978,7 @@ class IdentityHandler(BaseHandler):
                 data = await self.blacklisting_http_client.post_json_get_json(
                     url, invite_config
                 )
-            except TimeoutError:
+            except RequestTimedOutError:
                 raise SynapseError(500, "Timed out contacting identity server")
             except HttpResponseException as e:
                 logger.warning(
@@ -1068,6 +1034,9 @@ class IdentityHandler(BaseHandler):
         """
         # Extract the domain name from the IS URL as we store IS domains instead of URLs
         id_server = urllib.parse.urlparse(id_server_url).hostname
+        if not id_server:
+            # We were unable to determine the hostname, bail out
+            return
 
         # id_server_url is assumed to have no trailing slashes
         url = id_server_url + "/_matrix/identity/internal/bind"

@@ -33,14 +33,14 @@ from typing_extensions import ContextManager
 import synapse.metrics
 from synapse.api.constants import EventTypes, Membership, PresenceState
 from synapse.api.errors import SynapseError
+from synapse.api.presence import UserPresenceState
 from synapse.logging.context import run_in_background
 from synapse.logging.utils import log_function
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.state import StateHandler
-from synapse.storage.data_stores.main import DataStore
-from synapse.storage.presence import UserPresenceState
-from synapse.types import JsonDict, UserID, get_domain_from_id
+from synapse.storage.databases.main import DataStore
+from synapse.types import Collection, JsonDict, UserID, get_domain_from_id
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.descriptors import cached
 from synapse.util.metrics import Measure
@@ -319,7 +319,7 @@ class PresenceHandler(BasePresenceHandler):
         is some spurious presence changes that will self-correct.
         """
         # If the DB pool has already terminated, don't try updating
-        if not self.store.db.is_running():
+        if not self.store.db_pool.is_running():
             return
 
         logger.info(
@@ -1010,7 +1010,7 @@ def format_user_presence_state(state, now, include_user_id=True):
     return content
 
 
-class PresenceEventSource(object):
+class PresenceEventSource:
     def __init__(self, hs):
         # We can't call get_presence_handler here because there's a cycle:
         #
@@ -1107,9 +1107,6 @@ class PresenceEventSource(object):
 
     def get_current_key(self):
         return self.store.get_current_presence_token()
-
-    async def get_pagination_rows(self, user, pagination_config, key):
-        return await self.get_new_events(user, from_key=None, include_offline=False)
 
     @cached(num_args=2, cache_context=True)
     async def _get_interested_in(self, user, explicit_room_id, cache_context):
@@ -1318,7 +1315,7 @@ async def get_interested_parties(
 
 async def get_interested_remotes(
     store: DataStore, states: List[UserPresenceState], state_handler: StateHandler
-) -> List[Tuple[List[str], List[UserPresenceState]]]:
+) -> List[Tuple[Collection[str], List[UserPresenceState]]]:
     """Given a list of presence states figure out which remote servers
     should be sent which.
 
@@ -1334,7 +1331,7 @@ async def get_interested_remotes(
         each tuple the list of UserPresenceState should be sent to each
         destination
     """
-    hosts_and_states = []
+    hosts_and_states = []  # type: List[Tuple[Collection[str], List[UserPresenceState]]]
 
     # First we look up the rooms each user is in (as well as any explicit
     # subscriptions), then for each distinct room we look up the remote

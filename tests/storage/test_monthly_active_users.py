@@ -19,6 +19,7 @@ from twisted.internet import defer
 from synapse.api.constants import UserTypes
 
 from tests import unittest
+from tests.test_utils import make_awaitable
 from tests.unittest import default_config, override_config
 
 FORTY_DAYS = 40 * 24 * 60 * 60
@@ -78,7 +79,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         # XXX why are we doing this here? this function is only run at startup
         # so it is odd to re-run it here.
         self.get_success(
-            self.store.db.runInteraction(
+            self.store.db_pool.runInteraction(
                 "initialise", self.store._initialise_reserved_users, threepids
             )
         )
@@ -135,6 +136,21 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
 
         count = self.get_success(self.store.get_monthly_active_count())
         self.assertEqual(count, 1)
+
+    def test_appservice_user_not_counted_in_mau(self):
+        self.get_success(
+            self.store.register_user(
+                user_id="@appservice_user:server", appservice_id="wibble"
+            )
+        )
+        count = self.get_success(self.store.get_monthly_active_count())
+        self.assertEqual(count, 0)
+
+        d = self.store.upsert_monthly_active_user("@appservice_user:server")
+        self.get_success(d)
+
+        count = self.get_success(self.store.get_monthly_active_count())
+        self.assertEqual(count, 0)
 
     def test_user_last_seen_monthly_active(self):
         user_id1 = "@user1:server"
@@ -204,7 +220,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
                     self.store.user_add_threepid(user, "email", email, now, now)
                 )
 
-        d = self.store.db.runInteraction(
+        d = self.store.db_pool.runInteraction(
             "initialise", self.store._initialise_reserved_users, threepids
         )
         self.get_success(d)
@@ -230,7 +246,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         )
         self.get_success(d)
 
-        self.store.upsert_monthly_active_user = Mock()
+        self.store.upsert_monthly_active_user = Mock(return_value=make_awaitable(None))
 
         d = self.store.populate_monthly_active_users(user_id)
         self.get_success(d)
@@ -238,7 +254,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.store.upsert_monthly_active_user.assert_not_called()
 
     def test_populate_monthly_users_should_update(self):
-        self.store.upsert_monthly_active_user = Mock()
+        self.store.upsert_monthly_active_user = Mock(return_value=make_awaitable(None))
 
         self.store.is_trial_user = Mock(return_value=defer.succeed(False))
 
@@ -251,7 +267,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.store.upsert_monthly_active_user.assert_called_once()
 
     def test_populate_monthly_users_should_not_update(self):
-        self.store.upsert_monthly_active_user = Mock()
+        self.store.upsert_monthly_active_user = Mock(return_value=make_awaitable(None))
 
         self.store.is_trial_user = Mock(return_value=defer.succeed(False))
         self.store.user_last_seen_monthly_active = Mock(
@@ -280,7 +296,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         ]
 
         self.hs.config.mau_limits_reserved_threepids = threepids
-        d = self.store.db.runInteraction(
+        d = self.store.db_pool.runInteraction(
             "initialise", self.store._initialise_reserved_users, threepids
         )
         self.get_success(d)
@@ -293,8 +309,12 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.get_success(self.store.register_user(user_id=user2, password_hash=None))
 
         now = int(self.hs.get_clock().time_msec())
-        self.store.user_add_threepid(user1, "email", user1_email, now, now)
-        self.store.user_add_threepid(user2, "email", user2_email, now, now)
+        self.get_success(
+            self.store.user_add_threepid(user1, "email", user1_email, now, now)
+        )
+        self.get_success(
+            self.store.user_add_threepid(user2, "email", user2_email, now, now)
+        )
 
         users = self.get_success(self.store.get_registered_reserved_users())
         self.assertEqual(len(users), len(threepids))
@@ -333,7 +353,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
 
     @override_config({"limit_usage_by_mau": False, "mau_stats_only": False})
     def test_no_users_when_not_tracking(self):
-        self.store.upsert_monthly_active_user = Mock()
+        self.store.upsert_monthly_active_user = Mock(return_value=make_awaitable(None))
 
         self.get_success(self.store.populate_monthly_active_users("@user:sever"))
 
@@ -378,7 +398,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.get_success(self.store.upsert_monthly_active_user(appservice2_user1))
 
         count = self.get_success(self.store.get_monthly_active_count())
-        self.assertEqual(count, 4)
+        self.assertEqual(count, 1)
 
         d = self.store.get_monthly_active_count_by_service()
         result = self.get_success(d)

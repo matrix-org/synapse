@@ -15,8 +15,7 @@
 
 from mock import Mock
 
-from twisted.internet import defer
-
+from synapse.api.auth import Auth
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, ResourceLimitError, SynapseError
 from synapse.handlers.register import RegistrationHandler
@@ -25,15 +24,18 @@ from synapse.rest.client.v2_alpha.register import (
     _map_email_to_displayname,
     register_servlets,
 )
+from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.types import RoomAlias, UserID, create_requester
 
 from tests.server import FakeChannel
+from tests.test_utils import make_awaitable
 from tests.unittest import override_config
+from tests.utils import mock_getRawHeaders
 
 from .. import unittest
 
 
-class RegistrationHandlers(object):
+class RegistrationHandlers:
     def __init__(self, hs):
         self.registration_handler = RegistrationHandler(hs)
 
@@ -108,7 +110,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     def test_get_or_create_user_mau_not_blocked(self):
         self.hs.config.limit_usage_by_mau = True
         self.store.count_monthly_users = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value - 1)
+            return_value=make_awaitable(self.hs.config.max_mau_value - 1)
         )
         # Ensure does not throw exception
         self.get_success(self.get_or_create_user(self.requester, "c", "User"))
@@ -116,7 +118,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     def test_get_or_create_user_mau_blocked(self):
         self.hs.config.limit_usage_by_mau = True
         self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.lots_of_users)
+            return_value=make_awaitable(self.lots_of_users)
         )
         self.get_failure(
             self.get_or_create_user(self.requester, "b", "display_name"),
@@ -124,7 +126,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         )
 
         self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value)
+            return_value=make_awaitable(self.hs.config.max_mau_value)
         )
         self.get_failure(
             self.get_or_create_user(self.requester, "b", "display_name"),
@@ -134,14 +136,14 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     def test_register_mau_blocked(self):
         self.hs.config.limit_usage_by_mau = True
         self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.lots_of_users)
+            return_value=make_awaitable(self.lots_of_users)
         )
         self.get_failure(
             self.handler.register_user(localpart="local_part"), ResourceLimitError
         )
 
         self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value)
+            return_value=make_awaitable(self.hs.config.max_mau_value)
         )
         self.get_failure(
             self.handler.register_user(localpart="local_part"), ResourceLimitError
@@ -197,7 +199,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         room_alias_str = "#room:test"
         self.hs.config.auto_join_rooms = [room_alias_str]
 
-        self.store.is_real_user = Mock(return_value=defer.succeed(False))
+        self.store.is_real_user = Mock(return_value=make_awaitable(False))
         user_id = self.get_success(self.handler.register_user(localpart="support"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
@@ -209,8 +211,8 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     def test_auto_create_auto_join_rooms_when_user_is_the_first_real_user(self):
         room_alias_str = "#room:test"
 
-        self.store.count_real_users = Mock(return_value=defer.succeed(1))
-        self.store.is_real_user = Mock(return_value=defer.succeed(True))
+        self.store.count_real_users = Mock(return_value=make_awaitable(1))
+        self.store.is_real_user = Mock(return_value=make_awaitable(True))
         user_id = self.get_success(self.handler.register_user(localpart="real"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         directory_handler = self.hs.get_handlers().directory_handler
@@ -224,8 +226,8 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         room_alias_str = "#room:test"
         self.hs.config.auto_join_rooms = [room_alias_str]
 
-        self.store.count_real_users = Mock(return_value=defer.succeed(2))
-        self.store.is_real_user = Mock(return_value=defer.succeed(True))
+        self.store.count_real_users = Mock(return_value=make_awaitable(2))
+        self.store.is_real_user = Mock(return_value=make_awaitable(True))
         user_id = self.get_success(self.handler.register_user(localpart="real"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
@@ -484,6 +486,53 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             self.handler.register_user(localpart=invalid_user_id), SynapseError
         )
 
+    def test_spam_checker_deny(self):
+        """A spam checker can deny registration, which results in an error."""
+
+        class DenyAll:
+            def check_registration_for_spam(
+                self, email_threepid, username, request_info
+            ):
+                return RegistrationBehaviour.DENY
+
+        # Configure a spam checker that denies all users.
+        spam_checker = self.hs.get_spam_checker()
+        spam_checker.spam_checkers = [DenyAll()]
+
+        self.get_failure(self.handler.register_user(localpart="user"), SynapseError)
+
+    def test_spam_checker_shadow_ban(self):
+        """A spam checker can choose to shadow-ban a user, which allows registration to succeed."""
+
+        class BanAll:
+            def check_registration_for_spam(
+                self, email_threepid, username, request_info
+            ):
+                return RegistrationBehaviour.SHADOW_BAN
+
+        # Configure a spam checker that denies all users.
+        spam_checker = self.hs.get_spam_checker()
+        spam_checker.spam_checkers = [BanAll()]
+
+        user_id = self.get_success(self.handler.register_user(localpart="user"))
+
+        # Get an access token.
+        token = self.macaroon_generator.generate_access_token(user_id)
+        self.get_success(
+            self.store.add_access_token_to_user(
+                user_id=user_id, token=token, device_id=None, valid_until_ms=None
+            )
+        )
+
+        # Ensure the user was marked as shadow-banned.
+        request = Mock(args={})
+        request.args[b"access_token"] = [token.encode("ascii")]
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
+        auth = Auth(self.hs)
+        requester = self.get_success(auth.get_user_by_req(request))
+
+        self.assertTrue(requester.shadow_banned)
+
     def test_email_to_displayname_mapping(self):
         """Test that custom emails are mapped to new user displaynames correctly"""
         self._check_mapping(
@@ -527,16 +576,16 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
         # Mock Synapse's threepid validator
         get_threepid_validation_session = Mock(
-            return_value=defer.succeed(
+            return_value=make_awaitable(
                 {"medium": "email", "address": email, "validated_at": 0}
             )
         )
         self.store.get_threepid_validation_session = get_threepid_validation_session
-        delete_threepid_session = Mock(return_value=defer.succeed(None))
+        delete_threepid_session = Mock(return_value=make_awaitable(None))
         self.store.delete_threepid_session = delete_threepid_session
 
         # Mock Synapse's http json post method to check for the internal bind call
-        post_json_get_json = Mock(return_value=defer.succeed(None))
+        post_json_get_json = Mock(return_value=make_awaitable(None))
         self.hs.get_simple_http_client().post_json_get_json = post_json_get_json
 
         # Retrieve a UIA session ID

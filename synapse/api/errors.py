@@ -22,9 +22,9 @@ import typing
 from http import HTTPStatus
 from typing import Dict, List, Optional, Union
 
-from canonicaljson import json
-
 from twisted.web import http
+
+from synapse.util import json_decoder
 
 if typing.TYPE_CHECKING:
     from synapse.types import JsonDict
@@ -32,7 +32,7 @@ if typing.TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class Codes(object):
+class Codes:
     UNRECOGNIZED = "M_UNRECOGNIZED"
     UNAUTHORIZED = "M_UNAUTHORIZED"
     FORBIDDEN = "M_FORBIDDEN"
@@ -88,7 +88,7 @@ class CodeMessageException(RuntimeError):
     """
 
     def __init__(self, code: Union[int, HTTPStatus], msg: str):
-        super(CodeMessageException, self).__init__("%d: %s" % (code, msg))
+        super().__init__("%d: %s" % (code, msg))
 
         # Some calls to this method pass instances of http.HTTPStatus for `code`.
         # While HTTPStatus is a subclass of int, it has magic __str__ methods
@@ -139,7 +139,7 @@ class SynapseError(CodeMessageException):
             msg: The human-readable error message.
             errcode: The matrix error code e.g 'M_FORBIDDEN'
         """
-        super(SynapseError, self).__init__(code, msg)
+        super().__init__(code, msg)
         self.errcode = errcode
 
     def error_dict(self):
@@ -160,7 +160,7 @@ class ProxiedRequestError(SynapseError):
         errcode: str = Codes.UNKNOWN,
         additional_fields: Optional[Dict] = None,
     ):
-        super(ProxiedRequestError, self).__init__(code, msg, errcode)
+        super().__init__(code, msg, errcode)
         if additional_fields is None:
             self._additional_fields = {}  # type: Dict
         else:
@@ -182,7 +182,7 @@ class ConsentNotGivenError(SynapseError):
             msg: The human-readable error message
             consent_url: The URL where the user can give their consent
         """
-        super(ConsentNotGivenError, self).__init__(
+        super().__init__(
             code=HTTPStatus.FORBIDDEN, msg=msg, errcode=Codes.CONSENT_NOT_GIVEN
         )
         self._consent_uri = consent_uri
@@ -202,7 +202,7 @@ class UserDeactivatedError(SynapseError):
         Args:
             msg: The human-readable error message
         """
-        super(UserDeactivatedError, self).__init__(
+        super().__init__(
             code=HTTPStatus.FORBIDDEN, msg=msg, errcode=Codes.USER_DEACTIVATED
         )
 
@@ -226,7 +226,7 @@ class FederationDeniedError(SynapseError):
 
         self.destination = destination
 
-        super(FederationDeniedError, self).__init__(
+        super().__init__(
             code=403,
             msg="Federation denied with %s." % (self.destination,),
             errcode=Codes.FORBIDDEN,
@@ -239,14 +239,14 @@ class InteractiveAuthIncompleteError(Exception):
     (This indicates we should return a 401 with 'result' as the body)
 
     Attributes:
+        session_id: The ID of the ongoing interactive auth session.
         result: the server response to the request, which should be
             passed back to the client
     """
 
-    def __init__(self, result: "JsonDict"):
-        super(InteractiveAuthIncompleteError, self).__init__(
-            "Interactive auth not yet complete"
-        )
+    def __init__(self, session_id: str, result: "JsonDict"):
+        super().__init__("Interactive auth not yet complete")
+        self.session_id = session_id
         self.result = result
 
 
@@ -260,14 +260,14 @@ class UnrecognizedRequestError(SynapseError):
             message = "Unrecognized request"
         else:
             message = args[0]
-        super(UnrecognizedRequestError, self).__init__(400, message, **kwargs)
+        super().__init__(400, message, **kwargs)
 
 
 class NotFoundError(SynapseError):
     """An error indicating we can't find the thing you asked for"""
 
     def __init__(self, msg: str = "Not found", errcode: str = Codes.NOT_FOUND):
-        super(NotFoundError, self).__init__(404, msg, errcode=errcode)
+        super().__init__(404, msg, errcode=errcode)
 
 
 class AuthError(SynapseError):
@@ -278,7 +278,7 @@ class AuthError(SynapseError):
     def __init__(self, *args, **kwargs):
         if "errcode" not in kwargs:
             kwargs["errcode"] = Codes.FORBIDDEN
-        super(AuthError, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
 
 class InvalidClientCredentialsError(SynapseError):
@@ -334,7 +334,7 @@ class ResourceLimitError(SynapseError):
     ):
         self.admin_contact = admin_contact
         self.limit_type = limit_type
-        super(ResourceLimitError, self).__init__(code, msg, errcode=errcode)
+        super().__init__(code, msg, errcode=errcode)
 
     def error_dict(self):
         return cs_error(
@@ -351,7 +351,7 @@ class EventSizeError(SynapseError):
     def __init__(self, *args, **kwargs):
         if "errcode" not in kwargs:
             kwargs["errcode"] = Codes.TOO_LARGE
-        super(EventSizeError, self).__init__(413, *args, **kwargs)
+        super().__init__(413, *args, **kwargs)
 
 
 class EventStreamError(SynapseError):
@@ -360,7 +360,7 @@ class EventStreamError(SynapseError):
     def __init__(self, *args, **kwargs):
         if "errcode" not in kwargs:
             kwargs["errcode"] = Codes.BAD_PAGINATION
-        super(EventStreamError, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
 
 class LoginError(SynapseError):
@@ -383,7 +383,7 @@ class InvalidCaptchaError(SynapseError):
         error_url: Optional[str] = None,
         errcode: str = Codes.CAPTCHA_INVALID,
     ):
-        super(InvalidCaptchaError, self).__init__(code, msg, errcode)
+        super().__init__(code, msg, errcode)
         self.error_url = error_url
 
     def error_dict(self):
@@ -401,7 +401,7 @@ class LimitExceededError(SynapseError):
         retry_after_ms: Optional[int] = None,
         errcode: str = Codes.LIMIT_EXCEEDED,
     ):
-        super(LimitExceededError, self).__init__(code, msg, errcode)
+        super().__init__(code, msg, errcode)
         self.retry_after_ms = retry_after_ms
 
     def error_dict(self):
@@ -417,9 +417,7 @@ class RoomKeysVersionError(SynapseError):
         Args:
             current_version: the current version of the store they should have used
         """
-        super(RoomKeysVersionError, self).__init__(
-            403, "Wrong room_keys version", Codes.WRONG_ROOM_KEYS_VERSION
-        )
+        super().__init__(403, "Wrong room_keys version", Codes.WRONG_ROOM_KEYS_VERSION)
         self.current_version = current_version
 
 
@@ -428,7 +426,7 @@ class UnsupportedRoomVersionError(SynapseError):
     not support."""
 
     def __init__(self, msg: str = "Homeserver does not support this room version"):
-        super(UnsupportedRoomVersionError, self).__init__(
+        super().__init__(
             code=400, msg=msg, errcode=Codes.UNSUPPORTED_ROOM_VERSION,
         )
 
@@ -439,7 +437,7 @@ class ThreepidValidationError(SynapseError):
     def __init__(self, *args, **kwargs):
         if "errcode" not in kwargs:
             kwargs["errcode"] = Codes.FORBIDDEN
-        super(ThreepidValidationError, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
 
 class IncompatibleRoomVersionError(SynapseError):
@@ -450,7 +448,7 @@ class IncompatibleRoomVersionError(SynapseError):
     """
 
     def __init__(self, room_version: str):
-        super(IncompatibleRoomVersionError, self).__init__(
+        super().__init__(
             code=400,
             msg="Your homeserver does not support the features required to "
             "join this room",
@@ -472,7 +470,7 @@ class PasswordRefusedError(SynapseError):
         msg: str = "This password doesn't comply with the server's policy",
         errcode: str = Codes.WEAK_PASSWORD,
     ):
-        super(PasswordRefusedError, self).__init__(
+        super().__init__(
             code=400, msg=msg, errcode=errcode,
         )
 
@@ -487,7 +485,7 @@ class RequestSendFailed(RuntimeError):
     """
 
     def __init__(self, inner_exception, can_retry):
-        super(RequestSendFailed, self).__init__(
+        super().__init__(
             "Failed to send request: %s: %s"
             % (type(inner_exception).__name__, inner_exception)
         )
@@ -541,7 +539,7 @@ class FederationError(RuntimeError):
         self.source = source
 
         msg = "%s %s: %s" % (level, code, reason)
-        super(FederationError, self).__init__(msg)
+        super().__init__(msg)
 
     def get_dict(self):
         return {
@@ -569,7 +567,7 @@ class HttpResponseException(CodeMessageException):
             msg: reason phrase from HTTP response status line
             response: body of response
         """
-        super(HttpResponseException, self).__init__(code, msg)
+        super().__init__(code, msg)
         self.response = response
 
     def to_synapse_error(self):
@@ -592,7 +590,7 @@ class HttpResponseException(CodeMessageException):
         # try to parse the body as json, to get better errcode/msg, but
         # default to M_UNKNOWN with the HTTP status as the error text
         try:
-            j = json.loads(self.response.decode("utf-8"))
+            j = json_decoder.decode(self.response.decode("utf-8"))
         except ValueError:
             j = {}
 
@@ -603,3 +601,11 @@ class HttpResponseException(CodeMessageException):
         errmsg = j.pop("error", self.msg)
 
         return ProxiedRequestError(self.code, errmsg, errcode, j)
+
+
+class ShadowBanError(Exception):
+    """
+    Raised when a shadow-banned user attempts to perform an action.
+
+    This should be caught and a proper "fake" success response sent to the user.
+    """

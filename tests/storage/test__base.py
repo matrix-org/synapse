@@ -99,7 +99,7 @@ class CacheTestCase(unittest.HomeserverTestCase):
 class CacheDecoratorTestCase(unittest.HomeserverTestCase):
     @defer.inlineCallbacks
     def test_passthrough(self):
-        class A(object):
+        class A:
             @cached()
             def func(self, key):
                 return key
@@ -113,7 +113,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
     def test_hit(self):
         callcount = [0]
 
-        class A(object):
+        class A:
             @cached()
             def func(self, key):
                 callcount[0] += 1
@@ -131,7 +131,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
     def test_invalidate(self):
         callcount = [0]
 
-        class A(object):
+        class A:
             @cached()
             def func(self, key):
                 callcount[0] += 1
@@ -149,7 +149,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
         self.assertEquals(callcount[0], 2)
 
     def test_invalidate_missing(self):
-        class A(object):
+        class A:
             @cached()
             def func(self, key):
                 return key
@@ -160,7 +160,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
     def test_max_entries(self):
         callcount = [0]
 
-        class A(object):
+        class A:
             @cached(max_entries=10)
             def func(self, key):
                 callcount[0] += 1
@@ -187,7 +187,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
 
         d = defer.succeed(123)
 
-        class A(object):
+        class A:
             @cached()
             def func(self, key):
                 callcount[0] += 1
@@ -205,7 +205,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
         callcount = [0]
         callcount2 = [0]
 
-        class A(object):
+        class A:
             @cached()
             def func(self, key):
                 callcount[0] += 1
@@ -238,7 +238,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
         callcount = [0]
         callcount2 = [0]
 
-        class A(object):
+        class A:
             @cached(max_entries=2)
             def func(self, key):
                 callcount[0] += 1
@@ -275,7 +275,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
         callcount = [0]
         callcount2 = [0]
 
-        class A(object):
+        class A:
             @cached()
             def func(self, key):
                 callcount[0] += 1
@@ -323,7 +323,7 @@ class UpsertManyTests(unittest.HomeserverTestCase):
 
         self.table_name = "table_" + hs.get_secrets().token_hex(6)
         self.get_success(
-            self.storage.db.runInteraction(
+            self.storage.db_pool.runInteraction(
                 "create",
                 lambda x, *a: x.execute(*a),
                 "CREATE TABLE %s (id INTEGER, username TEXT, value TEXT)"
@@ -331,7 +331,7 @@ class UpsertManyTests(unittest.HomeserverTestCase):
             )
         )
         self.get_success(
-            self.storage.db.runInteraction(
+            self.storage.db_pool.runInteraction(
                 "index",
                 lambda x, *a: x.execute(*a),
                 "CREATE UNIQUE INDEX %sindex ON %s(id, username)"
@@ -354,9 +354,9 @@ class UpsertManyTests(unittest.HomeserverTestCase):
         value_values = [["hello"], ["there"]]
 
         self.get_success(
-            self.storage.db.runInteraction(
+            self.storage.db_pool.runInteraction(
                 "test",
-                self.storage.db.simple_upsert_many_txn,
+                self.storage.db_pool.simple_upsert_many_txn,
                 self.table_name,
                 key_names,
                 key_values,
@@ -367,7 +367,7 @@ class UpsertManyTests(unittest.HomeserverTestCase):
 
         # Check results are what we expect
         res = self.get_success(
-            self.storage.db.simple_select_list(
+            self.storage.db_pool.simple_select_list(
                 self.table_name, None, ["id, username, value"]
             )
         )
@@ -381,9 +381,9 @@ class UpsertManyTests(unittest.HomeserverTestCase):
         value_values = [["bleb"]]
 
         self.get_success(
-            self.storage.db.runInteraction(
+            self.storage.db_pool.runInteraction(
                 "test",
-                self.storage.db.simple_upsert_many_txn,
+                self.storage.db_pool.simple_upsert_many_txn,
                 self.table_name,
                 key_names,
                 key_values,
@@ -394,7 +394,7 @@ class UpsertManyTests(unittest.HomeserverTestCase):
 
         # Check results are what we expect
         res = self.get_success(
-            self.storage.db.simple_select_list(
+            self.storage.db_pool.simple_select_list(
                 self.table_name, None, ["id, username, value"]
             )
         )

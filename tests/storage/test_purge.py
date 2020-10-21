@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
+
+from synapse.api.errors import NotFoundError
 from synapse.rest.client.v1 import room
 
 from tests.unittest import HomeserverTestCase
@@ -44,28 +47,22 @@ class PurgeTests(HomeserverTestCase):
         storage = self.hs.get_storage()
 
         # Get the topological token
-        event = store.get_topological_token_for_event(last["event_id"])
-        self.pump()
-        event = self.successResultOf(event)
+        token = self.get_success(
+            store.get_topological_token_for_event(last["event_id"])
+        )
+        token_str = self.get_success(token.to_string(self.hs.get_datastore()))
 
         # Purge everything before this topological token
-        purge = storage.purge_events.purge_history(self.room_id, event, True)
-        self.pump()
-        self.assertEqual(self.successResultOf(purge), None)
-
-        # Try and get the events
-        get_first = store.get_event(first["event_id"])
-        get_second = store.get_event(second["event_id"])
-        get_third = store.get_event(third["event_id"])
-        get_last = store.get_event(last["event_id"])
-        self.pump()
+        self.get_success(
+            storage.purge_events.purge_history(self.room_id, token_str, True)
+        )
 
         # 1-3 should fail and last will succeed, meaning that 1-3 are deleted
         # and last is not.
-        self.failureResultOf(get_first)
-        self.failureResultOf(get_second)
-        self.failureResultOf(get_third)
-        self.successResultOf(get_last)
+        self.get_failure(store.get_event(first["event_id"]), NotFoundError)
+        self.get_failure(store.get_event(second["event_id"]), NotFoundError)
+        self.get_failure(store.get_event(third["event_id"]), NotFoundError)
+        self.get_success(store.get_event(last["event_id"]))
 
     def test_purge_wont_delete_extrems(self):
         """
@@ -80,28 +77,19 @@ class PurgeTests(HomeserverTestCase):
         storage = self.hs.get_datastore()
 
         # Set the topological token higher than it should be
-        event = storage.get_topological_token_for_event(last["event_id"])
-        self.pump()
-        event = self.successResultOf(event)
-        event = "t{}-{}".format(
-            *list(map(lambda x: x + 1, map(int, event[1:].split("-"))))
+        token = self.get_success(
+            storage.get_topological_token_for_event(last["event_id"])
         )
+        event = "t{}-{}".format(token.topological + 1, token.stream + 1)
 
         # Purge everything before this topological token
-        purge = storage.purge_history(self.room_id, event, True)
+        purge = defer.ensureDeferred(storage.purge_history(self.room_id, event, True))
         self.pump()
         f = self.failureResultOf(purge)
         self.assertIn("greater than forward", f.value.args[0])
 
         # Try and get the events
-        get_first = storage.get_event(first["event_id"])
-        get_second = storage.get_event(second["event_id"])
-        get_third = storage.get_event(third["event_id"])
-        get_last = storage.get_event(last["event_id"])
-        self.pump()
-
-        # Nothing is deleted.
-        self.successResultOf(get_first)
-        self.successResultOf(get_second)
-        self.successResultOf(get_third)
-        self.successResultOf(get_last)
+        self.get_success(storage.get_event(first["event_id"]))
+        self.get_success(storage.get_event(second["event_id"]))
+        self.get_success(storage.get_event(third["event_id"]))
+        self.get_success(storage.get_event(last["event_id"]))

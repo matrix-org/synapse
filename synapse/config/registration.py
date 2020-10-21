@@ -30,7 +30,7 @@ class AccountValidityConfig(Config):
     def __init__(self, config, synapse_config):
         if config is None:
             return
-        super(AccountValidityConfig, self).__init__()
+        super().__init__()
         self.enabled = config.get("enabled", False)
         self.renew_by_email_enabled = "renew_at" in config
 
@@ -220,6 +220,11 @@ class RegistrationConfig(Config):
         if session_lifetime is not None:
             session_lifetime = self.parse_duration(session_lifetime)
         self.session_lifetime = session_lifetime
+
+        # The success template used during fallback auth.
+        self.fallback_success_template = self.read_templates(
+            ["auth_success.html"], autoescape=True
+        )[0]
 
         self.bind_new_user_emails_to_sydent = config.get(
             "bind_new_user_emails_to_sydent"
@@ -411,24 +416,6 @@ class RegistrationConfig(Config):
         # This setting is ignored unless public_baseurl is also set.)
         #
         #default_identity_server: https://matrix.org
-
-        # The list of identity servers trusted to verify third party
-        # identifiers by this server.
-        #
-        # Also defines the ID server which will be called when an account is
-        # deactivated (one will be picked arbitrarily).
-        #
-        # Note: This option is deprecated. Since v0.99.4, Synapse has tracked which identity
-        # server a 3PID has been bound to. For 3PIDs bound before then, Synapse runs a
-        # background migration script, informing itself that the identity server all of its
-        # 3PIDs have been bound to is likely one of the below.
-        #
-        # As of Synapse v1.4.0, all other functionality of this option has been deprecated, and
-        # it is now solely used for the purposes of the background migration script, and can be
-        # removed once it has run.
-        #trusted_third_party_id_servers:
-        #  - matrix.org
-        #  - vector.im
 
         # If enabled, user IDs, display names and avatar URLs will be replicated
         # to this server whenever they change.

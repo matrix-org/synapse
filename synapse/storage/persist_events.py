@@ -18,20 +18,20 @@
 import itertools
 import logging
 from collections import deque, namedtuple
-from typing import Iterable, List, Optional, Set, Tuple
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 from prometheus_client import Counter, Histogram
 
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.events import FrozenEvent
+from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.storage.data_stores import DataStores
-from synapse.storage.data_stores.main.events import DeltaState
-from synapse.types import StateMap
+from synapse.storage.databases import Databases
+from synapse.storage.databases.main.events import DeltaState
+from synapse.types import Collection, PersistedEventPosition, RoomStreamToken, StateMap
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.metrics import Measure
 
@@ -69,7 +69,7 @@ stale_forward_extremities_counter = Histogram(
 )
 
 
-class _EventPeristenceQueue(object):
+class _EventPeristenceQueue:
     """Queues up events so that they can be persisted in bulk with only one
     concurrent transaction per room.
     """
@@ -172,32 +172,34 @@ class _EventPeristenceQueue(object):
             pass
 
 
-class EventsPersistenceStorage(object):
+class EventsPersistenceStorage:
     """High level interface for handling persisting newly received events.
 
     Takes care of batching up events by room, and calculating the necessary
     current state and forward extremity changes.
     """
 
-    def __init__(self, hs, stores: DataStores):
+    def __init__(self, hs, stores: Databases):
         # We ultimately want to split out the state store from the main store,
         # so we use separate variables here even though they point to the same
         # store for now.
         self.main_store = stores.main
         self.state_store = stores.state
+
+        assert stores.persist_events
         self.persist_events_store = stores.persist_events
 
         self._clock = hs.get_clock()
+        self._instance_name = hs.get_instance_name()
         self.is_mine_id = hs.is_mine_id
         self._event_persist_queue = _EventPeristenceQueue()
         self._state_resolution_handler = hs.get_state_resolution_handler()
 
-    @defer.inlineCallbacks
-    def persist_events(
+    async def persist_events(
         self,
-        events_and_contexts: List[Tuple[FrozenEvent, EventContext]],
+        events_and_contexts: Iterable[Tuple[EventBase, EventContext]],
         backfilled: bool = False,
-    ):
+    ) -> RoomStreamToken:
         """
         Write events to the database
         Args:
@@ -207,9 +209,9 @@ class EventsPersistenceStorage(object):
                 which might update the current state etc.
 
         Returns:
-            Deferred[int]: the stream ordering of the latest persisted event
+            the stream ordering of the latest persisted event
         """
-        partitioned = {}
+        partitioned = {}  # type: Dict[str, List[Tuple[EventBase, EventContext]]]
         for event, ctx in events_and_contexts:
             partitioned.setdefault(event.room_id, []).append((event, ctx))
 
@@ -223,22 +225,19 @@ class EventsPersistenceStorage(object):
         for room_id in partitioned:
             self._maybe_start_persisting(room_id)
 
-        yield make_deferred_yieldable(
+        await make_deferred_yieldable(
             defer.gatherResults(deferreds, consumeErrors=True)
         )
 
-        max_persisted_id = yield self.main_store.get_current_events_token()
+        return self.main_store.get_room_max_token()
 
-        return max_persisted_id
-
-    @defer.inlineCallbacks
-    def persist_event(
-        self, event: FrozenEvent, context: EventContext, backfilled: bool = False
-    ):
+    async def persist_event(
+        self, event: EventBase, context: EventContext, backfilled: bool = False
+    ) -> Tuple[PersistedEventPosition, RoomStreamToken]:
         """
         Returns:
-            Deferred[Tuple[int, int]]: the stream ordering of ``event``,
-            and the stream ordering of the latest persisted event
+            The stream ordering of `event`, and the stream ordering of the
+            latest persisted event
         """
         deferred = self._event_persist_queue.add_to_queue(
             event.room_id, [(event, context)], backfilled=backfilled
@@ -246,10 +245,12 @@ class EventsPersistenceStorage(object):
 
         self._maybe_start_persisting(event.room_id)
 
-        yield make_deferred_yieldable(deferred)
+        await make_deferred_yieldable(deferred)
 
-        max_persisted_id = yield self.main_store.get_current_events_token()
-        return (event.internal_metadata.stream_ordering, max_persisted_id)
+        event_stream_id = event.internal_metadata.stream_ordering
+
+        pos = PersistedEventPosition(self._instance_name, event_stream_id)
+        return pos, self.main_store.get_room_max_token()
 
     def _maybe_start_persisting(self, room_id: str):
         async def persisting_queue(item):
@@ -262,7 +263,7 @@ class EventsPersistenceStorage(object):
 
     async def _persist_events(
         self,
-        events_and_contexts: List[Tuple[FrozenEvent, EventContext]],
+        events_and_contexts: List[Tuple[EventBase, EventContext]],
         backfilled: bool = False,
     ):
         """Calculates the change to current state and forward extremities, and
@@ -309,7 +310,9 @@ class EventsPersistenceStorage(object):
                     # Work out the new "current state" for each room.
                     # We do this by working out what the new extremities are and then
                     # calculating the state from that.
-                    events_by_room = {}
+                    events_by_room = (
+                        {}
+                    )  # type: Dict[str, List[Tuple[EventBase, EventContext]]]
                     for event, context in chunk:
                         events_by_room.setdefault(event.room_id, []).append(
                             (event, context)
@@ -439,8 +442,8 @@ class EventsPersistenceStorage(object):
     async def _calculate_new_extremities(
         self,
         room_id: str,
-        event_contexts: List[Tuple[FrozenEvent, EventContext]],
-        latest_event_ids: List[str],
+        event_contexts: List[Tuple[EventBase, EventContext]],
+        latest_event_ids: Collection[str],
     ):
         """Calculates the new forward extremities for a room given events to
         persist.
@@ -474,7 +477,7 @@ class EventsPersistenceStorage(object):
         # Remove any events which are prev_events of any existing events.
         existing_prevs = await self.persist_events_store._get_events_which_are_prevs(
             result
-        )
+        )  # type: Collection[str]
         result.difference_update(existing_prevs)
 
         # Finally handle the case where the new events have soft-failed prev
@@ -497,7 +500,7 @@ class EventsPersistenceStorage(object):
     async def _get_new_state_after_events(
         self,
         room_id: str,
-        events_context: List[Tuple[FrozenEvent, EventContext]],
+        events_context: List[Tuple[EventBase, EventContext]],
         old_latest_event_ids: Iterable[str],
         new_latest_event_ids: Iterable[str],
     ) -> Tuple[Optional[StateMap[str]], Optional[StateMap[str]]]:
@@ -683,7 +686,7 @@ class EventsPersistenceStorage(object):
     async def _is_server_still_joined(
         self,
         room_id: str,
-        ev_ctx_rm: List[Tuple[FrozenEvent, EventContext]],
+        ev_ctx_rm: List[Tuple[EventBase, EventContext]],
         delta: DeltaState,
         current_state: Optional[StateMap[str]],
         potentially_left_users: Set[str],

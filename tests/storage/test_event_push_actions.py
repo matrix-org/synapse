@@ -39,14 +39,18 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_unread_push_actions_for_user_in_range_for_http(self):
-        yield self.store.get_unread_push_actions_for_user_in_range_for_http(
-            USER_ID, 0, 1000, 20
+        yield defer.ensureDeferred(
+            self.store.get_unread_push_actions_for_user_in_range_for_http(
+                USER_ID, 0, 1000, 20
+            )
         )
 
     @defer.inlineCallbacks
     def test_get_unread_push_actions_for_user_in_range_for_email(self):
-        yield self.store.get_unread_push_actions_for_user_in_range_for_email(
-            USER_ID, 0, 1000, 20
+        yield defer.ensureDeferred(
+            self.store.get_unread_push_actions_for_user_in_range_for_email(
+                USER_ID, 0, 1000, 20
+            )
         )
 
     @defer.inlineCallbacks
@@ -56,12 +60,18 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
 
         @defer.inlineCallbacks
         def _assert_counts(noitf_count, highlight_count):
-            counts = yield self.store.db.runInteraction(
-                "", self.store._get_unread_counts_by_pos_txn, room_id, user_id, 0
+            counts = yield defer.ensureDeferred(
+                self.store.db_pool.runInteraction(
+                    "", self.store._get_unread_counts_by_pos_txn, room_id, user_id, 0
+                )
             )
             self.assertEquals(
                 counts,
-                {"notify_count": noitf_count, "highlight_count": highlight_count},
+                {
+                    "notify_count": noitf_count,
+                    "unread_count": 0,  # Unread counts are tested in the sync tests.
+                    "highlight_count": highlight_count,
+                },
             )
 
         @defer.inlineCallbacks
@@ -72,28 +82,36 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
             event.internal_metadata.stream_ordering = stream
             event.depth = stream
 
-            yield self.store.add_push_actions_to_staging(
-                event.event_id, {user_id: action}
+            yield defer.ensureDeferred(
+                self.store.add_push_actions_to_staging(
+                    event.event_id, {user_id: action}, False,
+                )
             )
-            yield self.store.db.runInteraction(
-                "",
-                self.persist_events_store._set_push_actions_for_event_and_users_txn,
-                [(event, None)],
-                [(event, None)],
+            yield defer.ensureDeferred(
+                self.store.db_pool.runInteraction(
+                    "",
+                    self.persist_events_store._set_push_actions_for_event_and_users_txn,
+                    [(event, None)],
+                    [(event, None)],
+                )
             )
 
         def _rotate(stream):
-            return self.store.db.runInteraction(
-                "", self.store._rotate_notifs_before_txn, stream
+            return defer.ensureDeferred(
+                self.store.db_pool.runInteraction(
+                    "", self.store._rotate_notifs_before_txn, stream
+                )
             )
 
         def _mark_read(stream, depth):
-            return self.store.db.runInteraction(
-                "",
-                self.store._remove_old_push_actions_before_txn,
-                room_id,
-                user_id,
-                stream,
+            return defer.ensureDeferred(
+                self.store.db_pool.runInteraction(
+                    "",
+                    self.store._remove_old_push_actions_before_txn,
+                    room_id,
+                    user_id,
+                    stream,
+                )
             )
 
         yield _assert_counts(0, 0)
@@ -117,8 +135,10 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
         yield _inject_actions(6, PlAIN_NOTIF)
         yield _rotate(7)
 
-        yield self.store.db.simple_delete(
-            table="event_push_actions", keyvalues={"1": 1}, desc=""
+        yield defer.ensureDeferred(
+            self.store.db_pool.simple_delete(
+                table="event_push_actions", keyvalues={"1": 1}, desc=""
+            )
         )
 
         yield _assert_counts(1, 0)
@@ -136,33 +156,43 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
     @defer.inlineCallbacks
     def test_find_first_stream_ordering_after_ts(self):
         def add_event(so, ts):
-            return self.store.db.simple_insert(
-                "events",
-                {
-                    "stream_ordering": so,
-                    "received_ts": ts,
-                    "event_id": "event%i" % so,
-                    "type": "",
-                    "room_id": "",
-                    "content": "",
-                    "processed": True,
-                    "outlier": False,
-                    "topological_ordering": 0,
-                    "depth": 0,
-                },
+            return defer.ensureDeferred(
+                self.store.db_pool.simple_insert(
+                    "events",
+                    {
+                        "stream_ordering": so,
+                        "received_ts": ts,
+                        "event_id": "event%i" % so,
+                        "type": "",
+                        "room_id": "",
+                        "content": "",
+                        "processed": True,
+                        "outlier": False,
+                        "topological_ordering": 0,
+                        "depth": 0,
+                    },
+                )
             )
 
         # start with the base case where there are no events in the table
-        r = yield self.store.find_first_stream_ordering_after_ts(11)
+        r = yield defer.ensureDeferred(
+            self.store.find_first_stream_ordering_after_ts(11)
+        )
         self.assertEqual(r, 0)
 
         # now with one event
         yield add_event(2, 10)
-        r = yield self.store.find_first_stream_ordering_after_ts(9)
+        r = yield defer.ensureDeferred(
+            self.store.find_first_stream_ordering_after_ts(9)
+        )
         self.assertEqual(r, 2)
-        r = yield self.store.find_first_stream_ordering_after_ts(10)
+        r = yield defer.ensureDeferred(
+            self.store.find_first_stream_ordering_after_ts(10)
+        )
         self.assertEqual(r, 2)
-        r = yield self.store.find_first_stream_ordering_after_ts(11)
+        r = yield defer.ensureDeferred(
+            self.store.find_first_stream_ordering_after_ts(11)
+        )
         self.assertEqual(r, 3)
 
         # add a bunch of dummy events to the events table
@@ -175,25 +205,37 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
         ):
             yield add_event(stream_ordering, ts)
 
-        r = yield self.store.find_first_stream_ordering_after_ts(110)
+        r = yield defer.ensureDeferred(
+            self.store.find_first_stream_ordering_after_ts(110)
+        )
         self.assertEqual(r, 3, "First event after 110ms should be 3, was %i" % r)
 
         # 4 and 5 are both after 120: we want 4 rather than 5
-        r = yield self.store.find_first_stream_ordering_after_ts(120)
+        r = yield defer.ensureDeferred(
+            self.store.find_first_stream_ordering_after_ts(120)
+        )
         self.assertEqual(r, 4, "First event after 120ms should be 4, was %i" % r)
 
-        r = yield self.store.find_first_stream_ordering_after_ts(129)
+        r = yield defer.ensureDeferred(
+            self.store.find_first_stream_ordering_after_ts(129)
+        )
         self.assertEqual(r, 10, "First event after 129ms should be 10, was %i" % r)
 
         # check we can get the last event
-        r = yield self.store.find_first_stream_ordering_after_ts(140)
+        r = yield defer.ensureDeferred(
+            self.store.find_first_stream_ordering_after_ts(140)
+        )
         self.assertEqual(r, 20, "First event after 14ms should be 20, was %i" % r)
 
         # off the end
-        r = yield self.store.find_first_stream_ordering_after_ts(160)
+        r = yield defer.ensureDeferred(
+            self.store.find_first_stream_ordering_after_ts(160)
+        )
         self.assertEqual(r, 21)
 
         # check we can find an event at ordering zero
         yield add_event(0, 5)
-        r = yield self.store.find_first_stream_ordering_after_ts(1)
+        r = yield defer.ensureDeferred(
+            self.store.find_first_stream_ordering_after_ts(1)
+        )
         self.assertEqual(r, 0)

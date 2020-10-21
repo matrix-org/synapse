@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import random
 import re
 from http import HTTPStatus
 from typing import TYPE_CHECKING
@@ -23,10 +24,13 @@ from urllib.parse import urlparse
 if TYPE_CHECKING:
     from synapse.app.homeserver import HomeServer
 
-from twisted.internet import defer
-
 from synapse.api.constants import LoginType
-from synapse.api.errors import Codes, SynapseError, ThreepidValidationError
+from synapse.api.errors import (
+    Codes,
+    InteractiveAuthIncompleteError,
+    SynapseError,
+    ThreepidValidationError,
+)
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.server import finish_request, respond_with_html
 from synapse.http.servlet import (
@@ -35,7 +39,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
-from synapse.push.mailer import Mailer, load_jinja2_templates
+from synapse.push.mailer import Mailer
 from synapse.types import UserID
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import assert_valid_client_secret, random_string
@@ -50,28 +54,18 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/password/email/requestToken$")
 
     def __init__(self, hs):
-        super(EmailPasswordRequestTokenRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.datastore = hs.get_datastore()
         self.config = hs.config
         self.identity_handler = hs.get_handlers().identity_handler
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            template_html, template_text = load_jinja2_templates(
-                self.config.email_template_dir,
-                [
-                    self.config.email_password_reset_template_html,
-                    self.config.email_password_reset_template_text,
-                ],
-                apply_format_ts_filter=True,
-                apply_mxc_to_http_filter=True,
-                public_baseurl=self.config.public_baseurl,
-            )
             self.mailer = Mailer(
                 hs=self.hs,
                 app_name=self.config.email_app_name,
-                template_html=template_html,
-                template_text=template_text,
+                template_html=self.config.email_password_reset_template_html,
+                template_text=self.config.email_password_reset_template_text,
             )
 
     async def on_POST(self, request):
@@ -104,13 +98,6 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
 
-        if not check_3pid_allowed(self.hs, "email", email):
-            raise SynapseError(
-                403,
-                "Your email is not authorized on this server",
-                Codes.THREEPID_DENIED,
-            )
-
         if next_link:
             # Raise if the provided next_link value isn't valid
             assert_valid_next_link(self.hs, next_link)
@@ -127,6 +114,9 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             if self.config.request_token_inhibit_3pid_errors:
                 # Make the client think the operation succeeded. See the rationale in the
                 # comments for request_token_inhibit_3pid_errors.
+                # Also wait for some random amount of time between 100ms and 1s to make it
+                # look like we did something.
+                await self.hs.clock.sleep(random.randint(1, 10) / 10)
                 return 200, {"sid": random_string(16)}
 
             raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
@@ -158,87 +148,11 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         return 200, ret
 
 
-class PasswordResetSubmitTokenServlet(RestServlet):
-    """Handles 3PID validation token submission"""
-
-    PATTERNS = client_patterns(
-        "/password_reset/(?P<medium>[^/]*)/submit_token$", releases=(), unstable=True
-    )
-
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer): server
-        """
-        super(PasswordResetSubmitTokenServlet, self).__init__()
-        self.hs = hs
-        self.auth = hs.get_auth()
-        self.config = hs.config
-        self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
-        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            (self.failure_email_template,) = load_jinja2_templates(
-                self.config.email_template_dir,
-                [self.config.email_password_reset_template_failure_html],
-            )
-
-    async def on_GET(self, request, medium):
-        # We currently only handle threepid token submissions for email
-        if medium != "email":
-            raise SynapseError(
-                400, "This medium is currently not supported for password resets"
-            )
-        if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
-            if self.config.local_threepid_handling_disabled_due_to_email_config:
-                logger.warning(
-                    "Password reset emails have been disabled due to lack of an email config"
-                )
-            raise SynapseError(
-                400, "Email-based password resets are disabled on this server"
-            )
-
-        sid = parse_string(request, "sid", required=True)
-        token = parse_string(request, "token", required=True)
-        client_secret = parse_string(request, "client_secret", required=True)
-        assert_valid_client_secret(client_secret)
-
-        # Attempt to validate a 3PID session
-        try:
-            # Mark the session as valid
-            next_link = await self.store.validate_threepid_session(
-                sid, client_secret, token, self.clock.time_msec()
-            )
-
-            # Perform a 302 redirect if next_link is set
-            if next_link:
-                if next_link.startswith("file:///"):
-                    logger.warning(
-                        "Not redirecting to next_link as it is a local file: address"
-                    )
-                else:
-                    request.setResponseCode(302)
-                    request.setHeader("Location", next_link)
-                    finish_request(request)
-                    return None
-
-            # Otherwise show the success template
-            html = self.config.email_password_reset_template_success_html
-            status_code = 200
-        except ThreepidValidationError as e:
-            status_code = e.code
-
-            # Show a failure page with a reason
-            template_vars = {"failure_reason": e.msg}
-            html = self.failure_email_template.render(**template_vars)
-
-        respond_with_html(request, status_code, html)
-
-
 class PasswordRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/password$")
 
     def __init__(self, hs):
-        super(PasswordRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
@@ -253,17 +167,11 @@ class PasswordRestServlet(RestServlet):
 
         # we do basic sanity checks here because the auth layer will store these
         # in sessions. Pull out the new password provided to us.
-        if "new_password" in body:
-            new_password = body.pop("new_password")
+        new_password = body.pop("new_password", None)
+        if new_password is not None:
             if not isinstance(new_password, str) or len(new_password) > 512:
                 raise SynapseError(400, "Invalid password")
             self.password_policy_handler.validate_password(new_password)
-
-            # If the password is valid, hash it and store it back on the body.
-            # This ensures that only the hashed password is handled everywhere.
-            if "new_password_hash" in body:
-                raise SynapseError(400, "Unexpected property: new_password_hash")
-            body["new_password_hash"] = await self.auth_handler.hash(new_password)
 
         # there are two possibilities here. Either the user does not have an
         # access token, and needs to do a password reset; or they have one and
@@ -281,23 +189,52 @@ class PasswordRestServlet(RestServlet):
             if requester.app_service:
                 params = body
             else:
-                params = await self.auth_handler.validate_user_via_ui_auth(
-                    requester,
+                try:
+                    (
+                        params,
+                        session_id,
+                    ) = await self.auth_handler.validate_user_via_ui_auth(
+                        requester,
+                        request,
+                        body,
+                        self.hs.get_ip_from_request(request),
+                        "modify your account password",
+                    )
+                except InteractiveAuthIncompleteError as e:
+                    # The user needs to provide more steps to complete auth, but
+                    # they're not required to provide the password again.
+                    #
+                    # If a password is available now, hash the provided password and
+                    # store it for later.
+                    if new_password:
+                        password_hash = await self.auth_handler.hash(new_password)
+                        await self.auth_handler.set_session_data(
+                            e.session_id, "password_hash", password_hash
+                        )
+                    raise
+            user_id = requester.user.to_string()
+        else:
+            requester = None
+            try:
+                result, params, session_id = await self.auth_handler.check_ui_auth(
+                    [[LoginType.EMAIL_IDENTITY]],
                     request,
                     body,
                     self.hs.get_ip_from_request(request),
                     "modify your account password",
                 )
-            user_id = requester.user.to_string()
-        else:
-            requester = None
-            result, params, _ = await self.auth_handler.check_auth(
-                [[LoginType.EMAIL_IDENTITY]],
-                request,
-                body,
-                self.hs.get_ip_from_request(request),
-                "modify your account password",
-            )
+            except InteractiveAuthIncompleteError as e:
+                # The user needs to provide more steps to complete auth, but
+                # they're not required to provide the password again.
+                #
+                # If a password is available now, hash the provided password and
+                # store it for later.
+                if new_password:
+                    password_hash = await self.auth_handler.hash(new_password)
+                    await self.auth_handler.set_session_data(
+                        e.session_id, "password_hash", password_hash
+                    )
+                raise
 
             if LoginType.EMAIL_IDENTITY in result:
                 threepid = result[LoginType.EMAIL_IDENTITY]
@@ -322,32 +259,40 @@ class PasswordRestServlet(RestServlet):
                 logger.error("Auth succeeded but no known type! %r", result.keys())
                 raise SynapseError(500, "", Codes.UNKNOWN)
 
-        assert_params_in_dict(params, ["new_password_hash"])
-        new_password_hash = params["new_password_hash"]
+        # If we have a password in this request, prefer it. Otherwise, there
+        # must be a password hash from an earlier request.
+        if new_password:
+            password_hash = await self.auth_handler.hash(new_password)
+        else:
+            password_hash = await self.auth_handler.get_session_data(
+                session_id, "password_hash", None
+            )
+        if not password_hash:
+            raise SynapseError(400, "Missing params: password", Codes.MISSING_PARAM)
+
         logout_devices = params.get("logout_devices", True)
 
         await self._set_password_handler.set_password(
-            user_id, new_password_hash, logout_devices, requester
+            user_id, password_hash, logout_devices, requester
         )
 
         if self.hs.config.shadow_server:
             shadow_user = UserID(
                 requester.user.localpart, self.hs.config.shadow_server.get("hs")
             )
-            self.shadow_password(params, shadow_user.to_string())
+            await self.shadow_password(params, shadow_user.to_string())
 
         return 200, {}
 
     def on_OPTIONS(self, _):
         return 200, {}
 
-    @defer.inlineCallbacks
-    def shadow_password(self, body, user_id):
+    async def shadow_password(self, body, user_id):
         # TODO: retries
         shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
         as_token = self.hs.config.shadow_server.get("as_token")
 
-        yield self.http_client.post_json_get_json(
+        await self.http_client.post_json_get_json(
             "%s/_matrix/client/r0/account/password?access_token=%s&user_id=%s"
             % (shadow_hs_url, as_token, user_id),
             body,
@@ -358,7 +303,7 @@ class DeactivateAccountRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/deactivate$")
 
     def __init__(self, hs):
-        super(DeactivateAccountRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
@@ -377,7 +322,7 @@ class DeactivateAccountRestServlet(RestServlet):
 
         requester = await self.auth.get_user_by_req(request)
 
-        # allow ASes to dectivate their own users
+        # allow ASes to deactivate their own users
         if requester.app_service:
             await self._deactivate_account_handler.deactivate_account(
                 requester.user.to_string(), erase
@@ -406,26 +351,18 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid/email/requestToken$")
 
     def __init__(self, hs):
-        super(EmailThreepidRequestTokenRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.config = hs.config
         self.identity_handler = hs.get_handlers().identity_handler
         self.store = self.hs.get_datastore()
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            template_html, template_text = load_jinja2_templates(
-                self.config.email_template_dir,
-                [
-                    self.config.email_add_threepid_template_html,
-                    self.config.email_add_threepid_template_text,
-                ],
-                public_baseurl=self.config.public_baseurl,
-            )
             self.mailer = Mailer(
                 hs=self.hs,
                 app_name=self.config.email_app_name,
-                template_html=template_html,
-                template_text=template_text,
+                template_html=self.config.email_add_threepid_template_html,
+                template_text=self.config.email_add_threepid_template_text,
             )
 
     async def on_POST(self, request):
@@ -473,6 +410,9 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
             if self.config.request_token_inhibit_3pid_errors:
                 # Make the client think the operation succeeded. See the rationale in the
                 # comments for request_token_inhibit_3pid_errors.
+                # Also wait for some random amount of time between 100ms and 1s to make it
+                # look like we did something.
+                await self.hs.clock.sleep(random.randint(1, 10) / 10)
                 return 200, {"sid": random_string(16)}
 
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
@@ -509,7 +449,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
 
     def __init__(self, hs):
         self.hs = hs
-        super(MsisdnThreepidRequestTokenRestServlet, self).__init__()
+        super().__init__()
         self.store = self.hs.get_datastore()
         self.identity_handler = hs.get_handlers().identity_handler
 
@@ -545,6 +485,9 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
             if self.hs.config.request_token_inhibit_3pid_errors:
                 # Make the client think the operation succeeded. See the rationale in the
                 # comments for request_token_inhibit_3pid_errors.
+                # Also wait for some random amount of time between 100ms and 1s to make it
+                # look like we did something.
+                await self.hs.clock.sleep(random.randint(1, 10) / 10)
                 return 200, {"sid": random_string(16)}
 
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
@@ -588,9 +531,8 @@ class AddThreepidEmailSubmitTokenServlet(RestServlet):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            (self.failure_email_template,) = load_jinja2_templates(
-                self.config.email_template_dir,
-                [self.config.email_add_threepid_template_failure_html],
+            self._failure_email_template = (
+                self.config.email_add_threepid_template_failure_html
             )
 
     async def on_GET(self, request):
@@ -636,7 +578,7 @@ class AddThreepidEmailSubmitTokenServlet(RestServlet):
 
             # Show a failure page with a reason
             template_vars = {"failure_reason": e.msg}
-            html = self.failure_email_template.render(**template_vars)
+            html = self._failure_email_template.render(**template_vars)
 
         respond_with_html(request, status_code, html)
 
@@ -687,7 +629,7 @@ class ThreepidRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid$")
 
     def __init__(self, hs):
-        super(ThreepidRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
         self.auth = hs.get_auth()
@@ -731,7 +673,7 @@ class ThreepidRestServlet(RestServlet):
                 shadow_user = UserID(
                     requester.user.localpart, self.hs.config.shadow_server.get("hs")
                 )
-                self.shadow_3pid({"threepid": threepid}, shadow_user.to_string())
+                await self.shadow_3pid({"threepid": threepid}, shadow_user.to_string())
 
             return 200, {}
 
@@ -766,7 +708,7 @@ class ThreepidRestServlet(RestServlet):
                     "address": validation_session["address"],
                     "validated_at": validation_session["validated_at"],
                 }
-                self.shadow_3pid({"threepid": threepid}, shadow_user.to_string())
+                await self.shadow_3pid({"threepid": threepid}, shadow_user.to_string())
 
             return 200, {}
 
@@ -774,13 +716,12 @@ class ThreepidRestServlet(RestServlet):
             400, "No validated 3pid session found", Codes.THREEPID_AUTH_FAILED
         )
 
-    @defer.inlineCallbacks
-    def shadow_3pid(self, body, user_id):
+    async def shadow_3pid(self, body, user_id):
         # TODO: retries
         shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
         as_token = self.hs.config.shadow_server.get("as_token")
 
-        yield self.http_client.post_json_get_json(
+        await self.http_client.post_json_get_json(
             "%s/_matrix/client/r0/account/3pid?access_token=%s&user_id=%s"
             % (shadow_hs_url, as_token, user_id),
             body,
@@ -791,7 +732,7 @@ class ThreepidAddRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid/add$")
 
     def __init__(self, hs):
-        super(ThreepidAddRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
         self.auth = hs.get_auth()
@@ -841,20 +782,19 @@ class ThreepidAddRestServlet(RestServlet):
                     "address": validation_session["address"],
                     "validated_at": validation_session["validated_at"],
                 }
-                self.shadow_3pid({"threepid": threepid}, shadow_user.to_string())
+                await self.shadow_3pid({"threepid": threepid}, shadow_user.to_string())
             return 200, {}
 
         raise SynapseError(
             400, "No validated 3pid session found", Codes.THREEPID_AUTH_FAILED
         )
 
-    @defer.inlineCallbacks
-    def shadow_3pid(self, body, user_id):
+    async def shadow_3pid(self, body, user_id):
         # TODO: retries
         shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
         as_token = self.hs.config.shadow_server.get("as_token")
 
-        yield self.http_client.post_json_get_json(
+        await self.http_client.post_json_get_json(
             "%s/_matrix/client/r0/account/3pid?access_token=%s&user_id=%s"
             % (shadow_hs_url, as_token, user_id),
             body,
@@ -865,7 +805,7 @@ class ThreepidBindRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid/bind$")
 
     def __init__(self, hs):
-        super(ThreepidBindRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
         self.auth = hs.get_auth()
@@ -894,7 +834,7 @@ class ThreepidUnbindRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid/unbind$")
 
     def __init__(self, hs):
-        super(ThreepidUnbindRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
         self.auth = hs.get_auth()
@@ -925,7 +865,7 @@ class ThreepidDeleteRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid/delete$")
 
     def __init__(self, hs):
-        super(ThreepidDeleteRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
@@ -958,7 +898,7 @@ class ThreepidDeleteRestServlet(RestServlet):
             shadow_user = UserID(
                 requester.user.localpart, self.hs.config.shadow_server.get("hs")
             )
-            self.shadow_3pid_delete(body, shadow_user.to_string())
+            await self.shadow_3pid_delete(body, shadow_user.to_string())
 
         if ret:
             id_server_unbind_result = "success"
@@ -967,13 +907,12 @@ class ThreepidDeleteRestServlet(RestServlet):
 
         return 200, {"id_server_unbind_result": id_server_unbind_result}
 
-    @defer.inlineCallbacks
-    def shadow_3pid_delete(self, body, user_id):
+    async def shadow_3pid_delete(self, body, user_id):
         # TODO: retries
         shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
         as_token = self.hs.config.shadow_server.get("as_token")
 
-        yield self.http_client.post_json_get_json(
+        await self.http_client.post_json_get_json(
             "%s/_matrix/client/r0/account/3pid/delete?access_token=%s&user_id=%s"
             % (shadow_hs_url, as_token, user_id),
             body,
@@ -988,12 +927,11 @@ class ThreepidLookupRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.identity_handler = hs.get_handlers().identity_handler
 
-    @defer.inlineCallbacks
-    def on_GET(self, request):
+    async def on_GET(self, request):
         """Proxy a /_matrix/identity/api/v1/lookup request to an identity
         server
         """
-        yield self.auth.get_user_by_req(request)
+        await self.auth.get_user_by_req(request)
 
         # Verify query parameters
         query_params = request.args
@@ -1006,9 +944,9 @@ class ThreepidLookupRestServlet(RestServlet):
 
         # Proxy the request to the identity server. lookup_3pid handles checking
         # if the lookup is allowed so we don't need to do it here.
-        ret = yield self.identity_handler.proxy_lookup_3pid(id_server, medium, address)
+        ret = await self.identity_handler.proxy_lookup_3pid(id_server, medium, address)
 
-        defer.returnValue((200, ret))
+        return 200, ret
 
 
 class ThreepidBulkLookupRestServlet(RestServlet):
@@ -1019,12 +957,11 @@ class ThreepidBulkLookupRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.identity_handler = hs.get_handlers().identity_handler
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
+    async def on_POST(self, request):
         """Proxy a /_matrix/identity/api/v1/bulk_lookup request to an identity
         server
         """
-        yield self.auth.get_user_by_req(request)
+        await self.auth.get_user_by_req(request)
 
         body = parse_json_object_from_request(request)
 
@@ -1032,11 +969,11 @@ class ThreepidBulkLookupRestServlet(RestServlet):
 
         # Proxy the request to the identity server. lookup_3pid handles checking
         # if the lookup is allowed so we don't need to do it here.
-        ret = yield self.identity_handler.proxy_bulk_lookup_3pid(
+        ret = await self.identity_handler.proxy_bulk_lookup_3pid(
             body["id_server"], body["threepids"]
         )
 
-        defer.returnValue((200, ret))
+        return 200, ret
 
 
 def assert_valid_next_link(hs: "HomeServer", next_link: str):
@@ -1082,7 +1019,7 @@ class WhoamiRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/whoami$")
 
     def __init__(self, hs):
-        super(WhoamiRestServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
 
     async def on_GET(self, request):
@@ -1093,7 +1030,6 @@ class WhoamiRestServlet(RestServlet):
 
 def register_servlets(hs, http_server):
     EmailPasswordRequestTokenRestServlet(hs).register(http_server)
-    PasswordResetSubmitTokenServlet(hs).register(http_server)
     PasswordRestServlet(hs).register(http_server)
     DeactivateAccountRestServlet(hs).register(http_server)
     EmailThreepidRequestTokenRestServlet(hs).register(http_server)

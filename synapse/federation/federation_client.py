@@ -24,10 +24,12 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Mapping,
     Optional,
     Sequence,
     Tuple,
     TypeVar,
+    Union,
 )
 
 from prometheus_client import Counter
@@ -54,7 +56,7 @@ from synapse.events import EventBase, builder
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.logging.context import make_deferred_yieldable, preserve_fn
 from synapse.logging.utils import log_function
-from synapse.types import JsonDict
+from synapse.types import JsonDict, get_domain_from_id
 from synapse.util import unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.retryutils import NotRetryingDestination
@@ -79,7 +81,7 @@ class InvalidResponseError(RuntimeError):
 
 class FederationClient(FederationBase):
     def __init__(self, hs):
-        super(FederationClient, self).__init__(hs)
+        super().__init__(hs)
 
         self.pdu_destination_tried = {}
         self._clock.looping_call(self._clear_tried_cache, 60 * 1000)
@@ -135,7 +137,7 @@ class FederationClient(FederationBase):
                 and try the request anyway.
 
         Returns:
-            a Deferred which will eventually yield a JSON object from the
+            a Awaitable which will eventually yield a JSON object from the
             response
         """
         sent_queries_counter.labels(query_type).inc()
@@ -157,7 +159,7 @@ class FederationClient(FederationBase):
             content (dict): The query content.
 
         Returns:
-            a Deferred which will eventually yield a JSON object from the
+            an Awaitable which will eventually yield a JSON object from the
             response
         """
         sent_queries_counter.labels("client_device_keys").inc()
@@ -180,7 +182,7 @@ class FederationClient(FederationBase):
             content (dict): The query content.
 
         Returns:
-            a Deferred which will eventually yield a JSON object from the
+            an Awaitable which will eventually yield a JSON object from the
             response
         """
         sent_queries_counter.labels("client_one_time_keys").inc()
@@ -217,11 +219,9 @@ class FederationClient(FederationBase):
             for p in transaction_data["pdus"]
         ]
 
-        # FIXME: We should handle signature failures more gracefully.
-        pdus[:] = await make_deferred_yieldable(
-            defer.gatherResults(
-                self._check_sigs_and_hashes(room_version, pdus), consumeErrors=True,
-            ).addErrback(unwrapFirstError)
+        # Check signatures and hash of pdus, removing any from the list that fail checks
+        pdus[:] = await self._check_sigs_and_hash_and_fetch(
+            dest, pdus, outlier=True, room_version=room_version
         )
 
         return pdus
@@ -386,10 +386,11 @@ class FederationClient(FederationBase):
                     pdu.event_id, allow_rejected=True, allow_none=True
                 )
 
-            if not res and pdu.origin != origin:
+            pdu_origin = get_domain_from_id(pdu.sender)
+            if not res and pdu_origin != origin:
                 try:
                     res = await self.get_pdu(
-                        destinations=[pdu.origin],
+                        destinations=[pdu_origin],
                         event_id=pdu.event_id,
                         room_version=room_version,
                         outlier=outlier,
@@ -502,7 +503,7 @@ class FederationClient(FederationBase):
         user_id: str,
         membership: str,
         content: dict,
-        params: Dict[str, str],
+        params: Optional[Mapping[str, Union[str, Iterable[str]]]],
     ) -> Tuple[str, EventBase, RoomVersion]:
         """
         Creates an m.room.member event, with context, without participating in the room.
@@ -900,7 +901,7 @@ class FederationClient(FederationBase):
                 party instance
 
         Returns:
-            Deferred[Dict[str, Any]]: The response from the remote server, or None if
+            Awaitable[Dict[str, Any]]: The response from the remote server, or None if
             `remote_server` is the same as the local server_name
 
         Raises:

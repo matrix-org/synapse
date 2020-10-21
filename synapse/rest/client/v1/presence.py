@@ -30,7 +30,7 @@ class PresenceStatusRestServlet(RestServlet):
     PATTERNS = client_patterns("/presence/(?P<user_id>[^/]*)/status", v1=True)
 
     def __init__(self, hs):
-        super(PresenceStatusRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.presence_handler = hs.get_presence_handler()
         self.clock = hs.get_clock()

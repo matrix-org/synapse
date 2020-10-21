@@ -128,17 +128,6 @@ template. These templates are similar, but the parameters are slightly different
 * A string ``error`` parameter is available that includes a short hint of why a
   user is seeing the error page.
 
-ThirdPartyEventRules breaking changes
--------------------------------------
-
-This release introduces a backwards-incompatible change to modules making use of
-`ThirdPartyEventRules` in Synapse.
-
-The `http_client` argument is no longer passed to modules as they are initialised. Instead,
-modules are expected to make use of the `http_client` property on the `ModuleApi` class.
-Modules are now passed a `module_api` argument during initialisation, which is an instance of
-`ModuleApi`.
-
 Upgrading to v1.18.0
 ====================
 

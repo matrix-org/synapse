@@ -12,10 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from twisted.internet import defer
 
 
-class WorkerServerNoticesSender(object):
+class WorkerServerNoticesSender:
     """Stub impl of ServerNoticesSender which does nothing"""
 
     def __init__(self, hs):
@@ -24,24 +23,18 @@ class WorkerServerNoticesSender(object):
             hs (synapse.server.HomeServer):
         """
 
-    def on_user_syncing(self, user_id):
+    async def on_user_syncing(self, user_id: str) -> None:
         """Called when the user performs a sync operation.
 
         Args:
-            user_id (str): mxid of user who synced
-
-        Returns:
-            Deferred
+            user_id: mxid of user who synced
         """
-        return defer.succeed(None)
+        return None
 
-    def on_user_ip(self, user_id):
+    async def on_user_ip(self, user_id: str) -> None:
         """Called on the master when a worker process saw a client request.
 
         Args:
-            user_id (str): mxid
-
-        Returns:
-            Deferred
+            user_id: mxid
         """
         raise AssertionError("on_user_ip unexpectedly called on worker")

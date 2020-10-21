@@ -18,7 +18,7 @@ from typing import Dict
 import attr
 
 
-class EventFormatVersions(object):
+class EventFormatVersions:
     """This is an internal enum for tracking the version of the event format,
     independently from the room version.
     """
@@ -35,20 +35,20 @@ KNOWN_EVENT_FORMAT_VERSIONS = {
 }
 
 
-class StateResolutionVersions(object):
+class StateResolutionVersions:
     """Enum to identify the state resolution algorithms"""
 
     V1 = 1  # room v1 state res
     V2 = 2  # MSC1442 state res: room v2 and later
 
 
-class RoomDisposition(object):
+class RoomDisposition:
     STABLE = "stable"
     UNSTABLE = "unstable"
 
 
 @attr.s(slots=True, frozen=True)
-class RoomVersion(object):
+class RoomVersion:
     """An object which describes the unique attributes of a room version."""
 
     identifier = attr.ib()  # str; the identifier for this version
@@ -69,7 +69,7 @@ class RoomVersion(object):
     limit_notifications_power_levels = attr.ib(type=bool)
 
 
-class RoomVersions(object):
+class RoomVersions:
     V1 = RoomVersion(
         "1",
         RoomDisposition.STABLE,

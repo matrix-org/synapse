@@ -275,6 +275,8 @@ The following fields are possible in the JSON response body:
 
 * `room_id` - The ID of the room.
 * `name` - The name of the room.
+* `topic` - The topic of the room.
+* `avatar` - The `mxc` URI to the avatar of the room.
 * `canonical_alias` - The canonical (main) alias address of the room.
 * `joined_members` - How many users are currently in the room.
 * `joined_local_members` - How many local users are currently in the room.
@@ -304,6 +306,8 @@ Response:
 {
   "room_id": "!mscvqgqpHYjBGDxNym:matrix.org",
   "name": "Music Theory",
+  "avatar": "mxc://matrix.org/AQDaVFlbkQoErdOgqWRgiGSV",
+  "topic": "Theory, Composition, Notation, Analysis",
   "canonical_alias": "#musictheory:matrix.org",
   "joined_members": 127
   "joined_local_members": 2,
@@ -369,7 +373,9 @@ to the new room will have power level `-10` by default, and thus be unable to sp
 If `block` is `True` it prevents new joins to the old room.
 
 This API will remove all trace of the old room from your database after removing
-all local users.
+all local users. If `purge` is `true` (the default), all traces of the old room will
+be removed from your database after removing all local users. If you do not want
+this to happen, set `purge` to `false`.
 Depending on the amount of history being purged a call to the API may take
 several minutes or longer.
 
@@ -388,7 +394,8 @@ with a body of:
     "new_room_user_id": "@someuser:example.com",
     "room_name": "Content Violation Notification",
     "message": "Bad Room has been shutdown due to content violations on this server. Please review our Terms of Service.",
-    "block": true
+    "block": true,
+    "purge": true
 }
 ```
 
@@ -430,8 +437,10 @@ The following JSON body parameters are available:
               `new_room_user_id` in the new room. Ideally this will clearly convey why the
                original room was shut down. Defaults to `Sharing illegal content on this server
                is not permitted and rooms in violation will be blocked.`
-* `block` - Optional. If set to `true`, this room will be added to a blocking list, preventing future attempts to
-  join the room. Defaults to `false`.
+* `block` - Optional. If set to `true`, this room will be added to a blocking list, preventing
+            future attempts to join the room. Defaults to `false`.
+* `purge` - Optional. If set to `true`, it will remove all traces of the room from your database.
+            Defaults to `true`.
 
 The JSON body must not be empty. The body must be at least `{}`.
 

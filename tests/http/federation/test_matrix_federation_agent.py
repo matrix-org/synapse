@@ -972,7 +972,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
     def test_well_known_cache(self):
         self.reactor.lookups["testserv"] = "1.2.3.4"
 
-        fetch_d = self.well_known_resolver.get_well_known(b"testserv")
+        fetch_d = defer.ensureDeferred(
+            self.well_known_resolver.get_well_known(b"testserv")
+        )
 
         # there should be an attempt to connect on port 443 for the .well-known
         clients = self.reactor.tcpClients
@@ -995,7 +997,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
         well_known_server.loseConnection()
 
         # repeat the request: it should hit the cache
-        fetch_d = self.well_known_resolver.get_well_known(b"testserv")
+        fetch_d = defer.ensureDeferred(
+            self.well_known_resolver.get_well_known(b"testserv")
+        )
         r = self.successResultOf(fetch_d)
         self.assertEqual(r.delegated_server, b"target-server")
 
@@ -1003,7 +1007,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.reactor.pump((1000.0,))
 
         # now it should connect again
-        fetch_d = self.well_known_resolver.get_well_known(b"testserv")
+        fetch_d = defer.ensureDeferred(
+            self.well_known_resolver.get_well_known(b"testserv")
+        )
 
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients.pop(0)
@@ -1026,7 +1032,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
         self.reactor.lookups["testserv"] = "1.2.3.4"
 
-        fetch_d = self.well_known_resolver.get_well_known(b"testserv")
+        fetch_d = defer.ensureDeferred(
+            self.well_known_resolver.get_well_known(b"testserv")
+        )
 
         # there should be an attempt to connect on port 443 for the .well-known
         clients = self.reactor.tcpClients
@@ -1052,7 +1060,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # another lookup.
         self.reactor.pump((900.0,))
 
-        fetch_d = self.well_known_resolver.get_well_known(b"testserv")
+        fetch_d = defer.ensureDeferred(
+            self.well_known_resolver.get_well_known(b"testserv")
+        )
 
         # The resolver may retry a few times, so fonx all requests that come along
         attempts = 0
@@ -1082,7 +1092,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.reactor.pump((10000.0,))
 
         # Repated the request, this time it should fail if the lookup fails.
-        fetch_d = self.well_known_resolver.get_well_known(b"testserv")
+        fetch_d = defer.ensureDeferred(
+            self.well_known_resolver.get_well_known(b"testserv")
+        )
 
         clients = self.reactor.tcpClients
         (host, port, client_factory, _timeout, _bindAddress) = clients.pop(0)
@@ -1252,7 +1264,7 @@ def _log_request(request):
 
 
 @implementer(IPolicyForHTTPS)
-class TrustingTLSPolicyForHTTPS(object):
+class TrustingTLSPolicyForHTTPS:
     """An IPolicyForHTTPS which checks that the certificate belongs to the
     right server, but doesn't check the certificate chain."""
 

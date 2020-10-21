@@ -15,11 +15,12 @@
 from typing import Callable
 
 from synapse.events import EventBase
+from synapse.events.snapshot import EventContext
 from synapse.module_api import ModuleApi
-from synapse.types import StateMap
+from synapse.types import Requester, StateMap
 
 
-class ThirdPartyEventRules(object):
+class ThirdPartyEventRules:
     """Allows server admins to provide a Python module implementing an extra
     set of rules to apply when processing events.
 
@@ -42,15 +43,17 @@ class ThirdPartyEventRules(object):
                 config=config, module_api=ModuleApi(hs, hs.get_auth_handler()),
             )
 
-    async def check_event_allowed(self, event, context):
+    async def check_event_allowed(
+        self, event: EventBase, context: EventContext
+    ) -> bool:
         """Check if a provided event should be allowed in the given context.
 
         Args:
-            event (synapse.events.EventBase): The event to be checked.
-            context (synapse.events.snapshot.EventContext): The context of the event.
+            event: The event to be checked.
+            context: The context of the event.
 
         Returns:
-            defer.Deferred[bool]: True if the event should be allowed, False if not.
+            True if the event should be allowed, False if not.
         """
         if self.third_party_rules is None:
             return True
@@ -65,17 +68,19 @@ class ThirdPartyEventRules(object):
         ret = await self.third_party_rules.check_event_allowed(event, state_events)
         return ret
 
-    async def on_create_room(self, requester, config, is_requester_admin):
+    async def on_create_room(
+        self, requester: Requester, config: dict, is_requester_admin: bool
+    ) -> bool:
         """Intercept requests to create room to allow, deny or update the
         request config.
 
         Args:
-            requester (Requester)
-            config (dict): The creation config from the client.
-            is_requester_admin (bool): If the requester is an admin
+            requester
+            config: The creation config from the client.
+            is_requester_admin: If the requester is an admin
 
         Returns:
-            defer.Deferred[bool]: Whether room creation is allowed or denied.
+            Whether room creation is allowed or denied.
         """
 
         if self.third_party_rules is None:
@@ -86,16 +91,18 @@ class ThirdPartyEventRules(object):
         )
         return ret
 
-    async def check_threepid_can_be_invited(self, medium, address, room_id):
+    async def check_threepid_can_be_invited(
+        self, medium: str, address: str, room_id: str
+    ) -> bool:
         """Check if a provided 3PID can be invited in the given room.
 
         Args:
-            medium (str): The 3PID's medium.
-            address (str): The 3PID's address.
-            room_id (str): The room we want to invite the threepid to.
+            medium: The 3PID's medium.
+            address: The 3PID's address.
+            room_id: The room we want to invite the threepid to.
 
         Returns:
-            defer.Deferred[bool], True if the 3PID can be invited, False if not.
+            True if the 3PID can be invited, False if not.
         """
 
         if self.third_party_rules is None:

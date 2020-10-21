@@ -29,11 +29,11 @@ def _log_debug_as_f(f, msg, msg_args):
         lineno = f.__code__.co_firstlineno
         pathname = f.__code__.co_filename
 
-        record = logging.LogRecord(
+        record = logger.makeRecord(
             name=name,
             level=logging.DEBUG,
-            pathname=pathname,
-            lineno=lineno,
+            fn=pathname,
+            lno=lineno,
             msg=msg,
             args=msg_args,
             exc_info=None,

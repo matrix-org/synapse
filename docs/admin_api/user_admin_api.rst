@@ -108,7 +108,7 @@ The api is::
 
     GET /_synapse/admin/v2/users?from=0&limit=10&guests=false
 
-To use it, you will need to authenticate by providing an `access_token` for a
+To use it, you will need to authenticate by providing an ``access_token`` for a
 server admin: see `README.rst <README.rst>`_.
 
 The parameter ``from`` is optional but used for pagination, denoting the
@@ -119,8 +119,11 @@ from a previous call.
 The parameter ``limit`` is optional but is used for pagination, denoting the
 maximum number of items to return in this call. Defaults to ``100``.
 
-The parameter ``user_id`` is optional and filters to only users with user IDs
-that contain this value.
+The parameter ``user_id`` is optional and filters to only return users with user IDs
+that contain this value. This parameter is ignored when using the ``name`` parameter.
+
+The parameter ``name`` is optional and filters to only return users with user ID localparts
+**or** displaynames that contain this value.
 
 The parameter ``guests`` is optional and if ``false`` will **exclude** guest users.
 Defaults to ``true`` to include guest users.
@@ -211,9 +214,11 @@ Deactivate Account
 
 This API deactivates an account. It removes active access tokens, resets the
 password, and deletes third-party IDs (to prevent the user requesting a
-password reset). It can also mark the user as GDPR-erased (stopping their data
-from distributed further, and deleting it entirely if there are no other
-references to it).
+password reset).
+
+It can also mark the user as GDPR-erased. This means messages sent by the
+user will still be visible by anyone that was in the room when these messages
+were sent, but hidden from users joining the room afterwards.
 
 The api is::
 
@@ -297,6 +302,43 @@ with a body of:
 
 To use it, you will need to authenticate by providing an ``access_token`` for a
 server admin: see `README.rst <README.rst>`_.
+
+
+List room memberships of an user
+================================
+Gets a list of all ``room_id`` that a specific ``user_id`` is member.
+
+The API is::
+
+  GET /_synapse/admin/v1/users/<user_id>/joined_rooms
+
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
+
+A response body like the following is returned:
+
+.. code:: json
+
+    {
+        "joined_rooms": [
+            "!DuGcnbhHGaSZQoNQR:matrix.org",
+            "!ZtSaPCawyWtxfWiIy:matrix.org"
+        ],
+        "total": 2
+    }
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- ``user_id`` - fully qualified: for example, ``@user:server.com``.
+
+**Response**
+
+The following fields are returned in the JSON response body:
+
+- ``joined_rooms`` - An array of ``room_id``.
+- ``total`` - Number of rooms.
 
 
 User devices

@@ -22,6 +22,7 @@ from twisted.internet import defer
 
 import synapse
 import synapse.metrics
+from synapse.api.presence import UserPresenceState
 from synapse.events import EventBase
 from synapse.federation.sender.per_destination_queue import PerDestinationQueue
 from synapse.federation.sender.transaction_manager import TransactionManager
@@ -39,7 +40,6 @@ from synapse.metrics import (
     events_processed_counter,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.storage.presence import UserPresenceState
 from synapse.types import ReadReceipt
 from synapse.util.metrics import Measure, measure_func
 
@@ -55,8 +55,17 @@ sent_pdus_destination_dist_total = Counter(
     "Total number of PDUs queued for sending across all destinations",
 )
 
+# Time (in s) after Synapse's startup that we will begin to wake up destinations
+# that have catch-up outstanding.
+CATCH_UP_STARTUP_DELAY_SEC = 15
 
-class FederationSender(object):
+# Time (in s) to wait in between waking up each destination, i.e. one destination
+# will be woken up every <x> seconds after Synapse's startup until we have woken
+# every destination has outstanding catch-up.
+CATCH_UP_STARTUP_INTERVAL_SEC = 5
+
+
+class FederationSender:
     def __init__(self, hs: "synapse.server.HomeServer"):
         self.hs = hs
         self.server_name = hs.hostname
@@ -108,8 +117,6 @@ class FederationSender(object):
             ),
         )
 
-        self._order = 1
-
         self._is_processing = False
         self._last_poked_id = -1
 
@@ -125,6 +132,14 @@ class FederationSender(object):
 
         self._rr_txn_interval_per_room_ms = (
             1000.0 / hs.config.federation_rr_transactions_per_room_per_second
+        )
+
+        # wake up destinations that have outstanding PDUs to be caught up
+        self._catchup_after_startup_timer = self.clock.call_later(
+            CATCH_UP_STARTUP_DELAY_SEC,
+            run_as_background_process,
+            "wake_destinations_needing_catchup",
+            self._wake_destinations_needing_catchup,
         )
 
     def _get_per_destination_queue(self, destination: str) -> PerDestinationQueue:
@@ -211,7 +226,7 @@ class FederationSender(object):
                     logger.debug("Sending %s to %r", event, destinations)
 
                     if destinations:
-                        self._send_pdu(event, destinations)
+                        await self._send_pdu(event, destinations)
 
                         now = self.clock.time_msec()
                         ts = await self.store.get_received_ts(event.event_id)
@@ -267,13 +282,10 @@ class FederationSender(object):
         finally:
             self._is_processing = False
 
-    def _send_pdu(self, pdu: EventBase, destinations: Iterable[str]) -> None:
+    async def _send_pdu(self, pdu: EventBase, destinations: Iterable[str]) -> None:
         # We loop through all destinations to see whether we already have
         # a transaction in progress. If we do, stick it in the pending_pdus
         # table and we'll get back to it later.
-
-        order = self._order
-        self._order += 1
 
         destinations = set(destinations)
         destinations.discard(self.server_name)
@@ -285,11 +297,17 @@ class FederationSender(object):
         sent_pdus_destination_dist_total.inc(len(destinations))
         sent_pdus_destination_dist_count.inc()
 
-        for destination in destinations:
-            self._get_per_destination_queue(destination).send_pdu(pdu, order)
+        # track the fact that we have a PDU for these destinations,
+        # to allow us to perform catch-up later on if the remote is unreachable
+        # for a while.
+        await self.store.store_destination_rooms_entries(
+            destinations, pdu.room_id, pdu.internal_metadata.stream_ordering,
+        )
 
-    @defer.inlineCallbacks
-    def send_read_receipt(self, receipt: ReadReceipt):
+        for destination in destinations:
+            self._get_per_destination_queue(destination).send_pdu(pdu)
+
+    async def send_read_receipt(self, receipt: ReadReceipt) -> None:
         """Send a RR to any other servers in the room
 
         Args:
@@ -330,12 +348,10 @@ class FederationSender(object):
         room_id = receipt.room_id
 
         # Work out which remote servers should be poked and poke them.
-        domains = yield defer.ensureDeferred(
-            self.state.get_current_hosts_in_room(room_id)
-        )
+        domains_set = await self.state.get_current_hosts_in_room(room_id)
         domains = [
             d
-            for d in domains
+            for d in domains_set
             if d != self.server_name
             and self._federation_shard_config.should_handle(self._instance_name, d)
         ]
@@ -387,8 +403,7 @@ class FederationSender(object):
             queue.flush_read_receipts_for_room(room_id)
 
     @preserve_fn  # the caller should not yield on this
-    @defer.inlineCallbacks
-    def send_presence(self, states: List[UserPresenceState]):
+    async def send_presence(self, states: List[UserPresenceState]):
         """Send the new presence states to the appropriate destinations.
 
         This actually queues up the presence states ready for sending and
@@ -423,7 +438,7 @@ class FederationSender(object):
                 if not states_map:
                     break
 
-                yield self._process_presence_inner(list(states_map.values()))
+                await self._process_presence_inner(list(states_map.values()))
         except Exception:
             logger.exception("Error sending presence states to servers")
         finally:
@@ -450,14 +465,11 @@ class FederationSender(object):
             self._get_per_destination_queue(destination).send_presence(states)
 
     @measure_func("txnqueue._process_presence")
-    @defer.inlineCallbacks
-    def _process_presence_inner(self, states: List[UserPresenceState]):
+    async def _process_presence_inner(self, states: List[UserPresenceState]):
         """Given a list of states populate self.pending_presence_by_dest and
         poke to send a new transaction to each destination
         """
-        hosts_and_states = yield defer.ensureDeferred(
-            get_interested_remotes(self.store, states, self.state)
-        )
+        hosts_and_states = await get_interested_remotes(self.store, states, self.state)
 
         for destinations, states in hosts_and_states:
             for destination in destinations:
@@ -565,3 +577,37 @@ class FederationSender(object):
         # Dummy implementation for case where federation sender isn't offloaded
         # to a worker.
         return [], 0, False
+
+    async def _wake_destinations_needing_catchup(self):
+        """
+        Wakes up destinations that need catch-up and are not currently being
+        backed off from.
+
+        In order to reduce load spikes, adds a delay between each destination.
+        """
+
+        last_processed = None  # type: Optional[str]
+
+        while True:
+            destinations_to_wake = await self.store.get_catch_up_outstanding_destinations(
+                last_processed
+            )
+
+            if not destinations_to_wake:
+                # finished waking all destinations!
+                self._catchup_after_startup_timer = None
+                break
+
+            destinations_to_wake = [
+                d
+                for d in destinations_to_wake
+                if self._federation_shard_config.should_handle(self._instance_name, d)
+            ]
+
+            for last_processed in destinations_to_wake:
+                logger.info(
+                    "Destination %s has outstanding catch-up, waking up.",
+                    last_processed,
+                )
+                self.wake_destination(last_processed)
+                await self.clock.sleep(CATCH_UP_STARTUP_INTERVAL_SEC)

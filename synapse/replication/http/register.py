@@ -29,12 +29,12 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
     PATH_ARGS = ("user_id",)
 
     def __init__(self, hs):
-        super(ReplicationRegisterServlet, self).__init__(hs)
+        super().__init__(hs)
         self.store = hs.get_datastore()
         self.registration_handler = hs.get_registration_handler()
 
     @staticmethod
-    def _serialize_payload(
+    async def _serialize_payload(
         user_id,
         password_hash,
         was_guest,
@@ -44,6 +44,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
         admin,
         user_type,
         address,
+        shadow_banned,
     ):
         """
         Args:
@@ -60,6 +61,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             user_type (str|None): type of user. One of the values from
                 api.constants.UserTypes, or None for a normal user.
             address (str|None): the IP address used to perform the regitration.
+            shadow_banned (bool): Whether to shadow-ban the user
         """
         return {
             "password_hash": password_hash,
@@ -70,6 +72,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             "admin": admin,
             "user_type": user_type,
             "address": address,
+            "shadow_banned": shadow_banned,
         }
 
     async def _handle_request(self, request, user_id):
@@ -87,6 +90,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             admin=content["admin"],
             user_type=content["user_type"],
             address=content["address"],
+            shadow_banned=content["shadow_banned"],
         )
 
         return 200, {}
@@ -100,12 +104,12 @@ class ReplicationPostRegisterActionsServlet(ReplicationEndpoint):
     PATH_ARGS = ("user_id",)
 
     def __init__(self, hs):
-        super(ReplicationPostRegisterActionsServlet, self).__init__(hs)
+        super().__init__(hs)
         self.store = hs.get_datastore()
         self.registration_handler = hs.get_registration_handler()
 
     @staticmethod
-    def _serialize_payload(user_id, auth_result, access_token):
+    async def _serialize_payload(user_id, auth_result, access_token):
         """
         Args:
             user_id (str): The user ID that consented

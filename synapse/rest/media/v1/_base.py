@@ -17,7 +17,9 @@
 import logging
 import os
 import urllib
+from typing import Awaitable
 
+from twisted.internet.interfaces import IConsumer
 from twisted.protocols.basic import FileSender
 
 from synapse.api.errors import Codes, SynapseError, cs_error
@@ -233,21 +235,21 @@ async def respond_with_responder(
     finish_request(request)
 
 
-class Responder(object):
+class Responder:
     """Represents a response that can be streamed to the requester.
 
     Responder is a context manager which *must* be used, so that any resources
     held can be cleaned up.
     """
 
-    def write_to_consumer(self, consumer):
+    def write_to_consumer(self, consumer: IConsumer) -> Awaitable:
         """Stream response into consumer
 
         Args:
-            consumer (IConsumer)
+            consumer: The consumer to stream into.
 
         Returns:
-            Deferred: Resolves once the response has finished being written
+            Resolves once the response has finished being written
         """
         pass
 
@@ -258,7 +260,7 @@ class Responder(object):
         pass
 
 
-class FileInfo(object):
+class FileInfo:
     """Details about a requested/uploaded file.
 
     Attributes:

@@ -27,9 +27,7 @@ from typing import Dict, Optional
 from urllib import parse as urlparse
 
 import attr
-from canonicaljson import json
 
-from twisted.internet import defer
 from twisted.internet.error import DNSLookupError
 
 from synapse.api.errors import Codes, SynapseError
@@ -43,6 +41,7 @@ from synapse.http.servlet import parse_integer, parse_string
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.media.v1._base import get_filename_from_headers
+from synapse.util import json_encoder
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.stringutils import random_string
@@ -103,7 +102,7 @@ for endpoint, globs in _oembed_globs.items():
         _oembed_patterns[re.compile(pattern)] = endpoint
 
 
-@attr.s
+@attr.s(slots=True)
 class OEmbedResult:
     # Either HTML content or URL must be provided.
     html = attr.ib(type=Optional[str])
@@ -228,19 +227,19 @@ class PreviewUrlResource(DirectServeJsonResource):
         else:
             logger.info("Returning cached response")
 
-        og = await make_deferred_yieldable(defer.maybeDeferred(observable.observe))
+        og = await make_deferred_yieldable(observable.observe())
         respond_with_json_bytes(request, 200, og, send_cors=True)
 
-    async def _do_preview(self, url, user, ts):
+    async def _do_preview(self, url: str, user: str, ts: int) -> bytes:
         """Check the db, and download the URL and build a preview
 
         Args:
-            url (str):
-            user (str):
-            ts (int):
+            url: The URL to preview.
+            user: The user requesting the preview.
+            ts: The timestamp requested for the preview.
 
         Returns:
-            Deferred[bytes]: json-encoded og data
+            json-encoded og data
         """
         # check the URL cache in the DB (which will also provide us with
         # historical previews, if we have any)
@@ -355,7 +354,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         logger.debug("Calculated OG for %s as %s", url, og)
 
-        jsonog = json.dumps(og)
+        jsonog = json_encoder.encode(og)
 
         # store OG in history-aware DB cache
         await self.store.store_url_cache(
@@ -451,7 +450,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             logger.warning("Error downloading oEmbed metadata from %s: %r", url, e)
             raise OEmbedError() from e
 
-    async def _download_url(self, url, user):
+    async def _download_url(self, url: str, user):
         # TODO: we should probably honour robots.txt... except in practice
         # we're most likely being explicitly triggered by a human rather than a
         # bot, so are we really a robot?
@@ -461,7 +460,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         file_info = FileInfo(server_name=None, file_id=file_id, url_cache=True)
 
         # If this URL can be accessed via oEmbed, use that instead.
-        url_to_download = url
+        url_to_download = url  # type: Optional[str]
         oembed_url = self._get_oembed_url(url)
         if oembed_url:
             # The result might be a new URL to download, or it might be HTML content.
@@ -521,9 +520,15 @@ class PreviewUrlResource(DirectServeJsonResource):
                 # FIXME: we should calculate a proper expiration based on the
                 # Cache-Control and Expire headers.  But for now, assume 1 hour.
                 expires = ONE_HOUR
-                etag = headers["ETag"][0] if "ETag" in headers else None
+                etag = (
+                    headers[b"ETag"][0].decode("ascii") if b"ETag" in headers else None
+                )
         else:
-            html_bytes = oembed_result.html.encode("utf-8")  # type: ignore
+            # we can only get here if we did an oembed request and have an oembed_result.html
+            assert oembed_result.html is not None
+            assert oembed_url is not None
+
+            html_bytes = oembed_result.html.encode("utf-8")
             with self.media_storage.store_into_file(file_info) as (f, fname, finish):
                 f.write(html_bytes)
                 await finish()
@@ -586,7 +591,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         logger.debug("Running url preview cache expiry")
 
-        if not (await self.store.db.updates.has_completed_background_updates()):
+        if not (await self.store.db_pool.updates.has_completed_background_updates()):
             logger.info("Still running DB updates; skipping expiry")
             return
 

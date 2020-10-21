@@ -162,3 +162,32 @@ docker build -t matrixdotorg/synapse -f docker/Dockerfile .
 
 You can choose to build a different docker image by changing the value of the `-f` flag to
 point to another Dockerfile.
+
+## Disabling the healthcheck
+
+If you are using a non-standard port or tls inside docker you can disable the healthcheck
+whilst running the above `docker run` commands. 
+
+```
+   --no-healthcheck
+```
+## Setting custom healthcheck on docker run
+
+If you wish to point the healthcheck at a different port with docker command, add the following
+
+```
+  --health-cmd 'curl -fSs http://localhost:1234/health'
+```
+
+## Setting the healthcheck in docker-compose file
+
+You can add the following to set a custom healthcheck in a docker compose file.
+You will need version >2.1 for this to work. 
+
+```
+healthcheck:
+  test: ["CMD", "curl", "-fSs", "http://localhost:8008/health"]
+  interval: 1m
+  timeout: 10s
+  retries: 3
+```

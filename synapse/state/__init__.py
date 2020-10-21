@@ -13,31 +13,46 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import heapq
 import logging
-from collections import namedtuple
-from typing import Awaitable, Dict, Iterable, List, Optional, Set
+from collections import defaultdict, namedtuple
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    DefaultDict,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+    overload,
+)
 
 import attr
 from frozendict import frozendict
-from prometheus_client import Histogram
+from prometheus_client import Counter, Histogram
+from typing_extensions import Literal
 
 from synapse.api.constants import EventTypes
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, StateResolutionVersions
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
+from synapse.logging.context import ContextResourceUsage
 from synapse.logging.utils import log_function
 from synapse.state import v1, v2
-from synapse.storage.data_stores.main.events_worker import EventRedactBehaviour
+from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.roommember import ProfileInfo
-from synapse.types import StateMap
-from synapse.util import Clock
+from synapse.types import Collection, StateMap
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import Measure, measure_func
 
 logger = logging.getLogger(__name__)
-
+metrics_logger = logging.getLogger("synapse.state.metrics")
 
 # Metrics for number of state groups involved in a resolution.
 state_groups_histogram = Histogram(
@@ -65,11 +80,17 @@ def _gen_state_id():
     return s
 
 
-class _StateCacheEntry(object):
+class _StateCacheEntry:
     __slots__ = ["state", "state_group", "state_id", "prev_group", "delta_ids"]
 
-    def __init__(self, state, state_group, prev_group=None, delta_ids=None):
-        # dict[(str, str), str] map  from (type, state_key) to event_id
+    def __init__(
+        self,
+        state: StateMap[str],
+        state_group: Optional[int],
+        prev_group: Optional[int] = None,
+        delta_ids: Optional[StateMap[str]] = None,
+    ):
+        # A map from (type, state_key) to event_id.
         self.state = frozendict(state)
 
         # the ID of a state group if one and only one is involved.
@@ -95,7 +116,7 @@ class _StateCacheEntry(object):
         return len(self.state)
 
 
-class StateHandler(object):
+class StateHandler:
     """Fetches bits of state from the stores, and does state resolution
     where necessary
     """
@@ -107,24 +128,49 @@ class StateHandler(object):
         self.hs = hs
         self._state_resolution_handler = hs.get_state_resolution_handler()
 
+    @overload
     async def get_current_state(
-        self, room_id, event_type=None, state_key="", latest_event_ids=None
-    ):
-        """ Retrieves the current state for the room. This is done by
+        self,
+        room_id: str,
+        event_type: Literal[None] = None,
+        state_key: str = "",
+        latest_event_ids: Optional[List[str]] = None,
+    ) -> StateMap[EventBase]:
+        ...
+
+    @overload
+    async def get_current_state(
+        self,
+        room_id: str,
+        event_type: str,
+        state_key: str = "",
+        latest_event_ids: Optional[List[str]] = None,
+    ) -> Optional[EventBase]:
+        ...
+
+    async def get_current_state(
+        self,
+        room_id: str,
+        event_type: Optional[str] = None,
+        state_key: str = "",
+        latest_event_ids: Optional[List[str]] = None,
+    ) -> Union[Optional[EventBase], StateMap[EventBase]]:
+        """Retrieves the current state for the room. This is done by
         calling `get_latest_events_in_room` to get the leading edges of the
         event graph and then resolving any of the state conflicts.
 
         This is equivalent to getting the state of an event that were to send
         next before receiving any new events.
 
-        If `event_type` is specified, then the method returns only the one
-        event (or None) with that `event_type` and `state_key`.
-
         Returns:
-            map from (type, state_key) to event
+            If `event_type` is specified, then the method returns only the one
+            event (or None) with that `event_type` and `state_key`.
+
+            Otherwise, a map from (type, state_key) to event.
         """
         if not latest_event_ids:
             latest_event_ids = await self.store.get_latest_event_ids_in_room(room_id)
+        assert latest_event_ids is not None
 
         logger.debug("calling resolve_state_groups from get_current_state")
         ret = await self.resolve_state_groups_for_events(room_id, latest_event_ids)
@@ -140,34 +186,30 @@ class StateHandler(object):
         state_map = await self.store.get_events(
             list(state.values()), get_prev_content=False
         )
-        state = {
+        return {
             key: state_map[e_id] for key, e_id in state.items() if e_id in state_map
         }
 
-        return state
-
-    async def get_current_state_ids(self, room_id, latest_event_ids=None):
+    async def get_current_state_ids(
+        self, room_id: str, latest_event_ids: Optional[Iterable[str]] = None
+    ) -> StateMap[str]:
         """Get the current state, or the state at a set of events, for a room
 
         Args:
-            room_id (str):
-
-            latest_event_ids (iterable[str]|None): if given, the forward
-                extremities to resolve. If None, we look them up from the
-                database (via a cache)
+            room_id:
+            latest_event_ids: if given, the forward extremities to resolve. If
+                None, we look them up from the database (via a cache).
 
         Returns:
-            Deferred[dict[(str, str), str)]]: the state dict, mapping from
-                (event_type, state_key) -> event_id
+            the state dict, mapping from (event_type, state_key) -> event_id
         """
         if not latest_event_ids:
             latest_event_ids = await self.store.get_latest_event_ids_in_room(room_id)
+        assert latest_event_ids is not None
 
         logger.debug("calling resolve_state_groups from get_current_state_ids")
         ret = await self.resolve_state_groups_for_events(room_id, latest_event_ids)
-        state = ret.state
-
-        return state
+        return ret.state
 
     async def get_current_users_in_room(
         self, room_id: str, latest_event_ids: Optional[List[str]] = None
@@ -183,32 +225,34 @@ class StateHandler(object):
         """
         if not latest_event_ids:
             latest_event_ids = await self.store.get_latest_event_ids_in_room(room_id)
+        assert latest_event_ids is not None
+
         logger.debug("calling resolve_state_groups from get_current_users_in_room")
         entry = await self.resolve_state_groups_for_events(room_id, latest_event_ids)
-        joined_users = await self.store.get_joined_users_from_state(room_id, entry)
-        return joined_users
+        return await self.store.get_joined_users_from_state(room_id, entry)
 
-    async def get_current_hosts_in_room(self, room_id):
+    async def get_current_hosts_in_room(self, room_id: str) -> Set[str]:
         event_ids = await self.store.get_latest_event_ids_in_room(room_id)
         return await self.get_hosts_in_room_at_events(room_id, event_ids)
 
-    async def get_hosts_in_room_at_events(self, room_id, event_ids):
+    async def get_hosts_in_room_at_events(
+        self, room_id: str, event_ids: List[str]
+    ) -> Set[str]:
         """Get the hosts that were in a room at the given event ids
 
         Args:
-            room_id (str):
-            event_ids (list[str]):
+            room_id:
+            event_ids:
 
         Returns:
-            Deferred[list[str]]: the hosts in the room at the given events
+            The hosts in the room at the given events
         """
         entry = await self.resolve_state_groups_for_events(room_id, event_ids)
-        joined_hosts = await self.store.get_joined_hosts(room_id, entry)
-        return joined_hosts
+        return await self.store.get_joined_hosts(room_id, entry)
 
     async def compute_event_context(
         self, event: EventBase, old_state: Optional[Iterable[EventBase]] = None
-    ):
+    ) -> EventContext:
         """Build an EventContext structure for the event.
 
         This works out what the current state should be for the event, and
@@ -221,7 +265,7 @@ class StateHandler(object):
                 when receiving an event from federation where we don't have the
                 prev events for, e.g. when backfilling.
         Returns:
-            synapse.events.snapshot.EventContext:
+            The event context.
         """
 
         if event.internal_metadata.is_outlier():
@@ -262,7 +306,7 @@ class StateHandler(object):
             # if we're given the state before the event, then we use that
             state_ids_before_event = {
                 (s.type, s.state_key): s.event_id for s in old_state
-            }
+            }  # type: StateMap[str]
             state_group_before_event = None
             state_group_before_event_prev_group = None
             deltas_to_state_group_before_event = None
@@ -346,19 +390,18 @@ class StateHandler(object):
         )
 
     @measure_func()
-    async def resolve_state_groups_for_events(self, room_id, event_ids):
+    async def resolve_state_groups_for_events(
+        self, room_id: str, event_ids: Iterable[str]
+    ) -> _StateCacheEntry:
         """ Given a list of event_ids this method fetches the state at each
         event, resolves conflicts between them and returns them.
 
         Args:
-            room_id (str)
-            event_ids (list[str])
-            explicit_room_version (str|None): If set uses the the given room
-                version to choose the resolution algorithm. If None, then
-                checks the database for room version.
+            room_id
+            event_ids
 
         Returns:
-            Deferred[_StateCacheEntry]: resolved state
+            The resolved state
         """
         logger.debug("resolve_state_groups event_ids %s", event_ids)
 
@@ -394,7 +437,12 @@ class StateHandler(object):
         )
         return result
 
-    async def resolve_events(self, room_version, state_sets, event):
+    async def resolve_events(
+        self,
+        room_version: str,
+        state_sets: Collection[Iterable[EventBase]],
+        event: EventBase,
+    ) -> StateMap[EventBase]:
         logger.info(
             "Resolving state for %s with %d groups", event.room_id, len(state_sets)
         )
@@ -404,22 +452,45 @@ class StateHandler(object):
 
         state_map = {ev.event_id: ev for st in state_sets for ev in st}
 
-        with Measure(self.clock, "state._resolve_events"):
-            new_state = await resolve_events_with_store(
-                self.clock,
-                event.room_id,
-                room_version,
-                state_set_ids,
-                event_map=state_map,
-                state_res_store=StateResolutionStore(self.store),
-            )
+        new_state = await self._state_resolution_handler.resolve_events_with_store(
+            event.room_id,
+            room_version,
+            state_set_ids,
+            event_map=state_map,
+            state_res_store=StateResolutionStore(self.store),
+        )
 
-        new_state = {key: state_map[ev_id] for key, ev_id in new_state.items()}
-
-        return new_state
+        return {key: state_map[ev_id] for key, ev_id in new_state.items()}
 
 
-class StateResolutionHandler(object):
+@attr.s(slots=True)
+class _StateResMetrics:
+    """Keeps track of some usage metrics about state res."""
+
+    # System and User CPU time, in seconds
+    cpu_time = attr.ib(type=float, default=0.0)
+
+    # time spent on database transactions (excluding scheduling time). This roughly
+    # corresponds to the amount of work done on the db server, excluding event fetches.
+    db_time = attr.ib(type=float, default=0.0)
+
+    # number of events fetched from the db.
+    db_events = attr.ib(type=int, default=0)
+
+
+_biggest_room_by_cpu_counter = Counter(
+    "synapse_state_res_cpu_for_biggest_room_seconds",
+    "CPU time spent performing state resolution for the single most expensive "
+    "room for state resolution",
+)
+_biggest_room_by_db_counter = Counter(
+    "synapse_state_res_db_for_biggest_room_seconds",
+    "Database time spent performing state resolution for the single most "
+    "expensive room for state resolution",
+)
+
+
+class StateResolutionHandler:
     """Responsible for doing state conflict resolution.
 
     Note that the storage layer depends on this handler, so all functions must
@@ -429,10 +500,9 @@ class StateResolutionHandler(object):
     def __init__(self, hs):
         self.clock = hs.get_clock()
 
-        # dict of set of event_ids -> _StateCacheEntry.
-        self._state_cache = None
         self.resolve_linearizer = Linearizer(name="state_resolve_lock")
 
+        # dict of set of event_ids -> _StateCacheEntry.
         self._state_cache = ExpiringCache(
             cache_name="state_cache",
             clock=self.clock,
@@ -442,9 +512,25 @@ class StateResolutionHandler(object):
             reset_expiry_on_get=True,
         )
 
+        #
+        # stuff for tracking time spent on state-res by room
+        #
+
+        # tracks the amount of work done on state res per room
+        self._state_res_metrics = defaultdict(
+            _StateResMetrics
+        )  # type: DefaultDict[str, _StateResMetrics]
+
+        self.clock.looping_call(self._report_metrics, 120 * 1000)
+
     @log_function
     async def resolve_state_groups(
-        self, room_id, room_version, state_groups_ids, event_map, state_res_store
+        self,
+        room_id: str,
+        room_version: str,
+        state_groups_ids: Dict[int, StateMap[str]],
+        event_map: Optional[Dict[str, EventBase]],
+        state_res_store: "StateResolutionStore",
     ):
         """Resolves conflicts between a set of state groups
 
@@ -452,13 +538,13 @@ class StateResolutionHandler(object):
         not be called for a single state group
 
         Args:
-            room_id (str): room we are resolving for (used for logging and sanity checks)
-            room_version (str): version of the room
-            state_groups_ids (dict[int, dict[(str, str), str]]):
-                 map from state group id to the state in that state group
+            room_id: room we are resolving for (used for logging and sanity checks)
+            room_version: version of the room
+            state_groups_ids:
+                A map from state group id to the state in that state group
                 (where 'state' is a map from state key to event id)
 
-            event_map(dict[str,FrozenEvent]|None):
+            event_map:
                 a dict from event_id to event, for any events that we happen to
                 have in flight (eg, those currently being persisted). This will be
                 used as a starting point fof finding the state we need; any missing
@@ -466,55 +552,31 @@ class StateResolutionHandler(object):
 
                 If None, all events will be fetched via state_res_store.
 
-            state_res_store (StateResolutionStore)
+            state_res_store
 
         Returns:
-            _StateCacheEntry: resolved state
+            The resolved state
         """
-        logger.debug("resolve_state_groups state_groups %s", state_groups_ids.keys())
-
         group_names = frozenset(state_groups_ids.keys())
 
         with (await self.resolve_linearizer.queue(group_names)):
-            if self._state_cache is not None:
-                cache = self._state_cache.get(group_names, None)
-                if cache:
-                    return cache
+            cache = self._state_cache.get(group_names, None)
+            if cache:
+                return cache
 
             logger.info(
-                "Resolving state for %s with %d groups", room_id, len(state_groups_ids)
+                "Resolving state for %s with groups %s", room_id, list(group_names),
             )
 
             state_groups_histogram.observe(len(state_groups_ids))
 
-            # start by assuming we won't have any conflicted state, and build up the new
-            # state map by iterating through the state groups. If we discover a conflict,
-            # we give up and instead use `resolve_events_with_store`.
-            #
-            # XXX: is this actually worthwhile, or should we just let
-            # resolve_events_with_store do it?
-            new_state = {}
-            conflicted_state = False
-            for st in state_groups_ids.values():
-                for key, e_id in st.items():
-                    if key in new_state:
-                        conflicted_state = True
-                        break
-                    new_state[key] = e_id
-                if conflicted_state:
-                    break
-
-            if conflicted_state:
-                logger.info("Resolving conflicted state for %r", room_id)
-                with Measure(self.clock, "state._resolve_events"):
-                    new_state = await resolve_events_with_store(
-                        self.clock,
-                        room_id,
-                        room_version,
-                        list(state_groups_ids.values()),
-                        event_map=event_map,
-                        state_res_store=state_res_store,
-                    )
+            new_state = await self.resolve_events_with_store(
+                room_id,
+                room_version,
+                list(state_groups_ids.values()),
+                event_map=event_map,
+                state_res_store=state_res_store,
+            )
 
             # if the new state matches any of the input state groups, we can
             # use that state group again. Otherwise we will generate a state_id
@@ -524,27 +586,135 @@ class StateResolutionHandler(object):
             with Measure(self.clock, "state.create_group_ids"):
                 cache = _make_state_cache_entry(new_state, state_groups_ids)
 
-            if self._state_cache is not None:
-                self._state_cache[group_names] = cache
+            self._state_cache[group_names] = cache
 
             return cache
 
+    async def resolve_events_with_store(
+        self,
+        room_id: str,
+        room_version: str,
+        state_sets: Sequence[StateMap[str]],
+        event_map: Optional[Dict[str, EventBase]],
+        state_res_store: "StateResolutionStore",
+    ) -> StateMap[str]:
+        """
+        Args:
+            room_id: the room we are working in
 
-def _make_state_cache_entry(new_state, state_groups_ids):
+            room_version: Version of the room
+
+            state_sets: List of dicts of (type, state_key) -> event_id,
+                which are the different state groups to resolve.
+
+            event_map:
+                a dict from event_id to event, for any events that we happen to
+                have in flight (eg, those currently being persisted). This will be
+                used as a starting point fof finding the state we need; any missing
+                events will be requested via state_map_factory.
+
+                If None, all events will be fetched via state_res_store.
+
+            state_res_store: a place to fetch events from
+
+        Returns:
+            a map from (type, state_key) to event_id.
+        """
+        try:
+            with Measure(self.clock, "state._resolve_events") as m:
+                v = KNOWN_ROOM_VERSIONS[room_version]
+                if v.state_res == StateResolutionVersions.V1:
+                    return await v1.resolve_events_with_store(
+                        room_id, state_sets, event_map, state_res_store.get_events
+                    )
+                else:
+                    return await v2.resolve_events_with_store(
+                        self.clock,
+                        room_id,
+                        room_version,
+                        state_sets,
+                        event_map,
+                        state_res_store,
+                    )
+        finally:
+            self._record_state_res_metrics(room_id, m.get_resource_usage())
+
+    def _record_state_res_metrics(self, room_id: str, rusage: ContextResourceUsage):
+        room_metrics = self._state_res_metrics[room_id]
+        room_metrics.cpu_time += rusage.ru_utime + rusage.ru_stime
+        room_metrics.db_time += rusage.db_txn_duration_sec
+        room_metrics.db_events += rusage.evt_db_fetch_count
+
+    def _report_metrics(self):
+        if not self._state_res_metrics:
+            # no state res has happened since the last iteration: don't bother logging.
+            return
+
+        self._report_biggest(
+            lambda i: i.cpu_time, "CPU time", _biggest_room_by_cpu_counter,
+        )
+
+        self._report_biggest(
+            lambda i: i.db_time, "DB time", _biggest_room_by_db_counter,
+        )
+
+        self._state_res_metrics.clear()
+
+    def _report_biggest(
+        self,
+        extract_key: Callable[[_StateResMetrics], Any],
+        metric_name: str,
+        prometheus_counter_metric: Counter,
+    ) -> None:
+        """Report metrics on the biggest rooms for state res
+
+        Args:
+            extract_key: a callable which, given a _StateResMetrics, extracts a single
+                metric to sort by.
+            metric_name: the name of the metric we have extracted, for the log line
+            prometheus_counter_metric: a prometheus metric recording the sum of the
+                the extracted metric
+        """
+        n_to_log = 10
+        if not metrics_logger.isEnabledFor(logging.DEBUG):
+            # only need the most expensive if we don't have debug logging, which
+            # allows nlargest() to degrade to max()
+            n_to_log = 1
+
+        items = self._state_res_metrics.items()
+
+        # log the N biggest rooms
+        biggest = heapq.nlargest(
+            n_to_log, items, key=lambda i: extract_key(i[1])
+        )  # type: List[Tuple[str, _StateResMetrics]]
+        metrics_logger.debug(
+            "%i biggest rooms for state-res by %s: %s",
+            len(biggest),
+            metric_name,
+            ["%s (%gs)" % (r, extract_key(m)) for (r, m) in biggest],
+        )
+
+        # report info on the single biggest to prometheus
+        _, biggest_metrics = biggest[0]
+        prometheus_counter_metric.inc(extract_key(biggest_metrics))
+
+
+def _make_state_cache_entry(
+    new_state: StateMap[str], state_groups_ids: Dict[int, StateMap[str]]
+) -> _StateCacheEntry:
     """Given a resolved state, and a set of input state groups, pick one to base
     a new state group on (if any), and return an appropriately-constructed
     _StateCacheEntry.
 
     Args:
-        new_state (dict[(str, str), str]): resolved state map (mapping from
-           (type, state_key) to event_id)
+        new_state: resolved state map (mapping from (type, state_key) to event_id)
 
-        state_groups_ids (dict[int, dict[(str, str), str]]):
-                 map from state group id to the state in that state group
-                (where 'state' is a map from state key to event id)
+        state_groups_ids:
+            map from state group id to the state in that state group (where
+            'state' is a map from state key to event id)
 
     Returns:
-        _StateCacheEntry
+        The cache entry.
     """
     # if the new state matches any of the input state groups, we can
     # use that state group again. Otherwise we will generate a state_id
@@ -581,49 +751,8 @@ def _make_state_cache_entry(new_state, state_groups_ids):
     )
 
 
-def resolve_events_with_store(
-    clock: Clock,
-    room_id: str,
-    room_version: str,
-    state_sets: List[StateMap[str]],
-    event_map: Optional[Dict[str, EventBase]],
-    state_res_store: "StateResolutionStore",
-) -> Awaitable[StateMap[str]]:
-    """
-    Args:
-        room_id: the room we are working in
-
-        room_version: Version of the room
-
-        state_sets: List of dicts of (type, state_key) -> event_id,
-            which are the different state groups to resolve.
-
-        event_map:
-            a dict from event_id to event, for any events that we happen to
-            have in flight (eg, those currently being persisted). This will be
-            used as a starting point fof finding the state we need; any missing
-            events will be requested via state_map_factory.
-
-            If None, all events will be fetched via state_res_store.
-
-        state_res_store: a place to fetch events from
-
-    Returns:
-        a map from (type, state_key) to event_id.
-    """
-    v = KNOWN_ROOM_VERSIONS[room_version]
-    if v.state_res == StateResolutionVersions.V1:
-        return v1.resolve_events_with_store(
-            room_id, state_sets, event_map, state_res_store.get_events
-        )
-    else:
-        return v2.resolve_events_with_store(
-            clock, room_id, room_version, state_sets, event_map, state_res_store
-        )
-
-
-@attr.s
-class StateResolutionStore(object):
+@attr.s(slots=True)
+class StateResolutionStore:
     """Interface that allows state resolution algorithms to access the database
     in well defined way.
 
@@ -633,15 +762,17 @@ class StateResolutionStore(object):
 
     store = attr.ib()
 
-    def get_events(self, event_ids, allow_rejected=False):
+    def get_events(
+        self, event_ids: Iterable[str], allow_rejected: bool = False
+    ) -> Awaitable[Dict[str, EventBase]]:
         """Get events from the database
 
         Args:
-            event_ids (list): The event_ids of the events to fetch
-            allow_rejected (bool): If True return rejected events.
+            event_ids: The event_ids of the events to fetch
+            allow_rejected: If True return rejected events.
 
         Returns:
-            Deferred[dict[str, FrozenEvent]]: Dict from event_id to event.
+            An awaitable which resolves to a dict from event_id to event.
         """
 
         return self.store.get_events(
@@ -651,7 +782,9 @@ class StateResolutionStore(object):
             allow_rejected=allow_rejected,
         )
 
-    def get_auth_chain_difference(self, state_sets: List[Set[str]]):
+    def get_auth_chain_difference(
+        self, state_sets: List[Set[str]]
+    ) -> Awaitable[Set[str]]:
         """Given sets of state events figure out the auth chain difference (as
         per state res v2 algorithm).
 
@@ -660,7 +793,7 @@ class StateResolutionStore(object):
         chain.
 
         Returns:
-            Deferred[Set[str]]: Set of event IDs.
+            An awaitable that resolves to a set of event IDs.
         """
 
         return self.store.get_auth_chain_difference(state_sets)

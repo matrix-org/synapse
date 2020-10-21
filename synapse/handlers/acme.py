@@ -17,7 +17,6 @@ import logging
 
 import twisted
 import twisted.internet.error
-from twisted.internet import defer
 from twisted.web import server, static
 from twisted.web.resource import Resource
 
@@ -35,14 +34,13 @@ solutions, please read https://github.com/matrix-org/synapse/blob/master/docs/AC
 --------------------------------------------------------------------------------"""
 
 
-class AcmeHandler(object):
+class AcmeHandler:
     def __init__(self, hs):
         self.hs = hs
         self.reactor = hs.get_reactor()
         self._acme_domain = hs.config.acme_domain
 
-    @defer.inlineCallbacks
-    def start_listening(self):
+    async def start_listening(self):
         from synapse.handlers import acme_issuing_service
 
         # Configure logging for txacme, if you need to debug
@@ -82,18 +80,17 @@ class AcmeHandler(object):
         self._issuer._registered = False
 
         try:
-            yield self._issuer._ensure_registered()
+            await self._issuer._ensure_registered()
         except Exception:
             logger.error(ACME_REGISTER_FAIL_ERROR)
             raise
 
-    @defer.inlineCallbacks
-    def provision_certificate(self):
+    async def provision_certificate(self):
 
         logger.warning("Reprovisioning %s", self._acme_domain)
 
         try:
-            yield self._issuer.issue_cert(self._acme_domain)
+            await self._issuer.issue_cert(self._acme_domain)
         except Exception:
             logger.exception("Fail!")
             raise

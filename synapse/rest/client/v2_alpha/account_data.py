@@ -35,7 +35,7 @@ class AccountDataServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(AccountDataServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.notifier = hs.get_notifier()
@@ -93,7 +93,7 @@ class RoomAccountDataServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(RoomAccountDataServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.notifier = hs.get_notifier()

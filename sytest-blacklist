@@ -37,6 +37,14 @@ Inbound federation of state requires event_id as a mandatory paramater
 # Blacklisted until https://github.com/matrix-org/synapse/pull/6486 lands
 Can upload self-signing keys
 
+# Blacklisted until MSC2753 is implemented
+Local users can peek into world_readable rooms by room ID
+We can't peek into rooms with shared history_visibility
+We can't peek into rooms with invited history_visibility
+We can't peek into rooms with joined history_visibility
+Local users can peek by room alias
+Peeked rooms only turn up in the sync for the device who peeked them
+
 # Blacklisted due to https://github.com/matrix-org/synapse-dinsic/issues/43
 Inviting an AS-hosted user asks the AS server
 Accesing an AS-hosted room alias asks the AS server

@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
-
 import json
 import urllib
 from pprint import pformat
@@ -24,7 +22,7 @@ from twisted.web.client import Agent, readBody
 from twisted.web.http_headers import Headers
 
 
-class HttpClient(object):
+class HttpClient:
     """ Interface for talking json over http
     """
 
@@ -169,7 +167,7 @@ class TwistedHttpClient(HttpClient):
         return d
 
 
-class _RawProducer(object):
+class _RawProducer:
     def __init__(self, data):
         self.data = data
         self.body = data
@@ -186,7 +184,7 @@ class _RawProducer(object):
         pass
 
 
-class _JsonProducer(object):
+class _JsonProducer:
     """ Used by the twisted http client to create the HTTP body from json
     """
 

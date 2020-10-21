@@ -10,6 +10,17 @@
 # homeserver.yaml. Instead, if you are starting from scratch, please generate
 # a fresh config using Synapse by following the instructions in INSTALL.md.
 
+# Configuration options that take a time period can be set using a number
+# followed by a letter. Letters have the following meanings:
+# s = second
+# m = minute
+# h = hour
+# d = day
+# w = week
+# y = year
+# For example, setting redaction_retention_period: 5m would remove redacted
+# messages from the database after 5 minutes, rather than 5 months.
+
 ################################################################################
 
 # Configuration file for Synapse.
@@ -22,10 +33,23 @@
 
 ## Server ##
 
-# The domain name of the server, with optional explicit port.
-# This is used by remote servers to connect to this server,
-# e.g. matrix.org, localhost:8080, etc.
-# This is also the last part of your UserID.
+# The public-facing domain of the server
+#
+# The server_name name will appear at the end of usernames and room addresses
+# created on this server. For example if the server_name was example.com,
+# usernames on this server would be in the format @user:example.com
+#
+# In most cases you should avoid using a matrix specific subdomain such as
+# matrix.example.com or synapse.example.com as the server_name for the same
+# reasons you wouldn't use user@email.example.com as your email address.
+# See https://github.com/matrix-org/synapse/blob/master/docs/delegate.md
+# for information on how to host Synapse on a subdomain while preserving
+# a clean server_name.
+#
+# The server_name cannot be changed later so it is important to
+# configure this correctly before you start Synapse. It should be all
+# lowercase and may contain an explicit port.
+# Examples: matrix.org, localhost:8080
 #
 server_name: "SERVERNAME"
 
@@ -314,6 +338,10 @@ limit_remote_rooms:
   #
   #complexity_error: "This room is too complex."
 
+  # allow server admins to join complex rooms. Default is false.
+  #
+  #admins_can_join: true
+
 # Whether to require a user to be in the room to add an alias to it.
 # Defaults to 'true'.
 #
@@ -431,11 +459,10 @@ retention:
   #  min_lifetime: 1d
   #  max_lifetime: 1y
 
-  # Retention policy limits. If set, a user won't be able to send a
-  # 'm.room.retention' event which features a 'min_lifetime' or a 'max_lifetime'
-  # that's not within this range. This is especially useful in closed federations,
-  # in which server admins can make sure every federating server applies the same
-  # rules.
+  # Retention policy limits. If set, and the state of a room contains a
+  # 'm.room.retention' event in its state which contains a 'min_lifetime' or a
+  # 'max_lifetime' that's out of these bounds, Synapse will cap the room's policy
+  # to these limits when running purge jobs.
   #
   #allowed_lifetime_min: 1d
   #allowed_lifetime_max: 1y
@@ -461,12 +488,19 @@ retention:
   # (e.g. every 12h), but not want that purge to be performed by a job that's
   # iterating over every room it knows, which could be heavy on the server.
   #
+  # If any purge job is configured, it is strongly recommended to have at least
+  # a single job with neither 'shortest_max_lifetime' nor 'longest_max_lifetime'
+  # set, or one job without 'shortest_max_lifetime' and one job without
+  # 'longest_max_lifetime' set. Otherwise some rooms might be ignored, even if
+  # 'allowed_lifetime_min' and 'allowed_lifetime_max' are set, because capping a
+  # room's policy to these values is done after the policies are retrieved from
+  # Synapse's database (which is done using the range specified in a purge job's
+  # configuration).
+  #
   #purge_jobs:
-  #  - shortest_max_lifetime: 1d
-  #    longest_max_lifetime: 3d
+  #  - longest_max_lifetime: 3d
   #    interval: 12h
   #  - shortest_max_lifetime: 3d
-  #    longest_max_lifetime: 1y
   #    interval: 1d
 
 # Inhibits the /requestToken endpoints from returning an error that might leak
@@ -663,6 +697,7 @@ acme:
 #tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
 
 
+## Federation ##
 
 # Restrict federation to the following whitelist of domains.
 # N.B. we recommend also firewalling your federation listener to limit
@@ -695,6 +730,17 @@ federation_ip_range_blacklist:
   - '::1/128'
   - 'fe80::/64'
   - 'fc00::/7'
+
+# Report prometheus metrics on the age of PDUs being sent to and received from
+# the following domains. This can be used to give an idea of "delay" on inbound
+# and outbound federation, though be aware that any delay can be due to problems
+# at either end or with the intermediate network.
+#
+# By default, no domains are monitored in this way.
+#
+#federation_metrics_domains:
+#  - matrix.org
+#  - example.com
 
 
 ## Caching ##
@@ -819,6 +865,10 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #   - one for ratelimiting redactions by room admins. If this is not explicitly
 #     set then it uses the same ratelimiting as per rc_message. This is useful
 #     to allow room admins to deal with abuse quickly.
+#   - two for ratelimiting number of rooms a user can join, "local" for when
+#     users are joining rooms the server is already in (this is cheap) vs
+#     "remote" for when users are trying to join rooms not on the server (which
+#     can be more expensive)
 #
 # The defaults are as shown below.
 #
@@ -848,6 +898,14 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #rc_admin_redaction:
 #  per_second: 1
 #  burst_count: 50
+#
+#rc_joins:
+#  local:
+#    per_second: 0.1
+#    burst_count: 3
+#  remote:
+#    per_second: 0.01
+#    burst_count: 3
 
 
 # Ratelimiting settings for incoming federation
@@ -1289,24 +1347,6 @@ account_validity:
 #
 #default_identity_server: https://matrix.org
 
-# The list of identity servers trusted to verify third party
-# identifiers by this server.
-#
-# Also defines the ID server which will be called when an account is
-# deactivated (one will be picked arbitrarily).
-#
-# Note: This option is deprecated. Since v0.99.4, Synapse has tracked which identity
-# server a 3PID has been bound to. For 3PIDs bound before then, Synapse runs a
-# background migration script, informing itself that the identity server all of its
-# 3PIDs have been bound to is likely one of the below.
-#
-# As of Synapse v1.4.0, all other functionality of this option has been deprecated, and
-# it is now solely used for the purposes of the background migration script, and can be
-# removed once it has run.
-#trusted_third_party_id_servers:
-#  - matrix.org
-#  - vector.im
-
 # If enabled, user IDs, display names and avatar URLs will be replicated
 # to this server whenever they change.
 # This is an experimental API currently implemented by sydent to support
@@ -1645,10 +1685,13 @@ trusted_key_servers:
 # At least one of `sp_config` or `config_path` must be set in this section to
 # enable SAML login.
 #
-# (You will probably also want to set the following options to `false` to
+# You will probably also want to set the following options to `false` to
 # disable the regular login/registration flows:
 #   * enable_registration
 #   * password_config.enabled
+#
+# You will also want to investigate the settings under the "sso" configuration
+# section below.
 #
 # Once SAML support is enabled, a metadata file will be exposed at
 # https://<server>:<port>/_matrix/saml2/metadata.xml, which you may be able to
@@ -1761,30 +1804,16 @@ saml2_config:
   #
   #grandfathered_mxid_source_attribute: upn
 
-  # Directory in which Synapse will try to find the template files below.
-  # If not set, default templates from within the Synapse package will be used.
+  # It is possible to configure Synapse to only allow logins if SAML attributes
+  # match particular values. The requirements can be listed under
+  # `attribute_requirements` as shown below. All of the listed attributes must
+  # match for the login to be permitted.
   #
-  # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
-  # If you *do* uncomment it, you will need to make sure that all the templates
-  # below are in the directory.
-  #
-  # Synapse will look for the following templates in this directory:
-  #
-  # * HTML page to display to users if something goes wrong during the
-  #   authentication process: 'saml_error.html'.
-  #
-  #   When rendering, this template is given the following variables:
-  #     * code: an HTML error code corresponding to the error that is being
-  #       returned (typically 400 or 500)
-  #
-  #     * msg: a textual message describing the error.
-  #
-  #   The variables will automatically be HTML-escaped.
-  #
-  # You can see the default templates at:
-  # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
-  #
-  #template_dir: "res/templates"
+  #attribute_requirements:
+  #  - attribute: userGroup
+  #    value: "staff"
+  #  - attribute: department
+  #    value: "sales"
 
 
 # OpenID Connect integration. The following settings can be used to make Synapse
@@ -1860,6 +1889,11 @@ oidc_config:
   #
   #skip_verification: true
 
+  # Uncomment to allow a user logging in via OIDC to match a pre-existing account instead
+  # of failing. This could be used if switching from password logins to OIDC. Defaults to false.
+  #
+  #allow_existing_users: true
+
   # An external module can be provided here as a custom solution to mapping
   # attributes returned from a OIDC provider onto a matrix user.
   #
@@ -1900,6 +1934,14 @@ oidc_config:
       # If unset, no displayname will be set.
       #
       #display_name_template: "{{ user.given_name }} {{ user.last_name }}"
+
+      # Jinja2 templates for extra attributes to send back to the client during
+      # login.
+      #
+      # Note that these are non-standard and clients will ignore them without modifications.
+      #
+      #extra_attributes:
+        #birthdate: "{{ user.birthdate }}"
 
 
 
@@ -2175,9 +2217,7 @@ email:
   # Directory in which Synapse will try to find the template files below.
   # If not set, default templates from within the Synapse package will be used.
   #
-  # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
-  # If you *do* uncomment it, you will need to make sure that all the templates
-  # below are in the directory.
+  # Do not uncomment this setting unless you want to customise the templates.
   #
   # Synapse will look for the following templates in this directory:
   #
@@ -2190,9 +2230,13 @@ email:
   # * The contents of password reset emails sent by the homeserver:
   #   'password_reset.html' and 'password_reset.txt'
   #
-  # * HTML pages for success and failure that a user will see when they follow
-  #   the link in the password reset email: 'password_reset_success.html' and
-  #   'password_reset_failure.html'
+  # * An HTML page that a user will see when they follow the link in the password
+  #   reset email. The user will be asked to confirm the action before their
+  #   password is reset: 'password_reset_confirmation.html'
+  #
+  # * HTML pages for success and failure that a user will see when they confirm
+  #   the password reset flow using the page above: 'password_reset_success.html'
+  #   and 'password_reset_failure.html'
   #
   # * The contents of address verification emails sent during registration:
   #   'registration.html' and 'registration.txt'

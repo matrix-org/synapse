@@ -14,16 +14,16 @@
 # limitations under the License.
 
 from synapse.replication.tcp.streams import PublicRoomsStream
-from synapse.storage.data_stores.main.room import RoomWorkerStore
-from synapse.storage.database import Database
+from synapse.storage.database import DatabasePool
+from synapse.storage.databases.main.room import RoomWorkerStore
 
 from ._base import BaseSlavedStore
 from ._slaved_id_tracker import SlavedIdTracker
 
 
 class RoomStore(RoomWorkerStore, BaseSlavedStore):
-    def __init__(self, database: Database, db_conn, hs):
-        super(RoomStore, self).__init__(database, db_conn, hs)
+    def __init__(self, database: DatabasePool, db_conn, hs):
+        super().__init__(database, db_conn, hs)
         self._public_room_id_gen = SlavedIdTracker(
             db_conn, "public_room_list_stream", "stream_id"
         )
@@ -33,6 +33,6 @@ class RoomStore(RoomWorkerStore, BaseSlavedStore):
 
     def process_replication_rows(self, stream_name, instance_name, token, rows):
         if stream_name == PublicRoomsStream.NAME:
-            self._public_room_id_gen.advance(token)
+            self._public_room_id_gen.advance(instance_name, token)
 
         return super().process_replication_rows(stream_name, instance_name, token, rows)

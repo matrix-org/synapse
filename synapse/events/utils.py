@@ -18,8 +18,6 @@ from typing import Any, Mapping, Union
 
 from frozendict import frozendict
 
-from twisted.internet import defer
-
 from synapse.api.constants import EventTypes, RelationTypes
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersion
@@ -324,7 +322,7 @@ def serialize_event(
     return d
 
 
-class EventClientSerializer(object):
+class EventClientSerializer:
     """Serializes events that are to be sent to clients.
 
     This is used for bundling extra information with any events to be sent to
@@ -337,8 +335,9 @@ class EventClientSerializer(object):
             hs.config.experimental_msc1849_support_enabled
         )
 
-    @defer.inlineCallbacks
-    def serialize_event(self, event, time_now, bundle_aggregations=True, **kwargs):
+    async def serialize_event(
+        self, event, time_now, bundle_aggregations=True, **kwargs
+    ):
         """Serializes a single event.
 
         Args:
@@ -348,7 +347,7 @@ class EventClientSerializer(object):
             **kwargs: Arguments to pass to `serialize_event`
 
         Returns:
-            Deferred[dict]: The serialized event
+            dict: The serialized event
         """
         # To handle the case of presence events and the like
         if not isinstance(event, EventBase):
@@ -363,8 +362,8 @@ class EventClientSerializer(object):
         if not event.internal_metadata.is_redacted() and (
             self.experimental_msc1849_support_enabled and bundle_aggregations
         ):
-            annotations = yield self.store.get_aggregation_groups_for_event(event_id)
-            references = yield self.store.get_relations_for_event(
+            annotations = await self.store.get_aggregation_groups_for_event(event_id)
+            references = await self.store.get_relations_for_event(
                 event_id, RelationTypes.REFERENCE, direction="f"
             )
 
@@ -378,7 +377,7 @@ class EventClientSerializer(object):
 
             edit = None
             if event.type == EventTypes.Message:
-                edit = yield self.store.get_applicable_edit(event_id)
+                edit = await self.store.get_applicable_edit(event_id)
 
             if edit:
                 # If there is an edit replace the content, preserving existing

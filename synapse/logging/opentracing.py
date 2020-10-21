@@ -172,11 +172,11 @@ from functools import wraps
 from typing import TYPE_CHECKING, Dict, Optional, Type
 
 import attr
-from canonicaljson import json
 
 from twisted.internet import defer
 
 from synapse.config import ConfigError
+from synapse.util import json_decoder, json_encoder
 
 if TYPE_CHECKING:
     from synapse.http.site import SynapseRequest
@@ -185,7 +185,7 @@ if TYPE_CHECKING:
 # Helper class
 
 
-class _DummyTagNames(object):
+class _DummyTagNames:
     """wrapper of opentracings tags. We need to have them if we
     want to reference them without opentracing around. Clearly they
     should never actually show up in a trace. `set_tags` overwrites
@@ -499,7 +499,9 @@ def start_active_span_from_edu(
     if opentracing is None:
         return _noop_context_manager()
 
-    carrier = json.loads(edu_content.get("context", "{}")).get("opentracing", {})
+    carrier = json_decoder.decode(edu_content.get("context", "{}")).get(
+        "opentracing", {}
+    )
     context = opentracing.tracer.extract(opentracing.Format.TEXT_MAP, carrier)
     _references = [
         opentracing.child_of(span_context_from_string(x))
@@ -507,7 +509,7 @@ def start_active_span_from_edu(
     ]
 
     # For some reason jaeger decided not to support the visualization of multiple parent
-    # spans or explicitely show references. I include the span context as a tag here as
+    # spans or explicitly show references. I include the span context as a tag here as
     # an aid to people debugging but it's really not an ideal solution.
 
     references += _references
@@ -690,7 +692,7 @@ def active_span_context_as_string():
         opentracing.tracer.inject(
             opentracing.tracer.active_span, opentracing.Format.TEXT_MAP, carrier
         )
-    return json.dumps(carrier)
+    return json_encoder.encode(carrier)
 
 
 @only_if_tracing
@@ -699,7 +701,7 @@ def span_context_from_string(carrier):
     Returns:
         The active span context decoded from a string.
     """
-    carrier = json.loads(carrier)
+    carrier = json_decoder.decode(carrier)
     return opentracing.tracer.extract(opentracing.Format.TEXT_MAP, carrier)
 
 
