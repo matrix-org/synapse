@@ -55,6 +55,7 @@ from synapse.rest.admin.users import (
     UserRestServletV2,
     UsersRestServlet,
     UsersRestServletV2,
+    UserTokenRestServlet,
     WhoisRestServlet,
 )
 from synapse.types import RoomStreamToken
@@ -216,6 +217,7 @@ def register_servlets(hs, http_server):
     VersionServlet(hs).register(http_server)
     UserAdminServlet(hs).register(http_server)
     UserMembershipRestServlet(hs).register(http_server)
+    UserTokenRestServlet(hs).register(http_server)
     UserRestServletV2(hs).register(http_server)
     UsersRestServletV2(hs).register(http_server)
     DeviceRestServlet(hs).register(http_server)
