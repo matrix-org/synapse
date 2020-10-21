@@ -1325,3 +1325,20 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
 
         # Sending an event on their behalf should work fine
         self.helper.send_event(room_id, "com.example.test", tok=puppet_token)
+
+    @override_config(
+        {"limit_usage_by_mau": True, "max_mau_value": 1, "mau_trial_days": 0}
+    )
+    def test_mau_limit(self):
+        # Create a room as the admin user. This will bump the monthly active users to 1.
+        room_id = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+
+        # Trying to join as the other user should fail.
+        self.helper.join(
+            room_id, user=self.other_user, tok=self.other_user_tok, expect_code=403
+        )
+
+        # Logging in as the other user and joining a room should work, even
+        # though they should be denied.
+        puppet_token = self._get_token()
+        self.helper.join(room_id, user=self.other_user, tok=puppet_token)
