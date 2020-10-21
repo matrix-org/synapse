@@ -34,6 +34,7 @@ from typing_extensions import TypedDict
 from twisted.web.client import readBody
 
 from synapse.config import ConfigError
+from synapse.handlers._base import BaseHandler
 from synapse.http.server import respond_with_html
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
@@ -84,16 +85,15 @@ class OidcError(Exception):
 
 
 class MappingException(Exception):
-    """Used to catch errors when mapping the UserInfo object
-    """
+    """Used to catch errors when mapping the SAML2 response to a user."""
 
 
-class OidcHandler:
+class OidcHandler(BaseHandler):
     """Handles requests related to the OpenID Connect login flow.
     """
 
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
+        super().__init__(hs)
         self._callback_url = hs.config.oidc_callback_url  # type: str
         self._scopes = hs.config.oidc_scopes  # type: List[str]
         self._user_profile_method = hs.config.oidc_user_profile_method  # type: str
@@ -120,9 +120,6 @@ class OidcHandler:
         self._http_client = hs.get_proxied_http_client()
         self._auth_handler = hs.get_auth_handler()
         self._registration_handler = hs.get_registration_handler()
-        self._datastore = hs.get_datastore()
-        self._clock = hs.get_clock()
-        self._hostname = hs.hostname  # type: str
         self._server_name = hs.config.server_name  # type: str
         self._macaroon_secret_key = hs.config.macaroon_secret_key
         self._error_template = hs.config.sso_error_template
@@ -770,7 +767,7 @@ class OidcHandler:
             macaroon.add_first_party_caveat(
                 "ui_auth_session_id = %s" % (ui_auth_session_id,)
             )
-        now = self._clock.time_msec()
+        now = self.clock.time_msec()
         expiry = now + duration_in_ms
         macaroon.add_first_party_caveat("time < %d" % (expiry,))
 
@@ -845,7 +842,7 @@ class OidcHandler:
         if not caveat.startswith(prefix):
             return False
         expiry = int(caveat[len(prefix) :])
-        now = self._clock.time_msec()
+        now = self.clock.time_msec()
         return now < expiry
 
     async def _map_userinfo_to_user(
@@ -891,7 +888,7 @@ class OidcHandler:
             remote_user_id,
         )
 
-        registered_user_id = await self._datastore.get_user_by_external_id(
+        registered_user_id = await self.store.get_user_by_external_id(
             self._auth_provider_id, remote_user_id,
         )
 
@@ -917,8 +914,8 @@ class OidcHandler:
 
         localpart = map_username_to_mxid_localpart(attributes["localpart"])
 
-        user_id = UserID(localpart, self._hostname).to_string()
-        users = await self._datastore.get_users_by_id_case_insensitive(user_id)
+        user_id = UserID(localpart, self.server_name).to_string()
+        users = await self.store.get_users_by_id_case_insensitive(user_id)
         if users:
             if self._allow_existing_users:
                 if len(users) == 1:
@@ -942,7 +939,8 @@ class OidcHandler:
                 default_display_name=attributes["display_name"],
                 user_agent_ips=(user_agent, ip_address),
             )
-        await self._datastore.record_user_external_id(
+
+        await self.store.record_user_external_id(
             self._auth_provider_id, remote_user_id, registered_user_id,
         )
         return registered_user_id
