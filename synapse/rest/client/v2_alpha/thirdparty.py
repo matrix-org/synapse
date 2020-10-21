@@ -28,7 +28,7 @@ class ThirdPartyProtocolsServlet(RestServlet):
     PATTERNS = client_patterns("/thirdparty/protocols")
 
     def __init__(self, hs):
-        super(ThirdPartyProtocolsServlet, self).__init__()
+        super().__init__()
 
         self.auth = hs.get_auth()
         self.appservice_handler = hs.get_application_service_handler()
@@ -44,7 +44,7 @@ class ThirdPartyProtocolServlet(RestServlet):
     PATTERNS = client_patterns("/thirdparty/protocol/(?P<protocol>[^/]+)$")
 
     def __init__(self, hs):
-        super(ThirdPartyProtocolServlet, self).__init__()
+        super().__init__()
 
         self.auth = hs.get_auth()
         self.appservice_handler = hs.get_application_service_handler()
@@ -65,7 +65,7 @@ class ThirdPartyUserServlet(RestServlet):
     PATTERNS = client_patterns("/thirdparty/user(/(?P<protocol>[^/]+))?$")
 
     def __init__(self, hs):
-        super(ThirdPartyUserServlet, self).__init__()
+        super().__init__()
 
         self.auth = hs.get_auth()
         self.appservice_handler = hs.get_application_service_handler()
@@ -87,7 +87,7 @@ class ThirdPartyLocationServlet(RestServlet):
     PATTERNS = client_patterns("/thirdparty/location(/(?P<protocol>[^/]+))?$")
 
     def __init__(self, hs):
-        super(ThirdPartyLocationServlet, self).__init__()
+        super().__init__()
 
         self.auth = hs.get_auth()
         self.appservice_handler = hs.get_application_service_handler()

@@ -29,7 +29,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
     DELETE_SOFT_FAILED_EXTREMITIES = "delete_soft_failed_extremities"
 
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(EventsBackgroundUpdatesStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self.db_pool.updates.register_background_update_handler(
             self.EVENT_ORIGIN_SERVER_TS_NAME, self._background_reindex_origin_server_ts

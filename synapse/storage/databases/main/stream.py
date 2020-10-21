@@ -266,7 +266,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
     """
 
     def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
-        super(StreamWorkerStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self._instance_name = hs.get_instance_name()
         self._send_federation = hs.should_send_federation()

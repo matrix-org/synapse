@@ -58,7 +58,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         # Patch up the equality operator for events so that we can check
         # whether lists of events match using assertEquals
         self.unpatches = [patch__eq__(_EventInternalMetadata), patch__eq__(FrozenEvent)]
-        return super(SlavedEventStoreTestCase, self).setUp()
+        return super().setUp()
 
     def prepare(self, *args, **kwargs):
         super().prepare(*args, **kwargs)

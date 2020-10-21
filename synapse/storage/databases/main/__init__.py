@@ -172,7 +172,7 @@ class DataStore(
         else:
             self._cache_id_gen = None
 
-        super(DataStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self._presence_on_startup = self._get_active_presence(db_conn)
 

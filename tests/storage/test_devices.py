@@ -23,7 +23,7 @@ import tests.utils
 
 class DeviceStoreTestCase(tests.unittest.TestCase):
     def __init__(self, *args, **kwargs):
-        super(DeviceStoreTestCase, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.store = None  # type: synapse.storage.DataStore
 
     @defer.inlineCallbacks

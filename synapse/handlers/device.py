@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional
 from synapse.api import errors
 from synapse.api.constants import EventTypes
 from synapse.api.errors import (
+    Codes,
     FederationDeniedError,
     HttpResponseException,
     RequestSendFailed,
@@ -48,7 +49,7 @@ MAX_DEVICE_DISPLAY_NAME_LEN = 100
 
 class DeviceWorkerHandler(BaseHandler):
     def __init__(self, hs):
-        super(DeviceWorkerHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.hs = hs
         self.state = hs.get_state_handler()
@@ -251,7 +252,7 @@ class DeviceWorkerHandler(BaseHandler):
 
 class DeviceHandler(DeviceWorkerHandler):
     def __init__(self, hs):
-        super(DeviceHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.federation_sender = hs.get_federation_sender()
 
@@ -264,6 +265,24 @@ class DeviceHandler(DeviceWorkerHandler):
         )
 
         hs.get_distributor().observe("user_left_room", self.user_left_room)
+
+    def _check_device_name_length(self, name: str):
+        """
+        Checks whether a device name is longer than the maximum allowed length.
+
+        Args:
+            name: The name of the device.
+
+        Raises:
+            SynapseError: if the device name is too long.
+        """
+        if name and len(name) > MAX_DEVICE_DISPLAY_NAME_LEN:
+            raise SynapseError(
+                400,
+                "Device display name is too long (max %i)"
+                % (MAX_DEVICE_DISPLAY_NAME_LEN,),
+                errcode=Codes.TOO_LARGE,
+            )
 
     async def check_device_registered(
         self, user_id, device_id, initial_device_display_name=None
@@ -282,6 +301,9 @@ class DeviceHandler(DeviceWorkerHandler):
         Returns:
             str: device id (generated if none was supplied)
         """
+
+        self._check_device_name_length(initial_device_display_name)
+
         if device_id is not None:
             new_device = await self.store.store_device(
                 user_id=user_id,
@@ -397,12 +419,8 @@ class DeviceHandler(DeviceWorkerHandler):
 
         # Reject a new displayname which is too long.
         new_display_name = content.get("display_name")
-        if new_display_name and len(new_display_name) > MAX_DEVICE_DISPLAY_NAME_LEN:
-            raise SynapseError(
-                400,
-                "Device display name is too long (max %i)"
-                % (MAX_DEVICE_DISPLAY_NAME_LEN,),
-            )
+
+        self._check_device_name_length(new_display_name)
 
         try:
             await self.store.update_device(

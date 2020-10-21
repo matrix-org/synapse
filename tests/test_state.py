@@ -125,7 +125,7 @@ class StateGroupStore:
 
 class DictObj(dict):
     def __init__(self, **kwargs):
-        super(DictObj, self).__init__(kwargs)
+        super().__init__(kwargs)
         self.__dict__ = self
 
 

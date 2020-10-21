@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 class DirectoryHandler(BaseHandler):
     def __init__(self, hs):
-        super(DirectoryHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.state = hs.get_state_handler()
         self.appservice_handler = hs.get_application_service_handler()

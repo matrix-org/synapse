@@ -88,7 +88,7 @@ class ApplicationServiceApi(SimpleHttpClient):
     """
 
     def __init__(self, hs):
-        super(ApplicationServiceApi, self).__init__(hs)
+        super().__init__(hs)
         self.clock = hs.get_clock()
 
         self.protocol_meta_cache = ResponseCache(

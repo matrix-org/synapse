@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 class IdentityHandler(BaseHandler):
     def __init__(self, hs):
-        super(IdentityHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.hs = hs
         self.http_client = hs.get_simple_http_client()

@@ -260,7 +260,7 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
                 return succeed(lookups[name])
 
         self.nameResolver = SimpleResolverComplexifier(FakeResolver())
-        super(ThreadedMemoryReactorClock, self).__init__()
+        super().__init__()
 
     def listenUDP(self, port, protocol, interface="", maxPacketSize=8196):
         p = udp.Port(port, protocol, interface, maxPacketSize, self)

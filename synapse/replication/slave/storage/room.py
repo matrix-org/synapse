@@ -23,7 +23,7 @@ from ._slaved_id_tracker import SlavedIdTracker
 
 class RoomStore(RoomWorkerStore, BaseSlavedStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(RoomStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
         self._public_room_id_gen = SlavedIdTracker(
             db_conn, "public_room_list_stream", "stream_id"
         )

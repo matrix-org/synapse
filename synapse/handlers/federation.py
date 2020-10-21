@@ -115,7 +115,7 @@ class FederationHandler(BaseHandler):
     """
 
     def __init__(self, hs):
-        super(FederationHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.hs = hs
 

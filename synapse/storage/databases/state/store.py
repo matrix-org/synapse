@@ -52,7 +52,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
     """
 
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(StateGroupDataStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         # Originally the state store used a single DictionaryCache to cache the
         # event IDs for the state types in a given state group to avoid hammering
