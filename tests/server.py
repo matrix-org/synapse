@@ -571,12 +571,10 @@ def connect_client(reactor: IReactorTCP, client_id: int) -> AccumulatingProtocol
         reactor
         factory: The connecting factory to build.
     """
-    factory = reactor.tcpClients[client_id][2]
+    factory = reactor.tcpClients.pop(client_id)[2]
     client = factory.buildProtocol(None)
     server = AccumulatingProtocol()
     server.makeConnection(FakeTransport(client, reactor))
     client.makeConnection(FakeTransport(server, reactor))
-
-    reactor.tcpClients.pop(client_id)
 
     return client, server
