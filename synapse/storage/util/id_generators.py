@@ -612,14 +612,7 @@ class _MultiWriterCtxManager:
             db_autocommit=True,
         )
 
-        # Assert the fetched ID is actually greater than any ID we've already
-        # seen. If not, then the sequence and table have got out of sync
-        # somehow.
         with self.id_gen._lock:
-            assert max(self.id_gen._current_positions.values(), default=0) < min(
-                self.stream_ids
-            )
-
             self.id_gen._unfinished_ids.update(self.stream_ids)
 
         if self.multiple_ids is None:
