@@ -1275,7 +1275,9 @@ class EventCreationHandler:
         for user_id in members:
             if not self.hs.is_mine_id(user_id):
                 continue
-            requester = create_requester(user_id)
+            requester = create_requester(
+                user_id, authenticated_entity=self._server_name
+            )
             try:
                 event, context = await self.create_event(
                     requester,

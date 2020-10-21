@@ -183,7 +183,9 @@ class ProfileHandler(BaseHandler):
         # the join event to update the displayname in the rooms.
         # This must be done by the target user himself.
         if by_admin:
-            requester = create_requester(target_user)
+            requester = create_requester(
+                target_user, authenticated_entity=requester.authenticated_entity,
+            )
 
         await self.store.set_profile_displayname(target_user.localpart, new_displayname)
 
@@ -255,7 +257,9 @@ class ProfileHandler(BaseHandler):
 
         # Same like set_displayname
         if by_admin:
-            requester = create_requester(target_user)
+            requester = create_requester(
+                target_user, authenticated_entity=requester.authenticated_entity
+            )
 
         await self.store.set_profile_avatar_url(target_user.localpart, new_avatar_url)
 

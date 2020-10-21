@@ -52,6 +52,7 @@ class RegistrationHandler(BaseHandler):
         self.ratelimiter = hs.get_registration_ratelimiter()
         self.macaroon_gen = hs.get_macaroon_generator()
         self._server_notices_mxid = hs.config.server_notices_mxid
+        self._server_name = hs.hostname
 
         self.spam_checker = hs.get_spam_checker()
 
@@ -317,7 +318,8 @@ class RegistrationHandler(BaseHandler):
         requires_join = False
         if self.hs.config.registration.auto_join_user_id:
             fake_requester = create_requester(
-                self.hs.config.registration.auto_join_user_id
+                self.hs.config.registration.auto_join_user_id,
+                authenticated_entity=self._server_name,
             )
 
             # If the room requires an invite, add the user to the list of invites.
@@ -329,7 +331,9 @@ class RegistrationHandler(BaseHandler):
             # being necessary this will occur after the invite was sent.
             requires_join = True
         else:
-            fake_requester = create_requester(user_id)
+            fake_requester = create_requester(
+                user_id, authenticated_entity=self._server_name
+            )
 
         # Choose whether to federate the new room.
         if not self.hs.config.registration.autocreate_auto_join_rooms_federated:
@@ -362,7 +366,9 @@ class RegistrationHandler(BaseHandler):
                     # created it, then ensure the first user joins it.
                     if requires_join:
                         await room_member_handler.update_membership(
-                            requester=create_requester(user_id),
+                            requester=create_requester(
+                                user_id, authenticated_entity=self._server_name
+                            ),
                             target=UserID.from_string(user_id),
                             room_id=info["room_id"],
                             # Since it was just created, there are no remote hosts.
@@ -426,7 +432,8 @@ class RegistrationHandler(BaseHandler):
                 if requires_invite:
                     await room_member_handler.update_membership(
                         requester=create_requester(
-                            self.hs.config.registration.auto_join_user_id
+                            self.hs.config.registration.auto_join_user_id,
+                            authenticated_entity=self._server_name,
                         ),
                         target=UserID.from_string(user_id),
                         room_id=room_id,
@@ -437,7 +444,9 @@ class RegistrationHandler(BaseHandler):
 
                 # Send the join.
                 await room_member_handler.update_membership(
-                    requester=create_requester(user_id),
+                    requester=create_requester(
+                        user_id, authenticated_entity=self._server_name
+                    ),
                     target=UserID.from_string(user_id),
                     room_id=room_id,
                     remote_room_hosts=remote_room_hosts,
