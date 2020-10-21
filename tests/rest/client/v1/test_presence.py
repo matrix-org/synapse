@@ -33,11 +33,11 @@ class PresenceTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
 
-        ph = Mock()
-        ph.set_state.return_value = defer.succeed(None)
+        presence_handler = Mock()
+        presence_handler.set_state.return_value = defer.succeed(None)
 
         hs = self.setup_test_homeserver(
-            "red", http_client=None, federation_client=Mock(), presence_handler=ph
+            "red", http_client=None, federation_client=Mock(), presence_handler=presence_handler
         )
 
         return hs
