@@ -276,7 +276,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
     def test_limit_is_negative(self):
         """
-        Testing that a negative list parameter returns a 400
+        Testing that a negative limit parameter returns a 400
         """
 
         request, channel = self.make_request(
