@@ -83,21 +83,25 @@ class EventsWorkerStore(SQLBaseStore):
             self._stream_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
+                stream_name="events",
                 instance_name=hs.get_instance_name(),
                 table="events",
                 instance_column="instance_name",
                 id_column="stream_ordering",
                 sequence_name="events_stream_seq",
+                writers=hs.config.worker.writers.events,
             )
             self._backfill_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
+                stream_name="backfill",
                 instance_name=hs.get_instance_name(),
                 table="events",
                 instance_column="instance_name",
                 id_column="stream_ordering",
                 sequence_name="events_backfill_stream_seq",
                 positive=False,
+                writers=hs.config.worker.writers.events,
             )
         else:
             # We shouldn't be running in worker mode with SQLite, but its useful
