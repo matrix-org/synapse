@@ -1289,3 +1289,39 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+    @unittest.override_config(
+        {
+            "public_baseurl": "https://example.org/",
+            "user_consent": {
+                "version": "1.0",
+                "policy_name": "My Cool Privacy Policy",
+                "template_dir": "/",
+                "require_at_registration": True,
+                "block_events_error": "You should accept the policy",
+            },
+            "form_secret": "123secret",
+        }
+    )
+    def test_consent(self):
+        """Test that sending a message is not subject to the privacy policies.
+        """
+        # Have the admin user accept the terms.
+        self.get_success(self.store.user_set_consent_version(self.admin_user, "1.0"))
+
+        # First, cheekily accept the terms and create a room
+        self.get_success(self.store.user_set_consent_version(self.other_user, "1.0"))
+        room_id = self.helper.create_room_as(self.other_user, tok=self.other_user_tok)
+        self.helper.send_event(room_id, "com.example.test", tok=self.other_user_tok)
+
+        # Now unaccept it and check that we can't send an event
+        self.get_success(self.store.user_set_consent_version(self.other_user, "0.0"))
+        self.helper.send_event(
+            room_id, "com.example.test", tok=self.other_user_tok, expect_code=403
+        )
+
+        # Login in as the user
+        puppet_token = self._get_token()
+
+        # Sending an event on their behalf should work fine
+        self.helper.send_event(room_id, "com.example.test", tok=puppet_token)

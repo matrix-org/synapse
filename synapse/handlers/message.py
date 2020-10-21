@@ -620,7 +620,13 @@ class EventCreationHandler:
         if requester.app_service is not None:
             return
 
-        user_id = requester.user.to_string()
+        user_id = requester.authenticated_entity
+        if not user_id.startswith("@"):
+            # The authenticated entity might not be a user, e.g. if it's the
+            # server puppetting the user.
+            return
+
+        user = UserID.from_string(user_id)
 
         # exempt the system notices user
         if (
@@ -640,9 +646,7 @@ class EventCreationHandler:
         if u["consent_version"] == self.config.user_consent_version:
             return
 
-        consent_uri = self._consent_uri_builder.build_user_consent_uri(
-            requester.user.localpart
-        )
+        consent_uri = self._consent_uri_builder.build_user_consent_uri(user.localpart)
         msg = self._block_events_without_consent_error % {"consent_uri": consent_uri}
         raise ConsentNotGivenError(msg=msg, consent_uri=consent_uri)
 
