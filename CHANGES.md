@@ -1,16 +1,24 @@
+Synapse 1.20.0 (2020-09-22)
+===========================
+
+No significant changes.
+
+
 Synapse 1.20.0rc5 (2020-09-18)
 ==============================
+
+In addition to the below, Synapse 1.20.0rc5 also includes the bug fix that was included in 1.19.3.
 
 Features
 --------
 
-- Add flags to the `/versions` endpoint that includes whether new rooms default to using E2EE. ([\#8343](https://github.com/matrix-org/synapse/issues/8343))
+- Add flags to the `/versions` endpoint for whether new rooms default to using E2EE. ([\#8343](https://github.com/matrix-org/synapse/issues/8343))
 
 
 Bugfixes
 --------
 
-- Fix ratelimitng of federation `/send` requests. ([\#8342](https://github.com/matrix-org/synapse/issues/8342))
+- Fix rate limiting of federation `/send` requests. ([\#8342](https://github.com/matrix-org/synapse/issues/8342))
 - Fix a longstanding bug where back pagination over federation could get stuck if it failed to handle a received event. ([\#8349](https://github.com/matrix-org/synapse/issues/8349))
 
 
