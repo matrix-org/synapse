@@ -51,6 +51,8 @@ class TokenLookupResult:
         token_id: The ID of the access token looked up
         device_id: The device associated with the token, if any.
         valid_until_ms: The timestamp the token expires, if any.
+        token_owner: The "owner" of the token. This is either the same as the
+            user, or a server admin who is logged in as the user.
     """
 
     user_id = attr.ib(type=str)
@@ -59,6 +61,12 @@ class TokenLookupResult:
     token_id = attr.ib(type=Optional[int], default=None)
     device_id = attr.ib(type=Optional[str], default=None)
     valid_until_ms = attr.ib(type=Optional[int], default=None)
+    token_owner = attr.ib(type=str)
+
+    # Make the token owner default to the user ID, which is the common case.
+    @token_owner.default
+    def _default_token_owner(self):
+        return self.user_id
 
 
 class RegistrationWorkerStore(CacheInvalidationWorkerStore):
@@ -361,9 +369,10 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 users.shadow_banned,
                 access_tokens.id as token_id,
                 access_tokens.device_id,
-                access_tokens.valid_until_ms
+                access_tokens.valid_until_ms,
+                access_tokens.user_id as token_owner
             FROM users
-            INNER JOIN access_tokens on users.name = access_tokens.user_id
+            INNER JOIN access_tokens on users.name = COALESCE(puppets_user_id, access_tokens.user_id)
             WHERE token = ?
         """
 
