@@ -169,6 +169,12 @@ class SAML2Config(Config):
             saml2_config.get("saml_session_lifetime", "15m")
         )
 
+        # We enable autoescape here as the message may potentially come from a
+        # remote resource
+        self.saml2_error_html_template = self.read_templates(
+            ["saml_error.html"], saml2_config.get("template_dir"), autoescape=True
+        )[0]
+
     def _default_saml_config_dict(
         self, required_attributes: set, optional_attributes: set
     ):

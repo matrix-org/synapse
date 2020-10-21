@@ -195,7 +195,10 @@ class Config:
             return file_stream.read()
 
     def read_templates(
-        self, filenames: List[str], custom_template_directory: Optional[str] = None,
+        self,
+        filenames: List[str],
+        custom_template_directory: Optional[str] = None,
+        autoescape: bool = False,
     ) -> List[jinja2.Template]:
         """Load a list of template files from disk using the given variables.
 
@@ -210,6 +213,9 @@ class Config:
 
             custom_template_directory: A directory to try to look for the templates
                 before using the default Synapse template directory instead.
+
+            autoescape: Whether to autoescape variables before inserting them into the
+                template.
 
         Raises:
             ConfigError: if the file's path is incorrect or otherwise cannot be read.
@@ -234,7 +240,7 @@ class Config:
             search_directories.insert(0, custom_template_directory)
 
         loader = jinja2.FileSystemLoader(search_directories)
-        env = jinja2.Environment(loader=loader, autoescape=True)
+        env = jinja2.Environment(loader=loader, autoescape=autoescape)
 
         # Update the environment with our custom filters
         env.filters.update(
