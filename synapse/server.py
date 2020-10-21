@@ -234,14 +234,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         self._instance_id = random_string(5)
         self._instance_name = config.worker_name or "master"
 
-        self._clock = Clock(reactor)
         self.distributor = Distributor()
-
-        self.registration_ratelimiter = Ratelimiter(
-            clock=self._clock,
-            rate_hz=config.rc_registration.per_second,
-            burst_count=config.rc_registration.burst_count,
-        )
 
         self.version_string = version_string
 
@@ -300,8 +293,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     def is_mine_id(self, string: str) -> bool:
         return string.split(":", 1)[1] == self.hostname
 
-    # The caching attribute for this is technically already set in __init__, but it's replicated for the sake of
-    # consistency
     @cache_in_self
     def get_clock(self) -> Clock:
         return Clock(self._reactor)
@@ -324,8 +315,13 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_distributor(self) -> Distributor:
         return self.distributor
 
+    @cache_in_self
     def get_registration_ratelimiter(self) -> Ratelimiter:
-        return self.registration_ratelimiter
+        return Ratelimiter(
+            clock=self.get_clock(),
+            rate_hz=self.config.rc_registration.per_second,
+            burst_count=self.config.rc_registration.burst_count,
+        )
 
     @cache_in_self
     def get_federation_client(self) -> FederationClient:
