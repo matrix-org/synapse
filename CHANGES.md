@@ -1,5 +1,31 @@
+Synapse 1.21.0 (2020-10-12)
+===========================
+
+No significant changes since v1.21.0rc3.
+
+
+Synapse 1.21.0rc3 (2020-10-08)
+==============================
+
+Bugfixes
+--------
+
+- Fix duplication of events on high traffic servers, caused by PostgreSQL `could not serialize access due to concurrent update` errors. ([\#8456](https://github.com/matrix-org/synapse/issues/8456))
+
+
+Internal Changes
+----------------
+
+- Add Groovy Gorilla to the list of distributions we build `.deb`s for. ([\#8475](https://github.com/matrix-org/synapse/issues/8475))
+
+
 Synapse 1.21.0rc2 (2020-10-02)
 ==============================
+
+Features
+--------
+
+- Convert additional templates from inline HTML to Jinja2 templates. ([\#8444](https://github.com/matrix-org/synapse/issues/8444))
 
 Bugfixes
 --------
@@ -7,8 +33,7 @@ Bugfixes
 - Fix a regression in v1.21.0rc1 which broke thumbnails of remote media. ([\#8438](https://github.com/matrix-org/synapse/issues/8438))
 - Do not expose the experimental `uk.half-shot.msc2778.login.application_service` flow in the login API, which caused a compatibility problem with Element iOS. ([\#8440](https://github.com/matrix-org/synapse/issues/8440))
 - Fix malformed log line in new federation "catch up" logic. ([\#8442](https://github.com/matrix-org/synapse/issues/8442))
-- Convert additional templates from inline HTML to Jinja2 templates. ([\#8444](https://github.com/matrix-org/synapse/issues/8444))
-- Fix DB query on startup for negative streams which caused long start up times. Introduced in #8374. ([\#8447](https://github.com/matrix-org/synapse/issues/8447))
+- Fix DB query on startup for negative streams which caused long start up times. Introduced in [\#8374](https://github.com/matrix-org/synapse/issues/8374). ([\#8447](https://github.com/matrix-org/synapse/issues/8447))
 
 
 Synapse 1.21.0rc1 (2020-10-01)
