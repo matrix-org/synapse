@@ -98,13 +98,6 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
 
-        if not check_3pid_allowed(self.hs, "email", email):
-            raise SynapseError(
-                403,
-                "Your email is not authorized on this server",
-                Codes.THREEPID_DENIED,
-            )
-
         if next_link:
             # Raise if the provided next_link value isn't valid
             assert_valid_next_link(self.hs, next_link)

@@ -281,7 +281,7 @@ class FederationHandler(BaseHandler):
                             raise Exception(
                                 "Error fetching missing prev_events for %s: %s"
                                 % (event_id, e)
-                            )
+                            ) from e
 
                         # Update the set of things we've seen after trying to
                         # fetch the missing stuff

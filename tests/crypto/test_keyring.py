@@ -41,6 +41,7 @@ from synapse.storage.keys import FetchKeyResult
 
 from tests import unittest
 from tests.test_utils import make_awaitable
+from tests.unittest import logcontext_clean
 
 
 class MockPerspectiveServer:
@@ -67,6 +68,7 @@ class MockPerspectiveServer:
         signedjson.sign.sign_json(res, self.server_name, self.key)
 
 
+@logcontext_clean
 class KeyringTestCase(unittest.HomeserverTestCase):
     def check_context(self, val, expected):
         self.assertEquals(getattr(current_context(), "request", None), expected)
@@ -309,6 +311,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         mock_fetcher2.get_keys.assert_called_once()
 
 
+@logcontext_clean
 class ServerKeyFetcherTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         self.http_client = Mock()

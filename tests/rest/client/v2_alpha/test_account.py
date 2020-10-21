@@ -732,6 +732,12 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
     @override_config({"next_link_domain_whitelist": ["example.com", "example.org"]})
     def test_next_link_domain_whitelist(self):
         """Tests next_link parameters must fit the whitelist if provided"""
+
+        # Ensure not providing a next_link parameter still works
+        self._request_token(
+            "something@example.com", "some_secret", next_link=None, expect_code=200,
+        )
+
         self._request_token(
             "something@example.com",
             "some_secret",
