@@ -85,8 +85,18 @@ class AccountValidityHandler:
                 )
 
     async def send_renewal_email_to_user(self, user_id: str) -> None:
+        """
+        Send a renewal email for a specific user.
+
+        Note that if the user is not set to renew at some point in the future then
+        no email will be sent.
+
+        Args:
+            user_id: The user ID to send a renewal email for.
+        """
         expiration_ts = await self.store.get_expiration_ts_for_user(user_id)
-        await self._send_renewal_email(user_id, expiration_ts)
+        if expiration_ts is not None:
+            await self._send_renewal_email(user_id, expiration_ts)
 
     async def _send_renewal_email(self, user_id: str, expiration_ts: int) -> None:
         """Sends out a renewal email to every email address attached to the given user
