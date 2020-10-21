@@ -197,7 +197,7 @@ class EventsPersistenceStorage:
 
     async def persist_events(
         self,
-        events_and_contexts: List[Tuple[EventBase, EventContext]],
+        events_and_contexts: Iterable[Tuple[EventBase, EventContext]],
         backfilled: bool = False,
     ) -> RoomStreamToken:
         """
