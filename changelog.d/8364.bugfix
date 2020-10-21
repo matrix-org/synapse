@@ -1,2 +1,0 @@
-Fix a bug where during device registration the length of the device name wasn't
-limited.

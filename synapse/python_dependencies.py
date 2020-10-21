@@ -68,7 +68,11 @@ REQUIREMENTS = [
     "pymacaroons>=0.13.0",
     "msgpack>=0.5.2",
     "phonenumbers>=8.2.0",
-    "prometheus_client>=0.0.18,<0.9.0",
+    # we use GaugeHistogramMetric, which was added in prom-client 0.4.0.
+    # prom-client has a history of breaking backwards compatibility between
+    # minor versions (https://github.com/prometheus/client_python/issues/317),
+    # so we also pin the minor version.
+    "prometheus_client>=0.4.0,<0.9.0",
     # we use attr.validators.deep_iterable, which arrived in 19.1.0 (Note:
     # Fedora 31 only has 19.1, so if we want to upgrade we should wait until 33
     # is out in November.)

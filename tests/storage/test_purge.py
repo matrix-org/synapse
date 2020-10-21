@@ -47,12 +47,15 @@ class PurgeTests(HomeserverTestCase):
         storage = self.hs.get_storage()
 
         # Get the topological token
-        event = self.get_success(
+        token = self.get_success(
             store.get_topological_token_for_event(last["event_id"])
         )
+        token_str = self.get_success(token.to_string(self.hs.get_datastore()))
 
         # Purge everything before this topological token
-        self.get_success(storage.purge_events.purge_history(self.room_id, event, True))
+        self.get_success(
+            storage.purge_events.purge_history(self.room_id, token_str, True)
+        )
 
         # 1-3 should fail and last will succeed, meaning that 1-3 are deleted
         # and last is not.
@@ -74,12 +77,10 @@ class PurgeTests(HomeserverTestCase):
         storage = self.hs.get_datastore()
 
         # Set the topological token higher than it should be
-        event = self.get_success(
+        token = self.get_success(
             storage.get_topological_token_for_event(last["event_id"])
         )
-        event = "t{}-{}".format(
-            *list(map(lambda x: x + 1, map(int, event[1:].split("-"))))
-        )
+        event = "t{}-{}".format(token.topological + 1, token.stream + 1)
 
         # Purge everything before this topological token
         purge = defer.ensureDeferred(storage.purge_history(self.room_id, event, True))

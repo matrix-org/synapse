@@ -1107,11 +1107,13 @@ class RoomContextHandler:
         # the token, which we replace.
         token = StreamToken.START
 
-        results["start"] = token.copy_and_replace(
+        results["start"] = await token.copy_and_replace(
             "room_key", results["start"]
-        ).to_string()
+        ).to_string(self.store)
 
-        results["end"] = token.copy_and_replace("room_key", results["end"]).to_string()
+        results["end"] = await token.copy_and_replace(
+            "room_key", results["end"]
+        ).to_string(self.store)
 
         return results
 
@@ -1164,14 +1166,14 @@ class RoomEventSource:
                 events[:] = events[:limit]
 
             if events:
-                end_key = RoomStreamToken.parse(events[-1].internal_metadata.after)
+                end_key = events[-1].internal_metadata.after
             else:
                 end_key = to_key
 
         return (events, end_key)
 
     def get_current_key(self) -> RoomStreamToken:
-        return RoomStreamToken(None, self.store.get_room_max_stream_ordering())
+        return self.store.get_room_max_token()
 
     def get_current_key_for_room(self, room_id: str) -> Awaitable[str]:
         return self.store.get_room_events_max_id(room_id)

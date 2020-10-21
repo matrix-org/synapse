@@ -697,6 +697,7 @@ acme:
 #tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
 
 
+## Federation ##
 
 # Restrict federation to the following whitelist of domains.
 # N.B. we recommend also firewalling your federation listener to limit
@@ -729,6 +730,17 @@ federation_ip_range_blacklist:
   - '::1/128'
   - 'fe80::/64'
   - 'fc00::/7'
+
+# Report prometheus metrics on the age of PDUs being sent to and received from
+# the following domains. This can be used to give an idea of "delay" on inbound
+# and outbound federation, though be aware that any delay can be due to problems
+# at either end or with the intermediate network.
+#
+# By default, no domains are monitored in this way.
+#
+#federation_metrics_domains:
+#  - matrix.org
+#  - example.com
 
 
 ## Caching ##
@@ -1922,6 +1934,14 @@ oidc_config:
       # If unset, no displayname will be set.
       #
       #display_name_template: "{{ user.given_name }} {{ user.last_name }}"
+
+      # Jinja2 templates for extra attributes to send back to the client during
+      # login.
+      #
+      # Note that these are non-standard and clients will ignore them without modifications.
+      #
+      #extra_attributes:
+        #birthdate: "{{ user.birthdate }}"
 
 
 

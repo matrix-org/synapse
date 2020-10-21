@@ -1,1 +1,0 @@
-Fix inconsistent handling of non-existent push rules, and stop tracking the `enabled` state of removed push rules.

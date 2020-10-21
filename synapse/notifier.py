@@ -163,7 +163,7 @@ class _NotifierUserStream:
         """
         # Immediately wake up stream if something has already since happened
         # since their last token.
-        if self.last_notified_token.is_after(token):
+        if self.last_notified_token != token:
             return _NotificationListener(defer.succeed(self.current_token))
         else:
             return _NotificationListener(self.notify_deferred.observe())
@@ -470,7 +470,7 @@ class Notifier:
         async def check_for_updates(
             before_token: StreamToken, after_token: StreamToken
         ) -> EventStreamResult:
-            if not after_token.is_after(before_token):
+            if after_token == before_token:
                 return EventStreamResult([], (from_token, from_token))
 
             events = []  # type: List[EventBase]
