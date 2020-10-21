@@ -1034,6 +1034,9 @@ class IdentityHandler(BaseHandler):
         """
         # Extract the domain name from the IS URL as we store IS domains instead of URLs
         id_server = urllib.parse.urlparse(id_server_url).hostname
+        if not id_server:
+            # We were unable to determine the hostname, bail out
+            return
 
         # id_server_url is assumed to have no trailing slashes
         url = id_server_url + "/_matrix/identity/internal/bind"
