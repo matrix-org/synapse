@@ -1174,6 +1174,7 @@ class PushersRestTestCase(unittest.HomeserverTestCase):
 
     def test_get_pushers(self):
         """
+        Tests that a normal lookup for pushers is successfully
         """
 
         # Get pushers
@@ -1205,7 +1206,6 @@ class PushersRestTestCase(unittest.HomeserverTestCase):
                 data={"url": "example.com"},
             )
         )
-        self.pump()
 
         # Get pushers
         request, channel = self.make_request(
