@@ -1,3 +1,13 @@
+matrix-synapse-py3 (1.21.1) stable; urgency=medium
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.21.1.
+
+  [ Andrew Morgan ]
+  * Explicitly install "test" python dependencies.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 13 Oct 2020 10:24:13 +0100
+
 matrix-synapse-py3 (1.21.0) stable; urgency=medium
 
   * New synapse release 1.21.0.
