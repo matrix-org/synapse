@@ -73,7 +73,7 @@ staticClients:
   name: 'Synapse'
 ```
 
-Run with `dex serve examples/config-dex.yaml`.
+Run with `dex serve examples/config-dev.yaml`.
 
 Synapse config:
 
