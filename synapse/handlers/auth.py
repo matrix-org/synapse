@@ -172,10 +172,14 @@ class AuthHandler(BaseHandler):
         #   better way to break the loop
         account_handler = ModuleApi(hs, self)
 
-        self.password_providers = [
-            module(config=config, account_handler=account_handler)
-            for module, config in hs.config.password_providers
-        ]
+        self.password_providers = []
+        for module, config in hs.config.password_providers:
+            try:
+                self.password_providers.append(
+                    module(config=config, account_handler=account_handler)
+                )
+            except Exception as e:
+                logger.warn("Error while initializing %r: %s", module, e)
 
         logger.info("Extra password_providers: %r", self.password_providers)
 
