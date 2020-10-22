@@ -44,7 +44,7 @@ from synapse.logging.context import (
     set_current_context,
 )
 from synapse.server import HomeServer
-from synapse.types import Requester, UserID, create_requester
+from synapse.types import UserID, create_requester
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 from tests.server import (
@@ -627,7 +627,7 @@ class HomeserverTestCase(TestCase):
         """
         event_creator = self.hs.get_event_creation_handler()
         secrets = self.hs.get_secrets()
-        requester = Requester(user, None, False, False, None, None)
+        requester = create_requester(user)
 
         event, context = self.get_success(
             event_creator.create_event(
