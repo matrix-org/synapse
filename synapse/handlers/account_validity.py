@@ -98,7 +98,7 @@ class AccountValidityHandler:
 
         # If this user isn't set to be expired, raise an error.
         if expiration_ts is None:
-            raise SynapseError(400, "User has no expiration time: %s" % (user_id, ))
+            raise SynapseError(400, "User has no expiration time: %s" % (user_id,))
 
         await self._send_renewal_email(user_id, expiration_ts)
 
