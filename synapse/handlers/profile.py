@@ -94,7 +94,7 @@ class ProfileHandler(BaseHandler):
                     logger.info(
                         "Server replied with wrong response: %s %s", e.code, e.msg
                     )
-                    
+
                     raise SynapseError(502, "Failed to fetch profile")
                 raise e.to_synapse_error()
 
