@@ -1,0 +1,1 @@
+Fix a long standing bug where email notifications for encrypted messages were blank.

@@ -1364,7 +1364,12 @@ class EventCreationHandler:
         for k, v in original_event.internal_metadata.get_dict().items():
             setattr(builder.internal_metadata, k, v)
 
-        event = await builder.build(prev_event_ids=original_event.prev_event_ids())
+        # the event type hasn't changed, so there's no point in re-calculating the
+        # auth events.
+        event = await builder.build(
+            prev_event_ids=original_event.prev_event_ids(),
+            auth_event_ids=original_event.auth_event_ids(),
+        )
 
         # we rebuild the event context, to be on the safe side. If nothing else,
         # delta_ids might need an update.

@@ -496,6 +496,6 @@ class _Invalidation(namedtuple("_Invalidation", ("cache", "room_id"))):
     # dedupe when we add callbacks to lru cache nodes, otherwise the number
     # of callbacks would grow.
     def __call__(self):
-        rules = self.cache.get(self.room_id, None, update_metrics=False)
+        rules = self.cache.get_immediate(self.room_id, None, update_metrics=False)
         if rules:
             rules.invalidate_all()

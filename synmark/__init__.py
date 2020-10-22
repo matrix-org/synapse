@@ -15,7 +15,10 @@
 
 import sys
 
-from twisted.internet import epollreactor
+try:
+    from twisted.internet.epollreactor import EPollReactor as Reactor
+except ImportError:
+    from twisted.internet.pollreactor import PollReactor as Reactor
 from twisted.internet.main import installReactor
 
 from synapse.config.homeserver import HomeServerConfig
@@ -41,7 +44,7 @@ async def make_homeserver(reactor, config=None):
     config_obj = HomeServerConfig()
     config_obj.parse_config_dict(config, "", "")
 
-    hs = await setup_test_homeserver(
+    hs = setup_test_homeserver(
         cleanup_tasks.append, config=config_obj, reactor=reactor, clock=clock
     )
     stor = hs.get_datastore()
@@ -63,7 +66,7 @@ def make_reactor():
     Instantiate and install a Twisted reactor suitable for testing (i.e. not the
     default global one).
     """
-    reactor = epollreactor.EPollReactor()
+    reactor = Reactor()
 
     if "twisted.internet.reactor" in sys.modules:
         del sys.modules["twisted.internet.reactor"]

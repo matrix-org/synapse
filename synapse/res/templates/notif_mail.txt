@@ -2,9 +2,9 @@ Hi {{ user_display_name }},
 
 {{ summary_text }}
 
-{% for room in rooms %}
-{% include 'room.txt' with context %}
-{% endfor %}
+{%- for room in rooms %}
+{%- include 'room.txt' with context %}
+{%- endfor %}
 
 You can disable these notifications at {{ unsubscribe_link }}
 

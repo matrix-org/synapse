@@ -1,0 +1,1 @@
+Modify `DeferredCache.get()` to return `Deferred`s instead of `ObservableDeferred`s.

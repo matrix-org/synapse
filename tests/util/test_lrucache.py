@@ -19,7 +19,8 @@ from mock import Mock
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.treecache import TreeCache
 
-from .. import unittest
+from tests import unittest
+from tests.unittest import override_config
 
 
 class LruCacheTestCase(unittest.HomeserverTestCase):
@@ -59,7 +60,7 @@ class LruCacheTestCase(unittest.HomeserverTestCase):
         self.assertEquals(cache.pop("key"), None)
 
     def test_del_multi(self):
-        cache = LruCache(4, 2, cache_type=TreeCache)
+        cache = LruCache(4, keylen=2, cache_type=TreeCache)
         cache[("animal", "cat")] = "mew"
         cache[("animal", "dog")] = "woof"
         cache[("vehicles", "car")] = "vroom"
@@ -82,6 +83,11 @@ class LruCacheTestCase(unittest.HomeserverTestCase):
         cache["key"] = 1
         cache.clear()
         self.assertEquals(len(cache), 0)
+
+    @override_config({"caches": {"per_cache_factors": {"mycache": 10}}})
+    def test_special_size(self):
+        cache = LruCache(10, "mycache")
+        self.assertEqual(cache.max_size, 100)
 
 
 class LruCacheCallbacksTestCase(unittest.HomeserverTestCase):
@@ -160,7 +166,7 @@ class LruCacheCallbacksTestCase(unittest.HomeserverTestCase):
         m2 = Mock()
         m3 = Mock()
         m4 = Mock()
-        cache = LruCache(4, 2, cache_type=TreeCache)
+        cache = LruCache(4, keylen=2, cache_type=TreeCache)
 
         cache.set(("a", "1"), "value", callbacks=[m1])
         cache.set(("a", "2"), "value", callbacks=[m2])
