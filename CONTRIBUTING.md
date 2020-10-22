@@ -67,6 +67,31 @@ You can also provided the `-d` option, which will lint the files that have been
 changed since the last git commit. This will often be significantly faster than
 linting the whole codebase.
 
+Another option is to only run types checks, with `mypy`, in a fresh virtual env:
+
+```
+# Create the virtual env, the name of this venv must be 'testenv'
+python -m venv testenv
+
+# activate the virtual env for the current shell and install tox
+source testenv/bin/activate
+pip install tox
+
+# install dependencies and run tests
+tox -e mypy
+```
+
+or quicker, if you just want to run mypy appart from the other tests:
+
+```
+# After creating and activating a venv for the current shell
+# install mypy and the dependencies
+pip install -e .[mypy]
+
+# run tests
+mypy
+```
+
 Before pushing new changes, ensure they don't produce linting errors. Commit any
 files that were corrected.
 
