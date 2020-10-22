@@ -1,0 +1,1 @@
+Fix handling of invalid group IDs to return a 400 rather than log an exception and return a 500.
