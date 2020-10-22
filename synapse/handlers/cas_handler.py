@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 import urllib
-from typing import Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, Optional, Tuple
 from xml.etree import ElementTree as ET
 
 from twisted.web.client import PartialDownloadError
@@ -22,6 +22,9 @@ from twisted.web.client import PartialDownloadError
 from synapse.api.errors import Codes, LoginError
 from synapse.http.site import SynapseRequest
 from synapse.types import UserID, map_username_to_mxid_localpart
+
+if TYPE_CHECKING:
+    from synapse.app.homeserver import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -31,10 +34,10 @@ class CasHandler:
     Utility class for to handle the response from a CAS SSO service.
 
     Args:
-        hs (synapse.server.HomeServer)
+        hs
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self._hostname = hs.hostname
         self._auth_handler = hs.get_auth_handler()
@@ -205,11 +208,16 @@ class CasHandler:
         registered_user_id = await self._auth_handler.check_user_exists(user_id)
 
         if session:
+            # If there's a session then the user must already exist.
+            assert registered_user_id
+
             await self._auth_handler.complete_sso_ui_auth(
                 registered_user_id, session, request,
             )
-
         else:
+            # If this not a UI auth request than there must be a redirect URL.
+            assert client_redirect_url
+
             if not registered_user_id:
                 # Pull out the user-agent and IP from the request.
                 user_agent = request.get_user_agent("")
@@ -220,6 +228,8 @@ class CasHandler:
                     default_display_name=user_display_name,
                     user_agent_ips=(user_agent, ip_address),
                 )
+
+            assert registered_user_id
 
             await self._auth_handler.complete_sso_login(
                 registered_user_id, request, client_redirect_url

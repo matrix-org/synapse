@@ -152,7 +152,7 @@ class RegistrationHandler(BaseHandler):
         bind_emails=[],
         by_admin=False,
         user_agent_ips=None,
-    ):
+    ) -> str:
         """Registers a new client on the server.
 
         Args:
