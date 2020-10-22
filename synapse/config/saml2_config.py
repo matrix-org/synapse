@@ -216,10 +216,8 @@ class SAML2Config(Config):
         return """\
         ## Single sign-on integration ##
 
-        # Enable SAML2 for registration and login. Uses pysaml2.
-        #
-        # At least one of `sp_config` or `config_path` must be set in this section to
-        # enable SAML login.
+        # The following settings can be used to make Synapse use a single sign-on
+        # provider for authentication, instead of its internal password database.
         #
         # You will probably also want to set the following options to `false` to
         # disable the regular login/registration flows:
@@ -228,6 +226,11 @@ class SAML2Config(Config):
         #
         # You will also want to investigate the settings under the "sso" configuration
         # section below.
+
+        # Enable SAML2 for registration and login. Uses pysaml2.
+        #
+        # At least one of `sp_config` or `config_path` must be set in this section to
+        # enable SAML login.
         #
         # Once SAML support is enabled, a metadata file will be exposed at
         # https://<server>:<port>/_matrix/saml2/metadata.xml, which you may be able to
