@@ -214,7 +214,7 @@ class CasHandler:
                 # Pull out the user-agent and IP from the request.
                 user_agent = request.requestHeaders.getRawHeaders(
                     b"User-Agent", default=[b""]
-                )[0].decode("ascii", "surrogateescape")
+                )[0].decode("ascii", "replace")
                 ip_address = self.hs.get_ip_from_request(request)
 
                 registered_user_id = await self._registration_handler.register_user(

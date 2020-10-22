@@ -186,7 +186,7 @@ class Auth:
             ip_addr = self.hs.get_ip_from_request(request)
             user_agent = request.requestHeaders.getRawHeaders(
                 b"User-Agent", default=[b""]
-            )[0].decode("ascii", "surrogateescape")
+            )[0].decode("ascii", "replace")
 
             access_token = self.get_access_token_from_request(request)
 

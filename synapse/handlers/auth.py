@@ -472,7 +472,7 @@ class AuthHandler(BaseHandler):
 
         user_agent = request.requestHeaders.getRawHeaders(b"User-Agent", default=[b""])[
             0
-        ].decode("ascii", "surrogateescape")
+        ].decode("ascii", "replace")
 
         await self.store.add_user_agent_ip_to_ui_auth_session(
             session.session_id, user_agent, clientip
