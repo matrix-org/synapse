@@ -28,7 +28,12 @@ def _create_rerouter(func_name):
     """
 
     async def f(self, group_id, *args, **kwargs):
-        if self.is_mine_id(group_id):
+        try:
+            is_local = self.is_mine_id(group_id)
+        except Exception:
+            raise SynapseError(400, "Invalid group ID")
+
+        if is_local:
             return await getattr(self.groups_server_handler, func_name)(
                 group_id, *args, **kwargs
             )
