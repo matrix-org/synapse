@@ -59,7 +59,7 @@ application should point to your matrix server: `[synapse public baseurl]/_synap
 
 Go to Certificates & secrets and register a new client secret. Make note of your 
 Directory (tenant) ID as it will be used in the Azure links.
-Edit your Synapse config file and change the oidc_config section:
+Edit your Synapse config file and change the `oidc_config` section:
 
 ```yaml
 oidc_config:
