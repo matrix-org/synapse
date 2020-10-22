@@ -20,7 +20,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import TYPE_CHECKING, List
 
-from synapse.api.errors import StoreError
+from synapse.api.errors import StoreError, SynapseError
 from synapse.logging.context import make_deferred_yieldable
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.types import UserID
@@ -88,15 +88,19 @@ class AccountValidityHandler:
         """
         Send a renewal email for a specific user.
 
-        Note that if the user is not set to renew at some point in the future then
-        no email will be sent.
-
         Args:
             user_id: The user ID to send a renewal email for.
+
+        Raises:
+            SynapseError if the user is not set to renew.
         """
         expiration_ts = await self.store.get_expiration_ts_for_user(user_id)
-        if expiration_ts is not None:
-            await self._send_renewal_email(user_id, expiration_ts)
+
+        # If this user isn't set to be expired, raise an error.
+        if expiration_ts is None:
+            raise SynapseError(400, "User has no expiration time: %s" % (user_id, ))
+
+        await self._send_renewal_email(user_id, expiration_ts)
 
     async def _send_renewal_email(self, user_id: str, expiration_ts: int) -> None:
         """Sends out a renewal email to every email address attached to the given user
