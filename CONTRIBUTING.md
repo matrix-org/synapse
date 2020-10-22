@@ -63,7 +63,7 @@ run-time:
 ./scripts-dev/lint.sh path/to/file1.py path/to/file2.py path/to/folder
 ```
 
-You can also provided the `-d` option, which will lint the files that have been
+You can also provide the `-d` option, which will lint the files that have been
 changed since the last git commit. This will often be significantly faster than
 linting the whole codebase.
 
