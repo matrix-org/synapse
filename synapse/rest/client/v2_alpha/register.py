@@ -642,9 +642,6 @@ class RegisterRestServlet(RestServlet):
 
         return 200, return_dict
 
-    def on_OPTIONS(self, _):
-        return 200, {}
-
     async def _do_appservice_registration(self, username, as_token, body):
         user_id = await self.registration_handler.appservice_register(
             username, as_token
