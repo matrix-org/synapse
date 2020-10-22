@@ -125,8 +125,7 @@ class SamlHandler:
             URL to redirect to
         """
         reqid, info = self._saml_client.prepare_for_authenticate(
-            entityid=self._saml_idp_entityid,
-            relay_state=client_redirect_url
+            entityid=self._saml_idp_entityid, relay_state=client_redirect_url
         )
 
         # Since SAML sessions timeout it is useful to log when they were created.
