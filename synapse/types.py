@@ -155,7 +155,7 @@ def create_requester(
         shadow_banned (bool):  True if the user making this request is shadow-banned.
         device_id (str|None):  device_id which was set at authentication time
         app_service (ApplicationService|None):  the AS requesting on behalf of the user
-        authenticated_entity: The entity that authenticatd when making the request,
+        authenticated_entity: The entity that authenticated when making the request,
             this is different than the user_id when an admin user or the server is
             "puppeting" the user.
 
