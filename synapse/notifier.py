@@ -325,7 +325,7 @@ class Notifier:
         self,
         stream_key: str,
         new_token: Union[int, RoomStreamToken],
-        users: Collection[UserID] = [],
+        users: Collection[Union[str, UserID]] = [],
     ):
         try:
             stream_token = None

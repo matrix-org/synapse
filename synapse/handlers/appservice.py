@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 from prometheus_client import Counter
 
@@ -176,7 +176,10 @@ class ApplicationServicesHandler:
                 self.is_processing = False
 
     def notify_interested_services_ephemeral(
-        self, stream_key: str, new_token: Optional[int], users: Collection[UserID] = [],
+        self,
+        stream_key: str,
+        new_token: Optional[int],
+        users: Collection[Union[str, UserID]] = [],
     ):
         """This is called by the notifier in the background
         when a ephemeral event handled by the homeserver.
@@ -218,7 +221,7 @@ class ApplicationServicesHandler:
         services: List[ApplicationService],
         stream_key: str,
         new_token: Optional[int],
-        users: Collection[UserID],
+        users: Collection[Union[str, UserID]],
     ):
         logger.info("Checking interested services for %s" % (stream_key))
         with Measure(self.clock, "notify_interested_services_ephemeral"):
@@ -267,7 +270,7 @@ class ApplicationServicesHandler:
         return receipts
 
     async def _handle_presence(
-        self, service: ApplicationService, users: Collection[UserID]
+        self, service: ApplicationService, users: Collection[Union[str, UserID]]
     ):
         events = []  # type: List[JsonDict]
         presence_source = self.event_sources.sources["presence"]
@@ -275,6 +278,9 @@ class ApplicationServicesHandler:
             service, "presence"
         )
         for user in users:
+            if isinstance(user, str):
+                user = UserID.from_string(user)
+
             interested = await service.is_interested_in_presence(user, self.store)
             if not interested:
                 continue
