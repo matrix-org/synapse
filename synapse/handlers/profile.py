@@ -102,7 +102,7 @@ class ProfileHandler(BaseHandler):
 
     async def get_profile_from_cache(self, user_id: str) -> JsonDict:
         """Get the profile information from our local cache. If the user is
-        ours then the profile information will always be corect. Otherwise,
+        ours then the profile information will always be correct. Otherwise,
         it may be out of date/missing.
         """
         target_user = UserID.from_string(user_id)

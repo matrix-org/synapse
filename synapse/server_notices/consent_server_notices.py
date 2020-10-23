@@ -104,7 +104,7 @@ class ConsentServerNotices:
 
 
 def copy_with_str_subst(x: Any, substitutions: Any) -> Any:
-    """Deep-copy a structure, carrying out string substitions on any strings
+    """Deep-copy a structure, carrying out string substitutions on any strings
 
     Args:
         x (object): structure to be copied

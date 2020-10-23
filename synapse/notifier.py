@@ -393,7 +393,7 @@ class Notifier:
                 )
 
     def on_new_replication_data(self) -> None:
-        """Used to inform replication listeners that something has happend
+        """Used to inform replication listeners that something has happened
         without waking up any of the normal user event streams"""
         self.notify_replication()
 

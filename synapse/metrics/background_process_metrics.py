@@ -266,7 +266,7 @@ class BackgroundProcessLoggingContext(LoggingContext):
 
         super().__exit__(type, value, traceback)
 
-        # The background process has finished. We explictly remove and manually
+        # The background process has finished. We explicitly remove and manually
         # update the metrics here so that if nothing is scraping metrics the set
         # doesn't infinitely grow.
         with _bg_metrics_lock:
