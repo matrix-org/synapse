@@ -15,7 +15,7 @@
 # limitations under the License.
 import logging
 import re
-from typing import List
+from typing import List, Optional
 
 from synapse.appservice import ApplicationService, AppServiceTransaction
 from synapse.config.appservice import load_appservices
@@ -394,7 +394,7 @@ class ApplicationServiceTransactionWorkerStore(
         )
 
     async def set_type_stream_id_for_appservice(
-        self, service: ApplicationService, type: str, pos: int
+        self, service: ApplicationService, type: str, pos: Optional[int]
     ) -> None:
         if type not in ("read_receipt", "presence"):
             raise ValueError(
