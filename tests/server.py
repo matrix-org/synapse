@@ -380,7 +380,7 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
                 pool._runWithConnection,
                 func,
                 *args,
-                **kwargs
+                **kwargs,
             )
 
         def runInteraction(interaction, *args, **kwargs):
@@ -390,7 +390,7 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
                 pool._runInteraction,
                 interaction,
                 *args,
-                **kwargs
+                **kwargs,
             )
 
         pool.runWithConnection = runWithConnection
