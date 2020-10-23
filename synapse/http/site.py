@@ -109,8 +109,14 @@ class SynapseRequest(Request):
             method = self.method.decode("ascii")
         return method
 
-    def get_user_agent(self):
-        return self.requestHeaders.getRawHeaders(b"User-Agent", [None])[-1]
+    def get_user_agent(self, default: str) -> str:
+        """Return the last User-Agent header, or the given default.
+        """
+        user_agent = self.requestHeaders.getRawHeaders(b"User-Agent", [None])[-1]
+        if user_agent is None:
+            return default
+
+        return user_agent.decode("ascii", "replace")
 
     def render(self, resrc):
         # this is called once a Resource has been found to serve the request; in our
@@ -274,11 +280,7 @@ class SynapseRequest(Request):
         # with maximum recursion trying to log errors about
         # the charset problem.
         # c.f. https://github.com/matrix-org/synapse/issues/3471
-        user_agent = self.get_user_agent()
-        if user_agent is not None:
-            user_agent = user_agent.decode("utf-8", "replace")
-        else:
-            user_agent = "-"
+        user_agent = self.get_user_agent("-")
 
         code = str(self.code)
         if not self.finished:
