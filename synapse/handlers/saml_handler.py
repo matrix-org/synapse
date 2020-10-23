@@ -61,7 +61,7 @@ class SamlHandler:
     def __init__(self, hs: "synapse.server.HomeServer"):
         self.hs = hs
         self._saml_client = Saml2Client(hs.config.saml2_sp_config)
-        self._saml_idp_entityid = hs.config.saml2_sp_config.getattr('idp')
+        self._saml_idp_entityid = hs.config.saml2_sp_config.getattr("idp")
         self._auth = hs.get_auth()
         self._auth_handler = hs.get_auth_handler()
         self._registration_handler = hs.get_registration_handler()
