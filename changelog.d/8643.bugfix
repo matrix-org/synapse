@@ -1,0 +1,1 @@
+Fix a bug in joined_rooms admin API if user has no memberships.
