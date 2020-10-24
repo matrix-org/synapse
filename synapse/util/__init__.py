@@ -170,12 +170,14 @@ PATH_ARG = Union[str, Iterable[Union[str, Tuple[str, dict]]]]
 
 
 def servelet(cls):
-    """@servelet makes the class ready for @on decorations, and automatically adds these to .register() when
+    """
+    @servelet makes the class ready for @on decorations, and automatically adds these to .register() when
     detected.
 
     Please note that this function ignores any superclass .register functions once @on-decorated methods are found,
     any .register functions found in the defining class will be ran *before* the @on-decorated methods are
-    registered."""
+    registered.
+    """
     methods = set()
 
     for name, method in cls.__dict__.items():
@@ -183,6 +185,9 @@ def servelet(cls):
             methods.add(method)
 
     if len(methods) > 0:
+        # Set/replace the .register function to one that applies both (direct) cls.register and dynamic @on-methods,
+        # or only dynamic @on-methods.
+        # Ignores existence of superclass.register functions.
         setattr(
             cls, "register", register_proxy(methods, cls.__dict__.get("register", None))
         )
@@ -191,7 +196,7 @@ def servelet(cls):
 
 
 def register_proxy(methods: set, orig_register: Optional[Callable] = None):
-    def register(self, http_server):
+    def dyn_register(self, http_server):
 
         for _method in methods:
             on = _method._on  # type: Tuple[str, PATH_ARG, dict]
@@ -223,11 +228,11 @@ def register_proxy(methods: set, orig_register: Optional[Callable] = None):
                         )
 
     if orig_register is None:
-        return register
+        return dyn_register
     else:
 
         def bridge(self, http_server):
-            register(self, http_server)
+            dyn_register(self, http_server)
             orig_register(self, http_server)
 
         return bridge
@@ -271,20 +276,20 @@ class _On:
 class on(_On):
     @classmethod
     def get(cls, path_arg: PATH_ARG, **client_patterns_kwargs):
-        return _On("GET", path_arg, **client_patterns_kwargs)
+        return cls("GET", path_arg, **client_patterns_kwargs)
 
     @classmethod
     def post(cls, path_arg: PATH_ARG, **client_patterns_kwargs):
-        return _On("POST", path_arg, **client_patterns_kwargs)
+        return cls("POST", path_arg, **client_patterns_kwargs)
 
     @classmethod
     def put(cls, path_arg: PATH_ARG, **client_patterns_kwargs):
-        return _On("PUT", path_arg, **client_patterns_kwargs)
+        return cls("PUT", path_arg, **client_patterns_kwargs)
 
     @classmethod
     def options(cls, path_arg: PATH_ARG, **client_patterns_kwargs):
-        return _On("OPTIONS", path_arg, **client_patterns_kwargs)
+        return cls("OPTIONS", path_arg, **client_patterns_kwargs)
 
     @classmethod
     def delete(cls, path_arg: PATH_ARG, **client_patterns_kwargs):
-        return _On("DELETE", path_arg, **client_patterns_kwargs)
+        return cls("DELETE", path_arg, **client_patterns_kwargs)
