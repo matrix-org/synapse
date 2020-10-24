@@ -401,7 +401,7 @@ The following fields are returned in the JSON response body:
     devices was last seen. (May be a few minutes out of date, for efficiency reasons).
   - ``user_id`` - Owner of  device.
 
-* `total` - Total number of user's devices.
+- ``total`` - Total number of user's devices.
 
 Delete multiple devices
 ------------------
