@@ -285,7 +285,7 @@ class RestServlet:
         has_decorated = False
 
         for item in (getattr(self, attr) for attr in dir(self)):
-            if callable(item) and hasattr(item, "_on"):
+            if callable(item) and hasattr(item, "_on") and isinstance(item._on, tuple):
                 has_decorated = True
                 self._register_decorated_method(http_server, item)
 
