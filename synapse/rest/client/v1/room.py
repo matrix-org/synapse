@@ -45,7 +45,7 @@ from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
-from synapse.util import json_decoder
+from synapse.util import json_decoder, on, servelet
 from synapse.util.stringutils import random_string
 
 MYPY = False
@@ -61,6 +61,7 @@ class TransactionRestServlet(RestServlet):
         self.txns = HttpTransactionCache(hs)
 
 
+@servelet
 class RoomCreateRestServlet(TransactionRestServlet):
     # No PATTERN; we have custom dispatch rules here
 
@@ -69,15 +70,13 @@ class RoomCreateRestServlet(TransactionRestServlet):
         self._room_creation_handler = hs.get_room_creation_handler()
         self.auth = hs.get_auth()
 
-    def register(self, http_server):
-        PATTERNS = "/createRoom"
-        register_txn_path(self, PATTERNS, http_server)
-
-    def on_PUT(self, request, txn_id):
+    @on.put("/createRoom/{txn_id}", v1=True)
+    def put(self, request, txn_id):
         set_tag("txn_id", txn_id)
-        return self.txns.fetch_or_execute_request(request, self.on_POST, request)
+        return self.txns.fetch_or_execute_request(request, self.post, request)
 
-    async def on_POST(self, request):
+    @on.post("/createRoom", v1=True)
+    async def post(self, request):
         requester = await self.auth.get_user_by_req(request)
 
         info, _ = await self._room_creation_handler.create_room(
@@ -92,7 +91,12 @@ class RoomCreateRestServlet(TransactionRestServlet):
 
 
 # TODO: Needs unit testing for generic events
+@servelet
 class RoomStateEventRestServlet(TransactionRestServlet):
+    _no_state_key = "/rooms/{room_id}/state/{event_type}"
+
+    _state_key = "/rooms/{room_id}/state/{event_type}/{state_key}"
+
     def __init__(self, hs):
         super().__init__(hs)
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -100,48 +104,16 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         self.message_handler = hs.get_message_handler()
         self.auth = hs.get_auth()
 
-    def register(self, http_server):
-        # /room/$roomid/state/$eventtype
-        no_state_key = "/rooms/(?P<room_id>[^/]*)/state/(?P<event_type>[^/]*)$"
+    @on.get(_no_state_key, v1=True)
+    def get_no_state_key(self, request, room_id, event_type):
+        return self.get(request, room_id, event_type, "")
 
-        # /room/$roomid/state/$eventtype/$statekey
-        state_key = (
-            "/rooms/(?P<room_id>[^/]*)/state/"
-            "(?P<event_type>[^/]*)/(?P<state_key>[^/]*)$"
-        )
+    @on.put(_no_state_key, v1=True)
+    def put_no_state_key(self, request, room_id, event_type):
+        return self.put(request, room_id, event_type, "")
 
-        http_server.register_paths(
-            "GET",
-            client_patterns(state_key, v1=True),
-            self.on_GET,
-            self.__class__.__name__,
-        )
-        http_server.register_paths(
-            "PUT",
-            client_patterns(state_key, v1=True),
-            self.on_PUT,
-            self.__class__.__name__,
-        )
-        http_server.register_paths(
-            "GET",
-            client_patterns(no_state_key, v1=True),
-            self.on_GET_no_state_key,
-            self.__class__.__name__,
-        )
-        http_server.register_paths(
-            "PUT",
-            client_patterns(no_state_key, v1=True),
-            self.on_PUT_no_state_key,
-            self.__class__.__name__,
-        )
-
-    def on_GET_no_state_key(self, request, room_id, event_type):
-        return self.on_GET(request, room_id, event_type, "")
-
-    def on_PUT_no_state_key(self, request, room_id, event_type):
-        return self.on_PUT(request, room_id, event_type, "")
-
-    async def on_GET(self, request, room_id, event_type, state_key):
+    @on.get(_state_key, v1=True)
+    async def get(self, request, room_id, event_type, state_key):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         format = parse_string(
             request, "format", default="content", allowed_values=["content", "event"]
@@ -164,7 +136,8 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         elif format == "content":
             return 200, data.get_dict()["content"]
 
-    async def on_PUT(self, request, room_id, event_type, state_key, txn_id=None):
+    @on.put(_state_key, v1=True)
+    async def put(self, request, room_id, event_type, state_key, txn_id=None):
         requester = await self.auth.get_user_by_req(request)
 
         if txn_id:
@@ -209,18 +182,19 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
 
 # TODO: Needs unit testing for generic events + feedback
+@servelet
 class RoomSendEventRestServlet(TransactionRestServlet):
+    _path = "/rooms/{room_id}/send/{event_type}"
+
+    _path_with_txn = _path + "/{txn_id}"
+
     def __init__(self, hs):
         super().__init__(hs)
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
 
-    def register(self, http_server):
-        # /rooms/$roomid/send/$event_type[/$txn_id]
-        PATTERNS = "/rooms/(?P<room_id>[^/]*)/send/(?P<event_type>[^/]*)"
-        register_txn_path(self, PATTERNS, http_server, with_get=True)
-
-    async def on_POST(self, request, room_id, event_type, txn_id=None):
+    @on.post(_path, v1=True)
+    async def post(self, request, room_id, event_type, txn_id=None):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         content = parse_json_object_from_request(request)
 
@@ -248,14 +222,16 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         set_tag("event_id", event_id)
         return 200, {"event_id": event_id}
 
-    def on_GET(self, request, room_id, event_type, txn_id):
+    @on.get(_path_with_txn, v1=True)
+    def get(self, request, room_id, event_type, txn_id):
         return 200, "Not implemented"
 
-    def on_PUT(self, request, room_id, event_type, txn_id):
+    @on.put(_path_with_txn, v1=True)
+    def put(self, request, room_id, event_type, txn_id):
         set_tag("txn_id", txn_id)
 
         return self.txns.fetch_or_execute_request(
-            request, self.on_POST, request, room_id, event_type, txn_id
+            request, self.post, request, room_id, event_type, txn_id
         )
 
 

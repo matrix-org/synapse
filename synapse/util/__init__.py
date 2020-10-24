@@ -16,6 +16,7 @@
 import json
 import logging
 import re
+from typing import Callable, Iterable, Optional, Tuple, Union
 
 import attr
 
@@ -163,3 +164,127 @@ def glob_to_regex(glob):
 
     # \A anchors at start of string, \Z at end of string
     return re.compile(r"\A" + res + r"\Z", re.IGNORECASE)
+
+
+PATH_ARG = Union[str, Iterable[Union[str, Tuple[str, dict]]]]
+
+
+def servelet(cls):
+    """@servelet makes the class ready for @on decorations, and automatically adds these to .register() when
+    detected.
+
+    Please note that this function ignores any superclass .register functions once @on-decorated methods are found,
+    any .register functions found in the defining class will be ran *before* the @on-decorated methods are
+    registered."""
+    methods = set()
+
+    for name, method in cls.__dict__.items():
+        if callable(method) and hasattr(method, "_on"):
+            methods.add(method)
+
+    if len(methods) > 0:
+        setattr(
+            cls, "register", register_proxy(methods, cls.__dict__.get("register", None))
+        )
+
+    return cls
+
+
+def register_proxy(methods: set, orig_register: Optional[Callable] = None):
+    def register(self, http_server):
+
+        for _method in methods:
+            on = _method._on  # type: Tuple[str, PATH_ARG, dict]
+
+            # Bind method to class instance
+            method = _method.__get__(self, self.__class__)
+
+            if isinstance(on[1], str):
+                do_register(self.__class__, http_server, on[0], on[1], on[2], method)
+            elif isinstance(on[1], Iterable):
+                for path_aggregate in on[1]:
+                    if isinstance(path_aggregate, str):
+                        do_register(
+                            self.__class__,
+                            http_server,
+                            on[0],
+                            path_aggregate,
+                            on[2],
+                            method,
+                        )
+                    elif isinstance(path_aggregate, tuple):
+                        do_register(
+                            self.__class__,
+                            http_server,
+                            on[0],
+                            path_aggregate[0],
+                            {**on[2], **path_aggregate[1]},
+                            method,
+                        )
+
+    if orig_register is None:
+        return register
+    else:
+
+        def bridge(self, http_server):
+            register(self, http_server)
+            orig_register(self, http_server)
+
+        return bridge
+
+
+RE_SUGAR = re.compile(r"{(\w+)}")
+
+
+def transform_path(orig_path) -> str:
+    return RE_SUGAR.sub(r"(?P<\1>[^/]*)", orig_path)
+
+
+def do_register(
+    cls, http_server, http_method, client_pattern, client_pattern_kwargs, method
+):
+    # fixme: circumventing circular import
+    from synapse.rest.client.v2_alpha._base import client_patterns
+
+    client_pattern_kwargs.setdefault("add_stopper", True)
+
+    http_server.register_paths(
+        http_method,
+        client_patterns(transform_path(client_pattern), **client_pattern_kwargs),
+        method,
+        cls.__name__,
+    )
+
+
+class _On:
+    def __init__(self, on_method: str, path_arg: PATH_ARG, **client_patterns_kwargs):
+        def _internal(method):
+            method._on = (on_method, path_arg, client_patterns_kwargs)
+            return method
+
+        self.function = _internal
+
+    def __call__(self, method):
+        return self.function(method)
+
+
+class on(_On):
+    @classmethod
+    def get(cls, path_arg: PATH_ARG, **client_patterns_kwargs):
+        return _On("GET", path_arg, **client_patterns_kwargs)
+
+    @classmethod
+    def post(cls, path_arg: PATH_ARG, **client_patterns_kwargs):
+        return _On("POST", path_arg, **client_patterns_kwargs)
+
+    @classmethod
+    def put(cls, path_arg: PATH_ARG, **client_patterns_kwargs):
+        return _On("PUT", path_arg, **client_patterns_kwargs)
+
+    @classmethod
+    def options(cls, path_arg: PATH_ARG, **client_patterns_kwargs):
+        return _On("OPTIONS", path_arg, **client_patterns_kwargs)
+
+    @classmethod
+    def delete(cls, path_arg: PATH_ARG, **client_patterns_kwargs):
+        return _On("DELETE", path_arg, **client_patterns_kwargs)

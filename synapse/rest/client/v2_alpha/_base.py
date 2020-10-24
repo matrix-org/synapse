@@ -31,6 +31,7 @@ def client_patterns(
     releases: Iterable[int] = (0,),
     unstable: bool = True,
     v1: bool = False,
+    add_stopper: bool = False,
 ) -> Iterable[Pattern]:
     """Creates a regex compiled client path with the correct client path
     prefix.
@@ -45,6 +46,10 @@ def client_patterns(
         An iterable of patterns.
     """
     patterns = []
+
+    if add_stopper:
+        if path_regex[-1] != "$":
+            path_regex += "$"
 
     if unstable:
         unstable_prefix = CLIENT_API_PREFIX + "/unstable"
