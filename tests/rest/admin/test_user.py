@@ -1082,6 +1082,21 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Can only lookup local users", channel.json_body["error"])
 
+    def test_no_memberships(self):
+        """
+        Tests that a normal lookup for rooms is successfully
+        if user has no memberships
+        """
+        # Get rooms
+        request, channel = self.make_request(
+            "GET", self.url, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(0, channel.json_body["total"])
+        self.assertEqual(0, len(channel.json_body["joined_rooms"]))
+
     def test_get_rooms(self):
         """
         Tests that a normal lookup for rooms is successfully
