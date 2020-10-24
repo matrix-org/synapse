@@ -17,6 +17,7 @@ import hashlib
 import hmac
 import json
 import urllib.parse
+from binascii import unhexlify
 
 from mock import Mock
 
@@ -1101,3 +1102,128 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(number_rooms, channel.json_body["total"])
         self.assertEqual(number_rooms, len(channel.json_body["joined_rooms"]))
+
+
+class UserMediaRestTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+        sync.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
+        self.media_repo = hs.get_media_repository_resource()
+
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.other_user = self.register_user("user", "pass")
+        self.url = "/_synapse/admin/v1/users/%s/media" % urllib.parse.quote(
+            self.other_user
+        )
+
+    def test_no_auth(self):
+        """
+        Try to list media of an user without authentication.
+        """
+        request, channel = self.make_request("GET", self.url, b"{}")
+        self.render(request)
+
+        self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
+
+    def test_requester_is_no_admin(self):
+        """
+        If the user is not a server admin, an error is returned.
+        """
+        other_user_token = self.login("user", "pass")
+
+        request, channel = self.make_request(
+            "GET", self.url, access_token=other_user_token,
+        )
+        self.render(request)
+
+        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
+    def test_user_does_not_exist(self):
+        """
+        Tests that a lookup for a user that does not exist returns a 404
+        """
+        url = "/_synapse/admin/v1/users/@unknown_person:test/media"
+        request, channel = self.make_request(
+            "GET", url, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(404, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
+
+    def test_user_is_not_local(self):
+        """
+        Tests that a lookup for a user that is not a local returns a 400
+        """
+        url = "/_synapse/admin/v1/users/@unknown_person:unknown_domain/media"
+
+        request, channel = self.make_request(
+            "GET", url, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(400, channel.code, msg=channel.json_body)
+        self.assertEqual("Can only lookup local users", channel.json_body["error"])
+
+    def test_user_has_no_media(self):
+        """
+        Tests that a normal lookup for media is successfully
+        if user has no media created
+        """
+
+        request, channel = self.make_request(
+            "GET", self.url, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(0, channel.json_body["total"])
+        self.assertEqual(0, len(channel.json_body["media"]))
+
+    def test_get_media(self):
+        """
+        Tests that a normal lookup for media is successfully
+        """
+        number_media = 5
+
+        # Upload media
+        other_user_tok = self.login("user", "pass")
+        upload_resource = self.media_repo.children[b"upload"]
+        for i in range(number_media):
+            # file size is 67 Byte
+            image_data = unhexlify(
+                b"89504e470d0a1a0a0000000d4948445200000001000000010806"
+                b"0000001f15c4890000000a49444154789c63000100000500010d"
+                b"0a2db40000000049454e44ae426082"
+            )
+            self.helper.upload_media(
+                upload_resource, image_data, tok=other_user_tok, expect_code=200
+            )
+
+        request, channel = self.make_request(
+            "GET", self.url, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(number_media, channel.json_body["total"])
+        self.assertEqual(number_media, len(channel.json_body["media"]))
+        for m in channel.json_body["media"]:
+            self.assertIn("media_id", m)
+            self.assertIn("media_type", m)
+            self.assertIn("media_length", m)
+            self.assertIn("upload_name", m)
+            self.assertIn("created_ts", m)
+            self.assertIn("last_access_ts", m)
+            self.assertIn("quarantined_by", m)
+            self.assertIn("safe_from_quarantine", m)

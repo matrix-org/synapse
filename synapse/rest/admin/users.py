@@ -708,3 +708,31 @@ class UserMembershipRestServlet(RestServlet):
 
         ret = {"joined_rooms": list(room_ids), "total": len(room_ids)}
         return 200, ret
+
+
+class UserMediaRestServlet(RestServlet):
+    """
+    Get media list of an user.
+    """
+
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]+)/media$")
+
+    def __init__(self, hs):
+        self.is_mine = hs.is_mine
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+
+    async def on_GET(self, request, user_id):
+        await assert_requester_is_admin(self.auth, request)
+
+        if not self.is_mine(UserID.from_string(user_id)):
+            raise SynapseError(400, "Can only lookup local users")
+
+        u = await self.store.get_user_by_id(user_id)
+        if u is None:
+            raise NotFoundError("Unknown user")
+
+        media = await self.store.get_local_media_by_user(user_id)
+
+        ret = {"media": media, "total": len(media)}
+        return 200, ret

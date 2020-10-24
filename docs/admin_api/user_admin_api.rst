@@ -341,6 +341,73 @@ The following fields are returned in the JSON response body:
 - ``total`` - Number of rooms.
 
 
+List media of an user
+================================
+Gets a list of all local media that a specific ``user_id`` has created.
+
+The API is::
+
+  GET /_synapse/admin/v1/users/<user_id>/media
+
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
+
+A response body like the following is returned:
+
+.. code:: json
+
+    {
+      "media": [
+        {
+          "created_ts": 100400,
+          "last_access_ts": null,
+          "media_id": "qXhyRzulkwLsNHTbpHreuEgo",
+          "media_length": 67,
+          "media_type": "image/png",
+          "quarantined_by": null,
+          "safe_from_quarantine": false,
+          "upload_name": "test1.png"
+        },
+        {
+          "created_ts": 200400,
+          "last_access_ts": null,
+          "media_id": "FHfiSnzoINDatrXHQIXBtahw",
+          "media_length": 67,
+          "media_type": "image/png",
+          "quarantined_by": null,
+          "safe_from_quarantine": false,
+          "upload_name": "test2.png"
+        }
+      ],
+      "total": 2
+    }
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- ``user_id`` - fully qualified: for example, ``@user:server.com``.
+
+**Response**
+
+The following fields are returned in the JSON response body:
+
+- ``media`` - An array of objects, each containing information about a media.
+  Media objects contain the following fields:
+
+  - ``created_ts`` - integer - Timestamp when the content was uploaded in ms.
+  - ``last_access_ts`` - integer - Timestamp when the content was last accessed in ms.
+  - ``media_id`` - string - The id used to refer to the media.
+  - ``media_length`` - integer - Length of the media in bytes.
+  - ``media_type`` - string - The MIME-type of the media.
+  - ``quarantined_by`` - string - The user ID that initiated the quarantine request
+    for this media.
+
+  - ``safe_from_quarantine`` - bool - Status if this media is safe from quarantining.
+  - ``upload_name`` - string - The name the media was uploaded with.
+
+- ``total`` - Number of media.
+
 User devices
 ============
 

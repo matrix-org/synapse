@@ -115,6 +115,30 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             desc="get_local_media",
         )
 
+    async def get_local_media_by_user(self, user_id: str) -> List[Dict[str, Any]]:
+        """Get the metadata for a local piece of media
+        which user_id has uploaded
+
+        Returns:
+            A list of all metadata of user's media
+        """
+
+        return await self.db_pool.simple_select_list(
+            "local_media_repository",
+            {"user_id": user_id},
+            [
+                "media_id",
+                "media_type",
+                "media_length",
+                "upload_name",
+                "created_ts",
+                "last_access_ts",
+                "quarantined_by",
+                "safe_from_quarantine",
+            ],
+            "get_local_media_by_user",
+        )
+
     async def store_local_media(
         self,
         media_id,
