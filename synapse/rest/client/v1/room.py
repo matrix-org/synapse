@@ -42,6 +42,7 @@ from synapse.http.servlet import (
 )
 from synapse.logging.opentracing import set_tag
 from synapse.rest.client.transactions import HttpTransactionCache
+from synapse.rest.client.v1 import ClientServlet
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
@@ -56,7 +57,7 @@ if MYPY:
 logger = logging.getLogger(__name__)
 
 
-class TransactionRestServlet(RestServlet):
+class TransactionRestServlet(ClientServlet):
     def __init__(self, hs):
         super().__init__()
         self.txns = HttpTransactionCache(hs)

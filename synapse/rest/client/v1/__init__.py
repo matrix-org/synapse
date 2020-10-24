@@ -12,3 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from synapse.http.servlet import RestServlet
+from synapse.rest.client.v2_alpha._base import client_patterns
+
+
+class ClientServlet(RestServlet):
+    @classmethod
+    def _decorated_pattern(cls, pattern, **kwargs):
+        kwargs.setdefault("add_stopper", True)
+
+        return client_patterns(pattern, **kwargs)

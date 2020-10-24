@@ -17,7 +17,7 @@
 
 import logging
 import re
-from typing import Iterable, Tuple, Union
+from typing import Any, Dict, Iterable, Pattern, Tuple, Union
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.util import json_decoder
@@ -331,18 +331,24 @@ class RestServlet:
 
     @classmethod
     def _register_decorated(
-        cls, http_server, http_method, client_pattern, client_pattern_kwargs, method
+        cls,
+        http_server,
+        http_method: str,
+        pattern: str,
+        pattern_kwargs: Dict[str, Any],
+        method,
     ):
-        # fixme: avoid circular import
-        from synapse.rest.client.v2_alpha._base import client_patterns
-
-        client_pattern_kwargs.setdefault("add_stopper", True)
-
         http_server.register_paths(
             http_method,
-            client_patterns(transform_path(client_pattern), **client_pattern_kwargs),
+            cls._decorated_pattern(transform_path(pattern), **pattern_kwargs),
             method,
             cls.__name__,
+        )
+
+    @classmethod
+    def _decorated_pattern(cls, pattern: str, **kwargs: Any) -> Iterable[Pattern]:
+        raise NotImplementedError(
+            "Tried to define a decorated handler without a pattern function in servlet class."
         )
 
 
@@ -357,9 +363,9 @@ PATH_ARG = Union[str, Iterable[Union[str, Tuple[str, dict]]]]
 
 
 class _On:
-    def __init__(self, on_method: str, path_arg: PATH_ARG, **client_patterns_kwargs):
+    def __init__(self, on_method: str, path_arg: PATH_ARG, **pattern_kwargs):
         def _internal(method):
-            method._on = (on_method, path_arg, client_patterns_kwargs)
+            method._on = (on_method, path_arg, pattern_kwargs)
             return method
 
         self.function = _internal
@@ -370,21 +376,21 @@ class _On:
 
 class on(_On):
     @classmethod
-    def get(cls, path_arg: PATH_ARG, **client_patterns_kwargs):
-        return cls("GET", path_arg, **client_patterns_kwargs)
+    def get(cls, path_arg: PATH_ARG, **pattern_kwargs):
+        return cls("GET", path_arg, **pattern_kwargs)
 
     @classmethod
-    def post(cls, path_arg: PATH_ARG, **client_patterns_kwargs):
-        return cls("POST", path_arg, **client_patterns_kwargs)
+    def post(cls, path_arg: PATH_ARG, **pattern_kwargs):
+        return cls("POST", path_arg, **pattern_kwargs)
 
     @classmethod
-    def put(cls, path_arg: PATH_ARG, **client_patterns_kwargs):
-        return cls("PUT", path_arg, **client_patterns_kwargs)
+    def put(cls, path_arg: PATH_ARG, **pattern_kwargs):
+        return cls("PUT", path_arg, **pattern_kwargs)
 
     @classmethod
-    def options(cls, path_arg: PATH_ARG, **client_patterns_kwargs):
-        return cls("OPTIONS", path_arg, **client_patterns_kwargs)
+    def options(cls, path_arg: PATH_ARG, **pattern_kwargs):
+        return cls("OPTIONS", path_arg, **pattern_kwargs)
 
     @classmethod
-    def delete(cls, path_arg: PATH_ARG, **client_patterns_kwargs):
-        return cls("DELETE", path_arg, **client_patterns_kwargs)
+    def delete(cls, path_arg: PATH_ARG, **pattern_kwargs):
+        return cls("DELETE", path_arg, **pattern_kwargs)
