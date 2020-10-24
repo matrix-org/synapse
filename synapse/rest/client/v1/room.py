@@ -35,6 +35,7 @@ from synapse.events.utils import format_event_for_client_v2
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
+    on,
     parse_integer,
     parse_json_object_from_request,
     parse_string,
@@ -45,7 +46,7 @@ from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
-from synapse.util import json_decoder, on, servelet
+from synapse.util import json_decoder
 from synapse.util.stringutils import random_string
 
 MYPY = False
@@ -61,7 +62,6 @@ class TransactionRestServlet(RestServlet):
         self.txns = HttpTransactionCache(hs)
 
 
-@servelet
 class RoomCreateRestServlet(TransactionRestServlet):
     # No PATTERN; we have custom dispatch rules here
 
@@ -91,7 +91,6 @@ class RoomCreateRestServlet(TransactionRestServlet):
 
 
 # TODO: Needs unit testing for generic events
-@servelet
 class RoomStateEventRestServlet(TransactionRestServlet):
     _no_state_key = "/rooms/{room_id}/state/{event_type}"
 
@@ -182,7 +181,6 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
 
 # TODO: Needs unit testing for generic events + feedback
-@servelet
 class RoomSendEventRestServlet(TransactionRestServlet):
     _path = "/rooms/{room_id}/send/{event_type}"
 

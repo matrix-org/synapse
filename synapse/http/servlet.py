@@ -16,8 +16,11 @@
 """ This module contains base REST classes for constructing REST servlets. """
 
 import logging
+import re
+from typing import Iterable, Tuple, Union
 
 from synapse.api.errors import Codes, SynapseError
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.util import json_decoder
 
 logger = logging.getLogger(__name__)
@@ -279,6 +282,14 @@ class RestServlet:
 
     def register(self, http_server):
         """ Register this servlet with the given HTTP server. """
+
+        has_decorated = False
+
+        for item in (getattr(self, attr) for attr in dir(self)):
+            if callable(item) and hasattr(item, "_on"):
+                has_decorated = True
+                self._register_decorated_method(http_server, item)
+
         if hasattr(self, "PATTERNS"):
             patterns = self.PATTERNS
 
@@ -286,9 +297,92 @@ class RestServlet:
                 if hasattr(self, "on_%s" % (method,)):
                     servlet_classname = self.__class__.__name__
                     method_handler = getattr(self, "on_%s" % (method,))
+
+                    if hasattr(method_handler, "_on"):
+                        # already handled by _register_decorated_method
+                        continue
+
                     http_server.register_paths(
                         method, patterns, method_handler, servlet_classname
                     )
 
-        else:
+        elif not has_decorated:
             raise NotImplementedError("RestServlet must register something.")
+
+    @classmethod
+    def _register_decorated_method(cls, http_server, method):
+        on = method._on  # type: Tuple[str, PATH_ARG, dict]
+
+        if isinstance(on[1], str):
+            cls._register_decorated(http_server, on[0], on[1], on[2], method)
+        elif isinstance(on[1], Iterable):
+            for path_aggregate in on[1]:
+                if isinstance(path_aggregate, str):
+                    cls._register_decorated(
+                        http_server, on[0], path_aggregate, on[2], method,
+                    )
+                elif isinstance(path_aggregate, tuple):
+                    cls._register_decorated(
+                        http_server,
+                        on[0],
+                        path_aggregate[0],
+                        {**on[2], **path_aggregate[1]},
+                        method,
+                    )
+
+    @classmethod
+    def _register_decorated(
+        cls, http_server, http_method, client_pattern, client_pattern_kwargs, method
+    ):
+        client_pattern_kwargs.setdefault("add_stopper", True)
+
+        http_server.register_paths(
+            http_method,
+            client_patterns(transform_path(client_pattern), **client_pattern_kwargs),
+            method,
+            cls.__name__,
+        )
+
+
+RE_SUGAR = re.compile(r"{(\w+)}")
+
+
+def transform_path(orig_path) -> str:
+    return RE_SUGAR.sub(r"(?P<\1>[^/]*)", orig_path)
+
+
+PATH_ARG = Union[str, Iterable[Union[str, Tuple[str, dict]]]]
+
+
+class _On:
+    def __init__(self, on_method: str, path_arg: PATH_ARG, **client_patterns_kwargs):
+        def _internal(method):
+            method._on = (on_method, path_arg, client_patterns_kwargs)
+            return method
+
+        self.function = _internal
+
+    def __call__(self, method):
+        return self.function(method)
+
+
+class on(_On):
+    @classmethod
+    def get(cls, path_arg: PATH_ARG, **client_patterns_kwargs):
+        return cls("GET", path_arg, **client_patterns_kwargs)
+
+    @classmethod
+    def post(cls, path_arg: PATH_ARG, **client_patterns_kwargs):
+        return cls("POST", path_arg, **client_patterns_kwargs)
+
+    @classmethod
+    def put(cls, path_arg: PATH_ARG, **client_patterns_kwargs):
+        return cls("PUT", path_arg, **client_patterns_kwargs)
+
+    @classmethod
+    def options(cls, path_arg: PATH_ARG, **client_patterns_kwargs):
+        return cls("OPTIONS", path_arg, **client_patterns_kwargs)
+
+    @classmethod
+    def delete(cls, path_arg: PATH_ARG, **client_patterns_kwargs):
+        return cls("DELETE", path_arg, **client_patterns_kwargs)
