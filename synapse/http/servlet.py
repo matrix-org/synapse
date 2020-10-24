@@ -20,7 +20,6 @@ import re
 from typing import Iterable, Tuple, Union
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.util import json_decoder
 
 logger = logging.getLogger(__name__)
@@ -334,6 +333,9 @@ class RestServlet:
     def _register_decorated(
         cls, http_server, http_method, client_pattern, client_pattern_kwargs, method
     ):
+        # fixme: avoid circular import
+        from synapse.rest.client.v2_alpha._base import client_patterns
+
         client_pattern_kwargs.setdefault("add_stopper", True)
 
         http_server.register_paths(
