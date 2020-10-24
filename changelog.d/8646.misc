@@ -1,0 +1,1 @@
+Introduces a more idiomatic way to define handler functions (with python decorations).
