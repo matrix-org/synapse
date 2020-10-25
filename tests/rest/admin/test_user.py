@@ -1016,7 +1016,6 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
-        sync.register_servlets,
         room.register_servlets,
     ]
 
