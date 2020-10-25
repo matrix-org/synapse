@@ -1,0 +1,1 @@
+Fix an issue that would cause ephemeral events to not be sent to appservices.
