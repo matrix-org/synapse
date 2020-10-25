@@ -133,6 +133,11 @@ performance:
 -   `maintenance_work_mem`
 -   `autovacuum_work_mem`
 
+And turn on automatic call of VACUUM by uncommenting these values:
+
+-   `track_counts = on`
+-   `autovacuum = on`
+
 Note that the appropriate values for those fields depend on the amount
 of free memory the database host has available.
 
