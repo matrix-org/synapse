@@ -1109,7 +1109,6 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
-        sync.register_servlets,
     ]
 
     def prepare(self, reactor, clock, hs):
