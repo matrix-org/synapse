@@ -284,7 +284,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             # A note on user_agent. Technically a given device can have multiple
             # user agents, so we need to decide which one to pick. We could have
             # handled this in number of ways, but given that we don't care
-            # _that_ much  wehave gone for MAX(). For more details of the other
+            # _that_ much we have gone for MAX(). For more details of the other
             # options considered see
             # https://github.com/matrix-org/synapse/pull/8503#discussion_r502306111
             sql = """
