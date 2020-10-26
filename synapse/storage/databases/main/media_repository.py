@@ -115,28 +115,54 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             desc="get_local_media",
         )
 
-    async def get_local_media_by_user(self, user_id: str) -> List[Dict[str, Any]]:
-        """Get the metadata for a local piece of media
-        which user_id has uploaded
+    async def get_local_media_by_user_paginate(
+        self, start: int, limit: int, user_id: str
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Get a paginated list of metadata for a local piece of media
+        which an user_id has uploaded
 
+        Args:
+            start: offset in the list
+            limit: maximum amount of media_ids to retrieve
+            user_id: fully-qualified user id
         Returns:
-            A list of all metadata of user's media
+            A paginated list of all metadata of user's media
         """
 
-        return await self.db_pool.simple_select_list(
-            "local_media_repository",
-            {"user_id": user_id},
-            [
-                "media_id",
-                "media_type",
-                "media_length",
-                "upload_name",
-                "created_ts",
-                "last_access_ts",
-                "quarantined_by",
-                "safe_from_quarantine",
-            ],
-            "get_local_media_by_user",
+        def get_local_media_by_user_paginate_txn(txn):
+            sql_base = """
+                FROM local_media_repository
+                WHERE user_id = ?
+                """
+
+            args = [user_id]
+            sql = "SELECT COUNT(*) as total_media " + sql_base
+            txn.execute(sql, args)
+            count = txn.fetchone()[0]
+
+            sql = """
+                SELECT
+                    "media_id",
+                    "media_type",
+                    "media_length",
+                    "upload_name",
+                    "created_ts",
+                    "last_access_ts",
+                    "quarantined_by",
+                    "safe_from_quarantine"
+                {}
+                LIMIT ? OFFSET ?
+            """.format(
+                sql_base
+            )
+
+            args += [limit, start]
+            txn.execute(sql, args)
+            media = self.db_pool.cursor_to_dict(txn)
+            return media, count
+
+        return await self.db_pool.runInteraction(
+            "get_local_media_by_user_paginate_txn", get_local_media_by_user_paginate_txn
         )
 
     async def store_local_media(

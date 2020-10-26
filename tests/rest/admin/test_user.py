@@ -1174,6 +1174,150 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Can only lookup local users", channel.json_body["error"])
 
+    def test_limit(self):
+        """
+        Testing list of reported events with limit
+        """
+
+        number_media = 20
+        other_user_tok = self.login("user", "pass")
+        self._create_media(other_user_tok, number_media)
+
+        request, channel = self.make_request(
+            "GET", self.url + "?limit=5", access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["total"], 20)
+        self.assertEqual(len(channel.json_body["media"]), 5)
+        self.assertEqual(channel.json_body["next_token"], 5)
+        self._check_fields(channel.json_body["media"])
+
+    def test_from(self):
+        """
+        Testing list of media with a defined starting point (from)
+        """
+
+        number_media = 20
+        other_user_tok = self.login("user", "pass")
+        self._create_media(other_user_tok, number_media)
+
+        request, channel = self.make_request(
+            "GET", self.url + "?from=5", access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["total"], 20)
+        self.assertEqual(len(channel.json_body["media"]), 15)
+        self.assertNotIn("next_token", channel.json_body)
+        self._check_fields(channel.json_body["media"])
+
+    def test_limit_and_from(self):
+        """
+        Testing list of media with a defined starting point and limit
+        """
+
+        number_media = 20
+        other_user_tok = self.login("user", "pass")
+        self._create_media(other_user_tok, number_media)
+
+        request, channel = self.make_request(
+            "GET", self.url + "?from=5&limit=10", access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["total"], 20)
+        self.assertEqual(channel.json_body["next_token"], 15)
+        self.assertEqual(len(channel.json_body["media"]), 10)
+        self._check_fields(channel.json_body["media"])
+
+    def test_limit_is_negative(self):
+        """
+        Testing that a negative limit parameter returns a 400
+        """
+
+        request, channel = self.make_request(
+            "GET", self.url + "?limit=-5", access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+
+    def test_from_is_negative(self):
+        """
+        Testing that a negative from parameter returns a 400
+        """
+
+        request, channel = self.make_request(
+            "GET", self.url + "?from=-5", access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+
+    def test_next_token(self):
+        """
+        Testing that `next_token` appears at the right place
+        """
+
+        number_media = 20
+        other_user_tok = self.login("user", "pass")
+        self._create_media(other_user_tok, number_media)
+
+        #  `next_token` does not appear
+        # Number of results is the number of entries
+        request, channel = self.make_request(
+            "GET", self.url + "?limit=20", access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["total"], 20)
+        self.assertEqual(len(channel.json_body["media"]), 20)
+        self.assertNotIn("next_token", channel.json_body)
+
+        #  `next_token` does not appear
+        # Number of max results is larger than the number of entries
+        request, channel = self.make_request(
+            "GET", self.url + "?limit=21", access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["total"], 20)
+        self.assertEqual(len(channel.json_body["media"]), 20)
+        self.assertNotIn("next_token", channel.json_body)
+
+        #  `next_token` does appear
+        # Number of max results is smaller than the number of entries
+        request, channel = self.make_request(
+            "GET", self.url + "?limit=19", access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["total"], 20)
+        self.assertEqual(len(channel.json_body["media"]), 19)
+        self.assertEqual(channel.json_body["next_token"], 19)
+
+        # Check
+        # Set `from` to value of `next_token` for request remaining entries
+        #  `next_token` does not appear
+        request, channel = self.make_request(
+            "GET", self.url + "?from=19", access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["total"], 20)
+        self.assertEqual(len(channel.json_body["media"]), 1)
+        self.assertNotIn("next_token", channel.json_body)
+
     def test_user_has_no_media(self):
         """
         Tests that a normal lookup for media is successfully
@@ -1193,21 +1337,10 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         """
         Tests that a normal lookup for media is successfully
         """
-        number_media = 5
 
-        # Upload media
+        number_media = 5
         other_user_tok = self.login("user", "pass")
-        upload_resource = self.media_repo.children[b"upload"]
-        for i in range(number_media):
-            # file size is 67 Byte
-            image_data = unhexlify(
-                b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-                b"0000001f15c4890000000a49444154789c63000100000500010d"
-                b"0a2db40000000049454e44ae426082"
-            )
-            self.helper.upload_media(
-                upload_resource, image_data, tok=other_user_tok, expect_code=200
-            )
+        self._create_media(other_user_tok, number_media)
 
         request, channel = self.make_request(
             "GET", self.url, access_token=self.admin_user_tok,
@@ -1217,7 +1350,30 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(number_media, channel.json_body["total"])
         self.assertEqual(number_media, len(channel.json_body["media"]))
-        for m in channel.json_body["media"]:
+        self._check_fields(channel.json_body["media"])
+
+    def _create_media(self, user_token, number_media):
+        """
+        Create a number of media for a specific user
+        """
+        upload_resource = self.media_repo.children[b"upload"]
+        for i in range(number_media):
+            # file size is 67 Byte
+            image_data = unhexlify(
+                b"89504e470d0a1a0a0000000d4948445200000001000000010806"
+                b"0000001f15c4890000000a49444154789c63000100000500010d"
+                b"0a2db40000000049454e44ae426082"
+            )
+
+            # Upload some media into the room
+            self.helper.upload_media(
+                upload_resource, image_data, tok=user_token, expect_code=200
+            )
+
+    def _check_fields(self, content):
+        """Checks that all attributes are present in content
+        """
+        for m in content:
             self.assertIn("media_id", m)
             self.assertIn("media_type", m)
             self.assertIn("media_length", m)
