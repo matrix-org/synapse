@@ -19,7 +19,7 @@ from twisted.test.proto_helpers import AccumulatingProtocol
 from synapse.logging import RemoteHandler
 
 from tests.server import FakeTransport
-from tests.unittest import DEBUG, HomeserverTestCase
+from tests.unittest import HomeserverTestCase
 
 
 class StructuredLoggingTestBase:
@@ -50,7 +50,6 @@ def connect_logging_client(reactor, client_id):
 
 
 class RemoteHandlerTestCase(StructuredLoggingTestBase, HomeserverTestCase):
-    @DEBUG
     def test_log_output(self):
         """
         The remote handler delivers logs over TCP.
@@ -58,6 +57,7 @@ class RemoteHandlerTestCase(StructuredLoggingTestBase, HomeserverTestCase):
         handler = RemoteHandler("127.0.0.1", 9000, _reactor=self.reactor)
         logger = logging.getLogger()
         logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
 
         logger.info("Hello there, %s!", "wally")
 
@@ -75,7 +75,6 @@ class RemoteHandlerTestCase(StructuredLoggingTestBase, HomeserverTestCase):
         # Ensure the data passed through properly.
         self.assertEqual(logs[0], "Hello there, wally!")
 
-    @DEBUG
     def test_log_backpressure_debug(self):
         """
         When backpressure is hit, DEBUG logs will be shed.
@@ -85,6 +84,7 @@ class RemoteHandlerTestCase(StructuredLoggingTestBase, HomeserverTestCase):
         )
         logger = logging.getLogger()
         logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
 
         # Send some debug messages
         for i in range(0, 3):
@@ -106,7 +106,6 @@ class RemoteHandlerTestCase(StructuredLoggingTestBase, HomeserverTestCase):
         self.assertEqual(len(logs), 7)
         self.assertNotIn(b"debug", server.data)
 
-    @DEBUG
     def test_log_backpressure_info(self):
         """
         When backpressure is hit, DEBUG and INFO logs will be shed.
@@ -116,6 +115,7 @@ class RemoteHandlerTestCase(StructuredLoggingTestBase, HomeserverTestCase):
         )
         logger = logging.getLogger()
         logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
 
         # Send some debug messages
         for i in range(0, 3):
@@ -142,7 +142,6 @@ class RemoteHandlerTestCase(StructuredLoggingTestBase, HomeserverTestCase):
         self.assertNotIn(b"debug", server.data)
         self.assertNotIn(b"info", server.data)
 
-    @DEBUG
     def test_log_backpressure_cut_middle(self):
         """
         When backpressure is hit, and no more DEBUG and INFOs cannot be culled,
@@ -153,6 +152,7 @@ class RemoteHandlerTestCase(StructuredLoggingTestBase, HomeserverTestCase):
         )
         logger = logging.getLogger()
         logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
 
         # Send a bunch of useful messages
         for i in range(0, 20):
