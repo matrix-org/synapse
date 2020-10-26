@@ -167,10 +167,12 @@ class E2eKeysHandler:
                     user_id in cross_signing_keys["self_signing_keys"]
                 )
 
-                # check if only one of the cross-signing master and
-                # self-signing key are cached.
-                # for each user we want the master _and_ the self-signing key,
-                # so we fetch those keys from federation
+                # check if we are missing only one of cross-signing master or
+                # self-signing key, but the other one is cached.
+                # as we need both, this will issue a federation request.
+                # if we don't have any of the keys, either the user doesn't have
+                # cross-signing set up, or the cached device list
+                # is not (yet) updated.
                 if cached_cross_master ^ cached_cross_selfsigning:
                     user_ids_not_in_cache.add(user_id)
 
