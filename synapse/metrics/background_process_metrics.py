@@ -24,6 +24,7 @@ from prometheus_client.core import REGISTRY, Counter, Gauge
 from twisted.internet import defer
 
 from synapse.logging.context import LoggingContext, PreserveLoggingContext
+from synapse.logging.opentracing import noop_context_manager, start_active_span
 
 if TYPE_CHECKING:
     import resource
@@ -166,7 +167,7 @@ class _BackgroundProcess:
         )
 
 
-def run_as_background_process(desc: str, func, *args, **kwargs):
+def run_as_background_process(desc: str, func, *args, bg_start_span=True, **kwargs):
     """Run the given function in its own logcontext, with resource metrics
 
     This should be used to wrap processes which are fired off to run in the
@@ -180,6 +181,9 @@ def run_as_background_process(desc: str, func, *args, **kwargs):
     Args:
         desc: a description for this background process type
         func: a function, which may return a Deferred or a coroutine
+        bg_start_span: Whether to start an opentracing span. Defaults to True.
+            Should only be disabled for processes that will not log to or tag
+            a span.
         args: positional args for func
         kwargs: keyword args for func
 
@@ -197,14 +201,17 @@ def run_as_background_process(desc: str, func, *args, **kwargs):
 
         with BackgroundProcessLoggingContext(desc) as context:
             context.request = "%s-%i" % (desc, count)
-
             try:
-                result = func(*args, **kwargs)
+                ctx = noop_context_manager()
+                if bg_start_span:
+                    ctx = start_active_span(desc, tags={"request_id": context.request})
+                with ctx:
+                    result = func(*args, **kwargs)
 
-                if inspect.isawaitable(result):
-                    result = await result
+                    if inspect.isawaitable(result):
+                        result = await result
 
-                return result
+                    return result
             except Exception:
                 logger.exception(
                     "Background process '%s' threw an exception", desc,
@@ -265,7 +272,7 @@ class BackgroundProcessLoggingContext(LoggingContext):
 
         super().__exit__(type, value, traceback)
 
-        # The background process has finished. We explictly remove and manually
+        # The background process has finished. We explicitly remove and manually
         # update the metrics here so that if nothing is scraping metrics the set
         # doesn't infinitely grow.
         with _bg_metrics_lock:

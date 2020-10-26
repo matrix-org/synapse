@@ -24,7 +24,7 @@ from typing import Iterable, List, TypeVar
 import bleach
 import jinja2
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import StoreError
 from synapse.config.emailconfig import EmailSubjectConfig
 from synapse.logging.context import make_deferred_yieldable
@@ -317,9 +317,14 @@ class Mailer:
     async def get_room_vars(
         self, room_id, user_id, notifs, notif_events, room_state_ids
     ):
-        my_member_event_id = room_state_ids[("m.room.member", user_id)]
-        my_member_event = await self.store.get_event(my_member_event_id)
-        is_invite = my_member_event.content["membership"] == "invite"
+        # Check if one of the notifs is an invite event for the user.
+        is_invite = False
+        for n in notifs:
+            ev = notif_events[n["event_id"]]
+            if ev.type == EventTypes.Member and ev.state_key == user_id:
+                if ev.content.get("membership") == Membership.INVITE:
+                    is_invite = True
+                    break
 
         room_name = await calculate_room_name(self.store, room_state_ids, user_id)
 
@@ -387,8 +392,8 @@ class Mailer:
         return ret
 
     async def get_message_vars(self, notif, event, room_state_ids):
-        if event.type != EventTypes.Message:
-            return
+        if event.type != EventTypes.Message and event.type != EventTypes.Encrypted:
+            return None
 
         sender_state_event_id = room_state_ids[("m.room.member", event.sender)]
         sender_state_event = await self.store.get_event(sender_state_event_id)
@@ -399,10 +404,8 @@ class Mailer:
         # sender_hash % the number of default images to choose from
         sender_hash = string_ordinal_total(event.sender)
 
-        msgtype = event.content.get("msgtype")
-
         ret = {
-            "msgtype": msgtype,
+            "event_type": event.type,
             "is_historical": event.event_id != notif["event_id"],
             "id": event.event_id,
             "ts": event.origin_server_ts,
@@ -410,6 +413,14 @@ class Mailer:
             "sender_avatar_url": sender_avatar_url,
             "sender_hash": sender_hash,
         }
+
+        # Encrypted messages don't have any additional useful information.
+        if event.type == EventTypes.Encrypted:
+            return ret
+
+        msgtype = event.content.get("msgtype")
+
+        ret["msgtype"] = msgtype
 
         if msgtype == "m.text":
             self.add_text_message_vars(ret, event)
@@ -455,16 +466,26 @@ class Mailer:
                 self.store, room_state_ids[room_id], user_id, fallback_to_members=False
             )
 
-            my_member_event_id = room_state_ids[room_id][("m.room.member", user_id)]
-            my_member_event = await self.store.get_event(my_member_event_id)
-            if my_member_event.content["membership"] == "invite":
-                inviter_member_event_id = room_state_ids[room_id][
-                    ("m.room.member", my_member_event.sender)
-                ]
-                inviter_member_event = await self.store.get_event(
-                    inviter_member_event_id
+            # See if one of the notifs is an invite event for the user
+            invite_event = None
+            for n in notifs_by_room[room_id]:
+                ev = notif_events[n["event_id"]]
+                if ev.type == EventTypes.Member and ev.state_key == user_id:
+                    if ev.content.get("membership") == Membership.INVITE:
+                        invite_event = ev
+                        break
+
+            if invite_event:
+                inviter_member_event_id = room_state_ids[room_id].get(
+                    ("m.room.member", invite_event.sender)
                 )
-                inviter_name = name_from_member_event(inviter_member_event)
+                inviter_name = invite_event.sender
+                if inviter_member_event_id:
+                    inviter_member_event = await self.store.get_event(
+                        inviter_member_event_id, allow_none=True
+                    )
+                    if inviter_member_event:
+                        inviter_name = name_from_member_event(inviter_member_event)
 
                 if room_name is None:
                     return self.email_subjects.invite_from_person % {

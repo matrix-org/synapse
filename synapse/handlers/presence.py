@@ -802,7 +802,7 @@ class PresenceHandler(BasePresenceHandler):
             between the requested tokens due to the limit.
 
             The token returned can be used in a subsequent call to this
-            function to get further updatees.
+            function to get further updates.
 
             The updates are a list of 2-tuples of stream ID and the row data
         """
@@ -977,7 +977,7 @@ def should_notify(old_state, new_state):
             new_state.last_active_ts - old_state.last_active_ts
             > LAST_ACTIVE_GRANULARITY
         ):
-            # Only notify about last active bumps if we're not currently acive
+            # Only notify about last active bumps if we're not currently active
             if not new_state.currently_active:
                 notify_reason_counter.labels("last_active_change_online").inc()
                 return True

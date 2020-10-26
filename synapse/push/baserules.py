@@ -37,7 +37,7 @@ def list_with_base_rules(rawrules, use_new_defaults=False):
     modified_base_rules = {r["rule_id"]: r for r in rawrules if r["priority_class"] < 0}
 
     # Remove the modified base rules from the list, They'll be added back
-    # in the default postions in the list.
+    # in the default positions in the list.
     rawrules = [r for r in rawrules if r["priority_class"] >= 0]
 
     # shove the server default rules for each kind onto the end of each

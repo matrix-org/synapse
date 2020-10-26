@@ -78,7 +78,7 @@ class TerseJSONTCPTestCase(StructuredLoggingTestBase, HomeserverTestCase):
             "server_name",
             "name",
         ]
-        self.assertEqual(set(log.keys()), set(expected_log_keys))
+        self.assertCountEqual(log.keys(), expected_log_keys)
 
         # It contains the data we expect.
         self.assertEqual(log["name"], "wally")

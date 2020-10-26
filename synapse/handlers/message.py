@@ -657,7 +657,7 @@ class EventCreationHandler:
             context: The event context.
 
         Returns:
-            The previous verion of the event is returned, if it is found in the
+            The previous version of the event is returned, if it is found in the
             event context. Otherwise, None is returned.
         """
         prev_state_ids = await context.get_prev_state_ids()

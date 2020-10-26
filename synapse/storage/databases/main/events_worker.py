@@ -33,7 +33,10 @@ from synapse.api.room_versions import (
 from synapse.events import EventBase, make_event_from_dict
 from synapse.events.utils import prune_event
 from synapse.logging.context import PreserveLoggingContext, current_context
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.metrics.background_process_metrics import (
+    run_as_background_process,
+    wrap_as_background_process,
+)
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams import BackfillStream
 from synapse.replication.tcp.streams.events import EventsStream
@@ -42,8 +45,8 @@ from synapse.storage.database import DatabasePool
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator, StreamIdGenerator
 from synapse.types import Collection, get_domain_from_id
-from synapse.util.caches.deferred_cache import DeferredCache
 from synapse.util.caches.descriptors import cached
+from synapse.util.caches.lrucache import LruCache
 from synapse.util.iterutils import batch_iter
 from synapse.util.metrics import Measure
 
@@ -140,17 +143,13 @@ class EventsWorkerStore(SQLBaseStore):
         if hs.config.run_background_tasks:
             # We periodically clean out old transaction ID mappings
             self._clock.looping_call(
-                run_as_background_process,
-                5 * 60 * 1000,
-                "_cleanup_old_transaction_ids",
-                self._cleanup_old_transaction_ids,
+                self._cleanup_old_transaction_ids, 5 * 60 * 1000,
             )
 
-        self._get_event_cache = DeferredCache(
-            "*getEvent*",
+        self._get_event_cache = LruCache(
+            cache_name="*getEvent*",
             keylen=3,
-            max_entries=hs.config.caches.event_cache_size,
-            apply_cache_factor_from_config=False,
+            max_size=hs.config.caches.event_cache_size,
         )
 
         self._event_fetch_lock = threading.Condition()
@@ -749,7 +748,7 @@ class EventsWorkerStore(SQLBaseStore):
                 event=original_ev, redacted_event=redacted_event
             )
 
-            self._get_event_cache.prefill((event_id,), cache_entry)
+            self._get_event_cache.set((event_id,), cache_entry)
             result_map[event_id] = cache_entry
 
         return result_map
@@ -1375,6 +1374,7 @@ class EventsWorkerStore(SQLBaseStore):
 
         return mapping
 
+    @wrap_as_background_process("_cleanup_old_transaction_ids")
     async def _cleanup_old_transaction_ids(self):
         """Cleans out transaction id mappings older than 24hrs.
         """

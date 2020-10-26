@@ -110,10 +110,9 @@ class LoginRestServlet(RestServlet):
             ({"type": t} for t in self.auth_handler.get_supported_login_types())
         )
 
-        return 200, {"flows": flows}
+        flows.append({"type": LoginRestServlet.APPSERVICE_TYPE})
 
-    def on_OPTIONS(self, request: SynapseRequest):
-        return 200, {}
+        return 200, {"flows": flows}
 
     async def on_POST(self, request: SynapseRequest):
         self._address_ratelimiter.ratelimit(request.getClientIP())

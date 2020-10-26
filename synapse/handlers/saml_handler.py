@@ -216,9 +216,7 @@ class SamlHandler:
                 return
 
         # Pull out the user-agent and IP from the request.
-        user_agent = request.requestHeaders.getRawHeaders(b"User-Agent", default=[b""])[
-            0
-        ].decode("ascii", "surrogateescape")
+        user_agent = request.get_user_agent("")
         ip_address = self.hs.get_ip_from_request(request)
 
         # Call the mapper to register/login the user

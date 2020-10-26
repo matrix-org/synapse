@@ -470,9 +470,7 @@ class AuthHandler(BaseHandler):
             # authentication flow.
             await self.store.set_ui_auth_clientdict(sid, clientdict)
 
-        user_agent = request.requestHeaders.getRawHeaders(b"User-Agent", default=[b""])[
-            0
-        ].decode("ascii", "surrogateescape")
+        user_agent = request.get_user_agent("")
 
         await self.store.add_user_agent_ip_to_ui_auth_session(
             session.session_id, user_agent, clientip
@@ -692,7 +690,7 @@ class AuthHandler(BaseHandler):
         Creates a new access token for the user with the given user ID.
 
         The user is assumed to have been authenticated by some other
-        machanism (e.g. CAS), and the user_id converted to the canonical case.
+        mechanism (e.g. CAS), and the user_id converted to the canonical case.
 
         The device will be recorded in the table if it is not there already.
 
@@ -1122,20 +1120,22 @@ class AuthHandler(BaseHandler):
             Whether self.hash(password) == stored_hash.
         """
 
-        def _do_validate_hash():
+        def _do_validate_hash(checked_hash: bytes):
             # Normalise the Unicode in the password
             pw = unicodedata.normalize("NFKC", password)
 
             return bcrypt.checkpw(
                 pw.encode("utf8") + self.hs.config.password_pepper.encode("utf8"),
-                stored_hash,
+                checked_hash,
             )
 
         if stored_hash:
             if not isinstance(stored_hash, bytes):
                 stored_hash = stored_hash.encode("ascii")
 
-            return await defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
+            return await defer_to_thread(
+                self.hs.get_reactor(), _do_validate_hash, stored_hash
+            )
         else:
             return False
 

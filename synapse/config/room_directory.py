@@ -99,7 +99,7 @@ class RoomDirectoryConfig(Config):
         #
         # Options for the rules include:
         #
-        #   user_id: Matches agaisnt the creator of the alias
+        #   user_id: Matches against the creator of the alias
         #   room_id: Matches against the room ID being published
         #   alias: Matches against any current local or canonical aliases
         #            associated with the room

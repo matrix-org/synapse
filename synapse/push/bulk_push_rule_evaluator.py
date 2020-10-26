@@ -390,12 +390,12 @@ class RulesForRoom:
                     continue
 
                 # If a user has left a room we remove their push rule. If they
-                # joined then we readd it later in _update_rules_with_member_event_ids
+                # joined then we re-add it later in _update_rules_with_member_event_ids
                 ret_rules_by_user.pop(user_id, None)
                 missing_member_event_ids[user_id] = event_id
 
             if missing_member_event_ids:
-                # If we have some memebr events we haven't seen, look them up
+                # If we have some member events we haven't seen, look them up
                 # and fetch push rules for them if appropriate.
                 logger.debug("Found new member events %r", missing_member_event_ids)
                 await self._update_rules_with_member_event_ids(
@@ -496,6 +496,6 @@ class _Invalidation(namedtuple("_Invalidation", ("cache", "room_id"))):
     # dedupe when we add callbacks to lru cache nodes, otherwise the number
     # of callbacks would grow.
     def __call__(self):
-        rules = self.cache.get(self.room_id, None, update_metrics=False)
+        rules = self.cache.get_immediate(self.room_id, None, update_metrics=False)
         if rules:
             rules.invalidate_all()

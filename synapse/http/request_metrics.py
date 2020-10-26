@@ -109,7 +109,7 @@ in_flight_requests_db_sched_duration = Counter(
 # The set of all in flight requests, set[RequestMetrics]
 _in_flight_requests = set()
 
-# Protects the _in_flight_requests set from concurrent accesss
+# Protects the _in_flight_requests set from concurrent access
 _in_flight_requests_lock = threading.Lock()
 
 
