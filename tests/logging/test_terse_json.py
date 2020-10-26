@@ -19,10 +19,10 @@ from io import StringIO
 
 from synapse.logging._terse_json import TerseJsonFormatter
 
-from tests.unittest import HomeserverTestCase
+from tests.unittest import TestCase
 
 
-class TerseJsonTestCase(HomeserverTestCase):
+class TerseJsonTestCase(TestCase):
     def test_log_output(self):
         """
         The Terse JSON formatter converts log messages to JSON.
@@ -32,9 +32,11 @@ class TerseJsonTestCase(HomeserverTestCase):
         handler = logging.StreamHandler(output)
         handler.setFormatter(TerseJsonFormatter())
 
-        logger = logging.getLogger()
+        logger = logging.getLogger(__name__)
         logger.addHandler(handler)
+        self.addCleanup(logger.removeHandler, handler)
         logger.setLevel(logging.INFO)
+        self.addCleanup(logger.setLevel, logging.NOTSET)
 
         logger.info("Hello there, %s!", "wally")
 
@@ -51,8 +53,6 @@ class TerseJsonTestCase(HomeserverTestCase):
             "time",
             "level",
             "namespace",
-            # Added via LoggingContextFilter, configured in tests.test_utils.logging_setup.setup_logging.
-            "request",
         ]
         self.assertCountEqual(log.keys(), expected_log_keys)
         self.assertEqual(log["log"], "Hello there, wally!")

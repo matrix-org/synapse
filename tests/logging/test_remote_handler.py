@@ -18,21 +18,8 @@ from twisted.test.proto_helpers import AccumulatingProtocol
 
 from synapse.logging import RemoteHandler
 
-from tests.server import FakeTransport
-from tests.unittest import HomeserverTestCase
-
-
-class StructuredLoggingTestBase:
-    """
-    Test base that registers a cleanup handler to reset the stdlib log handler
-    to 'unset'.
-    """
-
-    def prepare(self, reactor, clock, hs):
-        def _cleanup():
-            logging.getLogger("synapse").setLevel(logging.NOTSET)
-
-        self.addCleanup(_cleanup)
+from tests.server import FakeTransport, get_clock
+from tests.unittest import TestCase
 
 
 def connect_logging_client(reactor, client_id):
@@ -49,15 +36,30 @@ def connect_logging_client(reactor, client_id):
     return client, server
 
 
-class RemoteHandlerTestCase(StructuredLoggingTestBase, HomeserverTestCase):
+class RemoteHandlerTestCase(TestCase):
+    def setUp(self):
+        self.reactor, _ = get_clock()
+
+    def get_logger(self, handler):
+        # Create a logger and add the handler to it.
+        logger = logging.getLogger(__name__)
+        logger.addHandler(handler)
+
+        # Ensure the logger actually logs something.
+        logger.setLevel(logging.INFO)
+
+        # Ensure the logger gets cleaned-up appropriately.
+        self.addCleanup(logger.removeHandler, handler)
+        self.addCleanup(logger.setLevel, logging.NOTSET)
+
+        return logger
+
     def test_log_output(self):
         """
         The remote handler delivers logs over TCP.
         """
         handler = RemoteHandler("127.0.0.1", 9000, _reactor=self.reactor)
-        logger = logging.getLogger()
-        logger.addHandler(handler)
-        logger.setLevel(logging.INFO)
+        logger = self.get_logger(handler)
 
         logger.info("Hello there, %s!", "wally")
 
@@ -82,9 +84,7 @@ class RemoteHandlerTestCase(StructuredLoggingTestBase, HomeserverTestCase):
         handler = RemoteHandler(
             "127.0.0.1", 9000, maximum_buffer=10, _reactor=self.reactor
         )
-        logger = logging.getLogger()
-        logger.addHandler(handler)
-        logger.setLevel(logging.INFO)
+        logger = self.get_logger(handler)
 
         # Send some debug messages
         for i in range(0, 3):
@@ -113,9 +113,7 @@ class RemoteHandlerTestCase(StructuredLoggingTestBase, HomeserverTestCase):
         handler = RemoteHandler(
             "127.0.0.1", 9000, maximum_buffer=10, _reactor=self.reactor
         )
-        logger = logging.getLogger()
-        logger.addHandler(handler)
-        logger.setLevel(logging.INFO)
+        logger = self.get_logger(handler)
 
         # Send some debug messages
         for i in range(0, 3):
@@ -150,9 +148,7 @@ class RemoteHandlerTestCase(StructuredLoggingTestBase, HomeserverTestCase):
         handler = RemoteHandler(
             "127.0.0.1", 9000, maximum_buffer=10, _reactor=self.reactor
         )
-        logger = logging.getLogger()
-        logger.addHandler(handler)
-        logger.setLevel(logging.INFO)
+        logger = self.get_logger(handler)
 
         # Send a bunch of useful messages
         for i in range(0, 20):
