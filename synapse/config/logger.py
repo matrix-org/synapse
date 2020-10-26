@@ -44,7 +44,11 @@ DEFAULT_LOG_CONFIG = Template(
 # This is a YAML file containing a standard Python logging configuration
 # dictionary. See [1] for details on the valid settings.
 #
+# Synapse also supports structured logging for machine readable logs which can
+# be ingested by ELK stacks. See [2] for details.
+#
 # [1]: https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
+# [2]: https://github.com/matrix-org/synapse/blob/master/docs/structured_logging.md
 
 version: 1
 
@@ -192,6 +196,15 @@ def _setup_stdlib_logging(config, log_config, logBeginner: LogBeginner) -> None:
         handler.setFormatter(formatter)
         logger.addHandler(handler)
     else:
+        # If the old structured logging configuration is being used, raise an
+        # error.
+        if "structured" in log_config and log_config.get("structured"):
+            raise ConfigError(
+                "The `structured` parameter is no longer supported, see the documentation "
+                "for enabling structured logging: "
+                "https://github.com/matrix-org/synapse/blob/master/docs/structured_logging.md"
+            )
+
         logging.config.dictConfig(log_config)
 
     # We add a log record factory that runs all messages through the
