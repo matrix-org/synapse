@@ -370,7 +370,9 @@ class ApplicationServiceTransactionWorkerStore(
         self, service: ApplicationService, type: str
     ) -> int:
         if type not in ("read_receipt", "presence"):
-            raise ValueError("Expected type to be a valid application stream id type, got %s" % type)
+            raise ValueError(
+                "Expected type to be a valid application stream id type, got %s" % type
+            )
 
         def get_type_stream_id_for_appservice_txn(txn):
             stream_id_type = "%s_stream_id" % type
@@ -394,7 +396,9 @@ class ApplicationServiceTransactionWorkerStore(
         self, service: ApplicationService, type: str, pos: int
     ) -> None:
         if type not in ("read_receipt", "presence"):
-            raise ValueError("Expected type to be a valid application stream id type, got %s" % type)
+            raise ValueError(
+                "Expected type to be a valid application stream id type, got %s" % type
+            )
 
         def set_type_stream_id_for_appservice_txn(txn):
             stream_id_type = "%s_stream_id" % type

@@ -1,1 +1,1 @@
-Fix an issue that would cause ephemeral events to not be sent to appservices.
+Fix a bug introduced in v1.22.0rc1 which would cause ephemeral events to not be sent to appservices.
