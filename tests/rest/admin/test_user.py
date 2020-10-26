@@ -1190,7 +1190,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
 
     def test_limit(self):
         """
-        Testing list of reported events with limit
+        Testing list of media with limit
         """
 
         number_media = 20
@@ -1203,7 +1203,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(channel.json_body["total"], 20)
+        self.assertEqual(channel.json_body["total"], number_media)
         self.assertEqual(len(channel.json_body["media"]), 5)
         self.assertEqual(channel.json_body["next_token"], 5)
         self._check_fields(channel.json_body["media"])
@@ -1223,7 +1223,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(channel.json_body["total"], 20)
+        self.assertEqual(channel.json_body["total"], number_media)
         self.assertEqual(len(channel.json_body["media"]), 15)
         self.assertNotIn("next_token", channel.json_body)
         self._check_fields(channel.json_body["media"])
@@ -1243,7 +1243,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(channel.json_body["total"], 20)
+        self.assertEqual(channel.json_body["total"], number_media)
         self.assertEqual(channel.json_body["next_token"], 15)
         self.assertEqual(len(channel.json_body["media"]), 10)
         self._check_fields(channel.json_body["media"])
@@ -1291,8 +1291,8 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(channel.json_body["total"], 20)
-        self.assertEqual(len(channel.json_body["media"]), 20)
+        self.assertEqual(channel.json_body["total"], number_media)
+        self.assertEqual(len(channel.json_body["media"]), number_media)
         self.assertNotIn("next_token", channel.json_body)
 
         #  `next_token` does not appear
@@ -1303,8 +1303,8 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(channel.json_body["total"], 20)
-        self.assertEqual(len(channel.json_body["media"]), 20)
+        self.assertEqual(channel.json_body["total"], number_media)
+        self.assertEqual(len(channel.json_body["media"]), number_media)
         self.assertNotIn("next_token", channel.json_body)
 
         #  `next_token` does appear
@@ -1315,7 +1315,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(channel.json_body["total"], 20)
+        self.assertEqual(channel.json_body["total"], number_media)
         self.assertEqual(len(channel.json_body["media"]), 19)
         self.assertEqual(channel.json_body["next_token"], 19)
 
@@ -1328,7 +1328,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(channel.json_body["total"], 20)
+        self.assertEqual(channel.json_body["total"], number_media)
         self.assertEqual(len(channel.json_body["media"]), 1)
         self.assertNotIn("next_token", channel.json_body)
 
@@ -1364,6 +1364,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(number_media, channel.json_body["total"])
         self.assertEqual(number_media, len(channel.json_body["media"]))
+        self.assertNotIn("next_token", channel.json_body)
         self._check_fields(channel.json_body["media"])
 
     def _create_media(self, user_token, number_media):
