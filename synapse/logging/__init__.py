@@ -17,4 +17,4 @@
 from synapse.logging._remote import RemoteHandler
 from synapse.logging._terse_json import TerseJsonFormatter
 
-__all__ = [RemoteHandler, TerseJsonFormatter]
+__all__ = ["RemoteHandler", "TerseJsonFormatter"]
