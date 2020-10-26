@@ -82,8 +82,8 @@ The following fields are returned in the JSON response body:
 - ``next_token``: integer - Indication for pagination. See above.
 - ``total``: integer - Total number of event reports related to the query (``user_id`` and ``room_id``).
 
-Show details of a specific event
-================================
+Show details of a specific event report
+=======================================
 
 This API returns information about a specific event report.
 
