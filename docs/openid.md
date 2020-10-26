@@ -58,8 +58,7 @@ Here are a few configs for providers that should work with Synapse.
 Although it is designed to help building a full-blown provider with an
 external database, it can be configured with static passwords in a config file.
 
-Follow the [Getting Started
-guide](https://github.com/dexidp/dex/blob/master/Documentation/getting-started.md)
+Follow the [Getting Started guide](https://dexidp.io/docs/getting-started/)
 to install Dex.
 
 Edit `examples/config-dev.yaml` config file from the Dex repo to add a client:
