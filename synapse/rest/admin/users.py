@@ -16,6 +16,7 @@ import hashlib
 import hmac
 import logging
 from http import HTTPStatus
+from typing import Tuple
 
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, NotFoundError, SynapseError
@@ -27,13 +28,14 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import (
     admin_patterns,
     assert_requester_is_admin,
     assert_user_is_admin,
     historical_admin_path_patterns,
 )
-from synapse.types import UserID
+from synapse.types import JsonDict, UserID
 
 logger = logging.getLogger(__name__)
 
@@ -722,6 +724,18 @@ class UserMembershipRestServlet(RestServlet):
 
 
 class PushersRestServlet(RestServlet):
+    """
+    Gets information about all pushers for a specific `user_id`.
+
+    Example:
+        http://localhost:8008/_synapse/admin/v1/users/
+        @user:server/pushers
+
+    Returns:
+        pushers: Dictionary containing pushers information.
+        total: Number of pushers in dictonary `pushers`.
+    """
+
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/pushers$")
 
     def __init__(self, hs):
@@ -729,7 +743,9 @@ class PushersRestServlet(RestServlet):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 
-    async def on_GET(self, request: SynapseRequest, user_id: str) -> Tuple[int, JsonDict]:
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
         if not self.is_mine(UserID.from_string(user_id)):
@@ -741,7 +757,8 @@ class PushersRestServlet(RestServlet):
         pushers = await self.store.get_pushers_by_user_id(user_id)
 
         filtered_pushers = [
-            {k: v for k, v in p.items() if k in _GET_PUSHERS_ALLOWED_KEYS} for p in pushers
+            {k: v for k, v in p.items() if k in _GET_PUSHERS_ALLOWED_KEYS}
+            for p in pushers
         ]
 
         return 200, {"pushers": filtered_pushers, "total": len(filtered_pushers)}
