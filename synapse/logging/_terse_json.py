@@ -59,8 +59,8 @@ class TerseJsonFormatter(logging.Formatter):
         }
 
         # Add any extra attributes to the event.
-        extra_attributes = set(record.__dict__.keys()) - _LOG_RECORD_ATTRIBUTES
-        for key in extra_attributes:
-            event[key] = getattr(record, key)
+        for key, value in record.__dict__.items():
+            if key not in _LOG_RECORD_ATTRIBUTES:
+                event[key] = value
 
         return _encoder.encode(event)
