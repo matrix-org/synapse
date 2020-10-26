@@ -238,7 +238,7 @@ class ApplicationServicesHandler:
 
     async def _handle_presence(
         self, service: ApplicationService, users: Collection[UserID]
-    ):
+    ) -> List[JsonDict]:
         events = []  # type: List[JsonDict]
         presence_source = self.event_sources.sources["presence"]
         from_key = await self.store.get_type_stream_id_for_appservice(
@@ -252,7 +252,7 @@ class ApplicationServicesHandler:
                 user=user, service=service, from_key=from_key,
             )
             time_now = self.clock.time_msec()
-            presence_events = [
+            events.extend(
                 {
                     "type": "m.presence",
                     "sender": event.user_id,
@@ -261,8 +261,9 @@ class ApplicationServicesHandler:
                     ),
                 }
                 for event in presence_events
-            ]
-            events = events + presence_events
+            )
+
+        return events
 
     async def query_user_exists(self, user_id):
         """Check if any application service knows this user_id exists.
