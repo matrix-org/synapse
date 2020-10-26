@@ -172,7 +172,7 @@ class WellKnownResolver:
         had_valid_well_known = self._had_valid_well_known_cache.get(server_name, False)
 
         # We do this in two steps to differentiate between possibly transient
-        # errors (e.g. can't connect to host, 503 response) and more permenant
+        # errors (e.g. can't connect to host, 503 response) and more permanent
         # errors (such as getting a 404 response).
         response, body = await self._make_well_known_request(
             server_name, retry=had_valid_well_known

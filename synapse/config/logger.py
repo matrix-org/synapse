@@ -105,7 +105,7 @@ root:
     # then write them to a file.
     #
     # Replace "buffer" with "console" to log to stderr instead. (Note that you'll
-    # also need to update the configuation for the `twisted` logger above, in
+    # also need to update the configuration for the `twisted` logger above, in
     # this case.)
     #
     handlers: [buffer]

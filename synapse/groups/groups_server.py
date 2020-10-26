@@ -113,7 +113,7 @@ class GroupsServerWorkerHandler:
             entry = await self.room_list_handler.generate_room_entry(
                 room_id, len(joined_users), with_alias=False, allow_private=True
             )
-            entry = dict(entry)  # so we don't change whats cached
+            entry = dict(entry)  # so we don't change what's cached
             entry.pop("room_id", None)
 
             room_entry["profile"] = entry
@@ -550,7 +550,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
                 group_id, room_id, is_public=is_public
             )
         else:
-            raise SynapseError(400, "Uknown config option")
+            raise SynapseError(400, "Unknown config option")
 
         return {}
 

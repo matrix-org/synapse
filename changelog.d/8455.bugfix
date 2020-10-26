@@ -1,0 +1,1 @@
+Fix fetching of E2E cross signing keys over federation when only one of the master key and device signing key is cached already.
