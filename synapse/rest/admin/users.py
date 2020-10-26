@@ -37,7 +37,7 @@ from synapse.types import UserID
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_KEYS = {
+_GET_PUSHERS_ALLOWED_KEYS = {
     "app_display_name",
     "app_id",
     "data",
@@ -729,7 +729,7 @@ class PushersRestServlet(RestServlet):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 
-    async def on_GET(self, request, user_id):
+    async def on_GET(self, request: SynapseRequest, user_id: str) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
         if not self.is_mine(UserID.from_string(user_id)):
@@ -741,7 +741,7 @@ class PushersRestServlet(RestServlet):
         pushers = await self.store.get_pushers_by_user_id(user_id)
 
         filtered_pushers = [
-            {k: v for k, v in p.items() if k in ALLOWED_KEYS} for p in pushers
+            {k: v for k, v in p.items() if k in _GET_PUSHERS_ALLOWED_KEYS} for p in pushers
         ]
 
         return 200, {"pushers": filtered_pushers, "total": len(filtered_pushers)}
