@@ -702,8 +702,8 @@ class UserMembershipRestServlet(RestServlet):
         if not self.is_mine(UserID.from_string(user_id)):
             raise SynapseError(400, "Can only lookup local users")
 
-        u = await self.store.get_user_by_id(user_id)
-        if u is None:
+        user = await self.store.get_user_by_id(user_id)
+        if user is None:
             raise NotFoundError("Unknown user")
 
         room_ids = await self.store.get_rooms_for_user(user_id)
