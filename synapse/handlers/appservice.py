@@ -288,7 +288,7 @@ class ApplicationServicesHandler:
                 user=user, service=service, from_key=from_key,
             )
             time_now = self.clock.time_msec()
-            presence_events = [
+            events.extend(
                 {
                     "type": "m.presence",
                     "sender": event.user_id,
@@ -297,8 +297,9 @@ class ApplicationServicesHandler:
                     ),
                 }
                 for event in presence_events
-            ]
-            events = events + presence_events
+            )
+
+        return events
 
     async def query_user_exists(self, user_id):
         """Check if any application service knows this user_id exists.
