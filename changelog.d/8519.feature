@@ -1,0 +1,1 @@
+Add an admin api to delete a single file or files were not used for a defined time from server. Contributed by @dklimpel.
