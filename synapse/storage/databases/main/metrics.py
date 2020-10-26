@@ -282,9 +282,10 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             now = self._clock.time_msec()
 
             # A note on user_agent. Technically a given device can have multiple
-            # user agents, so we need to decide which one to pick. We could have handled this
-            # in number of ways, but given that we don't _that_ much have gone for MAX()
-            # For more details of the other options considered see
+            # user agents, so we need to decide which one to pick. We could have
+            # handled this in number of ways, but given that we don't care
+            # _that_ much we have gone for MAX(). For more details of the other
+            # options considered see
             # https://github.com/matrix-org/synapse/pull/8503#discussion_r502306111
             sql = """
                 INSERT INTO user_daily_visits (user_id, device_id, timestamp, user_agent)
@@ -299,7 +300,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
                     WHERE last_seen > ? AND last_seen <= ?
                     AND udv.timestamp IS NULL AND users.is_guest=0
                     AND users.appservice_id IS NULL
-                    GROUP BY u.user_id, u.device_id, u.user_agent
+                    GROUP BY u.user_id, u.device_id
             """
 
             # This means that the day has rolled over but there could still

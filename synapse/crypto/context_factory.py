@@ -149,7 +149,7 @@ class FederationPolicyForHTTPS:
         return SSLClientConnectionCreator(host, ssl_context, should_verify)
 
     def creatorForNetloc(self, hostname, port):
-        """Implements the IPolicyForHTTPS interace so that this can be passed
+        """Implements the IPolicyForHTTPS interface so that this can be passed
         directly to agents.
         """
         return self.get_options(hostname)

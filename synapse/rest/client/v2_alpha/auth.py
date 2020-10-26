@@ -176,9 +176,6 @@ class AuthRestServlet(RestServlet):
         respond_with_html(request, 200, html)
         return None
 
-    def on_OPTIONS(self, _):
-        return 200, {}
-
 
 def register_servlets(hs, http_server):
     AuthRestServlet(hs).register(http_server)

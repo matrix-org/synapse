@@ -393,6 +393,22 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Can only lookup local users", channel.json_body["error"])
 
+    def test_user_has_no_devices(self):
+        """
+        Tests that a normal lookup for devices is successfully
+        if user has no devices
+        """
+
+        # Get devices
+        request, channel = self.make_request(
+            "GET", self.url, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(0, channel.json_body["total"])
+        self.assertEqual(0, len(channel.json_body["devices"]))
+
     def test_get_devices(self):
         """
         Tests that a normal lookup for devices is successfully
@@ -409,6 +425,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(number_devices, channel.json_body["total"])
         self.assertEqual(number_devices, len(channel.json_body["devices"]))
         self.assertEqual(self.other_user, channel.json_body["devices"][0]["user_id"])
         # Check that all fields are available

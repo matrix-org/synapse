@@ -1,1 +1,0 @@
-Fix a longstanding bug where invalid ignored users in account data could break clients.
