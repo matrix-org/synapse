@@ -814,7 +814,7 @@ class MediaRepository:
         """
         removed_media = []
         for media_id in media_ids:
-            logger.info("Deleting: %s", media_id)
+            logger.info("Deleting media with ID '%s'", media_id)
             full_path = self.filepaths.local_media_filepath(media_id)
             try:
                 os.remove(full_path)

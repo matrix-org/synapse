@@ -309,7 +309,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         `last_access_ts` is `NULL` and `created_ts` < `before_ts`
         """
 
-        # upload an do not access
+        # upload and do not access
         server_and_media_id = self._create_media()
         self.pump(1.0)
 
