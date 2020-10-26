@@ -1,3 +1,14 @@
+Synapse 1.22.0rc2 (2020-10-26)
+==============================
+
+Bugfixes
+--------
+
+- Fix a bug introduced in v1.22.0rc1 which would cause ephemeral events to not be sent to appservices. ([\#8648](https://github.com/matrix-org/synapse/issues/8648))
+- Fix `user_daily_visits` to not have duplicate rows for UA. Broke in v1.22.0rc1. ([\#8654](https://github.com/matrix-org/synapse/issues/8654))
+- Fix a bug introduced in v1.22.0rc1 where presence events were not properly passed to application services. ([\#8656](https://github.com/matrix-org/synapse/issues/8656))
+
+
 Synapse 1.22.0rc1 (2020-10-22)
 ==============================
 

@@ -1,1 +1,0 @@
-Fix `user_daily_visits` to not have duplicate rows for UA. Broke in v1.22.0rc1.
