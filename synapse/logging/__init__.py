@@ -14,5 +14,7 @@
 # limitations under the License.
 
 # These are imported to allow for nicer logging configuration files.
-from synapse.logging._remote import RemoteHandler  # noqa
-from synapse.logging._terse_json import TerseJsonFormatter  # noqa
+from synapse.logging._remote import RemoteHandler
+from synapse.logging._terse_json import TerseJsonFormatter
+
+__all__ = [RemoteHandler, TerseJsonFormatter]
