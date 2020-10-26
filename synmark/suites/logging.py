@@ -114,7 +114,7 @@ async def main(reactor, loops):
 
     # Send a bunch of useful messages
     for i in range(0, loops):
-        logger.info("test message %s" % (i,))
+        logger.info("test message %s", i)
 
         if len(handler._buffer) == handler.maximum_buffer:
             while len(handler._buffer) > handler.maximum_buffer / 2:
