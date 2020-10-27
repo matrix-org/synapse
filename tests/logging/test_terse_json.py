@@ -88,6 +88,6 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         self.assertCountEqual(log.keys(), expected_log_keys)
 
         # Check the values of the extra fields.
-        self.assertEqual(log["foo"], "property")
+        self.assertEqual(log["foo"], "bar")
         self.assertEqual(log["int"], 3)
         self.assertIs(log["bool"], True)
