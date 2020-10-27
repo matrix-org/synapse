@@ -265,7 +265,29 @@ class Notifier:
         max_room_stream_token: RoomStreamToken,
         extra_users: Collection[UserID] = [],
     ):
-        """ Used by handlers to inform the notifier something has happened
+        """Unrwaps event and calls `on_new_room_event_args`.
+        """
+        self.on_new_room_event_args(
+            event_pos=event_pos,
+            room_id=event.room_id,
+            event_type=event.type,
+            state_key=event.get("state_key"),
+            membership=event.get("membership"),
+            max_room_stream_token=max_room_stream_token,
+            extra_users=extra_users,
+        )
+
+    def on_new_room_event_args(
+        self,
+        room_id: str,
+        event_type: str,
+        state_key: Optional[str],
+        membership: Optional[str],
+        event_pos: PersistedEventPosition,
+        max_room_stream_token: RoomStreamToken,
+        extra_users: Collection[UserID] = [],
+    ):
+        """Used by handlers to inform the notifier something has happened
         in the room, room event wise.
 
         This triggers the notifier to wake up any listeners that are
@@ -280,10 +302,10 @@ class Notifier:
             _PendingRoomEventEntry(
                 event_pos=event_pos,
                 extra_users=extra_users,
-                room_id=event.room_id,
-                type=event.type,
-                state_key=event.get("state_key"),
-                membership=event.get("membership"),
+                room_id=room_id,
+                type=event_type,
+                state_key=state_key,
+                membership=membership,
             )
         )
         self._notify_pending_new_room_events(max_room_stream_token)
