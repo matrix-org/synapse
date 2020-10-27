@@ -1,1 +1,1 @@
-Don't unnecessarily start bg process while handling typing.
+Reduce number of OpenTracing spans started.
