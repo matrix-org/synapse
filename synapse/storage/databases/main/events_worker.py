@@ -534,7 +534,7 @@ class EventsWorkerStore(SQLBaseStore):
     ) -> List[JsonDict]:
         """
         Retrieve the stripped state from a room, given an event context to retrieve state
-        from as well as the state types to include. Optionally additionally include membership
+        from as well as the state types to include. Optionally, include the membership
         events from a specific user.
 
         "Stripped" state means that only the `type`, `state_key`, `content` and `sender` keys
@@ -545,7 +545,7 @@ class EventsWorkerStore(SQLBaseStore):
             state_types_to_include: The type of state events to include.
             membership_user_id: An optional user ID to include the stripped membership state
                 events of. This is useful when generating the stripped state of a room for
-                invites. We'd want to send membership events of the inviter, so that the
+                invites. We want to send membership events of the inviter, so that the
                 invitee can display the inviter's profile information if the room lacks any.
 
         Returns:
