@@ -1,0 +1,1 @@
+Fix a bug where Synapse would blindly forward bad responses from federation to clients when retrieving profile information.

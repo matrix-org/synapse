@@ -60,9 +60,6 @@ class PushersRestServlet(RestServlet):
 
         return 200, {"pushers": filtered_pushers}
 
-    def on_OPTIONS(self, _):
-        return 200, {}
-
 
 class PushersSetRestServlet(RestServlet):
     PATTERNS = client_patterns("/pushers/set$", v1=True)
@@ -140,9 +137,6 @@ class PushersSetRestServlet(RestServlet):
 
         return 200, {}
 
-    def on_OPTIONS(self, _):
-        return 200, {}
-
 
 class PushersRemoveRestServlet(RestServlet):
     """
@@ -181,9 +175,6 @@ class PushersRemoveRestServlet(RestServlet):
             request, 200, PushersRemoveRestServlet.SUCCESS_HTML,
         )
         return None
-
-    def on_OPTIONS(self, _):
-        return 200, {}
 
 
 def register_servlets(hs, http_server):

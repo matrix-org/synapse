@@ -1,0 +1,1 @@
+Fix handling of User-Agent headers that are invalid UTF-8, which caused user agents of users to not get correctly recorded.

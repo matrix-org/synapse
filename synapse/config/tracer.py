@@ -67,7 +67,7 @@ class TracerConfig(Config):
             # This is a list of regexes which are matched against the server_name of the
             # homeserver.
             #
-            # By defult, it is empty, so no servers are matched.
+            # By default, it is empty, so no servers are matched.
             #
             #homeserver_whitelist:
             #  - ".*"

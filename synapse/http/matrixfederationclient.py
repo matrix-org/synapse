@@ -587,7 +587,7 @@ class MatrixFederationHttpClient:
         """
         Builds the Authorization headers for a federation request
         Args:
-            destination (bytes|None): The desination homeserver of the request.
+            destination (bytes|None): The destination homeserver of the request.
                 May be None if the destination is an identity server, in which case
                 destination_is must be non-None.
             method (bytes): The HTTP method of the request
@@ -640,7 +640,7 @@ class MatrixFederationHttpClient:
         backoff_on_404=False,
         try_trailing_slash_on_400=False,
     ):
-        """ Sends the specifed json data using PUT
+        """ Sends the specified json data using PUT
 
         Args:
             destination (str): The remote server to send the HTTP request
@@ -729,7 +729,7 @@ class MatrixFederationHttpClient:
         ignore_backoff=False,
         args={},
     ):
-        """ Sends the specifed json data using POST
+        """ Sends the specified json data using POST
 
         Args:
             destination (str): The remote server to send the HTTP request
