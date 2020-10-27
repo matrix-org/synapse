@@ -92,7 +92,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             where_clause="NOT have_censored",
         )
 
-        self.db.updates.register_background_index_update(
+        self.db_pool.updates.register_background_index_update(
             "users_have_local_media",
             index_name="users_have_local_media",
             table="local_media_repository",
