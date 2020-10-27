@@ -15,11 +15,14 @@
 # limitations under the License.
 import heapq
 from collections.abc import Iterable
-from typing import List, Tuple, Type, Optional
+from typing import TYPE_CHECKING, List, Optional, Tuple, Type
 
 import attr
 
 from ._base import Stream, StreamUpdateResult, Token
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 """Handling of the 'events' replication stream
 
@@ -87,6 +90,7 @@ class EventsStreamEventRow(BaseEventsStreamRow):
     state_key = attr.ib(type=Optional[str])
     redacts = attr.ib(type=Optional[str])
     relates_to = attr.ib(type=Optional[str])
+    membership = attr.ib(type=Optional[str])
 
 
 @attr.s(slots=True, frozen=True)
@@ -113,7 +117,7 @@ class EventsStream(Stream):
 
     NAME = "events"
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self._store = hs.get_datastore()
         super().__init__(
             hs.get_instance_name(),
