@@ -763,3 +763,66 @@ class PushersRestServlet(RestServlet):
         ]
 
         return 200, {"pushers": filtered_pushers, "total": len(filtered_pushers)}
+
+
+class UserMediaRestServlet(RestServlet):
+    """
+    Gets information about all uploaded local media for a specific `user_id`.
+
+    Example:
+        http://localhost:8008/_synapse/admin/v1/users/
+        @user:server/media
+
+    Args:
+        The parameters `from` and `limit` are required for pagination.
+        By default, a `limit` of 100 is used.
+    Returns:
+        A list of media and an integer representing the total number of
+        media that exist given for this user
+    """
+
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]+)/media$")
+
+    def __init__(self, hs):
+        self.is_mine = hs.is_mine
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self.auth, request)
+
+        if not self.is_mine(UserID.from_string(user_id)):
+            raise SynapseError(400, "Can only lookup local users")
+
+        user = await self.store.get_user_by_id(user_id)
+        if user is None:
+            raise NotFoundError("Unknown user")
+
+        start = parse_integer(request, "from", default=0)
+        limit = parse_integer(request, "limit", default=100)
+
+        if start < 0:
+            raise SynapseError(
+                400,
+                "Query parameter from must be a string representing a positive integer.",
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        if limit < 0:
+            raise SynapseError(
+                400,
+                "Query parameter limit must be a string representing a positive integer.",
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        media, total = await self.store.get_local_media_by_user_paginate(
+            start, limit, user_id
+        )
+
+        ret = {"media": media, "total": total}
+        if (start + limit) < total:
+            ret["next_token"] = start + len(media)
+
+        return 200, ret
