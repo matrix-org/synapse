@@ -14,7 +14,7 @@
 import contextlib
 import logging
 import time
-from typing import Optional
+from typing import Optional, Union
 
 from twisted.python.failure import Failure
 from twisted.web.server import Request, Site
@@ -23,6 +23,7 @@ from synapse.config.server import ListenerConfig
 from synapse.http import redact_uri
 from synapse.http.request_metrics import RequestMetrics, requests_counter
 from synapse.logging.context import LoggingContext, PreserveLoggingContext
+from synapse.types import Requester
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +55,11 @@ class SynapseRequest(Request):
         Request.__init__(self, channel, *args, **kw)
         self.site = channel.site
         self._channel = channel  # this is used by the tests
-        self.authenticated_entity = None
-        self.target_user = None
         self.start_time = 0.0
+
+        # The requester, if authenticated. For federation requests this is the
+        # server name, for client requests this is the Requester object.
+        self.requester = None  # type: Optional[Union[Requester, str]]
 
         # we can't yet create the logcontext, as we don't know the method.
         self.logcontext = None  # type: Optional[LoggingContext]
@@ -264,16 +267,23 @@ class SynapseRequest(Request):
         # to the client (nb may be negative)
         response_send_time = self.finish_time - self._processing_finished_time
 
-        # need to decode as it could be raw utf-8 bytes
-        # from a IDN servname in an auth header
-        authenticated_entity = self.authenticated_entity
-        if authenticated_entity is not None and isinstance(authenticated_entity, bytes):
-            authenticated_entity = authenticated_entity.decode("utf-8", "replace")
+        # Convert the requester into a string that we can log
+        authenticated_entity = None
+        if isinstance(self.requester, str):
+            authenticated_entity = self.requester
+        elif isinstance(self.requester, Requester):
+            authenticated_entity = self.requester.authenticated_entity
 
-        if self.target_user:
-            authenticated_entity = "{} as {}".format(
-                authenticated_entity, self.target_user,
-            )
+            # If this is a request where the target user doesn't match the user who
+            # authenticated (e.g. and admin is puppetting a user) then we log both.
+            if self.requester.user.to_string() != authenticated_entity:
+                authenticated_entity = "{} as {}".format(
+                    authenticated_entity, self.requester.user.to_string(),
+                )
+        elif self.requester is not None:
+            # This shouldn't happen, but we log it so we don't lose information
+            # and can see that we're doing something wrong.
+            authenticated_entity = repr(self.requester)
 
         # ...or could be raw utf-8 bytes in the User-Agent header.
         # N.B. if you don't do this, the logger explodes cryptically
