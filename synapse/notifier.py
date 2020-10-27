@@ -272,7 +272,7 @@ class Notifier:
             room_id=event.room_id,
             event_type=event.type,
             state_key=event.get("state_key"),
-            membership=event.get("membership"),
+            membership=event.content.get("membership"),
             max_room_stream_token=max_room_stream_token,
             extra_users=extra_users,
         )
