@@ -344,6 +344,8 @@ The following fields are returned in the JSON response body:
 List media of an user
 ================================
 Gets a list of all local media that a specific ``user_id`` has created.
+The response is ordered by creation date descending and media ID descending.
+The newest media is on top.
 
 The API is::
 

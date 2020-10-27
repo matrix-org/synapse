@@ -127,17 +127,18 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             limit: maximum amount of media_ids to retrieve
             user_id: fully-qualified user id
         Returns:
-            A paginated list of all metadata of user's media
+            A paginated list of all metadata of user's media,
+            plus the total count of all the user's media
         """
 
         def get_local_media_by_user_paginate_txn(txn):
-            sql_base = """
-                FROM local_media_repository
-                WHERE user_id = ?
-                """
 
             args = [user_id]
-            sql = "SELECT COUNT(*) as total_media " + sql_base
+            sql = """
+                SELECT COUNT(*) as total_media
+                FROM local_media_repository
+                WHERE user_id = ?
+            """
             txn.execute(sql, args)
             count = txn.fetchone()[0]
 
@@ -151,11 +152,11 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                     "last_access_ts",
                     "quarantined_by",
                     "safe_from_quarantine"
-                {}
+                FROM local_media_repository
+                WHERE user_id = ?
+                ORDER BY created_ts DESC, media_id DESC
                 LIMIT ? OFFSET ?
-            """.format(
-                sql_base
-            )
+            """
 
             args += [limit, start]
             txn.execute(sql, args)
