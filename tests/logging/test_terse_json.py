@@ -64,7 +64,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         logger = self.get_logger(handler)
 
         logger.info(
-            "Hello there, %s!", "wally", extra={"foo": "bar", "int": 3, "bool": True,}
+            "Hello there, %s!", "wally", extra={"foo": "bar", "int": 3, "bool": True}
         )
 
         # One log message, with a single trailing newline.
