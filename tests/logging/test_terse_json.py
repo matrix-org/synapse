@@ -52,3 +52,42 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         ]
         self.assertCountEqual(log.keys(), expected_log_keys)
         self.assertEqual(log["log"], "Hello there, wally!")
+
+    def test_extra_data(self):
+        """
+        Additional information can be included in the structured logging.
+        """
+        output = StringIO()
+
+        handler = logging.StreamHandler(output)
+        handler.setFormatter(TerseJsonFormatter())
+        logger = self.get_logger(handler)
+
+        logger.info(
+            "Hello there, %s!", "wally", extra={"foo": "bar", "int": 3, "bool": True,}
+        )
+
+        # One log message, with a single trailing newline.
+        data = output.getvalue()
+        logs = data.splitlines()
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(data.count("\n"), 1)
+        log = json.loads(logs[0])
+
+        # The terse logger should give us these keys.
+        expected_log_keys = [
+            "log",
+            "time",
+            "level",
+            "namespace",
+            # The additional keys given via extra.
+            "foo",
+            "int",
+            "bool",
+        ]
+        self.assertCountEqual(log.keys(), expected_log_keys)
+
+        # Check the values of the extra fields.
+        self.assertEqual(log["foo"], "property")
+        self.assertEqual(log["int"], 3)
+        self.assertIs(log["bool"], True)
