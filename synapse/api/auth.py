@@ -208,7 +208,7 @@ class Auth:
 
                 request.requester = user_id
                 opentracing.set_tag("authenticated_entity", user_id)
-                opentracing.set_tag("target_user", user_id)
+                opentracing.set_tag("user_id", user_id)
                 opentracing.set_tag("appservice_id", app_service.id)
 
                 return requester
@@ -260,7 +260,7 @@ class Auth:
 
             request.requester = requester
             opentracing.set_tag("authenticated_entity", user_info.token_owner)
-            opentracing.set_tag("target_user", user_info.user_id)
+            opentracing.set_tag("user_id", user_info.user_id)
             if device_id:
                 opentracing.set_tag("device_id", device_id)
 
