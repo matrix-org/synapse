@@ -46,7 +46,7 @@ locally. You'll need python 3.6 or later, and to install a number of tools:
 
 ```
 # Install the dependencies
-pip install -e ".[lint]"
+pip install -e ".[lint]" "[mypy]"
 
 # Run the linter script
 ./scripts-dev/lint.sh
