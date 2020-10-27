@@ -29,6 +29,7 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
+    Union,
 )
 
 import attr
@@ -38,6 +39,7 @@ from unpaddedbase64 import decode_base64
 from synapse.api.errors import Codes, SynapseError
 
 if TYPE_CHECKING:
+    from synapse.appservice.api import ApplicationService
     from synapse.storage.databases.main import DataStore
 
 # define a version of typing.Collection that works on python 3.5
@@ -136,13 +138,13 @@ class Requester(
 
 
 def create_requester(
-    user_id,
-    access_token_id=None,
-    is_guest=False,
-    shadow_banned=False,
-    device_id=None,
-    app_service=None,
-    authenticated_entity=None,
+    user_id: Union[str, "UserID"],
+    access_token_id: Optional[int] = None,
+    is_guest: Optional[bool] = False,
+    shadow_banned: Optional[bool] = False,
+    device_id: Optional[str] = None,
+    app_service: Optional["ApplicationService"] = None,
+    authenticated_entity: Optional[str] = None,
 ):
     """
     Create a new ``Requester`` object
