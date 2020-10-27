@@ -283,7 +283,7 @@ class SynapseRequest(Request):
         elif self.requester is not None:
             # This shouldn't happen, but we log it so we don't lose information
             # and can see that we're doing something wrong.
-            authenticated_entity = repr(self.requester)
+            authenticated_entity = repr(self.requester)  # type: ignore[unreachable]
 
         # ...or could be raw utf-8 bytes in the User-Agent header.
         # N.B. if you don't do this, the logger explodes cryptically
