@@ -265,7 +265,7 @@ class Notifier:
         max_room_stream_token: RoomStreamToken,
         extra_users: Collection[UserID] = [],
     ):
-        """Unrwaps event and calls `on_new_room_event_args`.
+        """Unwraps event and calls `on_new_room_event_args`.
         """
         self.on_new_room_event_args(
             event_pos=event_pos,
