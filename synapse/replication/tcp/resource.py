@@ -117,11 +117,19 @@ class ReplicationStreamer:
                 stream.discard_updates_and_advance()
             return
 
-        self.pending_updates = True
-
         if self.is_looping:
             logger.debug("Notifier poke loop already running")
             return
+
+        # We check up front to see if anything has actually changed, as we get
+        # poked because of changes that happened on other instances.
+        if all(
+            stream.last_token == stream.current_token(self._instance_name)
+            for stream in self.streams
+        ):
+            return
+
+        self.pending_updates = True
 
         run_as_background_process("replication_notifier", self._run_notifier_loop)
 
