@@ -277,7 +277,7 @@ class SynapseRequest(Request):
             # If this is a request where the target user doesn't match the user who
             # authenticated (e.g. and admin is puppetting a user) then we log both.
             if self.requester.user.to_string() != authenticated_entity:
-                authenticated_entity = "{} as {}".format(
+                authenticated_entity = "{},{}".format(
                     authenticated_entity, self.requester.user.to_string(),
                 )
         elif self.requester is not None:
