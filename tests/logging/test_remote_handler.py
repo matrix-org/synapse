@@ -12,12 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import logging
-
 from twisted.test.proto_helpers import AccumulatingProtocol
 
 from synapse.logging import RemoteHandler
 
+from tests.logging import LoggerCleanupMixin
 from tests.server import FakeTransport, get_clock
 from tests.unittest import TestCase
 
@@ -36,23 +35,9 @@ def connect_logging_client(reactor, client_id):
     return client, server
 
 
-class RemoteHandlerTestCase(TestCase):
+class RemoteHandlerTestCase(LoggerCleanupMixin, TestCase):
     def setUp(self):
         self.reactor, _ = get_clock()
-
-    def get_logger(self, handler):
-        # Create a logger and add the handler to it.
-        logger = logging.getLogger(__name__)
-        logger.addHandler(handler)
-
-        # Ensure the logger actually logs something.
-        logger.setLevel(logging.INFO)
-
-        # Ensure the logger gets cleaned-up appropriately.
-        self.addCleanup(logger.removeHandler, handler)
-        self.addCleanup(logger.setLevel, logging.NOTSET)
-
-        return logger
 
     def test_log_output(self):
         """
