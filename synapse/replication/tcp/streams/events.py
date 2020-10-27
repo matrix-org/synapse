@@ -91,6 +91,7 @@ class EventsStreamEventRow(BaseEventsStreamRow):
     redacts = attr.ib(type=Optional[str])
     relates_to = attr.ib(type=Optional[str])
     membership = attr.ib(type=Optional[str])
+    rejected = attr.ib(type=bool)
 
 
 @attr.s(slots=True, frozen=True)
