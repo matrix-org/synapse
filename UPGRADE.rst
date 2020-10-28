@@ -81,13 +81,17 @@ Upgrading to v1.23.0
 Structured logging configuration breaking changes
 -------------------------------------------------
 
-This release introduces a backwars-incompatible change in the configuration of
+This release deprecates use of the ``structured: true`` logging configuration for
 structured logging. If your logging configuration contains ``structured: true``
-then it must be modified based on the `structured logging document
+then it should be modified based on the `structured logging documentation
 <https://github.com/matrix-org/synapse/blob/master/docs/structured_logging.md>`_.
 
-``drains`` are now an unused option and should be replaced by standard logging
-configuration of ``handlers`` and ``formatters`.
+The ``structured`` and ``drains`` logging options are now deprecated and should
+be replaced by standard logging configuration of ``handlers`` and ``formatters`.
+
+Note that updated configurations *must* include ``version: 1`` in them.
+
+A future will release of Synapse will make using ``structured: true`` an error.
 
 Upgrading to v1.22.0
 ====================

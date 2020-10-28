@@ -31,6 +31,7 @@ from twisted.logger import (
 
 import synapse
 from synapse.app import _base as appbase
+from synapse.logging._structured import setup_structured_logging
 from synapse.logging.context import LoggingContextFilter
 from synapse.logging.filter import MetadataFilter
 from synapse.util.versionstring import get_version_string
@@ -269,14 +270,10 @@ def _load_logging_config(log_config_path: str) -> None:
     if not log_config:
         logging.warning("Loaded a blank logging config?")
 
-    # If the old structured logging configuration is being used, raise an
-    # error.
+    # If the old structured logging configuration is being used, convert it to
+    # the new style configuration.
     if "structured" in log_config and log_config.get("structured"):
-        raise ConfigError(
-            "The `structured` parameter is no longer supported, see the documentation "
-            "for enabling structured logging: "
-            "https://github.com/matrix-org/synapse/blob/master/docs/structured_logging.md"
-        )
+        log_config = setup_structured_logging(log_config)
 
     logging.config.dictConfig(log_config)
 
