@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Iterable, List, Match, Optional
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
 from synapse.types import GroupID, JsonDict, UserID, get_domain_from_id
-from synapse.util.caches.descriptors import _CacheContext, cached
+from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
     from synapse.appservice.api import ApplicationServiceApi
@@ -166,7 +166,7 @@ class ApplicationService:
 
     @cached(num_args=1, cache_context=True)
     async def matches_user_in_member_list(
-        self, room_id: str, store: "DataStore", cache_context: _CacheContext,
+        self, room_id: str, store: "DataStore", cache_context,
     ) -> bool:
         """Check if this service is interested a room based upon it's membership
 
