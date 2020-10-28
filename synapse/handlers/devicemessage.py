@@ -153,7 +153,7 @@ class DeviceMessageHandler:
         local_messages = {}
         remote_messages = {}  # type: Dict[str, Dict[str, Dict[str, JsonDict]]]
         for user_id, by_device in messages.items():
-            # Temporary patch to disable sending local cross-user m.key_share_requests.
+            # Temporary patch to disable sending local cross-user key requests.
             if message_type == "m.room_key_request" and user_id != sender_user_id:
                 continue
 
