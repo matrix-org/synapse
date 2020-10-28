@@ -176,11 +176,11 @@ class LoggingConfig(Config):
                 log_config_file.write(DEFAULT_LOG_CONFIG.substitute(log_file=log_file))
 
 
-def _setup_stdlib_logging(config, log_config, logBeginner: LogBeginner) -> None:
+def _setup_stdlib_logging(config, log_config_path, logBeginner: LogBeginner) -> None:
     """
     Set up Python standard library logging.
     """
-    if log_config is None:
+    if log_config_path is None:
         log_format = (
             "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"
             " - %(message)s"
@@ -196,16 +196,8 @@ def _setup_stdlib_logging(config, log_config, logBeginner: LogBeginner) -> None:
         handler.setFormatter(formatter)
         logger.addHandler(handler)
     else:
-        # If the old structured logging configuration is being used, raise an
-        # error.
-        if "structured" in log_config and log_config.get("structured"):
-            raise ConfigError(
-                "The `structured` parameter is no longer supported, see the documentation "
-                "for enabling structured logging: "
-                "https://github.com/matrix-org/synapse/blob/master/docs/structured_logging.md"
-            )
-
-        logging.config.dictConfig(log_config)
+        # Load the logging configuration.
+        _load_logging_config(log_config_path)
 
     # We add a log record factory that runs all messages through the
     # LoggingContextFilter so that we get the context *at the time we log*
@@ -267,13 +259,38 @@ def _setup_stdlib_logging(config, log_config, logBeginner: LogBeginner) -> None:
         print("Redirected stdout/stderr to logs")
 
 
-def _reload_stdlib_logging(*args, log_config=None):
-    logger = logging.getLogger("")
+def _load_logging_config(log_config_path: str) -> None:
+    """
+    Configure logging from a log config path.
+    """
+    with open(log_config_path, "rb") as f:
+        log_config = yaml.safe_load(f.read())
 
     if not log_config:
-        logger.warning("Reloaded a blank config?")
+        logging.warning("Loaded a blank logging config?")
+
+    # If the old structured logging configuration is being used, raise an
+    # error.
+    if "structured" in log_config and log_config.get("structured"):
+        raise ConfigError(
+            "The `structured` parameter is no longer supported, see the documentation "
+            "for enabling structured logging: "
+            "https://github.com/matrix-org/synapse/blob/master/docs/structured_logging.md"
+        )
 
     logging.config.dictConfig(log_config)
+
+
+def _reload_logging_config(log_config_path):
+    """
+    Reload the log configuration from the file and apply it.
+    """
+    # If no log config path was given, it cannot be reloaded.
+    if log_config_path is None:
+        return
+
+    _load_logging_config(log_config_path)
+    logging.info("Reloaded log config from %s due to SIGHUP", log_config_path)
 
 
 def setup_logging(
@@ -292,28 +309,16 @@ def setup_logging(
         logBeginner: The Twisted logBeginner to use.
 
     """
-    log_config = config.worker_log_config if use_worker_options else config.log_config
+    log_config_path = (
+        config.worker_log_config if use_worker_options else config.log_config
+    )
 
-    def read_config(*args, callback=None):
-        if log_config is None:
-            return None
+    # Perform one-time logging configuration.
+    _setup_stdlib_logging(config, log_config_path, logBeginner=logBeginner)
+    # Add a SIGHUP handler to reload the logging configuration, if one is available.
+    appbase.register_sighup(_reload_logging_config, log_config_path)
 
-        with open(log_config, "rb") as f:
-            log_config_body = yaml.safe_load(f.read())
-
-        if callback:
-            callback(log_config=log_config_body)
-            logging.info("Reloaded log config from %s due to SIGHUP", log_config)
-
-        return log_config_body
-
-    log_config_body = read_config()
-
-    _setup_stdlib_logging(config, log_config_body, logBeginner=logBeginner)
-    appbase.register_sighup(read_config, callback=_reload_stdlib_logging)
-
-    # make sure that the first thing we log is a thing we can grep backwards
-    # for
+    # Log immediately so we can grep backwards.
     logging.warning("***** STARTING SERVER *****")
     logging.warning("Server %s version %s", sys.argv[0], get_version_string(synapse))
     logging.info("Server hostname: %s", config.server_name)
