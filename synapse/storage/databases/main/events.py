@@ -34,7 +34,7 @@ from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.search import SearchEntry
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
 from synapse.types import StateMap, get_domain_from_id
-from synapse.util.frozenutils import frozendict_json_encoder
+from synapse.util import json_encoder
 from synapse.util.iterutils import batch_iter
 
 if TYPE_CHECKING:
@@ -769,9 +769,7 @@ class PersistEventsStore:
                     logger.exception("")
                     raise
 
-                metadata_json = frozendict_json_encoder.encode(
-                    event.internal_metadata.get_dict()
-                )
+                metadata_json = json_encoder.encode(event.internal_metadata.get_dict())
 
                 sql = "UPDATE event_json SET internal_metadata = ? WHERE event_id = ?"
                 txn.execute(sql, (metadata_json, event.event_id))
@@ -826,10 +824,10 @@ class PersistEventsStore:
                 {
                     "event_id": event.event_id,
                     "room_id": event.room_id,
-                    "internal_metadata": frozendict_json_encoder.encode(
+                    "internal_metadata": json_encoder.encode(
                         event.internal_metadata.get_dict()
                     ),
-                    "json": frozendict_json_encoder.encode(event_dict(event)),
+                    "json": json_encoder.encode(event_dict(event)),
                     "format_version": event.format_version,
                 }
                 for event, _ in events_and_contexts
