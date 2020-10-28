@@ -620,7 +620,7 @@ def respond_with_json(
     if pretty_print:
         encoder = iterencode_pretty_printed_json
     else:
-        if canonical_json or synapse.events.USE_FROZEN_DICTS:
+        if canonical_json:
             encoder = iterencode_canonical_json
         else:
             encoder = _encode_json_bytes
