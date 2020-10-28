@@ -216,7 +216,6 @@ class Auth:
             user_info = await self.get_user_by_access_token(
                 access_token, rights, allow_expired=allow_expired
             )
-            user = UserID.from_string(user_info.user_id)
             token_id = user_info.token_id
             is_guest = user_info.is_guest
             shadow_banned = user_info.shadow_banned
@@ -249,7 +248,7 @@ class Auth:
                 )
 
             requester = synapse.types.create_requester(
-                user,
+                user_info.user_id,
                 token_id,
                 is_guest,
                 shadow_banned,
@@ -483,7 +482,9 @@ class Auth:
         if not service:
             logger.warning("Unrecognised appservice access token.")
             raise InvalidClientTokenError()
-        request.requester = service.sender
+        request.requester = synapse.types.create_requester(
+            service.sender, app_service=service
+        )
         return service
 
     async def is_server_admin(self, user: UserID) -> bool:
