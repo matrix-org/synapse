@@ -35,8 +35,6 @@ from twisted.web.server import NOT_DONE_YET, Request
 from twisted.web.static import File, NoRangeStaticProducer
 from twisted.web.util import redirectTo
 
-import synapse.events
-import synapse.metrics
 from synapse.api.errors import (
     CodeMessageException,
     Codes,
@@ -620,7 +618,7 @@ def respond_with_json(
     if pretty_print:
         encoder = iterencode_pretty_printed_json
     else:
-        if canonical_json or synapse.events.USE_FROZEN_DICTS:
+        if canonical_json:
             encoder = iterencode_canonical_json
         else:
             encoder = _encode_json_bytes
