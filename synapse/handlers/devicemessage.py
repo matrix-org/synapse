@@ -153,11 +153,12 @@ class DeviceMessageHandler:
         local_messages = {}
         remote_messages = {}  # type: Dict[str, Dict[str, Dict[str, JsonDict]]]
         for user_id, by_device in messages.items():
+            # Temporary patch to disable sending local cross-user m.key_share_requests.
+            if message_type == "m.key_share_request" and user_id != sender_user_id:
+                continue
+
             # we use UserID.from_string to catch invalid user ids
             if self.is_mine(UserID.from_string(user_id)):
-                # Temporary patch to disable sending local cross-user m.key_share_requests.
-                if message_type == "m.key_share_request" and user_id != sender_user_id:
-                    continue
 
                 messages_by_device = {
                     device_id: {
@@ -170,11 +171,6 @@ class DeviceMessageHandler:
                 if messages_by_device:
                     local_messages[user_id] = messages_by_device
             else:
-                # Temporary patch to disable sending cross-user m.key_share_requests.
-                # This includes all key share requests sent over federation
-                if message_type == "m.key_share_request":
-                    continue
-
                 destination = get_domain_from_id(user_id)
                 remote_messages.setdefault(destination, {})[user_id] = by_device
 
