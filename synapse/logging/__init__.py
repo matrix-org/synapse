@@ -15,6 +15,6 @@
 
 # These are imported to allow for nicer logging configuration files.
 from synapse.logging._remote import RemoteHandler
-from synapse.logging._terse_json import TerseJsonFormatter
+from synapse.logging._terse_json import JsonFormatter, TerseJsonFormatter
 
-__all__ = ["RemoteHandler", "TerseJsonFormatter"]
+__all__ = ["RemoteHandler", "JsonFormatter", "TerseJsonFormatter"]

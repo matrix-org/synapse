@@ -58,10 +58,10 @@ def parse_drain_configs(drains: dict,) -> typing.Generator[dict, None, None]:
             )
 
         # Either use the default formatter or the tersejson one.
-        if logging_type in (
-            DrainType.CONSOLE_JSON,
+        if logging_type in (DrainType.CONSOLE_JSON, DrainType.FILE_JSON,):
+            formatter = "json"
+        elif logging_type in (
             DrainType.CONSOLE_JSON_TERSE,
-            DrainType.FILE_JSON,
             DrainType.NETWORK_JSON_TERSE,
         ):
             formatter = "tersejson"
@@ -139,7 +139,10 @@ def setup_structured_logging(log_config: dict,) -> dict:
 
     new_config = {
         "version": 1,
-        "formatters": {"tersejson": {"class": "synapse.logging.TerseJsonFormatter"}},
+        "formatters": {
+            "json": {"class": "synapse.logging.JsonFormatter"},
+            "tersejson": {"class": "synapse.logging.TerseJsonFormatter"},
+        },
         "handlers": {},
         "loggers": log_config.get("loggers", DEFAULT_LOGGERS),
         "root": {"handlers": []},

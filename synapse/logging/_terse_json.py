@@ -49,7 +49,26 @@ _LOG_RECORD_ATTRIBUTES = {
 }
 
 
-class TerseJsonFormatter(logging.Formatter):
+class JsonFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        event = {
+            "log": record.getMessage(),
+            "namespace": record.name,
+            "level": record.levelname,
+        }
+
+        return self._format(record, event)
+
+    def _format(self, record: logging.LogRecord, event: dict) -> str:
+        # Add any extra attributes to the event.
+        for key, value in record.__dict__.items():
+            if key not in _LOG_RECORD_ATTRIBUTES:
+                event[key] = value
+
+        return _encoder.encode(event)
+
+
+class TerseJsonFormatter(JsonFormatter):
     def format(self, record: logging.LogRecord) -> str:
         event = {
             "log": record.getMessage(),
@@ -58,9 +77,4 @@ class TerseJsonFormatter(logging.Formatter):
             "time": round(record.created, 2),
         }
 
-        # Add any extra attributes to the event.
-        for key, value in record.__dict__.items():
-            if key not in _LOG_RECORD_ATTRIBUTES:
-                event[key] = value
-
-        return _encoder.encode(event)
+        return self._format(record, event)

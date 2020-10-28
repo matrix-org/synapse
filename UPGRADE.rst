@@ -89,8 +89,6 @@ then it should be modified based on the `structured logging documentation
 The ``structured`` and ``drains`` logging options are now deprecated and should
 be replaced by standard logging configuration of ``handlers`` and ``formatters`.
 
-Note that updated configurations *must* include ``version: 1`` in them.
-
 A future will release of Synapse will make using ``structured: true`` an error.
 
 Upgrading to v1.22.0
