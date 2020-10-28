@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os.path
-import typing
+from typing import Any, Dict, Generator, Optional, Tuple
 
 from constantly import NamedConstant, Names
 
@@ -32,7 +32,9 @@ class DrainType(Names):
 DEFAULT_LOGGERS = {"synapse": {"level": "info"}}
 
 
-def parse_drain_configs(drains: dict,) -> typing.Generator[dict, None, None]:
+def parse_drain_configs(
+    drains: dict,
+) -> Generator[Tuple[str, Dict[str, Any]], None, None]:
     """
     Parse the drain configurations.
 
@@ -59,7 +61,7 @@ def parse_drain_configs(drains: dict,) -> typing.Generator[dict, None, None]:
 
         # Either use the default formatter or the tersejson one.
         if logging_type in (DrainType.CONSOLE_JSON, DrainType.FILE_JSON,):
-            formatter = "json"
+            formatter = "json"  # type: Optional[str]
         elif logging_type in (
             DrainType.CONSOLE_JSON_TERSE,
             DrainType.NETWORK_JSON_TERSE,
