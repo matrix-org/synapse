@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 class BaseStreamTestCase(unittest.HomeserverTestCase):
     """Base class for tests of the replication streams"""
 
-    # hiredis is an optional depency so we don't want to require it for running
+    # hiredis is an optional dependency so we don't want to require it for running
     # the tests.
     if not hiredis:
         skip = "Requires hiredis"
