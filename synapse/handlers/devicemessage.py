@@ -159,7 +159,6 @@ class DeviceMessageHandler:
 
             # we use UserID.from_string to catch invalid user ids
             if self.is_mine(UserID.from_string(user_id)):
-
                 messages_by_device = {
                     device_id: {
                         "content": message_content,
