@@ -143,6 +143,9 @@ class ReplicationDataHandler:
                 assert isinstance(row, EventsStreamRow)
                 assert isinstance(row.data, EventsStreamEventRow)
 
+                if row.data.rejected:
+                    continue
+
                 extra_users = ()  # type: Tuple[UserID, ...]
                 if row.data.type == EventTypes.Member and row.data.state_key:
                     extra_users = (UserID.from_string(row.data.state_key),)
