@@ -916,7 +916,7 @@ class FederationHandlerRegistry:
             return
 
         # Temporary patch to drop cross-user key share requests
-        if edu_type == "m.key_share_request":
+        if edu_type == "m.room_key_request":
             return
 
         # Check if we have a handler on this instance
