@@ -915,6 +915,10 @@ class FederationHandlerRegistry:
         if not self.config.use_presence and edu_type == "m.presence":
             return
 
+        # Temporary patch to drop cross-user key share requests
+        if edu_type == "m.room_key_request":
+            return
+
         # Check if we have a handler on this instance
         handler = self.edu_handlers.get(edu_type)
         if handler:

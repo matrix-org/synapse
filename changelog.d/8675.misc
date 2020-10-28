@@ -1,0 +1,1 @@
+Temporarily drop cross-user m.room_key_request to_device messages over performance concerns.
