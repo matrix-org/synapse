@@ -19,10 +19,10 @@ can crop up, e.g the cache descriptors.
 
 from typing import Callable, Optional
 
+from mypy.nodes import ARG_NAMED_OPT
 from mypy.plugin import MethodSigContext, Plugin
 from mypy.typeops import bind_self
 from mypy.types import CallableType, NoneType
-from mypy.nodes import ARG_NAMED_OPT
 
 
 class SynapsePlugin(Plugin):
