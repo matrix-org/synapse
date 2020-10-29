@@ -132,9 +132,11 @@ class RemoteHandler(logging.Handler):
         factory = Factory.forProtocol(Protocol)
         self._service = ClientService(endpoint, factory, clock=_reactor)
         self._service.startService()
+        self._stopping = False
         self._connect()
 
     def close(self):
+        self._stopping = True
         self._service.stopService()
 
     def _connect(self) -> None:
@@ -150,7 +152,7 @@ class RemoteHandler(logging.Handler):
         def fail(failure: Failure) -> None:
             # If the Deferred was cancelled (e.g. during shutdown) do not try to
             # reconnect (this will cause an infinite loop of errors).
-            if failure.check(CancelledError):
+            if failure.check(CancelledError) and self._stopping:
                 return
 
             # For a different error, print the traceback and re-connect.
