@@ -52,7 +52,6 @@ class ApplicationService:
         self,
         token,
         hostname,
-        *,
         id,
         sender,
         url=None,
