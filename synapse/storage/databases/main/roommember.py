@@ -145,7 +145,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             )
 
     @cached(max_entries=100000, iterable=True)
-    async def get_users_in_room(self, room_id: str, **kwargs) -> List[str]:
+    async def get_users_in_room(self, room_id: str) -> List[str]:
         return await self.db_pool.runInteraction(
             "get_users_in_room", self.get_users_in_room_txn, room_id
         )
