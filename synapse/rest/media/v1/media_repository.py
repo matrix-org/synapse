@@ -335,6 +335,12 @@ class MediaRepository:
         file_id = media_info["filesystem_id"]
         file_info = FileInfo(server_name, file_id)
 
+        # We generate thumbnails event if another process downloaded the media
+        # as a) it's conceivable that the other download request dies before it
+        # generates thumbnails, but mainly b) we want toe be sure the thumbnails
+        # have finished being generated before responding to the client,
+        # otherwise they'll request thumbnails and get a 404 if they're not
+        # ready yet.
         await self._generate_thumbnails(
             server_name, media_id, file_id, media_info["media_type"]
         )
