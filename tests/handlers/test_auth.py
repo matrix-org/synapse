@@ -230,3 +230,9 @@ class AuthTestCase(unittest.TestCase):
     def _get_macaroon(self):
         token = self.macaroon_generator.generate_short_term_login_token("user_a", 5000)
         return pymacaroons.Macaroon.deserialize(token)
+
+    def test_foo(self):
+        async def foo():
+            pass
+
+        foo()
