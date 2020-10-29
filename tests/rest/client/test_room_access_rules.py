@@ -185,6 +185,49 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             expected_code=400,
         )
 
+    def test_create_room_with_missing_power_levels_use_default_values(self):
+        """
+        Tests that a room created with custom power levels, but without defining invite or state_default
+        succeeds, but the missing values are replaced with the defaults.
+        """
+
+        # Attempt to create a room without defining "invite" or "state_default"
+        modified_power_levels = RoomAccessRules._get_default_power_levels(self.user_id)
+        del modified_power_levels["invite"]
+        del modified_power_levels["state_default"]
+        room_id = self.create_room(
+            direct=True,
+            rule=AccessRules.DIRECT,
+            initial_state=[
+                {"type": "m.room.power_levels", "content": modified_power_levels}
+            ],
+        )
+
+        # This should succeed, but the defaults should be put in place instead
+        room_power_levels = self.helper.get_state(
+            room_id, "m.room.power_levels", self.tok
+        )
+        self.assertEqual(room_power_levels["invite"], 50)
+        self.assertEqual(room_power_levels["state_default"], 100)
+
+        # And now the same test, but using power_levels_content_override instead
+        # of initial_state (which takes a slightly different codepath)
+        modified_power_levels = RoomAccessRules._get_default_power_levels(self.user_id)
+        del modified_power_levels["invite"]
+        del modified_power_levels["state_default"]
+        room_id = self.create_room(
+            direct=True,
+            rule=AccessRules.DIRECT,
+            power_levels_content_override=modified_power_levels,
+        )
+
+        # This should succeed, but the defaults should be put in place instead
+        room_power_levels = self.helper.get_state(
+            room_id, "m.room.power_levels", self.tok
+        )
+        self.assertEqual(room_power_levels["invite"], 50)
+        self.assertEqual(room_power_levels["state_default"], 100)
+
     def test_existing_room_can_change_power_levels(self):
         """Tests that a room created with default power levels can have their power levels
         dropped after room creation
@@ -975,6 +1018,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         rule=None,
         preset=RoomCreationPreset.TRUSTED_PRIVATE_CHAT,
         initial_state=None,
+        power_levels_content_override=None,
         expected_code=200,
     ):
         content = {"is_direct": direct, "preset": preset}
@@ -989,6 +1033,9 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
                 content["initial_state"] = []
 
             content["initial_state"] += initial_state
+
+        if power_levels_content_override:
+            content["power_levels_content_override"] = power_levels_content_override
 
         request, channel = self.make_request(
             "POST", "/_matrix/client/r0/createRoom", content, access_token=self.tok,

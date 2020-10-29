@@ -189,34 +189,40 @@ class RoomAccessRules(object):
         ) and access_rule == AccessRules.DIRECT:
             raise SynapseError(400, "Invalid access rule")
 
+        default_power_levels = self._get_default_power_levels(
+            requester.user.to_string()
+        )
+
         # Check if the creator can override values for the power levels.
         allowed = self._is_power_level_content_allowed(
-            config.get("power_level_content_override", {}), access_rule
+            config.get("power_level_content_override", {}),
+            access_rule,
+            default_power_levels,
         )
         if not allowed:
             raise SynapseError(400, "Invalid power levels content override")
 
-        use_default_power_levels = True
-        if config.get("power_level_content_override"):
-            use_default_power_levels = False
+        custom_user_power_levels = config.get("power_level_content_override")
 
         # Second loop for events we need to know the current rule to process.
         for event in config.get("initial_state", []):
             if event["type"] == EventTypes.PowerLevels:
                 allowed = self._is_power_level_content_allowed(
-                    event["content"], access_rule
+                    event["content"], access_rule, default_power_levels
                 )
                 if not allowed:
                     raise SynapseError(400, "Invalid power levels content")
 
-                use_default_power_levels = False
-
-        # If power levels were not overridden by the user, override with DINUM's preferred
-        # defaults instead
-        if use_default_power_levels:
-            config["power_level_content_override"] = self._get_default_power_levels(
-                requester.user.to_string()
-            )
+                custom_user_power_levels = event["content"]
+        if custom_user_power_levels:
+            # If the user is using their own power levels, but failed to provide an expected
+            # key in the power levels content dictionary, fill it in from the defaults instead
+            for key, value in default_power_levels.items():
+                custom_user_power_levels.setdefault(key, value)
+        else:
+            # If power levels were not overridden by the user, completely override with the
+            # defaults instead
+            config["power_level_content_override"] = default_power_levels
 
         return True
 
@@ -710,7 +716,11 @@ class RoomAccessRules(object):
         return True
 
     def _is_power_level_content_allowed(
-        self, content: Dict, access_rule: str, on_room_creation: bool = True
+        self,
+        content: Dict,
+        access_rule: str,
+        default_power_levels: Optional[Dict] = None,
+        on_room_creation: bool = True,
     ) -> bool:
         """Check if a given power levels event is permitted under the given access rule.
 
@@ -721,6 +731,8 @@ class RoomAccessRules(object):
         Args:
             content: The content of the m.room.power_levels event to check.
             access_rule: The access rule in place in this room.
+            default_power_levels: The default power levels when a room is created with
+                the specified access rule. Required if on_room_creation is True.
             on_room_creation: True if this call is happening during a room's
                 creation, False otherwise.
 
@@ -733,12 +745,19 @@ class RoomAccessRules(object):
         # have a special circumstance, but still want to encourage a certain pattern during
         # room creation.
         if on_room_creation:
-            # If invite requirements are <PL50
-            if content.get("invite", 50) < 50:
+            # We specifically don't fail if "invite" or "state_default" are None, as those
+            # values should be replaced with our "default" power level values anyways,
+            # which are compliant
+
+            invite = default_power_levels["invite"]
+            state_default = default_power_levels["state_default"]
+
+            # If invite requirements are less than our required defaults
+            if content.get("invite", invite) < invite:
                 return False
 
-            # If "other" state requirements are <PL100
-            if content.get("state_default", 100) < 100:
+            # If "other" state requirements are less than our required defaults
+            if content.get("state_default", state_default) < state_default:
                 return False
 
         # Check if we need to apply the restrictions with the current rule.
