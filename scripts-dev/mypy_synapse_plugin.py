@@ -68,6 +68,9 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
         arg_names.pop(context_arg_index)
         arg_kinds.pop(context_arg_index)
 
+    # Third, we add an optional "on_invalidate" argument.
+    #
+    # This is a callable which accepts no input and returns nothing.
     calltyp = CallableType(
         arg_types=[],
         arg_kinds=[],
