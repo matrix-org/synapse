@@ -22,6 +22,7 @@ from typing import Callable, Optional
 from mypy.plugin import MethodSigContext, Plugin
 from mypy.typeops import bind_self
 from mypy.types import CallableType, NoneType
+from mypy.nodes import ARG_NAMED_OPT
 
 
 class SynapsePlugin(Plugin):
@@ -81,7 +82,7 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
 
     arg_types.append(calltyp)
     arg_names.append("on_invalidate")
-    arg_kinds.append(5)
+    arg_kinds.append(ARG_NAMED_OPT)  # Arg is an optional kwarg.
 
     signature = signature.copy_modified(
         arg_types=arg_types, arg_names=arg_names, arg_kinds=arg_kinds,
