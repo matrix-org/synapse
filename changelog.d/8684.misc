@@ -1,0 +1,1 @@
+Fix typing info on cache call signature to accept `on_invalidate`.
