@@ -151,3 +151,19 @@ class RemoteHandlerTestCase(LoggerCleanupMixin, TestCase):
             + ["warn %s" % (i,) for i in range(15, 20)],
             logs,
         )
+
+    def test_cancel_connection(self):
+        """
+        Gracefully handle the connection being cancelled.
+        """
+        handler = RemoteHandler(
+            "127.0.0.1", 9000, maximum_buffer=10, _reactor=self.reactor
+        )
+        logger = self.get_logger(handler)
+
+        # Send a message.
+        logger.info("Hello there, %s!", "wally")
+
+        # Do not accept the connection and shutdown. This causes the pending
+        # connection to be cancelled (and should not raise any exceptions).
+        handler.close()
