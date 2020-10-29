@@ -21,7 +21,7 @@ from typing import Callable, Optional
 
 from mypy.plugin import MethodSigContext, Plugin
 from mypy.typeops import bind_self
-from mypy.types import CallableType
+from mypy.types import CallableType, NoneType
 
 
 class SynapsePlugin(Plugin):
@@ -40,8 +40,9 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
 
     It already has *almost* the correct signature, except:
 
-        1. the `self` argument needs to be marked as "bound"; and
-        2. any `cache_context` argument should be removed.
+        1. the `self` argument needs to be marked as "bound";
+        2. any `cache_context` argument should be removed;
+        3. an optional keyword argument `on_invalidated` should be added.
     """
 
     # First we mark this as a bound function signature.
@@ -58,19 +59,30 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
             context_arg_index = idx
             break
 
+    arg_types = list(signature.arg_types)
+    arg_names = list(signature.arg_names)
+    arg_kinds = list(signature.arg_kinds)
+
     if context_arg_index:
-        arg_types = list(signature.arg_types)
         arg_types.pop(context_arg_index)
-
-        arg_names = list(signature.arg_names)
         arg_names.pop(context_arg_index)
-
-        arg_kinds = list(signature.arg_kinds)
         arg_kinds.pop(context_arg_index)
 
-        signature = signature.copy_modified(
-            arg_types=arg_types, arg_names=arg_names, arg_kinds=arg_kinds,
-        )
+    calltyp = CallableType(
+        arg_types=[],
+        arg_kinds=[],
+        arg_names=[],
+        ret_type=NoneType(),
+        fallback=ctx.api.named_generic_type("builtins.function", []),
+    )
+
+    arg_types.append(calltyp)
+    arg_names.append("on_invalidate")
+    arg_kinds.append(5)
+
+    signature = signature.copy_modified(
+        arg_types=arg_types, arg_names=arg_names, arg_kinds=arg_kinds,
+    )
 
     return signature
 
