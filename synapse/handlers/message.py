@@ -1274,11 +1274,6 @@ class EventCreationHandler:
                     requester, event, context, ratelimit=False, ignore_shadow_ban=True,
                 )
                 return True
-            except ConsentNotGivenError:
-                logger.info(
-                    "Failed to send dummy event into room %s for user %s due to "
-                    "lack of consent. Will try another user" % (room_id, user_id)
-                )
             except AuthError:
                 logger.info(
                     "Failed to send dummy event into room %s for user %s due to "
