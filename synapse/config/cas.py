@@ -46,6 +46,7 @@ class CasConfig(Config):
         cas_config:
           # Uncomment the following to enable authorization against a CAS server.
           # Defaults to false.
+          #
           #enabled: true
 
           # The URL of the CAS authorization endpoint.
@@ -67,6 +68,7 @@ class CasConfig(Config):
           # and the values must match the given value. Alternately if the given value
           # is None then any value is allowed (the attribute just must exist).
           # All of the listed attributes must match for the login to be permitted.
+          #
           #required_attributes:
           #  userGroup: "staff"
           #  department: None

@@ -239,11 +239,6 @@ class SAML2Config(Config):
         # https://<server>:<port>/_matrix/saml2/authn_response.
         #
         saml2_config:
-          # Uncomment the following to enable authorization against a SAML server.
-          # Defaults to true, but is unused unless sp_config exists.
-          #
-          #enabled: true
-
           # `sp_config` is the configuration for the pysaml2 Service Provider.
           # See pysaml2 docs for format of config.
           #
@@ -252,8 +247,10 @@ class SAML2Config(Config):
           # override them.
           #
           sp_config:
-            # point this to the IdP's metadata. You can use either a local file or
-            # (preferably) a URL.
+            # Point this to the IdP's metadata. You must provide either a local
+            # file via the `local` attribute or (preferably) a URL via the
+            # `remote` attribute.
+            #
             #metadata:
             #  local: ["saml2/idp.xml"]
             #  remote:
