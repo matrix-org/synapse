@@ -1,1 +1,0 @@
-Fix a bug where an appservice may not be forwarded events for a room it was recently invited to. Broken in v1.22.0.
