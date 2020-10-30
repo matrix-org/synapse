@@ -24,7 +24,7 @@ from twisted.enterprise.adbapi import Connection
 
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.database import make_in_list_sql_clause
+from synapse.storage.database import DatabasePool, make_in_list_sql_clause
 from synapse.storage.types import Cursor
 from synapse.types import JsonDict
 from synapse.util import json_encoder
@@ -33,6 +33,7 @@ from synapse.util.iterutils import batch_iter
 
 if TYPE_CHECKING:
     from synapse.handlers.e2e_keys import SignatureListItem
+    from synapse.server import HomeServer
 
 
 @attr.s(slots=True)
@@ -695,6 +696,17 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
 
 
 class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
+    def __init__(self, database: DatabasePool, db_conn: Connection, hs: "HomeServer"):
+        super().__init__(database, db_conn, hs)
+
+        self.db_pool.updates.register_background_index_update(
+            "e2e_cross_signing_keys_idx",
+            index_name="e2e_cross_signing_keys_stream_idx",
+            table="e2e_cross_signing_keys",
+            columns=["stream_id"],
+            unique=True,
+        )
+
     async def set_e2e_device_keys(
         self, user_id: str, device_id: str, time_now: int, device_keys: JsonDict
     ) -> bool:
