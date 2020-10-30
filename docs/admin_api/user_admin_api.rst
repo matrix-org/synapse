@@ -611,3 +611,82 @@ The following parameters should be set in the URL:
 
 - ``user_id`` - fully qualified: for example, ``@user:server.com``.
 - ``device_id`` - The device to delete.
+
+List all pushers
+================
+Gets information about all pushers for a specific ``user_id``.
+
+The API is::
+
+  GET /_synapse/admin/v1/users/<user_id>/pushers
+
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
+
+A response body like the following is returned:
+
+.. code:: json
+
+    {
+      "pushers": [
+        {
+          "app_display_name":"HTTP Push Notifications",
+          "app_id":"m.http",
+          "data": {
+            "url":"example.com"
+          },
+          "device_display_name":"pushy push",
+          "kind":"http",
+          "lang":"None",
+          "profile_tag":"",
+          "pushkey":"a@example.com"
+        }
+      ],
+      "total": 1
+    }
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- ``user_id`` - fully qualified: for example, ``@user:server.com``.
+
+**Response**
+
+The following fields are returned in the JSON response body:
+
+- ``pushers`` - An array containing the current pushers for the user
+
+  - ``app_display_name`` - string - A string that will allow the user to identify
+    what application owns this pusher.
+
+  - ``app_id`` - string - This is a reverse-DNS style identifier for the application.
+    Max length, 64 chars.
+
+  - ``data`` - A dictionary of information for the pusher implementation itself.
+
+    - ``url`` - string - Required if ``kind`` is ``http``. The URL to use to send
+      notifications to.
+
+    - ``format`` - string - The format to use when sending notifications to the
+      Push Gateway.
+
+  - ``device_display_name`` - string -  A string that will allow the user to identify
+    what device owns this pusher.
+
+  - ``profile_tag`` - string - This string determines which set of device specific rules
+    this pusher executes.
+
+  - ``kind`` - string -  The kind of pusher. "http" is a pusher that sends HTTP pokes.
+  - ``lang`` - string - The preferred language for receiving notifications
+    (e.g. 'en' or 'en-US')
+
+  - ``profile_tag`` - string - This string determines which set of device specific rules
+    this pusher executes.
+
+  - ``pushkey`` - string - This is a unique identifier for this pusher.
+    Max length, 512 bytes.
+
+- ``total`` - integer - Number of pushers.
+
+See also `Client-Server API Spec <https://matrix.org/docs/spec/client_server/latest#get-matrix-client-r0-pushers>`_

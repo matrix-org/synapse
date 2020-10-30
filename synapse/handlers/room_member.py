@@ -327,7 +327,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     # haproxy would have timed the request out anyway...
                     raise SynapseError(504, "took to long to process")
 
-                result = await self._update_membership(
+                result = await self.update_membership_locked(
                     requester,
                     target,
                     room_id,
@@ -342,7 +342,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         return result
 
-    async def _update_membership(
+    async def update_membership_locked(
         self,
         requester: Requester,
         target: UserID,
@@ -355,6 +355,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         content: Optional[dict] = None,
         require_consent: bool = True,
     ) -> Tuple[str, int]:
+        """Helper for update_membership.
+
+        Assumes that the membership linearizer is already held for the room.
+        """
         content_specified = bool(content)
         if content is None:
             content = {}

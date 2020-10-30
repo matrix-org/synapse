@@ -1118,6 +1118,130 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(number_rooms, len(channel.json_body["joined_rooms"]))
 
 
+class PushersRestTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
+
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.other_user = self.register_user("user", "pass")
+        self.url = "/_synapse/admin/v1/users/%s/pushers" % urllib.parse.quote(
+            self.other_user
+        )
+
+    def test_no_auth(self):
+        """
+        Try to list pushers of an user without authentication.
+        """
+        request, channel = self.make_request("GET", self.url, b"{}")
+        self.render(request)
+
+        self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
+
+    def test_requester_is_no_admin(self):
+        """
+        If the user is not a server admin, an error is returned.
+        """
+        other_user_token = self.login("user", "pass")
+
+        request, channel = self.make_request(
+            "GET", self.url, access_token=other_user_token,
+        )
+        self.render(request)
+
+        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
+    def test_user_does_not_exist(self):
+        """
+        Tests that a lookup for a user that does not exist returns a 404
+        """
+        url = "/_synapse/admin/v1/users/@unknown_person:test/pushers"
+        request, channel = self.make_request(
+            "GET", url, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(404, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
+
+    def test_user_is_not_local(self):
+        """
+        Tests that a lookup for a user that is not a local returns a 400
+        """
+        url = "/_synapse/admin/v1/users/@unknown_person:unknown_domain/pushers"
+
+        request, channel = self.make_request(
+            "GET", url, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(400, channel.code, msg=channel.json_body)
+        self.assertEqual("Can only lookup local users", channel.json_body["error"])
+
+    def test_get_pushers(self):
+        """
+        Tests that a normal lookup for pushers is successfully
+        """
+
+        # Get pushers
+        request, channel = self.make_request(
+            "GET", self.url, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(0, channel.json_body["total"])
+
+        # Register the pusher
+        other_user_token = self.login("user", "pass")
+        user_tuple = self.get_success(
+            self.store.get_user_by_access_token(other_user_token)
+        )
+        token_id = user_tuple.token_id
+
+        self.get_success(
+            self.hs.get_pusherpool().add_pusher(
+                user_id=self.other_user,
+                access_token=token_id,
+                kind="http",
+                app_id="m.http",
+                app_display_name="HTTP Push Notifications",
+                device_display_name="pushy push",
+                pushkey="a@example.com",
+                lang=None,
+                data={"url": "example.com"},
+            )
+        )
+
+        # Get pushers
+        request, channel = self.make_request(
+            "GET", self.url, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(1, channel.json_body["total"])
+
+        for p in channel.json_body["pushers"]:
+            self.assertIn("pushkey", p)
+            self.assertIn("kind", p)
+            self.assertIn("app_id", p)
+            self.assertIn("app_display_name", p)
+            self.assertIn("device_display_name", p)
+            self.assertIn("profile_tag", p)
+            self.assertIn("lang", p)
+            self.assertIn("url", p["data"])
+
+
 class UserMediaRestTestCase(unittest.HomeserverTestCase):
 
     servlets = [

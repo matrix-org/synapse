@@ -60,6 +60,8 @@
 
 1.  Restart Prometheus.
 
+1.  Consider using the [grafana dashboard](https://github.com/matrix-org/synapse/tree/master/contrib/grafana/) and required [recording rules](https://github.com/matrix-org/synapse/tree/master/contrib/prometheus/) 
+
 ## Monitoring workers
 
 To monitor a Synapse installation using

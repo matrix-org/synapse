@@ -16,7 +16,6 @@ import logging
 from typing import Any, Callable, List, Optional, Tuple
 
 import attr
-import hiredis
 
 from twisted.internet.interfaces import IConsumer, IPullProducer, IReactorTime
 from twisted.internet.protocol import Protocol
@@ -39,11 +38,21 @@ from synapse.util import Clock
 from tests import unittest
 from tests.server import FakeTransport, render
 
+try:
+    import hiredis
+except ImportError:
+    hiredis = None
+
 logger = logging.getLogger(__name__)
 
 
 class BaseStreamTestCase(unittest.HomeserverTestCase):
     """Base class for tests of the replication streams"""
+
+    # hiredis is an optional dependency so we don't want to require it for running
+    # the tests.
+    if not hiredis:
+        skip = "Requires hiredis"
 
     servlets = [
         streams.register_servlets,
@@ -269,7 +278,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
             homeserver_to_use=GenericWorkerServer,
             config=config,
             reactor=self.reactor,
-            **kwargs
+            **kwargs,
         )
 
         # If the instance is in the `instance_map` config then workers may try

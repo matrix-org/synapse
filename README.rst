@@ -256,9 +256,9 @@ directory of your choice::
 Synapse has a number of external dependencies, that are easiest
 to install using pip and a virtualenv::
 
-    virtualenv -p python3 env
-    source env/bin/activate
-    python -m pip install --no-use-pep517 -e ".[all]"
+    python3 -m venv ./env
+    source ./env/bin/activate
+    pip install -e ".[all,test]"
 
 This will run a process of downloading and installing all the needed
 dependencies into a virtual env.
@@ -270,9 +270,9 @@ check that everything is installed as it should be::
 
 This should end with a 'PASSED' result::
 
-    Ran 143 tests in 0.601s
+    Ran 1266 tests in 643.930s
 
-    PASSED (successes=143)
+    PASSED (skips=15, successes=1251)
 
 Running the Integration Tests
 =============================

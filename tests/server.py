@@ -46,7 +46,7 @@ class FakeChannel:
 
     site = attr.ib(type=Site)
     _reactor = attr.ib()
-    result = attr.ib(default=attr.Factory(dict))
+    result = attr.ib(type=dict, default=attr.Factory(dict))
     _producer = None
 
     @property
@@ -380,7 +380,7 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
                 pool._runWithConnection,
                 func,
                 *args,
-                **kwargs
+                **kwargs,
             )
 
         def runInteraction(interaction, *args, **kwargs):
@@ -390,7 +390,7 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
                 pool._runInteraction,
                 interaction,
                 *args,
-                **kwargs
+                **kwargs,
             )
 
         pool.runWithConnection = runWithConnection
@@ -571,12 +571,10 @@ def connect_client(reactor: IReactorTCP, client_id: int) -> AccumulatingProtocol
         reactor
         factory: The connecting factory to build.
     """
-    factory = reactor.tcpClients[client_id][2]
+    factory = reactor.tcpClients.pop(client_id)[2]
     client = factory.buildProtocol(None)
     server = AccumulatingProtocol()
     server.makeConnection(FakeTransport(client, reactor))
     client.makeConnection(FakeTransport(server, reactor))
-
-    reactor.tcpClients.pop(client_id)
 
     return client, server

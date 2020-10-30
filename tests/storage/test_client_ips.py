@@ -412,7 +412,7 @@ class ClientIpAuthTestCase(unittest.HomeserverTestCase):
             "GET",
             "/_matrix/client/r0/admin/users/" + self.user_id,
             access_token=access_token,
-            **make_request_args
+            **make_request_args,
         )
         request.requestHeaders.addRawHeader(b"User-Agent", b"Mozzila pizza")
 

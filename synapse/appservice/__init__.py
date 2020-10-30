@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Iterable, List, Match, Optional
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
 from synapse.types import GroupID, JsonDict, UserID, get_domain_from_id
-from synapse.util.caches.descriptors import cached
+from synapse.util.caches.descriptors import _CacheContext, cached
 
 if TYPE_CHECKING:
     from synapse.appservice.api import ApplicationServiceApi
@@ -52,11 +52,11 @@ class ApplicationService:
         self,
         token,
         hostname,
+        id,
+        sender,
         url=None,
         namespaces=None,
         hs_token=None,
-        sender=None,
-        id=None,
         protocols=None,
         rate_limited=True,
         ip_range_whitelist=None,
@@ -164,9 +164,9 @@ class ApplicationService:
         does_match = await self.matches_user_in_member_list(event.room_id, store)
         return does_match
 
-    @cached(num_args=1)
+    @cached(num_args=1, cache_context=True)
     async def matches_user_in_member_list(
-        self, room_id: str, store: "DataStore"
+        self, room_id: str, store: "DataStore", cache_context: _CacheContext,
     ) -> bool:
         """Check if this service is interested a room based upon it's membership
 
@@ -177,7 +177,9 @@ class ApplicationService:
         Returns:
             True if this service would like to know about this room.
         """
-        member_list = await store.get_users_in_room(room_id)
+        member_list = await store.get_users_in_room(
+            room_id, on_invalidate=cache_context.invalidate
+        )
 
         # check joined member events
         for user_id in member_list:

@@ -1,0 +1,1 @@
+Don't require `hiredis` package to be installed to run unit tests.

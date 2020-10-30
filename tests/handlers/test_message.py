@@ -46,7 +46,7 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         self.info = self.get_success(
             self.hs.get_datastore().get_user_by_access_token(self.access_token,)
         )
-        self.token_id = self.info["token_id"]
+        self.token_id = self.info.token_id
 
         self.requester = create_requester(self.user_id, access_token_id=self.token_id)
 
