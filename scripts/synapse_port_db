@@ -40,6 +40,7 @@ from synapse.storage.database import DatabasePool, make_conn
 from synapse.storage.databases.main.client_ips import ClientIpBackgroundUpdateStore
 from synapse.storage.databases.main.deviceinbox import DeviceInboxBackgroundUpdateStore
 from synapse.storage.databases.main.devices import DeviceBackgroundUpdateStore
+from synapse.storage.databases.main.end_to_end_keys import EndToEndKeyStore
 from synapse.storage.databases.main.events_bg_updates import (
     EventsBackgroundUpdatesStore,
 )
@@ -174,6 +175,7 @@ class Store(
     StateBackgroundUpdateStore,
     MainStateBackgroundUpdateStore,
     UserDirectoryBackgroundUpdateStore,
+    EndToEndKeyStore,
     StatsStore,
 ):
     def execute(self, f, *args, **kwargs):
