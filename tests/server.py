@@ -46,7 +46,7 @@ class FakeChannel:
 
     site = attr.ib(type=Site)
     _reactor = attr.ib()
-    result = attr.ib(default=attr.Factory(dict))
+    result = attr.ib(type=dict, default=attr.Factory(dict))
     _producer = None
 
     @property
