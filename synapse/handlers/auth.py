@@ -180,6 +180,7 @@ class AuthHandler(BaseHandler):
                 )
             except Exception as e:
                 logger.warn("Error while initializing %r: %s", module, e)
+                raise
 
         logger.info("Extra password_providers: %r", self.password_providers)
 
