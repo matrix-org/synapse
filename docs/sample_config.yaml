@@ -1505,10 +1505,8 @@ trusted_key_servers:
 
 ## Single sign-on integration ##
 
-# Enable SAML2 for registration and login. Uses pysaml2.
-#
-# At least one of `sp_config` or `config_path` must be set in this section to
-# enable SAML login.
+# The following settings can be used to make Synapse use a single sign-on
+# provider for authentication, instead of its internal password database.
 #
 # You will probably also want to set the following options to `false` to
 # disable the regular login/registration flows:
@@ -1517,6 +1515,11 @@ trusted_key_servers:
 #
 # You will also want to investigate the settings under the "sso" configuration
 # section below.
+
+# Enable SAML2 for registration and login. Uses pysaml2.
+#
+# At least one of `sp_config` or `config_path` must be set in this section to
+# enable SAML login.
 #
 # Once SAML support is enabled, a metadata file will be exposed at
 # https://<server>:<port>/_matrix/saml2/metadata.xml, which you may be able to
@@ -1532,40 +1535,42 @@ saml2_config:
   # so it is not normally necessary to specify them unless you need to
   # override them.
   #
-  #sp_config:
-  #  # point this to the IdP's metadata. You can use either a local file or
-  #  # (preferably) a URL.
-  #  metadata:
-  #    #local: ["saml2/idp.xml"]
-  #    remote:
-  #      - url: https://our_idp/metadata.xml
-  #
-  #  # By default, the user has to go to our login page first. If you'd like
-  #  # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
-  #  # 'service.sp' section:
-  #  #
-  #  #service:
-  #  #  sp:
-  #  #    allow_unsolicited: true
-  #
-  #  # The examples below are just used to generate our metadata xml, and you
-  #  # may well not need them, depending on your setup. Alternatively you
-  #  # may need a whole lot more detail - see the pysaml2 docs!
-  #
-  #  description: ["My awesome SP", "en"]
-  #  name: ["Test SP", "en"]
-  #
-  #  organization:
-  #    name: Example com
-  #    display_name:
-  #      - ["Example co", "en"]
-  #    url: "http://example.com"
-  #
-  #  contact_person:
-  #    - given_name: Bob
-  #      sur_name: "the Sysadmin"
-  #      email_address": ["admin@example.com"]
-  #      contact_type": technical
+  sp_config:
+    # Point this to the IdP's metadata. You must provide either a local
+    # file via the `local` attribute or (preferably) a URL via the
+    # `remote` attribute.
+    #
+    #metadata:
+    #  local: ["saml2/idp.xml"]
+    #  remote:
+    #    - url: https://our_idp/metadata.xml
+
+    # By default, the user has to go to our login page first. If you'd like
+    # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
+    # 'service.sp' section:
+    #
+    #service:
+    #  sp:
+    #    allow_unsolicited: true
+
+    # The examples below are just used to generate our metadata xml, and you
+    # may well not need them, depending on your setup. Alternatively you
+    # may need a whole lot more detail - see the pysaml2 docs!
+
+    #description: ["My awesome SP", "en"]
+    #name: ["Test SP", "en"]
+
+    #organization:
+    #  name: Example com
+    #  display_name:
+    #    - ["Example co", "en"]
+    #  url: "http://example.com"
+
+    #contact_person:
+    #  - given_name: Bob
+    #    sur_name: "the Sysadmin"
+    #    email_address": ["admin@example.com"]
+    #    contact_type": technical
 
   # Instead of putting the config inline as above, you can specify a
   # separate pysaml2 configuration file:
@@ -1641,11 +1646,10 @@ saml2_config:
   #    value: "sales"
 
 
-# OpenID Connect integration. The following settings can be used to make Synapse
-# use an OpenID Connect Provider for authentication, instead of its internal
-# password database.
+# Enable OpenID Connect (OIDC) / OAuth 2.0 for registration and login.
 #
-# See https://github.com/matrix-org/synapse/blob/master/docs/openid.md.
+# See https://github.com/matrix-org/synapse/blob/master/docs/openid.md
+# for some example configurations.
 #
 oidc_config:
   # Uncomment the following to enable authorization against an OpenID Connect
@@ -1778,15 +1782,37 @@ oidc_config:
 
 
 
-# Enable CAS for registration and login.
+# Enable Central Authentication Service (CAS) for registration and login.
 #
-#cas_config:
-#   enabled: true
-#   server_url: "https://cas-server.com"
-#   service_url: "https://homeserver.domain.com:8448"
-#   #displayname_attribute: name
-#   #required_attributes:
-#   #    name: value
+cas_config:
+  # Uncomment the following to enable authorization against a CAS server.
+  # Defaults to false.
+  #
+  #enabled: true
+
+  # The URL of the CAS authorization endpoint.
+  #
+  #server_url: "https://cas-server.com"
+
+  # The public URL of the homeserver.
+  #
+  #service_url: "https://homeserver.domain.com:8448"
+
+  # The attribute of the CAS response to use as the display name.
+  #
+  # If unset, no displayname will be set.
+  #
+  #displayname_attribute: name
+
+  # It is possible to configure Synapse to only allow logins if CAS attributes
+  # match particular values. All of the keys in the mapping below must exist
+  # and the values must match the given value. Alternately if the given value
+  # is None then any value is allowed (the attribute just must exist).
+  # All of the listed attributes must match for the login to be permitted.
+  #
+  #required_attributes:
+  #  userGroup: "staff"
+  #  department: None
 
 
 # Additional settings to use with single-sign on systems such as OpenID Connect,
