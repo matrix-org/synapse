@@ -62,6 +62,7 @@ from synapse.rest.admin.users import (
     UsersRestServletV2,
     WhoisRestServlet,
 )
+from synapse.rest.admin.statistics import UserMediaStatisticsRestServlet
 from synapse.types import RoomStreamToken
 from synapse.util.versionstring import get_version_string
 
@@ -227,6 +228,7 @@ def register_servlets(hs, http_server):
     DeviceRestServlet(hs).register(http_server)
     DevicesRestServlet(hs).register(http_server)
     DeleteDevicesRestServlet(hs).register(http_server)
+    UserMediaStatisticsRestServlet(hs).register(http_server)
     EventReportDetailRestServlet(hs).register(http_server)
     EventReportsRestServlet(hs).register(http_server)
     PushersRestServlet(hs).register(http_server)
