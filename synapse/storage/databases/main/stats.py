@@ -963,7 +963,6 @@ class StatsStore(StateDeltasStore):
             else:
                 order = "ASC"
 
-            sql_order = "ORDER BY %s %s" % (order_by_column, order)
             where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
 
             sql_base = """
