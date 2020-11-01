@@ -17,16 +17,9 @@ import logging
 from typing import Tuple
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.http.servlet import (
-    RestServlet,
-    parse_integer,
-    parse_string,
-)
+from synapse.http.servlet import RestServlet, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
-from synapse.rest.admin._base import (
-    assert_requester_is_admin,
-    admin_patterns,
-)
+from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
 from synapse.server import HomeServer
 from synapse.storage.databases.main.stats import UserSortOrder
 from synapse.types import JsonDict

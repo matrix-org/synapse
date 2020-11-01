@@ -47,6 +47,7 @@ from synapse.rest.admin.rooms import (
     ShutdownRoomRestServlet,
 )
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
+from synapse.rest.admin.statistics import UserMediaStatisticsRestServlet
 from synapse.rest.admin.users import (
     AccountValidityRenewServlet,
     DeactivateAccountRestServlet,
@@ -62,7 +63,6 @@ from synapse.rest.admin.users import (
     UsersRestServletV2,
     WhoisRestServlet,
 )
-from synapse.rest.admin.statistics import UserMediaStatisticsRestServlet
 from synapse.types import RoomStreamToken
 from synapse.util.versionstring import get_version_string
 
