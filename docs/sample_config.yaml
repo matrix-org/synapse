@@ -1396,6 +1396,17 @@ metrics_flags:
 #  - "m.room.encryption"
 #  - "m.room.name"
 
+# A list of event types from a room that will be given to users when they
+# knock on the room. This allows clients to display information about the
+# room that they've knocked on, without actually being in the room yet.
+#
+#room_knock_state_types:
+#  - "m.room.join_rules"
+#  - "m.room.canonical_alias"
+#  - "m.room.avatar"
+#  - "m.room.encryption"
+#  - "m.room.name"
+
 
 # A list of application service config files to use
 #
