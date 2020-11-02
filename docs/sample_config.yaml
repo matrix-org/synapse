@@ -1640,6 +1640,14 @@ saml2_config:
   #  - attribute: department
   #    value: "sales"
 
+  # Most metadata XML only contains a single IdP entity. However if the
+  # metadata XML contains multiple IdPs Synapse needs to know which IdP to
+  # redirect users to. `idp_entityid` can be populated with the entity of
+  # the IdP that should be used. For most deployments, this parameter should
+  # be omitted.
+  #
+  #idp_entityid: 'https://our_idp/entityid'
+
 
 # OpenID Connect integration. The following settings can be used to make Synapse
 # use an OpenID Connect Provider for authentication, instead of its internal
