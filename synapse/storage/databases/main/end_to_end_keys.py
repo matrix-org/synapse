@@ -709,17 +709,6 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
 
 
 class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
-    def __init__(self, database: DatabasePool, db_conn: Connection, hs: "HomeServer"):
-        super().__init__(database, db_conn, hs)
-
-        self.db_pool.updates.register_background_index_update(
-            "e2e_cross_signing_keys_idx",
-            index_name="e2e_cross_signing_keys_stream_idx",
-            table="e2e_cross_signing_keys",
-            columns=["stream_id"],
-            unique=True,
-        )
-
     async def set_e2e_device_keys(
         self, user_id: str, device_id: str, time_now: int, device_keys: JsonDict
     ) -> bool:
