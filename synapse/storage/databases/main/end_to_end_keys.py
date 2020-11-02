@@ -48,7 +48,20 @@ class DeviceKeyLookupResult:
     keys = attr.ib(type=Optional[JsonDict])
 
 
-class EndToEndKeyWorkerStore(SQLBaseStore):
+class EndToEndKeyBackgroundStore(SQLBaseStore):
+    def __init__(self, database: DatabasePool, db_conn: Connection, hs: "HomeServer"):
+        super().__init__(database, db_conn, hs)
+
+        self.db_pool.updates.register_background_index_update(
+            "e2e_cross_signing_keys_idx",
+            index_name="e2e_cross_signing_keys_stream_idx",
+            table="e2e_cross_signing_keys",
+            columns=["stream_id"],
+            unique=True,
+        )
+
+
+class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
     async def get_e2e_device_keys_for_federation_query(
         self, user_id: str
     ) -> Tuple[int, List[JsonDict]]:
