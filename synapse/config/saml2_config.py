@@ -353,11 +353,11 @@ class SAML2Config(Config):
           #  - attribute: department
           #    value: "sales"
 
-          # Most metadata XML only contains a single IdP entity. However if the
-          # metadata XML contains multiple IdPs Synapse needs to know which IdP to
-          # redirect users to. `idp_entityid` can be populated with the entity of
-          # the IdP that should be used. For most deployments, this parameter should
-          # be omitted.
+          # If the metadata XML contains multiple IdP entities then the `idp_entityid`
+          # option must be set to the entity to redirect users to.
+          #
+          # Most deployments only have a single IdP entity and so should omit this
+          # option.
           #
           #idp_entityid: 'https://our_idp/entityid'
         """ % {
