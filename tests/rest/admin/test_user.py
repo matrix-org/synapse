@@ -1759,6 +1759,6 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
         )
 
         # Logging in as the other user and joining a room should work, even
-        # though they should be denied.
+        # though the MAU limit would stop the user doing so.
         puppet_token = self._get_token()
         self.helper.join(room_id, user=self.other_user, tok=puppet_token)

@@ -61,8 +61,14 @@ class AuthBlocking:
                 certain blocking reasons like MAU.
 
             requester: If present, and the authenticated entity is a user, checks for
-                presence against existing MAU cohort.
+                presence against existing MAU cohort. Passing in both a `user_id` and
+                `requester` is an error.
         """
+        if requester and user_id:
+            raise Exception(
+                "Passed in both 'user_id' and 'requester' to 'check_auth_blocking'"
+            )
+
         if requester:
             if requester.authenticated_entity.startswith("@"):
                 user_id = requester.authenticated_entity

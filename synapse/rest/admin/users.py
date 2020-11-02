@@ -851,7 +851,7 @@ class UserTokenRestServlet(RestServlet):
         if not self.hs.is_mine_id(user_id):
             raise SynapseError(400, "Only local users can be logged in as")
 
-        body = parse_json_object_from_request(request)
+        body = parse_json_object_from_request(request, allow_empty_body=True)
 
         valid_until_ms = body.get("valid_until_ms")
         if valid_until_ms and not isinstance(valid_until_ms, int):
