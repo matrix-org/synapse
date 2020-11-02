@@ -116,7 +116,7 @@ public internet; it has no authentication and is unencrypted.
 ### Worker configuration
 
 In the config file for each worker, you must specify the type of worker
-application (`worker_app`), and you should specify a unqiue name for the worker
+application (`worker_app`), and you should specify a unique name for the worker
 (`worker_name`). The currently available worker applications are listed below.
 You must also specify the HTTP replication endpoint that it should talk to on
 the main synapse process.  `worker_replication_host` should specify the host of
