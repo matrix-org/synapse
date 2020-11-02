@@ -376,11 +376,6 @@ class RegistrationHandler(BaseHandler):
                             action="join",
                             ratelimit=False,
                         )
-
-            except ConsentNotGivenError as e:
-                # Technically not necessary to pull out this error though
-                # moving away from bare excepts is a good thing to do.
-                logger.error("Failed to join new user to %r: %r", r, e)
             except Exception as e:
                 logger.error("Failed to join new user to %r: %r", r, e)
 
