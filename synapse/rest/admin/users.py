@@ -833,6 +833,16 @@ class UserMediaRestServlet(RestServlet):
 
 class UserTokenRestServlet(RestServlet):
     """An admin API for logging in as a user.
+
+    Example:
+
+        POST /_synapse/admin/v1/users/@test:example.com/login
+        {}
+
+        200 OK
+        {
+            "access_token": "<some_token>"
+        }
     """
 
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/login$")
@@ -843,7 +853,7 @@ class UserTokenRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
 
-    async def on_PUT(self, request, user_id):
+    async def on_POST(self, request, user_id):
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
         auth_user = requester.user

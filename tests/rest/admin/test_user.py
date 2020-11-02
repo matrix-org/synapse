@@ -1550,7 +1550,7 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
 
     def _get_token(self) -> str:
         request, channel = self.make_request(
-            "PUT", self.url, b"{}", access_token=self.admin_user_tok
+            "POST", self.url, b"{}", access_token=self.admin_user_tok
         )
         self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -1559,7 +1559,7 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
     def test_no_auth(self):
         """Try to login as a user without authentication.
         """
-        request, channel = self.make_request("PUT", self.url, b"{}")
+        request, channel = self.make_request("POST", self.url, b"{}")
         self.render(request)
 
         self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
@@ -1569,7 +1569,7 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
         """Try to login as a user as a non-admin user.
         """
         request, channel = self.make_request(
-            "PUT", self.url, b"{}", access_token=self.other_user_tok
+            "POST", self.url, b"{}", access_token=self.other_user_tok
         )
         self.render(request)
 

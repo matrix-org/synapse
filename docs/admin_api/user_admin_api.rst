@@ -432,7 +432,7 @@ when admins wish to do actions on behalf of a user.
 
 The API is::
 
-    PUT /_synapse/admin/v1/users/<user_id>/login
+    POST /_synapse/admin/v1/users/<user_id>/login
     {}
 
 An optional ``valid_until_ms`` field can be specified in the request body as an
