@@ -90,6 +90,8 @@ class SAML2Config(Config):
             "grandfathered_mxid_source_attribute", "uid"
         )
 
+        self.saml2_idp_entityid = saml2_config.get("idp_entityid", None)
+
         # user_mapping_provider may be None if the key is present but has no value
         ump_dict = saml2_config.get("user_mapping_provider") or {}
 
@@ -350,6 +352,14 @@ class SAML2Config(Config):
           #    value: "staff"
           #  - attribute: department
           #    value: "sales"
+
+          # Most metadata XML only contains a single IdP entity. However if the
+          # metadata XML contains multiple IdPs Synapse needs to know which IdP to
+          # redirect users to. `idp_entityid` can be populated with the entity of
+          # the IdP that should be used. For most deployments, this parameter should
+          # be omitted.
+          #
+          #idp_entityid: 'https://our_idp/entityid'
         """ % {
             "config_dir_path": config_dir_path
         }
