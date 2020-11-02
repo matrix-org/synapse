@@ -302,7 +302,7 @@ Additionally, there is *experimental* support for moving writing of specific
 streams (such as events) off of the main process to a particular worker. (This
 is only supported with Redis-based replication.)
 
-Currently support streams are `events` and `typing`.
+Currently supported streams are `events` and `typing`.
 
 To enable this, the worker must have a HTTP replication listener configured,
 have a `worker_name` and be listed in the `instance_map` config. For example to
