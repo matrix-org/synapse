@@ -498,6 +498,30 @@ BASE_APPEND_UNDERRIDE_RULES = [
         ],
         "actions": ["notify", {"set_tweak": "highlight", "value": False}],
     },
+    {
+        "rule_id": "global/underride/.im.vector.jitsi",
+        "conditions": [
+            {
+                "kind": "event_match",
+                "key": "type",
+                "pattern": "im.vector.modular.widgets",
+                "_id": "_type_modular_widgets",
+            },
+            {
+                "kind": "event_match",
+                "key": "content.type",
+                "pattern": "jitsi",
+                "_id": "_content_type_jitsi",
+            },
+            {
+                "kind": "event_match",
+                "key": "state_key",
+                "pattern": "*",
+                "_id": "_is_state_event",
+            },
+        ],
+        "actions": ["notify", {"set_tweak": "highlight", "value": False}],
+    },
 ]
 
 
