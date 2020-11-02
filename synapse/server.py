@@ -234,8 +234,6 @@ class HomeServer(metaclass=abc.ABCMeta):
         self._instance_id = random_string(5)
         self._instance_name = config.worker_name or "master"
 
-        self.distributor = Distributor()
-
         self.version_string = version_string
 
         self.datastores = None  # type: Optional[Databases]
@@ -312,8 +310,9 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_config(self) -> HomeServerConfig:
         return self.config
 
+    @cache_in_self
     def get_distributor(self) -> Distributor:
-        return self.distributor
+        return Distributor()
 
     @cache_in_self
     def get_registration_ratelimiter(self) -> Ratelimiter:
