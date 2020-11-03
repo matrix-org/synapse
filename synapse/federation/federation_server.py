@@ -61,7 +61,7 @@ from synapse.replication.http.federation import (
     ReplicationFederationSendEduRestServlet,
     ReplicationGetQueryRestServlet,
 )
-from synapse.types import JsonDict, get_domain_from_id
+from synapse.types import JsonDict, UserID, get_domain_from_id
 from synapse.util import glob_to_regex, json_decoder, unwrapFirstError
 from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.caches.response_cache import ResponseCache
@@ -660,9 +660,42 @@ class FederationServer(FederationBase):
         return {"events": [ev.get_pdu_json(time_now) for ev in missing_events]}
 
     @log_function
-    async def on_openid_userinfo(self, token: str) -> Optional[str]:
+    async def on_openid_userinfo(self, token: str) -> Optional[Dict]:
+        """Generate an OpenID Connect userinfo dictionary.
+
+        https://openid.net/specs/openid-connect-core-1_0.html#Claims
+
+        Standard claims:
+        * sub -> user Matrix ID
+        * preferred_username -> user localpart
+        * email -> verified email (if found)
+        * email_verified -> true (if verified email found)
+        * name -> display name
+
+        Private claims:
+        * mx_other_emails -> any other verified emails known by Synapse
+        """
         ts_now_ms = self._clock.time_msec()
-        return await self.store.get_user_id_for_open_id_token(token, ts_now_ms)
+        user_id = await self.store.get_user_id_for_open_id_token(token, ts_now_ms)
+        if not user_id:
+            return None
+        localpart = UserID.from_string(user_id).localpart
+        userinfo = {
+            "sub": user_id,
+            "preferred_username": localpart,
+        }
+        user_emails = await self.store.get_user_emails(user_id)
+        if user_emails:
+            # Use the first one found for the standard claim
+            userinfo["email"] = user_emails[0]
+            userinfo["email_verified"] = True
+            if len(user_emails) > 1:
+                # Put additional emails in a non-standard claim
+                userinfo["mx_other_emails"] = user_emails[1:]
+        user_name = await self.store.get_profile_displayname(localpart)
+        if user_name:
+            userinfo["name"] = user_name
+        return userinfo
 
     def _transaction_from_pdus(self, pdu_list: List[EventBase]) -> Transaction:
         """Returns a new Transaction containing the given PDUs suitable for

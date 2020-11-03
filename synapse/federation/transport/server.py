@@ -705,8 +705,11 @@ class OpenIdUserInfo(BaseFederationServlet):
     Content-Type: application/json
 
     {
-        "sub": "@userpart:example.org",
+        "sub": "@userpart:example.org"
     }
+
+    Actual claims returned depened on what information is available for the user.
+    The above shows the minimum guaranteed to be returned as per OpenID Connect spec.
     """
 
     PATH = "/openid/userinfo"
@@ -721,9 +724,9 @@ class OpenIdUserInfo(BaseFederationServlet):
                 {"errcode": "M_MISSING_TOKEN", "error": "Access Token required"},
             )
 
-        user_id = await self.handler.on_openid_userinfo(token.decode("ascii"))
+        userinfo = await self.handler.on_openid_userinfo(token.decode("ascii"))
 
-        if user_id is None:
+        if userinfo is None:
             return (
                 401,
                 {
@@ -732,7 +735,7 @@ class OpenIdUserInfo(BaseFederationServlet):
                 },
             )
 
-        return 200, {"sub": user_id}
+        return 200, userinfo
 
 
 class PublicRoomList(BaseFederationServlet):

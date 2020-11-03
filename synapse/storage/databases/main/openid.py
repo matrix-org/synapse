@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 from synapse.storage._base import SQLBaseStore
 
@@ -16,6 +16,15 @@ class OpenIdStore(SQLBaseStore):
             },
             desc="insert_open_id_token",
         )
+
+    async def get_user_emails(self, user_id: str) -> Optional[List[str]]:
+        emails = await self.db_pool.simple_select_list(
+            table="user_threepids",
+            keyvalues={"user_id": user_id, "medium": "email"},
+            retcols=("address",),
+            desc="get_user_emails",
+        )
+        return [r["address"] for r in emails]
 
     async def get_user_id_for_open_id_token(
         self, token: str, ts_now_ms: int
