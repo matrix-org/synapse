@@ -154,3 +154,39 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         # Check that we've deduplicated the events.
         self.assertEqual(len(events), 2)
         self.assertEqual(events[0].event_id, events[1].event_id)
+
+
+class ServerAclValidationTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        admin.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.user_id = self.register_user("tester", "foobar")
+        self.access_token = self.login("tester", "foobar")
+        self.room_id = self.helper.create_room_as(self.user_id, tok=self.access_token)
+
+    def test_allow_server_acl(self):
+        """Test that sending an ACL that blocks everyone but ourselves work.
+        """
+
+        self.helper.send_state(
+            self.room_id,
+            EventTypes.ServerACL,
+            body={"allow": [self.hs.hostname]},
+            tok=self.access_token,
+            expect_code=200,
+        )
+
+    def test_deny_server_acl_block_outselves(self):
+        """Test that sending an ACL that blocks ourselves does not work.
+        """
+        self.helper.send_state(
+            self.room_id,
+            EventTypes.ServerACL,
+            body={},
+            tok=self.access_token,
+            expect_code=400,
+        )

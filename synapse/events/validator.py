@@ -22,6 +22,7 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
 from synapse.events.utils import validate_canonicaljson
+from synapse.federation.federation_server import server_matches_acl_event
 from synapse.types import EventID, RoomID, UserID
 
 
@@ -80,6 +81,12 @@ class EventValidator:
 
         if event.type == EventTypes.Retention:
             self._validate_retention(event)
+
+        if event.type == EventTypes.ServerACL:
+            if not server_matches_acl_event(config.server_name, event):
+                raise SynapseError(
+                    400, "Can't create an ACL event that denies the local server"
+                )
 
     def _validate_retention(self, event: EventBase):
         """Checks that an event that defines the retention policy for a room respects the
