@@ -169,7 +169,7 @@ class ServerAclValidationTestCase(unittest.HomeserverTestCase):
         self.room_id = self.helper.create_room_as(self.user_id, tok=self.access_token)
 
     def test_allow_server_acl(self):
-        """Test that sending an ACL that blocks everyone but ourselves work.
+        """Test that sending an ACL that blocks everyone but ourselves works.
         """
 
         self.helper.send_state(
@@ -192,7 +192,7 @@ class ServerAclValidationTestCase(unittest.HomeserverTestCase):
         )
 
     def test_deny_redact_server_acl(self):
-        """Test that attempting to redact an ACL is blocked
+        """Test that attempting to redact an ACL is blocked.
         """
 
         body = self.helper.send_state(

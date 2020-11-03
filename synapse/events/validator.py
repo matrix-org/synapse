@@ -31,7 +31,7 @@ class EventValidator:
         """Validates the event has roughly the right format
 
         Args:
-            event  The event to validate.
+            event: The event to validate.
             config: The homeserver's configuration.
         """
         self.validate_builder(event)
