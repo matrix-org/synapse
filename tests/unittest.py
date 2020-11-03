@@ -44,7 +44,7 @@ from synapse.logging.context import (
     set_current_context,
 )
 from synapse.server import HomeServer
-from synapse.types import Requester, UserID, create_requester
+from synapse.types import UserID, create_requester
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 from tests.server import (
@@ -54,7 +54,7 @@ from tests.server import (
     render,
     setup_test_homeserver,
 )
-from tests.test_utils import event_injection
+from tests.test_utils import event_injection, setup_awaitable_errors
 from tests.test_utils.logging_setup import setup_logging
 from tests.utils import default_config, setupdb
 
@@ -118,6 +118,10 @@ class TestCase(unittest.TestCase):
                     return ret
 
                 logging.getLogger().setLevel(level)
+
+            # Trial messes with the warnings configuration, thus this has to be
+            # done in the context of an individual TestCase.
+            self.addCleanup(setup_awaitable_errors())
 
             return orig()
 
@@ -627,7 +631,7 @@ class HomeserverTestCase(TestCase):
         """
         event_creator = self.hs.get_event_creation_handler()
         secrets = self.hs.get_secrets()
-        requester = Requester(user, None, False, False, None, None)
+        requester = create_requester(user)
 
         event, context = self.get_success(
             event_creator.create_event(

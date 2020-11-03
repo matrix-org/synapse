@@ -100,7 +100,7 @@ class EmailPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastore().get_user_by_access_token(self.access_token)
         )
-        token_id = user_tuple["token_id"]
+        token_id = user_tuple.token_id
 
         self.pusher = self.get_success(
             self.hs.get_pusherpool().add_pusher(
@@ -129,6 +129,35 @@ class EmailPusherTests(HomeserverTestCase):
         self.helper.send(room, body="There!", tok=self.others[0].token)
 
         # We should get emailed about that message
+        self._check_for_mail()
+
+    def test_invite_sends_email(self):
+        # Create a room and invite the user to it
+        room = self.helper.create_room_as(self.others[0].id, tok=self.others[0].token)
+        self.helper.invite(
+            room=room,
+            src=self.others[0].id,
+            tok=self.others[0].token,
+            targ=self.user_id,
+        )
+
+        # We should get emailed about the invite
+        self._check_for_mail()
+
+    def test_invite_to_empty_room_sends_email(self):
+        # Create a room and invite the user to it
+        room = self.helper.create_room_as(self.others[0].id, tok=self.others[0].token)
+        self.helper.invite(
+            room=room,
+            src=self.others[0].id,
+            tok=self.others[0].token,
+            targ=self.user_id,
+        )
+
+        # Then have the original user leave
+        self.helper.leave(room, self.others[0].id, tok=self.others[0].token)
+
+        # We should get emailed about the invite
         self._check_for_mail()
 
     def test_multiple_members_email(self):

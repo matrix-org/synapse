@@ -48,7 +48,7 @@ from synapse.util.wheel_timer import WheelTimer
 
 MYPY = False
 if MYPY:
-    import synapse.server
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +101,7 @@ assert LAST_ACTIVE_GRANULARITY < IDLE_TIMER
 class BasePresenceHandler(abc.ABC):
     """Parts of the PresenceHandler that are shared between workers and master"""
 
-    def __init__(self, hs: "synapse.server.HomeServer"):
+    def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
 
@@ -199,7 +199,7 @@ class BasePresenceHandler(abc.ABC):
 
 
 class PresenceHandler(BasePresenceHandler):
-    def __init__(self, hs: "synapse.server.HomeServer"):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.hs = hs
         self.is_mine_id = hs.is_mine_id
@@ -802,7 +802,7 @@ class PresenceHandler(BasePresenceHandler):
             between the requested tokens due to the limit.
 
             The token returned can be used in a subsequent call to this
-            function to get further updatees.
+            function to get further updates.
 
             The updates are a list of 2-tuples of stream ID and the row data
         """
@@ -977,7 +977,7 @@ def should_notify(old_state, new_state):
             new_state.last_active_ts - old_state.last_active_ts
             > LAST_ACTIVE_GRANULARITY
         ):
-            # Only notify about last active bumps if we're not currently acive
+            # Only notify about last active bumps if we're not currently active
             if not new_state.currently_active:
                 notify_reason_counter.labels("last_active_change_online").inc()
                 return True
@@ -1011,7 +1011,7 @@ def format_user_presence_state(state, now, include_user_id=True):
 
 
 class PresenceEventSource:
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         # We can't call get_presence_handler here because there's a cycle:
         #
         #   Presence -> Notifier -> PresenceEventSource -> Presence
@@ -1071,12 +1071,14 @@ class PresenceEventSource:
 
             users_interested_in = await self._get_interested_in(user, explicit_room_id)
 
-            user_ids_changed = set()
+            user_ids_changed = set()  # type: Collection[str]
             changed = None
             if from_key:
                 changed = stream_change_cache.get_all_entities_changed(from_key)
 
             if changed is not None and len(changed) < 500:
+                assert isinstance(user_ids_changed, set)
+
                 # For small deltas, its quicker to get all changes and then
                 # work out if we share a room or they're in our presence list
                 get_updates_counter.labels("stream").inc()

@@ -143,7 +143,7 @@ class RegistrationConfig(Config):
             RoomCreationPreset.TRUSTED_PRIVATE_CHAT,
         }
 
-        # Pull the creater/inviter from the configuration, this gets used to
+        # Pull the creator/inviter from the configuration, this gets used to
         # send invites for invite-only rooms.
         mxid_localpart = config.get("auto_join_mxid_localpart")
         self.auto_join_user_id = None

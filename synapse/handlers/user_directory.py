@@ -31,7 +31,7 @@ class UserDirectoryHandler(StateDeltasHandler):
     N.B.: ASSUMES IT IS THE ONLY THING THAT MODIFIES THE USER DIRECTORY
 
     The user directory is filled with users who this server can see are joined to a
-    world_readable or publically joinable room. We keep a database table up to date
+    world_readable or publicly joinable room. We keep a database table up to date
     by streaming changes of the current state and recalculating whether users should
     be in the directory or not when necessary.
     """

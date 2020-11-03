@@ -167,20 +167,25 @@ class FollowerTypingHandler:
             now_typing = set(row.user_ids)
             self._room_typing[row.room_id] = row.user_ids
 
-            run_as_background_process(
-                "_handle_change_in_typing",
-                self._handle_change_in_typing,
-                row.room_id,
-                prev_typing,
-                now_typing,
-            )
+            if self.federation:
+                run_as_background_process(
+                    "_send_changes_in_typing_to_remotes",
+                    self._send_changes_in_typing_to_remotes,
+                    row.room_id,
+                    prev_typing,
+                    now_typing,
+                )
 
-    async def _handle_change_in_typing(
+    async def _send_changes_in_typing_to_remotes(
         self, room_id: str, prev_typing: Set[str], now_typing: Set[str]
     ):
         """Process a change in typing of a room from replication, sending EDUs
         for any local users.
         """
+
+        if not self.federation:
+            return
+
         for user_id in now_typing - prev_typing:
             if self.is_mine_id(user_id):
                 await self._push_remote(RoomMember(room_id, user_id), True)
@@ -371,7 +376,7 @@ class TypingWriterHandler(FollowerTypingHandler):
             between the requested tokens due to the limit.
 
             The token returned can be used in a subsequent call to this
-            function to get further updatees.
+            function to get further updates.
 
             The updates are a list of 2-tuples of stream ID and the row data
         """

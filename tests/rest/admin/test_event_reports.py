@@ -70,6 +70,16 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
         self.url = "/_synapse/admin/v1/event_reports"
 
+    def test_no_auth(self):
+        """
+        Try to get an event report without authentication.
+        """
+        request, channel = self.make_request("GET", self.url, b"{}")
+        self.render(request)
+
+        self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
+
     def test_requester_is_no_admin(self):
         """
         If the user is not a server admin, an error 403 is returned.
@@ -266,7 +276,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
     def test_limit_is_negative(self):
         """
-        Testing that a negative list parameter returns a 400
+        Testing that a negative limit parameter returns a 400
         """
 
         request, channel = self.make_request(
@@ -360,7 +370,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
     def _check_fields(self, content):
-        """Checks that all attributes are present in a event report
+        """Checks that all attributes are present in an event report
         """
         for c in content:
             self.assertIn("id", c)
@@ -368,15 +378,175 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             self.assertIn("room_id", c)
             self.assertIn("event_id", c)
             self.assertIn("user_id", c)
-            self.assertIn("reason", c)
-            self.assertIn("content", c)
             self.assertIn("sender", c)
-            self.assertIn("room_alias", c)
-            self.assertIn("event_json", c)
-            self.assertIn("score", c["content"])
-            self.assertIn("reason", c["content"])
-            self.assertIn("auth_events", c["event_json"])
-            self.assertIn("type", c["event_json"])
-            self.assertIn("room_id", c["event_json"])
-            self.assertIn("sender", c["event_json"])
-            self.assertIn("content", c["event_json"])
+            self.assertIn("canonical_alias", c)
+            self.assertIn("name", c)
+            self.assertIn("score", c)
+            self.assertIn("reason", c)
+
+
+class EventReportDetailTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+        report_event.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
+
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.other_user = self.register_user("user", "pass")
+        self.other_user_tok = self.login("user", "pass")
+
+        self.room_id1 = self.helper.create_room_as(
+            self.other_user, tok=self.other_user_tok, is_public=True
+        )
+        self.helper.join(self.room_id1, user=self.admin_user, tok=self.admin_user_tok)
+
+        self._create_event_and_report(
+            room_id=self.room_id1, user_tok=self.other_user_tok,
+        )
+
+        # first created event report gets `id`=2
+        self.url = "/_synapse/admin/v1/event_reports/2"
+
+    def test_no_auth(self):
+        """
+        Try to get event report without authentication.
+        """
+        request, channel = self.make_request("GET", self.url, b"{}")
+        self.render(request)
+
+        self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
+
+    def test_requester_is_no_admin(self):
+        """
+        If the user is not a server admin, an error 403 is returned.
+        """
+
+        request, channel = self.make_request(
+            "GET", self.url, access_token=self.other_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
+    def test_default_success(self):
+        """
+        Testing get a reported event
+        """
+
+        request, channel = self.make_request(
+            "GET", self.url, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self._check_fields(channel.json_body)
+
+    def test_invalid_report_id(self):
+        """
+        Testing that an invalid `report_id` returns a 400.
+        """
+
+        # `report_id` is negative
+        request, channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v1/event_reports/-123",
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+        self.assertEqual(
+            "The report_id parameter must be a string representing a positive integer.",
+            channel.json_body["error"],
+        )
+
+        # `report_id` is a non-numerical string
+        request, channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v1/event_reports/abcdef",
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+        self.assertEqual(
+            "The report_id parameter must be a string representing a positive integer.",
+            channel.json_body["error"],
+        )
+
+        # `report_id` is undefined
+        request, channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v1/event_reports/",
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+        self.assertEqual(
+            "The report_id parameter must be a string representing a positive integer.",
+            channel.json_body["error"],
+        )
+
+    def test_report_id_not_found(self):
+        """
+        Testing that a not existing `report_id` returns a 404.
+        """
+
+        request, channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v1/event_reports/123",
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(404, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
+        self.assertEqual("Event report not found", channel.json_body["error"])
+
+    def _create_event_and_report(self, room_id, user_tok):
+        """Create and report events
+        """
+        resp = self.helper.send(room_id, tok=user_tok)
+        event_id = resp["event_id"]
+
+        request, channel = self.make_request(
+            "POST",
+            "rooms/%s/report/%s" % (room_id, event_id),
+            json.dumps({"score": -100, "reason": "this makes me sad"}),
+            access_token=user_tok,
+        )
+        self.render(request)
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+    def _check_fields(self, content):
+        """Checks that all attributes are present in a event report
+        """
+        self.assertIn("id", content)
+        self.assertIn("received_ts", content)
+        self.assertIn("room_id", content)
+        self.assertIn("event_id", content)
+        self.assertIn("user_id", content)
+        self.assertIn("sender", content)
+        self.assertIn("canonical_alias", content)
+        self.assertIn("name", content)
+        self.assertIn("event_json", content)
+        self.assertIn("score", content)
+        self.assertIn("reason", content)
+        self.assertIn("auth_events", content["event_json"])
+        self.assertIn("type", content["event_json"])
+        self.assertIn("room_id", content["event_json"])
+        self.assertIn("sender", content["event_json"])
+        self.assertIn("content", content["event_json"])

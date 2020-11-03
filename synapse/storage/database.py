@@ -94,7 +94,7 @@ def make_pool(
         cp_openfun=lambda conn: engine.on_new_connection(
             LoggingDatabaseConnection(conn, engine, "on_new_connection")
         ),
-        **db_config.config.get("args", {})
+        **db_config.config.get("args", {}),
     )
 
 
@@ -632,7 +632,7 @@ class DatabasePool:
                 func,
                 *args,
                 db_autocommit=db_autocommit,
-                **kwargs
+                **kwargs,
             )
 
             for after_callback, after_args, after_kwargs in after_callbacks:

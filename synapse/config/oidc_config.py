@@ -87,11 +87,10 @@ class OIDCConfig(Config):
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
-        # OpenID Connect integration. The following settings can be used to make Synapse
-        # use an OpenID Connect Provider for authentication, instead of its internal
-        # password database.
+        # Enable OpenID Connect (OIDC) / OAuth 2.0 for registration and login.
         #
-        # See https://github.com/matrix-org/synapse/blob/master/docs/openid.md.
+        # See https://github.com/matrix-org/synapse/blob/master/docs/openid.md
+        # for some example configurations.
         #
         oidc_config:
           # Uncomment the following to enable authorization against an OpenID Connect

@@ -341,6 +341,89 @@ The following fields are returned in the JSON response body:
 - ``total`` - Number of rooms.
 
 
+List media of an user
+================================
+Gets a list of all local media that a specific ``user_id`` has created.
+The response is ordered by creation date descending and media ID descending.
+The newest media is on top.
+
+The API is::
+
+  GET /_synapse/admin/v1/users/<user_id>/media
+
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
+
+A response body like the following is returned:
+
+.. code:: json
+
+    {
+      "media": [
+        {
+          "created_ts": 100400,
+          "last_access_ts": null,
+          "media_id": "qXhyRzulkwLsNHTbpHreuEgo",
+          "media_length": 67,
+          "media_type": "image/png",
+          "quarantined_by": null,
+          "safe_from_quarantine": false,
+          "upload_name": "test1.png"
+        },
+        {
+          "created_ts": 200400,
+          "last_access_ts": null,
+          "media_id": "FHfiSnzoINDatrXHQIXBtahw",
+          "media_length": 67,
+          "media_type": "image/png",
+          "quarantined_by": null,
+          "safe_from_quarantine": false,
+          "upload_name": "test2.png"
+        }
+      ],
+      "next_token": 3,
+      "total": 2
+    }
+
+To paginate, check for ``next_token`` and if present, call the endpoint again
+with ``from`` set to the value of ``next_token``. This will return a new page.
+
+If the endpoint does not return a ``next_token`` then there are no more
+reports to paginate through.
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- ``user_id`` - string - fully qualified: for example, ``@user:server.com``.
+- ``limit``: string representing a positive integer - Is optional but is used for pagination,
+  denoting the maximum number of items to return in this call. Defaults to ``100``.
+- ``from``: string representing a positive integer - Is optional but used for pagination,
+  denoting the offset in the returned results. This should be treated as an opaque value and
+  not explicitly set to anything other than the return value of ``next_token`` from a previous call.
+  Defaults to ``0``.
+
+**Response**
+
+The following fields are returned in the JSON response body:
+
+- ``media`` - An array of objects, each containing information about a media.
+  Media objects contain the following fields:
+
+  - ``created_ts`` - integer - Timestamp when the content was uploaded in ms.
+  - ``last_access_ts`` - integer - Timestamp when the content was last accessed in ms.
+  - ``media_id`` - string - The id used to refer to the media.
+  - ``media_length`` - integer - Length of the media in bytes.
+  - ``media_type`` - string - The MIME-type of the media.
+  - ``quarantined_by`` - string - The user ID that initiated the quarantine request
+    for this media.
+
+  - ``safe_from_quarantine`` - bool - Status if this media is safe from quarantining.
+  - ``upload_name`` - string - The name the media was uploaded with.
+
+- ``next_token``: integer - Indication for pagination. See above.
+- ``total`` - integer - Total number of media.
+
 User devices
 ============
 
@@ -375,7 +458,8 @@ A response body like the following is returned:
           "last_seen_ts": 1474491775025,
           "user_id": "<user_id>"
         }
-      ]
+      ],
+      "total": 2
     }
 
 **Parameters**
@@ -399,6 +483,8 @@ The following fields are returned in the JSON response body:
   - ``last_seen_ts`` - The timestamp (in milliseconds since the unix epoch) when this
     devices was last seen. (May be a few minutes out of date, for efficiency reasons).
   - ``user_id`` - Owner of  device.
+
+- ``total`` - Total number of user's devices.
 
 Delete multiple devices
 ------------------
@@ -525,3 +611,82 @@ The following parameters should be set in the URL:
 
 - ``user_id`` - fully qualified: for example, ``@user:server.com``.
 - ``device_id`` - The device to delete.
+
+List all pushers
+================
+Gets information about all pushers for a specific ``user_id``.
+
+The API is::
+
+  GET /_synapse/admin/v1/users/<user_id>/pushers
+
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
+
+A response body like the following is returned:
+
+.. code:: json
+
+    {
+      "pushers": [
+        {
+          "app_display_name":"HTTP Push Notifications",
+          "app_id":"m.http",
+          "data": {
+            "url":"example.com"
+          },
+          "device_display_name":"pushy push",
+          "kind":"http",
+          "lang":"None",
+          "profile_tag":"",
+          "pushkey":"a@example.com"
+        }
+      ],
+      "total": 1
+    }
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- ``user_id`` - fully qualified: for example, ``@user:server.com``.
+
+**Response**
+
+The following fields are returned in the JSON response body:
+
+- ``pushers`` - An array containing the current pushers for the user
+
+  - ``app_display_name`` - string - A string that will allow the user to identify
+    what application owns this pusher.
+
+  - ``app_id`` - string - This is a reverse-DNS style identifier for the application.
+    Max length, 64 chars.
+
+  - ``data`` - A dictionary of information for the pusher implementation itself.
+
+    - ``url`` - string - Required if ``kind`` is ``http``. The URL to use to send
+      notifications to.
+
+    - ``format`` - string - The format to use when sending notifications to the
+      Push Gateway.
+
+  - ``device_display_name`` - string -  A string that will allow the user to identify
+    what device owns this pusher.
+
+  - ``profile_tag`` - string - This string determines which set of device specific rules
+    this pusher executes.
+
+  - ``kind`` - string -  The kind of pusher. "http" is a pusher that sends HTTP pokes.
+  - ``lang`` - string - The preferred language for receiving notifications
+    (e.g. 'en' or 'en-US')
+
+  - ``profile_tag`` - string - This string determines which set of device specific rules
+    this pusher executes.
+
+  - ``pushkey`` - string - This is a unique identifier for this pusher.
+    Max length, 512 bytes.
+
+- ``total`` - integer - Number of pushers.
+
+See also `Client-Server API Spec <https://matrix.org/docs/spec/client_server/latest#get-matrix-client-r0-pushers>`_

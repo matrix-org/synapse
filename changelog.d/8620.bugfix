@@ -1,0 +1,1 @@
+Fix a bug where the account validity endpoint would silently fail if the user ID did not have an expiration time. It now returns a 400 error.
