@@ -190,3 +190,24 @@ class ServerAclValidationTestCase(unittest.HomeserverTestCase):
             tok=self.access_token,
             expect_code=400,
         )
+
+    def test_deny_redact_server_acl(self):
+        """Test that attempting to redact an ACL is blocked
+        """
+
+        body = self.helper.send_state(
+            self.room_id,
+            EventTypes.ServerACL,
+            body={"allow": [self.hs.hostname]},
+            tok=self.access_token,
+            expect_code=200,
+        )
+        event_id = body["event_id"]
+
+        # Redaction of event should fail.
+        path = "/_matrix/client/r0/rooms/%s/redact/%s" % (self.room_id, event_id)
+        request, channel = self.make_request(
+            "POST", path, content={}, access_token=self.access_token
+        )
+        self.render(request)
+        self.assertEqual(int(channel.result["code"]), 403)
