@@ -320,7 +320,7 @@ stream_writers:
 ```
 
 The `events` stream also experimentally supports having multiple writers, where
-work is sharded between them by room ID. Note that you *must* restart all
+work is sharded between them by room ID. Note that you *must* restart all worker
 instances when adding or removing event persisters. An example `stream_writers`
 configuration with multiple writers:
 
