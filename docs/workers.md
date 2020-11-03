@@ -319,6 +319,18 @@ stream_writers:
     events: event_persister1
 ```
 
+The `events` stream also experimentally supports having multiple writers, where
+work is sharded between them by room ID. Note that you *must* restart all worker
+instances when adding or removing event persisters. An example `stream_writers`
+configuration with multiple writers:
+
+```yaml
+stream_writers:
+    events:
+        - event_persister1
+        - event_persister2
+```
+
 #### Background tasks
 
 There is also *experimental* support for moving background tasks to a separate
