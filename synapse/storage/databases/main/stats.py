@@ -27,6 +27,7 @@ from synapse.api.errors import StoreError
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.state_deltas import StateDeltasStore
 from synapse.storage.engines import PostgresEngine
+from synapse.types import JsonDict
 from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
@@ -911,7 +912,7 @@ class StatsStore(StateDeltasStore):
         order_by: Optional[UserSortOrder] = UserSortOrder.USER_ID.value,
         direction: Optional[str] = "f",
         search_term: Optional[str] = None,
-    ) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
+    ) -> Tuple[List[JsonDict], Dict[str, int]]:
         """Function to retrieve a paginated list of users and their uploaded local media
         (size and number). This will return a json list of users and the
         total number of users matching the filter criteria.
@@ -974,14 +975,14 @@ class StatsStore(StateDeltasStore):
                 where_clause
             )
 
-            # SQlite does not support SELECT COUNT(*) OVER()
+            # SQLite does not support SELECT COUNT(*) OVER()
             sql = """
                 SELECT COUNT(*) FROM (
                     SELECT lmr.user_id
-                    {}
+                    {sql_base}
                 ) AS count_user_ids
             """.format(
-                sql_base
+                sql_base=sql_base,
             )
             txn.execute(sql, args)
             count = txn.fetchone()[0]
