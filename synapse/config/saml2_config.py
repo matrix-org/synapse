@@ -271,6 +271,24 @@ class SAML2Config(Config):
             #description: ["My awesome SP", "en"]
             #name: ["Test SP", "en"]
 
+            #ui_info:
+            #  display_name:
+            #    - lang: en
+            #      text: "Display Name is the descriptive name of your service."
+            #  description:
+            #    - lang: en
+            #      text: "Description should be a short paragraph explaining the purpose of the service."
+            #  information_url:
+            #    - lang: en
+            #      text: "https://example.com/terms-of-service"
+            #  privacy_statement_url:
+            #    - lang: en
+            #      text: "https://example.com/privacy-policy"
+            #  logo:
+            #    text: "https://example.com/logo.svg"
+            #    width: "200"
+            #    height: "80"
+                  
             #organization:
             #  name: Example com
             #  display_name:
