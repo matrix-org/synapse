@@ -1559,7 +1559,7 @@ saml2_config:
 
     #description: ["My awesome SP", "en"]
     #name: ["Test SP", "en"]
-    
+
     #ui_info:
     #  display_name:
     #    - lang: en
