@@ -288,7 +288,7 @@ class SAML2Config(Config):
             #    text: "https://example.com/logo.svg"
             #    width: "200"
             #    height: "80"
-                  
+
             #organization:
             #  name: Example com
             #  display_name:
