@@ -120,3 +120,45 @@ class UserMediaStatisticsRestServlet(RestServlet):
             ret["next_token"] = start + len(users_media)
 
         return 200, ret
+
+
+class ServerMediaStatisticsRestServlet(RestServlet):
+    """
+    Get statistics about uploaded media on this server.
+    """
+
+    PATTERNS = admin_patterns("/statistics/server/media$")
+
+    def __init__(self, hs: "HomeServer"):
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+
+    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self.auth, request)
+
+        from_ts = parse_integer(request, "from_ts", default=0)
+        if from_ts < 0:
+            raise SynapseError(
+                400,
+                "Query parameter from_ts must be a string representing a positive integer.",
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        until_ts = parse_integer(request, "until_ts")
+        if until_ts is not None:
+            if until_ts < 0:
+                raise SynapseError(
+                    400,
+                    "Query parameter until_ts must be a string representing a positive integer.",
+                    errcode=Codes.INVALID_PARAM,
+                )
+            if until_ts <= from_ts:
+                raise SynapseError(
+                    400,
+                    "Query parameter until_ts must be greater than from_ts.",
+                    errcode=Codes.INVALID_PARAM,
+                )
+
+        count, length = await self.store.get_server_media_usage(from_ts, until_ts)
+        return 200, {"media_count": count, "media_length": length}

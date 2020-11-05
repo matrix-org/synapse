@@ -24,12 +24,47 @@ from synapse.rest.client.v1 import login
 from tests import unittest
 
 
-class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
+class StatisticsBase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
     ]
 
+    def _create_users_with_media(self, number_users: int, media_per_user: int):
+        """
+        Create a number of users with a number of media
+        Args:
+            number_users: Number of users to be created
+            media_per_user: Number of media to be created for each user
+        """
+        for i in range(number_users):
+            self.register_user("foo_user_%s" % i, "pass", displayname="bar_user_%s" % i)
+            user_tok = self.login("foo_user_%s" % i, "pass")
+            self._create_media(user_tok, media_per_user)
+
+    def _create_media(self, user_token: str, number_media: int):
+        """
+        Create a number of media for a specific user
+        Args:
+            user_token: Access token of the user
+            number_media: Number of media to be created for the user
+        """
+        upload_resource = self.media_repo.children[b"upload"]
+        for i in range(number_media):
+            # file size is 67 Byte
+            image_data = unhexlify(
+                b"89504e470d0a1a0a0000000d4948445200000001000000010806"
+                b"0000001f15c4890000000a49444154789c63000100000500010d"
+                b"0a2db40000000049454e44ae426082"
+            )
+
+            # Upload some media into the room
+            self.helper.upload_media(
+                upload_resource, image_data, tok=user_token, expect_code=200
+            )
+
+
+class UserMediaStatisticsTestCase(StatisticsBase):
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
         self.media_repo = hs.get_media_repository_resource()
@@ -414,39 +449,6 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 0)
 
-    def _create_users_with_media(self, number_users: int, media_per_user: int):
-        """
-        Create a number of users with a number of media
-        Args:
-            number_users: Number of users to be created
-            media_per_user: Number of media to be created for each user
-        """
-        for i in range(number_users):
-            self.register_user("foo_user_%s" % i, "pass", displayname="bar_user_%s" % i)
-            user_tok = self.login("foo_user_%s" % i, "pass")
-            self._create_media(user_tok, media_per_user)
-
-    def _create_media(self, user_token: str, number_media: int):
-        """
-        Create a number of media for a specific user
-        Args:
-            user_token: Access token of the user
-            number_media: Number of media to be created for the user
-        """
-        upload_resource = self.media_repo.children[b"upload"]
-        for i in range(number_media):
-            # file size is 67 Byte
-            image_data = unhexlify(
-                b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-                b"0000001f15c4890000000a49444154789c63000100000500010d"
-                b"0a2db40000000049454e44ae426082"
-            )
-
-            # Upload some media into the room
-            self.helper.upload_media(
-                upload_resource, image_data, tok=user_token, expect_code=200
-            )
-
     def _check_fields(self, content: List[Dict[str, Any]]):
         """Checks that all attributes are present in content
         Args:
@@ -483,3 +485,157 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         returned_order = [row["user_id"] for row in channel.json_body["users"]]
         self.assertListEqual(expected_user_list, returned_order)
         self._check_fields(channel.json_body["users"])
+
+
+class ServerMediaStatisticsTestCase(StatisticsBase):
+    def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
+        self.media_repo = hs.get_media_repository_resource()
+
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.other_user = self.register_user("user", "pass")
+        self.other_user_tok = self.login("user", "pass")
+
+        self.url = "/_synapse/admin/v1/statistics/server/media"
+
+    def test_no_auth(self):
+        """
+        Try to list users without authentication.
+        """
+        request, channel = self.make_request("GET", self.url, b"{}")
+        self.render(request)
+
+        self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
+
+    def test_requester_is_no_admin(self):
+        """
+        If the user is not a server admin, an error 403 is returned.
+        """
+        request, channel = self.make_request(
+            "GET", self.url, json.dumps({}), access_token=self.other_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
+    def test_invalid_parameter(self):
+        """
+        If parameters are invalid, an error is returned.
+        """
+        # negative from_ts
+        request, channel = self.make_request(
+            "GET", self.url + "?from_ts=-1234", access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+
+        # negative until_ts
+        request, channel = self.make_request(
+            "GET", self.url + "?until_ts=-1234", access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+
+        # until_ts smaller from_ts
+        request, channel = self.make_request(
+            "GET",
+            self.url + "?from_ts=10&until_ts=5",
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+
+    def test_has_media(self):
+        """
+        Tests that a normal lookup for statistics is successfully
+        if server has media
+        """
+        self._create_users_with_media(5, 3)
+
+        request, channel = self.make_request(
+            "GET", self.url, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(15, channel.json_body["media_count"])
+        self.assertEqual(15 * 67, channel.json_body["media_length"])
+
+    def test_no_media(self):
+        """
+        Tests that a normal lookup for statistics is successfully
+        if server has no media
+        """
+
+        request, channel = self.make_request(
+            "GET", self.url, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(0, channel.json_body["media_count"])
+        self.assertEqual(0, channel.json_body["media_length"])
+
+    def test_from_until_ts(self):
+        """
+        Testing filter by time with parameters `from_ts` and `until_ts`
+        """
+        # create media earlier than `ts1` to ensure that `from_ts` is working
+        self._create_media(self.other_user_tok, 3)
+        self.pump(1)
+        ts1 = self.clock.time_msec()
+
+        # list all media when filter is not set
+        request, channel = self.make_request(
+            "GET", self.url, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["media_count"], 3)
+        self.assertGreaterEqual(channel.json_body["media_length"], 0)
+
+        # filter media starting at `ts1` after creating first media
+        # result is 0
+        request, channel = self.make_request(
+            "GET", self.url + "?from_ts=%s" % (ts1,), access_token=self.admin_user_tok,
+        )
+        self.render(request)
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["media_count"], 0)
+        self.assertEqual(channel.json_body["media_length"], 0)
+
+        self._create_media(self.other_user_tok, 3)
+        self.pump(1)
+        ts2 = self.clock.time_msec()
+        # create media after `ts2` to ensure that `until_ts` is working
+        self._create_media(self.other_user_tok, 3)
+
+        # filter media between `ts1` and `ts2`
+        request, channel = self.make_request(
+            "GET",
+            self.url + "?from_ts=%s&until_ts=%s" % (ts1, ts2),
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["media_count"], 3)
+        self.assertGreaterEqual(channel.json_body["media_length"], 0)
+
+        # filter media until `ts2` and earlier
+        request, channel = self.make_request(
+            "GET", self.url + "?until_ts=%s" % (ts2,), access_token=self.admin_user_tok,
+        )
+        self.render(request)
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["media_count"], 6)
+        self.assertGreaterEqual(channel.json_body["media_length"], 0)

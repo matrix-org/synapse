@@ -1009,3 +1009,48 @@ class StatsStore(StateDeltasStore):
         return await self.db_pool.runInteraction(
             "get_users_media_usage_paginate_txn", get_users_media_usage_paginate_txn
         )
+
+    async def get_server_media_usage(
+        self, from_ts: Optional[int] = None, until_ts: Optional[int] = None,
+    ) -> Tuple[int, int]:
+        """Function to retrieve size and number of uploaded local media.
+
+        Args:
+            from_ts: request only media that are created later than this timestamp (ms)
+            until_ts: request only media that are created earlier than this timestamp (ms)
+        Returns:
+            A tuple of integer representing the total number of
+            media and size that exist given this query
+        """
+
+        def get_server_media_usage_txn(txn):
+            filters = []
+            args = []
+
+            if from_ts:
+                filters.append("created_ts >= ?")
+                args.extend([from_ts])
+            if until_ts:
+                filters.append("created_ts <= ?")
+                args.extend([until_ts])
+
+            where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
+
+            sql = """
+                SELECT
+                    COUNT(*) as media_count,
+                    COALESCE(SUM(media_length), 0) as media_length
+                    FROM local_media_repository
+                    {where_clause}
+            """.format(
+                where_clause=where_clause,
+            )
+
+            txn.execute(sql, args)
+            row = txn.fetchone()
+
+            return row[0], row[1]
+
+        return await self.db_pool.runInteraction(
+            "get_server_media_usage_txn", get_server_media_usage_txn
+        )

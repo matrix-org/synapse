@@ -1,3 +1,50 @@
+# Server media usage statistics
+
+Returns information about all local media usage of this server.
+Gives the possibility to filter them by time.
+
+The API is:
+
+```
+GET /_synapse/admin/v1/statistics/server/media
+```
+
+To use it, you will need to authenticate by providing an `access_token`
+for a server admin: see [README.rst](README.rst).
+
+A response body like the following is returned:
+
+```json
+{
+  "media_count": 3,
+  "media_length": 210
+}
+```
+
+To paginate, check for `next_token` and if present, call the endpoint
+again with `from` set to the value of `next_token`. This will return a new page.
+
+If the endpoint does not return a `next_token` then there are no more
+reports to paginate through.
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+* `from_ts` - string representing a positive integer - Considers only
+  files created at this timestamp or later. Unix timestamp in ms.
+* `until_ts` - string representing a positive integer - Considers only
+  files created at this timestamp or earlier. Unix timestamp in ms.
+
+
+**Response**
+
+The following fields are returned in the JSON response body:
+
+* `media_count` - integer - Number of uploaded media.
+* `media_length` - integer - Size of uploaded media in bytes.
+
+
 # Users' media usage statistics
 
 Returns information about all local media usage of users. Gives the
