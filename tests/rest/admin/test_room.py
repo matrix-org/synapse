@@ -531,40 +531,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
     def _is_purged(self, room_id):
         """Test that the following tables have been purged of all rows related to the room.
         """
-        for table in (
-            "current_state_events",
-            "event_backward_extremities",
-            "event_forward_extremities",
-            "event_json",
-            "event_push_actions",
-            "event_search",
-            "events",
-            "group_rooms",
-            "public_room_list_stream",
-            "receipts_graph",
-            "receipts_linearized",
-            "room_aliases",
-            "room_depth",
-            "room_memberships",
-            "room_stats_state",
-            "room_stats_current",
-            "room_stats_historical",
-            "room_stats_earliest_token",
-            "rooms",
-            "stream_ordering_to_exterm",
-            "users_in_public_rooms",
-            "users_who_share_private_rooms",
-            "appservice_room_list",
-            "e2e_room_keys",
-            "event_push_summary",
-            "pusher_throttle",
-            "group_summary_rooms",
-            "local_invites",
-            "room_account_data",
-            "room_tags",
-            # "state_groups",  # Current impl leaves orphaned state groups around.
-            "state_groups_state",
-        ):
+        for table in PURGE_TABLES:
             count = self.get_success(
                 self.store.db_pool.simple_select_one_onecol(
                     table=table,
@@ -633,39 +600,7 @@ class PurgeRoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # Test that the following tables have been purged of all rows related to the room.
-        for table in (
-            "current_state_events",
-            "event_backward_extremities",
-            "event_forward_extremities",
-            "event_json",
-            "event_push_actions",
-            "event_search",
-            "events",
-            "group_rooms",
-            "public_room_list_stream",
-            "receipts_graph",
-            "receipts_linearized",
-            "room_aliases",
-            "room_depth",
-            "room_memberships",
-            "room_stats_state",
-            "room_stats_current",
-            "room_stats_historical",
-            "room_stats_earliest_token",
-            "rooms",
-            "stream_ordering_to_exterm",
-            "users_in_public_rooms",
-            "users_who_share_private_rooms",
-            "appservice_room_list",
-            "e2e_room_keys",
-            "event_push_summary",
-            "pusher_throttle",
-            "group_summary_rooms",
-            "room_account_data",
-            "room_tags",
-            # "state_groups",  # Current impl leaves orphaned state groups around.
-            "state_groups_state",
-        ):
+        for table in PURGE_TABLES:
             count = self.get_success(
                 self.store.db_pool.simple_select_one_onecol(
                     table=table,
@@ -1500,3 +1435,39 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(private_room_id, channel.json_body["joined_rooms"][0])
+
+
+PURGE_TABLES = [
+    "current_state_events",
+    "event_backward_extremities",
+    "event_forward_extremities",
+    "event_json",
+    "event_push_actions",
+    "event_search",
+    "events",
+    "group_rooms",
+    "public_room_list_stream",
+    "receipts_graph",
+    "receipts_linearized",
+    "room_aliases",
+    "room_depth",
+    "room_memberships",
+    "room_stats_state",
+    "room_stats_current",
+    "room_stats_historical",
+    "room_stats_earliest_token",
+    "rooms",
+    "stream_ordering_to_exterm",
+    "users_in_public_rooms",
+    "users_who_share_private_rooms",
+    "appservice_room_list",
+    "e2e_room_keys",
+    "event_push_summary",
+    "pusher_throttle",
+    "group_summary_rooms",
+    "local_invites",
+    "room_account_data",
+    "room_tags",
+    # "state_groups",  # Current impl leaves orphaned state groups around.
+    "state_groups_state",
+]

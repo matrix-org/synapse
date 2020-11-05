@@ -1,0 +1,1 @@
+Block attempts by clients to send server ACLs, or redactions of server ACLs, that would result in the local server being blocked from the room.

@@ -116,7 +116,7 @@ public internet; it has no authentication and is unencrypted.
 ### Worker configuration
 
 In the config file for each worker, you must specify the type of worker
-application (`worker_app`), and you should specify a unqiue name for the worker
+application (`worker_app`), and you should specify a unique name for the worker
 (`worker_name`). The currently available worker applications are listed below.
 You must also specify the HTTP replication endpoint that it should talk to on
 the main synapse process.  `worker_replication_host` should specify the host of
@@ -302,7 +302,7 @@ Additionally, there is *experimental* support for moving writing of specific
 streams (such as events) off of the main process to a particular worker. (This
 is only supported with Redis-based replication.)
 
-Currently support streams are `events` and `typing`.
+Currently supported streams are `events` and `typing`.
 
 To enable this, the worker must have a HTTP replication listener configured,
 have a `worker_name` and be listed in the `instance_map` config. For example to
@@ -317,6 +317,18 @@ instance_map:
 
 stream_writers:
     events: event_persister1
+```
+
+The `events` stream also experimentally supports having multiple writers, where
+work is sharded between them by room ID. Note that you *must* restart all worker
+instances when adding or removing event persisters. An example `stream_writers`
+configuration with multiple writers:
+
+```yaml
+stream_writers:
+    events:
+        - event_persister1
+        - event_persister2
 ```
 
 #### Background tasks
