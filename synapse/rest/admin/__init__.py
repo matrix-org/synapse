@@ -48,8 +48,8 @@ from synapse.rest.admin.rooms import (
 )
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
 from synapse.rest.admin.statistics import (
-    UserMediaStatisticsRestServlet,
     ServerMediaStatisticsRestServlet,
+    UserMediaStatisticsRestServlet,
 )
 from synapse.rest.admin.users import (
     AccountValidityRenewServlet,
