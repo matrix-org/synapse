@@ -237,9 +237,8 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(channel.json_body["users"]), 19)
         self.assertEqual(channel.json_body["next_token"], 19)
 
-        # Check
         # Set `from` to value of `next_token` for request remaining entries
-        #  `next_token` does not appear
+        # Check `next_token` does not appear
         request, channel = self.make_request(
             "GET", self.url + "?from=19", access_token=self.admin_user_tok,
         )

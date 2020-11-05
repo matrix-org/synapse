@@ -918,7 +918,7 @@ class StatsStore(StateDeltasStore):
         total number of users matching the filter criteria.
 
         Args:
-            start: start number to begin the query from
+            start: offset to begin the query from
             limit: number of rows to retrieve
             from_ts: request only media that are created later than this timestamp (ms)
             until_ts: request only media that are created earlier than this timestamp (ms)

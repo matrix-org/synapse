@@ -1,1 +1,1 @@
-Add an admin API for users' media statistics. Contributed by @dklimpel.
+Add an admin API for local user media statistics. Contributed by @dklimpel.

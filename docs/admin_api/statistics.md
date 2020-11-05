@@ -1,6 +1,6 @@
 # Users' media usage statistics
 
-Gets information about all local media usage of all users. Gives the
+Returns information about all local media usage of users. Gives the
 possibility to filter them by time and user.
 
 The API is:
@@ -62,8 +62,8 @@ The following parameters should be set in the URL:
   files created at this timestamp or later. Unix timestamp in ms.
 * `until_ts` - string representing a positive integer - Considers only
   files created at this timestamp or earlier. Unix timestamp in ms.
-* `search_term` - string - Filter users by their user ID localparts **or** `displayname`.
-  Search term can be contained in any part of the user ID localparts or `displayname`.
+* `search_term` - string - Filter users by their user ID localpart **or** displayname.
+  The search term can be found in any part of the string.
   Defaults to no filtering.
 * `dir` - string - Direction of order. Either `f` for forwards or `b` for backwards.
   Setting this value to `b` will reverse the above sort order. Defaults to `f`.
@@ -78,6 +78,6 @@ The following fields are returned in the JSON response body:
   - `displayname` - string - Displayname of this user.
   - `media_count` - integer - Number of uploaded media by this user.
   - `media_length` - integer - Size of uploaded media in bytes by this user.
-  - `user_id` - string - Fully-qualified user id: for example, @user:server.com.
-* `next_token` - integer - Indication for pagination. See above.
-* `total` - integer - Total number of users.
+  - `user_id` - string - Fully-qualified user ID (ex. `@user:server.com`).
+* `next_token` - integer - Opaque value used for pagination. See above.
+* `total` - integer - Total number of users after filtering.
