@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional
 
 import synapse.rest.admin
 from synapse.api.errors import Codes
-from synapse.rest.client.v1 import login, profile
+from synapse.rest.client.v1 import login
 
 from tests import unittest
 
@@ -28,7 +28,6 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
-        profile.register_servlets,
     ]
 
     def prepare(self, reactor, clock, hs):
@@ -272,19 +271,16 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         """
 
         # create users
-        userA = self.register_user("user_a", "pass")
+        self.register_user("user_a", "pass", displayname="UserZ")
         userA_tok = self.login("user_a", "pass")
-        self._set_displayname(userA, userA_tok, "UserZ")
         self._create_media(userA_tok, 1)
 
-        userB = self.register_user("user_b", "pass")
+        self.register_user("user_b", "pass", displayname="UserY")
         userB_tok = self.login("user_b", "pass")
-        self._set_displayname(userB, userB_tok, "UserY")
         self._create_media(userB_tok, 3)
 
-        userC = self.register_user("user_c", "pass")
+        self.register_user("user_c", "pass", displayname="UserX")
         userC_tok = self.login("user_c", "pass")
-        self._set_displayname(userC, userC_tok, "UserX")
         self._create_media(userC_tok, 2)
 
         # order by user_id
@@ -400,17 +396,15 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 11)
 
-        # set a displayname for one user
-        self._create_media(self.other_user_tok, 1)
-        self._set_displayname(self.other_user, self.other_user_tok, "UserZ")
-
         # filter on this user in `displayname`
         request, channel = self.make_request(
-            "GET", self.url + "?search_term=Z", access_token=self.admin_user_tok,
+            "GET",
+            self.url + "?search_term=bar_user_10",
+            access_token=self.admin_user_tok,
         )
         self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(channel.json_body["users"][0]["displayname"], "UserZ")
+        self.assertEqual(channel.json_body["users"][0]["displayname"], "bar_user_10")
         self.assertEqual(channel.json_body["total"], 1)
 
         # filter and get empty result
@@ -429,7 +423,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             media_per_user: Number of media to be created for each user
         """
         for i in range(number_users):
-            self.register_user("foo_user_%s" % i, "pass")
+            self.register_user("foo_user_%s" % i, "pass", displayname="bar_user_%s" % i)
             user_tok = self.login("foo_user_%s" % i, "pass")
             self._create_media(user_tok, media_per_user)
 
@@ -490,19 +484,3 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         returned_order = [row["user_id"] for row in channel.json_body["users"]]
         self.assertListEqual(expected_user_list, returned_order)
         self._check_fields(channel.json_body["users"])
-
-    def _set_displayname(self, user_id: str, accesss_token: str, displayname: str):
-        """Set a displayname of a specific user
-        Args:
-            user_id: user ID of the user whose displayname should be set
-            access_token: Access token of the user whose displayname should be set
-            displayname: new displayname to be set
-        """
-        request, channel = self.make_request(
-            "PUT",
-            "/profile/%s/displayname" % (user_id,),
-            content=json.dumps({"displayname": displayname}),
-            access_token=accesss_token,
-        )
-        self.render(request)
-        self.assertEqual(200, channel.code, msg=channel.json_body)
