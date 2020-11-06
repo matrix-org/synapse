@@ -256,7 +256,7 @@ class SAML2Config(Config):
             #  remote:
             #    - url: https://our_idp/metadata.xml
 
-            # Allowed clock difference in seconds from Identity Provider.
+            # Allowed clock difference in seconds from IdP.
             #accepted_time_diff: 3
 
             # By default, the user has to go to our login page first. If you'd like
