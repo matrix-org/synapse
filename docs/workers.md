@@ -263,7 +263,7 @@ Note that a HTTP listener with `client` and `federation` resources must be
 configured in the `worker_listeners` option in the worker config.
 
 Ensure that all SSO logins go to a single process (usually the main process). 
-Multiple workers not handling the SSO endpoints properly, see
+For multiple workers not handling the SSO endpoints properly, see
 [#7530](https://github.com/matrix-org/synapse/issues/7530).
 
 #### Load balancing
@@ -411,7 +411,7 @@ and you must configure a single instance to run the background tasks, e.g.:
     media_instance_running_background_jobs: "media-repository-1"
 ```
 
-If a reverse proxy is used, `/_matrix/media/` must be set for the client (e.g. 443) and the federation port (e.g. 8448) if they are different.
+Note that if a reverse proxy is used , then `/_matrix/media/` must be routed for both inbound client and federation requests (if they are handled separately).
 
 ### `synapse.app.user_dir`
 
