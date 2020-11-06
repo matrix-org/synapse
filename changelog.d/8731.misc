@@ -1,0 +1,1 @@
+SAML: add `accepted_time_diff` example to `saml2_config:` config to allow clock/time difference from IDP.
