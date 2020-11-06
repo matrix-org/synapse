@@ -820,7 +820,7 @@ class Porter(object):
                     "ALTER SEQUENCE events_stream_seq RESTART WITH %s", (next_id,)
                 )
 
-            txn.execute("SELECT -MIN(stream_ordering) FROM events")
+            txn.execute("SELECT GREATEST(-MIN(stream_ordering), 1) FROM events")
             curr_id = txn.fetchone()[0]
             if curr_id:
                 next_id = curr_id + 1
