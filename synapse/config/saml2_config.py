@@ -258,7 +258,7 @@ class SAML2Config(Config):
 
             # Allowed clock difference in seconds from Identity Provider.
             #accepted_time_diff: 3
-            
+
             # By default, the user has to go to our login page first. If you'd like
             # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
             # 'service.sp' section:
