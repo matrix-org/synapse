@@ -602,7 +602,7 @@ class ServerMediaStatisticsTestCase(StatisticsBase):
         self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["media_count"], 3)
-        self.assertGreaterEqual(channel.json_body["media_length"], 0)
+        self.assertGreater(channel.json_body["media_length"], 0)
 
         # filter media starting at `ts1` after creating first media
         # result is 0
@@ -629,7 +629,7 @@ class ServerMediaStatisticsTestCase(StatisticsBase):
         self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["media_count"], 3)
-        self.assertGreaterEqual(channel.json_body["media_length"], 0)
+        self.assertGreater(channel.json_body["media_length"], 0)
 
         # filter media until `ts2` and earlier
         request, channel = self.make_request(
@@ -638,4 +638,4 @@ class ServerMediaStatisticsTestCase(StatisticsBase):
         self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["media_count"], 6)
-        self.assertGreaterEqual(channel.json_body["media_length"], 0)
+        self.assertGreater(channel.json_body["media_length"], 0)
