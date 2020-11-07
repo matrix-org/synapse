@@ -285,9 +285,10 @@ class SAML2Config(Config):
             #    - lang: en
             #      text: "https://example.com/privacy-policy"
             #  logo:
-            #    text: "https://example.com/logo.svg"
-            #    width: "200"
-            #    height: "80"
+            #    - lang: en
+            #      text: "https://example.com/logo.svg"
+            #      width: "200"
+            #      height: "80"
 
             #organization:
             #  name: Example com
