@@ -284,6 +284,9 @@ class SAML2Config(Config):
             #  privacy_statement_url:
             #    - lang: en
             #      text: "https://example.com/privacy-policy"
+            #  keywords:
+            #    - lang: en
+            #      text: ["Matrix", "Element"]
             #  logo:
             #    - lang: en
             #      text: "https://example.com/logo.svg"
