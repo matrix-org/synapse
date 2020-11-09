@@ -348,7 +348,7 @@ class RegistrationConfig(Config):
         #
         # Additionally, if `msisdn` is not set, registration and password resets via msisdn
         # will be disabled regardless. Also, users won't be able to add an msisdn for
-        # identification to their account. This is due to Synapse currently not supporting 
+        # identification to their account. This is due to Synapse currently not supporting
         # any method of sending SMS messages on its own.
         #
         # To enable using an identity server for operations regarding a particular third-party
