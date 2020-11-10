@@ -492,7 +492,7 @@ class EventCreationHandler:
             membership = builder.content.get("membership", None)
             target = UserID.from_string(builder.state_key)
 
-            if membership in {Membership.JOIN, Membership.INVITE}:
+            if membership in {Membership.JOIN, Membership.INVITE, Membership.KNOCK}:
                 # If event doesn't include a display name, add one.
                 profile = self.profile_handler
                 content = builder.content
