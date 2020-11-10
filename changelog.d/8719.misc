@@ -1,1 +1,1 @@
-Return `502` HTTP error code to the client instead of `500` when a remote server incorrectly sets the `Content-Type` header in response to a JSON request.
+Improve the error message returned when a remote server incorrectly sets the `Content-Type` header in response to a JSON request.
