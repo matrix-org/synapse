@@ -1064,7 +1064,7 @@ def check_content_type_is_json(headers):
     c_type = headers.getRawHeaders(b"Content-Type")
     if c_type is None:
         raise RequestSendFailed(
-            SynapseError(502, "No Content-Type header received from remote server"),
+            RuntimeError("No Content-Type header received from remote server"),
             can_retry=False,
         )
 
@@ -1072,8 +1072,7 @@ def check_content_type_is_json(headers):
     val, options = cgi.parse_header(c_type)
     if val != "application/json":
         raise RequestSendFailed(
-            SynapseError(
-                502,
+            RuntimeError(
                 "Remote server sent Content-Type header of '%s', not 'application/json'"
                 % c_type,
             ),
