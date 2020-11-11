@@ -281,7 +281,7 @@ class ApplicationServicesHandler:
         presence_source = self.event_sources.sources["presence"]
         from_key = await self.store.get_type_stream_id_for_appservice(
             service, "presence"
-        )
+        )  # type: Optional[int]
 
         if from_key == 0:
             # We don't want to fetch the changes if this is the first time the appservice
