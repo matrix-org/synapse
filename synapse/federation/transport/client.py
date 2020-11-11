@@ -313,7 +313,12 @@ class TransportLayerClient:
                 itself represented as a JSON dict.
 
         Returns:
-            An empty JSON dictionary.
+            The remote homeserver can optionally return some state from the room. The response
+            dictionary is in the form:
+
+            {"knock_state_events": [<state event dict>, ...]}
+
+            The list of state events may be empty.
         """
         path = _create_v1_path("/send_knock/%s/%s", room_id, event_id)
 

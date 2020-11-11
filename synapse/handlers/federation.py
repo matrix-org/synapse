@@ -1485,10 +1485,18 @@ class FederationHandler(BaseHandler):
         except ValueError:
             pass
 
-        # Send the signed event back to the room
-        await self.federation_client.send_knock(target_hosts, event)
+        # Send the signed event back to the room, and potentially receive some
+        # further information about the room in the form of partial state events
+        stripped_room_state = await self.federation_client.send_knock(
+            target_hosts, event
+        )
 
-        # Store the event locally
+        # Store any stripped room state events in the "unsigned" key of the event.
+        # This is a bit of a hack and is cribbing off of invites. Basically we
+        # store the room state here and retrieve it again when this event appears
+        # in the invitee's sync stream. It is stripped out for all other local users.
+        event.unsigned["knock_room_state"] = stripped_room_state["knock_state_events"]
+
         context = await self.state_handler.compute_event_context(event)
         stream_id = await self.persist_events_and_notify(
             event.room_id, [(event, context)]
