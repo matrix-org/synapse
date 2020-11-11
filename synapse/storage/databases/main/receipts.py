@@ -294,12 +294,16 @@ class ReceiptsWorkerStore(SQLBaseStore, metaclass=abc.ABCMeta):
                 sql = """
                     SELECT * FROM receipts_linearized WHERE
                     stream_id > ? AND stream_id <= ?
+                    ORDER BY stream_id DESC
+                    LIMIT 100
                 """
                 txn.execute(sql, [from_key, to_key])
             else:
                 sql = """
                     SELECT * FROM receipts_linearized WHERE
                     stream_id <= ?
+                    ORDER BY stream_id DESC
+                    LIMIT 100
                 """
 
                 txn.execute(sql, [to_key])
