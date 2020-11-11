@@ -647,6 +647,8 @@ class Porter(object):
                     consumeErrors=True,
                 )
             )
+            # Map from table name to args passed to `handle_table`, i.e. a tuple
+            # of: `postgres_size`, `table_size`, `forward_chunk`, `backward_chunk`.
             tables_to_port_info_map = {r[0]: r[1:] for r in setup_res}
 
             # Step 4. Do the copying.
