@@ -881,7 +881,7 @@ class FederationClient(FederationBase):
         # content.
         return resp[1]
 
-    async def send_knock(self, destinations: List[str], pdu: EventBase):
+    async def send_knock(self, destinations: List[str], pdu: EventBase) -> JsonDict:
         """Attempts to send a knock event to given a list of servers. Iterates
         through the list until one attempt succeeds.
 
@@ -892,6 +892,14 @@ class FederationClient(FederationBase):
             destinations: A list of candidate homeservers which are likely to be
                 participating in the room.
             pdu: The event to be sent.
+
+        Returns:
+            The remote homeserver return some state from the room. The response
+            dictionary is in the form:
+
+            {"knock_state_events": [<state event dict>, ...]}
+
+            The list of state events may be empty.
 
         Raises:
             SynapseError: If the chosen remote server returns a 3xx/4xx code.
@@ -905,12 +913,20 @@ class FederationClient(FederationBase):
             "send_knock", destinations, send_request
         )
 
-    async def _do_send_knock(self, destination: str, pdu: EventBase):
+    async def _do_send_knock(self, destination: str, pdu: EventBase) -> JsonDict:
         """Send a knock event to a remote homeserver.
 
         Args:
             destination: The homeserver to send to.
             pdu: The event to send.
+
+        Returns:
+            The remote homeserver can optionally return some state from the room. The response
+            dictionary is in the form:
+
+            {"knock_state_events": [<state event dict>, ...]}
+
+            The list of state events may be empty.
         """
         time_now = self._clock.time_msec()
 

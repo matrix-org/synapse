@@ -118,6 +118,8 @@ class FederationServer(FederationBase):
             hs, "fed_txn_handler", timeout_ms=30000
         )  # type: ResponseCache[Tuple[str, str]]
 
+        self._room_knock_state_types = hs.config.room_knock_state_types
+
         self.transaction_actions = TransactionActions(self.store)
 
         self.registry = hs.get_federation_registry()
@@ -588,10 +590,16 @@ class FederationServer(FederationBase):
 
         pdu = await self._check_sigs_and_hash(room_version, pdu)
 
-        # Handle the event
-        await self.handler.on_send_knock_request(origin, pdu)
+        # Handle the event, and retrieve the EventContext
+        event_context = await self.handler.on_send_knock_request(origin, pdu)
 
-        return {}
+        # Retrieve stripped state events from the room and send them back to the remote
+        # server. This will allow the remote server's clients to display information
+        # related to the room while the knock request is pending.
+        stripped_room_state = await self.store.get_stripped_room_state_from_event_context(
+            event_context, self._room_knock_state_types
+        )
+        return {"knock_state_events": stripped_room_state}
 
     async def on_event_auth(
         self, origin: str, room_id: str, event_id: str
