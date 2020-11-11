@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyrignt 2020 Sorunome
+# Copyrignt 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -539,7 +541,7 @@ class FederationClient(FederationBase):
 
             RuntimeError: if no servers were reachable.
         """
-        valid_memberships = {Membership.JOIN, Membership.LEAVE}
+        valid_memberships = {Membership.JOIN, Membership.LEAVE, Membership.KNOCK}
         if membership not in valid_memberships:
             raise RuntimeError(
                 "make_membership_event called with membership='%s', must be one of %s"
@@ -878,6 +880,46 @@ class FederationClient(FederationBase):
         # We expect the v1 API to respond with [200, content], so we only return the
         # content.
         return resp[1]
+
+    async def send_knock(self, destinations: List[str], pdu: EventBase):
+        """Attempts to send a knock event to given a list of servers. Iterates
+        through the list until one attempt succeeds.
+
+        Doing so will cause the remote server to add the event to the graph,
+        and send the event out to the rest of the federation.
+
+        Args:
+            destinations: A list of candidate homeservers which are likely to be
+                participating in the room.
+            pdu: The event to be sent.
+
+        Raises:
+            SynapseError: If the chosen remote server returns a 3xx/4xx code.
+            RuntimeError: If no servers were reachable.
+        """
+
+        async def send_request(destination: str) -> JsonDict:
+            return await self._do_send_knock(destination, pdu)
+
+        return await self._try_destination_list(
+            "send_knock", destinations, send_request
+        )
+
+    async def _do_send_knock(self, destination: str, pdu: EventBase):
+        """Send a knock event to a remote homeserver.
+
+        Args:
+            destination: The homeserver to send to.
+            pdu: The event to send.
+        """
+        time_now = self._clock.time_msec()
+
+        return await self.transport_layer.send_knock_v1(
+            destination=destination,
+            room_id=pdu.room_id,
+            event_id=pdu.event_id,
+            content=pdu.get_pdu_json(time_now),
+        )
 
     def get_public_rooms(
         self,
