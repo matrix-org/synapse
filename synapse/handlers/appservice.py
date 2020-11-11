@@ -282,6 +282,12 @@ class ApplicationServicesHandler:
         from_key = await self.store.get_type_stream_id_for_appservice(
             service, "presence"
         )
+
+        if from_key == 0:
+            # We don't want to fetch the changes if this is the first time the appservice
+            # has checked for presence, because we will see all changes for all users
+            from_key = None
+
         for user in users:
             if isinstance(user, str):
                 user = UserID.from_string(user)
