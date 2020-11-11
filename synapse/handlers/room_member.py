@@ -111,6 +111,20 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     @abc.abstractmethod
+    async def _remote_knock(
+        self, remote_room_hosts: List[str], room_id: str, user: UserID, content: dict,
+    ) -> Tuple[str, int]:
+        """Try and knock on a room that this server is not in
+
+        Args:
+            remote_room_hosts: List of servers that can be used to knock via.
+            room_id: Room that we are trying to knock on.
+            user: User who is trying to knock.
+            content: A dict that should be used as the content of the knock event.
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
     async def remote_reject_invite(
         self,
         invite_event_id: str,
@@ -551,6 +565,23 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 # see: https://github.com/matrix-org/synapse/issues/7139
                 if len(latest_event_ids) == 0:
                     latest_event_ids = [invite.event_id]
+
+        elif effective_membership_state == Membership.KNOCK:
+            if not is_host_in_room:
+                # The knock needs to be sent over federation instead
+                remote_room_hosts.append(room_id.split(":", 1)[1])
+
+                content["membership"] = Membership.KNOCK
+
+                profile = self.profile_handler
+                if "displayname" not in content:
+                    content["displayname"] = await profile.get_displayname(target)
+                if "avatar_url" not in content:
+                    content["avatar_url"] = await profile.get_avatar_url(target)
+
+                return await self._remote_knock(
+                    remote_room_hosts, room_id, target, content
+                )
 
         return await self._local_membership_update(
             requester=requester,
@@ -1165,6 +1196,32 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         assert result_event.internal_metadata.stream_ordering
 
         return result_event.event_id, result_event.internal_metadata.stream_ordering
+
+    async def _remote_knock(
+        self, remote_room_hosts: List[str], room_id: str, user: UserID, content: dict,
+    ) -> Tuple[str, int]:
+        """Sends a knock to a room. Attempts to do so via one remote out of a given list.
+
+        Args:
+            remote_room_hosts: A list of homeservers to try knocking through.
+            room_id: The ID of the room to knock on.
+            user: The user to knock on behalf of.
+            content: The content of the knock event.
+
+        Returns:
+            A tuple of (event ID, stream ID).
+        """
+        # filter ourselves out of remote_room_hosts
+        remote_room_hosts = [
+            host for host in remote_room_hosts if host != self.hs.hostname
+        ]
+
+        if len(remote_room_hosts) == 0:
+            raise SynapseError(404, "No known servers")
+
+        return await self.federation_handler.do_knock(
+            remote_room_hosts, room_id, user.to_string(), content=content
+        )
 
     async def _user_left_room(self, target: UserID, room_id: str) -> None:
         """Implements RoomMemberHandler._user_left_room
