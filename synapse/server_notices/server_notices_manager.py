@@ -119,7 +119,7 @@ class ServerNoticesManager:
             # manages to invite the system user to a room, that doesn't make it
             # the server notices room.
             user_ids = await self._store.get_users_in_room(room.room_id)
-            if self.server_notices_mxid in user_ids:
+            if len(user_ids) <= 2 and self.server_notices_mxid in user_ids:
                 # we found a room which our user shares with the system notice
                 # user
                 logger.info(
