@@ -822,12 +822,10 @@ class Porter(object):
 
             txn.execute("SELECT GREATEST(-MIN(stream_ordering), 1) FROM events")
             curr_id = txn.fetchone()[0]
-            if curr_id:
-                next_id = curr_id + 1
-                txn.execute(
-                    "ALTER SEQUENCE events_backfill_stream_seq RESTART WITH %s",
-                    (next_id,),
-                )
+            next_id = curr_id + 1
+            txn.execute(
+                "ALTER SEQUENCE events_backfill_stream_seq RESTART WITH %s", (next_id,),
+            )
 
         return self.postgres_store.db_pool.runInteraction(
             "_setup_events_stream_seqs", r
