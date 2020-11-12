@@ -15,6 +15,7 @@
 
 import itertools
 import logging
+from typing import Any, Callable, Dict, List
 
 from synapse.api.constants import PresenceState
 from synapse.api.errors import Codes, StoreError, SynapseError
@@ -24,7 +25,7 @@ from synapse.events.utils import (
     format_event_raw,
 )
 from synapse.handlers.presence import format_user_presence_state
-from synapse.handlers.sync import SyncConfig
+from synapse.handlers.sync import KnockedSyncResult, SyncConfig
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.types import StreamToken
 from synapse.util import json_decoder
@@ -212,6 +213,10 @@ class SyncRestServlet(RestServlet):
             sync_result.invited, time_now, access_token_id, event_formatter
         )
 
+        knocked = await self.encode_knocked(
+            sync_result.knocked, time_now, access_token_id, event_formatter
+        )
+
         archived = await self.encode_archived(
             sync_result.archived,
             time_now,
@@ -229,7 +234,12 @@ class SyncRestServlet(RestServlet):
                 "left": list(sync_result.device_lists.left),
             },
             "presence": SyncRestServlet.encode_presence(sync_result.presence, time_now),
-            "rooms": {"join": joined, "invite": invited, "leave": archived},
+            "rooms": {
+                "join": joined,
+                "invite": invited,
+                "knock": knocked,
+                "leave": archived,
+            },
             "groups": {
                 "join": sync_result.groups.join,
                 "invite": sync_result.groups.invite,
@@ -295,7 +305,7 @@ class SyncRestServlet(RestServlet):
 
         Args:
             rooms(list[synapse.handlers.sync.InvitedSyncResult]): list of
-                sync results for rooms this user is joined to
+                sync results for rooms this user is invited to
             time_now(int): current time - used as a baseline for age
                 calculations
             token_id(int): ID of the user's auth token - used for namespacing
@@ -323,6 +333,52 @@ class SyncRestServlet(RestServlet):
             invited[room.room_id] = {"invite_state": {"events": invited_state}}
 
         return invited
+
+    async def encode_knocked(
+        self,
+        rooms: List[KnockedSyncResult],
+        time_now: int,
+        token_id: int,
+        event_formatter: Callable[[Dict], Dict],
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Encode the rooms we've knocked on in a sync result.
+
+        Args:
+            rooms: list of sync results for rooms this user is knocking on
+            time_now: current time - used as a baseline for age calculations
+            token_id: ID of the user's auth token - used for namespacing of transaction IDs
+            event_formatter: function to convert from federation format to client format
+
+        Returns:
+            The list of rooms the user has knocked on, in our response format.
+        """
+        knocked = {}
+        for room in rooms:
+            knock = await self._event_serializer.serialize_event(
+                room.knock, time_now, token_id=token_id, event_format=event_formatter,
+            )
+
+            # Extract the `unsigned` key from the knock event.
+            # This is where we (cheekily) store the knock state events
+            unsigned = knock.setdefault("unsigned", {})
+
+            # Extract the stripped room state from the unsigned dict
+            # This is for clients to get a little bit of information about
+            # the room they've knocked on, without revealing any sensitive information
+            knocked_state = list(unsigned.pop("knock_room_state", []))
+
+            # Append the actual knock membership event itself as well
+            # TODO: I *believe* this is just for the client's sake of track its membership
+            # state in each room, but I could be wrong. This certainly doesn't seem like it
+            # could have any negative effects besides resource usage
+            knocked_state.append(knock)
+
+            # Build the `knock_state` dictionary, which will contain the state of the
+            # room that the client has knocked on
+            knocked[room.room_id] = {"knock_state": {"events": knocked_state}}
+
+        return knocked
 
     async def encode_archived(
         self, rooms, time_now, token_id, event_fields, event_formatter

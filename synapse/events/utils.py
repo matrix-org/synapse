@@ -228,6 +228,7 @@ def format_event_for_client_v1(d):
         "replaces_state",
         "prev_content",
         "invite_room_state",
+        "knock_room_state",
     )
     for key in copy_keys:
         if key in d["unsigned"]:
@@ -311,6 +312,10 @@ def serialize_event(
     # If this is an invite for somebody else, then we don't care about the
     # invite_room_state as that's meant solely for the invitee. Other clients
     # will already have the state since they're in the room.
+    #
+    # Note that is_invite only seems to be set to False in the case of appservices
+    # that are not interested in the target user of the invite.
+    # TODO: Figure out what to do here w.r.t knocking
     if not is_invite:
         d["unsigned"].pop("invite_room_state", None)
 
