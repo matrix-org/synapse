@@ -272,6 +272,21 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             user_id, [Membership.INVITE]
         )
 
+    @cached()
+    async def get_knocked_rooms_for_local_user(self, user_id: str) -> RoomsForUser:
+        """Get all the rooms the *local* user currently has the membership of knock for.
+
+        Args:
+            user_id: The user ID.
+
+        Returns:
+            A list of RoomsForUser.
+        """
+
+        return await self.get_rooms_for_local_user_where_membership_is(
+            user_id, [Membership.KNOCK]
+        )
+
     async def get_invite_for_local_user_in_room(
         self, user_id: str, room_id: str
     ) -> Optional[RoomsForUser]:
@@ -288,6 +303,24 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         for invite in invites:
             if invite.room_id == room_id:
                 return invite
+        return None
+
+    async def get_knock_for_local_user_in_room(
+        self, user_id: str, room_id: str
+    ) -> Optional[RoomsForUser]:
+        """Gets the knock for the given *local* user and room.
+
+        Args:
+            user_id: The user ID to find the knock of.
+            room_id: The room to user knocked on.
+
+        Returns:
+            Either a RoomsForUser or None if no knock was found.
+        """
+        knocks = await self.get_knocked_rooms_for_local_user(user_id)
+        for knock in knocks:
+            if knock.room_id == room_id:
+                return knock
         return None
 
     async def get_rooms_for_local_user_where_membership_is(
