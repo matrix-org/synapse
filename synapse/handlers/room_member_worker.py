@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
+# Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,13 +18,14 @@ import logging
 from typing import List, Optional, Tuple
 
 from synapse.api.errors import SynapseError
+from synapse.events import EventBase
 from synapse.handlers.room_member import RoomMemberHandler
 from synapse.replication.http.membership import (
     ReplicationRemoteJoinRestServlet as ReplRemoteJoin,
     ReplicationRemoteRejectInviteRestServlet as ReplRejectInvite,
     ReplicationUserJoinedLeftRoomRestServlet as ReplJoinedLeft,
 )
-from synapse.types import Requester, UserID
+from synapse.types import JsonDict, Requester, UserID
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +75,33 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         """
         ret = await self._remote_reject_client(
             invite_event_id=invite_event_id,
+            txn_id=txn_id,
+            requester=requester,
+            content=content,
+        )
+        return ret["event_id"], ret["stream_id"]
+
+    async def generate_local_out_of_band_membership(
+        self,
+        previous_membership_event: EventBase,
+        txn_id: Optional[str],
+        requester: Requester,
+        content: JsonDict,
+    ):
+        """Generate a local leave event for a room
+
+        Args:
+            previous_membership_event: the previous membership event for this user
+            txn_id: optional transaction ID supplied by the client
+            requester: user making the request, according to the access token
+            content: additional content to include in the leave event.
+               Normally an empty dict.
+
+        Returns:
+            A tuple containing (event_id, stream_id of the leave event)
+        """
+        ret = await self.generate_local_out_of_band_membership(
+            previous_membership_event=previous_membership_event,
             txn_id=txn_id,
             requester=requester,
             content=content,

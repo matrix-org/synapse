@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016-2020 The Matrix.org Foundation C.I.C.
+# Copyright 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -144,6 +145,28 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         Returns:
             event id, stream_id of the leave event
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    async def generate_local_out_of_band_membership(
+        self,
+        previous_membership_event: EventBase,
+        txn_id: Optional[str],
+        requester: Requester,
+        content: JsonDict,
+    ):
+        """Generate a local leave event for a room
+
+        Args:
+            previous_membership_event: the previous membership event for this user
+            txn_id: optional transaction ID supplied by the client
+            requester: user making the request, according to the access token
+            content: additional content to include in the leave event.
+               Normally an empty dict.
+
+        Returns:
+            A tuple containing (event_id, stream_id of the leave event)
         """
         raise NotImplementedError()
 
@@ -532,39 +555,59 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 invite = await self.store.get_invite_for_local_user_in_room(
                     user_id=target.to_string(), room_id=room_id
                 )  # type: Optional[RoomsForUser]
-                if not invite:
+                if invite:
+                    logger.info(
+                        "%s rejects invite to %s from %s",
+                        target,
+                        room_id,
+                        invite.sender,
+                    )
+
+                    if not self.hs.is_mine_id(invite.sender):
+                        # send the rejection to the inviter's HS (with fallback to
+                        # local event)
+                        return await self.remote_reject_invite(
+                            invite.event_id, txn_id, requester, content,
+                        )
+
+                    # the inviter was on our server, but has now left. Carry on
+                    # with the normal rejection codepath, which will also send the
+                    # rejection out to any other servers we believe are still in the room.
+
+                    # thanks to overzealous cleaning up of event_forward_extremities in
+                    # `delete_old_current_state_events`, it's possible to end up with no
+                    # forward extremities here. If that happens, let's just hang the
+                    # rejection off the invite event.
+                    #
+                    # see: https://github.com/matrix-org/synapse/issues/7139
+                    if len(latest_event_ids) == 0:
+                        latest_event_ids = [invite.event_id]
+
+                else:
+                    # or perhaps this is a remote room that a local user has knocked on
+                    knock = await self.store.get_knock_for_local_user_in_room(
+                        user_id=target.to_string(), room_id=room_id
+                    )  # type: Optional[RoomsForUser]
+                    if knock:
+                        # TODO: We don't yet support rescinding knocks over federation
+                        # as we don't know which homeserver to send it to. An obvious
+                        # candidate is the remote homeserver we originally knocked through,
+                        # however we don't currently store that information.
+
+                        # Just rescind the knock locally
+                        knock_event = await self.store.get_event(knock.event_id)
+                        return await self.generate_local_out_of_band_membership(
+                            knock_event, txn_id, requester, content
+                        )
+
                     logger.info(
                         "%s sent a leave request to %s, but that is not an active room "
-                        "on this server, and there is no pending invite",
+                        "on this server, and there is no pending knock",
                         target,
                         room_id,
                     )
 
                     raise SynapseError(404, "Not a known room")
-
-                logger.info(
-                    "%s rejects invite to %s from %s", target, room_id, invite.sender
-                )
-
-                if not self.hs.is_mine_id(invite.sender):
-                    # send the rejection to the inviter's HS (with fallback to
-                    # local event)
-                    return await self.remote_reject_invite(
-                        invite.event_id, txn_id, requester, content,
-                    )
-
-                # the inviter was on our server, but has now left. Carry on
-                # with the normal rejection codepath, which will also send the
-                # rejection out to any other servers we believe are still in the room.
-
-                # thanks to overzealous cleaning up of event_forward_extremities in
-                # `delete_old_current_state_events`, it's possible to end up with no
-                # forward extremities here. If that happens, let's just hang the
-                # rejection off the invite event.
-                #
-                # see: https://github.com/matrix-org/synapse/issues/7139
-                if len(latest_event_ids) == 0:
-                    latest_event_ids = [invite.event_id]
 
         elif effective_membership_state == Membership.KNOCK:
             if not is_host_in_room:
@@ -1135,11 +1178,11 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             #
             logger.warning("Failed to reject invite: %s", e)
 
-            return await self._generate_local_out_of_band_membership(
+            return await self.generate_local_out_of_band_membership(
                 invite_event, txn_id, requester, content
             )
 
-    async def _generate_local_out_of_band_membership(
+    async def generate_local_out_of_band_membership(
         self,
         previous_membership_event: EventBase,
         txn_id: Optional[str],
