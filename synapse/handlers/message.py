@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+# Copyrignt 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -914,8 +915,8 @@ class EventCreationHandler:
             room_version = await self.store.get_room_version_id(event.room_id)
 
         if event.internal_metadata.is_out_of_band_membership():
-            # the only sort of out-of-band-membership events we expect to see here
-            # are invite rejections we have generated ourselves.
+            # the only sort of out-of-band-membership events we expect to see here are
+            # invite rejections and rescinded knocks that we have generated ourselves.
             assert event.type == EventTypes.Member
             assert event.content["membership"] == Membership.LEAVE
         else:
