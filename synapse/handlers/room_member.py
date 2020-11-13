@@ -1114,7 +1114,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         txn_id: Optional[str],
         requester: Requester,
         content: JsonDict,
-    ):
+    ) -> Tuple[str, int]:
         """Generate a local leave event for a room
 
         This can be called after we e.g fail to reject an invite via a remote server.
