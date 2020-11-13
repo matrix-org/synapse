@@ -1,1 +1,0 @@
-Catch exceptions during initialization of `password_providers`. Contributed by Nicolai Søborg.

@@ -1,1 +1,0 @@
-Fix exception during handling multiple concurrent requests for remote media when using multiple media repositories.
