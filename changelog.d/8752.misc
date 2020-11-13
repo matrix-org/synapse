@@ -1,0 +1,1 @@
+Speed up repeated state resolutions on the same room by caching event ID to auth event ID lookups.

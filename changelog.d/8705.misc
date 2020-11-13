@@ -1,0 +1,1 @@
+Improve the error returned when a non-string displayname or avatar_url is used when updating a user's profile.

@@ -546,18 +546,24 @@ class HomeserverTestCase(TestCase):
 
         return result
 
-    def register_user(self, username, password, admin=False):
+    def register_user(
+        self,
+        username: str,
+        password: str,
+        admin: Optional[bool] = False,
+        displayname: Optional[str] = None,
+    ) -> str:
         """
         Register a user. Requires the Admin API be registered.
 
         Args:
-            username (bytes/unicode): The user part of the new user.
-            password (bytes/unicode): The password of the new user.
-            admin (bool): Whether the user should be created as an admin
-            or not.
+            username: The user part of the new user.
+            password: The password of the new user.
+            admin: Whether the user should be created as an admin or not.
+            displayname: The displayname of the new user.
 
         Returns:
-            The MXID of the new user (unicode).
+            The MXID of the new user.
         """
         self.hs.config.registration_shared_secret = "shared"
 
@@ -581,6 +587,7 @@ class HomeserverTestCase(TestCase):
             {
                 "nonce": nonce,
                 "username": username,
+                "displayname": displayname,
                 "password": password,
                 "admin": admin,
                 "mac": want_mac,

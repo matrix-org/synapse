@@ -1,0 +1,1 @@
+Add `displayname` to Shared-Secret Registration for admins.
