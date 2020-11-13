@@ -429,9 +429,6 @@ class HomeserverTestCase(TestCase):
         Returns:
             Tuple[synapse.http.site.SynapseRequest, channel]
         """
-        if isinstance(content, dict):
-            content = json.dumps(content).encode("utf8")
-
         return make_request(
             self.reactor,
             self.site,
