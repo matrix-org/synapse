@@ -259,24 +259,24 @@ to install using pip and a virtualenv::
     python3 -m venv ./env
     source ./env/bin/activate
     pip install -e ".[all,test]"
-    
+
 This will run a process of downloading and installing all the needed
-dependencies into a virtual env.
+dependencies into a virtual env. If any dependencies fail to install,
+try installing the failing modules individually::
 
-Some of the dependencies might have to be installed manually, if you run into errors just install the dependency that is mentioned in the error manually.
+    pip install -e "module-name"
 
-Once this is done, you may wish to run Synapse's unit tests, to
-check that everything is installed as it should be::
+Once this is done, you may wish to run Synapse's unit tests to
+check that everything is installed correctly::
 
     python -m twisted.trial tests
 
-This should end with a 'PASSED' result::
+This should end with a 'PASSED' result (note that exact numbers will
+differ)::
 
-    Ran 1332 tests in 716.064s
+    Ran 1337 tests in 716.064s
 
-    PASSED (skips=15, successes=1317)
-
-(The amount of tests may change in the future...)
+    PASSED (skips=15, successes=1322)
 
 Running the Integration Tests
 =============================
