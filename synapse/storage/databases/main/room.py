@@ -1240,13 +1240,15 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             logger.error("store_room with room_id=%s failed: %s", room_id, e)
             raise StoreError(500, "Problem creating room.")
 
-    async def maybe_store_room_on_invite(self, room_id: str, room_version: RoomVersion):
+    async def maybe_store_room_on_outlier_membership(
+        self, room_id: str, room_version: RoomVersion
+    ):
         """
-        When we receive an invite over federation, store the version of the room if we
-        don't already know the room version.
+        When we receive an invite or any other event over federation that may relate to a room
+        we are not in, store the version of the room if we don't already know the room version.
         """
         await self.db_pool.simple_upsert(
-            desc="maybe_store_room_on_invite",
+            desc="maybe_store_room_on_outlier_membership",
             table="rooms",
             keyvalues={"room_id": room_id},
             values={},
