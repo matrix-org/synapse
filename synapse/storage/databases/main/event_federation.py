@@ -90,6 +90,8 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         else:
             results = set()
 
+        # We pull out the depth simply so that we can populate the
+        # `_event_auth_cache` cache.
         base_sql = """
             SELECT a.event_id, auth_id, depth
             FROM event_auth AS a
@@ -101,6 +103,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         while front:
             new_front = set()
             for chunk in batch_iter(front, 100):
+                # Pull the auth events either from the cache or DB.
                 to_fetch = []  # Event IDs to fetch from DB  # type: List[str]
                 for event_id in chunk:
                     res = self._event_auth_cache.get(event_id)
@@ -115,6 +118,8 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                     )
                     txn.execute(base_sql + clause, args)
 
+                    # Note we need to batch up the results by event ID before
+                    # adding to the cache.
                     to_cache = {}
                     for event_id, auth_event_id, auth_event_depth in txn:
                         to_cache.setdefault(event_id, []).append(
