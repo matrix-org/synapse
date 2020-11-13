@@ -21,7 +21,7 @@ from synapse.rest.client.v1 import login, room
 from synapse.rest.consent import consent_resource
 
 from tests import unittest
-from tests.server import render
+from tests.server import FakeSite, make_request, render
 
 
 class ConsentResourceTestCase(unittest.HomeserverTestCase):
@@ -61,7 +61,9 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
     def test_render_public_consent(self):
         """You can observe the terms form without specifying a user"""
         resource = consent_resource.ConsentResource(self.hs)
-        request, channel = self.make_request("GET", "/consent?v=1", shorthand=False)
+        request, channel = make_request(
+            self.reactor, FakeSite(resource), "GET", "/consent?v=1", shorthand=False
+        )
         render(request, resource, self.reactor)
         self.assertEqual(channel.code, 200)
 
@@ -81,8 +83,13 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
             uri_builder.build_user_consent_uri(user_id).replace("_matrix/", "")
             + "&u=user"
         )
-        request, channel = self.make_request(
-            "GET", consent_uri, access_token=access_token, shorthand=False
+        request, channel = make_request(
+            self.reactor,
+            FakeSite(resource),
+            "GET",
+            consent_uri,
+            access_token=access_token,
+            shorthand=False,
         )
         render(request, resource, self.reactor)
         self.assertEqual(channel.code, 200)
@@ -92,7 +99,9 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
         self.assertEqual(consented, "False")
 
         # POST to the consent page, saying we've agreed
-        request, channel = self.make_request(
+        request, channel = make_request(
+            self.reactor,
+            FakeSite(resource),
             "POST",
             consent_uri + "&v=" + version,
             access_token=access_token,
@@ -103,8 +112,13 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
 
         # Fetch the consent page, to get the consent version -- it should have
         # changed
-        request, channel = self.make_request(
-            "GET", consent_uri, access_token=access_token, shorthand=False
+        request, channel = make_request(
+            self.reactor,
+            FakeSite(resource),
+            "GET",
+            consent_uri,
+            access_token=access_token,
+            shorthand=False,
         )
         render(request, resource, self.reactor)
         self.assertEqual(channel.code, 200)

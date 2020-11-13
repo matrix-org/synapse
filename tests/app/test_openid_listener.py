@@ -20,6 +20,7 @@ from synapse.app.generic_worker import GenericWorkerServer
 from synapse.app.homeserver import SynapseHomeServer
 from synapse.config.server import parse_listener_def
 
+from tests.server import make_request, render
 from tests.unittest import HomeserverTestCase
 
 
@@ -66,16 +67,16 @@ class FederationReaderOpenIDListenerTests(HomeserverTestCase):
         # Grab the resource from the site that was told to listen
         site = self.reactor.tcpServers[0][1]
         try:
-            self.resource = site.resource.children[b"_matrix"].children[b"federation"]
+            resource = site.resource.children[b"_matrix"].children[b"federation"]
         except KeyError:
             if expectation == "no_resource":
                 return
             raise
 
-        request, channel = self.make_request(
-            "GET", "/_matrix/federation/v1/openid/userinfo"
+        request, channel = make_request(
+            self.reactor, site, "GET", "/_matrix/federation/v1/openid/userinfo"
         )
-        self.render(request)
+        render(request, resource, self.reactor)
 
         self.assertEqual(channel.code, 401)
 
@@ -115,15 +116,15 @@ class SynapseHomeserverOpenIDListenerTests(HomeserverTestCase):
         # Grab the resource from the site that was told to listen
         site = self.reactor.tcpServers[0][1]
         try:
-            self.resource = site.resource.children[b"_matrix"].children[b"federation"]
+            resource = site.resource.children[b"_matrix"].children[b"federation"]
         except KeyError:
             if expectation == "no_resource":
                 return
             raise
 
-        request, channel = self.make_request(
-            "GET", "/_matrix/federation/v1/openid/userinfo"
+        request, channel = make_request(
+            self.reactor, site, "GET", "/_matrix/federation/v1/openid/userinfo"
         )
-        self.render(request)
+        render(request, resource, self.reactor)
 
         self.assertEqual(channel.code, 401)
