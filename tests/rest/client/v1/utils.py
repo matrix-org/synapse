@@ -27,7 +27,7 @@ from twisted.web.server import Site
 
 from synapse.api.constants import Membership
 
-from tests.server import make_request, render
+from tests.server import FakeSite, make_request, render
 
 
 @attr.s
@@ -53,7 +53,11 @@ class RestHelper:
             path = path + "?access_token=%s" % tok
 
         request, channel = make_request(
-            self.hs.get_reactor(), "POST", path, json.dumps(content).encode("utf8")
+            self.hs.get_reactor(),
+            self.site,
+            "POST",
+            path,
+            json.dumps(content).encode("utf8"),
         )
         render(request, self.site.resource, self.hs.get_reactor())
 
@@ -126,7 +130,11 @@ class RestHelper:
         data.update(extra_data)
 
         request, channel = make_request(
-            self.hs.get_reactor(), "PUT", path, json.dumps(data).encode("utf8")
+            self.hs.get_reactor(),
+            self.site,
+            "PUT",
+            path,
+            json.dumps(data).encode("utf8"),
         )
 
         render(request, self.site.resource, self.hs.get_reactor())
@@ -159,7 +167,11 @@ class RestHelper:
             path = path + "?access_token=%s" % tok
 
         request, channel = make_request(
-            self.hs.get_reactor(), "PUT", path, json.dumps(content).encode("utf8")
+            self.hs.get_reactor(),
+            self.site,
+            "PUT",
+            path,
+            json.dumps(content).encode("utf8"),
         )
         render(request, self.site.resource, self.hs.get_reactor())
 
@@ -211,7 +223,9 @@ class RestHelper:
         if body is not None:
             content = json.dumps(body).encode("utf8")
 
-        request, channel = make_request(self.hs.get_reactor(), method, path, content)
+        request, channel = make_request(
+            self.hs.get_reactor(), self.site, method, path, content
+        )
 
         render(request, self.site.resource, self.hs.get_reactor())
 
@@ -297,7 +311,12 @@ class RestHelper:
         image_length = len(image_data)
         path = "/_matrix/media/r0/upload?filename=%s" % (filename,)
         request, channel = make_request(
-            self.hs.get_reactor(), "POST", path, content=image_data, access_token=tok
+            self.hs.get_reactor(),
+            FakeSite(resource),
+            "POST",
+            path,
+            content=image_data,
+            access_token=tok,
         )
         request.requestHeaders.addRawHeader(
             b"Content-Length", str(image_length).encode("UTF-8")

@@ -434,6 +434,7 @@ class HomeserverTestCase(TestCase):
 
         return make_request(
             self.reactor,
+            self.site,
             method,
             path,
             content,

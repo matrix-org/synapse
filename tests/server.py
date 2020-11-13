@@ -21,6 +21,7 @@ from twisted.python.failure import Failure
 from twisted.test.proto_helpers import AccumulatingProtocol, MemoryReactorClock
 from twisted.web.http import unquote
 from twisted.web.http_headers import Headers
+from twisted.web.resource import IResource
 from twisted.web.server import Site
 
 from synapse.http.site import SynapseRequest
@@ -128,9 +129,21 @@ class FakeSite:
     site_tag = "test"
     access_logger = logging.getLogger("synapse.access.http.fake")
 
+    def __init__(self, resource: IResource):
+        """
+
+        Args:
+            resource: the resource to be used for rendering all requests
+        """
+        self._resource = resource
+
+    def getResourceFor(self, request):
+        return self._resource
+
 
 def make_request(
     reactor,
+    site: Site,
     method,
     path,
     content=b"",
@@ -145,6 +158,8 @@ def make_request(
     content, and return the Request and the Channel underneath.
 
     Args:
+        site: The twisted Site to associate with the Channel
+
         method (bytes/unicode): The HTTP request method ("verb").
         path (bytes/unicode): The HTTP path, suitably URL encoded (e.g.
         escaped UTF-8 & spaces and such).
@@ -181,7 +196,6 @@ def make_request(
     if isinstance(content, str):
         content = content.encode("utf8")
 
-    site = FakeSite()
     channel = FakeChannel(site, reactor)
 
     req = request(channel)
