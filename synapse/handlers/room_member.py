@@ -1104,11 +1104,11 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             #
             logger.warning("Failed to reject invite: %s", e)
 
-            return await self._generate_local_out_of_band_membership(
+            return await self._generate_local_out_of_band_leave(
                 invite_event, txn_id, requester, content
             )
 
-    async def _generate_local_out_of_band_membership(
+    async def _generate_local_out_of_band_leave(
         self,
         previous_membership_event: EventBase,
         txn_id: Optional[str],
