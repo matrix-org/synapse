@@ -23,6 +23,7 @@ from typing import Any, Dict, Optional
 import attr
 
 from twisted.web.resource import Resource
+from twisted.web.server import Site
 
 from synapse.api.constants import Membership
 
@@ -36,7 +37,7 @@ class RestHelper:
     """
 
     hs = attr.ib()
-    resource = attr.ib()
+    site = attr.ib(type=Site)
     auth_user_id = attr.ib()
 
     def create_room_as(
@@ -54,7 +55,7 @@ class RestHelper:
         request, channel = make_request(
             self.hs.get_reactor(), "POST", path, json.dumps(content).encode("utf8")
         )
-        render(request, self.resource, self.hs.get_reactor())
+        render(request, self.site.resource, self.hs.get_reactor())
 
         assert channel.result["code"] == b"%d" % expect_code, channel.result
         self.auth_user_id = temp_id
@@ -128,7 +129,7 @@ class RestHelper:
             self.hs.get_reactor(), "PUT", path, json.dumps(data).encode("utf8")
         )
 
-        render(request, self.resource, self.hs.get_reactor())
+        render(request, self.site.resource, self.hs.get_reactor())
 
         assert int(channel.result["code"]) == expect_code, (
             "Expected: %d, got: %d, resp: %r"
@@ -160,7 +161,7 @@ class RestHelper:
         request, channel = make_request(
             self.hs.get_reactor(), "PUT", path, json.dumps(content).encode("utf8")
         )
-        render(request, self.resource, self.hs.get_reactor())
+        render(request, self.site.resource, self.hs.get_reactor())
 
         assert int(channel.result["code"]) == expect_code, (
             "Expected: %d, got: %d, resp: %r"
@@ -212,7 +213,7 @@ class RestHelper:
 
         request, channel = make_request(self.hs.get_reactor(), method, path, content)
 
-        render(request, self.resource, self.hs.get_reactor())
+        render(request, self.site.resource, self.hs.get_reactor())
 
         assert int(channel.result["code"]) == expect_code, (
             "Expected: %d, got: %d, resp: %r"
