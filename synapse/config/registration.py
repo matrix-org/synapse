@@ -347,8 +347,9 @@ class RegistrationConfig(Config):
         # email will be globally disabled.
         #
         # Additionally, if `msisdn` is not set, registration and password resets via msisdn
-        # will be disabled regardless. This is due to Synapse currently not supporting any
-        # method of sending SMS messages on its own.
+        # will be disabled regardless, and users will not be able to associate an msisdn
+        # identifier to their account. This is due to Synapse currently not supporting
+        # any method of sending SMS messages on its own.
         #
         # To enable using an identity server for operations regarding a particular third-party
         # identifier type, set the value to the URL of that identity server as shown in the
