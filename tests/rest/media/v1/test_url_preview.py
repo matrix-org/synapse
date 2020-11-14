@@ -133,11 +133,14 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         self.reactor.nameResolver = Resolver()
 
+    def create_test_resource(self):
+        return self.hs.get_media_repository_resource()
+
     def test_cache_returns_correct_type(self):
         self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
 
         request, channel = self.make_request(
-            "GET", "url_preview?url=http://matrix.org", shorthand=False
+            "GET", "preview_url?url=http://matrix.org", shorthand=False,
         )
         request.render(self.preview_url)
         self.pump()
@@ -160,7 +163,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         # Check the cache returns the correct response
         request, channel = self.make_request(
-            "GET", "url_preview?url=http://matrix.org", shorthand=False
+            "GET", "preview_url?url=http://matrix.org", shorthand=False
         )
         request.render(self.preview_url)
         self.pump()
@@ -178,7 +181,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         # Check the database cache returns the correct response
         request, channel = self.make_request(
-            "GET", "url_preview?url=http://matrix.org", shorthand=False
+            "GET", "preview_url?url=http://matrix.org", shorthand=False
         )
         request.render(self.preview_url)
         self.pump()
@@ -201,7 +204,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
 
         request, channel = self.make_request(
-            "GET", "url_preview?url=http://matrix.org", shorthand=False
+            "GET", "preview_url?url=http://matrix.org", shorthand=False,
         )
         request.render(self.preview_url)
         self.pump()
@@ -234,7 +237,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
 
         request, channel = self.make_request(
-            "GET", "url_preview?url=http://matrix.org", shorthand=False
+            "GET", "preview_url?url=http://matrix.org", shorthand=False
         )
         request.render(self.preview_url)
         self.pump()
@@ -267,7 +270,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
 
         request, channel = self.make_request(
-            "GET", "url_preview?url=http://matrix.org", shorthand=False
+            "GET", "preview_url?url=http://matrix.org", shorthand=False
         )
         request.render(self.preview_url)
         self.pump()
@@ -298,7 +301,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.lookups["example.com"] = [(IPv4Address, "10.1.2.3")]
 
         request, channel = self.make_request(
-            "GET", "url_preview?url=http://example.com", shorthand=False
+            "GET", "preview_url?url=http://example.com", shorthand=False
         )
         request.render(self.preview_url)
         self.pump()
@@ -326,7 +329,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.lookups["example.com"] = [(IPv4Address, "192.168.1.1")]
 
         request, channel = self.make_request(
-            "GET", "url_preview?url=http://example.com", shorthand=False
+            "GET", "preview_url?url=http://example.com", shorthand=False
         )
         request.render(self.preview_url)
         self.pump()
@@ -349,7 +352,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.lookups["example.com"] = [(IPv4Address, "1.1.1.2")]
 
         request, channel = self.make_request(
-            "GET", "url_preview?url=http://example.com", shorthand=False
+            "GET", "preview_url?url=http://example.com", shorthand=False
         )
         request.render(self.preview_url)
         self.pump()
@@ -368,7 +371,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         Blacklisted IP addresses, accessed directly, are not spidered.
         """
         request, channel = self.make_request(
-            "GET", "url_preview?url=http://192.168.1.1", shorthand=False
+            "GET", "preview_url?url=http://192.168.1.1", shorthand=False
         )
         request.render(self.preview_url)
         self.pump()
@@ -389,7 +392,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         Blacklisted IP ranges, accessed directly, are not spidered.
         """
         request, channel = self.make_request(
-            "GET", "url_preview?url=http://1.1.1.2", shorthand=False
+            "GET", "preview_url?url=http://1.1.1.2", shorthand=False
         )
         request.render(self.preview_url)
         self.pump()
@@ -411,7 +414,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.lookups["example.com"] = [(IPv4Address, "1.1.1.1")]
 
         request, channel = self.make_request(
-            "GET", "url_preview?url=http://example.com", shorthand=False
+            "GET", "preview_url?url=http://example.com", shorthand=False
         )
         request.render(self.preview_url)
         self.pump()
@@ -446,7 +449,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         ]
 
         request, channel = self.make_request(
-            "GET", "url_preview?url=http://example.com", shorthand=False
+            "GET", "preview_url?url=http://example.com", shorthand=False
         )
         request.render(self.preview_url)
         self.pump()
@@ -468,7 +471,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         ]
 
         request, channel = self.make_request(
-            "GET", "url_preview?url=http://example.com", shorthand=False
+            "GET", "preview_url?url=http://example.com", shorthand=False
         )
         request.render(self.preview_url)
         self.pump()
@@ -491,7 +494,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.lookups["example.com"] = [(IPv6Address, "2001:800::1")]
 
         request, channel = self.make_request(
-            "GET", "url_preview?url=http://example.com", shorthand=False
+            "GET", "preview_url?url=http://example.com", shorthand=False
         )
         request.render(self.preview_url)
         self.pump()
@@ -510,7 +513,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         OPTIONS returns the OPTIONS.
         """
         request, channel = self.make_request(
-            "OPTIONS", "url_preview?url=http://example.com", shorthand=False
+            "OPTIONS", "preview_url?url=http://example.com", shorthand=False
         )
         request.render(self.preview_url)
         self.pump()
@@ -525,7 +528,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         # Build and make a request to the server
         request, channel = self.make_request(
-            "GET", "url_preview?url=http://example.com", shorthand=False
+            "GET", "preview_url?url=http://example.com", shorthand=False
         )
         request.render(self.preview_url)
         self.pump()
@@ -598,7 +601,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
             request, channel = self.make_request(
                 "GET",
-                "url_preview?url=http://twitter.com/matrixdotorg/status/12345",
+                "preview_url?url=http://twitter.com/matrixdotorg/status/12345",
                 shorthand=False,
             )
             request.render(self.preview_url)
@@ -663,7 +666,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
             request, channel = self.make_request(
                 "GET",
-                "url_preview?url=http://twitter.com/matrixdotorg/status/12345",
+                "preview_url?url=http://twitter.com/matrixdotorg/status/12345",
                 shorthand=False,
             )
             request.render(self.preview_url)
