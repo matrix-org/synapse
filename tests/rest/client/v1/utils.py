@@ -296,10 +296,12 @@ class RestHelper:
         image_length = len(image_data)
         path = "/_matrix/media/r0/upload?filename=%s" % (filename,)
         request, channel = make_request(
-            self.hs.get_reactor(), "POST", path, content=image_data, access_token=tok
-        )
-        request.requestHeaders.addRawHeader(
-            b"Content-Length", str(image_length).encode("UTF-8")
+            self.hs.get_reactor(),
+            "POST",
+            path,
+            content=image_data,
+            access_token=tok,
+            custom_headers=[(b"Content-Length", str(image_length))],
         )
         request.render(resource)
         self.hs.get_reactor().pump([100])
