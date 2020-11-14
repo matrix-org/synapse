@@ -21,6 +21,7 @@ from synapse.http.site import XForwardedForRequest
 from synapse.rest.client.v1 import login
 
 from tests import unittest
+from tests.server import make_request
 from tests.test_utils import make_awaitable
 from tests.unittest import override_config
 
@@ -408,18 +409,18 @@ class ClientIpAuthTestCase(unittest.HomeserverTestCase):
         # Advance to a known time
         self.reactor.advance(123456 - self.reactor.seconds())
 
-        request, channel = self.make_request(
+        headers1 = {b"User-Agent": b"Mozzila pizza"}
+        headers1.update(headers)
+
+        make_request(
+            self.reactor,
+            self.site,
             "GET",
             "/_matrix/client/r0/admin/users/" + self.user_id,
             access_token=access_token,
+            custom_headers=headers1.items(),
             **make_request_args,
         )
-        request.requestHeaders.addRawHeader(b"User-Agent", b"Mozzila pizza")
-
-        # Add the optional headers
-        for h, v in headers.items():
-            request.requestHeaders.addRawHeader(h, v)
-        self.render(request)
 
         # Advance so the save loop occurs
         self.reactor.advance(100)
