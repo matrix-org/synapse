@@ -240,8 +240,8 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
             lambda: self._handle_http_replication_attempt(self.hs, 8765),
         )
 
-    def create_test_json_resource(self):
-        """Overrides `HomeserverTestCase.create_test_json_resource`.
+    def create_test_resource(self):
+        """Overrides `HomeserverTestCase.create_test_resource`.
         """
         # We override this so that it automatically registers all the HTTP
         # replication servlets, without having to explicitly do that in all
