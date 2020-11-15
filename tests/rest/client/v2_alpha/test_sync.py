@@ -320,10 +320,8 @@ class SyncTypingTests(unittest.HomeserverTestCase):
         typing._reset()
 
         # Now it SHOULD fail as it never completes!
-        request, channel = self.make_request(
-            "GET", sync_url % (access_token, next_batch)
-        )
-        self.assertRaises(TimedOutException, self.render, request)
+        with self.assertRaises(TimedOutException):
+            self.make_request("GET", sync_url % (access_token, next_batch))
 
 
 class UnreadMessagesTestCase(unittest.HomeserverTestCase):

@@ -412,7 +412,7 @@ class ClientIpAuthTestCase(unittest.HomeserverTestCase):
         headers1 = {b"User-Agent": b"Mozzila pizza"}
         headers1.update(headers)
 
-        request, channel = make_request(
+        make_request(
             self.reactor,
             self.site,
             "GET",
@@ -421,7 +421,6 @@ class ClientIpAuthTestCase(unittest.HomeserverTestCase):
             custom_headers=headers1.items(),
             **make_request_args,
         )
-        self.render(request)
 
         # Advance so the save loop occurs
         self.reactor.advance(100)

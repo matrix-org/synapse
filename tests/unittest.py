@@ -48,13 +48,7 @@ from synapse.server import HomeServer
 from synapse.types import UserID, create_requester
 from synapse.util.ratelimitutils import FederationRateLimiter
 
-from tests.server import (
-    FakeChannel,
-    get_clock,
-    make_request,
-    render,
-    setup_test_homeserver,
-)
+from tests.server import FakeChannel, get_clock, make_request, setup_test_homeserver
 from tests.test_utils import event_injection, setup_awaitable_errors
 from tests.test_utils.logging_setup import setup_logging
 from tests.utils import default_config, setupdb
@@ -454,7 +448,7 @@ class HomeserverTestCase(TestCase):
         Args:
             request (synapse.http.site.SynapseRequest): The request to render.
         """
-        render(request, self.resource, self.reactor)
+        pass
 
     def setup_test_homeserver(self, *args, **kwargs):
         """
