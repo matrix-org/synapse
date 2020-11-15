@@ -326,7 +326,6 @@ class RetentionNoDefaultPolicyTestCase(unittest.HomeserverTestCase):
         url = "/_matrix/client/r0/rooms/%s/event/%s" % (room_id, event_id)
 
         request, channel = self.make_request("GET", url, access_token=self.token)
-        self.render(request)
 
         self.assertEqual(channel.code, expected_code, channel.result)
 

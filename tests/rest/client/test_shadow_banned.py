@@ -95,7 +95,6 @@ class RoomTestCase(_ShadowBannedBase):
             {"id_server": "test", "medium": "email", "address": "test@test.test"},
             access_token=self.banned_access_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
 
         # This should have raised an error earlier, but double check this wasn't called.
@@ -110,7 +109,6 @@ class RoomTestCase(_ShadowBannedBase):
             {"visibility": "public", "invite": [self.other_user_id]},
             access_token=self.banned_access_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
         room_id = channel.json_body["room_id"]
 
@@ -166,7 +164,6 @@ class RoomTestCase(_ShadowBannedBase):
             {"new_version": "6"},
             access_token=self.banned_access_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
         # A new room_id should be returned.
         self.assertIn("replacement_room", channel.json_body)
@@ -192,7 +189,6 @@ class RoomTestCase(_ShadowBannedBase):
             {"typing": True, "timeout": 30000},
             access_token=self.banned_access_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
 
         # There should be no typing events.
@@ -208,7 +204,6 @@ class RoomTestCase(_ShadowBannedBase):
             {"typing": True, "timeout": 30000},
             access_token=self.other_access_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
 
         # These appear in the room.
@@ -255,7 +250,6 @@ class ProfileTestCase(_ShadowBannedBase):
             {"displayname": new_display_name},
             access_token=self.banned_access_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
         self.assertEqual(channel.json_body, {})
 
@@ -263,7 +257,6 @@ class ProfileTestCase(_ShadowBannedBase):
         request, channel = self.make_request(
             "GET", "/profile/%s/displayname" % (self.banned_user_id,)
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
         self.assertEqual(channel.json_body["displayname"], new_display_name)
 
@@ -296,7 +289,6 @@ class ProfileTestCase(_ShadowBannedBase):
             {"membership": "join", "displayname": new_display_name},
             access_token=self.banned_access_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
         self.assertIn("event_id", channel.json_body)
 

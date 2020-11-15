@@ -53,7 +53,6 @@ class PresenceTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "PUT", "/presence/%s/status" % (self.user_id,), body
         )
-        self.render(request)
 
         self.assertEqual(channel.code, 200)
         self.assertEqual(self.hs.presence_handler.set_state.call_count, 1)
@@ -69,7 +68,6 @@ class PresenceTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "PUT", "/presence/%s/status" % (self.user_id,), body
         )
-        self.render(request)
 
         self.assertEqual(channel.code, 200)
         self.assertEqual(self.hs.presence_handler.set_state.call_count, 0)

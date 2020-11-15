@@ -43,7 +43,6 @@ class VersionTestCase(unittest.HomeserverTestCase):
 
     def test_version_string(self):
         request, channel = self.make_request("GET", self.url, shorthand=False)
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(
@@ -76,7 +75,6 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
             content={"localpart": "test"},
         )
 
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         group_id = channel.json_body["group_id"]
@@ -89,14 +87,12 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "PUT", url.encode("ascii"), access_token=self.admin_user_tok, content={}
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         url = "/groups/%s/self/accept_invite" % (group_id,)
         request, channel = self.make_request(
             "PUT", url.encode("ascii"), access_token=self.other_user_token, content={}
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # Check other user knows they're in the group
@@ -112,7 +108,6 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
             content={"localpart": "test"},
         )
 
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # Check group returns 404
@@ -132,7 +127,6 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
             "GET", url.encode("ascii"), access_token=self.admin_user_tok
         )
 
-        self.render(request)
         self.assertEqual(
             expect_code, int(channel.result["code"]), msg=channel.result["body"]
         )
@@ -144,7 +138,6 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
             "GET", "/joined_groups".encode("ascii"), access_token=access_token
         )
 
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         return channel.json_body["groups"]
@@ -251,7 +244,6 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", url.encode("ascii"), access_token=non_admin_user_tok,
         )
-        self.render(request)
 
         # Expect a forbidden error
         self.assertEqual(
@@ -265,7 +257,6 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", url.encode("ascii"), access_token=non_admin_user_tok,
         )
-        self.render(request)
 
         # Expect a forbidden error
         self.assertEqual(
@@ -309,7 +300,6 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             urllib.parse.quote(media_id),
         )
         request, channel = self.make_request("POST", url, access_token=admin_user_tok,)
-        self.render(request)
         self.pump(1.0)
         self.assertEqual(200, int(channel.code), msg=channel.result["body"])
 
@@ -362,7 +352,6 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
                 room_id
             )
         request, channel = self.make_request("POST", url, access_token=admin_user_tok,)
-        self.render(request)
         self.pump(1.0)
         self.assertEqual(200, int(channel.code), msg=channel.result["body"])
         self.assertEqual(
@@ -409,7 +398,6 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", url.encode("ascii"), access_token=admin_user_tok,
         )
-        self.render(request)
         self.pump(1.0)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(
@@ -452,7 +440,6 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", url.encode("ascii"), access_token=admin_user_tok,
         )
-        self.render(request)
         self.pump(1.0)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(

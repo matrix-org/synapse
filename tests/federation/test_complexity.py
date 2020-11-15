@@ -51,7 +51,6 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         request, channel = self.make_request(
             "GET", "/_matrix/federation/unstable/rooms/%s/complexity" % (room_1,)
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
         complexity = channel.json_body["v1"]
         self.assertTrue(complexity > 0, complexity)
@@ -64,7 +63,6 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         request, channel = self.make_request(
             "GET", "/_matrix/federation/unstable/rooms/%s/complexity" % (room_1,)
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
         complexity = channel.json_body["v1"]
         self.assertEqual(complexity, 1.23)

@@ -54,7 +54,6 @@ class TermsTestCase(unittest.HomeserverTestCase):
         # Do a UI auth request
         request_data = json.dumps({"username": "kermit", "password": "monkey"})
         request, channel = self.make_request(b"POST", self.url, request_data)
-        self.render(request)
 
         self.assertEquals(channel.result["code"], b"401", channel.result)
 
@@ -98,7 +97,6 @@ class TermsTestCase(unittest.HomeserverTestCase):
         self.registration_handler.check_username = Mock(return_value=True)
 
         request, channel = self.make_request(b"POST", self.url, request_data)
-        self.render(request)
 
         # We don't bother checking that the response is correct - we'll leave that to
         # other tests. We just want to make sure we're on the right path.
@@ -116,7 +114,6 @@ class TermsTestCase(unittest.HomeserverTestCase):
             }
         )
         request, channel = self.make_request(b"POST", self.url, request_data)
-        self.render(request)
 
         # We're interested in getting a response that looks like a successful
         # registration, not so much that the details are exactly what we want.

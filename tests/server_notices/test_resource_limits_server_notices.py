@@ -306,7 +306,6 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
         tok = self.login("user", "password")
 
         request, channel = self.make_request("GET", "/sync?timeout=0", access_token=tok)
-        self.render(request)
 
         invites = channel.json_body["rooms"]["invite"]
         self.assertEqual(len(invites), 0, invites)
@@ -320,7 +319,6 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
         # Sync again to retrieve the events in the room, so we can check whether this
         # room has a notice in it.
         request, channel = self.make_request("GET", "/sync?timeout=0", access_token=tok)
-        self.render(request)
 
         # Scan the events in the room to search for a message from the server notices
         # user.
@@ -358,7 +356,6 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
             request, channel = self.make_request(
                 "GET", "/sync?timeout=0", access_token=tok,
             )
-            self.render(request)
 
             # Also retrieves the list of invites for this user. We don't care about that
             # one except if we're processing the last user, which should have received an

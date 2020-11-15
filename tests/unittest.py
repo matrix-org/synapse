@@ -440,16 +440,6 @@ class HomeserverTestCase(TestCase):
             await_result,
         )
 
-    def render(self, request):
-        """
-        Render a request against the resources registered by the test class's
-        servlets.
-
-        Args:
-            request (synapse.http.site.SynapseRequest): The request to render.
-        """
-        pass
-
     def setup_test_homeserver(self, *args, **kwargs):
         """
         Set up the test homeserver, meant to be called by the overridable
@@ -565,7 +555,6 @@ class HomeserverTestCase(TestCase):
 
         # Create the user
         request, channel = self.make_request("GET", "/_matrix/client/r0/admin/register")
-        self.render(request)
         self.assertEqual(channel.code, 200, msg=channel.result)
         nonce = channel.json_body["nonce"]
 
@@ -593,7 +582,6 @@ class HomeserverTestCase(TestCase):
         request, channel = self.make_request(
             "POST", "/_matrix/client/r0/admin/register", body.encode("utf8")
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.json_body)
 
         user_id = channel.json_body["user_id"]
@@ -612,7 +600,6 @@ class HomeserverTestCase(TestCase):
         request, channel = self.make_request(
             "POST", "/_matrix/client/r0/login", json.dumps(body).encode("utf8")
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         access_token = channel.json_body["access_token"]
@@ -681,7 +668,6 @@ class HomeserverTestCase(TestCase):
         request, channel = self.make_request(
             "POST", "/_matrix/client/r0/login", json.dumps(body).encode("utf8")
         )
-        self.render(request)
         self.assertEqual(channel.code, 403, channel.result)
 
     def inject_room_member(self, room: str, user: str, membership: Membership) -> None:
