@@ -310,7 +310,7 @@ class RestHelper:
         """
         image_length = len(image_data)
         path = "/_matrix/media/r0/upload?filename=%s" % (filename,)
-        request, channel = make_request(
+        _, channel = make_request(
             self.hs.get_reactor(),
             FakeSite(resource),
             "POST",
@@ -319,8 +319,6 @@ class RestHelper:
             access_token=tok,
             custom_headers=[(b"Content-Length", str(image_length))],
         )
-        request.render(resource)
-        self.hs.get_reactor().pump([100])
 
         assert channel.code == expect_code, "Expected: %d, got: %d, resp: %r" % (
             expect_code,

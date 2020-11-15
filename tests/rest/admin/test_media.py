@@ -133,8 +133,6 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
             shorthand=False,
             access_token=self.admin_user_tok,
         )
-        request.render(download_resource)
-        self.pump(1.0)
 
         # Should be successful
         self.assertEqual(
@@ -172,8 +170,6 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
             shorthand=False,
             access_token=self.admin_user_tok,
         )
-        request.render(download_resource)
-        self.pump(1.0)
         self.assertEqual(
             404,
             channel.code,
@@ -548,8 +544,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             shorthand=False,
             access_token=self.admin_user_tok,
         )
-        request.render(download_resource)
-        self.pump(1.0)
 
         if expect_success:
             self.assertEqual(

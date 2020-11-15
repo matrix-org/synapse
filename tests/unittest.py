@@ -377,6 +377,7 @@ class HomeserverTestCase(TestCase):
         shorthand: bool = True,
         federation_auth_origin: str = None,
         content_is_form: bool = False,
+        await_result: bool = True,
     ) -> Tuple[SynapseRequest, FakeChannel]:
         ...
 
@@ -391,6 +392,7 @@ class HomeserverTestCase(TestCase):
         shorthand: bool = True,
         federation_auth_origin: str = None,
         content_is_form: bool = False,
+        await_result: bool = True,
     ) -> Tuple[T, FakeChannel]:
         ...
 
@@ -404,6 +406,7 @@ class HomeserverTestCase(TestCase):
         shorthand: bool = True,
         federation_auth_origin: str = None,
         content_is_form: bool = False,
+        await_result: bool = True,
     ) -> Tuple[T, FakeChannel]:
         """
         Create a SynapseRequest at the path using the method and containing the
@@ -422,6 +425,10 @@ class HomeserverTestCase(TestCase):
             content_is_form: Whether the content is URL encoded form data. Adds the
                 'Content-Type': 'application/x-www-form-urlencoded' header.
 
+            await_result: whether to wait for the request to complete rendering. If
+                 true (the default), will pump the test reactor until the the renderer
+                 tells the channel the request is finished.
+
         Returns:
             Tuple[synapse.http.site.SynapseRequest, channel]
         """
@@ -436,6 +443,7 @@ class HomeserverTestCase(TestCase):
             shorthand,
             federation_auth_origin,
             content_is_form,
+            await_result,
         )
 
     def render(self, request):

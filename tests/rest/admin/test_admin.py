@@ -231,8 +231,6 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             shorthand=False,
             access_token=admin_user_tok,
         )
-        request.render(self.download_resource)
-        self.pump(1.0)
 
         # Should be quarantined
         self.assertEqual(
@@ -301,8 +299,6 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             shorthand=False,
             access_token=non_admin_user_tok,
         )
-        request.render(self.download_resource)
-        self.pump(1.0)
 
         # Should be successful
         self.assertEqual(200, int(channel.code), msg=channel.result["body"])
@@ -478,8 +474,6 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             shorthand=False,
             access_token=non_admin_user_tok,
         )
-        request.render(self.download_resource)
-        self.pump(1.0)
 
         # Shouldn't be quarantined
         self.assertEqual(

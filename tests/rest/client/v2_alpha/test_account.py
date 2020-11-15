@@ -263,8 +263,6 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
             path,
             shorthand=False,
         )
-        request.render(self.submit_token_resource)
-        self.pump()
 
         self.assertEquals(200, channel.code, channel.result)
 
@@ -288,8 +286,6 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
             shorthand=False,
             content_is_form=True,
         )
-        request.render(self.submit_token_resource)
-        self.pump()
         self.assertEquals(200, channel.code, channel.result)
 
     def _get_link_from_email(self):

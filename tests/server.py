@@ -171,16 +171,18 @@ def make_request(
     shorthand=True,
     federation_auth_origin=None,
     content_is_form=False,
+    await_result: bool = True,
     custom_headers: Optional[
         Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
     ] = None,
 ):
     """
-    Make a web request using the given method and path, feed it the
-    content, and return the Request and the Channel underneath.
+    Make a web request using the given method, path and content, and render it
+
+    Returns the Request and the Channel underneath.
 
     Args:
-        site: The twisted Site to associate with the Channel
+        site: The twisted Site to use to render the request
 
         method (bytes/unicode): The HTTP request method ("verb").
         path (bytes/unicode): The HTTP path, suitably URL encoded (e.g.
@@ -195,6 +197,10 @@ def make_request(
             'Content-Type': 'application/x-www-form-urlencoded' header.
 
         custom_headers: (name, value) pairs to add as request headers
+
+        await_result: whether to wait for the request to complete rendering. If true,
+             will pump the reactor until the the renderer tells the channel the request
+             is finished.
 
     Returns:
         Tuple[synapse.http.site.SynapseRequest, channel]
@@ -225,11 +231,9 @@ def make_request(
     channel = FakeChannel(site, reactor)
 
     req = request(channel)
-    req.process = lambda: b""
     req.content = BytesIO(content)
     # Twisted expects to be at the end of the content when parsing the request.
     req.content.seek(SEEK_END)
-    req.postpath = list(map(unquote, path[1:].split(b"/")))
 
     if access_token:
         req.requestHeaders.addRawHeader(
@@ -257,12 +261,14 @@ def make_request(
 
     req.requestReceived(method, path, b"1.1")
 
+    if await_result:
+        channel.await_result()
+
     return req, channel
 
 
 def render(request, resource, clock):
-    request.render(resource)
-    request._channel.await_result()
+    pass
 
 
 @implementer(IReactorPluggableNameResolver)
