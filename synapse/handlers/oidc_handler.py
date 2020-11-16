@@ -35,7 +35,7 @@ from twisted.web.client import readBody
 
 from synapse.config import ConfigError
 from synapse.handlers._base import BaseHandler
-from synapse.http.server import respond_with_html
+from synapse.handlers.sso import MappingException
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
 from synapse.types import JsonDict, UserID, map_username_to_mxid_localpart
@@ -84,10 +84,6 @@ class OidcError(Exception):
         return self.error
 
 
-class MappingException(Exception):
-    """Used to catch errors when mapping the SAML2 response to a user."""
-
-
 class OidcHandler(BaseHandler):
     """Handles requests related to the OpenID Connect login flow.
     """
@@ -122,31 +118,11 @@ class OidcHandler(BaseHandler):
         self._registration_handler = hs.get_registration_handler()
         self._server_name = hs.config.server_name  # type: str
         self._macaroon_secret_key = hs.config.macaroon_secret_key
-        self._error_template = hs.config.sso_error_template
 
         # identifier for the external_ids table
         self._auth_provider_id = "oidc"
 
-    def _render_error(
-        self, request, error: str, error_description: Optional[str] = None
-    ) -> None:
-        """Render the error template and respond to the request with it.
-
-        This is used to show errors to the user. The template of this page can
-        be found under `synapse/res/templates/sso_error.html`.
-
-        Args:
-            request: The incoming request from the browser.
-                We'll respond with an HTML page describing the error.
-            error: A technical identifier for this error. Those include
-                well-known OAuth2/OIDC error types like invalid_request or
-                access_denied.
-            error_description: A human-readable description of the error.
-        """
-        html = self._error_template.render(
-            error=error, error_description=error_description
-        )
-        respond_with_html(request, 400, html)
+        self._sso_handler = hs.get_sso_handler()
 
     def _validate_metadata(self):
         """Verifies the provider metadata.
@@ -568,7 +544,7 @@ class OidcHandler(BaseHandler):
 
         Since we might want to display OIDC-related errors in a user-friendly
         way, we don't raise SynapseError from here. Instead, we call
-        ``self._render_error`` which displays an HTML page for the error.
+        ``self._sso_handler.render_error`` which displays an HTML page for the error.
 
         Most of the OpenID Connect logic happens here:
 
@@ -606,7 +582,7 @@ class OidcHandler(BaseHandler):
             if error != "access_denied":
                 logger.error("Error from the OIDC provider: %s %s", error, description)
 
-            self._render_error(request, error, description)
+            self._sso_handler.render_error(request, error, description)
             return
 
         # otherwise, it is presumably a successful response. see:
@@ -616,7 +592,9 @@ class OidcHandler(BaseHandler):
         session = request.getCookie(SESSION_COOKIE_NAME)  # type: Optional[bytes]
         if session is None:
             logger.info("No session cookie found")
-            self._render_error(request, "missing_session", "No session cookie found")
+            self._sso_handler.render_error(
+                request, "missing_session", "No session cookie found"
+            )
             return
 
         # Remove the cookie. There is a good chance that if the callback failed
@@ -634,7 +612,9 @@ class OidcHandler(BaseHandler):
         # Check for the state query parameter
         if b"state" not in request.args:
             logger.info("State parameter is missing")
-            self._render_error(request, "invalid_request", "State parameter is missing")
+            self._sso_handler.render_error(
+                request, "invalid_request", "State parameter is missing"
+            )
             return
 
         state = request.args[b"state"][0].decode()
@@ -648,17 +628,19 @@ class OidcHandler(BaseHandler):
             ) = self._verify_oidc_session_token(session, state)
         except MacaroonDeserializationException as e:
             logger.exception("Invalid session")
-            self._render_error(request, "invalid_session", str(e))
+            self._sso_handler.render_error(request, "invalid_session", str(e))
             return
         except MacaroonInvalidSignatureException as e:
             logger.exception("Could not verify session")
-            self._render_error(request, "mismatching_session", str(e))
+            self._sso_handler.render_error(request, "mismatching_session", str(e))
             return
 
         # Exchange the code with the provider
         if b"code" not in request.args:
             logger.info("Code parameter is missing")
-            self._render_error(request, "invalid_request", "Code parameter is missing")
+            self._sso_handler.render_error(
+                request, "invalid_request", "Code parameter is missing"
+            )
             return
 
         logger.debug("Exchanging code")
@@ -667,7 +649,7 @@ class OidcHandler(BaseHandler):
             token = await self._exchange_code(code)
         except OidcError as e:
             logger.exception("Could not exchange code")
-            self._render_error(request, e.error, e.error_description)
+            self._sso_handler.render_error(request, e.error, e.error_description)
             return
 
         logger.debug("Successfully obtained OAuth2 access token")
@@ -680,7 +662,7 @@ class OidcHandler(BaseHandler):
                 userinfo = await self._fetch_userinfo(token)
             except Exception as e:
                 logger.exception("Could not fetch userinfo")
-                self._render_error(request, "fetch_error", str(e))
+                self._sso_handler.render_error(request, "fetch_error", str(e))
                 return
         else:
             logger.debug("Extracting userinfo from id_token")
@@ -688,7 +670,7 @@ class OidcHandler(BaseHandler):
                 userinfo = await self._parse_id_token(token, nonce=nonce)
             except Exception as e:
                 logger.exception("Invalid id_token")
-                self._render_error(request, "invalid_token", str(e))
+                self._sso_handler.render_error(request, "invalid_token", str(e))
                 return
 
         # Pull out the user-agent and IP from the request.
@@ -702,7 +684,7 @@ class OidcHandler(BaseHandler):
             )
         except MappingException as e:
             logger.exception("Could not map user")
-            self._render_error(request, "mapping_error", str(e))
+            self._sso_handler.render_error(request, "mapping_error", str(e))
             return
 
         # Mapping providers might not have get_extra_attributes: only call this

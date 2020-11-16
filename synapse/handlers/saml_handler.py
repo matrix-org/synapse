@@ -25,7 +25,7 @@ from synapse.api.errors import SynapseError
 from synapse.config import ConfigError
 from synapse.config.saml2_config import SamlAttributeRequirement
 from synapse.handlers._base import BaseHandler
-from synapse.http.server import respond_with_html
+from synapse.handlers.sso import MappingException
 from synapse.http.servlet import parse_string
 from synapse.http.site import SynapseRequest
 from synapse.module_api import ModuleApi
@@ -41,10 +41,6 @@ if TYPE_CHECKING:
     import synapse.server
 
 logger = logging.getLogger(__name__)
-
-
-class MappingException(Exception):
-    """Used to catch errors when mapping the SAML2 response to a user."""
 
 
 @attr.s(slots=True)
@@ -87,24 +83,7 @@ class SamlHandler(BaseHandler):
         # a lock on the mappings
         self._mapping_lock = Linearizer(name="saml_mapping", clock=self.clock)
 
-    def _render_error(
-        self, request, error: str, error_description: Optional[str] = None
-    ) -> None:
-        """Render the error template and respond to the request with it.
-
-        This is used to show errors to the user. The template of this page can
-        be found under `synapse/res/templates/sso_error.html`.
-
-        Args:
-            request: The incoming request from the browser.
-                We'll respond with an HTML page describing the error.
-            error: A technical identifier for this error.
-            error_description: A human-readable description of the error.
-        """
-        html = self._error_template.render(
-            error=error, error_description=error_description
-        )
-        respond_with_html(request, 400, html)
+        self._sso_handler = hs.get_sso_handler()
 
     def handle_redirect_request(
         self, client_redirect_url: bytes, ui_auth_session_id: Optional[str] = None
@@ -168,12 +147,12 @@ class SamlHandler(BaseHandler):
             # in the (user-visible) exception message, so let's log the exception here
             # so we can track down the session IDs later.
             logger.warning(str(e))
-            self._render_error(
+            self._sso_handler.render_error(
                 request, "unsolicited_response", "Unexpected SAML2 login."
             )
             return
         except Exception as e:
-            self._render_error(
+            self._sso_handler.render_error(
                 request,
                 "invalid_response",
                 "Unable to parse SAML2 response: %s." % (e,),
@@ -181,7 +160,7 @@ class SamlHandler(BaseHandler):
             return
 
         if saml2_auth.not_signed:
-            self._render_error(
+            self._sso_handler.render_error(
                 request, "unsigned_respond", "SAML2 response was not signed."
             )
             return
@@ -207,7 +186,7 @@ class SamlHandler(BaseHandler):
         # attributes.
         for requirement in self._saml2_attribute_requirements:
             if not _check_attribute_requirement(saml2_auth.ava, requirement):
-                self._render_error(
+                self._sso_handler.render_error(
                     request, "unauthorised", "You are not authorised to log in here."
                 )
                 return
@@ -223,7 +202,7 @@ class SamlHandler(BaseHandler):
             )
         except MappingException as e:
             logger.exception("Could not map user")
-            self._render_error(request, "mapping_error", str(e))
+            self._sso_handler.render_error(request, "mapping_error", str(e))
             return
 
         # Complete the interactive auth session or the login.
