@@ -23,6 +23,7 @@ from synapse.rest.client.v1 import login, profile, room
 from synapse.rest.media.v1.filepath import MediaFilePaths
 
 from tests import unittest
+from tests.server import FakeSite, make_request
 
 
 class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
@@ -124,7 +125,9 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         self.assertEqual(server_name, self.server_name)
 
         # Attempt to access media
-        request, channel = self.make_request(
+        request, channel = make_request(
+            self.reactor,
+            FakeSite(download_resource),
             "GET",
             server_and_media_id,
             shorthand=False,
@@ -161,7 +164,9 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         )
 
         # Attempt to access media
-        request, channel = self.make_request(
+        request, channel = make_request(
+            self.reactor,
+            FakeSite(download_resource),
             "GET",
             server_and_media_id,
             shorthand=False,
@@ -535,7 +540,9 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         media_id = server_and_media_id.split("/")[1]
         local_path = self.filepaths.local_media_filepath(media_id)
 
-        request, channel = self.make_request(
+        request, channel = make_request(
+            self.reactor,
+            FakeSite(download_resource),
             "GET",
             server_and_media_id,
             shorthand=False,
