@@ -414,6 +414,7 @@ class ClientIpAuthTestCase(unittest.HomeserverTestCase):
 
         request, channel = make_request(
             self.reactor,
+            self.site,
             "GET",
             "/_matrix/client/r0/admin/users/" + self.user_id,
             access_token=access_token,
