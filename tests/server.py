@@ -2,7 +2,7 @@ import json
 import logging
 from collections import deque
 from io import SEEK_END, BytesIO
-from typing import Callable
+from typing import Callable, Iterable, Optional, Tuple, Union
 
 import attr
 from typing_extensions import Deque
@@ -139,6 +139,9 @@ def make_request(
     shorthand=True,
     federation_auth_origin=None,
     content_is_form=False,
+    custom_headers: Optional[
+        Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
+    ] = None,
 ):
     """
     Make a web request using the given method and path, feed it the
@@ -156,6 +159,8 @@ def make_request(
             Authorization header pretenting to be the given server name.
         content_is_form: Whether the content is URL encoded form data. Adds the
             'Content-Type': 'application/x-www-form-urlencoded' header.
+
+        custom_headers: (name, value) pairs to add as request headers
 
     Returns:
         Tuple[synapse.http.site.SynapseRequest, channel]
@@ -210,6 +215,10 @@ def make_request(
         else:
             # Assume the body is JSON
             req.requestHeaders.addRawHeader(b"Content-Type", b"application/json")
+
+    if custom_headers:
+        for k, v in custom_headers:
+            req.requestHeaders.addRawHeader(k, v)
 
     req.requestReceived(method, path, b"1.1")
 
