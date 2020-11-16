@@ -865,11 +865,11 @@ class OidcHandler(BaseHandler):
         remote_user_id = str(remote_user_id)
 
         # first of all, check if we already have a mapping for this user
-        registered_user_id = await self._sso_handler.get_sso_user_by_remote_user_id(
+        previously_registered_user_id = await self._sso_handler.get_sso_user_by_remote_user_id(
             self._auth_provider_id, remote_user_id,
         )
-        if registered_user_id:
-            return registered_user_id
+        if previously_registered_user_id:
+            return previously_registered_user_id
 
         # Otherwise, generate a new user.
         try:

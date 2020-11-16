@@ -392,7 +392,7 @@ class HomeServer(metaclass=abc.ABCMeta):
             return FollowerTypingHandler(self)
 
     @cache_in_self
-    def get_sso_handler(self):
+    def get_sso_handler(self) -> SsoHandler:
         return SsoHandler(self)
 
     @cache_in_self
