@@ -117,6 +117,25 @@ class FakeChannel:
     def transport(self):
         return self
 
+    def await_result(self, timeout: int = 100) -> None:
+        """
+        Wait until the request is finished.
+        """
+        self._reactor.run()
+        x = 0
+
+        while not self.result.get("done"):
+            # If there's a producer, tell it to resume producing so we get content
+            if self._producer:
+                self._producer.resumeProducing()
+
+            x += 1
+
+            if x > timeout:
+                raise TimedOutException("Timed out waiting for request to finish.")
+
+            self._reactor.advance(0.1)
+
 
 class FakeSite:
     """
@@ -225,30 +244,9 @@ def make_request(
     return req, channel
 
 
-def wait_until_result(clock, request, timeout=100):
-    """
-    Wait until the request is finished.
-    """
-    clock.run()
-    x = 0
-
-    while not request.finished:
-
-        # If there's a producer, tell it to resume producing so we get content
-        if request._channel._producer:
-            request._channel._producer.resumeProducing()
-
-        x += 1
-
-        if x > timeout:
-            raise TimedOutException("Timed out waiting for request to finish.")
-
-        clock.advance(0.1)
-
-
 def render(request, resource, clock):
     request.render(resource)
-    wait_until_result(clock, request)
+    request._channel.await_result()
 
 
 @implementer(IReactorPluggableNameResolver)
