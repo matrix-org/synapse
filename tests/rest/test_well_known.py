@@ -20,11 +20,9 @@ from tests import unittest
 
 
 class WellKnownTests(unittest.HomeserverTestCase):
-    def setUp(self):
-        super().setUp()
-
+    def create_test_resource(self):
         # replace the JsonResource with a WellKnownResource
-        self.resource = WellKnownResource(self.hs)
+        return WellKnownResource(self.hs)
 
     def test_well_known(self):
         self.hs.config.public_baseurl = "https://tesths"
