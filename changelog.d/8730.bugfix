@@ -1,1 +1,0 @@
-Fix port script to correctly handle foreign key constraints. Broke in v1.21.0.

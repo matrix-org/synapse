@@ -41,7 +41,7 @@ class BaseRemoteKeyResourceTestCase(unittest.HomeserverTestCase):
         self.http_client = Mock()
         return self.setup_test_homeserver(http_client=self.http_client)
 
-    def create_test_json_resource(self):
+    def create_test_resource(self):
         return create_resource_tree(
             {"/_matrix/key/v2": KeyApiV2Resource(self.hs)}, root_resource=NoResource()
         )

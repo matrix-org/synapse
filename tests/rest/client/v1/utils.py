@@ -317,9 +317,7 @@ class RestHelper:
             path,
             content=image_data,
             access_token=tok,
-        )
-        request.requestHeaders.addRawHeader(
-            b"Content-Length", str(image_length).encode("UTF-8")
+            custom_headers=[(b"Content-Length", str(image_length))],
         )
         request.render(resource)
         self.hs.get_reactor().pump([100])

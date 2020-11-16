@@ -36,7 +36,7 @@ from tests.server import FakeSite, make_request
 class VersionTestCase(unittest.HomeserverTestCase):
     url = "/_synapse/admin/v1/server_version"
 
-    def create_test_json_resource(self):
+    def create_test_resource(self):
         resource = JsonResource(self.hs)
         VersionServlet(self.hs).register(resource)
         return resource
