@@ -754,10 +754,6 @@ class OidcHandlerTestCase(HomeserverTestCase):
             store.register_user(user_id=user2.to_string(), password_hash=None)
         )
 
-        userinfo = {
-            "sub": "test2",
-            "username": "test_user_2",
-        }
         mxid = self.get_success(
             self.handler._map_userinfo_to_user(
                 userinfo, token, "user-agent", "10.10.10.10"
