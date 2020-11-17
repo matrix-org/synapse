@@ -70,6 +70,15 @@ A custom mapping provider must specify the following methods:
                      information from.
       - `token` - A dictionary which includes information necessary to make
                   further requests to the OpenID provider.
+      - `failures` - An `int` that represents the amount of times the returned
+                     mxid localpart mapping has failed.  This should be used
+                     to create a deduplicated mxid localpart which should be
+                     returned instead. For example, if this method returns
+                     `john.doe` as the value of `localpart` in the returned
+                     dict, and that is already taken on the homeserver, this
+                     method will be called again with the same parameters but
+                     with failures=1. The method should then return a different
+                     `localpart` value, such as `john.doe1`.
     - Returns a dictionary with two keys:
       - localpart: A required string, used to generate the Matrix ID.
       - displayname: An optional string, the display name for the user.

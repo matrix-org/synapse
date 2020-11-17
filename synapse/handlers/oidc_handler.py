@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import inspect
 import logging
 from typing import TYPE_CHECKING, Dict, Generic, List, Optional, Tuple, TypeVar
 from urllib.parse import urlencode
@@ -92,6 +93,9 @@ class OidcError(Exception):
 class OidcHandler(BaseHandler):
     """Handles requests related to the OpenID Connect login flow.
     """
+
+    # The number of attempts to ask the mapping provider for when generating an MXID.
+    _MAP_USERNAME_RETRIES = 1000
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
@@ -876,56 +880,82 @@ class OidcHandler(BaseHandler):
         if previously_registered_user_id:
             return previously_registered_user_id
 
-        # Otherwise, generate a new user.
-        try:
-            attributes = await self._user_mapping_provider.map_user_attributes(
-                userinfo, token
-            )
-        except Exception as e:
-            raise MappingException(
-                "Could not extract user attributes from OIDC response: " + str(e)
-            )
-
-        logger.debug(
-            "Retrieved user attributes from user mapping provider: %r", attributes
+        # Older mapping providers don't accept the `failures` argument, so we
+        # try and detect support.
+        mapper_args = inspect.getfullargspec(
+            self._user_mapping_provider.map_user_attributes
         )
+        supports_failures = "failures" in mapper_args.args
 
-        localpart = attributes["localpart"]
-        if not localpart:
-            raise MappingException(
-                "Error parsing OIDC response: OIDC mapping provider plugin "
-                "did not return a localpart value"
+        # Otherwise, generate a new user.
+        for i in range(self._MAP_USERNAME_RETRIES):
+            try:
+                if supports_failures:
+                    attributes = await self._user_mapping_provider.map_user_attributes(
+                        userinfo, token, i
+                    )
+                else:
+                    attributes = await self._user_mapping_provider.map_user_attributes(  # type: ignore
+                        userinfo, token
+                    )
+            except Exception as e:
+                raise MappingException(
+                    "Could not extract user attributes from OIDC response: " + str(e)
+                )
+
+            logger.debug(
+                "Retrieved user attributes from user mapping provider: %r", attributes
             )
 
-        user_id = UserID(localpart, self.server_name).to_string()
-        users = await self.store.get_users_by_id_case_insensitive(user_id)
-        if users:
-            if self._allow_existing_users:
-                if len(users) == 1:
-                    registered_user_id = next(iter(users))
-                elif user_id in users:
-                    registered_user_id = user_id
-                else:
-                    raise MappingException(
-                        "Attempted to login as '{}' but it matches more than one user inexactly: {}".format(
-                            user_id, list(users.keys())
-                        )
-                    )
-            else:
-                # This mxid is taken
-                raise MappingException("mxid '{}' is already taken".format(user_id))
-        else:
-            # Since the localpart is provided via a potentially untrusted module,
-            # ensure the MXID is valid before registering.
-            if contains_invalid_mxid_characters(localpart):
-                raise MappingException("localpart is invalid: %s" % (localpart,))
+            localpart = attributes["localpart"]
+            if not localpart:
+                raise MappingException(
+                    "Error parsing OIDC response: OIDC mapping provider plugin "
+                    "did not return a localpart value"
+                )
 
-            # It's the first time this user is logging in and the mapped mxid was
-            # not taken, register the user
-            registered_user_id = await self._registration_handler.register_user(
-                localpart=localpart,
-                default_display_name=attributes["display_name"],
-                user_agent_ips=(user_agent, ip_address),
+            user_id = UserID(localpart, self.server_name).to_string()
+            users = await self.store.get_users_by_id_case_insensitive(user_id)
+            if users:
+                if self._allow_existing_users:
+                    if len(users) == 1:
+                        registered_user_id = next(iter(users))
+                        break
+                    elif user_id in users:
+                        registered_user_id = user_id
+                        break
+                    else:
+                        raise MappingException(
+                            "Attempted to login as '{}' but it matches more than one user inexactly: {}".format(
+                                user_id, list(users.keys())
+                            )
+                        )
+                else:
+                    # This mxid is taken
+                    if not supports_failures:
+                        raise MappingException(
+                            "mxid '{}' is already taken".format(user_id)
+                        )
+            else:
+                # Since the localpart is provided via a potentially untrusted module,
+                # ensure the MXID is valid before registering.
+                if contains_invalid_mxid_characters(localpart):
+                    raise MappingException("localpart is invalid: %s" % (localpart,))
+
+                # It's the first time this user is logging in and the mapped mxid was
+                # not taken, register the user
+                registered_user_id = await self._registration_handler.register_user(
+                    localpart=localpart,
+                    default_display_name=attributes["display_name"],
+                    user_agent_ips=(user_agent, ip_address),
+                )
+                break
+
+        else:
+            # Unable to generate a username in 1000 iterations
+            # Break and return error to the user
+            raise MappingException(
+                "Unable to generate a Matrix ID from the OpenID response"
             )
 
         await self.store.record_user_external_id(
@@ -978,13 +1008,15 @@ class OidcMappingProvider(Generic[C]):
         raise NotImplementedError()
 
     async def map_user_attributes(
-        self, userinfo: UserInfo, token: Token
+        self, userinfo: UserInfo, token: Token, failures: int
     ) -> UserAttribute:
         """Map a `UserInfo` object into user attributes.
 
         Args:
             userinfo: An object representing the user given by the OIDC provider
             token: A dict with the tokens returned by the provider
+            failures: How many times a call to this function with this
+                UserInfo has resulted in a failure.
 
         Returns:
             A dict containing the ``localpart`` and (optionally) the ``display_name``
@@ -1084,7 +1116,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         return userinfo[self._config.subject_claim]
 
     async def map_user_attributes(
-        self, userinfo: UserInfo, token: Token
+        self, userinfo: UserInfo, token: Token, failures: int
     ) -> UserAttribute:
         localpart = self._config.localpart_template.render(user=userinfo).strip()
 
