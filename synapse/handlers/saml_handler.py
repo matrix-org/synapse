@@ -266,11 +266,6 @@ class SamlHandler(BaseHandler):
                 user_id = UserID(
                     map_username_to_mxid_localpart(attrval), self.server_name
                 ).to_string()
-                logger.info(
-                    "Looking for existing account based on mapped %s %s",
-                    self._grandfathered_mxid_source_attribute,
-                    user_id,
-                )
 
                 users = await self.store.get_users_by_id_case_insensitive(user_id)
                 if users:
@@ -317,7 +312,7 @@ class SamlHandler(BaseHandler):
                     "Unable to generate a Matrix ID from the SAML response"
                 )
 
-            logger.info("Mapped SAML user to local part %s", localpart)
+            logger.debug("Mapped SAML user to local part %s", localpart)
             registered_user_id = await self._registration_handler.register_user(
                 localpart=localpart,
                 default_display_name=displayname,

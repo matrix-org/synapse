@@ -72,18 +72,18 @@ class SsoHandler(BaseHandler):
             The mxid of a previously seen user.
         """
         # Check if we already have a mapping for this user.
-        logger.info(
-            "Looking for existing mapping for user %s:%s",
-            auth_provider_id,
-            remote_user_id,
-        )
         previously_registered_user_id = await self.store.get_user_by_external_id(
             auth_provider_id, remote_user_id,
         )
 
         # A match was found, return the user ID.
         if previously_registered_user_id is not None:
-            logger.info("Found existing mapping %s", previously_registered_user_id)
+            logger.info(
+                "Found existing mapping for IdP '%s' and remote_user_id '%s': %s",
+                auth_provider_id,
+                remote_user_id,
+                previously_registered_user_id,
+            )
             return previously_registered_user_id
 
         # No match.
