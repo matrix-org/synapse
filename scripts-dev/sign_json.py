@@ -30,7 +30,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="""Adds a signature to a JSON object.
 
-Example usage: 
+Example usage:
 
     $ scripts-dev/sign_json.py -N test -k localhost.signing.key "{}"
     {"signatures":{"test":{"ed25519:a_ZnZh":"LmPnml6iM0iR..."}}}
