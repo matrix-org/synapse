@@ -1,0 +1,1 @@
+Fix a dependency versioning bug in the Dockerfile that prevented Synapse from starting.
