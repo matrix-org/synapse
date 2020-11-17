@@ -736,9 +736,10 @@ class OidcHandlerTestCase(HomeserverTestCase):
             ),
             MappingException,
         )
-        self.assertEqual(
-            str(e.value),
-            "Attempted to login as '@TEST_USER_2:test' but it matches more than one user inexactly: ['@TEST_user_2:test', '@test_USER_2:test']",
+        self.assertTrue(
+            str(e.value).startswith(
+                "Attempted to login as '@TEST_USER_2:test' but it matches more than one user inexactly:"
+            )
         )
 
         # Logging in when matching a name exactly should work.
