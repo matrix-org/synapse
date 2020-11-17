@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import json
 from urllib.parse import parse_qs, urlparse
 
@@ -24,12 +23,8 @@ import pymacaroons
 from twisted.python.failure import Failure
 from twisted.web._newclient import ResponseDone
 
-from synapse.handlers.oidc_handler import (
-    MappingException,
-    OidcError,
-    OidcHandler,
-    OidcMappingProvider,
-)
+from synapse.handlers.oidc_handler import OidcError, OidcHandler, OidcMappingProvider
+from synapse.handlers.sso import MappingException
 from synapse.types import UserID
 
 from tests.unittest import HomeserverTestCase, override_config
@@ -132,14 +127,13 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         config = self.default_config()
         config["public_baseurl"] = BASE_URL
-        oidc_config = {}
-        oidc_config["enabled"] = True
-        oidc_config["client_id"] = CLIENT_ID
-        oidc_config["client_secret"] = CLIENT_SECRET
-        oidc_config["issuer"] = ISSUER
-        oidc_config["scopes"] = SCOPES
-        oidc_config["user_mapping_provider"] = {
-            "module": __name__ + ".TestMappingProvider",
+        oidc_config = {
+            "enabled": True,
+            "client_id": CLIENT_ID,
+            "client_secret": CLIENT_SECRET,
+            "issuer": ISSUER,
+            "scopes": SCOPES,
+            "user_mapping_provider": {"module": __name__ + ".TestMappingProvider"},
         }
 
         # Update this config with what's in the default config so that
