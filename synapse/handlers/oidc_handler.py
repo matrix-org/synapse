@@ -38,7 +38,7 @@ from synapse.handlers._base import BaseHandler
 from synapse.handlers.sso import MappingException
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
-from synapse.types import JsonDict, UserID, map_username_to_mxid_localpart
+from synapse.types import JsonDict, UserID
 from synapse.util import json_decoder
 
 if TYPE_CHECKING:
@@ -885,10 +885,9 @@ class OidcHandler(BaseHandler):
             "Retrieved user attributes from user mapping provider: %r", attributes
         )
 
-        if not attributes["localpart"]:
+        localpart = attributes["localpart"]
+        if not localpart:
             raise MappingException("localpart is empty")
-
-        localpart = map_username_to_mxid_localpart(attributes["localpart"])
 
         user_id = UserID(localpart, self.server_name).to_string()
         users = await self.store.get_users_by_id_case_insensitive(user_id)

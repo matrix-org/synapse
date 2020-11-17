@@ -705,13 +705,13 @@ class OidcHandlerTestCase(HomeserverTestCase):
     def test_map_userinfo_to_existing_user(self):
         """Existing users can log in with OpenID Connect when allow_existing_users is True."""
         store = self.hs.get_datastore()
-        user4 = UserID.from_string("@test_user_4:test")
+        user = UserID.from_string("@test_user:test")
         self.get_success(
-            store.register_user(user_id=user4.to_string(), password_hash=None)
+            store.register_user(user_id=user.to_string(), password_hash=None)
         )
         userinfo = {
-            "sub": "test4",
-            "username": "test_user_4",
+            "sub": "test",
+            "username": "test_user",
         }
         token = {}
         mxid = self.get_success(
@@ -719,4 +719,42 @@ class OidcHandlerTestCase(HomeserverTestCase):
                 userinfo, token, "user-agent", "10.10.10.10"
             )
         )
-        self.assertEqual(mxid, "@test_user_4:test")
+        self.assertEqual(mxid, "@test_user:test")
+
+        # Register some non-exact matching cases.
+        user2 = UserID.from_string("@test_user_2:test")
+        self.get_success(
+            store.register_user(user_id=user2.to_string(), password_hash=None)
+        )
+        user2_caps = UserID.from_string("@TEST_USER_2:test")
+        self.get_success(
+            store.register_user(user_id=user2_caps.to_string(), password_hash=None)
+        )
+
+        # Attempting to login without matching a name exactly is an error.
+        userinfo = {
+            "sub": "test2",
+            "username": "test_USER_2",
+        }
+        e = self.get_failure(
+            self.handler._map_userinfo_to_user(
+                userinfo, token, "user-agent", "10.10.10.10"
+            ),
+            MappingException,
+        )
+        self.assertEqual(
+            str(e.value),
+            "Attempted to login as '@test_USER_2:test' but it matches more than one user inexactly: ['@test_user_2:test', '@TEST_USER_2:test']",
+        )
+
+        # Logging in when matching a name exactly should work.
+        userinfo = {
+            "sub": "test2",
+            "username": "test_user_2",
+        }
+        mxid = self.get_success(
+            self.handler._map_userinfo_to_user(
+                userinfo, token, "user-agent", "10.10.10.10"
+            )
+        )
+        self.assertEqual(mxid, "@test_user_2:test")
