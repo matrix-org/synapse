@@ -1,0 +1,1 @@
+Use `TYPE_CHECKING` instead of magic `MYPY` variable.
