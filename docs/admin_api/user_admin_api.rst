@@ -254,7 +254,7 @@ with a body of:
 
    {
        "new_password": "<secret>",
-       "logout_devices": true,
+       "logout_devices": true
    }
 
 To use it, you will need to authenticate by providing an ``access_token`` for a
