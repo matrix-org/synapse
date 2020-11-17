@@ -530,7 +530,7 @@ class EventsWorkerStore(SQLBaseStore):
         self,
         context: EventContext,
         state_types_to_include: List[EventTypes],
-        membership_user_id: Optional[str],
+        membership_user_id: Optional[str] = None,
     ) -> List[JsonDict]:
         """
         Retrieve the stripped state from a room, given an event context to retrieve state

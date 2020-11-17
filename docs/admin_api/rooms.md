@@ -265,11 +265,9 @@ Response:
 Once the `next_token` parameter is no longer present, we know we've reached the
 end of the list.
 
-# DRAFT: Room Details API
+# Room Details API
 
 The Room Details admin API allows server admins to get all details of a room.
-
-This API is still a draft and details might change!
 
 The following fields are possible in the JSON response body:
 

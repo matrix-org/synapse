@@ -205,7 +205,7 @@ GitHub is a bit special as it is not an OpenID Connect compliant provider, but
 just a regular OAuth2 provider.
 
 The [`/user` API endpoint](https://developer.github.com/v3/users/#get-the-authenticated-user)
-can be used to retrieve information on the authenticated user. As the Synaspse
+can be used to retrieve information on the authenticated user. As the Synapse
 login mechanism needs an attribute to uniquely identify users, and that endpoint
 does not return a `sub` property, an alternative `subject_claim` has to be set.
 

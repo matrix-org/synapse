@@ -216,10 +216,8 @@ class SAML2Config(Config):
         return """\
         ## Single sign-on integration ##
 
-        # Enable SAML2 for registration and login. Uses pysaml2.
-        #
-        # At least one of `sp_config` or `config_path` must be set in this section to
-        # enable SAML login.
+        # The following settings can be used to make Synapse use a single sign-on
+        # provider for authentication, instead of its internal password database.
         #
         # You will probably also want to set the following options to `false` to
         # disable the regular login/registration flows:
@@ -228,6 +226,11 @@ class SAML2Config(Config):
         #
         # You will also want to investigate the settings under the "sso" configuration
         # section below.
+
+        # Enable SAML2 for registration and login. Uses pysaml2.
+        #
+        # At least one of `sp_config` or `config_path` must be set in this section to
+        # enable SAML login.
         #
         # Once SAML support is enabled, a metadata file will be exposed at
         # https://<server>:<port>/_matrix/saml2/metadata.xml, which you may be able to
@@ -243,40 +246,64 @@ class SAML2Config(Config):
           # so it is not normally necessary to specify them unless you need to
           # override them.
           #
-          #sp_config:
-          #  # point this to the IdP's metadata. You can use either a local file or
-          #  # (preferably) a URL.
-          #  metadata:
-          #    #local: ["saml2/idp.xml"]
-          #    remote:
-          #      - url: https://our_idp/metadata.xml
-          #
-          #  # By default, the user has to go to our login page first. If you'd like
-          #  # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
-          #  # 'service.sp' section:
-          #  #
-          #  #service:
-          #  #  sp:
-          #  #    allow_unsolicited: true
-          #
-          #  # The examples below are just used to generate our metadata xml, and you
-          #  # may well not need them, depending on your setup. Alternatively you
-          #  # may need a whole lot more detail - see the pysaml2 docs!
-          #
-          #  description: ["My awesome SP", "en"]
-          #  name: ["Test SP", "en"]
-          #
-          #  organization:
-          #    name: Example com
-          #    display_name:
-          #      - ["Example co", "en"]
-          #    url: "http://example.com"
-          #
-          #  contact_person:
-          #    - given_name: Bob
-          #      sur_name: "the Sysadmin"
-          #      email_address": ["admin@example.com"]
-          #      contact_type": technical
+          sp_config:
+            # Point this to the IdP's metadata. You must provide either a local
+            # file via the `local` attribute or (preferably) a URL via the
+            # `remote` attribute.
+            #
+            #metadata:
+            #  local: ["saml2/idp.xml"]
+            #  remote:
+            #    - url: https://our_idp/metadata.xml
+
+            # By default, the user has to go to our login page first. If you'd like
+            # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
+            # 'service.sp' section:
+            #
+            #service:
+            #  sp:
+            #    allow_unsolicited: true
+
+            # The examples below are just used to generate our metadata xml, and you
+            # may well not need them, depending on your setup. Alternatively you
+            # may need a whole lot more detail - see the pysaml2 docs!
+
+            #description: ["My awesome SP", "en"]
+            #name: ["Test SP", "en"]
+
+            #ui_info:
+            #  display_name:
+            #    - lang: en
+            #      text: "Display Name is the descriptive name of your service."
+            #  description:
+            #    - lang: en
+            #      text: "Description should be a short paragraph explaining the purpose of the service."
+            #  information_url:
+            #    - lang: en
+            #      text: "https://example.com/terms-of-service"
+            #  privacy_statement_url:
+            #    - lang: en
+            #      text: "https://example.com/privacy-policy"
+            #  keywords:
+            #    - lang: en
+            #      text: ["Matrix", "Element"]
+            #  logo:
+            #    - lang: en
+            #      text: "https://example.com/logo.svg"
+            #      width: "200"
+            #      height: "80"
+
+            #organization:
+            #  name: Example com
+            #  display_name:
+            #    - ["Example co", "en"]
+            #  url: "http://example.com"
+
+            #contact_person:
+            #  - given_name: Bob
+            #    sur_name: "the Sysadmin"
+            #    email_address": ["admin@example.com"]
+            #    contact_type": technical
 
           # Instead of putting the config inline as above, you can specify a
           # separate pysaml2 configuration file:

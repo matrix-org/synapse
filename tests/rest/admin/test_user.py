@@ -24,7 +24,7 @@ from mock import Mock
 import synapse.rest.admin
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, HttpResponseException, ResourceLimitError
-from synapse.rest.client.v1 import login, logout, room
+from synapse.rest.client.v1 import login, logout, profile, room
 from synapse.rest.client.v2_alpha import devices, sync
 
 from tests import unittest
@@ -34,7 +34,10 @@ from tests.unittest import override_config
 
 class UserRegisterTestCase(unittest.HomeserverTestCase):
 
-    servlets = [synapse.rest.admin.register_servlets_for_client_rest_resource]
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        profile.register_servlets,
+    ]
 
     def make_homeserver(self, reactor, clock):
 
@@ -324,6 +327,120 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("Invalid user type", channel.json_body["error"])
+
+    def test_displayname(self):
+        """
+        Test that displayname of new user is set
+        """
+
+        # set no displayname
+        request, channel = self.make_request("GET", self.url)
+        self.render(request)
+        nonce = channel.json_body["nonce"]
+
+        want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
+        want_mac.update(nonce.encode("ascii") + b"\x00bob1\x00abc123\x00notadmin")
+        want_mac = want_mac.hexdigest()
+
+        body = json.dumps(
+            {"nonce": nonce, "username": "bob1", "password": "abc123", "mac": want_mac}
+        )
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob1:test", channel.json_body["user_id"])
+
+        request, channel = self.make_request("GET", "/profile/@bob1:test/displayname")
+        self.render(request)
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("bob1", channel.json_body["displayname"])
+
+        # displayname is None
+        request, channel = self.make_request("GET", self.url)
+        self.render(request)
+        nonce = channel.json_body["nonce"]
+
+        want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
+        want_mac.update(nonce.encode("ascii") + b"\x00bob2\x00abc123\x00notadmin")
+        want_mac = want_mac.hexdigest()
+
+        body = json.dumps(
+            {
+                "nonce": nonce,
+                "username": "bob2",
+                "displayname": None,
+                "password": "abc123",
+                "mac": want_mac,
+            }
+        )
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob2:test", channel.json_body["user_id"])
+
+        request, channel = self.make_request("GET", "/profile/@bob2:test/displayname")
+        self.render(request)
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("bob2", channel.json_body["displayname"])
+
+        # displayname is empty
+        request, channel = self.make_request("GET", self.url)
+        self.render(request)
+        nonce = channel.json_body["nonce"]
+
+        want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
+        want_mac.update(nonce.encode("ascii") + b"\x00bob3\x00abc123\x00notadmin")
+        want_mac = want_mac.hexdigest()
+
+        body = json.dumps(
+            {
+                "nonce": nonce,
+                "username": "bob3",
+                "displayname": "",
+                "password": "abc123",
+                "mac": want_mac,
+            }
+        )
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob3:test", channel.json_body["user_id"])
+
+        request, channel = self.make_request("GET", "/profile/@bob3:test/displayname")
+        self.render(request)
+        self.assertEqual(404, int(channel.result["code"]), msg=channel.result["body"])
+
+        # set displayname
+        request, channel = self.make_request("GET", self.url)
+        self.render(request)
+        nonce = channel.json_body["nonce"]
+
+        want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
+        want_mac.update(nonce.encode("ascii") + b"\x00bob4\x00abc123\x00notadmin")
+        want_mac = want_mac.hexdigest()
+
+        body = json.dumps(
+            {
+                "nonce": nonce,
+                "username": "bob4",
+                "displayname": "Bob's Name",
+                "password": "abc123",
+                "mac": want_mac,
+            }
+        )
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob4:test", channel.json_body["user_id"])
+
+        request, channel = self.make_request("GET", "/profile/@bob4:test/displayname")
+        self.render(request)
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("Bob's Name", channel.json_body["displayname"])
 
     @override_config(
         {"limit_usage_by_mau": True, "max_mau_value": 2, "mau_trial_days": 0}

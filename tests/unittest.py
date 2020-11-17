@@ -30,6 +30,7 @@ from twisted.internet.defer import Deferred, ensureDeferred, succeed
 from twisted.python.failure import Failure
 from twisted.python.threadpool import ThreadPool
 from twisted.trial import unittest
+from twisted.web.resource import Resource
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.config.homeserver import HomeServerConfig
@@ -54,7 +55,7 @@ from tests.server import (
     render,
     setup_test_homeserver,
 )
-from tests.test_utils import event_injection
+from tests.test_utils import event_injection, setup_awaitable_errors
 from tests.test_utils.logging_setup import setup_logging
 from tests.utils import default_config, setupdb
 
@@ -118,6 +119,10 @@ class TestCase(unittest.TestCase):
                     return ret
 
                 logging.getLogger().setLevel(level)
+
+            # Trial messes with the warnings configuration, thus this has to be
+            # done in the context of an individual TestCase.
+            self.addCleanup(setup_awaitable_errors())
 
             return orig()
 
@@ -235,10 +240,8 @@ class HomeserverTestCase(TestCase):
         if not isinstance(self.hs, HomeServer):
             raise Exception("A homeserver wasn't returned, but %r" % (self.hs,))
 
-        # Register the resources
-        self.resource = self.create_test_json_resource()
-
-        # create a site to wrap the resource.
+        # create the root resource, and a site to wrap it.
+        self.resource = self.create_test_resource()
         self.site = SynapseSite(
             logger_name="synapse.access.http.fake",
             site_tag=self.hs.config.server.server_name,
@@ -249,7 +252,7 @@ class HomeserverTestCase(TestCase):
 
         from tests.rest.client.v1.utils import RestHelper
 
-        self.helper = RestHelper(self.hs, self.resource, getattr(self, "user_id", None))
+        self.helper = RestHelper(self.hs, self.site, getattr(self, "user_id", None))
 
         if hasattr(self, "user_id"):
             if self.hijack_auth:
@@ -319,15 +322,12 @@ class HomeserverTestCase(TestCase):
         hs = self.setup_test_homeserver()
         return hs
 
-    def create_test_json_resource(self):
+    def create_test_resource(self) -> Resource:
         """
-        Create a test JsonResource, with the relevant servlets registerd to it
+        Create a the root resource for the test server.
 
-        The default implementation calls each function in `servlets` to do the
-        registration.
-
-        Returns:
-            JsonResource:
+        The default implementation creates a JsonResource and calls each function in
+        `servlets` to register servletes against it
         """
         resource = JsonResource(self.hs)
 
@@ -425,11 +425,9 @@ class HomeserverTestCase(TestCase):
         Returns:
             Tuple[synapse.http.site.SynapseRequest, channel]
         """
-        if isinstance(content, dict):
-            content = json.dumps(content).encode("utf8")
-
         return make_request(
             self.reactor,
+            self.site,
             method,
             path,
             content,
@@ -542,18 +540,24 @@ class HomeserverTestCase(TestCase):
 
         return result
 
-    def register_user(self, username, password, admin=False):
+    def register_user(
+        self,
+        username: str,
+        password: str,
+        admin: Optional[bool] = False,
+        displayname: Optional[str] = None,
+    ) -> str:
         """
         Register a user. Requires the Admin API be registered.
 
         Args:
-            username (bytes/unicode): The user part of the new user.
-            password (bytes/unicode): The password of the new user.
-            admin (bool): Whether the user should be created as an admin
-            or not.
+            username: The user part of the new user.
+            password: The password of the new user.
+            admin: Whether the user should be created as an admin or not.
+            displayname: The displayname of the new user.
 
         Returns:
-            The MXID of the new user (unicode).
+            The MXID of the new user.
         """
         self.hs.config.registration_shared_secret = "shared"
 
@@ -577,6 +581,7 @@ class HomeserverTestCase(TestCase):
             {
                 "nonce": nonce,
                 "username": username,
+                "displayname": displayname,
                 "password": password,
                 "admin": admin,
                 "mac": want_mac,
