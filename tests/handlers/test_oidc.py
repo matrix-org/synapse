@@ -722,11 +722,11 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(mxid, "@test_user:test")
 
         # Register some non-exact matching cases.
-        user2 = UserID.from_string("@test_user_2:test")
+        user2 = UserID.from_string("@TEST_user_2:test")
         self.get_success(
             store.register_user(user_id=user2.to_string(), password_hash=None)
         )
-        user2_caps = UserID.from_string("@TEST_USER_2:test")
+        user2_caps = UserID.from_string("@test_USER_2:test")
         self.get_success(
             store.register_user(user_id=user2_caps.to_string(), password_hash=None)
         )
@@ -734,7 +734,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         # Attempting to login without matching a name exactly is an error.
         userinfo = {
             "sub": "test2",
-            "username": "test_USER_2",
+            "username": "test_user_2",
         }
         e = self.get_failure(
             self.handler._map_userinfo_to_user(
@@ -744,10 +744,16 @@ class OidcHandlerTestCase(HomeserverTestCase):
         )
         self.assertEqual(
             str(e.value),
-            "Attempted to login as '@test_USER_2:test' but it matches more than one user inexactly: ['@test_user_2:test', '@TEST_USER_2:test']",
+            "Attempted to login as '@test_user_2:test' but it matches more than one user inexactly: ['@TEST_user_2:test', '@test_USER_2:test']",
         )
 
-        # Logging in when matching a name exactly should work.
+        # Logging in when matching a name exactly should work. (Note that this
+        # essentially means matching an all lowercase name.)
+        user2 = UserID.from_string("@test_user_2:test")
+        self.get_success(
+            store.register_user(user_id=user2.to_string(), password_hash=None)
+        )
+
         userinfo = {
             "sub": "test2",
             "username": "test_user_2",
