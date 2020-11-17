@@ -1,1 +1,1 @@
-Expand tests for OpenID Connect.
+Add additional error checking for OpenID Connect and SAML mapping providers.
