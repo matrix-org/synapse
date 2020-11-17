@@ -451,3 +451,19 @@ The following fields are returned in the JSON response body:
 * `local_aliases` - An array of strings representing the local aliases that were migrated from
                     the old room to the new.
 * `new_room_id` - A string representing the room ID of the new room.
+
+
+# Make Room Admin API
+
+Grants the server admin power in a room if a local user has power in the room;
+inviting the server admin if they're not in the room and its not a publically
+joinable room.
+
+The caller can optionally specify another user to be granted power, e.g.:
+
+```
+    POST /_synapse/admin/v1/make_room_admin/<room_id_or_alias>
+    {
+        "user_id": "@foo:example.com"
+    }
+```
