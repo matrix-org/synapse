@@ -51,7 +51,6 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v1/media/%s/%s" % (self.server_name, "12345")
 
         request, channel = self.make_request("DELETE", url, b"{}")
-        self.render(request)
 
         self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
@@ -68,7 +67,6 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "DELETE", url, access_token=self.other_user_token,
         )
-        self.render(request)
 
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
@@ -82,7 +80,6 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "DELETE", url, access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
@@ -96,7 +93,6 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "DELETE", url, access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Can only delete local media", channel.json_body["error"])
@@ -133,8 +129,6 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
             shorthand=False,
             access_token=self.admin_user_tok,
         )
-        request.render(download_resource)
-        self.pump(1.0)
 
         # Should be successful
         self.assertEqual(
@@ -155,7 +149,6 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "DELETE", url, access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(1, channel.json_body["total"])
@@ -172,8 +165,6 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
             shorthand=False,
             access_token=self.admin_user_tok,
         )
-        request.render(download_resource)
-        self.pump(1.0)
         self.assertEqual(
             404,
             channel.code,
@@ -215,7 +206,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         """
 
         request, channel = self.make_request("POST", self.url, b"{}")
-        self.render(request)
 
         self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
@@ -230,7 +220,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", self.url, access_token=self.other_user_token,
         )
-        self.render(request)
 
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
@@ -244,7 +233,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", url + "?before_ts=1234", access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Can only delete local media", channel.json_body["error"])
@@ -256,7 +244,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", self.url, access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.MISSING_PARAM, channel.json_body["errcode"])
@@ -271,7 +258,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", self.url + "?before_ts=-1234", access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
@@ -285,7 +271,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             self.url + "?before_ts=1234&size_gt=-1234",
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
@@ -299,7 +284,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             self.url + "?before_ts=1234&keep_profiles=not_bool",
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
@@ -330,7 +314,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             self.url + "?before_ts=" + str(now_ms),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(1, channel.json_body["total"])
         self.assertEqual(
@@ -355,7 +338,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             self.url + "?before_ts=" + str(now_ms),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(0, channel.json_body["total"])
 
@@ -368,7 +350,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             self.url + "?before_ts=" + str(now_ms),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(1, channel.json_body["total"])
         self.assertEqual(
@@ -392,7 +373,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             self.url + "?before_ts=" + str(now_ms) + "&size_gt=67",
             access_token=self.admin_user_tok,
         )
-        self.render(request)
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(0, channel.json_body["total"])
 
@@ -404,7 +384,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             self.url + "?before_ts=" + str(now_ms) + "&size_gt=66",
             access_token=self.admin_user_tok,
         )
-        self.render(request)
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(1, channel.json_body["total"])
         self.assertEqual(
@@ -429,7 +408,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             content=json.dumps({"avatar_url": "mxc://%s" % (server_and_media_id,)}),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
         self.assertEqual(200, channel.code, msg=channel.json_body)
 
         now_ms = self.clock.time_msec()
@@ -438,7 +416,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             self.url + "?before_ts=" + str(now_ms) + "&keep_profiles=true",
             access_token=self.admin_user_tok,
         )
-        self.render(request)
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(0, channel.json_body["total"])
 
@@ -450,7 +427,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             self.url + "?before_ts=" + str(now_ms) + "&keep_profiles=false",
             access_token=self.admin_user_tok,
         )
-        self.render(request)
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(1, channel.json_body["total"])
         self.assertEqual(
@@ -476,7 +452,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             content=json.dumps({"url": "mxc://%s" % (server_and_media_id,)}),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
         self.assertEqual(200, channel.code, msg=channel.json_body)
 
         now_ms = self.clock.time_msec()
@@ -485,7 +460,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             self.url + "?before_ts=" + str(now_ms) + "&keep_profiles=true",
             access_token=self.admin_user_tok,
         )
-        self.render(request)
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(0, channel.json_body["total"])
 
@@ -497,7 +471,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             self.url + "?before_ts=" + str(now_ms) + "&keep_profiles=false",
             access_token=self.admin_user_tok,
         )
-        self.render(request)
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(1, channel.json_body["total"])
         self.assertEqual(
@@ -548,8 +521,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             shorthand=False,
             access_token=self.admin_user_tok,
         )
-        request.render(download_resource)
-        self.pump(1.0)
 
         if expect_success:
             self.assertEqual(

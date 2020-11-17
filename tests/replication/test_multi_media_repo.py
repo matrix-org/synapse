@@ -68,15 +68,15 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
             the media which the caller should respond to.
         """
         resource = hs.get_media_repository_resource().children[b"download"]
-        request, channel = make_request(
+        _, channel = make_request(
             self.reactor,
             FakeSite(resource),
             "GET",
             "/{}/{}".format(target, media_id),
             shorthand=False,
             access_token=self.access_token,
+            await_result=False,
         )
-        request.render(resource)
         self.pump()
 
         clients = self.reactor.tcpClients

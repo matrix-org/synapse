@@ -55,7 +55,6 @@ class ClientReaderTestCase(BaseMultiWorkerStreamTestCase):
             "register",
             {"username": "user", "type": "m.login.password", "password": "bar"},
         )  # type: SynapseRequest, FakeChannel
-        self.render_on_worker(worker_hs, request_1)
         self.assertEqual(request_1.code, 401)
 
         # Grab the session
@@ -69,7 +68,6 @@ class ClientReaderTestCase(BaseMultiWorkerStreamTestCase):
             "register",
             {"auth": {"session": session, "type": "m.login.dummy"}},
         )  # type: SynapseRequest, FakeChannel
-        self.render_on_worker(worker_hs, request_2)
         self.assertEqual(request_2.code, 200)
 
         # We're given a registered user.
@@ -89,7 +87,6 @@ class ClientReaderTestCase(BaseMultiWorkerStreamTestCase):
             "register",
             {"username": "user", "type": "m.login.password", "password": "bar"},
         )  # type: SynapseRequest, FakeChannel
-        self.render_on_worker(worker_hs_1, request_1)
         self.assertEqual(request_1.code, 401)
 
         # Grab the session
@@ -104,7 +101,6 @@ class ClientReaderTestCase(BaseMultiWorkerStreamTestCase):
             "register",
             {"auth": {"session": session, "type": "m.login.dummy"}},
         )  # type: SynapseRequest, FakeChannel
-        self.render_on_worker(worker_hs_2, request_2)
         self.assertEqual(request_2.code, 200)
 
         # We're given a registered user.

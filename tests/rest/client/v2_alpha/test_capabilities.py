@@ -37,7 +37,6 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
 
     def test_check_auth_required(self):
         request, channel = self.make_request("GET", self.url)
-        self.render(request)
 
         self.assertEqual(channel.code, 401)
 
@@ -46,7 +45,6 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         access_token = self.login("user", "pass")
 
         request, channel = self.make_request("GET", self.url, access_token=access_token)
-        self.render(request)
         capabilities = channel.json_body["capabilities"]
 
         self.assertEqual(channel.code, 200)
@@ -65,7 +63,6 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         access_token = self.login(user, password)
 
         request, channel = self.make_request("GET", self.url, access_token=access_token)
-        self.render(request)
         capabilities = channel.json_body["capabilities"]
 
         self.assertEqual(channel.code, 200)
@@ -74,7 +71,6 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         self.assertTrue(capabilities["m.change_password"]["enabled"])
         self.get_success(self.store.user_set_password_hash(user, None))
         request, channel = self.make_request("GET", self.url, access_token=access_token)
-        self.render(request)
         capabilities = channel.json_body["capabilities"]
 
         self.assertEqual(channel.code, 200)

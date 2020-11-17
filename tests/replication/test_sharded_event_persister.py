@@ -183,7 +183,6 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         request, channel = make_request(
             self.reactor, sync_hs_site, "GET", "/sync", access_token=access_token
         )
-        self.render_on_worker(sync_hs, request)
         next_batch = channel.json_body["next_batch"]
 
         # We now gut wrench into the events stream MultiWriterIdGenerator on
@@ -214,7 +213,6 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
             "/sync?since={}".format(next_batch),
             access_token=access_token,
         )
-        self.render_on_worker(sync_hs, request)
 
         # We should only see the new event and nothing else
         self.assertIn(room_id1, channel.json_body["rooms"]["join"])
@@ -245,7 +243,6 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
             "/sync?since={}".format(vector_clock_token),
             access_token=access_token,
         )
-        self.render_on_worker(sync_hs, request)
 
         self.assertNotIn(room_id1, channel.json_body["rooms"]["join"])
         self.assertIn(room_id2, channel.json_body["rooms"]["join"])
@@ -271,7 +268,6 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
             "/sync?since={}".format(next_batch),
             access_token=access_token,
         )
-        self.render_on_worker(sync_hs, request)
 
         prev_batch1 = channel.json_body["rooms"]["join"][room_id1]["timeline"][
             "prev_batch"
@@ -292,7 +288,6 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
             ),
             access_token=access_token,
         )
-        self.render_on_worker(sync_hs, request)
         self.assertListEqual([], channel.json_body["chunk"])
 
         # Paginating back on the second room should produce the first event
@@ -306,7 +301,6 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
             ),
             access_token=access_token,
         )
-        self.render_on_worker(sync_hs, request)
         self.assertEqual(len(channel.json_body["chunk"]), 1)
         self.assertEqual(
             channel.json_body["chunk"][0]["event_id"], first_event_in_room2
@@ -322,7 +316,6 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
             ),
             access_token=access_token,
         )
-        self.render_on_worker(sync_hs, request)
         self.assertListEqual([], channel.json_body["chunk"])
 
         request, channel = make_request(
@@ -334,7 +327,6 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
             ),
             access_token=access_token,
         )
-        self.render_on_worker(sync_hs, request)
         self.assertEqual(len(channel.json_body["chunk"]), 1)
         self.assertEqual(
             channel.json_body["chunk"][0]["event_id"], first_event_in_room2

@@ -27,7 +27,7 @@ from twisted.web.server import Site
 
 from synapse.api.constants import Membership
 
-from tests.server import FakeSite, make_request, render
+from tests.server import FakeSite, make_request
 
 
 @attr.s
@@ -52,14 +52,13 @@ class RestHelper:
         if tok:
             path = path + "?access_token=%s" % tok
 
-        request, channel = make_request(
+        _, channel = make_request(
             self.hs.get_reactor(),
             self.site,
             "POST",
             path,
             json.dumps(content).encode("utf8"),
         )
-        render(request, self.site.resource, self.hs.get_reactor())
 
         assert channel.result["code"] == b"%d" % expect_code, channel.result
         self.auth_user_id = temp_id
@@ -129,15 +128,13 @@ class RestHelper:
         data = {"membership": membership}
         data.update(extra_data)
 
-        request, channel = make_request(
+        _, channel = make_request(
             self.hs.get_reactor(),
             self.site,
             "PUT",
             path,
             json.dumps(data).encode("utf8"),
         )
-
-        render(request, self.site.resource, self.hs.get_reactor())
 
         assert int(channel.result["code"]) == expect_code, (
             "Expected: %d, got: %d, resp: %r"
@@ -166,14 +163,13 @@ class RestHelper:
         if tok:
             path = path + "?access_token=%s" % tok
 
-        request, channel = make_request(
+        _, channel = make_request(
             self.hs.get_reactor(),
             self.site,
             "PUT",
             path,
             json.dumps(content).encode("utf8"),
         )
-        render(request, self.site.resource, self.hs.get_reactor())
 
         assert int(channel.result["code"]) == expect_code, (
             "Expected: %d, got: %d, resp: %r"
@@ -223,11 +219,9 @@ class RestHelper:
         if body is not None:
             content = json.dumps(body).encode("utf8")
 
-        request, channel = make_request(
+        _, channel = make_request(
             self.hs.get_reactor(), self.site, method, path, content
         )
-
-        render(request, self.site.resource, self.hs.get_reactor())
 
         assert int(channel.result["code"]) == expect_code, (
             "Expected: %d, got: %d, resp: %r"
@@ -310,7 +304,7 @@ class RestHelper:
         """
         image_length = len(image_data)
         path = "/_matrix/media/r0/upload?filename=%s" % (filename,)
-        request, channel = make_request(
+        _, channel = make_request(
             self.hs.get_reactor(),
             FakeSite(resource),
             "POST",
@@ -319,8 +313,6 @@ class RestHelper:
             access_token=tok,
             custom_headers=[(b"Content-Length", str(image_length))],
         )
-        request.render(resource)
-        self.hs.get_reactor().pump([100])
 
         assert channel.code == expect_code, "Expected: %d, got: %d, resp: %r" % (
             expect_code,

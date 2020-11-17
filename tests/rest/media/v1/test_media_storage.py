@@ -234,8 +234,8 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             "GET",
             self.media_id,
             shorthand=False,
+            await_result=False,
         )
-        request.render(self.download_resource)
         self.pump()
 
         # We've made one fetch, to example.com, using the media URL, and asking
@@ -330,8 +330,8 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             "GET",
             self.media_id + params,
             shorthand=False,
+            await_result=False,
         )
-        request.render(self.thumbnail_resource)
         self.pump()
 
         headers = {
@@ -359,7 +359,6 @@ class MediaRepoTests(unittest.HomeserverTestCase):
                 channel.json_body,
                 {
                     "errcode": "M_NOT_FOUND",
-                    "error": "Not found [b'example.com', b'12345?width=32&height=32&method=%s']"
-                    % method,
+                    "error": "Not found [b'example.com', b'12345']",
                 },
             )

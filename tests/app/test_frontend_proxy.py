@@ -15,7 +15,7 @@
 
 from synapse.app.generic_worker import GenericWorkerServer
 
-from tests.server import make_request, render
+from tests.server import make_request
 from tests.unittest import HomeserverTestCase
 
 
@@ -56,10 +56,8 @@ class FrontendProxyTests(HomeserverTestCase):
         # Grab the resource from the site that was told to listen
         self.assertEqual(len(self.reactor.tcpServers), 1)
         site = self.reactor.tcpServers[0][1]
-        resource = site.resource.children[b"_matrix"].children[b"client"]
 
-        request, channel = make_request(self.reactor, site, "PUT", "presence/a/status")
-        render(request, resource, self.reactor)
+        _, channel = make_request(self.reactor, site, "PUT", "presence/a/status")
 
         # 400 + unrecognised, because nothing is registered
         self.assertEqual(channel.code, 400)
@@ -78,10 +76,8 @@ class FrontendProxyTests(HomeserverTestCase):
         # Grab the resource from the site that was told to listen
         self.assertEqual(len(self.reactor.tcpServers), 1)
         site = self.reactor.tcpServers[0][1]
-        resource = site.resource.children[b"_matrix"].children[b"client"]
 
-        request, channel = make_request(self.reactor, site, "PUT", "presence/a/status")
-        render(request, resource, self.reactor)
+        _, channel = make_request(self.reactor, site, "PUT", "presence/a/status")
 
         # 401, because the stub servlet still checks authentication
         self.assertEqual(channel.code, 401)

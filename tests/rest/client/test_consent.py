@@ -21,7 +21,7 @@ from synapse.rest.client.v1 import login, room
 from synapse.rest.consent import consent_resource
 
 from tests import unittest
-from tests.server import FakeSite, make_request, render
+from tests.server import FakeSite, make_request
 
 
 class ConsentResourceTestCase(unittest.HomeserverTestCase):
@@ -64,7 +64,6 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
         request, channel = make_request(
             self.reactor, FakeSite(resource), "GET", "/consent?v=1", shorthand=False
         )
-        render(request, resource, self.reactor)
         self.assertEqual(channel.code, 200)
 
     def test_accept_consent(self):
@@ -91,7 +90,6 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
             access_token=access_token,
             shorthand=False,
         )
-        render(request, resource, self.reactor)
         self.assertEqual(channel.code, 200)
 
         # Get the version from the body, and whether we've consented
@@ -107,7 +105,6 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
             access_token=access_token,
             shorthand=False,
         )
-        render(request, resource, self.reactor)
         self.assertEqual(channel.code, 200)
 
         # Fetch the consent page, to get the consent version -- it should have
@@ -120,7 +117,6 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
             access_token=access_token,
             shorthand=False,
         )
-        render(request, resource, self.reactor)
         self.assertEqual(channel.code, 200)
 
         # Get the version from the body, and check that it's the version we

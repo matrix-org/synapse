@@ -195,7 +195,6 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             content=json.dumps({"displayname": "test"}),
             access_token=self.owner_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         res = self.get_displayname()
@@ -209,7 +208,6 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             content=json.dumps({"displayname": "test" * 100}),
             access_token=self.owner_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 400, channel.result)
 
         res = self.get_displayname()
@@ -219,7 +217,6 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "/profile/%s/displayname" % (self.owner,)
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
         return channel.json_body["displayname"]
 
@@ -284,7 +281,6 @@ class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.profile_url + url_suffix, access_token=access_token
         )
-        self.render(request)
         self.assertEqual(channel.code, expected_code, channel.result)
 
     def ensure_requester_left_room(self):
@@ -327,7 +323,6 @@ class OwnProfileUnrestrictedTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "/profile/" + self.requester, access_token=self.requester_tok
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         request, channel = self.make_request(
@@ -335,7 +330,6 @@ class OwnProfileUnrestrictedTestCase(unittest.HomeserverTestCase):
             "/profile/" + self.requester + "/displayname",
             access_token=self.requester_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         request, channel = self.make_request(
@@ -343,5 +337,4 @@ class OwnProfileUnrestrictedTestCase(unittest.HomeserverTestCase):
             "/profile/" + self.requester + "/avatar_url",
             access_token=self.requester_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
