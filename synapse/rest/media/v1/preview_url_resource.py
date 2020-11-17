@@ -60,18 +60,6 @@ ONE_HOUR = 60 * 60 * 1000
 
 # A map of globs to API endpoints.
 _oembed_globs = {
-    # Twitter.
-    "https://publish.twitter.com/oembed": [
-        "https://twitter.com/*/status/*",
-        "https://*.twitter.com/*/status/*",
-        "https://twitter.com/*/moments/*",
-        "https://*.twitter.com/*/moments/*",
-        # Include the HTTP versions too.
-        "http://twitter.com/*/status/*",
-        "http://*.twitter.com/*/status/*",
-        "http://twitter.com/*/moments/*",
-        "http://*.twitter.com/*/moments/*",
-    ],
 }
 # Convert the globs to regular expressions.
 _oembed_patterns = {}
@@ -135,6 +123,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             ip_blacklist=hs.config.url_preview_ip_range_blacklist,
             http_proxy=os.getenvb(b"http_proxy"),
             https_proxy=os.getenvb(b"HTTPS_PROXY"),
+            user_agent=f"{hs.version_string} UrlPreviewBot"
         )
         self.media_repo = media_repo
         self.primary_base_path = media_repo.primary_base_path

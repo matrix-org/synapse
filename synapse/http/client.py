@@ -291,6 +291,7 @@ class SimpleHttpClient:
         ip_blacklist: Optional[IPSet] = None,
         http_proxy: Optional[bytes] = None,
         https_proxy: Optional[bytes] = None,
+        user_agent: Optional[str] = None,
     ):
         """
         Args:
@@ -309,7 +310,7 @@ class SimpleHttpClient:
         self._ip_blacklist = ip_blacklist
         self._extra_treq_args = treq_args
 
-        self.user_agent = hs.version_string
+        self.user_agent = user_agent or hs.version_string
         self.clock = hs.get_clock()
         if hs.config.user_agent_suffix:
             self.user_agent = "%s %s" % (self.user_agent, hs.config.user_agent_suffix)
