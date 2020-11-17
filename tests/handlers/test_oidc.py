@@ -734,7 +734,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         # Attempting to login without matching a name exactly is an error.
         userinfo = {
             "sub": "test2",
-            "username": "test_user_2",
+            "username": "test_USER_2",
         }
         e = self.get_failure(
             self.handler._map_userinfo_to_user(
@@ -747,8 +747,15 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "Attempted to login as '@test_user_2:test' but it matches more than one user inexactly: ['@TEST_user_2:test', '@test_USER_2:test']",
         )
 
-        # Logging in when matching a name exactly should work. (Note that this
-        # essentially means matching an all lowercase name.)
+        # Logging in when matching a name exactly should work.
+        #
+        # Note that this essentially means matching an existing all lowercase
+        # name, regardless of the case of the localpart providing by the mapping
+        # provider.
+        #
+        # Above we return test_USER_2, which you'd expect to match the user
+        # test_USER_2, which was already created, but it actually ends up
+        # matching test_user_2.
         user2 = UserID.from_string("@test_user_2:test")
         self.get_success(
             store.register_user(user_id=user2.to_string(), password_hash=None)
