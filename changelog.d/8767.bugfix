@@ -1,1 +1,1 @@
-Cap the version of `prometheus-client` in the docker image to match Synapse's requirements.
+Fix a dependency versioning bug in the Dockerfile that prevented Synapse from starting.
