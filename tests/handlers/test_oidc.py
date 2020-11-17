@@ -734,7 +734,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         # Attempting to login without matching a name exactly is an error.
         userinfo = {
             "sub": "test2",
-            "username": "test_USER_2",
+            "username": "TEST_USER_2",
         }
         e = self.get_failure(
             self.handler._map_userinfo_to_user(
@@ -744,19 +744,11 @@ class OidcHandlerTestCase(HomeserverTestCase):
         )
         self.assertEqual(
             str(e.value),
-            "Attempted to login as '@test_user_2:test' but it matches more than one user inexactly: ['@TEST_user_2:test', '@test_USER_2:test']",
+            "Attempted to login as '@TEST_USER_2:test' but it matches more than one user inexactly: ['@TEST_user_2:test', '@test_USER_2:test']",
         )
 
         # Logging in when matching a name exactly should work.
-        #
-        # Note that this essentially means matching an existing all lowercase
-        # name, regardless of the case of the localpart providing by the mapping
-        # provider.
-        #
-        # Above we return test_USER_2, which you'd expect to match the user
-        # test_USER_2, which was already created, but it actually ends up
-        # matching test_user_2.
-        user2 = UserID.from_string("@test_user_2:test")
+        user2 = UserID.from_string("@TEST_USER_2:test")
         self.get_success(
             store.register_user(user_id=user2.to_string(), password_hash=None)
         )
@@ -766,4 +758,19 @@ class OidcHandlerTestCase(HomeserverTestCase):
                 userinfo, token, "user-agent", "10.10.10.10"
             )
         )
-        self.assertEqual(mxid, "@test_user_2:test")
+        self.assertEqual(mxid, "@TEST_USER_2:test")
+
+    def test_map_userinfo_to_invalid_localpart(self):
+        """If the mapping provider generates an invalid localpart it should be rejected."""
+        userinfo = {
+            "sub": "test2",
+            "username": "föö",
+        }
+        token = {}
+        e = self.get_failure(
+            self.handler._map_userinfo_to_user(
+                userinfo, token, "user-agent", "10.10.10.10"
+            ),
+            MappingException,
+        )
+        self.assertEqual(str(e.value), "localpart is invalid: föö")

@@ -38,7 +38,12 @@ from synapse.handlers._base import BaseHandler
 from synapse.handlers.sso import MappingException
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
-from synapse.types import JsonDict, UserID, map_username_to_mxid_localpart
+from synapse.types import (
+    JsonDict,
+    UserID,
+    contains_invalid_mxid_characters,
+    map_username_to_mxid_localpart,
+)
 from synapse.util import json_decoder
 
 if TYPE_CHECKING:
@@ -887,10 +892,10 @@ class OidcHandler(BaseHandler):
 
         localpart = attributes["localpart"]
         if not localpart:
-            raise MappingException("localpart is empty")
-
-        # Ensure only valid characters are included in the MXID.
-        localpart = map_username_to_mxid_localpart(localpart)
+            raise MappingException(
+                "Error parsing OIDC response: OIDC mapping provider plugin "
+                "did not return a localpart value"
+            )
 
         user_id = UserID(localpart, self.server_name).to_string()
         users = await self.store.get_users_by_id_case_insensitive(user_id)
@@ -910,6 +915,11 @@ class OidcHandler(BaseHandler):
                 # This mxid is taken
                 raise MappingException("mxid '{}' is already taken".format(user_id))
         else:
+            # Since the localpart is provided via a potentially untrusted module,
+            # ensure the MXID is valid before registering.
+            if contains_invalid_mxid_characters(localpart):
+                raise MappingException("localpart is invalid: %s" % (localpart,))
+
             # It's the first time this user is logging in and the mapped mxid was
             # not taken, register the user
             registered_user_id = await self._registration_handler.register_user(
@@ -1077,6 +1087,9 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         self, userinfo: UserInfo, token: Token
     ) -> UserAttribute:
         localpart = self._config.localpart_template.render(user=userinfo).strip()
+
+        # Ensure only valid characters are included in the MXID.
+        localpart = map_username_to_mxid_localpart(localpart)
 
         display_name = None  # type: Optional[str]
         if self._config.display_name_template is not None:
