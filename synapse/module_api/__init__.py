@@ -49,6 +49,7 @@ class ModuleApi:
         self._store = hs.get_datastore()
         self._auth = hs.get_auth()
         self._auth_handler = auth_handler
+        self._server_name = hs.hostname
 
         # We expose these as properties below in order to attach a helpful docstring.
         self._http_client = hs.get_simple_http_client()  # type: SimpleHttpClient
@@ -336,7 +337,9 @@ class ModuleApi:
             SynapseError if the event was not allowed.
         """
         # Create a requester object
-        requester = create_requester(event_dict["sender"])
+        requester = create_requester(
+            event_dict["sender"], authenticated_entity=self._server_name
+        )
 
         # Create and send the event
         (

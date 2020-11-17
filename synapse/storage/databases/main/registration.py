@@ -1110,6 +1110,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         token: str,
         device_id: Optional[str],
         valid_until_ms: Optional[int],
+        puppets_user_id: Optional[str] = None,
     ) -> int:
         """Adds an access token for the given user.
 
@@ -1133,6 +1134,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                 "token": token,
                 "device_id": device_id,
                 "valid_until_ms": valid_until_ms,
+                "puppets_user_id": puppets_user_id,
             },
             desc="add_access_token_to_user",
         )
