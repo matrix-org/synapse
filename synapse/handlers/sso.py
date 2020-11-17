@@ -77,14 +77,14 @@ class SsoHandler(BaseHandler):
             auth_provider_id,
             remote_user_id,
         )
-        registered_user_id = await self.store.get_user_by_external_id(
+        previously_registered_user_id = await self.store.get_user_by_external_id(
             auth_provider_id, remote_user_id,
         )
 
         # A match was found, return the user ID.
-        if registered_user_id is not None:
-            logger.info("Found existing mapping %s", registered_user_id)
-            return registered_user_id
+        if previously_registered_user_id is not None:
+            logger.info("Found existing mapping %s", previously_registered_user_id)
+            return previously_registered_user_id
 
         # No match.
         return None
