@@ -282,7 +282,11 @@ class AuthTestCase(unittest.TestCase):
             )
         )
         self.store.add_access_token_to_user.assert_called_with(
-            USER_ID, token, "DEVICE", None
+            user_id=USER_ID,
+            token=token,
+            device_id="DEVICE",
+            valid_until_ms=None,
+            puppets_user_id=None,
         )
 
         def get_user(tok):

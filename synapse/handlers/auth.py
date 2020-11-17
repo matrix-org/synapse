@@ -698,8 +698,12 @@ class AuthHandler(BaseHandler):
         }
 
     async def get_access_token_for_user_id(
-        self, user_id: str, device_id: Optional[str], valid_until_ms: Optional[int]
-    ):
+        self,
+        user_id: str,
+        device_id: Optional[str],
+        valid_until_ms: Optional[int],
+        puppets_user_id: Optional[str] = None,
+    ) -> str:
         """
         Creates a new access token for the user with the given user ID.
 
@@ -725,13 +729,25 @@ class AuthHandler(BaseHandler):
             fmt_expiry = time.strftime(
                 " until %Y-%m-%d %H:%M:%S", time.localtime(valid_until_ms / 1000.0)
             )
-        logger.info("Logging in user %s on device %s%s", user_id, device_id, fmt_expiry)
+
+        if puppets_user_id:
+            logger.info(
+                "Logging in user %s as %s%s", user_id, puppets_user_id, fmt_expiry
+            )
+        else:
+            logger.info(
+                "Logging in user %s on device %s%s", user_id, device_id, fmt_expiry
+            )
 
         await self.auth.check_auth_blocking(user_id)
 
         access_token = self.macaroon_gen.generate_access_token(user_id)
         await self.store.add_access_token_to_user(
-            user_id, access_token, device_id, valid_until_ms
+            user_id=user_id,
+            token=access_token,
+            device_id=device_id,
+            valid_until_ms=valid_until_ms,
+            puppets_user_id=puppets_user_id,
         )
 
         # the device *should* have been registered before we got here; however,
