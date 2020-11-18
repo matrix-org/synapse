@@ -65,7 +65,7 @@ Internal Changes
 ----------------
 
 - Optimise `/createRoom` with multiple invited users. ([\#8559](https://github.com/matrix-org/synapse/issues/8559))
-- Implement and use an @lru_cache decorator. ([\#8595](https://github.com/matrix-org/synapse/issues/8595))
+- Implement and use an `@lru_cache` decorator. ([\#8595](https://github.com/matrix-org/synapse/issues/8595))
 - Don't instansiate Requester directly. ([\#8614](https://github.com/matrix-org/synapse/issues/8614))
 - Type hints for `RegistrationStore`. ([\#8615](https://github.com/matrix-org/synapse/issues/8615))
 - Change schema to support access tokens belonging to one user but granting access to another. ([\#8616](https://github.com/matrix-org/synapse/issues/8616))
