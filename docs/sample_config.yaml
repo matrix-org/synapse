@@ -1545,7 +1545,7 @@ saml2_config:
     #  remote:
     #    - url: https://our_idp/metadata.xml
 
-    # Allowed clock difference in seconds from IdP. Uncomment the below to 
+    # Allowed clock difference in seconds from IdP. Uncomment the below to
     # increase the accepted time difference from 0 to 3 seconds.
     #accepted_time_diff: 3
 
