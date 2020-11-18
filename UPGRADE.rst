@@ -87,7 +87,7 @@ then it should be modified based on the `structured logging documentation
 <https://github.com/matrix-org/synapse/blob/master/docs/structured_logging.md>`_.
 
 The ``structured`` and ``drains`` logging options are now deprecated and should
-be replaced by standard logging configuration of ``handlers`` and ``formatters`.
+be replaced by standard logging configuration of ``handlers`` and ``formatters``.
 
 A future will release of Synapse will make using ``structured: true`` an error.
 

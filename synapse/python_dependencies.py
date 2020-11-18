@@ -72,6 +72,10 @@ REQUIREMENTS = [
     # prom-client has a history of breaking backwards compatibility between
     # minor versions (https://github.com/prometheus/client_python/issues/317),
     # so we also pin the minor version.
+    #
+    # Note that we replicate these constraints in the Synapse Dockerfile while
+    # pre-installing dependencies. If these constraints are updated here, the
+    # same change should be made in the Dockerfile.
     "prometheus_client>=0.4.0,<0.9.0",
     # we use attr.validators.deep_iterable, which arrived in 19.1.0 (Note:
     # Fedora 31 only has 19.1, so if we want to upgrade we should wait until 33
