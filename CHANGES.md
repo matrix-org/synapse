@@ -1,6 +1,10 @@
 Synapse 1.23.0 (2020-11-18)
 ===========================
 
+This release changes the way structured logging is configured. See the [upgrade notes](UPGRADE.rst#upgrading-to-v1230) for details.
+
+**Note**: We are aware of a trivially exploitable denial of service vulnerability in versions of Synapse prior to 1.20.0. Complete details will be disclosed on Monday, November 23rd. If you have not upgraded recently, please do so.
+
 Bugfixes
 --------
 
