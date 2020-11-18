@@ -267,6 +267,12 @@ class SamlHandler(BaseHandler):
                     map_username_to_mxid_localpart(attrval), self.server_name
                 ).to_string()
 
+                logger.debug(
+                    "Looking for existing account based on mapped %s %s",
+                    self._grandfathered_mxid_source_attribute,
+                    user_id,
+                )
+
                 users = await self.store.get_users_by_id_case_insensitive(user_id)
                 if users:
                     registered_user_id = list(users.keys())[0]

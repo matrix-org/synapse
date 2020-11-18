@@ -71,6 +71,12 @@ class SsoHandler(BaseHandler):
         Returns:
             The mxid of a previously seen user.
         """
+        logger.debug(
+            "Looking for existing mapping for user %s:%s",
+            auth_provider_id,
+            remote_user_id,
+        )
+
         # Check if we already have a mapping for this user.
         previously_registered_user_id = await self.store.get_user_by_external_id(
             auth_provider_id, remote_user_id,
