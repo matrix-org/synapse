@@ -1574,7 +1574,6 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", self.url, b"{}", access_token=self.admin_user_tok
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         return channel.json_body["access_token"]
 
@@ -1582,7 +1581,6 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
         """Try to login as a user without authentication.
         """
         request, channel = self.make_request("POST", self.url, b"{}")
-        self.render(request)
 
         self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
@@ -1593,7 +1591,6 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", self.url, b"{}", access_token=self.other_user_tok
         )
-        self.render(request)
 
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
 
@@ -1622,7 +1619,6 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "devices", b"{}", access_token=self.other_user_tok
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # We should only see the one device (from the login in `prepare`)
@@ -1638,28 +1634,24 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "devices", b"{}", access_token=puppet_token
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # Logout with the puppet token
         request, channel = self.make_request(
             "POST", "logout", b"{}", access_token=puppet_token
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # The puppet token should no longer work
         request, channel = self.make_request(
             "GET", "devices", b"{}", access_token=puppet_token
         )
-        self.render(request)
         self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
 
         # .. but the real user's tokens should still work
         request, channel = self.make_request(
             "GET", "devices", b"{}", access_token=self.other_user_tok
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
     def test_user_logout_all(self):
@@ -1673,28 +1665,24 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "devices", b"{}", access_token=puppet_token
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # Logout all with the real user token
         request, channel = self.make_request(
             "POST", "logout/all", b"{}", access_token=self.other_user_tok
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # The puppet token should still work
         request, channel = self.make_request(
             "GET", "devices", b"{}", access_token=puppet_token
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # .. but the real user's tokens shouldn't
         request, channel = self.make_request(
             "GET", "devices", b"{}", access_token=self.other_user_tok
         )
-        self.render(request)
         self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
 
     def test_admin_logout_all(self):
@@ -1708,28 +1696,24 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "devices", b"{}", access_token=puppet_token
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # Logout all with the admin user token
         request, channel = self.make_request(
             "POST", "logout/all", b"{}", access_token=self.admin_user_tok
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # The puppet token should no longer work
         request, channel = self.make_request(
             "GET", "devices", b"{}", access_token=puppet_token
         )
-        self.render(request)
         self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
 
         # .. but the real user's tokens should still work
         request, channel = self.make_request(
             "GET", "devices", b"{}", access_token=self.other_user_tok
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
     @unittest.override_config(
