@@ -1,3 +1,12 @@
+Synapse 1.23.0 (2020-11-18)
+===========================
+
+Bugfixes
+--------
+
+- Fix a dependency versioning bug in the Dockerfile that prevented Synapse from starting. ([\#8767](https://github.com/matrix-org/synapse/issues/8767))
+
+
 Synapse 1.23.0rc1 (2020-11-13)
 ==============================
 
