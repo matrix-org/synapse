@@ -1,1 +1,1 @@
-SAML: add `accepted_time_diff` example to `saml2_config:` config to allow clock/time difference from IdP.
+Add an example and documentation for clock skew to the SAML2 sample configuration to allow for clock/time difference between the homserver and IdP. Contributed by @localguru.
