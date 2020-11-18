@@ -278,7 +278,8 @@ class ReceiptsWorkerStore(SQLBaseStore, metaclass=abc.ABCMeta):
     async def get_linearized_receipts_for_all_rooms(
         self, to_key: int, from_key: Optional[int] = None
     ) -> Dict[str, JsonDict]:
-        """Get receipts for all rooms between two stream_ids.
+        """Get receipts for all rooms between two stream_ids, up
+        to a limit of the latest 100 read receipts.
 
         Args:
             to_key: Max stream id to fetch receipts upto.
