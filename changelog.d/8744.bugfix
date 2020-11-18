@@ -1,0 +1,1 @@
+Fix a bug where appservices may be sent an excessive amount of read receipts and presence. Broke in v1.22.0. 
