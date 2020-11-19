@@ -597,9 +597,6 @@ class RegistrationHandler(BaseHandler):
                 api.constants.UserTypes, or None for a normal user.
             address: the IP address used to perform the registration.
             shadow_banned: Whether to shadow-ban the user
-
-        Returns:
-            Awaitable
         """
         if self.hs.config.worker_app:
             await self._register_client(
