@@ -116,21 +116,23 @@ This will install and start a systemd service called `coturn`.
     basic installation and got it working.
 
 1.  Ensure your firewall allows traffic into the TURN server on the ports
-    you've configured it to listen on (By default: 3478 for TURN and 5349 for
-    TURNs traffic (remember to allow both TCP and UDP traffic), and ports
-    49152-65535 for the UDP relay.)
+    you've configured it to listen on (By default: 3478 and 5349 for TURN
+    traffic (remember to allow both TCP and UDP traffic), and ports 49152-65535
+    for the UDP relay.)
 
-1.  If your TURN server is behind NAT, you will need to tell it its external IP
-    address:
+1.  We do not recommend running a TURN server behind NAT, and are not aware of
+    anyone doing so successfully.
+
+    If you want to try it anyway, you will at least need to tell coturn its
+    external IP address:
 
         external-ip=192.88.99.1
 
-    For this to work, your NAT gateway must forward all of the relayed ports
-    directly (relayed port 12345 must be always mapped to the same 'external'
-    port 12345).
+    ... and your NAT gateway must forward all of the relayed ports directly
+    (eg, port 56789 on the external IP must be always be forwarded to port
+    56789 on the internal IP).
 
-    We are not aware of anyone who has successfully configured a TURN server
-    behind NAT. If you get it working, let us know!
+    If you get this working, let us know!
 
 1.  (Re)start the turn server:
 
@@ -226,8 +228,9 @@ Here are a few things to try:
 
  * If you are using a browser-based client under Chrome, check
    `chrome://webrtc-internals/` for insights into the internals of the
-   negotiation. (Understanding the output is beyond the scope of this
-   document!)
+   negotiation. On Firefox, check the "Connection Log" on `about:webrtc`.
+
+   (Understanding the output is beyond the scope of this document!)
 
  * There is a WebRTC test tool at
    https://webrtc.github.io/samples/src/content/peerconnection/trickle-ice/. To
@@ -237,6 +240,18 @@ Here are a few things to try:
     * look for the `GET /_matrix/client/r0/voip/turnServer` request made by a
       matrix client to your homeserver in your browser's network inspector. In
       the response you should see `username` and `password`. Or:
+
+    * Use the following shell commands:
+
+      ```sh
+      secret=staticAuthSecretHere
+
+      u=$((`date +%s` + 3600)):test
+      p=$(echo -n $u | openssl dgst -hmac $secret -sha1 -binary | base64)
+      echo -e "username: $u\npassword: $p"
+      ```
+
+      Or:
 
     * Temporarily configure coturn to accept a static username/password. To do
       this, comment out `use-auth-secret` and `static-auth-secret` and add the
