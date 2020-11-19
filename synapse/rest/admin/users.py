@@ -15,6 +15,7 @@
 import hashlib
 import hmac
 import logging
+import re
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
@@ -33,7 +34,6 @@ from synapse.rest.admin._base import (
     admin_patterns,
     assert_requester_is_admin,
     assert_user_is_admin,
-    historical_admin_path_patterns,
 )
 from synapse.types import JsonDict, UserID
 
@@ -55,7 +55,7 @@ _GET_PUSHERS_ALLOWED_KEYS = {
 
 
 class UsersRestServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns("/users/(?P<user_id>[^/]*)$")
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)$")
 
     def __init__(self, hs):
         self.hs = hs
@@ -338,7 +338,7 @@ class UserRegisterServlet(RestServlet):
              nonce to the time it was generated, in int seconds.
     """
 
-    PATTERNS = historical_admin_path_patterns("/register")
+    PATTERNS = admin_patterns("/register")
     NONCE_TIMEOUT = 60
 
     def __init__(self, hs):
@@ -461,7 +461,14 @@ class UserRegisterServlet(RestServlet):
 
 
 class WhoisRestServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns("/whois/(?P<user_id>[^/]*)")
+    path_regex = "/whois/(?P<user_id>[^/]*)"
+    PATTERNS = (
+        admin_patterns(path_regex)
+        +
+        # URL for spec reason
+        # https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-admin-whois-userid
+        [re.compile("/_matrix/client/r0/admin" + path_regex)]
+    )
 
     def __init__(self, hs):
         self.hs = hs
@@ -485,7 +492,7 @@ class WhoisRestServlet(RestServlet):
 
 
 class DeactivateAccountRestServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns("/deactivate/(?P<target_user_id>[^/]*)")
+    PATTERNS = admin_patterns("/deactivate/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
         self._deactivate_account_handler = hs.get_deactivate_account_handler()
@@ -516,7 +523,7 @@ class DeactivateAccountRestServlet(RestServlet):
 
 
 class AccountValidityRenewServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns("/account_validity/validity$")
+    PATTERNS = admin_patterns("/account_validity/validity$")
 
     def __init__(self, hs):
         """
@@ -559,9 +566,7 @@ class ResetPasswordRestServlet(RestServlet):
             200 OK with empty object if success otherwise an error.
         """
 
-    PATTERNS = historical_admin_path_patterns(
-        "/reset_password/(?P<target_user_id>[^/]*)"
-    )
+    PATTERNS = admin_patterns("/reset_password/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -603,7 +608,7 @@ class SearchUsersRestServlet(RestServlet):
             200 OK with json object {list[dict[str, Any]], count} or empty object.
     """
 
-    PATTERNS = historical_admin_path_patterns("/search_users/(?P<target_user_id>[^/]*)")
+    PATTERNS = admin_patterns("/search_users/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
         self.hs = hs

@@ -342,7 +342,7 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         self.register_user("admin", "adminpassword", admin=True)
         admin_tok = self.login("admin", "adminpassword")
 
-        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        url = "/_synapse/admin/v1/account_validity/validity"
         params = {"user_id": user_id}
         request_data = json.dumps(params)
         request, channel = self.make_request(
@@ -362,7 +362,7 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         self.register_user("admin", "adminpassword", admin=True)
         admin_tok = self.login("admin", "adminpassword")
 
-        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        url = "/_synapse/admin/v1/account_validity/validity"
         params = {
             "user_id": user_id,
             "expiration_ts": 0,
@@ -389,7 +389,7 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         self.register_user("admin", "adminpassword", admin=True)
         admin_tok = self.login("admin", "adminpassword")
 
-        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        url = "/_synapse/admin/v1/account_validity/validity"
         params = {
             "user_id": user_id,
             "expiration_ts": 0,
