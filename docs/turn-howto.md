@@ -168,7 +168,8 @@ Your home server configuration file needs the following extra keys:
     without having gone through a CAPTCHA or similar to register a
     real account.
 
-As an example, here is the relevant section of the config file for matrix.org:
+As an example, here is the relevant section of the config file for `matrix.org`. The
+`turn_uris` are appropriate for TURN servers listening on the default ports, with no TLS.
 
     turn_uris: [ "turn:turn.matrix.org?transport=udp", "turn:turn.matrix.org?transport=tcp" ]
     turn_shared_secret: "n0t4ctuAllymatr1Xd0TorgSshar3d5ecret4obvIousreAsons"
