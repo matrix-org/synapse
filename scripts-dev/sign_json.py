@@ -105,7 +105,7 @@ Example usage:
         sys.exit(1)
 
     if not isinstance(obj, dict):
-        print("Input json was not a dict", file=sys.stderr)
+        print("Input json was not an object", file=sys.stderr)
         sys.exit(1)
 
     sign_json(obj, args.server_name, key)
