@@ -31,6 +31,7 @@ from synapse.http.site import SynapseRequest
 from synapse.module_api import ModuleApi
 from synapse.types import (
     UserID,
+    contains_invalid_mxid_characters,
     map_username_to_mxid_localpart,
     mxid_localpart_allowed_characters,
 )
@@ -317,6 +318,11 @@ class SamlHandler(BaseHandler):
                 raise MappingException(
                     "Unable to generate a Matrix ID from the SAML response"
                 )
+
+            # Since the localpart is provided via a potentially untrusted module,
+            # ensure the MXID is valid before registering.
+            if contains_invalid_mxid_characters(localpart):
+                raise MappingException("localpart is invalid: %s" % (localpart,))
 
             logger.info("Mapped SAML user to local part %s", localpart)
             registered_user_id = await self._registration_handler.register_user(
