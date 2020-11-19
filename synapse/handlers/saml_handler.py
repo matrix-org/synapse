@@ -329,7 +329,7 @@ class SamlHandler(BaseHandler):
                 localpart=localpart,
                 default_display_name=displayname,
                 bind_emails=emails,
-                user_agent_ips=(user_agent, ip_address),
+                user_agent_ips=[(user_agent, ip_address)],
             )
 
             await self.store.record_user_external_id(

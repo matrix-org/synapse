@@ -226,7 +226,7 @@ class CasHandler:
                 registered_user_id = await self._registration_handler.register_user(
                     localpart=localpart,
                     default_display_name=user_display_name,
-                    user_agent_ips=(user_agent, ip_address),
+                    user_agent_ips=[(user_agent, ip_address)],
                 )
 
             assert registered_user_id
