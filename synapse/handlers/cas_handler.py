@@ -229,8 +229,6 @@ class CasHandler:
                     user_agent_ips=[(user_agent, ip_address)],
                 )
 
-            assert registered_user_id
-
             await self._auth_handler.complete_sso_login(
                 registered_user_id, request, client_redirect_url
             )
