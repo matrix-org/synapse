@@ -1,1 +1,1 @@
-Fix type hints in CAS handler.
+Add additional type hints in the registration and SSO handlers.
