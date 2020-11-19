@@ -15,13 +15,12 @@
 # limitations under the License.
 
 import inspect
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.types import Collection
 
-MYPY = False
-if MYPY:
+if TYPE_CHECKING:
     import synapse.events
     import synapse.server
 

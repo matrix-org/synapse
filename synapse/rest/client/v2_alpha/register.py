@@ -45,6 +45,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.metrics import threepid_send_requests
 from synapse.push.mailer import Mailer
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
@@ -163,6 +164,10 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             # Wrap the session id in a JSON object
             ret = {"sid": sid}
 
+        threepid_send_requests.labels(type="email", reason="register").observe(
+            send_attempt
+        )
+
         return 200, ret
 
 
@@ -232,6 +237,10 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
             client_secret,
             send_attempt,
             next_link,
+        )
+
+        threepid_send_requests.labels(type="msisdn", reason="register").observe(
+            send_attempt
         )
 
         return 200, ret
@@ -641,9 +650,6 @@ class RegisterRestServlet(RestServlet):
             )
 
         return 200, return_dict
-
-    def on_OPTIONS(self, _):
-        return 200, {}
 
     async def _do_appservice_registration(self, username, as_token, body):
         user_id = await self.registration_handler.appservice_register(

@@ -587,7 +587,7 @@ class MatrixFederationHttpClient:
         """
         Builds the Authorization headers for a federation request
         Args:
-            destination (bytes|None): The desination homeserver of the request.
+            destination (bytes|None): The destination homeserver of the request.
                 May be None if the destination is an identity server, in which case
                 destination_is must be non-None.
             method (bytes): The HTTP method of the request
@@ -640,7 +640,7 @@ class MatrixFederationHttpClient:
         backoff_on_404=False,
         try_trailing_slash_on_400=False,
     ):
-        """ Sends the specifed json data using PUT
+        """ Sends the specified json data using PUT
 
         Args:
             destination (str): The remote server to send the HTTP request
@@ -729,7 +729,7 @@ class MatrixFederationHttpClient:
         ignore_backoff=False,
         args={},
     ):
-        """ Sends the specifed json data using POST
+        """ Sends the specified json data using POST
 
         Args:
             destination (str): The remote server to send the HTTP request
@@ -1063,13 +1063,19 @@ def check_content_type_is_json(headers):
     """
     c_type = headers.getRawHeaders(b"Content-Type")
     if c_type is None:
-        raise RequestSendFailed(RuntimeError("No Content-Type header"), can_retry=False)
+        raise RequestSendFailed(
+            RuntimeError("No Content-Type header received from remote server"),
+            can_retry=False,
+        )
 
     c_type = c_type[0].decode("ascii")  # only the first header
     val, options = cgi.parse_header(c_type)
     if val != "application/json":
         raise RequestSendFailed(
-            RuntimeError("Content-Type not application/json: was '%s'" % c_type),
+            RuntimeError(
+                "Remote server sent Content-Type header of '%s', not 'application/json'"
+                % c_type,
+            ),
             can_retry=False,
         )
 

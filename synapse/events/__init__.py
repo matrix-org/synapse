@@ -59,7 +59,7 @@ class DictProperty:
             #
             # To exclude the KeyError from the traceback, we explicitly
             # 'raise from e1.__context__' (which is better than 'raise from None',
-            # becuase that would omit any *earlier* exceptions).
+            # because that would omit any *earlier* exceptions).
             #
             raise AttributeError(
                 "'%s' has no '%s' property" % (type(instance), self.key)
@@ -368,7 +368,7 @@ class FrozenEvent(EventBase):
         return self.__repr__()
 
     def __repr__(self):
-        return "<FrozenEvent event_id='%s', type='%s', state_key='%s'>" % (
+        return "<FrozenEvent event_id=%r, type=%r, state_key=%r>" % (
             self.get("event_id", None),
             self.get("type", None),
             self.get("state_key", None),
@@ -451,7 +451,7 @@ class FrozenEventV2(EventBase):
         return self.__repr__()
 
     def __repr__(self):
-        return "<%s event_id='%s', type='%s', state_key='%s'>" % (
+        return "<%s event_id=%r, type=%r, state_key=%r>" % (
             self.__class__.__name__,
             self.event_id,
             self.get("type", None),

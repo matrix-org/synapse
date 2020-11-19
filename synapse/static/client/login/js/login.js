@@ -182,7 +182,7 @@ matrixLogin.passwordLogin = function() {
 };
 
 /*
- * The onLogin function gets called after a succesful login.
+ * The onLogin function gets called after a successful login.
  *
  * It is expected that implementations override this to be notified when the
  * login is complete. The response to the login call is provided as the single

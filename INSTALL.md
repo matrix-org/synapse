@@ -57,7 +57,7 @@ light workloads.
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 3.5.2 or later, up to Python 3.8.
+- Python 3.5.2 or later, up to Python 3.9.
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
 Synapse is written in Python but some of the libraries it uses are written in

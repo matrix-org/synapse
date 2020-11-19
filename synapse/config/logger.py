@@ -23,7 +23,6 @@ from string import Template
 import yaml
 
 from twisted.logger import (
-    ILogObserver,
     LogBeginner,
     STDLibLogObserver,
     eventAsText,
@@ -32,11 +31,9 @@ from twisted.logger import (
 
 import synapse
 from synapse.app import _base as appbase
-from synapse.logging._structured import (
-    reload_structured_logging,
-    setup_structured_logging,
-)
+from synapse.logging._structured import setup_structured_logging
 from synapse.logging.context import LoggingContextFilter
+from synapse.logging.filter import MetadataFilter
 from synapse.util.versionstring import get_version_string
 
 from ._base import Config, ConfigError
@@ -48,7 +45,11 @@ DEFAULT_LOG_CONFIG = Template(
 # This is a YAML file containing a standard Python logging configuration
 # dictionary. See [1] for details on the valid settings.
 #
+# Synapse also supports structured logging for machine readable logs which can
+# be ingested by ELK stacks. See [2] for details.
+#
 # [1]: https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
+# [2]: https://github.com/matrix-org/synapse/blob/master/docs/structured_logging.md
 
 version: 1
 
@@ -105,7 +106,7 @@ root:
     # then write them to a file.
     #
     # Replace "buffer" with "console" to log to stderr instead. (Note that you'll
-    # also need to update the configuation for the `twisted` logger above, in
+    # also need to update the configuration for the `twisted` logger above, in
     # this case.)
     #
     handlers: [buffer]
@@ -176,11 +177,11 @@ class LoggingConfig(Config):
                 log_config_file.write(DEFAULT_LOG_CONFIG.substitute(log_file=log_file))
 
 
-def _setup_stdlib_logging(config, log_config, logBeginner: LogBeginner):
+def _setup_stdlib_logging(config, log_config_path, logBeginner: LogBeginner) -> None:
     """
-    Set up Python stdlib logging.
+    Set up Python standard library logging.
     """
-    if log_config is None:
+    if log_config_path is None:
         log_format = (
             "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"
             " - %(message)s"
@@ -196,7 +197,8 @@ def _setup_stdlib_logging(config, log_config, logBeginner: LogBeginner):
         handler.setFormatter(formatter)
         logger.addHandler(handler)
     else:
-        logging.config.dictConfig(log_config)
+        # Load the logging configuration.
+        _load_logging_config(log_config_path)
 
     # We add a log record factory that runs all messages through the
     # LoggingContextFilter so that we get the context *at the time we log*
@@ -204,12 +206,14 @@ def _setup_stdlib_logging(config, log_config, logBeginner: LogBeginner):
     # filter options, but care must when using e.g. MemoryHandler to buffer
     # writes.
 
-    log_filter = LoggingContextFilter(request="")
+    log_context_filter = LoggingContextFilter(request="")
+    log_metadata_filter = MetadataFilter({"server_name": config.server_name})
     old_factory = logging.getLogRecordFactory()
 
     def factory(*args, **kwargs):
         record = old_factory(*args, **kwargs)
-        log_filter.filter(record)
+        log_context_filter.filter(record)
+        log_metadata_filter.filter(record)
         return record
 
     logging.setLogRecordFactory(factory)
@@ -255,21 +259,40 @@ def _setup_stdlib_logging(config, log_config, logBeginner: LogBeginner):
     if not config.no_redirect_stdio:
         print("Redirected stdout/stderr to logs")
 
-    return observer
 
-
-def _reload_stdlib_logging(*args, log_config=None):
-    logger = logging.getLogger("")
+def _load_logging_config(log_config_path: str) -> None:
+    """
+    Configure logging from a log config path.
+    """
+    with open(log_config_path, "rb") as f:
+        log_config = yaml.safe_load(f.read())
 
     if not log_config:
-        logger.warning("Reloaded a blank config?")
+        logging.warning("Loaded a blank logging config?")
+
+    # If the old structured logging configuration is being used, convert it to
+    # the new style configuration.
+    if "structured" in log_config and log_config.get("structured"):
+        log_config = setup_structured_logging(log_config)
 
     logging.config.dictConfig(log_config)
 
 
+def _reload_logging_config(log_config_path):
+    """
+    Reload the log configuration from the file and apply it.
+    """
+    # If no log config path was given, it cannot be reloaded.
+    if log_config_path is None:
+        return
+
+    _load_logging_config(log_config_path)
+    logging.info("Reloaded log config from %s due to SIGHUP", log_config_path)
+
+
 def setup_logging(
     hs, config, use_worker_options=False, logBeginner: LogBeginner = globalLogBeginner
-) -> ILogObserver:
+) -> None:
     """
     Set up the logging subsystem.
 
@@ -282,41 +305,18 @@ def setup_logging(
 
         logBeginner: The Twisted logBeginner to use.
 
-    Returns:
-        The "root" Twisted Logger observer, suitable for sending logs to from a
-        Logger instance.
     """
-    log_config = config.worker_log_config if use_worker_options else config.log_config
+    log_config_path = (
+        config.worker_log_config if use_worker_options else config.log_config
+    )
 
-    def read_config(*args, callback=None):
-        if log_config is None:
-            return None
+    # Perform one-time logging configuration.
+    _setup_stdlib_logging(config, log_config_path, logBeginner=logBeginner)
+    # Add a SIGHUP handler to reload the logging configuration, if one is available.
+    appbase.register_sighup(_reload_logging_config, log_config_path)
 
-        with open(log_config, "rb") as f:
-            log_config_body = yaml.safe_load(f.read())
-
-        if callback:
-            callback(log_config=log_config_body)
-            logging.info("Reloaded log config from %s due to SIGHUP", log_config)
-
-        return log_config_body
-
-    log_config_body = read_config()
-
-    if log_config_body and log_config_body.get("structured") is True:
-        logger = setup_structured_logging(
-            hs, config, log_config_body, logBeginner=logBeginner
-        )
-        appbase.register_sighup(read_config, callback=reload_structured_logging)
-    else:
-        logger = _setup_stdlib_logging(config, log_config_body, logBeginner=logBeginner)
-        appbase.register_sighup(read_config, callback=_reload_stdlib_logging)
-
-    # make sure that the first thing we log is a thing we can grep backwards
-    # for
+    # Log immediately so we can grep backwards.
     logging.warning("***** STARTING SERVER *****")
     logging.warning("Server %s version %s", sys.argv[0], get_version_string(synapse))
     logging.info("Server hostname: %s", config.server_name)
     logging.info("Instance name: %s", hs.get_instance_name())
-
-    return logger

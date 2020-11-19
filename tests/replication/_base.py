@@ -16,7 +16,6 @@ import logging
 from typing import Any, Callable, List, Optional, Tuple
 
 import attr
-import hiredis
 
 from twisted.internet.interfaces import IConsumer, IPullProducer, IReactorTime
 from twisted.internet.protocol import Protocol
@@ -37,13 +36,23 @@ from synapse.server import HomeServer
 from synapse.util import Clock
 
 from tests import unittest
-from tests.server import FakeTransport, render
+from tests.server import FakeTransport
+
+try:
+    import hiredis
+except ImportError:
+    hiredis = None
 
 logger = logging.getLogger(__name__)
 
 
 class BaseStreamTestCase(unittest.HomeserverTestCase):
     """Base class for tests of the replication streams"""
+
+    # hiredis is an optional dependency so we don't want to require it for running
+    # the tests.
+    if not hiredis:
+        skip = "Requires hiredis"
 
     servlets = [
         streams.register_servlets,
@@ -231,8 +240,8 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
             lambda: self._handle_http_replication_attempt(self.hs, 8765),
         )
 
-    def create_test_json_resource(self):
-        """Overrides `HomeserverTestCase.create_test_json_resource`.
+    def create_test_resource(self):
+        """Overrides `HomeserverTestCase.create_test_resource`.
         """
         # We override this so that it automatically registers all the HTTP
         # replication servlets, without having to explicitly do that in all
@@ -269,7 +278,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
             homeserver_to_use=GenericWorkerServer,
             config=config,
             reactor=self.reactor,
-            **kwargs
+            **kwargs,
         )
 
         # If the instance is in the `instance_map` config then workers may try
@@ -337,9 +346,6 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         config["worker_replication_host"] = "testserv"
         config["worker_replication_http_port"] = "8765"
         return config
-
-    def render_on_worker(self, worker_hs: HomeServer, request: SynapseRequest):
-        render(request, self._hs_to_site[worker_hs].resource, self.reactor)
 
     def replicate(self):
         """Tell the master side of replication that something has happened, and then

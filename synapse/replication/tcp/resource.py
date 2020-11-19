@@ -117,6 +117,16 @@ class ReplicationStreamer:
                 stream.discard_updates_and_advance()
             return
 
+        # We check up front to see if anything has actually changed, as we get
+        # poked because of changes that happened on other instances.
+        if all(
+            stream.last_token == stream.current_token(self._instance_name)
+            for stream in self.streams
+        ):
+            return
+
+        # If there are updates then we need to set this even if we're already
+        # looping, as the loop needs to know that he might need to loop again.
         self.pending_updates = True
 
         if self.is_looping:

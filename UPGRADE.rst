@@ -75,6 +75,22 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+Upgrading to v1.23.0
+====================
+
+Structured logging configuration breaking changes
+-------------------------------------------------
+
+This release deprecates use of the ``structured: true`` logging configuration for
+structured logging. If your logging configuration contains ``structured: true``
+then it should be modified based on the `structured logging documentation
+<https://github.com/matrix-org/synapse/blob/master/docs/structured_logging.md>`_.
+
+The ``structured`` and ``drains`` logging options are now deprecated and should
+be replaced by standard logging configuration of ``handlers`` and ``formatters``.
+
+A future will release of Synapse will make using ``structured: true`` an error.
+
 Upgrading to v1.22.0
 ====================
 

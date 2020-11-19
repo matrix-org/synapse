@@ -1,1 +1,0 @@
-Allow `ThirdPartyEventRules` modules to query and manipulate whether a room is in the public rooms directory.

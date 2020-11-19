@@ -88,13 +88,18 @@ def make_pool(
     """Get the connection pool for the database.
     """
 
+    # By default enable `cp_reconnect`. We need to fiddle with db_args in case
+    # someone has explicitly set `cp_reconnect`.
+    db_args = dict(db_config.config.get("args", {}))
+    db_args.setdefault("cp_reconnect", True)
+
     return adbapi.ConnectionPool(
         db_config.config["name"],
         cp_reactor=reactor,
         cp_openfun=lambda conn: engine.on_new_connection(
             LoggingDatabaseConnection(conn, engine, "on_new_connection")
         ),
-        **db_config.config.get("args", {})
+        **db_args,
     )
 
 
@@ -632,7 +637,7 @@ class DatabasePool:
                 func,
                 *args,
                 db_autocommit=db_autocommit,
-                **kwargs
+                **kwargs,
             )
 
             for after_callback, after_args, after_kwargs in after_callbacks:

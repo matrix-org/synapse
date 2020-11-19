@@ -11,7 +11,7 @@
 #    docker build -f docker/Dockerfile --build-arg PYTHON_VERSION=3.6 .
 #
 
-ARG PYTHON_VERSION=3.7
+ARG PYTHON_VERSION=3.8
 
 ###
 ### Stage 0: builder
@@ -36,7 +36,8 @@ RUN pip install --prefix="/install" --no-warn-script-location \
         frozendict \
         jaeger-client \
         opentracing \
-        prometheus-client \
+        # Match the version constraints of Synapse
+        "prometheus_client>=0.4.0,<0.9.0" \
         psycopg2 \
         pycparser \
         pyrsistent \

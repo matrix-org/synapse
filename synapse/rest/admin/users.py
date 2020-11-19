@@ -16,6 +16,7 @@ import hashlib
 import hmac
 import logging
 from http import HTTPStatus
+from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, NotFoundError, SynapseError
@@ -27,15 +28,30 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import (
     admin_patterns,
     assert_requester_is_admin,
     assert_user_is_admin,
     historical_admin_path_patterns,
 )
-from synapse.types import UserID
+from synapse.types import JsonDict, UserID
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+_GET_PUSHERS_ALLOWED_KEYS = {
+    "app_display_name",
+    "app_id",
+    "data",
+    "device_display_name",
+    "kind",
+    "lang",
+    "profile_tag",
+    "pushkey",
+}
 
 
 class UsersRestServlet(RestServlet):
@@ -399,6 +415,7 @@ class UserRegisterServlet(RestServlet):
 
         admin = body.get("admin", None)
         user_type = body.get("user_type", None)
+        displayname = body.get("displayname", None)
 
         if user_type is not None and user_type not in UserTypes.ALL_USER_TYPES:
             raise SynapseError(400, "Invalid user type")
@@ -435,6 +452,7 @@ class UserRegisterServlet(RestServlet):
             password_hash=password_hash,
             admin=bool(admin),
             user_type=user_type,
+            default_display_name=displayname,
             by_admin=True,
         )
 
@@ -702,9 +720,163 @@ class UserMembershipRestServlet(RestServlet):
         if not self.is_mine(UserID.from_string(user_id)):
             raise SynapseError(400, "Can only lookup local users")
 
-        room_ids = await self.store.get_rooms_for_user(user_id)
-        if not room_ids:
-            raise NotFoundError("User not found")
+        user = await self.store.get_user_by_id(user_id)
+        if user is None:
+            raise NotFoundError("Unknown user")
 
+        room_ids = await self.store.get_rooms_for_user(user_id)
         ret = {"joined_rooms": list(room_ids), "total": len(room_ids)}
         return 200, ret
+
+
+class PushersRestServlet(RestServlet):
+    """
+    Gets information about all pushers for a specific `user_id`.
+
+    Example:
+        http://localhost:8008/_synapse/admin/v1/users/
+        @user:server/pushers
+
+    Returns:
+        pushers: Dictionary containing pushers information.
+        total: Number of pushers in dictonary `pushers`.
+    """
+
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/pushers$")
+
+    def __init__(self, hs):
+        self.is_mine = hs.is_mine
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self.auth, request)
+
+        if not self.is_mine(UserID.from_string(user_id)):
+            raise SynapseError(400, "Can only lookup local users")
+
+        if not await self.store.get_user_by_id(user_id):
+            raise NotFoundError("User not found")
+
+        pushers = await self.store.get_pushers_by_user_id(user_id)
+
+        filtered_pushers = [
+            {k: v for k, v in p.items() if k in _GET_PUSHERS_ALLOWED_KEYS}
+            for p in pushers
+        ]
+
+        return 200, {"pushers": filtered_pushers, "total": len(filtered_pushers)}
+
+
+class UserMediaRestServlet(RestServlet):
+    """
+    Gets information about all uploaded local media for a specific `user_id`.
+
+    Example:
+        http://localhost:8008/_synapse/admin/v1/users/
+        @user:server/media
+
+    Args:
+        The parameters `from` and `limit` are required for pagination.
+        By default, a `limit` of 100 is used.
+    Returns:
+        A list of media and an integer representing the total number of
+        media that exist given for this user
+    """
+
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]+)/media$")
+
+    def __init__(self, hs):
+        self.is_mine = hs.is_mine
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self.auth, request)
+
+        if not self.is_mine(UserID.from_string(user_id)):
+            raise SynapseError(400, "Can only lookup local users")
+
+        user = await self.store.get_user_by_id(user_id)
+        if user is None:
+            raise NotFoundError("Unknown user")
+
+        start = parse_integer(request, "from", default=0)
+        limit = parse_integer(request, "limit", default=100)
+
+        if start < 0:
+            raise SynapseError(
+                400,
+                "Query parameter from must be a string representing a positive integer.",
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        if limit < 0:
+            raise SynapseError(
+                400,
+                "Query parameter limit must be a string representing a positive integer.",
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        media, total = await self.store.get_local_media_by_user_paginate(
+            start, limit, user_id
+        )
+
+        ret = {"media": media, "total": total}
+        if (start + limit) < total:
+            ret["next_token"] = start + len(media)
+
+        return 200, ret
+
+
+class UserTokenRestServlet(RestServlet):
+    """An admin API for logging in as a user.
+
+    Example:
+
+        POST /_synapse/admin/v1/users/@test:example.com/login
+        {}
+
+        200 OK
+        {
+            "access_token": "<some_token>"
+        }
+    """
+
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/login$")
+
+    def __init__(self, hs: "HomeServer"):
+        self.hs = hs
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.auth_handler = hs.get_auth_handler()
+
+    async def on_POST(self, request, user_id):
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
+        auth_user = requester.user
+
+        if not self.hs.is_mine_id(user_id):
+            raise SynapseError(400, "Only local users can be logged in as")
+
+        body = parse_json_object_from_request(request, allow_empty_body=True)
+
+        valid_until_ms = body.get("valid_until_ms")
+        if valid_until_ms and not isinstance(valid_until_ms, int):
+            raise SynapseError(400, "'valid_until_ms' parameter must be an int")
+
+        if auth_user.to_string() == user_id:
+            raise SynapseError(400, "Cannot use admin API to login as self")
+
+        token = await self.auth_handler.get_access_token_for_user_id(
+            user_id=auth_user.to_string(),
+            device_id=None,
+            valid_until_ms=valid_until_ms,
+            puppets_user_id=user_id,
+        )
+
+        return 200, {"access_token": token}

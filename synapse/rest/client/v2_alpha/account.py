@@ -38,6 +38,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.metrics import threepid_send_requests
 from synapse.push.mailer import Mailer
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import assert_valid_client_secret, random_string
@@ -142,6 +143,10 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
 
             # Wrap the session id in a JSON object
             ret = {"sid": sid}
+
+        threepid_send_requests.labels(type="email", reason="password_reset").observe(
+            send_attempt
+        )
 
         return 200, ret
 
@@ -266,9 +271,6 @@ class PasswordRestServlet(RestServlet):
             user_id, password_hash, logout_devices, requester
         )
 
-        return 200, {}
-
-    def on_OPTIONS(self, _):
         return 200, {}
 
 
@@ -414,6 +416,10 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
             # Wrap the session id in a JSON object
             ret = {"sid": sid}
 
+        threepid_send_requests.labels(type="email", reason="add_threepid").observe(
+            send_attempt
+        )
+
         return 200, ret
 
 
@@ -482,6 +488,10 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
             client_secret,
             send_attempt,
             next_link,
+        )
+
+        threepid_send_requests.labels(type="msisdn", reason="add_threepid").observe(
+            send_attempt
         )
 
         return 200, ret

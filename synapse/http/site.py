@@ -14,7 +14,7 @@
 import contextlib
 import logging
 import time
-from typing import Optional
+from typing import Optional, Union
 
 from twisted.python.failure import Failure
 from twisted.web.server import Request, Site
@@ -23,6 +23,7 @@ from synapse.config.server import ListenerConfig
 from synapse.http import redact_uri
 from synapse.http.request_metrics import RequestMetrics, requests_counter
 from synapse.logging.context import LoggingContext, PreserveLoggingContext
+from synapse.types import Requester
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +55,11 @@ class SynapseRequest(Request):
         Request.__init__(self, channel, *args, **kw)
         self.site = channel.site
         self._channel = channel  # this is used by the tests
-        self.authenticated_entity = None
         self.start_time = 0.0
+
+        # The requester, if authenticated. For federation requests this is the
+        # server name, for client requests this is the Requester object.
+        self.requester = None  # type: Optional[Union[Requester, str]]
 
         # we can't yet create the logcontext, as we don't know the method.
         self.logcontext = None  # type: Optional[LoggingContext]
@@ -109,8 +113,14 @@ class SynapseRequest(Request):
             method = self.method.decode("ascii")
         return method
 
-    def get_user_agent(self):
-        return self.requestHeaders.getRawHeaders(b"User-Agent", [None])[-1]
+    def get_user_agent(self, default: str) -> str:
+        """Return the last User-Agent header, or the given default.
+        """
+        user_agent = self.requestHeaders.getRawHeaders(b"User-Agent", [None])[-1]
+        if user_agent is None:
+            return default
+
+        return user_agent.decode("ascii", "replace")
 
     def render(self, resrc):
         # this is called once a Resource has been found to serve the request; in our
@@ -161,7 +171,9 @@ class SynapseRequest(Request):
             yield
         except Exception:
             # this should already have been caught, and sent back to the client as a 500.
-            logger.exception("Asynchronous messge handler raised an uncaught exception")
+            logger.exception(
+                "Asynchronous message handler raised an uncaught exception"
+            )
         finally:
             # the request handler has finished its work and either sent the whole response
             # back, or handed over responsibility to a Producer.
@@ -263,22 +275,30 @@ class SynapseRequest(Request):
         # to the client (nb may be negative)
         response_send_time = self.finish_time - self._processing_finished_time
 
-        # need to decode as it could be raw utf-8 bytes
-        # from a IDN servname in an auth header
-        authenticated_entity = self.authenticated_entity
-        if authenticated_entity is not None and isinstance(authenticated_entity, bytes):
-            authenticated_entity = authenticated_entity.decode("utf-8", "replace")
+        # Convert the requester into a string that we can log
+        authenticated_entity = None
+        if isinstance(self.requester, str):
+            authenticated_entity = self.requester
+        elif isinstance(self.requester, Requester):
+            authenticated_entity = self.requester.authenticated_entity
+
+            # If this is a request where the target user doesn't match the user who
+            # authenticated (e.g. and admin is puppetting a user) then we log both.
+            if self.requester.user.to_string() != authenticated_entity:
+                authenticated_entity = "{},{}".format(
+                    authenticated_entity, self.requester.user.to_string(),
+                )
+        elif self.requester is not None:
+            # This shouldn't happen, but we log it so we don't lose information
+            # and can see that we're doing something wrong.
+            authenticated_entity = repr(self.requester)  # type: ignore[unreachable]
 
         # ...or could be raw utf-8 bytes in the User-Agent header.
         # N.B. if you don't do this, the logger explodes cryptically
         # with maximum recursion trying to log errors about
         # the charset problem.
         # c.f. https://github.com/matrix-org/synapse/issues/3471
-        user_agent = self.get_user_agent()
-        if user_agent is not None:
-            user_agent = user_agent.decode("utf-8", "replace")
-        else:
-            user_agent = "-"
+        user_agent = self.get_user_agent("-")
 
         code = str(self.code)
         if not self.finished:

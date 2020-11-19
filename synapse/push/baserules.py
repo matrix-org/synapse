@@ -37,7 +37,7 @@ def list_with_base_rules(rawrules, use_new_defaults=False):
     modified_base_rules = {r["rule_id"]: r for r in rawrules if r["priority_class"] < 0}
 
     # Remove the modified base rules from the list, They'll be added back
-    # in the default postions in the list.
+    # in the default positions in the list.
     rawrules = [r for r in rawrules if r["priority_class"] >= 0]
 
     # shove the server default rules for each kind onto the end of each
@@ -495,6 +495,30 @@ BASE_APPEND_UNDERRIDE_RULES = [
                 "pattern": "m.room.encrypted",
                 "_id": "_encrypted",
             }
+        ],
+        "actions": ["notify", {"set_tweak": "highlight", "value": False}],
+    },
+    {
+        "rule_id": "global/underride/.im.vector.jitsi",
+        "conditions": [
+            {
+                "kind": "event_match",
+                "key": "type",
+                "pattern": "im.vector.modular.widgets",
+                "_id": "_type_modular_widgets",
+            },
+            {
+                "kind": "event_match",
+                "key": "content.type",
+                "pattern": "jitsi",
+                "_id": "_content_type_jitsi",
+            },
+            {
+                "kind": "event_match",
+                "key": "state_key",
+                "pattern": "*",
+                "_id": "_is_state_event",
+            },
         ],
         "actions": ["notify", {"set_tweak": "highlight", "value": False}],
     },

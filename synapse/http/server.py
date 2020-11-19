@@ -35,8 +35,6 @@ from twisted.web.server import NOT_DONE_YET, Request
 from twisted.web.static import File, NoRangeStaticProducer
 from twisted.web.util import redirectTo
 
-import synapse.events
-import synapse.metrics
 from synapse.api.errors import (
     CodeMessageException,
     Codes,
@@ -182,7 +180,7 @@ class HttpServer:
         """ Register a callback that gets fired if we receive a http request
         with the given method for a path that matches the given regex.
 
-        If the regex contains groups these gets passed to the calback via
+        If the regex contains groups these gets passed to the callback via
         an unpacked tuple.
 
         Args:
@@ -241,7 +239,7 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
 
     async def _async_render(self, request: Request):
         """Delegates to `_async_render_<METHOD>` methods, or returns a 400 if
-        no appropriate method exists. Can be overriden in sub classes for
+        no appropriate method exists. Can be overridden in sub classes for
         different routing.
         """
         # Treat HEAD requests as GET requests.
@@ -386,7 +384,7 @@ class JsonResource(DirectServeJsonResource):
     async def _async_render(self, request):
         callback, servlet_classname, group_dict = self._get_handler_for_request(request)
 
-        # Make sure we have an appopriate name for this handler in prometheus
+        # Make sure we have an appropriate name for this handler in prometheus
         # (rather than the default of JsonResource).
         request.request_metrics.name = servlet_classname
 
@@ -620,7 +618,7 @@ def respond_with_json(
     if pretty_print:
         encoder = iterencode_pretty_printed_json
     else:
-        if canonical_json or synapse.events.USE_FROZEN_DICTS:
+        if canonical_json:
             encoder = iterencode_canonical_json
         else:
             encoder = _encode_json_bytes

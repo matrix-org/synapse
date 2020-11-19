@@ -143,7 +143,7 @@ class RegistrationConfig(Config):
             RoomCreationPreset.TRUSTED_PRIVATE_CHAT,
         }
 
-        # Pull the creater/inviter from the configuration, this gets used to
+        # Pull the creator/inviter from the configuration, this gets used to
         # send invites for invite-only rooms.
         mxid_localpart = config.get("auto_join_mxid_localpart")
         self.auto_join_user_id = None
@@ -347,8 +347,9 @@ class RegistrationConfig(Config):
         # email will be globally disabled.
         #
         # Additionally, if `msisdn` is not set, registration and password resets via msisdn
-        # will be disabled regardless. This is due to Synapse currently not supporting any
-        # method of sending SMS messages on its own.
+        # will be disabled regardless, and users will not be able to associate an msisdn
+        # identifier to their account. This is due to Synapse currently not supporting
+        # any method of sending SMS messages on its own.
         #
         # To enable using an identity server for operations regarding a particular third-party
         # identifier type, set the value to the URL of that identity server as shown in the

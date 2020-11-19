@@ -1,1 +1,0 @@
-Fix increase in the number of `There was no active span...` errors logged when using OpenTracing.

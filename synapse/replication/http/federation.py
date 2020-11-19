@@ -254,20 +254,20 @@ class ReplicationCleanRoomRestServlet(ReplicationEndpoint):
         return 200, {}
 
 
-class ReplicationStoreRoomOnInviteRestServlet(ReplicationEndpoint):
+class ReplicationStoreRoomOnOutlierMembershipRestServlet(ReplicationEndpoint):
     """Called to clean up any data in DB for a given room, ready for the
     server to join the room.
 
     Request format:
 
-        POST /_synapse/replication/store_room_on_invite/:room_id/:txn_id
+        POST /_synapse/replication/store_room_on_outlier_membership/:room_id/:txn_id
 
         {
             "room_version": "1",
         }
     """
 
-    NAME = "store_room_on_invite"
+    NAME = "store_room_on_outlier_membership"
     PATH_ARGS = ("room_id",)
 
     def __init__(self, hs):
@@ -282,7 +282,7 @@ class ReplicationStoreRoomOnInviteRestServlet(ReplicationEndpoint):
     async def _handle_request(self, request, room_id):
         content = parse_json_object_from_request(request)
         room_version = KNOWN_ROOM_VERSIONS[content["room_version"]]
-        await self.store.maybe_store_room_on_invite(room_id, room_version)
+        await self.store.maybe_store_room_on_outlier_membership(room_id, room_version)
         return 200, {}
 
 
@@ -291,4 +291,4 @@ def register_servlets(hs, http_server):
     ReplicationFederationSendEduRestServlet(hs).register(http_server)
     ReplicationGetQueryRestServlet(hs).register(http_server)
     ReplicationCleanRoomRestServlet(hs).register(http_server)
-    ReplicationStoreRoomOnInviteRestServlet(hs).register(http_server)
+    ReplicationStoreRoomOnOutlierMembershipRestServlet(hs).register(http_server)

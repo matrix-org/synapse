@@ -89,6 +89,7 @@ from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.search import SearchHandler
 from synapse.handlers.set_password import SetPasswordHandler
+from synapse.handlers.sso import SsoHandler
 from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import FollowerTypingHandler, TypingWriterHandler
@@ -389,6 +390,10 @@ class HomeServer(metaclass=abc.ABCMeta):
             return TypingWriterHandler(self)
         else:
             return FollowerTypingHandler(self)
+
+    @cache_in_self
+    def get_sso_handler(self) -> SsoHandler:
+        return SsoHandler(self)
 
     @cache_in_self
     def get_sync_handler(self) -> SyncHandler:

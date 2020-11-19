@@ -1,1 +1,0 @@
-Rename `Cache` to `DeferredCache`, to better reflect its purpose.

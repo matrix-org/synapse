@@ -73,7 +73,6 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "/_matrix/client/r0/password_policy"
         )
-        self.render(request)
 
         self.assertEqual(channel.code, 200, channel.result)
         self.assertEqual(
@@ -91,7 +90,6 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
     def test_password_too_short(self):
         request_data = json.dumps({"username": "kermit", "password": "shorty"})
         request, channel = self.make_request("POST", self.register_url, request_data)
-        self.render(request)
 
         self.assertEqual(channel.code, 400, channel.result)
         self.assertEqual(
@@ -101,7 +99,6 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
     def test_password_no_digit(self):
         request_data = json.dumps({"username": "kermit", "password": "longerpassword"})
         request, channel = self.make_request("POST", self.register_url, request_data)
-        self.render(request)
 
         self.assertEqual(channel.code, 400, channel.result)
         self.assertEqual(
@@ -111,7 +108,6 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
     def test_password_no_symbol(self):
         request_data = json.dumps({"username": "kermit", "password": "l0ngerpassword"})
         request, channel = self.make_request("POST", self.register_url, request_data)
-        self.render(request)
 
         self.assertEqual(channel.code, 400, channel.result)
         self.assertEqual(
@@ -121,7 +117,6 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
     def test_password_no_uppercase(self):
         request_data = json.dumps({"username": "kermit", "password": "l0ngerpassword!"})
         request, channel = self.make_request("POST", self.register_url, request_data)
-        self.render(request)
 
         self.assertEqual(channel.code, 400, channel.result)
         self.assertEqual(
@@ -131,7 +126,6 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
     def test_password_no_lowercase(self):
         request_data = json.dumps({"username": "kermit", "password": "L0NGERPASSWORD!"})
         request, channel = self.make_request("POST", self.register_url, request_data)
-        self.render(request)
 
         self.assertEqual(channel.code, 400, channel.result)
         self.assertEqual(
@@ -141,7 +135,6 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
     def test_password_compliant(self):
         request_data = json.dumps({"username": "kermit", "password": "L0ngerpassword!"})
         request, channel = self.make_request("POST", self.register_url, request_data)
-        self.render(request)
 
         # Getting a 401 here means the password has passed validation and the server has
         # responded with a list of registration flows.
@@ -173,7 +166,6 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
             request_data,
             access_token=tok,
         )
-        self.render(request)
 
         self.assertEqual(channel.code, 400, channel.result)
         self.assertEqual(channel.json_body["errcode"], Codes.PASSWORD_NO_DIGIT)

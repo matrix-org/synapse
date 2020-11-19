@@ -98,11 +98,18 @@ class ProfileHandler(BaseHandler):
             except RequestSendFailed as e:
                 raise SynapseError(502, "Failed to fetch profile") from e
             except HttpResponseException as e:
+                if e.code < 500 and e.code != 404:
+                    # Other codes are not allowed in c2s API
+                    logger.info(
+                        "Server replied with wrong response: %s %s", e.code, e.msg
+                    )
+
+                    raise SynapseError(502, "Failed to fetch profile")
                 raise e.to_synapse_error()
 
     async def get_profile_from_cache(self, user_id: str) -> JsonDict:
         """Get the profile information from our local cache. If the user is
-        ours then the profile information will always be corect. Otherwise,
+        ours then the profile information will always be correct. Otherwise,
         it may be out of date/missing.
         """
         target_user = UserID.from_string(user_id)
@@ -124,7 +131,7 @@ class ProfileHandler(BaseHandler):
             profile = await self.store.get_from_remote_profile_cache(user_id)
             return profile or {}
 
-    async def get_displayname(self, target_user: UserID) -> str:
+    async def get_displayname(self, target_user: UserID) -> Optional[str]:
         if self.hs.is_mine(target_user):
             try:
                 displayname = await self.store.get_profile_displayname(
@@ -182,7 +189,9 @@ class ProfileHandler(BaseHandler):
                 )
 
         if not isinstance(new_displayname, str):
-            raise SynapseError(400, "Invalid displayname")
+            raise SynapseError(
+                400, "'displayname' must be a string", errcode=Codes.INVALID_PARAM
+            )
 
         if len(new_displayname) > MAX_DISPLAYNAME_LEN:
             raise SynapseError(
@@ -197,7 +206,9 @@ class ProfileHandler(BaseHandler):
         # the join event to update the displayname in the rooms.
         # This must be done by the target user himself.
         if by_admin:
-            requester = create_requester(target_user)
+            requester = create_requester(
+                target_user, authenticated_entity=requester.authenticated_entity,
+            )
 
         await self.store.set_profile_displayname(
             target_user.localpart, displayname_to_set
@@ -211,7 +222,7 @@ class ProfileHandler(BaseHandler):
 
         await self._update_join_states(requester, target_user)
 
-    async def get_avatar_url(self, target_user: UserID) -> str:
+    async def get_avatar_url(self, target_user: UserID) -> Optional[str]:
         if self.hs.is_mine(target_user):
             try:
                 avatar_url = await self.store.get_profile_avatar_url(
@@ -266,7 +277,9 @@ class ProfileHandler(BaseHandler):
                 )
 
         if not isinstance(new_avatar_url, str):
-            raise SynapseError(400, "Invalid displayname")
+            raise SynapseError(
+                400, "'avatar_url' must be a string", errcode=Codes.INVALID_PARAM
+            )
 
         if len(new_avatar_url) > MAX_AVATAR_URL_LEN:
             raise SynapseError(
@@ -275,7 +288,9 @@ class ProfileHandler(BaseHandler):
 
         # Same like set_displayname
         if by_admin:
-            requester = create_requester(target_user)
+            requester = create_requester(
+                target_user, authenticated_entity=requester.authenticated_entity
+            )
 
         await self.store.set_profile_avatar_url(target_user.localpart, new_avatar_url)
 

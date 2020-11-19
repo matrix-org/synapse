@@ -47,7 +47,6 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
             % other_user,
             access_token=token,
         )
-        self.render(request)
         return request, channel
 
     def test_shared_room_list_public(self):

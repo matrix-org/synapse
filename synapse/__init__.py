@@ -48,7 +48,7 @@ try:
 except ImportError:
     pass
 
-__version__ = "1.21.2"
+__version__ = "1.23.0"
 
 if bool(os.environ.get("SYNAPSE_TEST_PATCH_LOG_CONTEXTS", False)):
     # We import here so that we don't have to install a bunch of deps when
