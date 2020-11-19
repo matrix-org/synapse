@@ -58,6 +58,7 @@ class SamlHandler(BaseHandler):
     def __init__(self, hs: "synapse.server.HomeServer"):
         super().__init__(hs)
         self._saml_client = Saml2Client(hs.config.saml2_sp_config)
+        self._saml_idp_entityid = hs.config.saml2_idp_entityid
         self._auth_handler = hs.get_auth_handler()
         self._registration_handler = hs.get_registration_handler()
 
@@ -100,7 +101,7 @@ class SamlHandler(BaseHandler):
             URL to redirect to
         """
         reqid, info = self._saml_client.prepare_for_authenticate(
-            relay_state=client_redirect_url
+            entityid=self._saml_idp_entityid, relay_state=client_redirect_url
         )
 
         # Since SAML sessions timeout it is useful to log when they were created.
