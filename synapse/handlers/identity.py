@@ -46,12 +46,10 @@ class IdentityHandler(BaseHandler):
     def __init__(self, hs):
         super().__init__(hs)
 
+        # An HTTP client to contact trusted URLs.
         self.http_client = SimpleHttpClient(hs)
-        # We create a blacklisting instance of SimpleHttpClient for contacting identity
-        # servers specified by clients
-        self.blacklisting_http_client = SimpleHttpClient(
-            hs, ip_blacklist=hs.config.federation_ip_range_blacklist
-        )
+        # An HTTP client for contacting identity servers specified by clients.
+        self.blacklisting_http_client = hs.get_proxied_blacklisted_http_client()
         self.federation_http_client = hs.get_http_client()
         self.hs = hs
 
