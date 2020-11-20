@@ -83,6 +83,9 @@ class FederationConfig(Config):
         # As of Synapse v1.4.0 this option also affects any outbound requests to identity
         # servers provided by user input.
         #
+        # As of Synapse v1.24.0 this option also affects any outbound requests to push
+        # servers provided by user input.
+        #
         # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
         # listed here, since they correspond to unroutable addresses.)
         #
