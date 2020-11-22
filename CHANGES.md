@@ -6586,8 +6586,8 @@ Presence has been reenabled in this release.
 Homeserver:
 
 -   Update client to server API, including:
-   -   Use a more consistent url scheme.
-   -   Provide more useful information in the initial sync api.
+    -   Use a more consistent url scheme.
+    -   Provide more useful information in the initial sync api.
 -   Change the presence handling to be much more efficient.
 -   Change the presence server to server API to not require explicit polling of all users who share a room with a user.
 -   Fix races in the event streaming logic.
