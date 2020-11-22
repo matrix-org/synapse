@@ -31,6 +31,17 @@ class CaptchaConfig(Config):
         self.recaptcha_template = self.read_templates(
             ["recaptcha.html"], autoescape=True
         )[0]
+        self.hcaptcha_private_key = config.get("hcaptcha_private_key")
+        self.hcaptcha_public_key = config.get("hcaptcha_public_key")
+        self.enable_registration_hcaptcha = config.get(
+            "enable_registration_hcaptcha", False
+        )
+        self.hcaptcha_siteverify_api = config.get(
+            "hcaptcha_siteverify_api", "https://hcaptcha.com/siteverify",
+        )
+        self.hcaptcha_template = self.read_templates(
+            ["hcaptcha.html"], autoescape=True
+        )[0]
 
     def generate_config_section(self, **kwargs):
         return """\
@@ -57,4 +68,25 @@ class CaptchaConfig(Config):
         # Defaults to "https://www.recaptcha.net/recaptcha/api/siteverify".
         #
         #recaptcha_siteverify_api: "https://my.recaptcha.site"
+
+        # This homeserver's hCAPTCHA public key. Must be specified if
+        # enable_registration_hcaptcha is enabled.
+        #
+        #hcaptcha_public_key: "YOUR_PUBLIC_KEY"
+
+        # This homeserver's hCAPTCHA private key. Must be specified if
+        # enable_registration_hcaptcha is enabled.
+        #
+        #hcaptcha_private_key: "YOUR_PRIVATE_KEY"
+
+        # Uncomment to enable hCAPTCHA checks when registering, preventing signup
+        # unless a captcha is answered. Requires a valid hCaptcha
+        # public/private key. Defaults to 'false'.
+        #
+        #enable_registration_hcaptcha: true
+
+        # The API endpoint to use for verifying m.login.recaptcha responses.
+        # Defaults to "https://my.hcaptcha.site".
+        #
+        #hcaptcha_siteverify_api: "https://my.hcaptcha.site"
         """

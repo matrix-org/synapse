@@ -655,6 +655,9 @@ class AuthHandler(BaseHandler):
     def _get_params_recaptcha(self) -> dict:
         return {"public_key": self.hs.config.recaptcha_public_key}
 
+    def _get_params_hcaptcha(self) -> dict:
+        return {"public_key": self.hs.config.hcaptcha_public_key}
+
     def _get_params_terms(self) -> dict:
         return {
             "policies": {
@@ -681,6 +684,7 @@ class AuthHandler(BaseHandler):
 
         get_params = {
             LoginType.RECAPTCHA: self._get_params_recaptcha,
+            LoginType.HCAPTCHA: self._get_params_hcaptcha,
             LoginType.TERMS: self._get_params_terms,
         }
 

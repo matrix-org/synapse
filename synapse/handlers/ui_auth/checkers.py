@@ -132,6 +132,66 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
         raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
 
 
+class HcaptchaAuthChecker(UserInteractiveAuthChecker):
+    AUTH_TYPE = LoginType.HCAPTCHA
+
+    def __init__(self, hs):
+        super().__init__(hs)
+        self._enabled = bool(hs.config.hcaptcha_private_key)
+        self._http_client = hs.get_proxied_http_client()
+        self._url = hs.config.hcaptcha_siteverify_api
+        self._secret = hs.config.hcaptcha_private_key
+
+    def is_enabled(self):
+        return self._enabled
+
+    async def check_auth(self, authdict, clientip):
+        try:
+            user_response = authdict["response"]
+        except KeyError:
+            # Client tried to provide captcha but didn't give the parameter:
+            # bad request.
+            raise LoginError(
+                400, "HCaptcha response is required", errcode=Codes.CAPTCHA_NEEDED
+            )
+
+        logger.info(
+            "Submitting hcaptcha response %s with remoteip %s", user_response, clientip
+        )
+
+        # TODO: get this from the homeserver rather than creating a new one for
+        # each request
+        try:
+            resp_body = await self._http_client.post_urlencoded_get_json(
+                self._url,
+                args={
+                    "secret": self._secret,
+                    "response": user_response,
+                    "remoteip": clientip,
+                },
+            )
+        except PartialDownloadError as pde:
+            # Twisted is silly
+            data = pde.response
+            resp_body = json_decoder.decode(data.decode("utf-8"))
+
+        if "success" in resp_body:
+            # Note that we do NOT check the hostname here: we explicitly
+            # intend the CAPTCHA to be presented by whatever client the
+            # user is using, we just care that they have completed a CAPTCHA.
+            # this seems like where it would be nice to also integrate in support for hcaptcha
+            # https://www.hcaptcha.com/
+
+            logger.info(
+                "%s hCAPTCHA from hostname %s",
+                "Successful" if resp_body["success"] else "Failed",
+                resp_body.get("hostname"),
+            )
+            if resp_body["success"]:
+                return True
+        raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
+
+
 class _BaseThreepidAuthChecker:
     def __init__(self, hs):
         self.hs = hs
@@ -239,6 +299,7 @@ INTERACTIVE_AUTH_CHECKERS = [
     DummyAuthChecker,
     TermsAuthChecker,
     RecaptchaAuthChecker,
+    HcaptchaAuthChecker,
     EmailIdentityAuthChecker,
     MsisdnAuthChecker,
 ]

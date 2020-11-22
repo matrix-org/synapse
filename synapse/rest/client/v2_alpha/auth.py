@@ -58,6 +58,7 @@ class AuthRestServlet(RestServlet):
             self._cas_service_url = hs.config.cas_service_url
 
         self.recaptcha_template = hs.config.recaptcha_template
+        self.hcaptcha_template = hs.config.hcaptcha_template
         self.terms_template = hs.config.terms_template
         self.success_template = hs.config.fallback_success_template
 
@@ -72,6 +73,13 @@ class AuthRestServlet(RestServlet):
                 myurl="%s/r0/auth/%s/fallback/web"
                 % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
                 sitekey=self.hs.config.recaptcha_public_key,
+            )
+        elif stagetype == LoginType.HCAPTCHA:
+            html = self.hcaptcha_template.render(
+                session=session,
+                myurl="%s/r0/auth/%s/fallback/web"
+                % (CLIENT_API_PREFIX, LoginType.HCAPTCHA),
+                sitekey=self.hs.config.hcaptcha_public_key,
             )
         elif stagetype == LoginType.TERMS:
             html = self.terms_template.render(
@@ -145,6 +153,28 @@ class AuthRestServlet(RestServlet):
                     myurl="%s/r0/auth/%s/fallback/web"
                     % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
                     sitekey=self.hs.config.recaptcha_public_key,
+                )
+        elif stagetype == LoginType.HCAPTCHA:
+            response = parse_string(request, "h-captcha-response")
+
+            if not response:
+                raise SynapseError(400, "No hcaptcha response supplied")
+
+            authdict = {"response": response, "session": session}
+
+            success = await self.auth_handler.add_oob_auth(
+                LoginType.HCAPTCHA, authdict, self.hs.get_ip_from_request(request)
+            )
+
+            if success:
+                html = self.success_template.render()
+            else:
+
+                html = self.hcaptcha_template.render(
+                    session=session,
+                    myurl="%s/r0/auth/%s/fallback/web"
+                    % (CLIENT_API_PREFIX, LoginType.HCAPTCHA),
+                    sitekey=self.hs.config.hcaptcha_public_key,
                 )
         elif stagetype == LoginType.TERMS:
             authdict = {"session": session}
