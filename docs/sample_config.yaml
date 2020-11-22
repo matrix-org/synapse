@@ -1055,6 +1055,27 @@ url_preview_accept_language:
 #
 #recaptcha_siteverify_api: "https://my.recaptcha.site"
 
+# This homeserver's hCAPTCHA public key. Must be specified if
+# enable_registration_hcaptcha is enabled.
+#
+#hcaptcha_public_key: "YOUR_PUBLIC_KEY"
+
+# This homeserver's hCAPTCHA private key. Must be specified if
+# enable_registration_hcaptcha is enabled.
+#
+#hcaptcha_private_key: "YOUR_PRIVATE_KEY"
+
+# Uncomment to enable hCAPTCHA checks when registering, preventing signup
+# unless a captcha is answered. Requires a valid hCaptcha
+# public/private key. Defaults to 'false'.
+#
+#enable_registration_hcaptcha: true
+
+# The API endpoint to use for verifying m.login.recaptcha responses.
+# Defaults to "https://my.hcaptcha.site".
+#
+#hcaptcha_siteverify_api: "https://my.hcaptcha.site"
+
 
 ## TURN ##
 
