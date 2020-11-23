@@ -87,7 +87,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         txn_id: Optional[str],
         requester: Requester,
         content: JsonDict,
-    ):
+    ) -> Tuple[str, int]:
         """Generate a local leave event for a room
 
         Args:
