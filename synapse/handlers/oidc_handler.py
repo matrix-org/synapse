@@ -872,7 +872,7 @@ class OidcHandler(BaseHandler):
         )
         supports_failures = "failures" in mapper_args.args
 
-        async def oidc_response_to_user_attributes(userinfo, token, failures):
+        async def oidc_response_to_user_attributes(failures):
             """
             Call the mapping provider to map the OIDC userinfo and token to user attributes.
 
@@ -897,8 +897,6 @@ class OidcHandler(BaseHandler):
             user_agent,
             ip_address,
             oidc_response_to_user_attributes,
-            userinfo,
-            token,
         )
 
 

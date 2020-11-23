@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional
+from typing import TYPE_CHECKING, Awaitable, Callable, Optional
 
 from synapse.handlers._base import BaseHandler
 from synapse.http.server import respond_with_html
@@ -106,9 +106,7 @@ class SsoHandler(BaseHandler):
         remote_user_id: str,
         user_agent: str,
         ip_address: str,
-        mapper: "Callable[..., Awaitable[str]]",
-        *args: Any,
-        **kwargs: Any,
+        sso_to_matrix_id_mapper: Callable[[int], Awaitable[dict]],
     ):
         """
 
@@ -118,10 +116,9 @@ class SsoHandler(BaseHandler):
             remote_user_id: The unique identifier from the SSO provider.
             user_agent: The user agent of the client making the request.
             ip_address: The IP address of the client making the request.
-            mapper: A callable to generate the user attributes. Note that the
-                current number of failures is passed in as the last argument.
-            args: Additional arguments for mapper.
-            kwargs: Additional keyword arguments for mapper.
+            sso_to_matrix_id_mapper: A callable to generate the user attributes.
+                The only parameter is an integer which represents the amount of
+                times the returned mxid localpart mapping has failed.
 
         Returns:
              The user ID associated with the SSO response.
@@ -142,7 +139,7 @@ class SsoHandler(BaseHandler):
         # Otherwise, generate a new user.
         for i in range(self._MAP_USERNAME_RETRIES):
             try:
-                attributes = await mapper(*args, i, **kwargs)
+                attributes = await sso_to_matrix_id_mapper(i)
             except Exception as e:
                 raise MappingException(
                     "Could not extract user attributes from SSO response: " + str(e)

@@ -249,9 +249,7 @@ class SamlHandler(BaseHandler):
                 "Failed to extract remote user id from SAML response"
             )
 
-        async def saml_response_to_remapped_user_attributes(
-            saml_response, client_redirect_url, failures
-        ):
+        async def saml_response_to_remapped_user_attributes(failures):
             """
             Call the mapping provider to map a SAML response to user attributes and coerce the result into the standard form.
 
@@ -259,7 +257,7 @@ class SamlHandler(BaseHandler):
             """
             # Remap the arguments to the mapping provider.
             result = self._user_mapping_provider.saml_response_to_user_attributes(
-                saml_response, failures, client_redirect_url
+                saml2_auth, failures, client_redirect_url
             )
             # Remap some of the results.
             if "mxid_localpart" in result:
@@ -301,8 +299,6 @@ class SamlHandler(BaseHandler):
                 user_agent,
                 ip_address,
                 saml_response_to_remapped_user_attributes,
-                saml2_auth,
-                client_redirect_url,
             )
 
     def expire_sessions(self):
