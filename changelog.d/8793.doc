@@ -1,1 +1,1 @@
-Fixed the example on how to set the `Content-Type` header in nginx for Client Well-Known URI.
+Fix the example on how to set the `Content-Type` header in nginx for the Client Well-Known URI.
