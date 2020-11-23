@@ -1,1 +1,1 @@
-Implement "room knocking" as per MSC2403. Contributed by Sorunome and anoa.
+Implement "room knocking" as per [MSC2403](https://github.com/matrix-org/matrix-doc/pull/2403). Contributed by Sorunome and anoa.
