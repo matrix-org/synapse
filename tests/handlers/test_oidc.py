@@ -714,8 +714,27 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.get_success(
             store.register_user(user_id=user.to_string(), password_hash=None)
         )
+
+        # Map a user via SSO.
         userinfo = {
             "sub": "test",
+            "username": "test_user",
+        }
+        token = {}
+        mxid = self.get_success(
+            self.handler._map_userinfo_to_user(
+                userinfo, token, "user-agent", "10.10.10.10"
+            )
+        )
+        self.assertEqual(mxid, "@test_user:test")
+
+        # Note that a second SSO user can be mapped to the same Matrix ID. (This
+        # requires a unique sub, but something that maps to the same matrix ID,
+        # in this case we'll just use the same username. A more realistic example
+        # would be subs which are email addresses, and mapping from the localpart
+        # of the email, e.g. bob@foo.com and bob@bar.com -> @bob:test.)
+        userinfo = {
+            "sub": "test1",
             "username": "test_user",
         }
         token = {}
