@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import abc
 import logging
 import random
@@ -33,7 +32,15 @@ from synapse.api.ratelimiting import Ratelimiter
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.storage.roommember import RoomsForUser
-from synapse.types import JsonDict, Requester, RoomAlias, RoomID, StateMap, UserID
+from synapse.types import (
+    JsonDict,
+    Requester,
+    RoomAlias,
+    RoomID,
+    StateMap,
+    UserID,
+    get_domain_from_id,
+)
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_left_room
 
@@ -612,7 +619,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         elif effective_membership_state == Membership.KNOCK:
             if not is_host_in_room:
                 # The knock needs to be sent over federation instead
-                remote_room_hosts.append(room_id.split(":", 1)[1])
+                remote_room_hosts.append(get_domain_from_id(room_id))
 
                 content["membership"] = Membership.KNOCK
 
