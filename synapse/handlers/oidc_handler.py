@@ -883,6 +883,12 @@ class OidcHandler(BaseHandler):
                     userinfo, token, failures
                 )
             else:
+                # If the mapping provider does not support processing failures,
+                # do not continually generate the same Matrix ID since this will
+                # likely continue to fail.
+                if failures:
+                    raise RuntimeError("Mapping provider does not support de-duplicating Matrix IDs")
+
                 attributes = await self._user_mapping_provider.map_user_attributes(  # type: ignore
                     userinfo, token
                 )

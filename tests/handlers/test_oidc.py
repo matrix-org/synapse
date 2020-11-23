@@ -705,7 +705,8 @@ class OidcHandlerTestCase(HomeserverTestCase):
             MappingException,
         )
         self.assertEqual(
-            str(e.value), "Unable to generate a Matrix ID from the SSO response"
+            str(e.value),
+            "Could not extract user attributes from SSO response: Mapping provider does not support de-duplicating Matrix IDs",
         )
 
     @override_config({"oidc_config": {"allow_existing_users": True}})
