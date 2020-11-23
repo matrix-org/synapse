@@ -1473,7 +1473,6 @@ class FederationHandler(BaseHandler):
         )
 
         # Record the room ID and its version so that we have a record of the room
-        # TODO: Rename this function as its scope has expanded
         await self._maybe_store_room_on_outlier_membership(
             room_id=event.room_id, room_version=event_format_version
         )
