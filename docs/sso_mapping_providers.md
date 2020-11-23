@@ -63,7 +63,7 @@ A custom mapping provider must specify the following methods:
                      information from.
     - This method must return a string, which is the unique identifier for the
       user. Commonly the ``sub`` claim of the response.
-* `map_user_attributes(self, userinfo, token)`
+* `map_user_attributes(self, userinfo, token, failures)`
     - This method must be async.
     - Arguments:
       - `userinfo` - A `authlib.oidc.core.claims.UserInfo` object to extract user

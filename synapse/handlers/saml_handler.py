@@ -257,7 +257,7 @@ class SamlHandler(BaseHandler):
 
             This is backwards compatibility for abstraction for the SSO handler.
             """
-            # Remap the arguments to the mapping provider.
+            # Call the mapping provider.
             result = self._user_mapping_provider.saml_response_to_user_attributes(
                 saml2_auth, failures, client_redirect_url
             )
