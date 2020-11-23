@@ -925,7 +925,7 @@ class OidcHandler(BaseHandler):
             registered_user_id = await self._registration_handler.register_user(
                 localpart=localpart,
                 default_display_name=attributes["display_name"],
-                user_agent_ips=(user_agent, ip_address),
+                user_agent_ips=[(user_agent, ip_address)],
             )
 
         await self.store.record_user_external_id(
