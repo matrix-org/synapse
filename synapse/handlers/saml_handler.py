@@ -268,7 +268,8 @@ class SamlHandler(BaseHandler):
                 user_id = UserID(
                     map_username_to_mxid_localpart(attrval), self.server_name
                 ).to_string()
-                logger.info(
+
+                logger.debug(
                     "Looking for existing account based on mapped %s %s",
                     self._grandfathered_mxid_source_attribute,
                     user_id,
@@ -324,7 +325,7 @@ class SamlHandler(BaseHandler):
             if contains_invalid_mxid_characters(localpart):
                 raise MappingException("localpart is invalid: %s" % (localpart,))
 
-            logger.info("Mapped SAML user to local part %s", localpart)
+            logger.debug("Mapped SAML user to local part %s", localpart)
             registered_user_id = await self._registration_handler.register_user(
                 localpart=localpart,
                 default_display_name=displayname,
