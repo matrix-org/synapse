@@ -567,7 +567,22 @@ class FederationServer(FederationBase):
         await self.handler.on_send_leave_request(origin, pdu)
         return {}
 
-    async def on_make_knock_request(self, origin: str, room_id: str, user_id: str):
+    async def on_make_knock_request(
+        self, origin: str, room_id: str, user_id: str,
+    ) -> Dict[str, Union[EventBase, str]]:
+        """We've received a /make_knock/ request, so we create a partial knock event
+        for the room and hand that back, along with the room version, to the knocking
+        homeserver. We do *not* persist or process this event until the other server has
+        signed it and sent it back.
+
+        Args:
+            origin: The (verified) server name of the requesting server.
+            room_id: The room to create the knock event in.
+            user_id: The user to create the knock for.
+
+        Returns:
+            The partial knock event.
+        """
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, room_id)
         pdu = await self.handler.on_make_knock_request(origin, room_id, user_id)
@@ -577,7 +592,22 @@ class FederationServer(FederationBase):
         time_now = self._clock.time_msec()
         return {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
 
-    async def on_send_knock_request(self, origin: str, content: JsonDict, room_id: str):
+    async def on_send_knock_request(
+        self, origin: str, content: JsonDict, room_id: str,
+    ) -> Dict[str, List[JsonDict]]:
+        """
+        We have received a knock event for a room. Verify and send the event into the room
+        on the knocking homeserver's behalf. Then reply with some stripped state from the
+        room for the knockee.
+
+        Args:
+            origin: The remote homeserver of the knocking user.
+            content: The content of the request.
+            room_id: The ID of the room to knock on.
+
+        Returns:
+            The stripped room state.
+        """
         logger.debug("on_send_knock_request: content: %s", content)
 
         room_version = await self.store.get_room_version(room_id)
