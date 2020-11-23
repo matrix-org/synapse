@@ -329,7 +329,7 @@ def _is_membership_change_allowed(
             raise AuthError(403, "You are banned from this room")
         elif join_rule == JoinRules.PUBLIC:
             pass
-        elif join_rule in [JoinRules.INVITE, JoinRules.KNOCK]:
+        elif join_rule in (JoinRules.INVITE, JoinRules.KNOCK):
             if not caller_in_room and not caller_invited:
                 raise AuthError(403, "You are not invited to this room.")
         else:

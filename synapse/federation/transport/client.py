@@ -301,8 +301,8 @@ class TransportLayerClient:
         self, destination: str, room_id: str, event_id: str, content: JsonDict,
     ) -> JsonDict:
         """
-        Sends an signed knock membership event to a remote server. This is the second
-        step knocking after make_knock.
+        Sends a signed knock membership event to a remote server. This is the second
+        step for knocking after make_knock.
 
         Args:
             destination: The remote homeserver.
