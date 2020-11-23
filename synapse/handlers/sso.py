@@ -208,7 +208,7 @@ class SsoHandler(BaseHandler):
         if contains_invalid_mxid_characters(attributes.localpart):
             raise MappingException("localpart is invalid: %s" % (attributes.localpart,))
 
-        logger.debug("Mapped SAML user to local part %s", attributes.localpart)
+        logger.debug("Mapped SSO user to local part %s", attributes.localpart)
         registered_user_id = await self._registration_handler.register_user(
             localpart=attributes.localpart,
             default_display_name=attributes.display_name,
