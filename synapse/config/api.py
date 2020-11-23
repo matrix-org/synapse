@@ -17,23 +17,25 @@ from synapse.api.constants import EventTypes
 
 from ._base import Config
 
+# The default types of room state to send to users to are invited to or knock on a room.
+DEFAULT_ROOM_STATE_TYPES = [
+    EventTypes.JoinRules,
+    EventTypes.CanonicalAlias,
+    EventTypes.RoomAvatar,
+    EventTypes.RoomEncryption,
+    EventTypes.Name,
+]
+
 
 class ApiConfig(Config):
     section = "api"
 
     def read_config(self, config, **kwargs):
-        default_room_state_types = [
-            EventTypes.JoinRules,
-            EventTypes.CanonicalAlias,
-            EventTypes.RoomAvatar,
-            EventTypes.RoomEncryption,
-            EventTypes.Name,
-        ]
         self.room_invite_state_types = config.get(
-            "room_invite_state_types", default_room_state_types
+            "room_invite_state_types", DEFAULT_ROOM_STATE_TYPES
         )
         self.room_knock_state_types = config.get(
-            "room_knock_state_types", default_room_state_types
+            "room_knock_state_types", DEFAULT_ROOM_STATE_TYPES
         )
 
     def generate_config_section(cls, **kwargs):
