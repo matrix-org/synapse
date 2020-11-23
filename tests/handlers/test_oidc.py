@@ -161,7 +161,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.handler._sso_handler.render_error = self.render_error
 
         # Reduce the number of attempts when generating MXIDs.
-        self.handler._MAP_USERNAME_RETRIES = 3
+        self.handler._sso_handler._MAP_USERNAME_RETRIES = 3
 
         return hs
 
@@ -704,7 +704,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
             ),
             MappingException,
         )
-        self.assertEqual(str(e.value), "mxid '@test_user_3:test' is already taken")
+        self.assertEqual(
+            str(e.value), "Unable to generate a Matrix ID from the SSO response"
+        )
 
     @override_config({"oidc_config": {"allow_existing_users": True}})
     def test_map_userinfo_to_existing_user(self):
@@ -850,5 +852,5 @@ class OidcHandlerTestCase(HomeserverTestCase):
             MappingException,
         )
         self.assertEqual(
-            str(e.value), "Unable to generate a Matrix ID from the OpenID response"
+            str(e.value), "Unable to generate a Matrix ID from the SSO response"
         )

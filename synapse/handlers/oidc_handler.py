@@ -39,12 +39,7 @@ from synapse.handlers._base import BaseHandler
 from synapse.handlers.sso import MappingException
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
-from synapse.types import (
-    JsonDict,
-    UserID,
-    contains_invalid_mxid_characters,
-    map_username_to_mxid_localpart,
-)
+from synapse.types import JsonDict, map_username_to_mxid_localpart
 from synapse.util import json_decoder
 
 if TYPE_CHECKING:
@@ -93,9 +88,6 @@ class OidcError(Exception):
 class OidcHandler(BaseHandler):
     """Handles requests related to the OpenID Connect login flow.
     """
-
-    # The number of attempts to ask the mapping provider for when generating an MXID.
-    _MAP_USERNAME_RETRIES = 1000
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
@@ -873,13 +865,6 @@ class OidcHandler(BaseHandler):
         # to be strings.
         remote_user_id = str(remote_user_id)
 
-        # first of all, check if we already have a mapping for this user
-        previously_registered_user_id = await self._sso_handler.get_sso_user_by_remote_user_id(
-            self._auth_provider_id, remote_user_id,
-        )
-        if previously_registered_user_id:
-            return previously_registered_user_id
-
         # Older mapping providers don't accept the `failures` argument, so we
         # try and detect support.
         mapper_args = inspect.getfullargspec(
@@ -887,81 +872,34 @@ class OidcHandler(BaseHandler):
         )
         supports_failures = "failures" in mapper_args.args
 
-        # Otherwise, generate a new user.
-        for i in range(self._MAP_USERNAME_RETRIES):
-            try:
-                if supports_failures:
-                    attributes = await self._user_mapping_provider.map_user_attributes(
-                        userinfo, token, i
-                    )
-                else:
-                    attributes = await self._user_mapping_provider.map_user_attributes(  # type: ignore
-                        userinfo, token
-                    )
-            except Exception as e:
-                raise MappingException(
-                    "Could not extract user attributes from OIDC response: " + str(e)
+        async def oidc_response_to_user_attributes(userinfo, token, failures):
+            """
+            Call the mapping provider to map the OIDC userinfo and token to user attributes.
+
+            This is backwards compatibility for abstraction for the SSO handler.
+            """
+            if supports_failures:
+                attributes = await self._user_mapping_provider.map_user_attributes(
+                    userinfo, token, failures
                 )
-
-            logger.debug(
-                "Retrieved user attributes from user mapping provider: %r", attributes
-            )
-
-            localpart = attributes["localpart"]
-            if not localpart:
-                raise MappingException(
-                    "Error parsing OIDC response: OIDC mapping provider plugin "
-                    "did not return a localpart value"
-                )
-
-            user_id = UserID(localpart, self.server_name).to_string()
-            users = await self.store.get_users_by_id_case_insensitive(user_id)
-            if users:
-                if self._allow_existing_users:
-                    if len(users) == 1:
-                        registered_user_id = next(iter(users))
-                        break
-                    elif user_id in users:
-                        registered_user_id = user_id
-                        break
-                    else:
-                        raise MappingException(
-                            "Attempted to login as '{}' but it matches more than one user inexactly: {}".format(
-                                user_id, list(users.keys())
-                            )
-                        )
-                else:
-                    # This mxid is taken
-                    if not supports_failures:
-                        raise MappingException(
-                            "mxid '{}' is already taken".format(user_id)
-                        )
             else:
-                # Since the localpart is provided via a potentially untrusted module,
-                # ensure the MXID is valid before registering.
-                if contains_invalid_mxid_characters(localpart):
-                    raise MappingException("localpart is invalid: %s" % (localpart,))
-
-                # It's the first time this user is logging in and the mapped mxid was
-                # not taken, register the user
-                registered_user_id = await self._registration_handler.register_user(
-                    localpart=localpart,
-                    default_display_name=attributes["display_name"],
-                    user_agent_ips=(user_agent, ip_address),
+                attributes = await self._user_mapping_provider.map_user_attributes(  # type: ignore
+                    userinfo, token
                 )
-                break
 
-        else:
-            # Unable to generate a username in 1000 iterations
-            # Break and return error to the user
-            raise MappingException(
-                "Unable to generate a Matrix ID from the OpenID response"
-            )
+            return attributes
 
-        await self.store.record_user_external_id(
-            self._auth_provider_id, remote_user_id, registered_user_id,
+        # TODO Support existing users.
+
+        return await self._sso_handler.get_mxid_from_sso(
+            self._auth_provider_id,
+            remote_user_id,
+            user_agent,
+            ip_address,
+            oidc_response_to_user_attributes,
+            userinfo,
+            token,
         )
-        return registered_user_id
 
 
 UserAttribute = TypedDict(
