@@ -25,7 +25,7 @@ from synapse.api.errors import SynapseError
 from synapse.config import ConfigError
 from synapse.config.saml2_config import SamlAttributeRequirement
 from synapse.handlers._base import BaseHandler
-from synapse.handlers.sso import MappingException
+from synapse.handlers.sso import MappingException, UserAttributes
 from synapse.http.servlet import parse_string
 from synapse.http.site import SynapseRequest
 from synapse.module_api import ModuleApi
@@ -249,7 +249,9 @@ class SamlHandler(BaseHandler):
                 "Failed to extract remote user id from SAML response"
             )
 
-        async def saml_response_to_remapped_user_attributes(failures):
+        async def saml_response_to_remapped_user_attributes(
+            failures: int,
+        ) -> UserAttributes:
             """
             Call the mapping provider to map a SAML response to user attributes and coerce the result into the standard form.
 
@@ -260,11 +262,11 @@ class SamlHandler(BaseHandler):
                 saml2_auth, failures, client_redirect_url
             )
             # Remap some of the results.
-            if "mxid_localpart" in result:
-                result["localpart"] = result.pop("mxid_localpart")
-            if "displayname" in result:
-                result["display_name"] = result.pop("displayname")
-            return result
+            return UserAttributes(
+                localpart=result.get("mxid_localpart"),
+                display_name=result.get("displayname"),
+                emails=result.get("emails"),
+            )
 
         with (await self._mapping_lock.queue(self._auth_provider_id)):
             # backwards-compatibility hack: see if there is an existing user with a

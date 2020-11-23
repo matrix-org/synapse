@@ -36,7 +36,7 @@ from twisted.web.client import readBody
 
 from synapse.config import ConfigError
 from synapse.handlers._base import BaseHandler
-from synapse.handlers.sso import MappingException
+from synapse.handlers.sso import MappingException, UserAttributes
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
 from synapse.types import JsonDict, map_username_to_mxid_localpart
@@ -872,7 +872,7 @@ class OidcHandler(BaseHandler):
         )
         supports_failures = "failures" in mapper_args.args
 
-        async def oidc_response_to_user_attributes(failures):
+        async def oidc_response_to_user_attributes(failures: int) -> UserAttributes:
             """
             Call the mapping provider to map the OIDC userinfo and token to user attributes.
 
@@ -895,7 +895,7 @@ class OidcHandler(BaseHandler):
                     userinfo, token
                 )
 
-            return attributes
+            return UserAttributes(**attributes)
 
         return await self._sso_handler.get_mxid_from_sso(
             self._auth_provider_id,
@@ -907,8 +907,8 @@ class OidcHandler(BaseHandler):
         )
 
 
-UserAttribute = TypedDict(
-    "UserAttribute", {"localpart": str, "display_name": Optional[str]}
+UserAttributeDict = TypedDict(
+    "UserAttributeDict", {"localpart": str, "display_name": Optional[str]}
 )
 C = TypeVar("C")
 
@@ -952,7 +952,7 @@ class OidcMappingProvider(Generic[C]):
 
     async def map_user_attributes(
         self, userinfo: UserInfo, token: Token, failures: int
-    ) -> UserAttribute:
+    ) -> UserAttributeDict:
         """Map a `UserInfo` object into user attributes.
 
         Args:
@@ -1060,7 +1060,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
 
     async def map_user_attributes(
         self, userinfo: UserInfo, token: Token, failures: int
-    ) -> UserAttribute:
+    ) -> UserAttributeDict:
         localpart = self._config.localpart_template.render(user=userinfo).strip()
 
         # Ensure only valid characters are included in the MXID.
@@ -1075,7 +1075,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             if display_name == "":
                 display_name = None
 
-        return UserAttribute(localpart=localpart, display_name=display_name)
+        return UserAttributeDict(localpart=localpart, display_name=display_name)
 
     async def get_extra_attributes(self, userinfo: UserInfo, token: Token) -> JsonDict:
         extras = {}  # type: Dict[str, str]

@@ -15,6 +15,8 @@
 import logging
 from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional
 
+import attr
+
 from synapse.handlers._base import BaseHandler
 from synapse.http.server import respond_with_html
 from synapse.types import UserID, contains_invalid_mxid_characters
@@ -28,6 +30,13 @@ logger = logging.getLogger(__name__)
 class MappingException(Exception):
     """Used to catch errors when mapping the UserInfo object
     """
+
+
+@attr.s
+class UserAttributes:
+    localpart = attr.ib(type=str)
+    display_name = attr.ib(type=Optional[str], default=None)
+    emails = attr.ib(type=List[str], default=attr.Factory(list))
 
 
 class SsoHandler(BaseHandler):
@@ -106,7 +115,7 @@ class SsoHandler(BaseHandler):
         remote_user_id: str,
         user_agent: str,
         ip_address: str,
-        sso_to_matrix_id_mapper: Callable[[int], Awaitable[dict]],
+        sso_to_matrix_id_mapper: Callable[[int], Awaitable[UserAttributes]],
         allow_existing_users: bool = False,
     ):
         """
@@ -154,19 +163,14 @@ class SsoHandler(BaseHandler):
                 i,
             )
 
-            localpart = attributes["localpart"]
-            if not localpart:
+            if not attributes.localpart:
                 raise MappingException(
                     "Error parsing SSO response: SSO mapping provider plugin "
                     "did not return a localpart value"
                 )
 
-            # Other potential attributes returned by the mapping provider.
-            display_name = attributes.get("display_name")
-            emails = attributes.get("emails", [])
-
             # Check if this mxid already exists
-            user_id = UserID(localpart, self.server_name).to_string()
+            user_id = UserID(attributes.localpart, self.server_name).to_string()
             users = await self.store.get_users_by_id_case_insensitive(user_id)
             if users and allow_existing_users:
                 # If an existing matrix ID is returned, then use it.
@@ -201,14 +205,14 @@ class SsoHandler(BaseHandler):
 
         # Since the localpart is provided via a potentially untrusted module,
         # ensure the MXID is valid before registering.
-        if contains_invalid_mxid_characters(localpart):
-            raise MappingException("localpart is invalid: %s" % (localpart,))
+        if contains_invalid_mxid_characters(attributes.localpart):
+            raise MappingException("localpart is invalid: %s" % (attributes.localpart,))
 
-        logger.debug("Mapped SAML user to local part %s", localpart)
+        logger.debug("Mapped SAML user to local part %s", attributes.localpart)
         registered_user_id = await self._registration_handler.register_user(
-            localpart=localpart,
-            default_display_name=display_name,
-            bind_emails=emails,
+            localpart=attributes.localpart,
+            default_display_name=attributes.display_name,
+            bind_emails=attributes.emails,
             user_agent_ips=(user_agent, ip_address),
         )
 
