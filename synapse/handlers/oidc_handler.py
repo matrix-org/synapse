@@ -887,7 +887,9 @@ class OidcHandler(BaseHandler):
                 # do not continually generate the same Matrix ID since this will
                 # likely continue to fail.
                 if failures:
-                    raise RuntimeError("Mapping provider does not support de-duplicating Matrix IDs")
+                    raise RuntimeError(
+                        "Mapping provider does not support de-duplicating Matrix IDs"
+                    )
 
                 attributes = await self._user_mapping_provider.map_user_attributes(  # type: ignore
                     userinfo, token
@@ -895,14 +897,13 @@ class OidcHandler(BaseHandler):
 
             return attributes
 
-        # TODO Support existing users.
-
         return await self._sso_handler.get_mxid_from_sso(
             self._auth_provider_id,
             remote_user_id,
             user_agent,
             ip_address,
             oidc_response_to_user_attributes,
+            self._allow_existing_users,
         )
 
 

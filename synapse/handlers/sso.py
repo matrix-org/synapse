@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Awaitable, Callable, Optional
+from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional
 
 from synapse.handlers._base import BaseHandler
 from synapse.http.server import respond_with_html
@@ -107,6 +107,7 @@ class SsoHandler(BaseHandler):
         user_agent: str,
         ip_address: str,
         sso_to_matrix_id_mapper: Callable[[int], Awaitable[dict]],
+        allow_existing_users: bool = False,
     ):
         """
 
@@ -119,6 +120,8 @@ class SsoHandler(BaseHandler):
             sso_to_matrix_id_mapper: A callable to generate the user attributes.
                 The only parameter is an integer which represents the amount of
                 times the returned mxid localpart mapping has failed.
+            allow_existing_users: True if the localpart returned from the
+                mapping provider can be linked to an existing matrix ID.
 
         Returns:
              The user ID associated with the SSO response.
@@ -164,7 +167,29 @@ class SsoHandler(BaseHandler):
 
             # Check if this mxid already exists
             user_id = UserID(localpart, self.server_name).to_string()
-            if not await self.store.get_users_by_id_case_insensitive(user_id):
+            users = await self.store.get_users_by_id_case_insensitive(user_id)
+            if users and allow_existing_users:
+                # If an existing matrix ID is returned, then use it.
+                if len(users) == 1:
+                    previously_registered_user_id = next(iter(users))
+                elif user_id in users:
+                    previously_registered_user_id = user_id
+                else:
+                    # Do not attempt to continue generating Matrix IDs.
+                    raise MappingException(
+                        "Attempted to login as '{}' but it matches more than one user inexactly: {}".format(
+                            user_id, users
+                        )
+                    )
+
+                # Future logins should also match this user ID.
+                await self.store.record_user_external_id(
+                    auth_provider_id, remote_user_id, previously_registered_user_id
+                )
+
+                return previously_registered_user_id
+
+            elif not users:
                 # This mxid is free
                 break
         else:
