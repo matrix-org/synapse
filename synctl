@@ -359,7 +359,9 @@ def main():
             env = os.environ.copy()
 
             # Skip starting a worker if its already running
-            if os.path.exists(worker.pidfile) and pid_running(int(open(worker.pidfile).read())):
+            if os.path.exists(worker.pidfile) and pid_running(
+                int(open(worker.pidfile).read())
+            ):
                 print(worker.app + " already running")
                 continue
 
