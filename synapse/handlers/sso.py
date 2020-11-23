@@ -213,7 +213,7 @@ class SsoHandler(BaseHandler):
             localpart=attributes.localpart,
             default_display_name=attributes.display_name,
             bind_emails=attributes.emails,
-            user_agent_ips=(user_agent, ip_address),
+            user_agent_ips=[(user_agent, ip_address)],
         )
 
         await self.store.record_user_external_id(
