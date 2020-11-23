@@ -112,7 +112,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    async def _remote_knock(
+    async def remote_knock(
         self, remote_room_hosts: List[str], room_id: str, user: UserID, content: dict,
     ) -> Tuple[str, int]:
         """Try and knock on a room that this server is not in
@@ -622,7 +622,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 if "avatar_url" not in content:
                     content["avatar_url"] = await profile.get_avatar_url(target)
 
-                return await self._remote_knock(
+                return await self.remote_knock(
                     remote_room_hosts, room_id, target, content
                 )
 
@@ -1242,7 +1242,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         return result_event.event_id, result_event.internal_metadata.stream_ordering
 
-    async def _remote_knock(
+    async def remote_knock(
         self, remote_room_hosts: List[str], room_id: str, user: UserID, content: dict,
     ) -> Tuple[str, int]:
         """Sends a knock to a room. Attempts to do so via one remote out of a given list.
