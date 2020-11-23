@@ -324,7 +324,7 @@ class SyncRestServlet(RestServlet):
                 time_now,
                 token_id=token_id,
                 event_format=event_formatter,
-                is_invite=True,
+                include_stripped_room_state=True,
             )
             unsigned = dict(invite.get("unsigned", {}))
             invite["unsigned"] = unsigned

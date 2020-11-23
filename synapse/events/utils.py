@@ -265,7 +265,7 @@ def serialize_event(
     event_format=format_event_for_client_v1,
     token_id=None,
     only_event_fields=None,
-    is_invite=False,
+    include_stripped_room_state=False,
 ):
     """Serialize event for clients
 
@@ -276,8 +276,10 @@ def serialize_event(
         event_format
         token_id
         only_event_fields
-        is_invite (bool): Whether this is an invite that is being sent to the
-            invitee
+        include_stripped_room_state (bool): Some events can have stripped room state
+            stored in the `unsigned` field. This is required for invite and knock
+            functionality. If this option is False, that state will be removed from the
+            event before it is returned. Otherwise, it will be kept.
 
     Returns:
         dict
@@ -309,15 +311,13 @@ def serialize_event(
             if txn_id is not None:
                 d["unsigned"]["transaction_id"] = txn_id
 
-    # If this is an invite for somebody else, then we don't care about the
-    # invite_room_state as that's meant solely for the invitee. Other clients
-    # will already have the state since they're in the room.
-    #
-    # Note that is_invite only seems to be set to False in the case of appservices
-    # that are not interested in the target user of the invite.
-    # TODO: Figure out what to do here w.r.t knocking
-    if not is_invite:
+    # invite_room_state is a list of stripped room state events that are meant to
+    # provide metadata about a room to an invitee. knock_room_state is the same,
+    # but for user knocking on a room. They are intended to only be included in specific
+    # circumstances, such as down sync, and should not be included in any other case.
+    if not include_stripped_room_state:
         d["unsigned"].pop("invite_room_state", None)
+        d["unsigned"].pop("knock_room_state", None)
 
     if as_client_event:
         d = event_format(d)
