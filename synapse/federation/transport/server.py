@@ -544,10 +544,10 @@ class FederationV2SendLeaveServlet(BaseFederationServlet):
 
 
 class FederationMakeKnockServlet(BaseFederationServlet):
-    PATH = "/make_knock/(?P<context>[^/]*)/(?P<user_id>[^/]*)"
+    PATH = "/make_knock/(?P<room_id>[^/]*)/(?P<user_id>[^/]*)"
 
-    async def on_GET(self, origin, content, query, context, user_id):
-        content = await self.handler.on_make_knock_request(origin, context, user_id)
+    async def on_GET(self, origin, content, query, room_id, user_id):
+        content = await self.handler.on_make_knock_request(origin, room_id, user_id)
         return 200, content
 
 
