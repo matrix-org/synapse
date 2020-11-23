@@ -92,7 +92,6 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
             {},
             access_token=self.tok,
         )
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         callback.assert_called_once()
@@ -111,7 +110,6 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
             {},
             access_token=self.tok,
         )
-        self.render(request)
         self.assertEquals(channel.result["code"], b"403", channel.result)
 
     def test_cannot_modify_event(self):
@@ -131,7 +129,6 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
             {"x": "x"},
             access_token=self.tok,
         )
-        self.render(request)
         self.assertEqual(channel.result["code"], b"500", channel.result)
 
     def test_modify_event(self):
@@ -151,7 +148,6 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
             {"x": "x"},
             access_token=self.tok,
         )
-        self.render(request)
         self.assertEqual(channel.result["code"], b"200", channel.result)
         event_id = channel.json_body["event_id"]
 
@@ -161,7 +157,6 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/r0/rooms/%s/event/%s" % (self.room_id, event_id),
             access_token=self.tok,
         )
-        self.render(request)
         self.assertEqual(channel.result["code"], b"200", channel.result)
         ev = channel.json_body
         self.assertEqual(ev["content"]["x"], "y")

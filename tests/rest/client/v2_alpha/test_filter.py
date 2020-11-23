@@ -41,7 +41,6 @@ class FilterTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/r0/user/%s/filter" % (self.user_id),
             self.EXAMPLE_FILTER_JSON,
         )
-        self.render(request)
 
         self.assertEqual(channel.result["code"], b"200")
         self.assertEqual(channel.json_body, {"filter_id": "0"})
@@ -55,7 +54,6 @@ class FilterTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/r0/user/%s/filter" % ("@watermelon:test"),
             self.EXAMPLE_FILTER_JSON,
         )
-        self.render(request)
 
         self.assertEqual(channel.result["code"], b"403")
         self.assertEquals(channel.json_body["errcode"], Codes.FORBIDDEN)
@@ -68,7 +66,6 @@ class FilterTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/r0/user/%s/filter" % (self.user_id),
             self.EXAMPLE_FILTER_JSON,
         )
-        self.render(request)
 
         self.hs.is_mine = _is_mine
         self.assertEqual(channel.result["code"], b"403")
@@ -85,7 +82,6 @@ class FilterTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "/_matrix/client/r0/user/%s/filter/%s" % (self.user_id, filter_id)
         )
-        self.render(request)
 
         self.assertEqual(channel.result["code"], b"200")
         self.assertEquals(channel.json_body, self.EXAMPLE_FILTER)
@@ -94,7 +90,6 @@ class FilterTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "/_matrix/client/r0/user/%s/filter/12382148321" % (self.user_id)
         )
-        self.render(request)
 
         self.assertEqual(channel.result["code"], b"404")
         self.assertEquals(channel.json_body["errcode"], Codes.NOT_FOUND)
@@ -105,7 +100,6 @@ class FilterTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "/_matrix/client/r0/user/%s/filter/foobar" % (self.user_id)
         )
-        self.render(request)
 
         self.assertEqual(channel.result["code"], b"400")
 
@@ -114,6 +108,5 @@ class FilterTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "/_matrix/client/r0/user/%s/filter/" % (self.user_id)
         )
-        self.render(request)
 
         self.assertEqual(channel.result["code"], b"400")

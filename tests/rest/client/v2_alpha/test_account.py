@@ -246,7 +246,6 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
             b"account/password/email/requestToken",
             {"client_secret": client_secret, "email": email, "send_attempt": 1},
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
 
         return channel.json_body["sid"]
@@ -263,8 +262,6 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
             path,
             shorthand=False,
         )
-        request.render(self.submit_token_resource)
-        self.pump()
 
         self.assertEquals(200, channel.code, channel.result)
 
@@ -288,8 +285,6 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
             shorthand=False,
             content_is_form=True,
         )
-        request.render(self.submit_token_resource)
-        self.pump()
         self.assertEquals(200, channel.code, channel.result)
 
     def _get_link_from_email(self):
@@ -329,7 +324,6 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
                 },
             },
         )
-        self.render(request)
         self.assertEquals(expected_code, channel.code, channel.result)
 
 
@@ -359,7 +353,6 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
 
         # Check that this access token has been invalidated.
         request, channel = self.make_request("GET", "account/whoami")
-        self.render(request)
         self.assertEqual(request.code, 401)
 
     def test_pending_invites(self):
@@ -417,7 +410,6 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", "account/deactivate", request_data, access_token=tok
         )
-        self.render(request)
         self.assertEqual(request.code, 200)
 
 
@@ -552,7 +544,6 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             },
             access_token=self.user_id_tok,
         )
-        self.render(request)
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
@@ -560,7 +551,6 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url_3pid, access_token=self.user_id_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertFalse(channel.json_body["threepids"])
@@ -585,14 +575,12 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             {"medium": "email", "address": self.email},
             access_token=self.user_id_tok,
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # Get user
         request, channel = self.make_request(
             "GET", self.url_3pid, access_token=self.user_id_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertFalse(channel.json_body["threepids"])
@@ -619,7 +607,6 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             {"medium": "email", "address": self.email},
             access_token=self.user_id_tok,
         )
-        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
@@ -628,7 +615,6 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url_3pid, access_token=self.user_id_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
@@ -657,7 +643,6 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             },
             access_token=self.user_id_tok,
         )
-        self.render(request)
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.THREEPID_AUTH_FAILED, channel.json_body["errcode"])
 
@@ -665,7 +650,6 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url_3pid, access_token=self.user_id_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertFalse(channel.json_body["threepids"])
@@ -692,7 +676,6 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             },
             access_token=self.user_id_tok,
         )
-        self.render(request)
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.THREEPID_AUTH_FAILED, channel.json_body["errcode"])
 
@@ -700,7 +683,6 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url_3pid, access_token=self.user_id_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertFalse(channel.json_body["threepids"])
@@ -805,7 +787,6 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", b"account/3pid/email/requestToken", body,
         )
-        self.render(request)
         self.assertEquals(expect_code, channel.code, channel.result)
 
         return channel.json_body.get("sid")
@@ -818,7 +799,6 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             b"account/3pid/email/requestToken",
             {"client_secret": client_secret, "email": email, "send_attempt": 1},
         )
-        self.render(request)
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(expected_errcode, channel.json_body["errcode"])
         self.assertEqual(expected_error, channel.json_body["error"])
@@ -828,7 +808,6 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         path = link.replace("https://example.com", "")
 
         request, channel = self.make_request("GET", path, shorthand=False)
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
 
     def _get_link_from_email(self):
@@ -877,14 +856,12 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             access_token=self.user_id_tok,
         )
 
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # Get user
         request, channel = self.make_request(
             "GET", self.url_3pid, access_token=self.user_id_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])

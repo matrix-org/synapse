@@ -31,6 +31,7 @@ from synapse.http.site import SynapseRequest
 from synapse.module_api import ModuleApi
 from synapse.types import (
     UserID,
+    contains_invalid_mxid_characters,
     map_username_to_mxid_localpart,
     mxid_localpart_allowed_characters,
 )
@@ -58,6 +59,7 @@ class SamlHandler(BaseHandler):
     def __init__(self, hs: "synapse.server.HomeServer"):
         super().__init__(hs)
         self._saml_client = Saml2Client(hs.config.saml2_sp_config)
+        self._saml_idp_entityid = hs.config.saml2_idp_entityid
         self._auth_handler = hs.get_auth_handler()
         self._registration_handler = hs.get_registration_handler()
 
@@ -100,7 +102,7 @@ class SamlHandler(BaseHandler):
             URL to redirect to
         """
         reqid, info = self._saml_client.prepare_for_authenticate(
-            relay_state=client_redirect_url
+            entityid=self._saml_idp_entityid, relay_state=client_redirect_url
         )
 
         # Since SAML sessions timeout it is useful to log when they were created.
@@ -317,6 +319,11 @@ class SamlHandler(BaseHandler):
                 raise MappingException(
                     "Unable to generate a Matrix ID from the SAML response"
                 )
+
+            # Since the localpart is provided via a potentially untrusted module,
+            # ensure the MXID is valid before registering.
+            if contains_invalid_mxid_characters(localpart):
+                raise MappingException("localpart is invalid: %s" % (localpart,))
 
             logger.debug("Mapped SAML user to local part %s", localpart)
             registered_user_id = await self._registration_handler.register_user(

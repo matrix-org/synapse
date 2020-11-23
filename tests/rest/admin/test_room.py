@@ -85,7 +85,6 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
             json.dumps({"new_room_user_id": self.admin_user}),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
@@ -110,7 +109,6 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
             json.dumps({"history_visibility": "world_readable"}),
             access_token=self.other_user_token,
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # Test that the admin can still send shutdown
@@ -121,7 +119,6 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
             json.dumps({"new_room_user_id": self.admin_user}),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
@@ -136,7 +133,6 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok
         )
-        self.render(request)
         self.assertEqual(
             expect_code, int(channel.result["code"]), msg=channel.result["body"]
         )
@@ -145,7 +141,6 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok
         )
-        self.render(request)
         self.assertEqual(
             expect_code, int(channel.result["code"]), msg=channel.result["body"]
         )
@@ -192,7 +187,6 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", self.url, json.dumps({}), access_token=self.other_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
@@ -206,7 +200,6 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", url, json.dumps({}), access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(404, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
@@ -220,7 +213,6 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", url, json.dumps({}), access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(
@@ -239,7 +231,6 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertIn("new_room_id", channel.json_body)
@@ -259,7 +250,6 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(
@@ -278,7 +268,6 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.BAD_JSON, channel.json_body["errcode"])
@@ -295,7 +284,6 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.BAD_JSON, channel.json_body["errcode"])
@@ -322,7 +310,6 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(None, channel.json_body["new_room_id"])
@@ -356,7 +343,6 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(None, channel.json_body["new_room_id"])
@@ -391,7 +377,6 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(None, channel.json_body["new_room_id"])
@@ -439,7 +424,6 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
             json.dumps({"new_room_user_id": self.admin_user}),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(self.other_user, channel.json_body["kicked_users"][0])
@@ -470,7 +454,6 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
             json.dumps({"history_visibility": "world_readable"}),
             access_token=self.other_user_tok,
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # Test that room is not purged
@@ -488,7 +471,6 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
             json.dumps({"new_room_user_id": self.admin_user}),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(self.other_user, channel.json_body["kicked_users"][0])
@@ -551,7 +533,6 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok
         )
-        self.render(request)
         self.assertEqual(
             expect_code, int(channel.result["code"]), msg=channel.result["body"]
         )
@@ -560,7 +541,6 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok
         )
-        self.render(request)
         self.assertEqual(
             expect_code, int(channel.result["code"]), msg=channel.result["body"]
         )
@@ -595,7 +575,6 @@ class PurgeRoomTestCase(unittest.HomeserverTestCase):
             {"room_id": room_id},
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
@@ -647,7 +626,6 @@ class RoomTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         # Check request completed successfully
         self.assertEqual(200, int(channel.code), msg=channel.json_body)
@@ -729,7 +707,6 @@ class RoomTestCase(unittest.HomeserverTestCase):
             request, channel = self.make_request(
                 "GET", url.encode("ascii"), access_token=self.admin_user_tok,
             )
-            self.render(request)
             self.assertEqual(
                 200, int(channel.result["code"]), msg=channel.result["body"]
             )
@@ -770,7 +747,6 @@ class RoomTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok,
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
     def test_correct_room_attributes(self):
@@ -794,7 +770,6 @@ class RoomTestCase(unittest.HomeserverTestCase):
             {"room_id": room_id},
             access_token=self.admin_user_tok,
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # Set this new alias as the canonical alias for this room
@@ -822,7 +797,6 @@ class RoomTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok,
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # Check that rooms were returned
@@ -867,7 +841,6 @@ class RoomTestCase(unittest.HomeserverTestCase):
                 {"room_id": room_id},
                 access_token=admin_user_tok,
             )
-            self.render(request)
             self.assertEqual(
                 200, int(channel.result["code"]), msg=channel.result["body"]
             )
@@ -905,7 +878,6 @@ class RoomTestCase(unittest.HomeserverTestCase):
             request, channel = self.make_request(
                 "GET", url.encode("ascii"), access_token=self.admin_user_tok,
             )
-            self.render(request)
             self.assertEqual(200, channel.code, msg=channel.json_body)
 
             # Check that rooms were returned
@@ -1042,7 +1014,6 @@ class RoomTestCase(unittest.HomeserverTestCase):
             request, channel = self.make_request(
                 "GET", url.encode("ascii"), access_token=self.admin_user_tok,
             )
-            self.render(request)
             self.assertEqual(expected_http_code, channel.code, msg=channel.json_body)
 
             if expected_http_code != 200:
@@ -1104,7 +1075,6 @@ class RoomTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok,
         )
-        self.render(request)
         self.assertEqual(200, channel.code, msg=channel.json_body)
 
         self.assertIn("room_id", channel.json_body)
@@ -1152,7 +1122,6 @@ class RoomTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok,
         )
-        self.render(request)
         self.assertEqual(200, channel.code, msg=channel.json_body)
 
         self.assertCountEqual(
@@ -1164,7 +1133,6 @@ class RoomTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok,
         )
-        self.render(request)
         self.assertEqual(200, channel.code, msg=channel.json_body)
 
         self.assertCountEqual(
@@ -1208,7 +1176,6 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             content=body.encode(encoding="utf_8"),
             access_token=self.second_tok,
         )
-        self.render(request)
 
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
@@ -1225,7 +1192,6 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.MISSING_PARAM, channel.json_body["errcode"])
@@ -1242,7 +1208,6 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(404, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
@@ -1259,7 +1224,6 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(
@@ -1280,7 +1244,6 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(404, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("No known servers", channel.json_body["error"])
@@ -1298,7 +1261,6 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(
@@ -1318,7 +1280,6 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(self.public_room_id, channel.json_body["room_id"])
@@ -1328,7 +1289,6 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "/_matrix/client/r0/joined_rooms", access_token=self.second_tok,
         )
-        self.render(request)
         self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(self.public_room_id, channel.json_body["joined_rooms"][0])
 
@@ -1349,7 +1309,6 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
@@ -1377,7 +1336,6 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "/_matrix/client/r0/joined_rooms", access_token=self.admin_user_tok,
         )
-        self.render(request)
         self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(private_room_id, channel.json_body["joined_rooms"][0])
 
@@ -1392,7 +1350,6 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(private_room_id, channel.json_body["room_id"])
 
@@ -1401,7 +1358,6 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "/_matrix/client/r0/joined_rooms", access_token=self.second_tok,
         )
-        self.render(request)
         self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(private_room_id, channel.json_body["joined_rooms"][0])
 
@@ -1422,7 +1378,6 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(private_room_id, channel.json_body["room_id"])
@@ -1432,7 +1387,6 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "/_matrix/client/r0/joined_rooms", access_token=self.second_tok,
         )
-        self.render(request)
         self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(private_room_id, channel.json_body["joined_rooms"][0])
 

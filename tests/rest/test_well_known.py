@@ -31,7 +31,6 @@ class WellKnownTests(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "/.well-known/matrix/client", shorthand=False
         )
-        self.render(request)
 
         self.assertEqual(request.code, 200)
         self.assertEqual(
@@ -48,6 +47,5 @@ class WellKnownTests(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "/.well-known/matrix/client", shorthand=False
         )
-        self.render(request)
 
         self.assertEqual(request.code, 404)
