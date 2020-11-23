@@ -347,16 +347,16 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             # later on.
             content = dict(content)
 
-        is_requester_server_notice_user = False
+        is_requester_server_notices_user = False
         if (
             self._server_notices_mxid is not None
             and requester.user.to_string() == self._server_notices_mxid
         ):
             # allow the server notices mxid to set room-level profile
-            is_requester_server_notice_user = True
+            is_requester_server_notices_user = True
 
         if (
-            not self.allow_per_room_profiles and not is_requester_server_notice_user
+            not self.allow_per_room_profiles and not is_requester_server_notices_user
         ) or requester.shadow_banned:
             # Strip profile data, knowing that new profile data will be added to the
             # event's content in event_creation_handler.create_event() using the target's
