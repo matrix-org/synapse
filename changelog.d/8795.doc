@@ -1,1 +1,1 @@
-Make resluts of admin list media API much clearer.
+Improve the documentation for the admin API to list all media in a room with respect to encrypted events.
