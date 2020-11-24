@@ -1011,7 +1011,7 @@ class SyncHandler:
         res = await self._generate_sync_entry_for_rooms(
             sync_result_builder, account_data_by_room
         )
-        newly_joined_rooms, newly_joined_or_invited_or_knocking_users, _, _ = res
+        newly_joined_rooms, newly_joined_or_invited_or_knocked_users, _, _ = res
         _, _, newly_left_rooms, newly_left_users = res
 
         block_all_presence_data = (
@@ -1022,7 +1022,7 @@ class SyncHandler:
             await self._generate_sync_entry_for_presence(
                 sync_result_builder,
                 newly_joined_rooms,
-                newly_joined_or_invited_or_knocking_users,
+                newly_joined_or_invited_or_knocked_users,
             )
 
         logger.debug("Fetching to-device data")
@@ -1031,7 +1031,7 @@ class SyncHandler:
         device_lists = await self._generate_sync_entry_for_device_list(
             sync_result_builder,
             newly_joined_rooms=newly_joined_rooms,
-            newly_joined_or_invited_or_knocking_users=newly_joined_or_invited_or_knocking_users,
+            newly_joined_or_invited_or_knocked_users=newly_joined_or_invited_or_knocked_users,
             newly_left_rooms=newly_left_rooms,
             newly_left_users=newly_left_users,
         )
@@ -1125,7 +1125,7 @@ class SyncHandler:
         self,
         sync_result_builder: "SyncResultBuilder",
         newly_joined_rooms: Set[str],
-        newly_joined_or_invited_or_knocking_users: Set[str],
+        newly_joined_or_invited_or_knocked_users: Set[str],
         newly_left_rooms: Set[str],
         newly_left_users: Set[str],
     ) -> DeviceLists:
@@ -1134,7 +1134,7 @@ class SyncHandler:
         Args:
             sync_result_builder
             newly_joined_rooms: Set of rooms user has joined since previous sync
-            newly_joined_or_invited_or_knocking_users: Set of users that have joined,
+            newly_joined_or_invited_or_knocked_users: Set of users that have joined,
                 been invited to a room or are knocking on a room since
                 previous sync.
             newly_left_rooms: Set of rooms user has left since previous sync
@@ -1147,8 +1147,8 @@ class SyncHandler:
 
         # We're going to mutate these fields, so lets copy them rather than
         # assume they won't get used later.
-        newly_joined_or_invited_or_knocking_users = set(
-            newly_joined_or_invited_or_knocking_users
+        newly_joined_or_invited_or_knocked_users = set(
+            newly_joined_or_invited_or_knocked_users
         )
         newly_left_users = set(newly_left_users)
 
@@ -1188,11 +1188,11 @@ class SyncHandler:
             # Step 1b, check for newly joined rooms
             for room_id in newly_joined_rooms:
                 joined_users = await self.state.get_current_users_in_room(room_id)
-                newly_joined_or_invited_or_knocking_users.update(joined_users)
+                newly_joined_or_invited_or_knocked_users.update(joined_users)
 
             # TODO: Check that these users are actually new, i.e. either they
             # weren't in the previous sync *or* they left and rejoined.
-            users_that_have_changed.update(newly_joined_or_invited_or_knocking_users)
+            users_that_have_changed.update(newly_joined_or_invited_or_knocked_users)
 
             user_signatures_changed = await self.store.get_users_whose_signatures_changed(
                 user_id, since_token.device_list_key
@@ -1461,7 +1461,7 @@ class SyncHandler:
         sync_result_builder.knocked.extend(knocked)
 
         # Now we want to get any newly joined, invited or knocking users
-        newly_joined_or_invited_or_knocking_users = set()
+        newly_joined_or_invited_or_knocked_users = set()
         newly_left_users = set()
         if since_token:
             for joined_sync in sync_result_builder.joined:
@@ -1475,7 +1475,7 @@ class SyncHandler:
                             or event.membership == Membership.INVITE
                             or event.membership == Membership.KNOCK
                         ):
-                            newly_joined_or_invited_or_knocking_users.add(
+                            newly_joined_or_invited_or_knocked_users.add(
                                 event.state_key
                             )
                         else:
@@ -1484,11 +1484,11 @@ class SyncHandler:
                             if prev_membership == Membership.JOIN:
                                 newly_left_users.add(event.state_key)
 
-        newly_left_users -= newly_joined_or_invited_or_knocking_users
+        newly_left_users -= newly_joined_or_invited_or_knocked_users
 
         return (
             set(newly_joined_rooms),
-            newly_joined_or_invited_or_knocking_users,
+            newly_joined_or_invited_or_knocked_users,
             set(newly_left_rooms),
             newly_left_users,
         )
