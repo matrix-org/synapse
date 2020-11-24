@@ -930,7 +930,7 @@ class FederationClient(FederationBase):
         """
         time_now = self._clock.time_msec()
 
-        return await self.transport_layer.send_knock_v1(
+        return await self.transport_layer.send_knock_v2(
             destination=destination,
             room_id=pdu.room_id,
             event_id=pdu.event_id,

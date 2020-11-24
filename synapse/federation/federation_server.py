@@ -43,8 +43,8 @@ from synapse.api.errors import (
     SynapseError,
     UnsupportedRoomVersionError,
 )
-from synapse.config.api import DEFAULT_ROOM_STATE_TYPES
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.config.api import DEFAULT_ROOM_STATE_TYPES
 from synapse.events import EventBase
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.federation.persistence import TransactionActions

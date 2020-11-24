@@ -297,7 +297,7 @@ class TransportLayerClient:
         return response
 
     @log_function
-    async def send_knock_v1(
+    async def send_knock_v2(
         self, destination: str, room_id: str, event_id: str, content: JsonDict,
     ) -> JsonDict:
         """
@@ -320,7 +320,7 @@ class TransportLayerClient:
 
             The list of state events may be empty.
         """
-        path = _create_v1_path("/send_knock/%s/%s", room_id, event_id)
+        path = _create_v2_path("/send_knock/%s/%s", room_id, event_id)
 
         return await self.client.put_json(
             destination=destination, path=path, data=content
