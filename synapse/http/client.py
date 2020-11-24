@@ -524,7 +524,10 @@ class SimpleHttpClient:
             )
 
     async def get_json(
-        self, uri: str, args: QueryParams = {}, headers: Optional[RawHeaders] = None,
+        self,
+        uri: str,
+        args: Optional[QueryParams] = None,
+        headers: Optional[RawHeaders] = None,
     ) -> Any:
         """Gets some json from the given URI.
 
@@ -554,7 +557,7 @@ class SimpleHttpClient:
         self,
         uri: str,
         json_body: Any,
-        args: QueryParams = {},
+        args: Optional[QueryParams] = None,
         headers: RawHeaders = None,
     ) -> Any:
         """Puts some json to the given URI.
@@ -575,9 +578,9 @@ class SimpleHttpClient:
 
             ValueError: if the response was not JSON
         """
-        if len(args):
-            query_bytes = urllib.parse.urlencode(args, True)
-            uri = "%s?%s" % (uri, query_bytes)
+        if args:
+            query_str = urllib.parse.urlencode(args, True)
+            uri = "%s?%s" % (uri, query_str)
 
         json_str = encode_canonical_json(json_body)
 
@@ -603,7 +606,10 @@ class SimpleHttpClient:
             )
 
     async def get_raw(
-        self, uri: str, args: QueryParams = {}, headers: Optional[RawHeaders] = None
+        self,
+        uri: str,
+        args: Optional[QueryParams] = None,
+        headers: Optional[RawHeaders] = None,
     ) -> bytes:
         """Gets raw text from the given URI.
 
@@ -621,9 +627,9 @@ class SimpleHttpClient:
 
             HttpResponseException on a non-2xx HTTP response.
         """
-        if len(args):
-            query_bytes = urllib.parse.urlencode(args, True)
-            uri = "%s?%s" % (uri, query_bytes)
+        if args:
+            query_str = urllib.parse.urlencode(args, True)
+            uri = "%s?%s" % (uri, query_str)
 
         actual_headers = {b"User-Agent": [self.user_agent]}
         if headers:
