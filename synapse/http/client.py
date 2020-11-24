@@ -14,9 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import urllib
+import urllib.parse
 from io import BytesIO
 from typing import (
+    TYPE_CHECKING,
     Any,
     BinaryIO,
     Dict,
@@ -31,7 +32,7 @@ from typing import (
 
 import treq
 from canonicaljson import encode_canonical_json
-from netaddr import IPAddress
+from netaddr import IPAddress, IPSet
 from prometheus_client import Counter
 from zope.interface import implementer, provider
 
@@ -39,6 +40,8 @@ from OpenSSL import SSL
 from OpenSSL.SSL import VERIFY_NONE
 from twisted.internet import defer, error as twisted_error, protocol, ssl
 from twisted.internet.interfaces import (
+    IAddress,
+    IHostResolution,
     IReactorPluggableNameResolver,
     IResolutionReceiver,
 )
@@ -53,7 +56,7 @@ from twisted.web.client import (
 )
 from twisted.web.http import PotentialDataLoss
 from twisted.web.http_headers import Headers
-from twisted.web.iweb import IResponse
+from twisted.web.iweb import IAgent, IBodyProducer, IResponse
 
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.http import QuieterFileBodyProducer, RequestTimedOutError, redact_uri
@@ -62,6 +65,9 @@ from synapse.logging.context import make_deferred_yieldable
 from synapse.logging.opentracing import set_tag, start_active_span, tags
 from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
+
+if TYPE_CHECKING:
+    from synapse.app.homeserver import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -84,12 +90,19 @@ QueryParamValue = Union[str, bytes, Iterable[Union[str, bytes]]]
 QueryParams = Union[Mapping[str, QueryParamValue], Mapping[bytes, QueryParamValue]]
 
 
-def check_against_blacklist(ip_address, ip_whitelist, ip_blacklist):
+def check_against_blacklist(
+    ip_address: IPAddress, ip_whitelist: Optional[IPSet], ip_blacklist: IPSet
+) -> bool:
     """
+    Compares an IP address to allowed and disallowed IP sets.
+
     Args:
-        ip_address (netaddr.IPAddress)
-        ip_whitelist (netaddr.IPSet)
-        ip_blacklist (netaddr.IPSet)
+        ip_address: The IP address to check
+        ip_whitelist: Allowed IP addresses.
+        ip_blacklist: Disallowed IP addresses.
+
+    Returns:
+        True if the IP address is in the blacklist and not in the whitelist.
     """
     if ip_address in ip_blacklist:
         if ip_whitelist is None or ip_address not in ip_whitelist:
@@ -118,23 +131,30 @@ class IPBlacklistingResolver:
     addresses, preventing DNS rebinding attacks on URL preview.
     """
 
-    def __init__(self, reactor, ip_whitelist, ip_blacklist):
+    def __init__(
+        self,
+        reactor: IReactorPluggableNameResolver,
+        ip_whitelist: Optional[IPSet],
+        ip_blacklist: IPSet,
+    ):
         """
         Args:
-            reactor (twisted.internet.reactor)
-            ip_whitelist (netaddr.IPSet)
-            ip_blacklist (netaddr.IPSet)
+            reactor: The twisted reactor.
+            ip_whitelist: IP addresses to allow.
+            ip_blacklist: IP addresses to disallow.
         """
         self._reactor = reactor
         self._ip_whitelist = ip_whitelist
         self._ip_blacklist = ip_blacklist
 
-    def resolveHostName(self, recv, hostname, portNumber=0):
+    def resolveHostName(
+        self, recv: IResolutionReceiver, hostname: str, portNumber: int = 0
+    ) -> IResolutionReceiver:
 
         r = recv()
-        addresses = []
+        addresses = []  # type: List[IAddress]
 
-        def _callback():
+        def _callback() -> None:
             r.resolutionBegan(None)
 
             has_bad_ip = False
@@ -161,15 +181,15 @@ class IPBlacklistingResolver:
         @provider(IResolutionReceiver)
         class EndpointReceiver:
             @staticmethod
-            def resolutionBegan(resolutionInProgress):
+            def resolutionBegan(resolutionInProgress: IHostResolution) -> None:
                 pass
 
             @staticmethod
-            def addressResolved(address):
+            def addressResolved(address: IAddress) -> None:
                 addresses.append(address)
 
             @staticmethod
-            def resolutionComplete():
+            def resolutionComplete() -> None:
                 _callback()
 
         self._reactor.nameResolver.resolveHostName(
@@ -185,19 +205,29 @@ class BlacklistingAgentWrapper(Agent):
     directly (without an IP address lookup).
     """
 
-    def __init__(self, agent, reactor, ip_whitelist=None, ip_blacklist=None):
+    def __init__(
+        self,
+        agent: IAgent,
+        ip_whitelist: Optional[IPSet] = None,
+        ip_blacklist: Optional[IPSet] = None,
+    ):
         """
         Args:
-            agent (twisted.web.client.Agent): The Agent to wrap.
-            reactor (twisted.internet.reactor)
-            ip_whitelist (netaddr.IPSet)
-            ip_blacklist (netaddr.IPSet)
+            agent: The Agent to wrap.
+            ip_whitelist: IP addresses to allow.
+            ip_blacklist: IP addresses to disallow.
         """
         self._agent = agent
         self._ip_whitelist = ip_whitelist
         self._ip_blacklist = ip_blacklist
 
-    def request(self, method, uri, headers=None, bodyProducer=None):
+    def request(
+        self,
+        method: bytes,
+        uri: bytes,
+        headers: Optional[Headers] = None,
+        bodyProducer: Optional[IBodyProducer] = None,
+    ) -> defer.Deferred:
         h = urllib.parse.urlparse(uri.decode("ascii"))
 
         try:
@@ -226,23 +256,23 @@ class SimpleHttpClient:
 
     def __init__(
         self,
-        hs,
-        treq_args={},
-        ip_whitelist=None,
-        ip_blacklist=None,
-        http_proxy=None,
-        https_proxy=None,
+        hs: "HomeServer",
+        treq_args: Dict[str, Any] = {},
+        ip_whitelist: Optional[IPSet] = None,
+        ip_blacklist: Optional[IPSet] = None,
+        http_proxy: Optional[bytes] = None,
+        https_proxy: Optional[bytes] = None,
     ):
         """
         Args:
-            hs (synapse.server.HomeServer)
-            treq_args (dict): Extra keyword arguments to be given to treq.request.
-            ip_blacklist (netaddr.IPSet): The IP addresses that are blacklisted that
+            hs
+            treq_args: Extra keyword arguments to be given to treq.request.
+            ip_blacklist: The IP addresses that are blacklisted that
                 we may not request.
-            ip_whitelist (netaddr.IPSet): The whitelisted IP addresses, that we can
+            ip_whitelist: The whitelisted IP addresses, that we can
                request if it were otherwise caught in a blacklist.
-            http_proxy (bytes): proxy server to use for http connections. host[:port]
-            https_proxy (bytes): proxy server to use for https connections. host[:port]
+            http_proxy: proxy server to use for http connections. host[:port]
+            https_proxy: proxy server to use for https connections. host[:port]
         """
         self.hs = hs
 
@@ -306,7 +336,6 @@ class SimpleHttpClient:
             # by the DNS resolution.
             self.agent = BlacklistingAgentWrapper(
                 self.agent,
-                self.reactor,
                 ip_whitelist=self._ip_whitelist,
                 ip_blacklist=self._ip_blacklist,
             )
@@ -432,7 +461,7 @@ class SimpleHttpClient:
             b"Accept": [b"application/json"],
         }
         if headers:
-            actual_headers.update(headers)
+            actual_headers.update(headers)  # type: ignore
 
         response = await self.request(
             "POST", uri, headers=Headers(actual_headers), data=query_bytes
@@ -479,7 +508,7 @@ class SimpleHttpClient:
             b"Accept": [b"application/json"],
         }
         if headers:
-            actual_headers.update(headers)
+            actual_headers.update(headers)  # type: ignore
 
         response = await self.request(
             "POST", uri, headers=Headers(actual_headers), data=json_str
@@ -516,7 +545,7 @@ class SimpleHttpClient:
         """
         actual_headers = {b"Accept": [b"application/json"]}
         if headers:
-            actual_headers.update(headers)
+            actual_headers.update(headers)  # type: ignore
 
         body = await self.get_raw(uri, args, headers=headers)
         return json_decoder.decode(body.decode("utf-8"))
@@ -558,7 +587,7 @@ class SimpleHttpClient:
             b"Accept": [b"application/json"],
         }
         if headers:
-            actual_headers.update(headers)
+            actual_headers.update(headers)  # type: ignore
 
         response = await self.request(
             "PUT", uri, headers=Headers(actual_headers), data=json_str
@@ -598,7 +627,7 @@ class SimpleHttpClient:
 
         actual_headers = {b"User-Agent": [self.user_agent]}
         if headers:
-            actual_headers.update(headers)
+            actual_headers.update(headers)  # type: ignore
 
         response = await self.request("GET", uri, headers=Headers(actual_headers))
 
@@ -641,7 +670,7 @@ class SimpleHttpClient:
 
         actual_headers = {b"User-Agent": [self.user_agent]}
         if headers:
-            actual_headers.update(headers)
+            actual_headers.update(headers)  # type: ignore
 
         response = await self.request("GET", url, headers=Headers(actual_headers))
 
@@ -649,12 +678,13 @@ class SimpleHttpClient:
 
         if (
             b"Content-Length" in resp_headers
+            and max_size
             and int(resp_headers[b"Content-Length"][0]) > max_size
         ):
-            logger.warning("Requested URL is too large > %r bytes" % (self.max_size,))
+            logger.warning("Requested URL is too large > %r bytes" % (max_size,))
             raise SynapseError(
                 502,
-                "Requested file is too large > %r bytes" % (self.max_size,),
+                "Requested file is too large > %r bytes" % (max_size,),
                 Codes.TOO_LARGE,
             )
 
