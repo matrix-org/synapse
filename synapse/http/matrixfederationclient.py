@@ -641,8 +641,8 @@ class MatrixFederationHttpClient:
         self,
         destination: str,
         path: str,
-        args: QueryArgs = {},
-        data: JsonDict = {},
+        args: Optional[QueryArgs] = None,
+        data: Optional[JsonDict] = None,
         json_data_callback: Optional[Callable[[], JsonDict]] = None,
         long_retries: bool = False,
         timeout: Optional[int] = None,
@@ -732,11 +732,11 @@ class MatrixFederationHttpClient:
         self,
         destination: str,
         path: str,
-        data: JsonDict = {},
+        data: Optional[JsonDict] = None,
         long_retries: bool = False,
         timeout: Optional[int] = None,
         ignore_backoff: bool = False,
-        args: QueryArgs = {},
+        args: Optional[QueryArgs] = None,
     ) -> Union[JsonDict, list]:
         """ Sends the specified json data using POST
 
@@ -882,7 +882,7 @@ class MatrixFederationHttpClient:
         long_retries: bool = False,
         timeout: Optional[int] = None,
         ignore_backoff: bool = False,
-        args: Optional[QueryArgs] = {},
+        args: Optional[QueryArgs] = None,
     ) -> Union[JsonDict, list]:
         """Send a DELETE request to the remote expecting some json response
 
@@ -947,7 +947,7 @@ class MatrixFederationHttpClient:
         destination: str,
         path: str,
         output_stream,
-        args: QueryArgs = {},
+        args: Optional[QueryArgs] = None,
         retry_on_dns_fail: bool = True,
         max_size: Optional[int] = None,
         ignore_backoff: bool = False,
