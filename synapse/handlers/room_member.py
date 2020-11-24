@@ -564,7 +564,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     invite = room_state_or_invite.get(
                         (EventTypes.Member, target.to_string())
                     )
-                    if invite and invite.membership == Membership.KNOCK:
+                    if invite and invite.membership == Membership.INVITE:
                         logger.info(
                             "%s rejects invite to %s from %s",
                             target,
