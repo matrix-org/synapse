@@ -187,7 +187,7 @@ def parse_string_from_args(
     param_type: Optional[str] = "string",
     encoding: Optional[str] = "ascii",
 ):
-    """Parse a single
+    """Parse and optionally decode a single value from request query parameters.
 
     Args:
         args: A dictionary of query parameters from a request.
