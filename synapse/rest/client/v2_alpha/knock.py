@@ -32,13 +32,7 @@ from ._base import client_patterns
 logger = logging.getLogger(__name__)
 
 
-class TransactionRestServlet(RestServlet):
-    def __init__(self, hs: "HomeServer"):
-        super(TransactionRestServlet, self).__init__()
-        self.txns = HttpTransactionCache(hs)
-
-
-class KnockRoomAliasServlet(TransactionRestServlet):
+class KnockRoomAliasServlet(RestServlet):
     """
     POST /knock/{roomIdOrAlias}
     """
@@ -46,7 +40,8 @@ class KnockRoomAliasServlet(TransactionRestServlet):
     PATTERNS = client_patterns("/knock/(?P<room_identifier>[^/]*)")
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        super().__init__()
+        self.txns = HttpTransactionCache(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
