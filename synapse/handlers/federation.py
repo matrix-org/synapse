@@ -1901,20 +1901,20 @@ class FederationHandler(BaseHandler):
         return event
 
     @log_function
-    async def on_send_knock_request(self, origin: str, pdu: EventBase) -> EventContext:
+    async def on_send_knock_request(
+        self, origin: str, event: EventBase
+    ) -> EventContext:
         """
         We have received a knock event for a room. Verify that event and send it into the room
         on the knocking homeserver's behalf.
 
         Args:
             origin: The remote homeserver of the knocking user.
-            pdu: The knocking member event that has been signed by the remote homeserver.
+            event: The knocking member event that has been signed by the remote homeserver.
 
         Returns:
             The context of the event after inserting it into the room graph.
         """
-        event = pdu
-
         logger.debug(
             "on_send_knock_request: Got event: %s, signatures: %s",
             event.event_id,
