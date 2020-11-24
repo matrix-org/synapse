@@ -311,10 +311,10 @@ def serialize_event(
             if txn_id is not None:
                 d["unsigned"]["transaction_id"] = txn_id
 
-    # invite_room_state is a list of stripped room state events that are meant to
-    # provide metadata about a room to an invitee. knock_room_state is the same,
-    # but for user knocking on a room. They are intended to only be included in specific
-    # circumstances, such as down sync, and should not be included in any other case.
+    # invite_room_state and knock_room_state are a list of stripped room state events
+    # that are meant to provide metadata about a room to an invitee/knocker. They are
+    # intended to only be included in specific circumstances, such as down sync, and
+    # should not be included in any other case.
     if not include_stripped_room_state:
         d["unsigned"].pop("invite_room_state", None)
         d["unsigned"].pop("knock_room_state", None)

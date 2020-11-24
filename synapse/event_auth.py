@@ -291,7 +291,7 @@ def _is_membership_change_allowed(
             raise AuthError(403, "%s is banned from the room" % (target_user_id,))
         return
 
-    # Require the user to be in the room for membership changes other than join/knocking
+    # Require the user to be in the room for membership changes other than join/knock.
     if Membership.JOIN != membership and Membership.KNOCK != membership:
         # If the user has been invited or has knocked, they are allowed to change their
         # membership event to leave

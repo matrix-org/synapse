@@ -551,7 +551,7 @@ class FederationMakeKnockServlet(BaseFederationServlet):
         return 200, content
 
 
-class FederationV1MakeKnockServlet(BaseFederationServlet):
+class FederationV2MakeKnockServlet(BaseFederationServlet):
     PATH = "/send_knock/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
 
     async def on_PUT(self, origin, content, query, room_id, event_id):
