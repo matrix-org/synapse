@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Optional, Tuple
 
 from twisted.web.server import Request
 
+from synapse.api.constants import Membership
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import (
     RestServlet,
@@ -79,7 +80,7 @@ class KnockRoomAliasServlet(RestServlet):
             requester=requester,
             target=requester.user,
             room_id=room_id,
-            action="knock",
+            action=Membership.KNOCK,
             txn_id=txn_id,
             third_party_signed=None,
             remote_room_hosts=remote_room_hosts,

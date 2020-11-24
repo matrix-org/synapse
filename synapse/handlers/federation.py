@@ -1469,7 +1469,7 @@ class FederationHandler(BaseHandler):
         # Ask the remote server to create a valid knock event for us. Once received,
         # we sign the event
         origin, event, event_format_version = await self._make_and_verify_event(
-            target_hosts, room_id, knockee, "knock", content,
+            target_hosts, room_id, knockee, Membership.KNOCK, content,
         )
 
         # Record the room ID and its version so that we have a record of the room

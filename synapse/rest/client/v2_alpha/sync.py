@@ -17,7 +17,7 @@ import itertools
 import logging
 from typing import Any, Callable, Dict, List
 
-from synapse.api.constants import PresenceState
+from synapse.api.constants import PresenceState, Membership
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.api.filtering import DEFAULT_FILTER_COLLECTION, FilterCollection
 from synapse.events.utils import (
@@ -235,15 +235,15 @@ class SyncRestServlet(RestServlet):
             },
             "presence": SyncRestServlet.encode_presence(sync_result.presence, time_now),
             "rooms": {
-                "join": joined,
-                "invite": invited,
-                "knock": knocked,
-                "leave": archived,
+                Membership.JOIN: joined,
+                Membership.INVITE: invited,
+                Membership.KNOCK: knocked,
+                Membership.LEAVE: archived,
             },
             "groups": {
-                "join": sync_result.groups.join,
-                "invite": sync_result.groups.invite,
-                "leave": sync_result.groups.leave,
+                Membership.JOIN: sync_result.groups.join,
+                Membership.INVITE: sync_result.groups.invite,
+                Membership.LEAVE: sync_result.groups.leave,
             },
             "device_one_time_keys_count": sync_result.device_one_time_keys_count,
             "org.matrix.msc2732.device_unused_fallback_key_types": sync_result.device_unused_fallback_key_types,
