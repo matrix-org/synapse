@@ -136,10 +136,7 @@ class ReplicationRemoteKnockRestServlet(ReplicationEndpoint):
         }
 
     async def _handle_request(  # type: ignore
-        self,
-        request: Request,
-        room_id: str,
-        user_id: str,
+        self, request: Request, room_id: str, user_id: str,
     ):
         content = parse_json_object_from_request(request)
 
@@ -267,9 +264,7 @@ class ReplicationRemoteRescindKnockRestServlet(ReplicationEndpoint):
         }
 
     async def _handle_request(  # type: ignore
-        self,
-        request: Request,
-        knock_event_id: str,
+        self, request: Request, knock_event_id: str,
     ):
         content = parse_json_object_from_request(request)
 

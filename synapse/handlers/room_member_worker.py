@@ -18,7 +18,6 @@ import logging
 from typing import List, Optional, Tuple
 
 from synapse.api.errors import SynapseError
-from synapse.events import EventBase
 from synapse.handlers.room_member import RoomMemberHandler
 from synapse.replication.http.membership import (
     ReplicationRemoteJoinRestServlet as ReplRemoteJoin,
