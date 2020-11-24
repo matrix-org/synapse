@@ -43,6 +43,7 @@ from synapse.api.errors import (
     SynapseError,
     UnsupportedRoomVersionError,
 )
+from synapse.config.api import DEFAULT_ROOM_STATE_TYPES
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
@@ -118,8 +119,6 @@ class FederationServer(FederationBase):
         self._transaction_resp_cache = ResponseCache(
             hs, "fed_txn_handler", timeout_ms=30000
         )  # type: ResponseCache[Tuple[str, str]]
-
-        self._room_knock_state_types = hs.config.room_knock_state_types
 
         self.transaction_actions = TransactionActions(self.store)
 
@@ -628,7 +627,7 @@ class FederationServer(FederationBase):
         # server. This will allow the remote server's clients to display information
         # related to the room while the knock request is pending.
         stripped_room_state = await self.store.get_stripped_room_state_from_event_context(
-            event_context, self._room_knock_state_types
+            event_context, DEFAULT_ROOM_STATE_TYPES
         )
         return {"knock_state_events": stripped_room_state}
 

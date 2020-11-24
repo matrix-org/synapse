@@ -34,9 +34,6 @@ class ApiConfig(Config):
         self.room_invite_state_types = config.get(
             "room_invite_state_types", DEFAULT_ROOM_STATE_TYPES
         )
-        self.room_knock_state_types = config.get(
-            "room_knock_state_types", DEFAULT_ROOM_STATE_TYPES
-        )
 
     def generate_config_section(cls, **kwargs):
         return """\
@@ -47,17 +44,6 @@ class ApiConfig(Config):
         # room that they've been invited to, without actually being in the room yet.
         #
         #room_invite_state_types:
-        #  - "{JoinRules}"
-        #  - "{CanonicalAlias}"
-        #  - "{RoomAvatar}"
-        #  - "{RoomEncryption}"
-        #  - "{Name}"
-
-        # A list of event types from a room that will be given to users when they
-        # knock on the room. This allows clients to display information about the
-        # room that they've knocked on, without actually being in the room yet.
-        #
-        #room_knock_state_types:
         #  - "{JoinRules}"
         #  - "{CanonicalAlias}"
         #  - "{RoomAvatar}"
