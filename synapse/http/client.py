@@ -426,7 +426,7 @@ class SimpleHttpClient:
     async def post_urlencoded_get_json(
         self,
         uri: str,
-        args: Mapping[str, Union[str, List[str]]] = {},
+        args: Optional[Mapping[str, Union[str, List[str]]]] = None,
         headers: Optional[RawHeaders] = None,
     ) -> Any:
         """
@@ -451,9 +451,7 @@ class SimpleHttpClient:
         # TODO: Do we ever want to log message contents?
         logger.debug("post_urlencoded_get_json args: %s", args)
 
-        query_bytes = urllib.parse.urlencode(encode_urlencode_args(args), True).encode(
-            "utf8"
-        )
+        query_bytes = encode_query_args(args)
 
         actual_headers = {
             b"Content-Type": [b"application/x-www-form-urlencoded"],
@@ -732,18 +730,16 @@ def _timeout_to_request_timed_out_error(f: Failure):
     return f
 
 
-# XXX: FIXME: This is horribly copy-pasted from matrixfederationclient.
-# The two should be factored out.
-
-
 class _ReadBodyToFileProtocol(protocol.Protocol):
-    def __init__(self, stream, deferred, max_size):
+    def __init__(
+        self, stream: BinaryIO, deferred: defer.Deferred, max_size: Optional[int]
+    ):
         self.stream = stream
         self.deferred = deferred
         self.length = 0
         self.max_size = max_size
 
-    def dataReceived(self, data):
+    def dataReceived(self, data: bytes) -> None:
         self.stream.write(data)
         self.length += len(data)
         if self.max_size is not None and self.length >= self.max_size:
@@ -757,7 +753,7 @@ class _ReadBodyToFileProtocol(protocol.Protocol):
             self.deferred = defer.Deferred()
             self.transport.loseConnection()
 
-    def connectionLost(self, reason):
+    def connectionLost(self, reason: Failure) -> None:
         if reason.check(ResponseDone):
             self.deferred.callback(self.length)
         elif reason.check(PotentialDataLoss):
@@ -768,35 +764,27 @@ class _ReadBodyToFileProtocol(protocol.Protocol):
             self.deferred.errback(reason)
 
 
-# XXX: FIXME: This is horribly copy-pasted from matrixfederationclient.
-# The two should be factored out.
-
-
-def _readBodyToFile(response, stream, max_size):
+def _readBodyToFile(
+    response: IResponse, stream: BinaryIO, max_size: Optional[int]
+) -> defer.Deferred:
     d = defer.Deferred()
     response.deliverBody(_ReadBodyToFileProtocol(stream, d, max_size))
     return d
 
 
-def encode_urlencode_args(args):
-    return {k: encode_urlencode_arg(v) for k, v in args.items()}
+def encode_query_args(args: Optional[Mapping[str, Union[str, List[str]]]]) -> bytes:
+    if args is None:
+        return b""
 
+    encoded_args = {}
+    for k, vs in args.items():
+        if isinstance(vs, str):
+            vs = [vs]
+        encoded_args[k] = [v.encode("utf8") for v in vs]
 
-def encode_urlencode_arg(arg):
-    if isinstance(arg, str):
-        return arg.encode("utf-8")
-    elif isinstance(arg, list):
-        return [encode_urlencode_arg(i) for i in arg]
-    else:
-        return arg
+    query_str = urllib.parse.urlencode(encoded_args, True)
 
-
-def _print_ex(e):
-    if hasattr(e, "reasons") and e.reasons:
-        for ex in e.reasons:
-            _print_ex(ex)
-    else:
-        logger.exception(e)
+    return query_str.encode("utf8")
 
 
 class InsecureInterceptableContextFactory(ssl.ContextFactory):
