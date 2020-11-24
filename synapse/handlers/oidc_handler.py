@@ -1066,6 +1066,10 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         # Ensure only valid characters are included in the MXID.
         localpart = map_username_to_mxid_localpart(localpart)
 
+        # Append suffix integer if last call to this function failed to produce
+        # a usable mxid.
+        localpart += str(failures) if failures else ""
+
         display_name = None  # type: Optional[str]
         if self._config.display_name_template is not None:
             display_name = self._config.display_name_template.render(
