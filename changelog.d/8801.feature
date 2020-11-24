@@ -1,1 +1,1 @@
-Support re-trying generating a localpart for OpenID Connect mapping providers.
+Add support for re-trying generation of a localpart for OpenID Connect mapping providers.
