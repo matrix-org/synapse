@@ -1801,7 +1801,7 @@ class WhoisRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
-    def test_requester_is_no_admin(self):
+    def test_requester_is_not_admin(self):
         """
         If the user is not a server admin, an error is returned.
         """
@@ -1841,7 +1841,7 @@ class WhoisRestTestCase(unittest.HomeserverTestCase):
 
     def test_get_whois_admin(self):
         """
-        Tests that a normal lookup as admin is successfully
+        The lookup should succeed for an admin.
         """
         request, channel = self.make_request(
             "GET", self.url1, access_token=self.admin_user_tok,
@@ -1859,7 +1859,7 @@ class WhoisRestTestCase(unittest.HomeserverTestCase):
 
     def test_get_whois_user(self):
         """
-        Tests that a normal lookup as user for own is successfully
+        The lookup should succeed for a normal user looking up their own information.
         """
         other_user_token = self.login("user", "pass")
 
