@@ -119,12 +119,13 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
 
         Implements RoomMemberHandler.remote_knock
         """
-        return await self._remote_knock_client(
+        ret = await self._remote_knock_client(
             remote_room_hosts=remote_room_hosts,
             room_id=room_id,
             user=user,
             content=content,
         )
+        return ret["event_id"], ret["stream_id"]
 
     async def _user_left_room(self, target: UserID, room_id: str) -> None:
         """Implements RoomMemberHandler._user_left_room
