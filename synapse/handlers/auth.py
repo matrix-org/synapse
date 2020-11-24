@@ -870,17 +870,6 @@ class AuthHandler(BaseHandler):
                 raise SynapseError(400, "Missing parameter: password")
 
         for provider in self.password_providers:
-            if (
-                hasattr(provider._pp, "check_password")
-                and login_type == LoginType.PASSWORD
-            ):
-                known_login_type = True
-                is_valid = await provider._pp.check_password(
-                    qualified_user_id, password
-                )
-                if is_valid:
-                    return qualified_user_id, None
-
             supported_login_types = provider.get_supported_login_types()
             if login_type not in supported_login_types:
                 # this password provider doesn't understand this login type
@@ -1378,10 +1367,21 @@ class PasswordProvider:
         except Exception as e:
             logger.error("Error while initializing %r: %s", module, e)
             raise
-        return cls(pp)
+        return cls(pp, module_api)
 
-    def __init__(self, pp):
+    def __init__(self, pp, module_api: ModuleApi):
         self._pp = pp
+        self._module_api = module_api
+
+        self._supported_login_types = {}
+
+        # grandfather in check_password support
+        if hasattr(self._pp, "check_password"):
+            self._supported_login_types[LoginType.PASSWORD] = ("password",)
+
+        g = getattr(self._pp, "get_supported_login_types", None)
+        if g:
+            self._supported_login_types.update(g())
 
     def __str__(self):
         return str(self._pp)
@@ -1392,16 +1392,19 @@ class PasswordProvider:
         Returns a map from a login type identifier (such as m.login.password) to an
         iterable giving the fields which must be provided by the user in the submission
         to the /login API.
+
+        This wrapper adds m.login.password to the list if the underlying password
+        provider supports the check_password() api.
         """
-        g = getattr(self._pp, "get_supported_login_types", None)
-        if not g:
-            return {}
-        return g()
+        return self._supported_login_types
 
     async def check_auth(
         self, username: str, login_type: str, login_dict: JsonDict
     ) -> Optional[Tuple[str, Optional[Callable]]]:
         """Check if the user has presented valid login credentials
+
+        This wrapper also calls check_password() if the underlying password provider
+        supports the check_password() api and the login type is m.login.password.
 
         Args:
             username: user id presented by the client. Either an MXID or an unqualified
@@ -1416,6 +1419,17 @@ class PasswordProvider:
             user, and `callback` is an optional callback which will be called with the
             result from the /login call (including access_token, device_id, etc.)
         """
+        # first grandfather in a call to check_password
+        if login_type == LoginType.PASSWORD:
+            g = getattr(self._pp, "check_password", None)
+            if g:
+                qualified_user_id = self._module_api.get_qualified_user_id(username)
+                is_valid = await self._pp.check_password(
+                    qualified_user_id, login_dict["password"]
+                )
+                if is_valid:
+                    return qualified_user_id, None
+
         g = getattr(self._pp, "check_auth", None)
         if not g:
             return None
