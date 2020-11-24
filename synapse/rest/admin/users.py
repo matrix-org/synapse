@@ -15,7 +15,6 @@
 import hashlib
 import hmac
 import logging
-import re
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
@@ -35,6 +34,7 @@ from synapse.rest.admin._base import (
     assert_requester_is_admin,
     assert_user_is_admin,
 )
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import JsonDict, UserID
 
 if TYPE_CHECKING:
@@ -461,13 +461,13 @@ class UserRegisterServlet(RestServlet):
 
 
 class WhoisRestServlet(RestServlet):
-    path_regex = "/whois/(?P<user_id>[^/]*)"
+    path_regex = "/whois/(?P<user_id>[^/]*)$"
     PATTERNS = (
         admin_patterns(path_regex)
         +
         # URL for spec reason
         # https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-admin-whois-userid
-        [re.compile("/_matrix/client/r0/admin" + path_regex)]
+        client_patterns("/admin" + path_regex, v1=True)
     )
 
     def __init__(self, hs):
