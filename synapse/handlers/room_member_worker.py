@@ -22,7 +22,9 @@ from synapse.events import EventBase
 from synapse.handlers.room_member import RoomMemberHandler
 from synapse.replication.http.membership import (
     ReplicationRemoteJoinRestServlet as ReplRemoteJoin,
+    ReplicationRemoteKnockRestServlet as ReplRemoteKnock,
     ReplicationRemoteRejectInviteRestServlet as ReplRejectInvite,
+    ReplicationRemoteRescindKnockRestServlet as ReplRescindKnock,
     ReplicationUserJoinedLeftRoomRestServlet as ReplJoinedLeft,
 )
 from synapse.types import JsonDict, Requester, UserID
@@ -35,7 +37,9 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         super().__init__(hs)
 
         self._remote_join_client = ReplRemoteJoin.make_client(hs)
+        self._remote_knock_client = ReplRemoteKnock.make_client(hs)
         self._remote_reject_client = ReplRejectInvite.make_client(hs)
+        self._remote_rescind_client = ReplRescindKnock.make_client(hs)
         self._notify_change_client = ReplJoinedLeft.make_client(hs)
 
     async def _remote_join(
@@ -81,17 +85,18 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         )
         return ret["event_id"], ret["stream_id"]
 
-    async def generate_local_out_of_band_leave(
+    async def remote_rescind_knock(
         self,
-        previous_membership_event: EventBase,
+        knock_event_id: str,
         txn_id: Optional[str],
         requester: Requester,
         content: JsonDict,
     ) -> Tuple[str, int]:
-        """Generate a local leave event for a room
+        """
+        Rescinds a local knock made on a remote room
 
         Args:
-            previous_membership_event: the previous membership event for this user
+            knock_event_id: the knock event
             txn_id: optional transaction ID supplied by the client
             requester: user making the request, according to the access token
             content: additional content to include in the leave event.
@@ -100,8 +105,8 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         Returns:
             A tuple containing (event_id, stream_id of the leave event)
         """
-        ret = await self.generate_local_out_of_band_leave(
-            previous_membership_event=previous_membership_event,
+        ret = await self._remote_rescind_client(
+            knock_event_id=knock_event_id,
             txn_id=txn_id,
             requester=requester,
             content=content,
@@ -115,7 +120,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
 
         Implements RoomMemberHandler.remote_knock
         """
-        return await self.remote_knock(
+        return await self._remote_knock_client(
             remote_room_hosts=remote_room_hosts,
             room_id=room_id,
             user=user,

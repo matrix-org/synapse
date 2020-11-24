@@ -156,24 +156,23 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    async def generate_local_out_of_band_leave(
+    async def remote_rescind_knock(
         self,
-        previous_membership_event: EventBase,
+        knock_event_id: str,
         txn_id: Optional[str],
         requester: Requester,
         content: JsonDict,
     ) -> Tuple[str, int]:
-        """Generate a local leave event for a room
+        """Rescind a local knock made on a remote room.
 
         Args:
-            previous_membership_event: the previous membership event for this user
-            txn_id: optional transaction ID supplied by the client
-            requester: user making the request, according to the access token
-            content: additional content to include in the leave event.
-               Normally an empty dict.
+            knock_event_id: The ID of the knock event to rescind.
+            txn_id: An optional transaction ID supplied by the client.
+            requester: The user making the request, according to the access token.
+            content: The content of the generated leave event.
 
         Returns:
-            A tuple containing (event_id, stream_id of the leave event)
+            A tuple containing (event_id, stream_id of the leave event).
         """
         raise NotImplementedError()
 
@@ -596,15 +595,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                         user_id=target.to_string(), room_id=room_id
                     )  # type: Optional[RoomsForUser]
                     if knock:
-                        # TODO: We don't yet support rescinding knocks over federation
-                        # as we don't know which homeserver to send it to. An obvious
-                        # candidate is the remote homeserver we originally knocked through,
-                        # however we don't currently store that information.
-
-                        # Just rescind the knock locally
-                        knock_event = await self.store.get_event(knock.event_id)
-                        return await self.generate_local_out_of_band_leave(
-                            knock_event, txn_id, requester, content
+                        return await self.remote_rescind_knock(
+                            knock.event_id, txn_id, requester, content
                         )
 
                     logger.info(
@@ -1185,11 +1177,40 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             #
             logger.warning("Failed to reject invite: %s", e)
 
-            return await self.generate_local_out_of_band_leave(
+            return await self._generate_local_out_of_band_leave(
                 invite_event, txn_id, requester, content
             )
 
-    async def generate_local_out_of_band_leave(
+    async def remote_rescind_knock(
+        self,
+        knock_event_id: str,
+        txn_id: Optional[str],
+        requester: Requester,
+        content: JsonDict,
+    ) -> Tuple[str, int]:
+        """
+        Rescinds a local knock made on a remote room
+
+        Args:
+            knock_event_id: The ID of the knock event to rescind.
+            txn_id: The transaction ID to use.
+            requester: The originator of the request.
+            content: The content of the leave event.
+
+        Implements RoomMemberHandler.remote_rescind_knock
+        """
+        # TODO: We don't yet support rescinding knocks over federation
+        # as we don't know which homeserver to send it to. An obvious
+        # candidate is the remote homeserver we originally knocked through,
+        # however we don't currently store that information.
+
+        # Just rescind the knock locally
+        knock_event = await self.store.get_event(knock_event_id)
+        return await self._generate_local_out_of_band_leave(
+            knock_event, txn_id, requester, content
+        )
+
+    async def _generate_local_out_of_band_leave(
         self,
         previous_membership_event: EventBase,
         txn_id: Optional[str],
