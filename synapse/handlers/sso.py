@@ -117,8 +117,31 @@ class SsoHandler(BaseHandler):
         ip_address: str,
         sso_to_matrix_id_mapper: Callable[[int], Awaitable[UserAttributes]],
         allow_existing_users: bool = False,
-    ):
+    ) -> str:
         """
+        Given an SSO ID, retrieve the user ID for it and possibly register the user.
+
+        This first checks if the SSO ID has previously been linked to a matrix ID,
+        if it has that matrix ID is returned regardless of the current mapping
+        logic.
+
+        The mapping function is called (potentially multiple times) to generate
+        a localpart for the user.
+
+        If an unused localpart is generated, the user is registered from the
+        given user-agent and IP address and the SSO ID is linked to this matrix
+        ID for subsequent calls.
+
+        If allow_existing_users is true the mapping function is only called once
+        and results in:
+
+            1. The use of a previously registered matrix ID. In this case, the
+               SSO ID is linked to the matrix ID. (Note it is possible that
+               other SSO IDs are linked to the same matrix ID.)
+            2. An unused localpart, in which case the user is registered (as
+               discussed above).
+            3. An error if the generated localpart matches multiple pre-existing
+               matrix IDs. Generally this should not happen.
 
         Args:
             auth_provider_id: A unique identifier for this SSO provider, e.g.
