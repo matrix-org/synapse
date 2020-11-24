@@ -72,7 +72,6 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", "register", body
         )  # type: SynapseRequest, FakeChannel
-        self.render(request)
 
         self.assertEqual(request.code, expected_response)
         return channel
@@ -87,7 +86,6 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "auth/m.login.recaptcha/fallback/web?session=" + session
         )  # type: SynapseRequest, FakeChannel
-        self.render(request)
         self.assertEqual(request.code, 200)
 
         request, channel = self.make_request(
@@ -96,7 +94,6 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
             + post_session
             + "&g-recaptcha-response=a",
         )
-        self.render(request)
         self.assertEqual(request.code, expected_post_response)
 
         # The recaptcha handler is called with the response given
@@ -177,7 +174,6 @@ class UIAuthTests(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "devices", access_token=self.user_tok,
         )  # type: SynapseRequest, FakeChannel
-        self.render(request)
 
         # Get the ID of the device.
         self.assertEqual(request.code, 200)
@@ -190,7 +186,6 @@ class UIAuthTests(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "DELETE", "devices/" + device, body, access_token=self.user_tok
         )  # type: SynapseRequest, FakeChannel
-        self.render(request)
 
         # Ensure the response is sane.
         self.assertEqual(request.code, expected_response)
@@ -204,7 +199,6 @@ class UIAuthTests(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", "delete_devices", body, access_token=self.user_tok,
         )  # type: SynapseRequest, FakeChannel
-        self.render(request)
 
         # Ensure the response is sane.
         self.assertEqual(request.code, expected_response)

@@ -17,7 +17,7 @@
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
 import logging
 import re
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from urllib import parse as urlparse
 
 from synapse.api.constants import EventTypes, Membership
@@ -48,8 +48,7 @@ from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, 
 from synapse.util import json_decoder
 from synapse.util.stringutils import random_string
 
-MYPY = False
-if MYPY:
+if TYPE_CHECKING:
     import synapse.server
 
 logger = logging.getLogger(__name__)

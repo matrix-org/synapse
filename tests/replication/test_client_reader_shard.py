@@ -20,7 +20,7 @@ from synapse.rest.client.v2_alpha import register
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.rest.client.v2_alpha.test_auth import DummyRecaptchaChecker
-from tests.server import FakeChannel
+from tests.server import FakeChannel, make_request
 
 logger = logging.getLogger(__name__)
 
@@ -46,23 +46,28 @@ class ClientReaderTestCase(BaseMultiWorkerStreamTestCase):
         """Test that registration works when using a single client reader worker.
         """
         worker_hs = self.make_worker_hs("synapse.app.client_reader")
+        site = self._hs_to_site[worker_hs]
 
-        request_1, channel_1 = self.make_request(
+        request_1, channel_1 = make_request(
+            self.reactor,
+            site,
             "POST",
             "register",
             {"username": "user", "type": "m.login.password", "password": "bar"},
         )  # type: SynapseRequest, FakeChannel
-        self.render_on_worker(worker_hs, request_1)
         self.assertEqual(request_1.code, 401)
 
         # Grab the session
         session = channel_1.json_body["session"]
 
         # also complete the dummy auth
-        request_2, channel_2 = self.make_request(
-            "POST", "register", {"auth": {"session": session, "type": "m.login.dummy"}}
+        request_2, channel_2 = make_request(
+            self.reactor,
+            site,
+            "POST",
+            "register",
+            {"auth": {"session": session, "type": "m.login.dummy"}},
         )  # type: SynapseRequest, FakeChannel
-        self.render_on_worker(worker_hs, request_2)
         self.assertEqual(request_2.code, 200)
 
         # We're given a registered user.
@@ -74,22 +79,28 @@ class ClientReaderTestCase(BaseMultiWorkerStreamTestCase):
         worker_hs_1 = self.make_worker_hs("synapse.app.client_reader")
         worker_hs_2 = self.make_worker_hs("synapse.app.client_reader")
 
-        request_1, channel_1 = self.make_request(
+        site_1 = self._hs_to_site[worker_hs_1]
+        request_1, channel_1 = make_request(
+            self.reactor,
+            site_1,
             "POST",
             "register",
             {"username": "user", "type": "m.login.password", "password": "bar"},
         )  # type: SynapseRequest, FakeChannel
-        self.render_on_worker(worker_hs_1, request_1)
         self.assertEqual(request_1.code, 401)
 
         # Grab the session
         session = channel_1.json_body["session"]
 
         # also complete the dummy auth
-        request_2, channel_2 = self.make_request(
-            "POST", "register", {"auth": {"session": session, "type": "m.login.dummy"}}
+        site_2 = self._hs_to_site[worker_hs_2]
+        request_2, channel_2 = make_request(
+            self.reactor,
+            site_2,
+            "POST",
+            "register",
+            {"auth": {"session": session, "type": "m.login.dummy"}},
         )  # type: SynapseRequest, FakeChannel
-        self.render_on_worker(worker_hs_2, request_2)
         self.assertEqual(request_2.code, 200)
 
         # We're given a registered user.

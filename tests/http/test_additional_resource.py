@@ -17,6 +17,7 @@
 from synapse.http.additional_resource import AdditionalResource
 from synapse.http.server import respond_with_json
 
+from tests.server import FakeSite, make_request
 from tests.unittest import HomeserverTestCase
 
 
@@ -43,20 +44,18 @@ class AdditionalResourceTests(HomeserverTestCase):
 
     def test_async(self):
         handler = _AsyncTestCustomEndpoint({}, None).handle_request
-        self.resource = AdditionalResource(self.hs, handler)
+        resource = AdditionalResource(self.hs, handler)
 
-        request, channel = self.make_request("GET", "/")
-        self.render(request)
+        request, channel = make_request(self.reactor, FakeSite(resource), "GET", "/")
 
         self.assertEqual(request.code, 200)
         self.assertEqual(channel.json_body, {"some_key": "some_value_async"})
 
     def test_sync(self):
         handler = _SyncTestCustomEndpoint({}, None).handle_request
-        self.resource = AdditionalResource(self.hs, handler)
+        resource = AdditionalResource(self.hs, handler)
 
-        request, channel = self.make_request("GET", "/")
-        self.render(request)
+        request, channel = make_request(self.reactor, FakeSite(resource), "GET", "/")
 
         self.assertEqual(request.code, 200)
         self.assertEqual(channel.json_body, {"some_key": "some_value_sync"})

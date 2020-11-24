@@ -26,7 +26,6 @@ class HealthCheckTests(unittest.HomeserverTestCase):
 
     def test_health(self):
         request, channel = self.make_request("GET", "/health", shorthand=False)
-        self.render(request)
 
         self.assertEqual(request.code, 200)
         self.assertEqual(channel.result["body"], b"OK")

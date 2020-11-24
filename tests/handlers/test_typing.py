@@ -228,7 +228,6 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             ),
             federation_auth_origin=b"farm",
         )
-        self.render(request)
         self.assertEqual(channel.code, 200)
 
         self.on_new_event.assert_has_calls([call("typing_key", 1, rooms=[ROOM_ID])])

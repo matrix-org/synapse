@@ -36,7 +36,7 @@ from synapse.server import HomeServer
 from synapse.util import Clock
 
 from tests import unittest
-from tests.server import FakeTransport, render
+from tests.server import FakeTransport
 
 try:
     import hiredis
@@ -346,9 +346,6 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         config["worker_replication_host"] = "testserv"
         config["worker_replication_http_port"] = "8765"
         return config
-
-    def render_on_worker(self, worker_hs: HomeServer, request: SynapseRequest):
-        render(request, self._hs_to_site[worker_hs].resource, self.reactor)
 
     def replicate(self):
         """Tell the master side of replication that something has happened, and then

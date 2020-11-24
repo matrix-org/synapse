@@ -90,6 +90,8 @@ class SAML2Config(Config):
             "grandfathered_mxid_source_attribute", "uid"
         )
 
+        self.saml2_idp_entityid = saml2_config.get("idp_entityid", None)
+
         # user_mapping_provider may be None if the key is present but has no value
         ump_dict = saml2_config.get("user_mapping_provider") or {}
 
@@ -256,6 +258,12 @@ class SAML2Config(Config):
             #  remote:
             #    - url: https://our_idp/metadata.xml
 
+            # Allowed clock difference in seconds between the homeserver and IdP.
+            #
+            # Uncomment the below to increase the accepted time difference from 0 to 3 seconds.
+            #
+            #accepted_time_diff: 3
+
             # By default, the user has to go to our login page first. If you'd like
             # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
             # 'service.sp' section:
@@ -377,6 +385,14 @@ class SAML2Config(Config):
           #    value: "staff"
           #  - attribute: department
           #    value: "sales"
+
+          # If the metadata XML contains multiple IdP entities then the `idp_entityid`
+          # option must be set to the entity to redirect users to.
+          #
+          # Most deployments only have a single IdP entity and so should omit this
+          # option.
+          #
+          #idp_entityid: 'https://our_idp/entityid'
         """ % {
             "config_dir_path": config_dir_path
         }
