@@ -14,12 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from twisted.web.server import Request
 
 from synapse.api.errors import SynapseError
-from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.http.servlet import (
+    RestServlet,
+    parse_json_object_from_request,
+    parse_list_from_args,
+)
 from synapse.logging.opentracing import set_tag
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.types import JsonDict, RoomAlias, RoomID
@@ -58,10 +62,8 @@ class KnockRoomAliasServlet(RestServlet):
         if RoomID.is_valid(room_identifier):
             room_id = room_identifier
             try:
-                remote_room_hosts = [
-                    x.decode("ascii") for x in request.args[b"server_name"]
-                ]  # type: Optional[List[str]]
-            except Exception:
+                remote_room_hosts = parse_list_from_args(request.args, "server_name")
+            except KeyError:
                 remote_room_hosts = None
         elif RoomAlias.is_valid(room_identifier):
             handler = self.room_member_handler
