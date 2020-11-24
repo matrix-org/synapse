@@ -551,7 +551,7 @@ class FederationMakeKnockServlet(BaseFederationServlet):
         return 200, content
 
 
-class FederationV2MakeKnockServlet(BaseFederationServlet):
+class FederationV2SendKnockServlet(BaseFederationServlet):
     PATH = "/send_knock/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
 
     async def on_PUT(self, origin, content, query, room_id, event_id):
@@ -1410,7 +1410,7 @@ FEDERATION_SERVLET_CLASSES = (
     FederationV2SendJoinServlet,
     FederationV1SendLeaveServlet,
     FederationV2SendLeaveServlet,
-    FederationV1MakeKnockServlet,
+    FederationV2SendKnockServlet,
     FederationV1InviteServlet,
     FederationV2InviteServlet,
     FederationGetMissingEventsServlet,
