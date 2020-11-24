@@ -867,10 +867,10 @@ class OidcHandler(BaseHandler):
 
         # Older mapping providers don't accept the `failures` argument, so we
         # try and detect support.
-        mapper_args = inspect.getfullargspec(
+        mapper_signature = inspect.signature(
             self._user_mapping_provider.map_user_attributes
         )
-        supports_failures = "failures" in mapper_args.args
+        supports_failures = "failures" in mapper_signature.parameters
 
         async def oidc_response_to_user_attributes(failures: int) -> UserAttributes:
             """
