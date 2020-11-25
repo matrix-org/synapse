@@ -70,7 +70,7 @@ class PushConfig(Config):
           # The default value is "true" to include message details. Uncomment to only
           # include the event ID and room ID in push notification payloads.
           #
-          # include_content: false
+          #include_content: false
 
           # When a push notification is received, a total unread message count is also sent.
           # This number can either be calculated as the total number of unread messages
