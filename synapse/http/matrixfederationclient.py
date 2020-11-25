@@ -46,7 +46,7 @@ from synapse.http import QuieterFileBodyProducer
 from synapse.http.client import (
     BlacklistingAgentWrapper,
     IPBlacklistingResolver,
-    _readBodyToFile,
+    readBodyToFile,
     encode_query_args,
 )
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
@@ -985,7 +985,7 @@ class MatrixFederationHttpClient:
         headers = dict(response.headers.getAllRawHeaders())
 
         try:
-            d = _readBodyToFile(response, output_stream, max_size)
+            d = readBodyToFile(response, output_stream, max_size)
             d.addTimeout(self.default_timeout, self.reactor)
             length = await make_deferred_yieldable(d)
         except Exception as e:

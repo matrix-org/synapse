@@ -702,7 +702,7 @@ class SimpleHttpClient:
 
         try:
             length = await make_deferred_yieldable(
-                _readBodyToFile(response, output_stream, max_size)
+                readBodyToFile(response, output_stream, max_size)
             )
         except SynapseError:
             # This can happen e.g. because the body is too large.
@@ -730,7 +730,7 @@ def _timeout_to_request_timed_out_error(f: Failure):
     return f
 
 
-class _ReadBodyToFileProtocol(protocol.Protocol):
+class readBodyToFileProtocol(protocol.Protocol):
     def __init__(
         self, stream: BinaryIO, deferred: defer.Deferred, max_size: Optional[int]
     ):
@@ -764,11 +764,23 @@ class _ReadBodyToFileProtocol(protocol.Protocol):
             self.deferred.errback(reason)
 
 
-def _readBodyToFile(
+def readBodyToFile(
     response: IResponse, stream: BinaryIO, max_size: Optional[int]
 ) -> defer.Deferred:
+    """
+    Read a HTTP response body to a file-object. Optionally enforcing a maximum file size.
+
+    Args:
+        response: The HTTP response to read from.
+        stream: The file-object to write to.
+        max_size: The maximum file size to allow.
+
+    Returns:
+        A Deferred which resolves to the length of the read body.
+    """
+
     d = defer.Deferred()
-    response.deliverBody(_ReadBodyToFileProtocol(stream, d, max_size))
+    response.deliverBody(readBodyToFileProtocol(stream, d, max_size))
     return d
 
 
