@@ -23,6 +23,9 @@ class PushConfig(Config):
     def read_config(self, config, **kwargs):
         push_config = config.get("push") or {}
         self.push_include_content = push_config.get("include_content", True)
+        self.push_group_unread_count_by_room = push_config.get(
+            "group_unread_count_by_room", True
+        )
 
         pusher_instances = config.get("pusher_instances") or []
         self.pusher_shard_config = ShardedWorkerHandlingConfig(pusher_instances)
@@ -68,4 +71,14 @@ class PushConfig(Config):
           # include the event ID and room ID in push notification payloads.
           #
           # include_content: false
+
+          # When a push notification is received, a total unread message count is also sent.
+          # This number can either be calculated as the total number of unread messages
+          # for the user, or the total number of *rooms* the user has unread messages in.
+          #
+          # The default value is "true", meaning push clients will see the total number of
+          # rooms with unread messages in them. Uncomment to instead send the total number
+          # of unread messages.
+          #
+          # group_unread_count_by_room: false
         """

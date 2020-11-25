@@ -17,7 +17,7 @@ from synapse.push.presentable_names import calculate_room_name, name_from_member
 from synapse.storage import Storage
 
 
-async def get_badge_count(store, user_id):
+async def get_badge_count(store, user_id, group_by_room: bool):
     invites = await store.get_invited_rooms_for_local_user(user_id)
     joins = await store.get_rooms_for_user(user_id)
 
@@ -34,9 +34,15 @@ async def get_badge_count(store, user_id):
                     room_id, user_id, last_unread_event_id
                 )
             )
-            # return one badge count per conversation, as count per
-            # message is so noisy as to be almost useless
-            badge += 1 if notifs["notify_count"] else 0
+            if notifs["notify_count"] == 0:
+                continue
+
+            if group_by_room:
+                # return one badge count per conversation
+                badge += 1
+            else:
+                # increment the badge count by the number of unread messages in the room
+                badge += notifs["notify_count"]
     return badge
 
 
