@@ -150,9 +150,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         config["oidc_config"] = oidc_config
 
         hs = self.setup_test_homeserver(
-            http_client=self.http_client,
-            proxied_http_client=self.http_client,
-            config=config,
+            proxied_http_client=self.http_client, config=config,
         )
 
         self.handler = OidcHandler(hs)

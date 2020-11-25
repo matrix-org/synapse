@@ -34,7 +34,7 @@ class PresenceTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         hs = self.setup_test_homeserver(
-            "red", http_client=None, federation_client=Mock()
+            "red", federation_http_client=None, federation_client=Mock()
         )
 
         hs.presence_handler = Mock()

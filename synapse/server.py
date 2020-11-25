@@ -381,7 +381,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         )
 
     @cache_in_self
-    def get_http_client(self) -> MatrixFederationHttpClient:
+    def get_federation_http_client(self) -> MatrixFederationHttpClient:
         """
         An HTTP client for federation.
         """
