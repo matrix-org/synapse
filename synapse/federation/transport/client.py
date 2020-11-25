@@ -302,7 +302,7 @@ class TransportLayerClient:
     ) -> JsonDict:
         """
         Sends a signed knock membership event to a remote server. This is the second
-        step for knocking after make_knock.
+        step for knocking after /make_xyz.amorgan.knock.
 
         Args:
             destination: The remote homeserver.
@@ -320,7 +320,7 @@ class TransportLayerClient:
 
             The list of state events may be empty.
         """
-        path = _create_v2_path("/send_knock/%s/%s", room_id, event_id)
+        path = _create_v2_path("/send_xyz.amorgan.knock/%s/%s", room_id, event_id)
 
         return await self.client.put_json(
             destination=destination, path=path, data=content
