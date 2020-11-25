@@ -195,6 +195,10 @@ class SsoHandler(BaseHandler):
             # Check if this mxid already exists
             user_id = UserID(attributes.localpart, self.server_name).to_string()
             users = await self.store.get_users_by_id_case_insensitive(user_id)
+            # Note, if allow_existing_users is true then the loop is guaranteed
+            # to end on the first iteration: either by matching an existing user,
+            # raising an error, or registering a new user. See the docstring for
+            # more in-depth an explanation.
             if users and allow_existing_users:
                 # If an existing matrix ID is returned, then use it.
                 if len(users) == 1:
