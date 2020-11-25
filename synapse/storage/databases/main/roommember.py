@@ -350,7 +350,6 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         return results
 
-    @cached()
     async def get_local_current_membership_for_user_in_room(
         self, user_id: str, room_id: str
     ) -> Tuple[Optional[str], Optional[str]]:
