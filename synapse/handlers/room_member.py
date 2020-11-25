@@ -557,40 +557,43 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         elif effective_membership_state == Membership.LEAVE:
             if not is_host_in_room:
                 # perhaps we've been invited
-                room_state_or_invite = await self.state_handler.get_current_state(
-                    room_id, event_type=EventTypes.Member, state_key=target.to_string()
+                (
+                    current_membership_type,
+                    current_membership_event_id,
+                ) = await self.store.get_local_current_membership_for_user_in_room(
+                    target.to_string(), room_id
                 )
-                if room_state_or_invite:
-                    invite = room_state_or_invite.get(
-                        (EventTypes.Member, target.to_string())
+                if (
+                    current_membership_type == Membership.INVITE
+                    and current_membership_event_id
+                ):
+                    invite = await self.store.get_event(current_membership_event_id)
+                    logger.info(
+                        "%s rejects invite to %s from %s",
+                        target,
+                        room_id,
+                        invite.sender,
                     )
-                    if invite and invite.membership == Membership.INVITE:
-                        logger.info(
-                            "%s rejects invite to %s from %s",
-                            target,
-                            room_id,
-                            invite.sender,
+
+                    if not self.hs.is_mine_id(invite.sender):
+                        # send the rejection to the inviter's HS (with fallback to
+                        # local event)
+                        return await self.remote_reject_invite(
+                            invite.event_id, txn_id, requester, content,
                         )
 
-                        if not self.hs.is_mine_id(invite.sender):
-                            # send the rejection to the inviter's HS (with fallback to
-                            # local event)
-                            return await self.remote_reject_invite(
-                                invite.event_id, txn_id, requester, content,
-                            )
+                    # the inviter was on our server, but has now left. Carry on
+                    # with the normal rejection codepath, which will also send the
+                    # rejection out to any other servers we believe are still in the room.
 
-                        # the inviter was on our server, but has now left. Carry on
-                        # with the normal rejection codepath, which will also send the
-                        # rejection out to any other servers we believe are still in the room.
-
-                        # thanks to overzealous cleaning up of event_forward_extremities in
-                        # `delete_old_current_state_events`, it's possible to end up with no
-                        # forward extremities here. If that happens, let's just hang the
-                        # rejection off the invite event.
-                        #
-                        # see: https://github.com/matrix-org/synapse/issues/7139
-                        if len(latest_event_ids) == 0:
-                            latest_event_ids = [invite.event_id]
+                    # thanks to overzealous cleaning up of event_forward_extremities in
+                    # `delete_old_current_state_events`, it's possible to end up with no
+                    # forward extremities here. If that happens, let's just hang the
+                    # rejection off the invite event.
+                    #
+                    # see: https://github.com/matrix-org/synapse/issues/7139
+                    if len(latest_event_ids) == 0:
+                        latest_event_ids = [invite.event_id]
 
                 else:
                     # or perhaps this is a remote room that a local user has knocked on
