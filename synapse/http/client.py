@@ -785,6 +785,15 @@ def readBodyToFile(
 
 
 def encode_query_args(args: Optional[Mapping[str, Union[str, List[str]]]]) -> bytes:
+    """
+    Encodes a map of query arguments to bytes which can be appended to a URL.
+
+    Args:
+        args: The query arguments, a mapping of string to string or list of strings.
+
+    Returns:
+        The query arguments encoded as bytes.
+    """
     if args is None:
         return b""
 
