@@ -46,8 +46,8 @@ from synapse.http import QuieterFileBodyProducer
 from synapse.http.client import (
     BlacklistingAgentWrapper,
     IPBlacklistingResolver,
-    readBodyToFile,
     encode_query_args,
+    readBodyToFile,
 )
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.logging.context import make_deferred_yieldable
