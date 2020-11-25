@@ -80,5 +80,5 @@ class PushConfig(Config):
           # rooms with unread messages in them. Uncomment to instead send the total number
           # of unread messages.
           #
-          # group_unread_count_by_room: false
+          #group_unread_count_by_room: false
         """
