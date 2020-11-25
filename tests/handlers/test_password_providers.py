@@ -15,14 +15,17 @@
 
 """Tests for the password_auth_provider interface"""
 
-from typing import Any, Type
+from typing import Any, Optional, Type, Union
 
 from mock import Mock
 
 from twisted.internet import defer
 
 import synapse
+from synapse.module_api import ModuleApi
 from synapse.rest.client.v1 import login
+from synapse.rest.client.v2_alpha import devices
+from synapse.types import JsonDict, UserID
 
 from tests import unittest
 from tests.server import FakeChannel
@@ -78,9 +81,11 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
+        devices.register_servlets,
     ]
 
     def setUp(self):
+        # we use a global mock device, so make sure we are starting with a clean slate
         mock_password_provider.reset_mock()
         super().setUp()
 
@@ -106,7 +111,41 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         mock_password_provider.reset_mock()
 
     @override_config(providers_config(PasswordOnlyAuthProvider))
-    def test_password_auth_local_user_fallback(self):
+    def test_password_only_auth_provider_ui_auth(self):
+        """UI Auth should delegate correctly to the password provider"""
+
+        # create the user, otherwise access doesn't work
+        module_api = self.hs.get_module_api()
+        self.get_success(module_api.register_user("u"))
+
+        # log in twice, to get two devices
+        mock_password_provider.check_password.return_value = defer.succeed(True)
+        tok1 = self.login("u", "p")
+        self.login("u", "p", device_id="dev2")
+        mock_password_provider.reset_mock()
+
+        # have the auth provider deny the request to start with
+        mock_password_provider.check_password.return_value = defer.succeed(False)
+
+        # make the initial request which returns a 401
+        session = self._start_delete_device_session(tok1, "dev2")
+        mock_password_provider.check_password.assert_not_called()
+
+        # Make another request providing the UI auth flow.
+        channel = self._authed_delete_device(tok1, "dev2", session, "u", "p")
+        self.assertEqual(channel.code, 401)  # XXX why not a 403?
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
+        mock_password_provider.check_password.assert_called_once_with("@u:test", "p")
+        mock_password_provider.reset_mock()
+
+        # Finally, check the request goes through when we allow it
+        mock_password_provider.check_password.return_value = defer.succeed(True)
+        channel = self._authed_delete_device(tok1, "dev2", session, "u", "p")
+        self.assertEqual(channel.code, 200)
+        mock_password_provider.check_password.assert_called_once_with("@u:test", "p")
+
+    @override_config(providers_config(PasswordOnlyAuthProvider))
+    def test_local_user_fallback_login(self):
         """rejected login should fall back to local db"""
         self.register_user("localuser", "localpass")
 
@@ -119,20 +158,88 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.result)
         self.assertEqual("@localuser:test", channel.json_body["user_id"])
 
+    @override_config(providers_config(PasswordOnlyAuthProvider))
+    def test_local_user_fallback_ui_auth(self):
+        """rejected login should fall back to local db"""
+        self.register_user("localuser", "localpass")
+
+        # have the auth provider deny the request
+        mock_password_provider.check_password.return_value = defer.succeed(False)
+
+        # log in twice, to get two devices
+        tok1 = self.login("localuser", "localpass")
+        self.login("localuser", "localpass", device_id="dev2")
+        mock_password_provider.check_password.reset_mock()
+
+        # first delete should give a 401
+        session = self._start_delete_device_session(tok1, "dev2")
+        mock_password_provider.check_password.assert_not_called()
+
+        # Wrong password
+        channel = self._authed_delete_device(tok1, "dev2", session, "localuser", "xxx")
+        self.assertEqual(channel.code, 401)  # XXX why not a 403?
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
+        mock_password_provider.check_password.assert_called_once_with(
+            "@localuser:test", "xxx"
+        )
+        mock_password_provider.reset_mock()
+
+        # Right password
+        channel = self._authed_delete_device(
+            tok1, "dev2", session, "localuser", "localpass"
+        )
+        self.assertEqual(channel.code, 200)
+
     @override_config(
         {
             **providers_config(PasswordOnlyAuthProvider),
             "password_config": {"localdb_enabled": False},
         }
     )
-    def test_password_auth_no_local_user_fallback(self):
-        """even though we have a local password for a user, localdb_enabled can block it"""
+    def test_no_local_user_fallback_login(self):
+        """localdb_enabled can block login with the local password
+        """
         self.register_user("localuser", "localpass")
 
         # check_password must return an awaitable
         mock_password_provider.check_password.return_value = defer.succeed(False)
         channel = self._send_password_login("localuser", "localpass")
-        self.assertEqual(channel.code, 403, channel.result)
+        self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
+        mock_password_provider.check_password.assert_called_once_with(
+            "@localuser:test", "localpass"
+        )
+
+    @override_config(
+        {
+            **providers_config(PasswordOnlyAuthProvider),
+            "password_config": {"localdb_enabled": False},
+        }
+    )
+    def test_no_local_user_fallback_ui_auth(self):
+        """localdb_enabled can block ui auth with the local password
+        """
+        self.register_user("localuser", "localpass")
+
+        # allow login via the auth provider
+        mock_password_provider.check_password.return_value = defer.succeed(True)
+
+        # log in twice, to get two devices
+        tok1 = self.login("localuser", "p")
+        self.login("localuser", "p", device_id="dev2")
+        mock_password_provider.check_password.reset_mock()
+
+        # first delete should give a 401
+        session = self._start_delete_device_session(tok1, "dev2")
+        mock_password_provider.check_password.assert_not_called()
+
+        # now try deleting with the local password
+        mock_password_provider.check_password.return_value = defer.succeed(False)
+        channel = self._authed_delete_device(
+            tok1, "dev2", session, "localuser", "localpass"
+        )
+        self.assertEqual(channel.code, 401)  # XXX why not a 403?
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
 
     @override_config(
         {
@@ -174,6 +281,62 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.assertEqual("@user:bz", channel.json_body["user_id"])
         mock_password_provider.check_auth.assert_called_once_with(
             "u", "test.login_type", {"test_field": "y"}
+        )
+
+    @override_config(providers_config(CustomAuthProvider))
+    def test_custom_auth_provider_ui_auth(self):
+        # register the user and log in twice, to get two devices
+        self.register_user("localuser", "localpass")
+        tok1 = self.login("localuser", "localpass")
+        self.login("localuser", "localpass", device_id="dev2")
+
+        # make the initial request which returns a 401
+        channel = self._delete_device(tok1, "dev2")
+        self.assertEqual(channel.code, 401)
+        # Ensure that flows are what is expected.
+        self.assertIn({"stages": ["m.login.password"]}, channel.json_body["flows"])
+        self.assertIn({"stages": ["test.login_type"]}, channel.json_body["flows"])
+        session = channel.json_body["session"]
+
+        # missing param
+        body = {
+            "auth": {
+                "type": "test.login_type",
+                "identifier": {"type": "m.id.user", "user": "localuser"},
+                # FIXME "identifier" is ignored
+                #   https://github.com/matrix-org/synapse/issues/5665
+                "user": "localuser",
+                "session": session,
+            },
+        }
+
+        channel = self._delete_device(tok1, "dev2", body)
+        self.assertEqual(channel.code, 400)
+        # there's a perfectly good M_MISSING_PARAM errcode, but heaven forfend we should
+        # use it...
+        self.assertIn("Missing parameters", channel.json_body["error"])
+        mock_password_provider.check_auth.assert_not_called()
+        mock_password_provider.reset_mock()
+
+        # right params, but authing as the wrong user
+        mock_password_provider.check_auth.return_value = defer.succeed("@user:bz")
+        body["auth"]["test_field"] = "foo"
+        channel = self._delete_device(tok1, "dev2", body)
+        self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
+        mock_password_provider.check_auth.assert_called_once_with(
+            "localuser", "test.login_type", {"test_field": "foo"}
+        )
+        mock_password_provider.reset_mock()
+
+        # and finally, succeed
+        mock_password_provider.check_auth.return_value = defer.succeed(
+            "@localuser:test"
+        )
+        channel = self._delete_device(tok1, "dev2", body)
+        self.assertEqual(channel.code, 200)
+        mock_password_provider.check_auth.assert_called_once_with(
+            "localuser", "test.login_type", {"test_field": "foo"}
         )
 
     @override_config(providers_config(CustomAuthProvider))
@@ -245,4 +408,46 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
     def _send_login(self, type, user, **params) -> FakeChannel:
         params.update({"user": user, "type": type})
         _, channel = self.make_request("POST", "/_matrix/client/r0/login", params,)
+        return channel
+
+    def _start_delete_device_session(self, access_token, device_id) -> str:
+        """Make an initial delete device request, and return the UI Auth session ID"""
+        channel = self._delete_device(access_token, device_id)
+        self.assertEqual(channel.code, 401)
+        # Ensure that flows are what is expected.
+        self.assertIn({"stages": ["m.login.password"]}, channel.json_body["flows"])
+        return channel.json_body["session"]
+
+    def _authed_delete_device(
+        self,
+        access_token: str,
+        device_id: str,
+        session: str,
+        user_id: str,
+        password: str,
+    ) -> FakeChannel:
+        """Make a delete device request, authenticating with the given uid/password"""
+        return self._delete_device(
+            access_token,
+            device_id,
+            {
+                "auth": {
+                    "type": "m.login.password",
+                    "identifier": {"type": "m.id.user", "user": user_id},
+                    # FIXME "identifier" is ignored
+                    #   https://github.com/matrix-org/synapse/issues/5665
+                    "user": user_id,
+                    "password": password,
+                    "session": session,
+                },
+            },
+        )
+
+    def _delete_device(
+        self, access_token: str, device: str, body: Union[JsonDict, bytes] = b"",
+    ) -> FakeChannel:
+        """Delete an individual device."""
+        _, channel = self.make_request(
+            "DELETE", "devices/" + device, body, access_token=access_token
+        )
         return channel
