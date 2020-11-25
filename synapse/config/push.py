@@ -21,7 +21,7 @@ class PushConfig(Config):
     section = "push"
 
     def read_config(self, config, **kwargs):
-        push_config = config.get("push", {})
+        push_config = config.get("push") or {}
         self.push_include_content = push_config.get("include_content", True)
 
         pusher_instances = config.get("pusher_instances") or []
@@ -49,18 +49,23 @@ class PushConfig(Config):
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """
-        # Clients requesting push notifications can either have the body of
-        # the message sent in the notification poke along with other details
-        # like the sender, or just the event ID and room ID (`event_id_only`).
-        # If clients choose the former, this option controls whether the
-        # notification request includes the content of the event (other details
-        # like the sender are still included). For `event_id_only` push, it
-        # has no effect.
-        #
-        # For modern android devices the notification content will still appear
-        # because it is loaded by the app. iPhone, however will send a
-        # notification saying only that a message arrived and who it came from.
-        #
-        #push:
-        #  include_content: true
+        ## Push ##
+
+        push:
+          # Clients requesting push notifications can either have the body of
+          # the message sent in the notification poke along with other details
+          # like the sender, or just the event ID and room ID (`event_id_only`).
+          # If clients choose the former, this option controls whether the
+          # notification request includes the content of the event (other details
+          # like the sender are still included). For `event_id_only` push, it
+          # has no effect.
+          #
+          # For modern android devices the notification content will still appear
+          # because it is loaded by the app. iPhone, however will send a
+          # notification saying only that a message arrived and who it came from.
+          #
+          # The default value is "true" to include message details. Uncomment to only
+          # include the event ID and room ID in push notification payloads.
+          #
+          # include_content: false
         """
