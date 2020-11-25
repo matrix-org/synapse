@@ -2269,7 +2269,7 @@ push:
   # The default value is "true" to include message details. Uncomment to only
   # include the event ID and room ID in push notification payloads.
   #
-  # include_content: false
+  #include_content: false
 
 
 # Spam checkers are third-party modules that can block specific actions

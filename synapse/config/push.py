@@ -67,5 +67,5 @@ class PushConfig(Config):
           # The default value is "true" to include message details. Uncomment to only
           # include the event ID and room ID in push notification payloads.
           #
-          # include_content: false
+          #include_content: false
         """
