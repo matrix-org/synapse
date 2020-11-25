@@ -245,7 +245,10 @@ class MatrixFederationHttpClient:
         user_agent = user_agent.encode("ascii")
 
         self.agent = MatrixFederationAgent(
-            self.reactor, tls_client_options_factory, user_agent
+            self.reactor,
+            tls_client_options_factory,
+            user_agent,
+            hs.config.federation_ip_range_blacklist,
         )
 
         # Use a BlacklistingAgentWrapper to prevent circumventing the IP
