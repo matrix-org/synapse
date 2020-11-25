@@ -730,7 +730,7 @@ def _timeout_to_request_timed_out_error(f: Failure):
     return f
 
 
-class readBodyToFileProtocol(protocol.Protocol):
+class _ReadBodyToFileProtocol(protocol.Protocol):
     def __init__(
         self, stream: BinaryIO, deferred: defer.Deferred, max_size: Optional[int]
     ):
@@ -780,7 +780,7 @@ def readBodyToFile(
     """
 
     d = defer.Deferred()
-    response.deliverBody(readBodyToFileProtocol(stream, d, max_size))
+    response.deliverBody(_ReadBodyToFileProtocol(stream, d, max_size))
     return d
 
 
