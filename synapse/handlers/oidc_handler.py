@@ -884,8 +884,9 @@ class OidcHandler(BaseHandler):
                 )
             else:
                 # If the mapping provider does not support processing failures,
-                # do not continually generate the same Matrix ID since this will
-                # likely continue to fail.
+                # do not continually generate the same Matrix ID since it will
+                # continue to already be in use. Note that the error raised is
+                # arbitrary and will get turned into a MappingException.
                 if failures:
                     raise RuntimeError(
                         "Mapping provider does not support de-duplicating Matrix IDs"
