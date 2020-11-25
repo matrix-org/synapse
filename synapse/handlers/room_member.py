@@ -521,8 +521,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     target.to_string(), room_id
                 )
                 if (
-                    not current_membership_type
-                    or current_membership_type != Membership.INVITE
+                    current_membership_type != Membership.INVITE
                     or not current_membership_event_id
                 ):
                     logger.info(
