@@ -42,7 +42,9 @@ class KnockRoomAliasServlet(RestServlet):
     POST /xyz.amorgan.knock/{roomIdOrAlias}
     """
 
-    PATTERNS = client_patterns("/xyz.amorgan.knock/(?P<room_identifier>[^/]*)")
+    PATTERNS = client_patterns(
+        "/xyz.amorgan.knock/(?P<room_identifier>[^/]*)", releases=()
+    )
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
