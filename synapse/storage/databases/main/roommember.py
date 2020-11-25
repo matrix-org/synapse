@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Dict, FrozenSet, Iterable, List, Optional, Set
+from typing import TYPE_CHECKING, Dict, FrozenSet, Iterable, List, Optional, Set, Tuple
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.events import EventBase
@@ -349,6 +349,51 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         results = [RoomsForUser(**r) for r in self.db_pool.cursor_to_dict(txn)]
 
         return results
+
+    @cached()
+    async def get_local_current_membership_for_user_in_room(
+        self, user_id: str, room_id: str
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Retrieve the current local membership state and event ID for a user in a room.
+
+        Args:
+            user_id: The ID of the user.
+            room_id: The ID of the room.
+
+        Returns:
+            A tuple of (membership_type, event_id). Both will be None if a
+                room_id/user_id pair is not found.
+
+        """
+        return await self.db_pool.runInteraction(
+            "get_local_current_membership_for_user_in_room",
+            self._get_local_current_membership_for_user_in_room_txn,
+            user_id,
+            room_id,
+        )
+
+    def _get_local_current_membership_for_user_in_room_txn(
+        self, txn, user_id: str, room_id: str
+    ) -> Tuple[Optional[str], Optional[str]]:
+        # Paranoia check.
+        if not self.hs.is_mine_id(user_id):
+            raise Exception(
+                "Cannot call 'get_local_current_membership_for_user_in_room' on "
+                "non-local user %s" % (user_id,),
+            )
+
+        sql = """
+            SELECT membership, event_id
+            FROM local_current_membership
+            WHERE
+                room_id = ? AND user_id = ?
+        """
+
+        txn.execute(sql, (room_id, user_id))
+        row = txn.fetchone()
+        if row:
+            return row[0], row[1]
+        return None, None
 
     @cached(max_entries=500000, iterable=True)
     async def get_rooms_for_user_with_stream_ordering(
