@@ -15,17 +15,16 @@
 
 """Tests for the password_auth_provider interface"""
 
-from typing import Any, Optional, Type, Union
+from typing import Any, Type, Union
 
 from mock import Mock
 
 from twisted.internet import defer
 
 import synapse
-from synapse.module_api import ModuleApi
 from synapse.rest.client.v1 import login
 from synapse.rest.client.v2_alpha import devices
-from synapse.types import JsonDict, UserID
+from synapse.types import JsonDict
 
 from tests import unittest
 from tests.server import FakeChannel
@@ -71,7 +70,7 @@ def providers_config(*providers: Type[Any]) -> dict:
     """Returns a config dict that will enable the given password auth providers"""
     return {
         "password_providers": [
-            {"module": "%s.%s" % (__name__, provider.__qualname__), "config": {},}
+            {"module": "%s.%s" % (__name__, provider.__qualname__), "config": {}}
             for provider in providers
         ]
     }
@@ -363,7 +362,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
             self.assertIn(p, call_args[0])
 
     @override_config(
-        {**providers_config(CustomAuthProvider), "password_config": {"enabled": False},}
+        {**providers_config(CustomAuthProvider), "password_config": {"enabled": False}}
     )
     def test_custom_auth_password_disabled(self):
         """Test login with a custom auth provider where password login is disabled"""
