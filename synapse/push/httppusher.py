@@ -75,9 +75,7 @@ class HttpPusher:
         self.failing_since = pusherdict["failing_since"]
         self.timed_call = None
         self._is_processing = False
-        self._push_group_unread_count_by_room = (
-            hs.config.push_group_unread_count_by_room
-        )
+        self._group_unread_count_by_room = hs.config.push_group_unread_count_by_room
 
         # This is the highest stream ordering we know it's safe to process.
         # When new events arrive, we'll be given a window of new events: we
@@ -142,7 +140,7 @@ class HttpPusher:
         badge = await push_tools.get_badge_count(
             self.hs.get_datastore(),
             self.user_id,
-            group_by_room=self._push_group_unread_count_by_room,
+            group_by_room=self._group_unread_count_by_room,
         )
         await self._send_badge(badge)
 
@@ -293,7 +291,7 @@ class HttpPusher:
         badge = await push_tools.get_badge_count(
             self.hs.get_datastore(),
             self.user_id,
-            group_by_room=self._push_group_unread_count_by_room,
+            group_by_room=self._group_unread_count_by_room,
         )
 
         event = await self.store.get_event(push_action["event_id"], allow_none=True)
