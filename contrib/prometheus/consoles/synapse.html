@@ -154,11 +154,11 @@ new PromConsole.Graph({
 })
 </script>
 
-<h3>Database scheduling latency</h3>
-<div id="synapse_storage_schedule_time"></div>
+<h3>Average time waiting for database connection</h3>
+<div id="synapse_storage_avg_waiting_time"></div>
 <script>
 new PromConsole.Graph({
-  node: document.querySelector("#synapse_storage_schedule_time"),
+  node: document.querySelector("#synapse_storage_avg_waiting_time"),
   expr: "rate(synapse_storage_schedule_time_sum[2m]) / rate(synapse_storage_schedule_time_count[2m])",
   name: "[[job]]-[[index]]",
   min: 0,
@@ -170,10 +170,10 @@ new PromConsole.Graph({
 </script>
 
 <h3>Cache request rate</h3>
-<div id="synapse_cache_ratio"></div>
+<div id="synapse_cache_request_rate"></div>
 <script>
 new PromConsole.Graph({
-  node: document.querySelector("#synapse_cache_ratio"),
+  node: document.querySelector("#synapse_cache_request_rate"),
   expr: "rate(synapse_util_caches_cache:total[2m])",
   name: "[[job]]-[[index]] [[name]]",
   min: 0,
