@@ -556,17 +556,25 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         elif effective_membership_state == Membership.LEAVE:
             if not is_host_in_room:
-                # perhaps we've been invited
+                # Figure out the user's current membership state for the room
                 (
                     current_membership_type,
                     current_membership_event_id,
                 ) = await self.store.get_local_current_membership_for_user_in_room(
                     target.to_string(), room_id
                 )
-                if (
-                    current_membership_type == Membership.INVITE
-                    and current_membership_event_id
-                ):
+                if not current_membership_type or not current_membership_event_id:
+                    logger.info(
+                        "%s sent a leave request to %s, but that is not an active room "
+                        "on this server, or there is no pending invite or knock",
+                        target,
+                        room_id,
+                    )
+
+                    raise SynapseError(404, "Not a known room")
+
+                # perhaps we've been invited
+                if current_membership_type == Membership.INVITE:
                     invite = await self.store.get_event(current_membership_event_id)
                     logger.info(
                         "%s rejects invite to %s from %s",
@@ -595,30 +603,12 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     if len(latest_event_ids) == 0:
                         latest_event_ids = [invite.event_id]
 
-                else:
-                    # or perhaps this is a remote room that a local user has knocked on
-                    room_state_or_knock = await self.state_handler.get_current_state(
-                        room_id,
-                        event_type=EventTypes.Member,
-                        state_key=target.to_string(),
+                # or perhaps this is a remote room that a local user has knocked on
+                elif current_membership_type == Membership.KNOCK:
+                    knock = await self.store.get_event(current_membership_event_id)
+                    return await self.remote_rescind_knock(
+                        knock.event_id, txn_id, requester, content
                     )
-                    if room_state_or_knock:
-                        knock = room_state_or_knock.get(
-                            (EventTypes.Member, target.to_string())
-                        )
-                        if knock and knock.membership == Membership.KNOCK:
-                            return await self.remote_rescind_knock(
-                                knock.event_id, txn_id, requester, content
-                            )
-
-                    logger.info(
-                        "%s sent a leave request to %s, but that is not an active room "
-                        "on this server, or there is no pending knock",
-                        target,
-                        room_id,
-                    )
-
-                    raise SynapseError(404, "Not a known room")
 
         elif effective_membership_state == Membership.KNOCK:
             if not is_host_in_room:
