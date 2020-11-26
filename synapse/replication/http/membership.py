@@ -190,7 +190,7 @@ class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
 
     @staticmethod
     async def _serialize_payload(  # type: ignore
-        room_id: str, user_id: str, change: str,
+        room_id: str, user_id: str, change: str
     ) -> JsonDict:
         """
         Args:
@@ -206,7 +206,7 @@ class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
         return {}
 
     def _handle_request(  # type: ignore
-        self, request: Request, room_id: str, user_id: str, change: str,
+        self, request: Request, room_id: str, user_id: str, change: str
     ) -> Tuple[int, JsonDict]:
         logger.info("user membership change: %s in %s", user_id, room_id)
 
