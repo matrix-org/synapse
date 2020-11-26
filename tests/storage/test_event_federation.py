@@ -217,6 +217,11 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         self.assertSetEqual(difference, {"a", "b", "c"})
 
         difference = self.get_success(
+            self.store.get_auth_chain_difference([{"a", "c"}, {"b", "c"}])
+        )
+        self.assertSetEqual(difference, {"a", "b"})
+
+        difference = self.get_success(
             self.store.get_auth_chain_difference([{"a"}, {"b"}, {"d"}])
         )
         self.assertSetEqual(difference, {"a", "b", "d", "e"})
