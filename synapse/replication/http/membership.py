@@ -115,11 +115,17 @@ class ReplicationRemoteKnockRestServlet(ReplicationEndpoint):
 
     @staticmethod
     async def _serialize_payload(  # type: ignore
-        requester: Requester, remote_room_hosts: List[str], content: JsonDict,
+        requester: Requester,
+        room_id: str,
+        user_id: str,
+        remote_room_hosts: List[str],
+        content: JsonDict,
     ):
         """
         Args:
             requester: The user making the request, according to the access token.
+            room_id: The ID of the room to knock on.
+            user_id: The ID of the knocking user.
             remote_room_hosts: Servers to try and send the knock via.
             content: The event content to use for the knock event.
         """
@@ -239,10 +245,14 @@ class ReplicationRemoteRescindKnockRestServlet(ReplicationEndpoint):
 
     @staticmethod
     async def _serialize_payload(  # type: ignore
-        txn_id: Optional[str], requester: Requester, content: JsonDict,
+        knock_event_id: str,
+        txn_id: Optional[str],
+        requester: Requester,
+        content: JsonDict,
     ):
         """
         Args:
+            knock_event_id: The ID of the knock to be rescinded.
             txn_id: An optional transaction ID supplied by the client.
             requester: The user making the rescind request, according to the access token.
             content: The content to include in the rescind event.
