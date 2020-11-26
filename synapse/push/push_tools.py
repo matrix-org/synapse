@@ -12,12 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from synapse.push.presentable_names import calculate_room_name, name_from_member_event
 from synapse.storage import Storage
+from synapse.storage.databases.main import DataStore
 
 
-async def get_badge_count(store, user_id, group_by_room: bool):
+async def get_badge_count(store: DataStore, user_id: str, group_by_room: bool) -> int:
     invites = await store.get_invited_rooms_for_local_user(user_id)
     joins = await store.get_rooms_for_user(user_id)
 
