@@ -355,6 +355,8 @@ def _is_membership_change_allowed(
             raise AuthError(403, "You cannot knock for other users")
         elif target_in_room:
             raise AuthError(403, "You cannot knock on a room you are already in")
+        elif caller_knocked:
+            raise AuthError(403, "You already have a pending knock for this room")
         elif target_banned:
             raise AuthError(403, "You are banned from this room")
     else:
