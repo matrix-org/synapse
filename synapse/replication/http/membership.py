@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from twisted.web.http import Request
 
@@ -54,13 +54,22 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
 
     @staticmethod
     async def _serialize_payload(  # type: ignore
-        requester: Requester, remote_room_hosts: List[str], content: JsonDict,
-    ):
+        requester: Requester,
+        room_id: str,
+        user_id: str,
+        remote_room_hosts: List[str],
+        content: JsonDict,
+    ) -> JsonDict:
         """
         Args:
-            requester: the user making the request according to the access token
+            requester: The user making the request according to the access token
+            room_id: The ID of the room.
+            user_id: The ID of the user.
             remote_room_hosts: Servers to try and join via
             content: The event content to use for the join event
+
+        Returns:
+            A dict representing the payload of the request.
         """
         return {
             "requester": requester.serialize(),
@@ -70,7 +79,7 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
 
     async def _handle_request(  # type: ignore
         self, request: Request, room_id: str, user_id: str
-    ):
+    ) -> Tuple[int, JsonDict]:
         content = parse_json_object_from_request(request)
 
         remote_room_hosts = content["remote_room_hosts"]
@@ -115,14 +124,21 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
 
     @staticmethod
     async def _serialize_payload(  # type: ignore
-        txn_id: Optional[str], requester: Requester, content: JsonDict,
-    ):
+        invite_event_id: str,
+        txn_id: Optional[str],
+        requester: Requester,
+        content: JsonDict,
+    ) -> JsonDict:
         """
         Args:
-            txn_id: optional transaction ID supplied by the client
-            requester: user making the rejection request, according to the access token
-            content: additional content to include in the rejection event.
+            invite_event_id: The ID of the invite to be rejected.
+            txn_id: Optional transaction ID supplied by the client
+            requester: User making the rejection request, according to the access token
+            content: Additional content to include in the rejection event.
                Normally an empty dict.
+
+        Returns:
+            A dict representing the payload of the request.
         """
         return {
             "txn_id": txn_id,
@@ -132,7 +148,7 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
 
     async def _handle_request(  # type: ignore
         self, request: Request, invite_event_id: str
-    ):
+    ) -> Tuple[int, JsonDict]:
         content = parse_json_object_from_request(request)
 
         txn_id = content["txn_id"]
@@ -174,11 +190,16 @@ class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
 
     @staticmethod
     async def _serialize_payload(  # type: ignore
-        change: str,
-    ):
+        room_id: str, user_id: str, change: str,
+    ) -> JsonDict:
         """
         Args:
+            room_id: The ID of the room.
+            user_id: The ID of the user.
             change: "left"
+
+        Returns:
+            A dict representing the payload of the request.
         """
         assert change == "left"
 
@@ -186,7 +207,7 @@ class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
 
     def _handle_request(  # type: ignore
         self, request: Request, room_id: str, user_id: str, change: str,
-    ):
+    ) -> Tuple[int, JsonDict]:
         logger.info("user membership change: %s in %s", user_id, room_id)
 
         user = UserID.from_string(user_id)
