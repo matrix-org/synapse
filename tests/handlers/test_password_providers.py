@@ -40,6 +40,8 @@ mock_password_provider = Mock()
 
 
 class PasswordOnlyAuthProvider:
+    """A password_provider which only implements `check_password`."""
+
     @staticmethod
     def parse_config(self):
         pass
@@ -52,6 +54,8 @@ class PasswordOnlyAuthProvider:
 
 
 class CustomAuthProvider:
+    """A password_provider which implements a custom login type."""
+
     @staticmethod
     def parse_config(self):
         pass
