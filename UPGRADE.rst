@@ -75,6 +75,22 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+Upgrading to v1.xx.0
+====================
+
+Removal old Room Admin API
+--------------------------
+
+Remove old Room Admin API:
+
+* ``POST /_synapse/admin/v1/purge_room``
+* ``POST /_synapse/admin/v1/shutdown_room/<room_id>``
+
+The new `Delete Room Admin API <https://github.com/matrix-org/synapse/tree/master/docs/admin_api/rooms.md#delete-room-api>`_
+is accessible under ``POST /_synapse/admin/v1/rooms/<room_id>/delete``.
+
+The deprecation of the old endpoints was announced with Synapse 1.xx.0 (released on 2020-xx-xx).
+
 Upgrading to v1.24.0
 ====================
 
