@@ -70,6 +70,24 @@ class CustomAuthProvider:
         return mock_password_provider.check_auth(*args)
 
 
+class PasswordCustomAuthProvider:
+    """A password_provider which implements password login via `check_auth`, as well
+    as a custom type."""
+
+    @staticmethod
+    def parse_config(self):
+        pass
+
+    def __init__(self, config, account_handler):
+        pass
+
+    def get_supported_login_types(self):
+        return {"m.login.password": ["password"], "test.login_type": ["test_field"]}
+
+    def check_auth(self, *args):
+        return mock_password_provider.check_auth(*args)
+
+
 def providers_config(*providers: Type[Any]) -> dict:
     """Returns a config dict that will enable the given password auth providers"""
     return {
@@ -409,6 +427,88 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         channel = self._send_password_login("localuser", "localpass")
         self.assertEqual(channel.code, 400, channel.result)
         mock_password_provider.check_auth.assert_not_called()
+
+    @override_config(
+        {
+            **providers_config(PasswordCustomAuthProvider),
+            "password_config": {"enabled": False},
+        }
+    )
+    def test_password_custom_auth_password_disabled_login(self):
+        """log in with a custom auth provider which implements password, but password
+        login is disabled"""
+        self.register_user("localuser", "localpass")
+
+        flows = self._get_login_flows()
+        self.assertEqual(flows, [{"type": "test.login_type"}] + ADDITIONAL_LOGIN_FLOWS)
+
+        # login shouldn't work and should be rejected with a 400 ("unknown login type")
+        channel = self._send_password_login("localuser", "localpass")
+        self.assertEqual(channel.code, 400, channel.result)
+        mock_password_provider.check_auth.assert_not_called()
+
+    @override_config(
+        {
+            **providers_config(PasswordCustomAuthProvider),
+            "password_config": {"enabled": False},
+        }
+    )
+    def test_password_custom_auth_password_disabled_ui_auth(self):
+        """UI Auth with a custom auth provider which implements password, but password
+        login is disabled"""
+        # register the user and log in twice via the test login type to get two devices,
+        self.register_user("localuser", "localpass")
+        mock_password_provider.check_auth.return_value = defer.succeed(
+            "@localuser:test"
+        )
+        channel = self._send_login("test.login_type", "localuser", test_field="")
+        self.assertEqual(channel.code, 200, channel.result)
+        tok1 = channel.json_body["access_token"]
+
+        channel = self._send_login(
+            "test.login_type", "localuser", test_field="", device_id="dev2"
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+
+        # make the initial request which returns a 401
+        channel = self._delete_device(tok1, "dev2")
+        self.assertEqual(channel.code, 401)
+        # Ensure that flows are what is expected. In particular, "password" should *not*
+        # be present.
+        self.assertIn({"stages": ["test.login_type"]}, channel.json_body["flows"])
+        session = channel.json_body["session"]
+
+        mock_password_provider.reset_mock()
+
+        # check that auth with password is rejected
+        body = {
+            "auth": {
+                "type": "m.login.password",
+                "identifier": {"type": "m.id.user", "user": "localuser"},
+                # FIXME "identifier" is ignored
+                #   https://github.com/matrix-org/synapse/issues/5665
+                "user": "localuser",
+                "password": "localpass",
+                "session": session,
+            },
+        }
+
+        channel = self._delete_device(tok1, "dev2", body)
+        self.assertEqual(channel.code, 400)
+        self.assertEqual(
+            "Password login has been disabled.", channel.json_body["error"]
+        )
+        mock_password_provider.check_auth.assert_not_called()
+        mock_password_provider.reset_mock()
+
+        # successful auth
+        body["auth"]["type"] = "test.login_type"
+        body["auth"]["test_field"] = "x"
+        channel = self._delete_device(tok1, "dev2", body)
+        self.assertEqual(channel.code, 200)
+        mock_password_provider.check_auth.assert_called_once_with(
+            "localuser", "test.login_type", {"test_field": "x"}
+        )
 
     @override_config(
         {

@@ -205,15 +205,21 @@ class AuthHandler(BaseHandler):
         # type in the list. (NB that the spec doesn't require us to do so and
         # clients which favour types that they don't understand over those that
         # they do are technically broken)
-        login_types = []
-        if self._password_enabled:
-            login_types.append(LoginType.PASSWORD)
+
+        # start out by assuming PASSWORD is enabled; we will remove it later if not.
+        login_types = [LoginType.PASSWORD]
+
         for provider in self.password_providers:
             if hasattr(provider, "get_supported_login_types"):
                 for t in provider.get_supported_login_types().keys():
                     if t not in login_types:
                         login_types.append(t)
+
+        if not self._password_enabled:
+            login_types.remove(LoginType.PASSWORD)
+
         self._supported_login_types = login_types
+
         # Login types and UI Auth types have a heavy overlap, but are not
         # necessarily identical. Login types have SSO (and other login types)
         # added in the rest layer, see synapse.rest.client.v1.login.LoginRestServerlet.on_GET.
