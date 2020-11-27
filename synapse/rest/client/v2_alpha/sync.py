@@ -356,7 +356,11 @@ class SyncRestServlet(RestServlet):
         knocked = {}
         for room in rooms:
             knock = await self._event_serializer.serialize_event(
-                room.knock, time_now, token_id=token_id, event_format=event_formatter,
+                room.knock,
+                time_now,
+                token_id=token_id,
+                event_format=event_formatter,
+                include_stripped_room_state=True,
             )
 
             # Extract the `unsigned` key from the knock event.
