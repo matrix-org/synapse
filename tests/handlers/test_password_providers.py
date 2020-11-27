@@ -400,7 +400,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
 
     test_custom_auth_no_local_user_fallback.skip = "currently broken"
 
-    def _get_login_flows(self):
+    def _get_login_flows(self) -> JsonDict:
         _, channel = self.make_request("GET", "/_matrix/client/r0/login")
         self.assertEqual(channel.code, 200, channel.result)
         return channel.json_body["flows"]
@@ -410,7 +410,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
 
     def _send_login(self, type, user, **params) -> FakeChannel:
         params.update({"user": user, "type": type})
-        _, channel = self.make_request("POST", "/_matrix/client/r0/login", params,)
+        _, channel = self.make_request("POST", "/_matrix/client/r0/login", params)
         return channel
 
     def _start_delete_device_session(self, access_token, device_id) -> str:
