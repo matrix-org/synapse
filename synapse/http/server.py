@@ -94,10 +94,7 @@ def return_json_error(f: failure.Failure, request: SynapseRequest) -> None:
                 pass
     else:
         respond_with_json(
-            request,
-            error_code,
-            error_dict,
-            send_cors=True,
+            request, error_code, error_dict, send_cors=True,
         )
 
 
