@@ -98,7 +98,6 @@ def return_json_error(f: failure.Failure, request: SynapseRequest) -> None:
             error_code,
             error_dict,
             send_cors=True,
-            pretty_print=_request_user_agent_is_curl(request),
         )
 
 
@@ -290,7 +289,6 @@ class DirectServeJsonResource(_AsyncResource):
             code,
             response_object,
             send_cors=True,
-            pretty_print=_request_user_agent_is_curl(request),
             canonical_json=self.canonical_json,
         )
 
@@ -759,11 +757,3 @@ def finish_request(request: Request):
         request.finish()
     except RuntimeError as e:
         logger.info("Connection disconnected before response was written: %r", e)
-
-
-def _request_user_agent_is_curl(request: Request) -> bool:
-    user_agents = request.requestHeaders.getRawHeaders(b"User-Agent", default=[])
-    for user_agent in user_agents:
-        if b"curl" in user_agent:
-            return True
-    return False
