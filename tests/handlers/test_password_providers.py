@@ -111,6 +111,17 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.result)
         self.assertEqual("@u:bz", channel.json_body["user_id"])
         mock_password_provider.check_password.assert_called_once_with("@u:bz", "p")
+        mock_password_provider.reset_mock()
+
+        # try a weird username / pass. Honestly it's unclear what we *expect* to happen
+        # in these cases, but at least we can guard against the API changing
+        # unexpectedly
+        channel = self._send_password_login(" USER🙂NAME ", " pASS\U0001F622word ")
+        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual("@ USER🙂NAME :test", channel.json_body["user_id"])
+        mock_password_provider.check_password.assert_called_once_with(
+            "@ USER🙂NAME :test", " pASS😢word "
+        )
 
     @override_config(providers_config(PasswordOnlyAuthProvider))
     def test_password_only_auth_provider_ui_auth(self):
@@ -289,6 +300,20 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.assertEqual("@user:bz", channel.json_body["user_id"])
         mock_password_provider.check_auth.assert_called_once_with(
             "u", "test.login_type", {"test_field": "y"}
+        )
+        mock_password_provider.reset_mock()
+
+        # try a weird username. Again, it's unclear what we *expect* to happen
+        # in these cases, but at least we can guard against the API changing
+        # unexpectedly
+        mock_password_provider.check_auth.return_value = defer.succeed(
+            "@ MALFORMED! :bz"
+        )
+        channel = self._send_login("test.login_type", " USER🙂NAME ", test_field=" abc ")
+        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual("@ MALFORMED! :bz", channel.json_body["user_id"])
+        mock_password_provider.check_auth.assert_called_once_with(
+            " USER🙂NAME ", "test.login_type", {"test_field": " abc "}
         )
 
     @override_config(providers_config(CustomAuthProvider))
