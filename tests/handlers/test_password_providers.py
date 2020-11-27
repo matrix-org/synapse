@@ -111,7 +111,6 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.result)
         self.assertEqual("@u:bz", channel.json_body["user_id"])
         mock_password_provider.check_password.assert_called_once_with("@u:bz", "p")
-        mock_password_provider.reset_mock()
 
     @override_config(providers_config(PasswordOnlyAuthProvider))
     def test_password_only_auth_provider_ui_auth(self):
@@ -192,6 +191,9 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
             tok1, "dev2", session, "localuser", "localpass"
         )
         self.assertEqual(channel.code, 200)
+        mock_password_provider.check_password.assert_called_once_with(
+            "@localuser:test", "localpass"
+        )
 
     @override_config(
         {
@@ -243,6 +245,9 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, 401)  # XXX why not a 403?
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
+        mock_password_provider.check_password.assert_called_once_with(
+            "@localuser:test", "localpass"
+        )
 
     @override_config(
         {
