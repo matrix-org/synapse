@@ -21,11 +21,7 @@ import synapse
 from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.server import JsonResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
-from synapse.rest.admin._base import (
-    admin_patterns,
-    assert_requester_is_admin,
-    historical_admin_path_patterns,
-)
+from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
 from synapse.rest.admin.devices import (
     DeleteDevicesRestServlet,
     DeviceRestServlet,
@@ -61,6 +57,7 @@ from synapse.rest.admin.users import (
     UserRestServletV2,
     UsersRestServlet,
     UsersRestServletV2,
+    UserTokenRestServlet,
     WhoisRestServlet,
 )
 from synapse.types import RoomStreamToken
@@ -83,7 +80,7 @@ class VersionServlet(RestServlet):
 
 
 class PurgeHistoryRestServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns(
+    PATTERNS = admin_patterns(
         "/purge_history/(?P<room_id>[^/]*)(/(?P<event_id>[^/]+))?"
     )
 
@@ -168,9 +165,7 @@ class PurgeHistoryRestServlet(RestServlet):
 
 
 class PurgeHistoryStatusRestServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns(
-        "/purge_history_status/(?P<purge_id>[^/]+)"
-    )
+    PATTERNS = admin_patterns("/purge_history_status/(?P<purge_id>[^/]+)")
 
     def __init__(self, hs):
         """
@@ -223,6 +218,7 @@ def register_servlets(hs, http_server):
     UserAdminServlet(hs).register(http_server)
     UserMediaRestServlet(hs).register(http_server)
     UserMembershipRestServlet(hs).register(http_server)
+    UserTokenRestServlet(hs).register(http_server)
     UserRestServletV2(hs).register(http_server)
     UsersRestServletV2(hs).register(http_server)
     DeviceRestServlet(hs).register(http_server)

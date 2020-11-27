@@ -1,1 +1,0 @@
- Re-organize the structured logging code to separate the TCP transport handling from the JSON formatting.

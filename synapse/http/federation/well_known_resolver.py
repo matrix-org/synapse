@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 import random
 import time
@@ -21,10 +20,11 @@ from typing import Callable, Dict, Optional, Tuple
 import attr
 
 from twisted.internet import defer
+from twisted.internet.interfaces import IReactorTime
 from twisted.web.client import RedirectAgent, readBody
 from twisted.web.http import stringToDatetime
 from twisted.web.http_headers import Headers
-from twisted.web.iweb import IResponse
+from twisted.web.iweb import IAgent, IResponse
 
 from synapse.logging.context import make_deferred_yieldable
 from synapse.util import Clock, json_decoder
@@ -81,11 +81,11 @@ class WellKnownResolver:
 
     def __init__(
         self,
-        reactor,
-        agent,
-        user_agent,
-        well_known_cache=None,
-        had_well_known_cache=None,
+        reactor: IReactorTime,
+        agent: IAgent,
+        user_agent: bytes,
+        well_known_cache: Optional[TTLCache] = None,
+        had_well_known_cache: Optional[TTLCache] = None,
     ):
         self._reactor = reactor
         self._clock = Clock(reactor)
@@ -127,7 +127,7 @@ class WellKnownResolver:
             with Measure(self._clock, "get_well_known"):
                 result, cache_period = await self._fetch_well_known(
                     server_name
-                )  # type: Tuple[Optional[bytes], float]
+                )  # type: Optional[bytes], float
 
         except _FetchWellKnownFailure as e:
             if prev_result and e.temporary:

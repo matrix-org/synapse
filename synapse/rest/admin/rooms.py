@@ -29,7 +29,6 @@ from synapse.rest.admin._base import (
     admin_patterns,
     assert_requester_is_admin,
     assert_user_is_admin,
-    historical_admin_path_patterns,
 )
 from synapse.storage.databases.main.room import RoomSortOrder
 from synapse.types import RoomAlias, RoomID, UserID, create_requester
@@ -44,7 +43,7 @@ class ShutdownRoomRestServlet(RestServlet):
     joined to the new room.
     """
 
-    PATTERNS = historical_admin_path_patterns("/shutdown_room/(?P<room_id>[^/]+)")
+    PATTERNS = admin_patterns("/shutdown_room/(?P<room_id>[^/]+)")
 
     def __init__(self, hs):
         self.hs = hs
@@ -309,7 +308,9 @@ class JoinRoomAliasServlet(RestServlet):
                 400, "%s was not legal room ID or room alias" % (room_identifier,)
             )
 
-        fake_requester = create_requester(target_user)
+        fake_requester = create_requester(
+            target_user, authenticated_entity=requester.authenticated_entity
+        )
 
         # send invite if room has "JoinRules.INVITE"
         room_state = await self.state_handler.get_current_state(room_id)

@@ -46,7 +46,6 @@ class IdentityTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"POST", "/createRoom", b"{}", access_token=tok
         )
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
         room_id = channel.json_body["room_id"]
 
@@ -60,5 +59,4 @@ class IdentityTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"POST", request_url, request_data, access_token=tok
         )
-        self.render(request)
         self.assertEquals(channel.result["code"], b"403", channel.result)

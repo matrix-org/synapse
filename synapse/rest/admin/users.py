@@ -16,7 +16,7 @@ import hashlib
 import hmac
 import logging
 from http import HTTPStatus
-from typing import Tuple
+from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, NotFoundError, SynapseError
@@ -33,9 +33,12 @@ from synapse.rest.admin._base import (
     admin_patterns,
     assert_requester_is_admin,
     assert_user_is_admin,
-    historical_admin_path_patterns,
 )
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import JsonDict, UserID
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +55,7 @@ _GET_PUSHERS_ALLOWED_KEYS = {
 
 
 class UsersRestServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns("/users/(?P<user_id>[^/]*)$")
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)$")
 
     def __init__(self, hs):
         self.hs = hs
@@ -335,7 +338,7 @@ class UserRegisterServlet(RestServlet):
              nonce to the time it was generated, in int seconds.
     """
 
-    PATTERNS = historical_admin_path_patterns("/register")
+    PATTERNS = admin_patterns("/register")
     NONCE_TIMEOUT = 60
 
     def __init__(self, hs):
@@ -458,7 +461,14 @@ class UserRegisterServlet(RestServlet):
 
 
 class WhoisRestServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns("/whois/(?P<user_id>[^/]*)")
+    path_regex = "/whois/(?P<user_id>[^/]*)$"
+    PATTERNS = (
+        admin_patterns(path_regex)
+        +
+        # URL for spec reason
+        # https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-admin-whois-userid
+        client_patterns("/admin" + path_regex, v1=True)
+    )
 
     def __init__(self, hs):
         self.hs = hs
@@ -482,7 +492,7 @@ class WhoisRestServlet(RestServlet):
 
 
 class DeactivateAccountRestServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns("/deactivate/(?P<target_user_id>[^/]*)")
+    PATTERNS = admin_patterns("/deactivate/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
         self._deactivate_account_handler = hs.get_deactivate_account_handler()
@@ -513,7 +523,7 @@ class DeactivateAccountRestServlet(RestServlet):
 
 
 class AccountValidityRenewServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns("/account_validity/validity$")
+    PATTERNS = admin_patterns("/account_validity/validity$")
 
     def __init__(self, hs):
         """
@@ -556,9 +566,7 @@ class ResetPasswordRestServlet(RestServlet):
             200 OK with empty object if success otherwise an error.
         """
 
-    PATTERNS = historical_admin_path_patterns(
-        "/reset_password/(?P<target_user_id>[^/]*)"
-    )
+    PATTERNS = admin_patterns("/reset_password/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -600,7 +608,7 @@ class SearchUsersRestServlet(RestServlet):
             200 OK with json object {list[dict[str, Any]], count} or empty object.
     """
 
-    PATTERNS = historical_admin_path_patterns("/search_users/(?P<target_user_id>[^/]*)")
+    PATTERNS = admin_patterns("/search_users/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
         self.hs = hs
@@ -828,3 +836,52 @@ class UserMediaRestServlet(RestServlet):
             ret["next_token"] = start + len(media)
 
         return 200, ret
+
+
+class UserTokenRestServlet(RestServlet):
+    """An admin API for logging in as a user.
+
+    Example:
+
+        POST /_synapse/admin/v1/users/@test:example.com/login
+        {}
+
+        200 OK
+        {
+            "access_token": "<some_token>"
+        }
+    """
+
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/login$")
+
+    def __init__(self, hs: "HomeServer"):
+        self.hs = hs
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.auth_handler = hs.get_auth_handler()
+
+    async def on_POST(self, request, user_id):
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
+        auth_user = requester.user
+
+        if not self.hs.is_mine_id(user_id):
+            raise SynapseError(400, "Only local users can be logged in as")
+
+        body = parse_json_object_from_request(request, allow_empty_body=True)
+
+        valid_until_ms = body.get("valid_until_ms")
+        if valid_until_ms and not isinstance(valid_until_ms, int):
+            raise SynapseError(400, "'valid_until_ms' parameter must be an int")
+
+        if auth_user.to_string() == user_id:
+            raise SynapseError(400, "Cannot use admin API to login as self")
+
+        token = await self.auth_handler.get_access_token_for_user_id(
+            user_id=auth_user.to_string(),
+            device_id=None,
+            valid_until_ms=valid_until_ms,
+            puppets_user_id=user_id,
+        )
+
+        return 200, {"access_token": token}

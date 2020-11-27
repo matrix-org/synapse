@@ -32,7 +32,7 @@ from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.stringutils import random_string
 
 from tests import unittest
-from tests.server import FakeChannel, wait_until_result
+from tests.server import FakeChannel
 from tests.utils import default_config
 
 
@@ -41,7 +41,7 @@ class BaseRemoteKeyResourceTestCase(unittest.HomeserverTestCase):
         self.http_client = Mock()
         return self.setup_test_homeserver(http_client=self.http_client)
 
-    def create_test_json_resource(self):
+    def create_test_resource(self):
         return create_resource_tree(
             {"/_matrix/key/v2": KeyApiV2Resource(self.hs)}, root_resource=NoResource()
         )
@@ -94,7 +94,7 @@ class RemoteKeyResourceTestCase(BaseRemoteKeyResourceTestCase):
             % (server_name.encode("utf-8"), key_id.encode("utf-8")),
             b"1.1",
         )
-        wait_until_result(self.reactor, req)
+        channel.await_result()
         self.assertEqual(channel.code, 200)
         resp = channel.json_body
         return resp
@@ -190,7 +190,7 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
             req.requestReceived(
                 b"POST", path.encode("utf-8"), b"1.1",
             )
-            wait_until_result(self.reactor, req)
+            channel.await_result()
             self.assertEqual(channel.code, 200)
             resp = channel.json_body
             return resp

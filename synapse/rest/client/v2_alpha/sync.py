@@ -171,6 +171,7 @@ class SyncRestServlet(RestServlet):
         )
         with context:
             sync_result = await self.sync_handler.wait_for_sync_for_user(
+                requester,
                 sync_config,
                 since_token=since_token,
                 timeout=timeout,

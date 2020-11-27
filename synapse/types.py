@@ -317,14 +317,14 @@ mxid_localpart_allowed_characters = set(
 )
 
 
-def contains_invalid_mxid_characters(localpart):
+def contains_invalid_mxid_characters(localpart: str) -> bool:
     """Check for characters not allowed in an mxid or groupid localpart
 
     Args:
-        localpart (basestring): the localpart to be checked
+        localpart: the localpart to be checked
 
     Returns:
-        bool: True if there are any naughty characters
+        True if there are any naughty characters
     """
     return any(c not in mxid_localpart_allowed_characters for c in localpart)
 

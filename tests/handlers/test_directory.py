@@ -412,7 +412,6 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
             b"directory/room/%23test%3Atest",
             ('{"room_id":"%s"}' % (room_id,)).encode("ascii"),
         )
-        self.render(request)
         self.assertEquals(403, channel.code, channel.result)
 
     def test_allowed(self):
@@ -423,7 +422,6 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
             b"directory/room/%23unofficial_test%3Atest",
             ('{"room_id":"%s"}' % (room_id,)).encode("ascii"),
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
 
 
@@ -438,7 +436,6 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "PUT", b"directory/list/room/%s" % (room_id.encode("ascii"),), b"{}"
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
 
         self.room_list_handler = hs.get_room_list_handler()
@@ -452,7 +449,6 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
 
         # Room list is enabled so we should get some results
         request, channel = self.make_request("GET", b"publicRooms")
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["chunk"]) > 0)
 
@@ -461,7 +457,6 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
 
         # Room list disabled so we should get no results
         request, channel = self.make_request("GET", b"publicRooms")
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["chunk"]) == 0)
 
@@ -470,5 +465,4 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "PUT", b"directory/list/room/%s" % (room_id.encode("ascii"),), b"{}"
         )
-        self.render(request)
         self.assertEquals(403, channel.code, channel.result)

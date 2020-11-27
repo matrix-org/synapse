@@ -169,6 +169,7 @@ class StateTestCase(unittest.TestCase):
                 "get_state_handler",
                 "get_clock",
                 "get_state_resolution_handler",
+                "hostname",
             ]
         )
         hs.config = default_config("tesths", True)

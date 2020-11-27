@@ -40,7 +40,6 @@ class RoomDirectoryFederationTests(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "/_matrix/federation/v1/publicRooms"
         )
-        self.render(request)
         self.assertEquals(403, channel.code)
 
     @override_config({"allow_public_rooms_over_federation": True})
@@ -48,5 +47,4 @@ class RoomDirectoryFederationTests(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "/_matrix/federation/v1/publicRooms"
         )
-        self.render(request)
         self.assertEquals(200, channel.code)

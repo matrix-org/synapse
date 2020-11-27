@@ -1230,8 +1230,9 @@ account_validity:
 # email will be globally disabled.
 #
 # Additionally, if `msisdn` is not set, registration and password resets via msisdn
-# will be disabled regardless. This is due to Synapse currently not supporting any
-# method of sending SMS messages on its own.
+# will be disabled regardless, and users will not be able to associate an msisdn
+# identifier to their account. This is due to Synapse currently not supporting
+# any method of sending SMS messages on its own.
 #
 # To enable using an identity server for operations regarding a particular third-party
 # identifier type, set the value to the URL of that identity server as shown in the
@@ -1545,6 +1546,12 @@ saml2_config:
     #  remote:
     #    - url: https://our_idp/metadata.xml
 
+    # Allowed clock difference in seconds between the homeserver and IdP.
+    #
+    # Uncomment the below to increase the accepted time difference from 0 to 3 seconds.
+    #
+    #accepted_time_diff: 3
+
     # By default, the user has to go to our login page first. If you'd like
     # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
     # 'service.sp' section:
@@ -1559,6 +1566,28 @@ saml2_config:
 
     #description: ["My awesome SP", "en"]
     #name: ["Test SP", "en"]
+
+    #ui_info:
+    #  display_name:
+    #    - lang: en
+    #      text: "Display Name is the descriptive name of your service."
+    #  description:
+    #    - lang: en
+    #      text: "Description should be a short paragraph explaining the purpose of the service."
+    #  information_url:
+    #    - lang: en
+    #      text: "https://example.com/terms-of-service"
+    #  privacy_statement_url:
+    #    - lang: en
+    #      text: "https://example.com/privacy-policy"
+    #  keywords:
+    #    - lang: en
+    #      text: ["Matrix", "Element"]
+    #  logo:
+    #    - lang: en
+    #      text: "https://example.com/logo.svg"
+    #      width: "200"
+    #      height: "80"
 
     #organization:
     #  name: Example com
@@ -1644,6 +1673,14 @@ saml2_config:
   #    value: "staff"
   #  - attribute: department
   #    value: "sales"
+
+  # If the metadata XML contains multiple IdP entities then the `idp_entityid`
+  # option must be set to the entity to redirect users to.
+  #
+  # Most deployments only have a single IdP entity and so should omit this
+  # option.
+  #
+  #idp_entityid: 'https://our_idp/entityid'
 
 
 # Enable OpenID Connect (OIDC) / OAuth 2.0 for registration and login.
@@ -2214,20 +2251,25 @@ password_providers:
 
 
 
-# Clients requesting push notifications can either have the body of
-# the message sent in the notification poke along with other details
-# like the sender, or just the event ID and room ID (`event_id_only`).
-# If clients choose the former, this option controls whether the
-# notification request includes the content of the event (other details
-# like the sender are still included). For `event_id_only` push, it
-# has no effect.
-#
-# For modern android devices the notification content will still appear
-# because it is loaded by the app. iPhone, however will send a
-# notification saying only that a message arrived and who it came from.
-#
-#push:
-#  include_content: true
+## Push ##
+
+push:
+  # Clients requesting push notifications can either have the body of
+  # the message sent in the notification poke along with other details
+  # like the sender, or just the event ID and room ID (`event_id_only`).
+  # If clients choose the former, this option controls whether the
+  # notification request includes the content of the event (other details
+  # like the sender are still included). For `event_id_only` push, it
+  # has no effect.
+  #
+  # For modern android devices the notification content will still appear
+  # because it is loaded by the app. iPhone, however will send a
+  # notification saying only that a message arrived and who it came from.
+  #
+  # The default value is "true" to include message details. Uncomment to only
+  # include the event ID and room ID in push notification payloads.
+  #
+  #include_content: false
 
 
 # Spam checkers are third-party modules that can block specific actions

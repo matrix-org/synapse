@@ -28,7 +28,7 @@ from synapse.server import HomeServer
 
 from tests.http import TestServerTLSConnectionFactory, get_test_ca_cert_file
 from tests.replication._base import BaseMultiWorkerStreamTestCase
-from tests.server import FakeChannel, FakeTransport
+from tests.server import FakeChannel, FakeSite, FakeTransport, make_request
 
 logger = logging.getLogger(__name__)
 
@@ -67,14 +67,16 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
             The channel for the *client* request and the *outbound* request for
             the media which the caller should respond to.
         """
-
-        request, channel = self.make_request(
+        resource = hs.get_media_repository_resource().children[b"download"]
+        _, channel = make_request(
+            self.reactor,
+            FakeSite(resource),
             "GET",
             "/{}/{}".format(target, media_id),
             shorthand=False,
             access_token=self.access_token,
+            await_result=False,
         )
-        request.render(hs.get_media_repository_resource().children[b"download"])
         self.pump()
 
         clients = self.reactor.tcpClients

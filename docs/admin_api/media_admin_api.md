@@ -1,6 +1,7 @@
 # List all media in a room
 
 This API gets a list of known media in a room.
+However, it only shows media from unencrypted events or rooms.
 
 The API is:
 ```
