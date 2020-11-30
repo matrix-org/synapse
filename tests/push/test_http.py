@@ -505,16 +505,33 @@ class HTTPPusherTests(HomeserverTestCase):
         """
         The HTTP pusher will group unread count by number of unread rooms.
         """
-        self._test_push_unread_count(group_by_room=True)
+        # Carry out common push count tests and setup
+        self._test_push_unread_count()
+
+        # Carry out our option-value specific test
+        #
+        # This push should still only contain an unread count of 1 (for 1 unread room)
+        self.assertEqual(
+            self.push_attempts[5][2]["notification"]["counts"]["unread"], 1
+        )
 
     @override_config({"push": {"group_unread_count_by_room": False}})
     def test_push_unread_count_message_count(self):
         """
         The HTTP pusher will send the total unread message count.
         """
-        self._test_push_unread_count(group_by_room=False)
+        # Carry out common push count tests and setup
+        self._test_push_unread_count()
 
-    def _test_push_unread_count(self, group_by_room: bool):
+        # Carry out our option-value specific test
+        #
+        # We're counting every unread message, so there should now be 4 since the
+        # last read receipt
+        self.assertEqual(
+            self.push_attempts[5][2]["notification"]["counts"]["unread"], 4
+        )
+
+    def _test_push_unread_count(self):
         """
         Tests that the correct unread count appears in sent push notifications
 
@@ -641,14 +658,3 @@ class HTTPPusherTests(HomeserverTestCase):
         self.push_attempts[5][0].callback({})
 
         self.assertEqual(len(self.push_attempts), 6)
-        if group_by_room:
-            # This push should still only contain an unread count of 1 (for 1 unread room)
-            self.assertEqual(
-                self.push_attempts[5][2]["notification"]["counts"]["unread"], 1
-            )
-        else:
-            # We're counting every unread message, so there should now be 4 since our
-            # last read receipt
-            self.assertEqual(
-                self.push_attempts[5][2]["notification"]["counts"]["unread"], 4
-            )
