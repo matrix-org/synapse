@@ -70,14 +70,18 @@ class ShutdownRoomRestServlet(RestServlet):
 
 
 class DeleteRoomRestServlet(RestServlet):
-    """Delete a room from server. It is a combination and improvement of
-    shut down and purge room.
+    """Delete a room from server.
+
+    It is a combination and improvement of shutdown and purge room.
+
     Shuts down a room by removing all local users from the room.
     Blocking all future invites and joins to the room is optional.
+
     If desired any local aliases will be repointed to a new room
-    created by `new_room_user_id` and kicked users will be auto
+    created by `new_room_user_id` and kicked users will be auto-
     joined to the new room.
-    It will remove all trace of a room from the database.
+
+    If 'purge' is true, it will remove all traces of a room from the database.
     """
 
     PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)/delete$")
@@ -110,6 +114,14 @@ class DeleteRoomRestServlet(RestServlet):
                 Codes.BAD_JSON,
             )
 
+        force_purge = content.get("force_purge", False)
+        if not isinstance(force_purge, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Param 'force_purge' must be a boolean, if given",
+                Codes.BAD_JSON,
+            )
+
         ret = await self.room_shutdown_handler.shutdown_room(
             room_id=room_id,
             new_room_user_id=content.get("new_room_user_id"),
@@ -121,7 +133,7 @@ class DeleteRoomRestServlet(RestServlet):
 
         # Purge room
         if purge:
-            await self.pagination_handler.purge_room(room_id)
+            await self.pagination_handler.purge_room(room_id, force=force_purge)
 
         return (200, ret)
 
