@@ -36,17 +36,13 @@ class FederationConfig(Config):
             for domain in federation_domain_whitelist:
                 self.federation_domain_whitelist[domain] = True
 
-        ip_range_blacklist = config.get(
-            "ip_range_blacklist", []
-        )
+        ip_range_blacklist = config.get("ip_range_blacklist", [])
 
         # Attempt to create an IPSet from the given ranges
         try:
             self.ip_range_blacklist = IPSet(ip_range_blacklist)
         except Exception as e:
-            raise ConfigError(
-                "Invalid range(s) provided in ip_range_blacklist: %s" % e
-            )
+            raise ConfigError("Invalid range(s) provided in ip_range_blacklist: %s" % e)
         # Always blacklist 0.0.0.0, ::
         self.ip_range_blacklist.update(["0.0.0.0", "::"])
 
