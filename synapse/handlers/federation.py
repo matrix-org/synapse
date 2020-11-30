@@ -1446,9 +1446,9 @@ class FederationHandler(BaseHandler):
     ) -> Tuple[str, int]:
         """Sends the knock to the remote server.
 
-        This first triggers a /make_xyz.amorgan.knock request that returns a partial
+        This first triggers a make_knock request that returns a partial
         event that we can fill out and sign. This is then sent to the
-        remote server via /send_xyz.amorgan.knock.
+        remote server via send_knock.
 
         Knock events must be signed by the knockee's server before distributing.
 
@@ -1478,7 +1478,7 @@ class FederationHandler(BaseHandler):
             room_id=event.room_id, room_version=event_format_version
         )
 
-        # Initially try the host that we successfully called /make_xyz.amorgan.knock on
+        # Initially try the host that we successfully called /make_knock on
         try:
             target_hosts.remove(origin)
             target_hosts.insert(0, origin)
@@ -1843,7 +1843,7 @@ class FederationHandler(BaseHandler):
     async def on_make_knock_request(
         self, origin: str, room_id: str, user_id: str
     ) -> EventBase:
-        """We've received a /make_xyz.amorgan.knock/ request, so we create a partial
+        """We've received a make_knock request, so we create a partial
         knock event for the room and return that. We do *not* persist or
         process it until the other server has signed it and sent it back.
 
@@ -1857,7 +1857,7 @@ class FederationHandler(BaseHandler):
         """
         if get_domain_from_id(user_id) != origin:
             logger.info(
-                "Get /make_xyz.amorgan.knock request for user %r"
+                "Get /xyz.amorgan.knock/make_knock request for user %r"
                 "from different origin %s, ignoring",
                 user_id,
                 origin,
@@ -1924,7 +1924,8 @@ class FederationHandler(BaseHandler):
 
         if get_domain_from_id(event.sender) != origin:
             logger.info(
-                "Got /send_xyz.amorgan.knock request for user %r from different origin %s",
+                "Got /xyz.amorgan.knock/send_knock request for user %r "
+                "from different origin %s",
                 event.sender,
                 origin,
             )

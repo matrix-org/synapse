@@ -221,11 +221,15 @@ class TransportLayerClient:
 
         # Knock currently uses an unstable prefix
         if membership == Membership.KNOCK:
-            prefix = FEDERATION_UNSTABLE_PREFIX
+            # Create a path in the form of /unstable/xyz.amorgan.knock/make_knock/...
+            path = _create_path(
+                FEDERATION_UNSTABLE_PREFIX + "/xyz.amorgan.knock",
+                "/make_knock/%s/%s",
+                room_id,
+                user_id,
+            )
         else:
-            prefix = FEDERATION_V1_PREFIX
-
-        path = _create_path(prefix, "/make_%s/%s/%s", membership, room_id, user_id)
+            path = _create_v1_path("/make_%s/%s/%s", membership, room_id, user_id)
 
         ignore_backoff = False
         retry_on_dns_fail = False
@@ -309,7 +313,7 @@ class TransportLayerClient:
     ) -> JsonDict:
         """
         Sends a signed knock membership event to a remote server. This is the second
-        step for knocking after /make_xyz.amorgan.knock.
+        step for knocking after make_knock.
 
         Args:
             destination: The remote homeserver.
@@ -328,8 +332,8 @@ class TransportLayerClient:
             The list of state events may be empty.
         """
         path = _create_path(
-            FEDERATION_UNSTABLE_PREFIX,
-            "/send_xyz.amorgan.knock/%s/%s",
+            FEDERATION_UNSTABLE_PREFIX + "/xyz.amorgan.knock",
+            "/send_knock/%s/%s",
             room_id,
             event_id,
         )

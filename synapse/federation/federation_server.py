@@ -570,7 +570,7 @@ class FederationServer(FederationBase):
     async def on_make_knock_request(
         self, origin: str, room_id: str, user_id: str,
     ) -> Dict[str, Union[EventBase, str]]:
-        """We've received a /make_xyz.amorgan.knock/ request, so we create a partial knock
+        """We've received a /make_knock/ request, so we create a partial knock
         event for the room and hand that back, along with the room version, to the knocking
         homeserver. We do *not* persist or process this event until the other server has
         signed it and sent it back.

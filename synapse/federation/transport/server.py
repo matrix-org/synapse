@@ -544,9 +544,9 @@ class FederationV2SendLeaveServlet(BaseFederationServlet):
 
 
 class FederationMakeKnockServlet(BaseFederationServlet):
-    PATH = "/make_xyz.amorgan.knock/(?P<room_id>[^/]*)/(?P<user_id>[^/]*)"
+    PATH = "/make_knock/(?P<room_id>[^/]*)/(?P<user_id>[^/]*)"
 
-    PREFIX = FEDERATION_UNSTABLE_PREFIX
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/xyz.amorgan.knock"
 
     async def on_GET(self, origin, content, query, room_id, user_id):
         content = await self.handler.on_make_knock_request(origin, room_id, user_id)
@@ -554,9 +554,9 @@ class FederationMakeKnockServlet(BaseFederationServlet):
 
 
 class FederationV2SendKnockServlet(BaseFederationServlet):
-    PATH = "/send_xyz.amorgan.knock/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+    PATH = "/send_knock/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
 
-    PREFIX = FEDERATION_UNSTABLE_PREFIX
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/xyz.amorgan.knock"
 
     async def on_PUT(self, origin, content, query, room_id, event_id):
         content = await self.handler.on_send_knock_request(origin, content, room_id)
