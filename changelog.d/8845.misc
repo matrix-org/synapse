@@ -1,0 +1,1 @@
+Drop redundant database index on `event_json`.
