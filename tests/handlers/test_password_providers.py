@@ -264,7 +264,11 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         mock_password_provider.check_password.reset_mock()
 
         # first delete should give a 401
-        session = self._start_delete_device_session(tok1, "dev2")
+        channel = self._delete_device(tok1, "dev2")
+        self.assertEqual(channel.code, 401)
+        # there are no valid flows here!
+        self.assertEqual(channel.json_body["flows"], [])
+        session = channel.json_body["session"]
         mock_password_provider.check_password.assert_not_called()
 
         # now try deleting with the local password
