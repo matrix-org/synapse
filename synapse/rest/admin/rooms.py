@@ -115,7 +115,7 @@ class DeleteRoomRestServlet(RestServlet):
             )
 
         force_purge = content.get("force_purge", False)
-        if not isinstance(purge, bool):
+        if not isinstance(force_purge, bool):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "Param 'force_purge' must be a boolean, if given",
