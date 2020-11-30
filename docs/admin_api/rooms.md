@@ -382,7 +382,7 @@ the new room. Users on other servers will be unaffected.
 
 The API is:
 
-```json
+```
 POST /_synapse/admin/v1/rooms/<room_id>/delete
 ```
 
@@ -439,6 +439,10 @@ The following JSON body parameters are available:
             future attempts to join the room. Defaults to `false`.
 * `purge` - Optional. If set to `true`, it will remove all traces of the room from your database.
             Defaults to `true`.
+* `force_purge` - Optional, and ignored unless `purge` is `true`. If set to `true`, it
+  will force a purge to go ahead even if there are local users still in the room. Do not
+  use this unless a regular `purge` operation fails, as it could leave those users'
+  clients in a confused state.
 
 The JSON body must not be empty. The body must be at least `{}`.
 
