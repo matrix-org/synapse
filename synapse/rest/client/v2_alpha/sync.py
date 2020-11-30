@@ -375,10 +375,11 @@ class SyncRestServlet(RestServlet):
             # the room they've knocked on, without revealing any sensitive information
             knocked_state = list(unsigned.pop("knock_room_state", []))
 
-            # Append the actual knock membership event itself as well
-            # TODO: I *believe* this is just for the client's sake of track its membership
-            # state in each room, but I could be wrong. This certainly doesn't seem like it
-            # could have any negative effects besides resource usage
+            # Append the actual knock membership event itself as well. This provides
+            # the client with:
+            #
+            # * A knock state event that they can use for easier internal tracking
+            # * The rough timestamp of when the knock occurred contained within the event
             knocked_state.append(knock)
 
             # Build the `knock_state` dictionary, which will contain the state of the
