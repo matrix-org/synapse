@@ -89,21 +89,12 @@ class SamlHandlerTestCase(HomeserverTestCase):
         )
         self.assertEqual(mxid, "@test_user:test")
 
-        # Some providers return an integer ID.
-        saml_response = FakeAuthnResponse({"uid": 1234, "username": "test_user_2"})
-        mxid = self.get_success(
-            self.handler._map_saml_response_to_user(
-                saml_response, redirect_url, "user-agent", "10.10.10.10"
-            )
-        )
-        self.assertEqual(mxid, "@test_user_2:test")
-
         # Test if the mxid is already taken
         store = self.hs.get_datastore()
         self.get_success(
-            store.register_user(user_id="@test_user_3:test", password_hash=None)
+            store.register_user(user_id="@test_user_2:test", password_hash=None)
         )
-        saml_response = FakeAuthnResponse({"uid": "test3", "username": "test_user_3"})
+        saml_response = FakeAuthnResponse({"uid": "test2", "username": "test_user_2"})
         e = self.get_failure(
             self.handler._map_saml_response_to_user(
                 saml_response, redirect_url, "user-agent", "10.10.10.10"
@@ -116,7 +107,7 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
     def test_map_saml_response_to_invalid_localpart(self):
         """If the mapping provider generates an invalid localpart it should be rejected."""
-        saml_response = FakeAuthnResponse({"uid": "test2", "username": "föö"})
+        saml_response = FakeAuthnResponse({"uid": "test", "username": "föö"})
         redirect_url = ""
         e = self.get_failure(
             self.handler._map_saml_response_to_user(
