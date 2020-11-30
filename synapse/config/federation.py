@@ -85,7 +85,7 @@ class FederationConfig(Config):
         #  - syd.example.com
 
         # Prevent outgoing requests from being sent to the following blacklisted IP address
-        # CIDR ranges. If this option is not specified, or specified with an empty list, 
+        # CIDR ranges. If this option is not specified, or specified with an empty list,
         # no IP range blacklist will be enforced.
         #
         # The outbound requests for federation, identity servers, push servers, and for
