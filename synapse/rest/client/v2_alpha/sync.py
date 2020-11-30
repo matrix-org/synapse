@@ -367,6 +367,9 @@ class SyncRestServlet(RestServlet):
             # This is where we (cheekily) store the knock state events
             unsigned = knock.setdefault("unsigned", {})
 
+            # Duplicate the dictionary in order to avoid modifying the original
+            unsigned = dict(unsigned)
+
             # Extract the stripped room state from the unsigned dict
             # This is for clients to get a little bit of information about
             # the room they've knocked on, without revealing any sensitive information
