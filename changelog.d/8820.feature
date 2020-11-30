@@ -1,2 +1,1 @@
-Add a config option, `push.group_by_unread_count`, which controls whether unread message counts in push notifications are defined as "total unread rooms" or "total unread messages".
-
+Add a config option, `push.group_by_unread_count`, which controls whether unread message counts in push notifications are defined as "the number of rooms with unread messages" or "total unread messages".
