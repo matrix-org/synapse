@@ -554,7 +554,7 @@ class HomeserverTestCase(TestCase):
         self.hs.config.registration_shared_secret = "shared"
 
         # Create the user
-        request, channel = self.make_request("GET", "/_matrix/client/r0/admin/register")
+        request, channel = self.make_request("GET", "/_synapse/admin/v1/register")
         self.assertEqual(channel.code, 200, msg=channel.result)
         nonce = channel.json_body["nonce"]
 
@@ -580,7 +580,7 @@ class HomeserverTestCase(TestCase):
             }
         )
         request, channel = self.make_request(
-            "POST", "/_matrix/client/r0/admin/register", body.encode("utf8")
+            "POST", "/_synapse/admin/v1/register", body.encode("utf8")
         )
         self.assertEqual(channel.code, 200, channel.json_body)
 

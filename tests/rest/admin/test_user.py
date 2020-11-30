@@ -41,7 +41,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
 
-        self.url = "/_matrix/client/r0/admin/register"
+        self.url = "/_synapse/admin/v1/register"
 
         self.registration_handler = Mock()
         self.identity_handler = Mock()
@@ -1768,3 +1768,111 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
         # though the MAU limit would stop the user doing so.
         puppet_token = self._get_token()
         self.helper.join(room_id, user=self.other_user, tok=puppet_token)
+
+
+class WhoisRestTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
+
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.other_user = self.register_user("user", "pass")
+        self.url1 = "/_synapse/admin/v1/whois/%s" % urllib.parse.quote(self.other_user)
+        self.url2 = "/_matrix/client/r0/admin/whois/%s" % urllib.parse.quote(
+            self.other_user
+        )
+
+    def test_no_auth(self):
+        """
+        Try to get information of an user without authentication.
+        """
+        request, channel = self.make_request("GET", self.url1, b"{}")
+        self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
+
+        request, channel = self.make_request("GET", self.url2, b"{}")
+        self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
+
+    def test_requester_is_not_admin(self):
+        """
+        If the user is not a server admin, an error is returned.
+        """
+        self.register_user("user2", "pass")
+        other_user2_token = self.login("user2", "pass")
+
+        request, channel = self.make_request(
+            "GET", self.url1, access_token=other_user2_token,
+        )
+        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
+        request, channel = self.make_request(
+            "GET", self.url2, access_token=other_user2_token,
+        )
+        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
+    def test_user_is_not_local(self):
+        """
+        Tests that a lookup for a user that is not a local returns a 400
+        """
+        url1 = "/_synapse/admin/v1/whois/@unknown_person:unknown_domain"
+        url2 = "/_matrix/client/r0/admin/whois/@unknown_person:unknown_domain"
+
+        request, channel = self.make_request(
+            "GET", url1, access_token=self.admin_user_tok,
+        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
+        self.assertEqual("Can only whois a local user", channel.json_body["error"])
+
+        request, channel = self.make_request(
+            "GET", url2, access_token=self.admin_user_tok,
+        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
+        self.assertEqual("Can only whois a local user", channel.json_body["error"])
+
+    def test_get_whois_admin(self):
+        """
+        The lookup should succeed for an admin.
+        """
+        request, channel = self.make_request(
+            "GET", self.url1, access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(self.other_user, channel.json_body["user_id"])
+        self.assertIn("devices", channel.json_body)
+
+        request, channel = self.make_request(
+            "GET", self.url2, access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(self.other_user, channel.json_body["user_id"])
+        self.assertIn("devices", channel.json_body)
+
+    def test_get_whois_user(self):
+        """
+        The lookup should succeed for a normal user looking up their own information.
+        """
+        other_user_token = self.login("user", "pass")
+
+        request, channel = self.make_request(
+            "GET", self.url1, access_token=other_user_token,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(self.other_user, channel.json_body["user_id"])
+        self.assertIn("devices", channel.json_body)
+
+        request, channel = self.make_request(
+            "GET", self.url2, access_token=other_user_token,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(self.other_user, channel.json_body["user_id"])
+        self.assertIn("devices", channel.json_body)

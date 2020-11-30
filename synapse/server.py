@@ -147,7 +147,8 @@ def cache_in_self(builder: T) -> T:
             "@cache_in_self can only be used on functions starting with `get_`"
         )
 
-    depname = builder.__name__[len("get_") :]
+    # get_attr -> _attr
+    depname = builder.__name__[len("get") :]
 
     building = [False]
 
@@ -235,15 +236,6 @@ class HomeServer(metaclass=abc.ABCMeta):
         self._instance_id = random_string(5)
         self._instance_name = config.worker_name or "master"
 
-        self.clock = Clock(reactor)
-        self.distributor = Distributor()
-
-        self.registration_ratelimiter = Ratelimiter(
-            clock=self.clock,
-            rate_hz=config.rc_registration.per_second,
-            burst_count=config.rc_registration.burst_count,
-        )
-
         self.version_string = version_string
 
         self.datastores = None  # type: Optional[Databases]
@@ -301,8 +293,9 @@ class HomeServer(metaclass=abc.ABCMeta):
     def is_mine_id(self, string: str) -> bool:
         return string.split(":", 1)[1] == self.hostname
 
+    @cache_in_self
     def get_clock(self) -> Clock:
-        return self.clock
+        return Clock(self._reactor)
 
     def get_datastore(self) -> DataStore:
         if not self.datastores:
@@ -319,11 +312,17 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_config(self) -> HomeServerConfig:
         return self.config
 
+    @cache_in_self
     def get_distributor(self) -> Distributor:
-        return self.distributor
+        return Distributor()
 
+    @cache_in_self
     def get_registration_ratelimiter(self) -> Ratelimiter:
-        return self.registration_ratelimiter
+        return Ratelimiter(
+            clock=self.get_clock(),
+            rate_hz=self.config.rc_registration.per_second,
+            burst_count=self.config.rc_registration.burst_count,
+        )
 
     @cache_in_self
     def get_federation_client(self) -> FederationClient:
@@ -709,7 +708,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_federation_ratelimiter(self) -> FederationRateLimiter:
-        return FederationRateLimiter(self.clock, config=self.config.rc_federation)
+        return FederationRateLimiter(self.get_clock(), config=self.config.rc_federation)
 
     @cache_in_self
     def get_module_api(self) -> ModuleApi:

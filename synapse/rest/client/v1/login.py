@@ -154,13 +154,28 @@ class LoginRestServlet(RestServlet):
     async def _do_appservice_login(
         self, login_submission: JsonDict, appservice: ApplicationService
     ):
-        logger.info(
-            "Got appservice login request with identifier: %r",
-            login_submission.get("identifier"),
-        )
+        identifier = login_submission.get("identifier")
+        logger.info("Got appservice login request with identifier: %r", identifier)
 
-        identifier = convert_client_dict_legacy_fields_to_identifier(login_submission)
-        qualified_user_id = self._get_qualified_user_id(identifier)
+        if not isinstance(identifier, dict):
+            raise SynapseError(
+                400, "Invalid identifier in login submission", Codes.INVALID_PARAM
+            )
+
+        # this login flow only supports identifiers of type "m.id.user".
+        if identifier.get("type") != "m.id.user":
+            raise SynapseError(
+                400, "Unknown login identifier type", Codes.INVALID_PARAM
+            )
+
+        user = identifier.get("user")
+        if not isinstance(user, str):
+            raise SynapseError(400, "Invalid user in identifier", Codes.INVALID_PARAM)
+
+        if user.startswith("@"):
+            qualified_user_id = user
+        else:
+            qualified_user_id = UserID(user, self.hs.hostname).to_string()
 
         if not appservice.is_interested_in_user(qualified_user_id):
             raise LoginError(403, "Invalid access_token", errcode=Codes.FORBIDDEN)

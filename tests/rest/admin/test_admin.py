@@ -100,7 +100,7 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
         self.assertIn(group_id, self._get_groups_user_is_in(self.other_user_token))
 
         # Now delete the group
-        url = "/admin/delete_group/" + group_id
+        url = "/_synapse/admin/v1/delete_group/" + group_id
         request, channel = self.make_request(
             "POST",
             url.encode("ascii"),

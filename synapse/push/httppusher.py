@@ -75,6 +75,7 @@ class HttpPusher:
         self.failing_since = pusherdict["failing_since"]
         self.timed_call = None
         self._is_processing = False
+        self._group_unread_count_by_room = hs.config.push_group_unread_count_by_room
 
         # This is the highest stream ordering we know it's safe to process.
         # When new events arrive, we'll be given a window of new events: we
@@ -136,7 +137,11 @@ class HttpPusher:
     async def _update_badge(self):
         # XXX as per https://github.com/matrix-org/matrix-doc/issues/2627, this seems
         # to be largely redundant. perhaps we can remove it.
-        badge = await push_tools.get_badge_count(self.hs.get_datastore(), self.user_id)
+        badge = await push_tools.get_badge_count(
+            self.hs.get_datastore(),
+            self.user_id,
+            group_by_room=self._group_unread_count_by_room,
+        )
         await self._send_badge(badge)
 
     def on_timer(self):
@@ -283,7 +288,11 @@ class HttpPusher:
             return True
 
         tweaks = push_rule_evaluator.tweaks_for_actions(push_action["actions"])
-        badge = await push_tools.get_badge_count(self.hs.get_datastore(), self.user_id)
+        badge = await push_tools.get_badge_count(
+            self.hs.get_datastore(),
+            self.user_id,
+            group_by_room=self._group_unread_count_by_room,
+        )
 
         event = await self.store.get_event(push_action["event_id"], allow_none=True)
         if event is None:

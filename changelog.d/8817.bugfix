@@ -1,0 +1,1 @@
+Fix bug where logging could break after a call to SIGHUP.
