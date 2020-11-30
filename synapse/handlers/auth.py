@@ -207,7 +207,9 @@ class AuthHandler(BaseHandler):
         # they do are technically broken)
 
         # start out by assuming PASSWORD is enabled; we will remove it later if not.
-        login_types = [LoginType.PASSWORD]
+        login_types = []
+        if hs.config.password_localdb_enabled:
+            login_types.append(LoginType.PASSWORD)
 
         for provider in self.password_providers:
             if hasattr(provider, "get_supported_login_types"):

@@ -528,8 +528,6 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         channel = self._send_password_login("localuser", "localpass")
         self.assertEqual(channel.code, 400, channel.result)
 
-    test_custom_auth_no_local_user_fallback.skip = "currently broken"
-
     def _get_login_flows(self) -> JsonDict:
         _, channel = self.make_request("GET", "/_matrix/client/r0/login")
         self.assertEqual(channel.code, 200, channel.result)
