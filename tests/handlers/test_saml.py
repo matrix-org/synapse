@@ -48,7 +48,8 @@ class TestMappingProvider:
     def saml_response_to_user_attributes(
         self, saml_response, failures, client_redirect_url
     ):
-        return {"mxid_localpart": saml_response.ava["username"], "displayname": None}
+        localpart = saml_response.ava["username"] + (str(failures) if failures else "")
+        return {"mxid_localpart": localpart, "displayname": None}
 
 
 class SamlHandlerTestCase(HomeserverTestCase):
@@ -75,6 +76,9 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
         self.handler = SamlHandler(hs)
 
+        # Reduce the number of attempts when generating MXIDs.
+        self.handler._sso_handler._MAP_USERNAME_RETRIES = 3
+
         return hs
 
     def test_map_saml_response_to_user(self):
@@ -89,22 +93,6 @@ class SamlHandlerTestCase(HomeserverTestCase):
         )
         self.assertEqual(mxid, "@test_user:test")
 
-        # Test if the mxid is already taken
-        store = self.hs.get_datastore()
-        self.get_success(
-            store.register_user(user_id="@test_user_2:test", password_hash=None)
-        )
-        saml_response = FakeAuthnResponse({"uid": "test2", "username": "test_user_2"})
-        e = self.get_failure(
-            self.handler._map_saml_response_to_user(
-                saml_response, redirect_url, "user-agent", "10.10.10.10"
-            ),
-            MappingException,
-        )
-        self.assertEqual(
-            str(e.value), "Unable to generate a Matrix ID from the SAML response"
-        )
-
     def test_map_saml_response_to_invalid_localpart(self):
         """If the mapping provider generates an invalid localpart it should be rejected."""
         saml_response = FakeAuthnResponse({"uid": "test", "username": "föö"})
@@ -116,3 +104,40 @@ class SamlHandlerTestCase(HomeserverTestCase):
             MappingException,
         )
         self.assertEqual(str(e.value), "localpart is invalid: föö")
+
+    def test_map_userinfo_to_user_retries(self):
+        """The mapping provider can retry generating an MXID if the MXID is already in use."""
+        store = self.hs.get_datastore()
+        self.get_success(
+            store.register_user(user_id="@test_user:test", password_hash=None)
+        )
+        saml_response = FakeAuthnResponse({"uid": "test", "username": "test_user"})
+        redirect_url = ""
+        mxid = self.get_success(
+            self.handler._map_saml_response_to_user(
+                saml_response, redirect_url, "user-agent", "10.10.10.10"
+            )
+        )
+        # test_user is already taken, so test_user1 gets registered instead.
+        self.assertEqual(mxid, "@test_user1:test")
+
+        # Register all of the potential usernames for a particular username.
+        self.get_success(
+            store.register_user(user_id="@tester:test", password_hash=None)
+        )
+        for i in range(1, 3):
+            self.get_success(
+                store.register_user(user_id="@tester%d:test" % i, password_hash=None)
+            )
+
+        # Now attempt to map to a username, this will fail since all potential usernames are taken.
+        saml_response = FakeAuthnResponse({"uid": "tester", "username": "tester"})
+        e = self.get_failure(
+            self.handler._map_saml_response_to_user(
+                saml_response, redirect_url, "user-agent", "10.10.10.10"
+            ),
+            MappingException,
+        )
+        self.assertEqual(
+            str(e.value), "Unable to generate a Matrix ID from the SSO response"
+        )
