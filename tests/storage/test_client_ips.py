@@ -416,7 +416,7 @@ class ClientIpAuthTestCase(unittest.HomeserverTestCase):
             self.reactor,
             self.site,
             "GET",
-            "/_matrix/client/r0/admin/users/" + self.user_id,
+            "/_synapse/admin/v1/users/" + self.user_id,
             access_token=access_token,
             custom_headers=headers1.items(),
             **make_request_args,

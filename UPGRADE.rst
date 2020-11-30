@@ -105,6 +105,28 @@ shown below:
 
           return {"localpart": localpart}
 
+Removal historical Synapse Admin API 
+------------------------------------
+
+Historically, the Synapse Admin API has been accessible under:
+
+* ``/_matrix/client/api/v1/admin``
+* ``/_matrix/client/unstable/admin``
+* ``/_matrix/client/r0/admin``
+* ``/_synapse/admin/v1``
+
+The endpoints with ``/_matrix/client/*`` prefixes have been removed as of v1.24.0.
+The Admin API is now only accessible under:
+
+* ``/_synapse/admin/v1``
+
+The only exception is the `/admin/whois` endpoint, which is
+`also available via the client-server API <https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-admin-whois-userid>`_.
+
+The deprecation of the old endpoints was announced with Synapse 1.20.0 (released
+on 2020-09-22) and makes it easier for homeserver admins to lock down external
+access to the Admin API endpoints.
+
 Upgrading to v1.23.0
 ====================
 

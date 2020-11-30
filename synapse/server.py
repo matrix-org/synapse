@@ -27,7 +27,8 @@ import logging
 import os
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, TypeVar, cast
 
-import twisted
+import twisted.internet.base
+import twisted.internet.tcp
 from twisted.mail.smtp import sendmail
 from twisted.web.iweb import IPolicyForHTTPS
 
