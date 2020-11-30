@@ -238,6 +238,13 @@ class AuthHandler(BaseHandler):
             burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
         )
 
+        # Ratelimitier for failed /login attempts
+        self._failed_login_attempts_ratelimiter = Ratelimiter(
+            clock=hs.get_clock(),
+            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
+            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
+        )
+
         self._clock = self.hs.get_clock()
 
         # Expire old UI auth sessions after a period of time.
@@ -650,14 +657,8 @@ class AuthHandler(BaseHandler):
             res = await checker.check_auth(authdict, clientip=clientip)
             return res
 
-        # build a v1-login-style dict out of the authdict and fall back to the
-        # v1 code
-        user_id = authdict.get("user")
-
-        if user_id is None:
-            raise SynapseError(400, "", Codes.MISSING_PARAM)
-
-        (canonical_id, callback) = await self.validate_login(user_id, authdict)
+        # fall back to the v1 login flow
+        canonical_id, _ = await self.validate_login(authdict)
         return canonical_id
 
     def _get_params_recaptcha(self) -> dict:
@@ -832,15 +833,155 @@ class AuthHandler(BaseHandler):
         return self._supported_login_types
 
     async def validate_login(
-        self, username: str, login_submission: Dict[str, Any]
+        self, login_submission: Dict[str, Any], ratelimit=False,
     ) -> Tuple[str, Optional[Callable[[Dict[str, str]], None]]]:
         """Authenticates the user for the /login API
 
-        Also used by the user-interactive auth flow to validate
-        m.login.password auth types.
+        Also used by the user-interactive auth flow to validate auth types which don't
+        have an explicit UIA handler, including m.password.auth.
 
         Args:
-            username: username supplied by the user
+            login_submission: the whole of the login submission
+                (including 'type' and other relevant fields)
+            ratelimit: whether to apply the failed_login_attempt ratelimiter
+        Returns:
+            A tuple of the canonical user id, and optional callback
+                to be called once the access token and device id are issued
+        Raises:
+            StoreError if there was a problem accessing the database
+            SynapseError if there was a problem with the request
+            LoginError if there was an authentication problem.
+        """
+        login_type = login_submission.get("type")
+
+        # ideally, we wouldn't be checking the identifier unless we know we have a login
+        # method which uses it (https://github.com/matrix-org/synapse/issues/8836)
+        #
+        # But the auth providers' check_auth interface requires a username, so in
+        # practice we can only support login methods which we can map to a username
+        # anyway.
+
+        # special case to check for "password" for the check_password interface
+        # for the auth providers
+        password = login_submission.get("password")
+        if login_type == LoginType.PASSWORD:
+            if not self._password_enabled:
+                raise SynapseError(400, "Password login has been disabled.")
+            if not isinstance(password, str):
+                raise SynapseError(400, "Bad parameter: password", Codes.INVALID_PARAM)
+
+        # map old-school login fields into new-school "identifier" fields.
+        identifier_dict = convert_client_dict_legacy_fields_to_identifier(
+            login_submission
+        )
+
+        # convert phone type identifiers to generic threepids
+        if identifier_dict["type"] == "m.id.phone":
+            identifier_dict = login_id_phone_to_thirdparty(identifier_dict)
+
+        # convert threepid identifiers to user IDs
+        if identifier_dict["type"] == "m.id.thirdparty":
+            address = identifier_dict.get("address")
+            medium = identifier_dict.get("medium")
+
+            if medium is None or address is None:
+                raise SynapseError(400, "Invalid thirdparty identifier")
+
+            # For emails, canonicalise the address.
+            # We store all email addresses canonicalised in the DB.
+            # (See add_threepid in synapse/handlers/auth.py)
+            if medium == "email":
+                try:
+                    address = canonicalise_email(address)
+                except ValueError as e:
+                    raise SynapseError(400, str(e))
+
+            # We also apply account rate limiting using the 3PID as a key, as
+            # otherwise using 3PID bypasses the ratelimiting based on user ID.
+            if ratelimit:
+                self._failed_login_attempts_ratelimiter.ratelimit(
+                    (medium, address), update=False
+                )
+
+            # Check for login providers that support 3pid login types
+            if login_type == LoginType.PASSWORD:
+                # we've already checked that there is a (valid) password field
+                assert isinstance(password, str)
+                (
+                    canonical_user_id,
+                    callback_3pid,
+                ) = await self.check_password_provider_3pid(medium, address, password)
+                if canonical_user_id:
+                    # Authentication through password provider and 3pid succeeded
+                    return canonical_user_id, callback_3pid
+
+            # No password providers were able to handle this 3pid
+            # Check local store
+            user_id = await self.hs.get_datastore().get_user_id_by_threepid(
+                medium, address
+            )
+            if not user_id:
+                logger.warning(
+                    "unknown 3pid identifier medium %s, address %r", medium, address
+                )
+                # We mark that we've failed to log in here, as
+                # `check_password_provider_3pid` might have returned `None` due
+                # to an incorrect password, rather than the account not
+                # existing.
+                #
+                # If it returned None but the 3PID was bound then we won't hit
+                # this code path, which is fine as then the per-user ratelimit
+                # will kick in below.
+                if ratelimit:
+                    self._failed_login_attempts_ratelimiter.can_do_action(
+                        (medium, address)
+                    )
+                raise LoginError(403, "", errcode=Codes.FORBIDDEN)
+
+            identifier_dict = {"type": "m.id.user", "user": user_id}
+
+        # by this point, the identifier should be an m.id.user: if it's anything
+        # else, we haven't understood it.
+        if identifier_dict["type"] != "m.id.user":
+            raise SynapseError(400, "Unknown login identifier type")
+
+        username = identifier_dict.get("user")
+        if not username:
+            raise SynapseError(400, "User identifier is missing 'user' key")
+
+        if username.startswith("@"):
+            qualified_user_id = username
+        else:
+            qualified_user_id = UserID(username, self.hs.hostname).to_string()
+
+        # Check if we've hit the failed ratelimit (but don't update it)
+        if ratelimit:
+            self._failed_login_attempts_ratelimiter.ratelimit(
+                qualified_user_id.lower(), update=False
+            )
+
+        try:
+            return await self._validate_userid_login(username, login_submission)
+        except LoginError:
+            # The user has failed to log in, so we need to update the rate
+            # limiter. Using `can_do_action` avoids us raising a ratelimit
+            # exception and masking the LoginError. The actual ratelimiting
+            # should have happened above.
+            if ratelimit:
+                self._failed_login_attempts_ratelimiter.can_do_action(
+                    qualified_user_id.lower()
+                )
+            raise
+
+    async def _validate_userid_login(
+        self, username: str, login_submission: Dict[str, Any],
+    ) -> Tuple[str, Optional[Callable[[Dict[str, str]], None]]]:
+        """Helper for validate_login
+
+        Handles login, once we've mapped 3pids onto userids
+
+        Args:
+            username: the username, from the identifier dict
             login_submission: the whole of the login submission
                 (including 'type' and other relevant fields)
         Returns:
@@ -851,7 +992,6 @@ class AuthHandler(BaseHandler):
             SynapseError if there was a problem with the request
             LoginError if there was an authentication problem.
         """
-
         if username.startswith("@"):
             qualified_user_id = username
         else:
@@ -860,20 +1000,13 @@ class AuthHandler(BaseHandler):
         login_type = login_submission.get("type")
         known_login_type = False
 
-        # special case to check for "password" for the check_password interface
-        # for the auth providers
-        password = login_submission.get("password")
-
-        if login_type == LoginType.PASSWORD:
-            if not self._password_enabled:
-                raise SynapseError(400, "Password login has been disabled.")
-            if not password:
-                raise SynapseError(400, "Missing parameter: password")
-
         for provider in self.password_providers:
             if hasattr(provider, "check_password") and login_type == LoginType.PASSWORD:
                 known_login_type = True
-                is_valid = await provider.check_password(qualified_user_id, password)
+                # we've already checked that there is a (valid) password field
+                is_valid = await provider.check_password(
+                    qualified_user_id, login_submission["password"]
+                )
                 if is_valid:
                     return qualified_user_id, None
 
@@ -914,8 +1047,12 @@ class AuthHandler(BaseHandler):
         if login_type == LoginType.PASSWORD and self.hs.config.password_localdb_enabled:
             known_login_type = True
 
+            # we've already checked that there is a (valid) password field
+            password = login_submission["password"]
+            assert isinstance(password, str)
+
             canonical_user_id = await self._check_local_password(
-                qualified_user_id, password  # type: ignore
+                qualified_user_id, password
             )
 
             if canonical_user_id:
