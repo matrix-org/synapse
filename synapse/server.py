@@ -371,11 +371,11 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_proxied_blacklisted_http_client(self) -> SimpleHttpClient:
         """
         An HTTP client that uses configured HTTP(S) proxies and blacklists IPs
-        based on the federation IP range blacklist.
+        based on the IP range blacklist.
         """
         return SimpleHttpClient(
             self,
-            ip_blacklist=self.config.federation_ip_range_blacklist,
+            ip_blacklist=self.config.ip_range_blacklist,
             http_proxy=os.getenvb(b"http_proxy"),
             https_proxy=os.getenvb(b"HTTPS_PROXY"),
         )
