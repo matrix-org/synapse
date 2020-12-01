@@ -106,6 +106,25 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
 
         assert self.METHOD in ("PUT", "POST", "GET")
 
+        self._replication_secret = None
+        if hs.config.worker.worker_replication_secret:
+            self._replication_secret = hs.config.worker.worker_replication_secret
+
+    def check_auth(self, request) -> None:
+        # Get the authorization header.
+        auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
+
+        if len(auth_headers) > 1:
+            raise RuntimeError("Too many Authorization headers.")
+        parts = auth_headers[0].split(b" ")
+        if parts[0] == b"Bearer" and len(parts) == 2:
+            received_secret = parts[1].decode("ascii")
+            if self._replication_secret == received_secret:
+                # Success!
+                return
+
+        raise RuntimeError("Invalid Authorization header.")
+
     @abc.abstractmethod
     async def _serialize_payload(**kwargs):
         """Static method that is called when creating a request.
@@ -149,6 +168,12 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         instance_map = hs.config.worker.instance_map
 
         outgoing_gauge = _pending_outgoing_requests.labels(cls.NAME)
+
+        replication_secret = None
+        if hs.config.worker.worker_replication_secret:
+            replication_secret = hs.config.worker.worker_replication_secret.encode(
+                "ascii"
+            )
 
         @trace(opname="outgoing_replication_request")
         @outgoing_gauge.track_inprogress()
@@ -202,6 +227,9 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                 # the master, and so whether we should clean up or not.
                 while True:
                     headers = {}  # type: Dict[bytes, List[bytes]]
+                    # Add an authorization header, if configured.
+                    if replication_secret:
+                        headers[b"Authorization"] = [b"Bearer " + replication_secret]
                     inject_active_span_byte_dict(headers, None, check_destination=False)
                     try:
                         result = await request_func(uri, data, headers=headers)
@@ -242,6 +270,20 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         if self.CACHE:
             handler = self._cached_handler  # type: ignore
             url_args.append("txn_id")
+
+        # If there's a shared replication secret, wrap the handler to ensure the
+        # secret is checked.
+        if self._replication_secret:
+            raw_handler = handler
+
+            def check_auth_and_handle(request, *args, **kwargs):
+                """
+                Check the authorization headers, then handle the request.
+                """
+                self.check_auth(request)
+                return raw_handler(request, *args, **kwargs)
+
+            handler = check_auth_and_handle
 
         args = "/".join("(?P<%s>[^/]+)" % (arg,) for arg in url_args)
         pattern = re.compile("^/_synapse/replication/%s/%s$" % (self.NAME, args))
