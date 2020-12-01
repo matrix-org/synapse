@@ -18,7 +18,8 @@ import json
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
 from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import read_marker, sync
+from synapse.rest.client.v2_alpha import knock, read_marker, sync
+from synapse.types import RoomAlias
 
 from tests import unittest
 from tests.server import TimedOutException
@@ -314,6 +315,144 @@ class SyncTypingTests(unittest.HomeserverTestCase):
             self.make_request("GET", sync_url % (access_token, next_batch))
 
 
+class SyncKnockTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+        sync.register_servlets,
+        knock.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
+        self.url = "/sync?since=%s"
+        self.next_batch = "s0"
+
+        # Register the first user (used to create the room to knock on).
+        self.user_id = self.register_user("kermit", "monkey")
+        self.tok = self.login("kermit", "monkey")
+
+        # Create the room we'll knock on.
+        self.room_id = self.helper.create_room_as(
+            self.user_id,
+            is_public=False,
+            room_version="xyz.amorgan.knock",
+            tok=self.tok,
+        )
+
+        # Register the second user (used to knock on the room).
+        self.knocker = self.register_user("knocker", "monkey")
+        self.knocker_tok = self.login("knocker", "monkey")
+
+        # Perform an initial sync for the knocking user
+        request, channel = self.make_request(
+            "GET", self.url % self.next_batch, access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        # Store the next batch for the next request.
+        self.next_batch = channel.json_body["next_batch"]
+
+        # Set up some room state to test with.
+
+        # To set a canonical alias, we'll need to point an alias at the room first.
+        canonical_alias = "#fancy_alias:test"
+        self.get_success(
+            self.store.create_room_alias_association(
+                RoomAlias.from_string(canonical_alias), self.room_id, ["test"]
+            )
+        )
+
+        self.room_state = {
+            # We need to set the room's join rules to allow knocking
+            EventTypes.JoinRules: {
+                "content": {"join_rule": "xyz.amorgan.knock"},
+                "state_key": "",
+            },
+            # The rest are state events that are recommended to strip and send to clients
+            EventTypes.Name: {"content": {"name": "A cool room"}, "state_key": ""},
+            EventTypes.RoomAvatar: {
+                "content": {
+                    "info": {
+                        "h": 398,
+                        "mimetype": "image/jpeg",
+                        "size": 31037,
+                        "w": 394,
+                    },
+                    "url": "mxc://example.org/JWEIFJgwEIhweiWJE",
+                },
+                "state_key": "",
+            },
+            EventTypes.RoomEncryption: {
+                "content": {"algorithm": "m.megolm.v1.aes-sha2"},
+                "state_key": "",
+            },
+            EventTypes.CanonicalAlias: {
+                "content": {"alias": canonical_alias, "alt_aliases": []},
+                "state_key": "",
+            },
+        }
+
+        for event_type, event in self.room_state.items():
+            self.helper.send_state(
+                self.room_id, event_type, event["content"], tok=self.tok,
+            )
+
+        # We expect the knock event to be included as well
+        self.room_state[EventTypes.Member] = {
+            "content": {"membership": "xyz.amorgan.knock", "displayname": "knocker"},
+            "state_key": "@knocker:test",
+        }
+
+    def test_knock_room_state(self):
+        """Tests that /sync returns state from a room after knocking on it."""
+        # Knock on a room
+        request, channel = self.make_request(
+            "POST",
+            "/_matrix/client/unstable/xyz.amorgan.knock/%s" % (self.room_id,),
+            b"{}",
+            self.knocker_tok,
+            shorthand=False,
+        )
+        self.assertEquals(200, channel.code, channel.result)
+
+        # Check that /sync includes stripped state from the room
+        request, channel = self.make_request(
+            "GET", self.url % self.next_batch, access_token=self.knocker_tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        knock_entry = channel.json_body["rooms"]["xyz.amorgan.knock"]
+        room_state_events = knock_entry[self.room_id]["knock_state"]["events"]
+        for event in room_state_events:
+            event_type = event["type"]
+            if event_type not in self.room_state:
+                raise Exception(
+                    "Unexpected room state type '%s' in knock sync result"
+                    % (event_type,)
+                )
+
+            # Check the state content matches
+            self.assertDictEqual(
+                self.room_state[event_type]["content"], event["content"]
+            )
+
+            # Check the state key is correct
+            self.assertEqual(
+                self.room_state[event_type]["state_key"], event["state_key"]
+            )
+
+            # Ensure the event has been stripped
+            self.assertNotIn("signatures", event)
+
+            # Pop once we've found and processed a state event
+            self.room_state.pop(event_type)
+
+        # Check that all expected state events were accounted for
+        self.assertEqual(len(self.room_state), 0)
+
+
 class UnreadMessagesTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
@@ -447,7 +586,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         )
         self._check_unread_count(5)
 
-    def _check_unread_count(self, expected_count: True):
+    def _check_unread_count(self, expected_count: int):
         """Syncs and compares the unread count with the expected value."""
 
         request, channel = self.make_request(
