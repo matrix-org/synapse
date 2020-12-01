@@ -833,7 +833,7 @@ class AuthHandler(BaseHandler):
         return self._supported_login_types
 
     async def validate_login(
-        self, login_submission: Dict[str, Any], ratelimit=False,
+        self, login_submission: Dict[str, Any], ratelimit: bool = False,
     ) -> Tuple[str, Optional[Callable[[Dict[str, str]], None]]]:
         """Authenticates the user for the /login API
 
