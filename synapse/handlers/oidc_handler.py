@@ -117,7 +117,6 @@ class OidcHandler(BaseHandler):
         self._http_client = hs.get_proxied_http_client()
         self._auth_handler = hs.get_auth_handler()
         self._registration_handler = hs.get_registration_handler()
-        self._server_name = hs.config.server_name  # type: str
         self._macaroon_secret_key = hs.config.macaroon_secret_key
 
         # identifier for the external_ids table
@@ -737,7 +736,7 @@ class OidcHandler(BaseHandler):
             A signed macaroon token with the session information.
         """
         macaroon = pymacaroons.Macaroon(
-            location=self._server_name, identifier="key", key=self._macaroon_secret_key,
+            location=self.server_name, identifier="key", key=self._macaroon_secret_key,
         )
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("type = session")
