@@ -105,7 +105,7 @@ class SamlHandlerTestCase(HomeserverTestCase):
         )
         self.assertEqual(str(e.value), "localpart is invalid: föö")
 
-    def test_map_userinfo_to_user_retries(self):
+    def test_map_saml_response_to_user_retries(self):
         """The mapping provider can retry generating an MXID if the MXID is already in use."""
         store = self.hs.get_datastore()
         self.get_success(
