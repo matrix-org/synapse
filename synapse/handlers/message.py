@@ -41,6 +41,7 @@ from synapse.api.errors import (
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.api.urls import ConsentURIBuilder
+from synapse.config.api import DEFAULT_ROOM_STATE_TYPES
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext
@@ -1125,6 +1126,13 @@ class EventCreationHandler:
 
                     # TODO: Make sure the signatures actually are correct.
                     event.signatures.update(returned_invite.signatures)
+
+            if event.content["membership"] == Membership.KNOCK:
+                event.unsigned[
+                    "knock_room_state"
+                ] = await self.store.get_stripped_room_state_from_event_context(
+                    context, DEFAULT_ROOM_STATE_TYPES,
+                )
 
         if event.type == EventTypes.Redaction:
             original_event = await self.store.get_event(
