@@ -997,6 +997,9 @@ class AuthHandler(BaseHandler):
             qualified_user_id = UserID(username, self.hs.hostname).to_string()
 
         login_type = login_submission.get("type")
+        # we already checked that we have a valid login type
+        assert isinstance(login_type, str)
+
         known_login_type = False
 
         for provider in self.password_providers:
