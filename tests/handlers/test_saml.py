@@ -14,7 +14,6 @@
 
 import attr
 
-from synapse.handlers.saml_handler import SamlHandler
 from synapse.handlers.sso import MappingException
 
 from tests.unittest import HomeserverTestCase
@@ -63,15 +62,14 @@ class SamlHandlerTestCase(HomeserverTestCase):
         config["saml2_config"] = saml_config
 
         hs = self.setup_test_homeserver(
-            http_client=self.http_client,
-            proxied_http_client=self.http_client,
             config=config,
         )
 
-        self.handler = SamlHandler(hs)
+        self.handler = hs.get_saml_handler()
 
         # Reduce the number of attempts when generating MXIDs.
-        self.handler._sso_handler._MAP_USERNAME_RETRIES = 3
+        sso_handler = hs.get_sso_handler()
+        sso_handler._MAP_USERNAME_RETRIES = 3
 
         return hs
 

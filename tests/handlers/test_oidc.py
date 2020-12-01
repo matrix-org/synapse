@@ -23,7 +23,7 @@ import pymacaroons
 from twisted.python.failure import Failure
 from twisted.web._newclient import ResponseDone
 
-from synapse.handlers.oidc_handler import OidcError, OidcHandler, OidcMappingProvider
+from synapse.handlers.oidc_handler import OidcError, OidcMappingProvider
 from synapse.handlers.sso import MappingException
 from synapse.types import UserID
 
@@ -155,13 +155,14 @@ class OidcHandlerTestCase(HomeserverTestCase):
             config=config,
         )
 
-        self.handler = OidcHandler(hs)
+        self.handler = hs.get_oidc_handler()
+        sso_handler = hs.get_sso_handler()
         # Mock the render error method.
         self.render_error = Mock(return_value=None)
-        self.handler._sso_handler.render_error = self.render_error
+        sso_handler.render_error = self.render_error
 
         # Reduce the number of attempts when generating MXIDs.
-        self.handler._sso_handler._MAP_USERNAME_RETRIES = 3
+        sso_handler._MAP_USERNAME_RETRIES = 3
 
         return hs
 
