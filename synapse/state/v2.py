@@ -19,6 +19,7 @@ import logging
 from typing import (
     Any,
     Callable,
+    Collection,
     Dict,
     Generator,
     Iterable,
@@ -258,16 +259,18 @@ async def _get_auth_chain_difference(
     # we need to manually handle those events.
     #
     # We do this by:
-    #   1. calculating the auth chain difference for the state sets based on the events in `event_map` alone
-    #   2. replacing any events in the state_sets that are also in `event_map` with their auth events
-    #       (recursively), and then calling `store.get_auth_chain_difference` as normal
+    #   1. calculating the auth chain difference for the state sets based on the
+    #      events in `event_map` alone
+    #   2. replacing any events in the state_sets that are also in `event_map`
+    #      with their auth events (recursively), and then calling
+    #      `store.get_auth_chain_difference` as normal
     #   3. adding the results of 1 and 2 together.
 
     # Map from event ID in `event_map` to their auth event IDs, and their auth
     # event IDs if they appear in the `event_map`. This is the intersection of
     # the event's auth chain with the events in the `event_map` *plus* their
     # auth event IDs.
-    events_to_auth_chain = {}
+    events_to_auth_chain = {}  # type: Dict[str, Set[str]]
     for event in event_map.values():
         chain = {event.event_id}
         events_to_auth_chain[event.event_id] = chain
@@ -285,10 +288,15 @@ async def _get_auth_chain_difference(
     #
     # Note: If the `event_map` is empty (which is the common case), we can do a
     # much simpler calculation.
-    difference_from_event_map = set()
     if event_map:
-        state_sets_ids = []
-        unpersisted_set_ids = []
+        # The list of state sets to pass to the store. This is the same as
+        # `state_sets` except with unpersisted events stripped out and replaced
+        # with persisted events in their auth chain.
+        state_sets_ids = []  # type: List[Set[str]]
+
+        # List of sets of the unpersisted event IDs reachable (by their auth
+        # chain) from each state set.
+        unpersisted_set_ids = []  # type: List[Set[str]]
 
         for state_set in state_sets:
             set_ids = set()  # type: Set[str]
@@ -317,8 +325,9 @@ async def _get_auth_chain_difference(
         union = unpersisted_set_ids[0].union(*unpersisted_set_ids[1:])
         intersection = unpersisted_set_ids[0].intersection(*unpersisted_set_ids[1:])
 
-        difference_from_event_map = union - intersection
+        difference_from_event_map = union - intersection  # type: Collection[str]
     else:
+        difference_from_event_map = ()
         state_sets_ids = [set(state_set.values()) for state_set in state_sets]
 
     difference = await state_res_store.get_auth_chain_difference(state_sets_ids)
