@@ -152,9 +152,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.http_client.get_json.side_effect = get_json
         self.http_client.user_agent = "Synapse Test"
 
-        hs = self.setup_test_homeserver(
-            http_client=self.http_client, proxied_http_client=self.http_client,
-        )
+        hs = self.setup_test_homeserver(proxied_http_client=self.http_client)
 
         self.handler = hs.get_oidc_handler()
         sso_handler = hs.get_sso_handler()
