@@ -13,5 +13,5 @@
  * limitations under the License.
  */
 
-INSERT INTO background_updates (update_name, progress_json) VALUES
-  ('e2e_cross_signing_keys_idx', '{}');
+INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
+  (5823, 'e2e_cross_signing_keys_idx', '{}');
