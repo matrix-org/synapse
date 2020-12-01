@@ -15,7 +15,7 @@
 import itertools
 import logging
 from queue import Empty, PriorityQueue
-from typing import Dict, Iterable, List, Set, Tuple
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 from synapse.api.errors import StoreError
 from synapse.events import EventBase
@@ -153,9 +153,125 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
         return await self.db_pool.runInteraction(
             "get_auth_chain_difference",
-            self._get_auth_chain_difference_txn,
+            self._get_auth_chain_difference_using_chains_txn,
             state_sets,
         )
+
+    def _get_auth_chain_difference_using_chains_txn(
+        self, txn, state_sets: List[Set[str]]
+    ) -> Set[str]:
+        """Uses chains dlfks;fk
+        """
+
+        initial_events = set(state_sets[0]).union(*state_sets[1:])
+
+        chain_info = {}
+        chain_to_event = {}
+        seen_chains = set()
+
+        # FIXME: Need to handle chains that point to chains not in state sets
+
+        sql = """
+            SELECT event_id, chain_id, sequence_number
+            FROM event_auth_chains
+            WHERE %s
+        """
+        for batch in batch_iter(initial_events, 1000):
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "event_id", batch
+            )
+            txn.execute(sql % (clause,), args)
+
+            for event_id, chain_id, sequence_number in txn:
+                chain_info[event_id] = (chain_id, sequence_number)
+                seen_chains.add(chain_id)
+                chain_to_event.setdefault(chain_id, {})[sequence_number] = event_id
+
+        set_to_chain = {}
+        for set_id, state_set in enumerate(state_sets):
+            chains = set_to_chain.setdefault(set_id, {})
+            for event_id in state_set:
+                chain_id, seq_no = chain_info[event_id]
+
+                curr = chains.setdefault(chain_id, seq_no)
+                if curr < seq_no:
+                    chains[chain_id] = seq_no
+
+        sql = """
+            SELECT
+                origin_chain_id, origin_sequence_number,
+                target_chain_id, target_sequence_number
+            FROM event_auth_chain_links
+            WHERE %s
+        """
+
+        # chain_links = {}
+        for batch in batch_iter(seen_chains, 1000):
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "origin_chain_id", batch
+            )
+            txn.execute(sql % (clause,), args)
+
+            for (
+                origin_chain_id,
+                origin_sequence_number,
+                target_chain_id,
+                target_sequence_number,
+            ) in txn:
+                # chain_links.setdefault(
+                #     (origin_chain_id, origin_sequence_number), []
+                # ).append((target_chain_id, target_sequence_number))
+
+                # TODO: Handle this case, its valid for it to happen.
+                # DOES THIS WORK?
+                for chains in set_to_chain.values():
+                    if origin_sequence_number <= chains.get(chain_id, 0):
+                        curr = chains.setdefault(
+                            target_chain_id, target_sequence_number
+                        )
+                        if curr < target_sequence_number:
+                            chains[target_chain_id] = target_sequence_number
+
+        result = set()
+
+        chain_to_gap = {}
+        for chain_id in seen_chains:
+            min_seq_no = min(
+                chains.get(chain_id, 0) for chains in set_to_chain.values()
+            )
+
+            max_seq_no = 0
+            for chains in set_to_chain.values():
+                s = chains.get(chain_id)
+                if s:
+                    max_seq_no = max(max_seq_no, s)
+
+            if min_seq_no < max_seq_no:
+                for seq_no in range(min_seq_no + 1, max_seq_no + 1):
+                    event_id = chain_to_event[chain_id].get(seq_no)
+                    if event_id:
+                        result.add(event_id)
+                    else:
+                        chain_to_gap[chain_id] = (min_seq_no, max_seq_no)
+                        break
+
+        sql = """
+            SELECT event_id
+            FROM event_auth_chains AS c, (VALUES ?) AS l(chain_id, min_seq, max_seq)
+            WHERE
+                c.chain_id = l.chain_id
+                AND min_seq < sequence_number AND sequence_number <= max_seq
+        """
+
+        args = [
+            (chain_id, min_no, max_no)
+            for chain_id, (min_no, max_no) in chain_to_gap.items()
+        ]
+
+        rows = txn.execute_values(sql, args, fetch=True)
+        result.update(r for r, in rows)
+
+        return result
 
     def _get_auth_chain_difference_txn(
         self, txn, state_sets: List[Set[str]]
