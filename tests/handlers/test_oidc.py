@@ -832,7 +832,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         # test_user is already taken, so test_user1 gets registered instead.
         self.assertEqual(mxid, "@test_user1:test")
 
-        # Register all of the potential usernames for a particular username.
+        # Register all of the potential mxids for a particular OIDC username.
         self.get_success(
             store.register_user(user_id="@tester:test", password_hash=None)
         )
