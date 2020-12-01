@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from mock import Mock
-
 import attr
 
 from synapse.handlers.saml_handler import SamlHandler
@@ -54,10 +52,6 @@ class TestMappingProvider:
 
 class SamlHandlerTestCase(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
-
-        self.http_client = Mock(spec=["get_json"])
-        self.http_client.user_agent = "Synapse Test"
-
         config = self.default_config()
         config["public_baseurl"] = BASE_URL
         saml_config = {
