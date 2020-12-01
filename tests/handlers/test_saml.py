@@ -50,8 +50,8 @@ class TestMappingProvider:
 
 
 class SamlHandlerTestCase(HomeserverTestCase):
-    def make_homeserver(self, reactor, clock):
-        config = self.default_config()
+    def default_config(self):
+        config = super().default_config()
         config["public_baseurl"] = BASE_URL
         saml_config = {
             "sp_config": {"metadata": {}},
@@ -61,9 +61,10 @@ class SamlHandlerTestCase(HomeserverTestCase):
         }
         config["saml2_config"] = saml_config
 
-        hs = self.setup_test_homeserver(
-            config=config,
-        )
+        return config
+
+    def make_homeserver(self, reactor, clock):
+        hs = self.setup_test_homeserver()
 
         self.handler = hs.get_saml_handler()
 

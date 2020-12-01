@@ -127,13 +127,8 @@ async def get_json(url):
 
 
 class OidcHandlerTestCase(HomeserverTestCase):
-    def make_homeserver(self, reactor, clock):
-
-        self.http_client = Mock(spec=["get_json"])
-        self.http_client.get_json.side_effect = get_json
-        self.http_client.user_agent = "Synapse Test"
-
-        config = self.default_config()
+    def default_config(self):
+        config = super().default_config()
         config["public_baseurl"] = BASE_URL
         oidc_config = {
             "enabled": True,
@@ -149,10 +144,17 @@ class OidcHandlerTestCase(HomeserverTestCase):
         oidc_config.update(config.get("oidc_config", {}))
         config["oidc_config"] = oidc_config
 
+        return config
+
+    def make_homeserver(self, reactor, clock):
+
+        self.http_client = Mock(spec=["get_json"])
+        self.http_client.get_json.side_effect = get_json
+        self.http_client.user_agent = "Synapse Test"
+
         hs = self.setup_test_homeserver(
             http_client=self.http_client,
             proxied_http_client=self.http_client,
-            config=config,
         )
 
         self.handler = hs.get_oidc_handler()
