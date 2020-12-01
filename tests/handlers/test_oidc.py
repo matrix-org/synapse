@@ -153,8 +153,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.http_client.user_agent = "Synapse Test"
 
         hs = self.setup_test_homeserver(
-            http_client=self.http_client,
-            proxied_http_client=self.http_client,
+            http_client=self.http_client, proxied_http_client=self.http_client,
         )
 
         self.handler = hs.get_oidc_handler()
