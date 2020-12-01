@@ -257,10 +257,11 @@ async def _get_auth_chain_difference(
     # previously. This is not the case for any events in the `event_map`, and so
     # we need to manually handle those events.
     #
-    # We do this by calculating the auth chain difference based on events in
-    # `event_map` and adding that to the result from calling
-    # `get_auth_chain_difference` with state sets where we've replaced
-    # references to events in `event_map` with their auth events (recursively).
+    # We do this by:
+    #   1. calculating the auth chain difference for the state sets based on the events in `event_map` alone
+    #   2. replacing any events in the state_sets that are also in `event_map` with their auth events
+    #       (recursively), and then calling `store.get_auth_chain_difference` as normal
+    #   3. adding the results of 1 and 2 together.
 
     # Map from event ID in `event_map` to their auth event IDs, and their auth
     # event IDs if they appear in the `event_map`. This is the intersection of
@@ -300,7 +301,7 @@ async def _get_auth_chain_difference(
                 event_chain = events_to_auth_chain.get(event_id)
                 if event_chain is not None:
                     # We have an event in `event_map`. We add all the auth
-                    # events that it reference's (that aren't also in `event_map`).
+                    # events that it references (that aren't also in `event_map`).
                     set_ids.update(e for e in event_chain if e not in event_map)
 
                     # We also add the full chain of unpersisted event IDs
@@ -311,7 +312,7 @@ async def _get_auth_chain_difference(
                     set_ids.add(event_id)
 
         # The auth chain difference of the unpersisted events of the state sets
-        # is calcualted by taking the difference between the union and
+        # is calculated by taking the difference between the union and
         # intersections.
         union = unpersisted_set_ids[0].union(*unpersisted_set_ids[1:])
         intersection = unpersisted_set_ids[0].intersection(*unpersisted_set_ids[1:])
