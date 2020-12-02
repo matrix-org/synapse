@@ -47,7 +47,7 @@ class FederationConfig(Config):
         self.ip_range_blacklist.update(["0.0.0.0", "::"])
 
         # The federation_ip_range_blacklist is used for backwards-compatibility
-        # and only applies ot federation and identity servers. If it is not given,
+        # and only applies to federation and identity servers. If it is not given,
         # default to ip_range_blacklist.
         federation_ip_range_blacklist = config.get(
             "federation_ip_range_blacklist", ip_range_blacklist
