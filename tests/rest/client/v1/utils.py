@@ -41,14 +41,37 @@ class RestHelper:
     auth_user_id = attr.ib()
 
     def create_room_as(
-        self, room_creator=None, is_public=True, tok=None, expect_code=200,
-    ):
+        self,
+        room_creator: str = None,
+        is_public: bool = True,
+        room_version: str = None,
+        tok: str = None,
+        expect_code: int = 200,
+    ) -> str:
+        """
+        Create a room.
+
+        Args:
+            room_creator: The user ID to create the room with.
+            is_public: If True, the `visibility` parameter will be set to the
+                default (public). Otherwise, the `visibility` parameter will be set
+                to "private".
+            room_version: The room version to create the room as. Defaults to Synapse's
+                default room version.
+            tok: The access token to use in the request.
+            expect_code: The expected HTTP response code.
+
+        Returns:
+            The ID of the newly created room.
+        """
         temp_id = self.auth_user_id
         self.auth_user_id = room_creator
         path = "/_matrix/client/r0/createRoom"
         content = {}
         if not is_public:
             content["visibility"] = "private"
+        if room_version:
+            content["room_version"] = room_version
         if tok:
             path = path + "?access_token=%s" % tok
 

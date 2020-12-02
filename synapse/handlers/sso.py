@@ -116,7 +116,7 @@ class SsoHandler(BaseHandler):
         user_agent: str,
         ip_address: str,
         sso_to_matrix_id_mapper: Callable[[int], Awaitable[UserAttributes]],
-        allow_existing_users: bool = False,
+        grandfather_existing_users: Optional[Callable[[], Awaitable[Optional[str]]]],
     ) -> str:
         """
         Given an SSO ID, retrieve the user ID for it and possibly register the user.
@@ -125,23 +125,16 @@ class SsoHandler(BaseHandler):
         if it has that matrix ID is returned regardless of the current mapping
         logic.
 
+        If a callable is provided for grandfathering users, it is called and can
+        potentially return a matrix ID to use. If it does, the SSO ID is linked to
+        this matrix ID for subsequent calls.
+
         The mapping function is called (potentially multiple times) to generate
         a localpart for the user.
 
         If an unused localpart is generated, the user is registered from the
         given user-agent and IP address and the SSO ID is linked to this matrix
         ID for subsequent calls.
-
-        If allow_existing_users is true the mapping function is only called once
-        and results in:
-
-            1. The use of a previously registered matrix ID. In this case, the
-               SSO ID is linked to the matrix ID. (Note it is possible that
-               other SSO IDs are linked to the same matrix ID.)
-            2. An unused localpart, in which case the user is registered (as
-               discussed above).
-            3. An error if the generated localpart matches multiple pre-existing
-               matrix IDs. Generally this should not happen.
 
         Args:
             auth_provider_id: A unique identifier for this SSO provider, e.g.
@@ -152,8 +145,9 @@ class SsoHandler(BaseHandler):
             sso_to_matrix_id_mapper: A callable to generate the user attributes.
                 The only parameter is an integer which represents the amount of
                 times the returned mxid localpart mapping has failed.
-            allow_existing_users: True if the localpart returned from the
-                mapping provider can be linked to an existing matrix ID.
+            grandfather_existing_users: A callable which can return an previously
+                existing matrix ID. The SSO ID is then linked to the returned
+                matrix ID.
 
         Returns:
              The user ID associated with the SSO response.
@@ -170,6 +164,16 @@ class SsoHandler(BaseHandler):
         )
         if previously_registered_user_id:
             return previously_registered_user_id
+
+        # Check for grandfathering of users.
+        if grandfather_existing_users:
+            previously_registered_user_id = await grandfather_existing_users()
+            if previously_registered_user_id:
+                # Future logins should also match this user ID.
+                await self.store.record_user_external_id(
+                    auth_provider_id, remote_user_id, previously_registered_user_id
+                )
+                return previously_registered_user_id
 
         # Otherwise, generate a new user.
         for i in range(self._MAP_USERNAME_RETRIES):
@@ -194,33 +198,7 @@ class SsoHandler(BaseHandler):
 
             # Check if this mxid already exists
             user_id = UserID(attributes.localpart, self.server_name).to_string()
-            users = await self.store.get_users_by_id_case_insensitive(user_id)
-            # Note, if allow_existing_users is true then the loop is guaranteed
-            # to end on the first iteration: either by matching an existing user,
-            # raising an error, or registering a new user. See the docstring for
-            # more in-depth an explanation.
-            if users and allow_existing_users:
-                # If an existing matrix ID is returned, then use it.
-                if len(users) == 1:
-                    previously_registered_user_id = next(iter(users))
-                elif user_id in users:
-                    previously_registered_user_id = user_id
-                else:
-                    # Do not attempt to continue generating Matrix IDs.
-                    raise MappingException(
-                        "Attempted to login as '{}' but it matches more than one user inexactly: {}".format(
-                            user_id, users
-                        )
-                    )
-
-                # Future logins should also match this user ID.
-                await self.store.record_user_external_id(
-                    auth_provider_id, remote_user_id, previously_registered_user_id
-                )
-
-                return previously_registered_user_id
-
-            elif not users:
+            if not await self.store.get_users_by_id_case_insensitive(user_id):
                 # This mxid is free
                 break
         else:

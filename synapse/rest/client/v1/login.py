@@ -19,10 +19,6 @@ from typing import Awaitable, Callable, Dict, Optional
 from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.appservice import ApplicationService
-from synapse.handlers.auth import (
-    convert_client_dict_legacy_fields_to_identifier,
-    login_id_phone_to_thirdparty,
-)
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
@@ -33,7 +29,6 @@ from synapse.http.site import SynapseRequest
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import JsonDict, UserID
-from synapse.util.threepids import canonicalise_email
 
 logger = logging.getLogger(__name__)
 
@@ -77,11 +72,6 @@ class LoginRestServlet(RestServlet):
             clock=hs.get_clock(),
             rate_hz=self.hs.config.rc_login_account.per_second,
             burst_count=self.hs.config.rc_login_account.burst_count,
-        )
-        self._failed_attempts_ratelimiter = Ratelimiter(
-            clock=hs.get_clock(),
-            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
-            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
         )
 
     def on_GET(self, request: SynapseRequest):
@@ -140,17 +130,6 @@ class LoginRestServlet(RestServlet):
             result["well_known"] = well_known_data
         return 200, result
 
-    def _get_qualified_user_id(self, identifier):
-        if identifier["type"] != "m.id.user":
-            raise SynapseError(400, "Unknown login identifier type")
-        if "user" not in identifier:
-            raise SynapseError(400, "User identifier is missing 'user' key")
-
-        if identifier["user"].startswith("@"):
-            return identifier["user"]
-        else:
-            return UserID(identifier["user"], self.hs.hostname).to_string()
-
     async def _do_appservice_login(
         self, login_submission: JsonDict, appservice: ApplicationService
     ):
@@ -201,91 +180,9 @@ class LoginRestServlet(RestServlet):
             login_submission.get("address"),
             login_submission.get("user"),
         )
-        identifier = convert_client_dict_legacy_fields_to_identifier(login_submission)
-
-        # convert phone type identifiers to generic threepids
-        if identifier["type"] == "m.id.phone":
-            identifier = login_id_phone_to_thirdparty(identifier)
-
-        # convert threepid identifiers to user IDs
-        if identifier["type"] == "m.id.thirdparty":
-            address = identifier.get("address")
-            medium = identifier.get("medium")
-
-            if medium is None or address is None:
-                raise SynapseError(400, "Invalid thirdparty identifier")
-
-            # For emails, canonicalise the address.
-            # We store all email addresses canonicalised in the DB.
-            # (See add_threepid in synapse/handlers/auth.py)
-            if medium == "email":
-                try:
-                    address = canonicalise_email(address)
-                except ValueError as e:
-                    raise SynapseError(400, str(e))
-
-            # We also apply account rate limiting using the 3PID as a key, as
-            # otherwise using 3PID bypasses the ratelimiting based on user ID.
-            self._failed_attempts_ratelimiter.ratelimit((medium, address), update=False)
-
-            # Check for login providers that support 3pid login types
-            (
-                canonical_user_id,
-                callback_3pid,
-            ) = await self.auth_handler.check_password_provider_3pid(
-                medium, address, login_submission["password"]
-            )
-            if canonical_user_id:
-                # Authentication through password provider and 3pid succeeded
-
-                result = await self._complete_login(
-                    canonical_user_id, login_submission, callback_3pid
-                )
-                return result
-
-            # No password providers were able to handle this 3pid
-            # Check local store
-            user_id = await self.hs.get_datastore().get_user_id_by_threepid(
-                medium, address
-            )
-            if not user_id:
-                logger.warning(
-                    "unknown 3pid identifier medium %s, address %r", medium, address
-                )
-                # We mark that we've failed to log in here, as
-                # `check_password_provider_3pid` might have returned `None` due
-                # to an incorrect password, rather than the account not
-                # existing.
-                #
-                # If it returned None but the 3PID was bound then we won't hit
-                # this code path, which is fine as then the per-user ratelimit
-                # will kick in below.
-                self._failed_attempts_ratelimiter.can_do_action((medium, address))
-                raise LoginError(403, "", errcode=Codes.FORBIDDEN)
-
-            identifier = {"type": "m.id.user", "user": user_id}
-
-        # by this point, the identifier should be an m.id.user: if it's anything
-        # else, we haven't understood it.
-        qualified_user_id = self._get_qualified_user_id(identifier)
-
-        # Check if we've hit the failed ratelimit (but don't update it)
-        self._failed_attempts_ratelimiter.ratelimit(
-            qualified_user_id.lower(), update=False
+        canonical_user_id, callback = await self.auth_handler.validate_login(
+            login_submission, ratelimit=True
         )
-
-        try:
-            canonical_user_id, callback = await self.auth_handler.validate_login(
-                identifier["user"], login_submission
-            )
-        except LoginError:
-            # The user has failed to log in, so we need to update the rate
-            # limiter. Using `can_do_action` avoids us raising a ratelimit
-            # exception and masking the LoginError. The actual ratelimiting
-            # should have happened above.
-            self._failed_attempts_ratelimiter.can_do_action(qualified_user_id.lower())
-            raise
-
         result = await self._complete_login(
             canonical_user_id, login_submission, callback
         )
