@@ -288,13 +288,16 @@ async def _get_auth_chain_difference(
     # Note: If the `event_map` is empty (which is the common case), we can do a
     # much simpler calculation.
     if event_map:
-        # The list of state sets to pass to the store. This is the same as
-        # `state_sets` except with unpersisted events stripped out and replaced
-        # with persisted events in their auth chain.
+        # The list of state sets to pass to the store, where each state set is a set
+        # of the event ids making up the state. This is similar to `state_sets`,
+        # except that (a) we only have event ids, not the complete
+        # ((type, state_key)->event_id) mappings; and (b) we have stripped out
+        # unpersisted events and replaced them with the persisted events in 
+        # their auth chain.
         state_sets_ids = []  # type: List[Set[str]]
 
-        # List of sets of the unpersisted event IDs reachable (by their auth
-        # chain) from each state set.
+        # For each state set, the unpersisted event IDs reachable (by their auth
+        # chain) from the events in that set.
         unpersisted_set_ids = []  # type: List[Set[str]]
 
         for state_set in state_sets:
