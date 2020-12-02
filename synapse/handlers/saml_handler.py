@@ -265,7 +265,7 @@ class SamlHandler(BaseHandler):
             return UserAttributes(
                 localpart=result.get("mxid_localpart"),
                 display_name=result.get("displayname"),
-                emails=result.get("emails"),
+                emails=result.get("emails", []),
             )
 
         with (await self._mapping_lock.queue(self._auth_provider_id)):
