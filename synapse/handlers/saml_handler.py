@@ -268,7 +268,7 @@ class SamlHandler(BaseHandler):
                 emails=result.get("emails", []),
             )
 
-        with (await self._mapping_lock.queue(self._auth_provider_id)):
+        async def grandfather_existing_users() -> Optional[str]:
             # backwards-compatibility hack: see if there is an existing user with a
             # suitable mapping from the uid
             if (
@@ -290,17 +290,18 @@ class SamlHandler(BaseHandler):
                 if users:
                     registered_user_id = list(users.keys())[0]
                     logger.info("Grandfathering mapping to %s", registered_user_id)
-                    await self.store.record_user_external_id(
-                        self._auth_provider_id, remote_user_id, registered_user_id
-                    )
                     return registered_user_id
 
+            return None
+
+        with (await self._mapping_lock.queue(self._auth_provider_id)):
             return await self._sso_handler.get_mxid_from_sso(
                 self._auth_provider_id,
                 remote_user_id,
                 user_agent,
                 ip_address,
                 saml_response_to_remapped_user_attributes,
+                grandfather_existing_users,
             )
 
     def expire_sessions(self):
