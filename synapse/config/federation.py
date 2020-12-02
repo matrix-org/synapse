@@ -88,8 +88,8 @@ class FederationConfig(Config):
         # CIDR ranges. If this option is not specified, or specified with an empty list,
         # no IP range blacklist will be enforced.
         #
-        # The outbound requests for federation, identity servers, push servers, and for
-        # checking key validitity for third-party invite events
+        # The blacklist applies to the outbound requests for federation, identity servers,
+        # push servers, and for checking key validitity for third-party invite events.
         #
         # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
         # listed here, since they correspond to unroutable addresses.)
