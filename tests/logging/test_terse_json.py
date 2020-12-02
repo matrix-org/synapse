@@ -18,6 +18,7 @@ import logging
 from io import StringIO
 
 from synapse.logging._terse_json import JsonFormatter, TerseJsonFormatter
+from synapse.logging.context import LoggingContext, LoggingContextFilter
 
 from tests.logging import LoggerCleanupMixin
 from tests.unittest import TestCase
@@ -109,3 +110,31 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         ]
         self.assertCountEqual(log.keys(), expected_log_keys)
         self.assertEqual(log["log"], "Hello there, wally!")
+
+    def test_with_context(self):
+        """
+        The logging context should be added to the JSON response.
+        """
+        handler = logging.StreamHandler(self.output)
+        handler.setFormatter(JsonFormatter())
+        handler.addFilter(LoggingContextFilter(request=""))
+        logger = self.get_logger(handler)
+
+        with LoggingContext() as context_one:
+            context_one.request = "test"
+            logger.info("Hello there, %s!", "wally")
+
+        log = self.get_log_line()
+
+        # The terse logger should give us these keys.
+        expected_log_keys = [
+            "log",
+            "level",
+            "namespace",
+            "request",
+            "scope",
+        ]
+        self.assertCountEqual(log.keys(), expected_log_keys)
+        self.assertEqual(log["log"], "Hello there, wally!")
+        self.assertEqual(log["request"], "test")
+        self.assertIsNone(log["scope"])
