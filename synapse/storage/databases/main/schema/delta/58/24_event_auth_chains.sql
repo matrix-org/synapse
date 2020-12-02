@@ -34,3 +34,11 @@ CREATE TABLE event_auth_chain_links (
 
 
 CREATE INDEX ON event_auth_chain_links (origin_chain_id, target_chain_id);
+
+
+-- List of rooms that we haven't calculated the above index for
+CREATE TABLE rooms_without_auth_chains_calculated (
+  room_id TEXT PRIMARY KEY,
+);
+
+INSERT INTO rooms_without_auth_chains_calculated (room_id) SELECT room_id FROM rooms;

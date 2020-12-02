@@ -425,6 +425,8 @@ class PersistEventsStore:
         # persisting. We ignore out of band memberships as we're not in the room
         # and won't have their auth chain (we'll fix it up later if we join the
         # room).
+        #
+        # See: docs/auth_chain_difference_algorithm.md
         event_ids = {event.event_id for event in events}
         state_events = [
             event

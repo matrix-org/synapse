@@ -160,7 +160,9 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
     def _get_auth_chain_difference_using_chains_txn(
         self, txn, state_sets: List[Set[str]]
     ) -> Set[str]:
-        """Uses chains dlfks;fk
+        """Calculates the auth chain difference using the chain index.
+
+        See docs/auth_chain_difference_algorithm.md for details
         """
 
         initial_events = set(state_sets[0]).union(*state_sets[1:])
