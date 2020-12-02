@@ -1462,7 +1462,7 @@ def register_servlets(hs, resource, authenticator, ratelimiter, servlet_groups=N
 
     Args:
         hs (synapse.server.HomeServer): homeserver
-        resource (TransportLayerServer): resource class to register to
+        resource (JsonResource): resource class to register to
         authenticator (Authenticator): authenticator to use
         ratelimiter (util.ratelimitutils.FederationRateLimiter): ratelimiter to use
         servlet_groups (list[str], optional): List of servlet groups to register.
