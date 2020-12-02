@@ -642,17 +642,19 @@ acme:
 #  - nyc.example.com
 #  - syd.example.com
 
-# Prevent federation requests from being sent to the following
-# blacklist IP address CIDR ranges. If this option is not specified, or
-# specified with an empty list, no ip range blacklist will be enforced.
+# Prevent outgoing requests from being sent to the following blacklisted IP address
+# CIDR ranges. If this option is not specified, or specified with an empty list,
+# no IP range blacklist will be enforced.
 #
-# As of Synapse v1.4.0 this option also affects any outbound requests to identity
-# servers provided by user input.
+# The blacklist applies to the outbound requests for federation, identity servers,
+# push servers, and for checking key validitity for third-party invite events.
 #
 # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
 # listed here, since they correspond to unroutable addresses.)
 #
-federation_ip_range_blacklist:
+# This option replaces federation_ip_range_blacklist in Synapse v1.24.0.
+#
+ip_range_blacklist:
   - '127.0.0.0/8'
   - '10.0.0.0/8'
   - '172.16.0.0/12'

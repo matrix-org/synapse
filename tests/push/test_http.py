@@ -49,7 +49,9 @@ class HTTPPusherTests(HomeserverTestCase):
         config = self.default_config()
         config["start_pushers"] = True
 
-        hs = self.setup_test_homeserver(config=config, proxied_http_client=m)
+        hs = self.setup_test_homeserver(
+            config=config, proxied_blacklisted_http_client=m
+        )
 
         return hs
 
