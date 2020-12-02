@@ -33,9 +33,10 @@ from synapse.storage._base import db_to_json, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.search import SearchEntry
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
+from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import StateMap, get_domain_from_id
 from synapse.util import json_encoder
-from synapse.util.iterutils import batch_iter
+from synapse.util.iterutils import batch_iter, sorted_topologically
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -88,6 +89,14 @@ class PersistEventsStore:
         self.database_engine = db.engine
         self._clock = hs.get_clock()
         self._instance_name = hs.get_instance_name()
+
+        def get_chain_id_txn(txn):
+            txn.execute("SELECT COALESCE(max(chain_id), 0) FROM event_auth_chains")
+            return txn.fetchone()[0]
+
+        self._event_chain_id_gen = build_sequence_generator(
+            db.engine, get_chain_id_txn, "event_auth_chain_id"
+        )
 
         self._ephemeral_messages_enabled = hs.config.enable_ephemeral_messages
         self.is_mine_id = hs.is_mine_id
@@ -366,26 +375,7 @@ class PersistEventsStore:
         # Insert into event_to_state_groups.
         self._store_event_state_mappings_txn(txn, events_and_contexts)
 
-        # We want to store event_auth mappings for rejected events, as they're
-        # used in state res v2.
-        # This is only necessary if the rejected event appears in an accepted
-        # event's auth chain, but its easier for now just to store them (and
-        # it doesn't take much storage compared to storing the entire event
-        # anyway).
-        self.db_pool.simple_insert_many_txn(
-            txn,
-            table="event_auth",
-            values=[
-                {
-                    "event_id": event.event_id,
-                    "room_id": event.room_id,
-                    "auth_id": auth_id,
-                }
-                for event, _ in events_and_contexts
-                for auth_id in event.auth_event_ids()
-                if event.is_state()
-            ],
-        )
+        self._persist_event_auth_chain_txn(txn, [e for e, _ in events_and_contexts])
 
         # _store_rejected_events_txn filters out any events which were
         # rejected, and returns the filtered list.
@@ -406,6 +396,314 @@ class PersistEventsStore:
         # We call this last as it assumes we've inserted the events into
         # room_memberships, where applicable.
         self._update_current_state_txn(txn, state_delta_for_room, min_stream_order)
+
+    def _persist_event_auth_chain_txn(
+        self, txn: LoggingTransaction, events: List[EventBase],
+    ):
+        # We want to store event_auth mappings for rejected events, as they're
+        # used in state res v2.
+        # This is only necessary if the rejected event appears in an accepted
+        # event's auth chain, but its easier for now just to store them (and
+        # it doesn't take much storage compared to storing the entire event
+        # anyway).
+        self.db_pool.simple_insert_many_txn(
+            txn,
+            table="event_auth",
+            values=[
+                {
+                    "event_id": event.event_id,
+                    "room_id": event.room_id,
+                    "auth_id": auth_id,
+                }
+                for event in events
+                for auth_id in event.auth_event_ids()
+                if event.is_state()
+            ],
+        )
+
+        # We now calculate chain ID/sequence numbers for any state events we're
+        # persisting. We ignore out of band memberships as we're not in the room
+        # and won't have their auth chain (we'll fix it up later if we join the
+        # room).
+        event_ids = {event.event_id for event in events}
+        state_events = [
+            event
+            for event in events
+            if event.is_state()
+            and not event.internal_metadata.is_out_of_band_membership()
+        ]
+        if state_events:
+            chain_map = {}
+            new_chains = {}
+
+            event_to_types = {e.event_id: (e.type, e.state_key) for e in state_events}
+            events_to_calc_chain_id_for = set(event_to_types)
+            event_to_auth_chain = {e.event_id: e.auth_event_ids() for e in state_events}
+
+            # First we get the chain ID and sequence numbers for the events'
+            # auth events (that aren't also currently being persisted).
+            #
+            # Note that there there is an edge case here where we might not have
+            # calculated chains and sequence numbers for events that were "out
+            # of band". We handle this case by fetching the necessary info and
+            # adding it to the set of events to calculate chain IDs for.
+
+            missing_auth_chains = {
+                a_id
+                for e in state_events
+                for a_id in e.auth_event_ids()
+                if a_id not in event_ids
+            }
+
+            # We loop here in case we find an out of band membership and need to
+            # fetch their auth event info.
+            while missing_auth_chains:
+                sql = """
+                    SELECT event_id, events.type, state_key, chain_id, sequence_number
+                    FROM events
+                    INNER JOIN state_events USING (event_id)
+                    LEFT JOIN event_auth_chains USING (event_id)
+                    WHERE
+                """
+                clause, args = make_in_list_sql_clause(
+                    txn.database_engine, "event_id", missing_auth_chains,
+                )
+                txn.execute(sql + clause, args)
+
+                missing_auth_chains.clear()
+
+                for auth_id, etype, state_key, chain_id, sequence_number in txn:
+                    event_to_types[auth_id] = (etype, state_key)
+
+                    if chain_id is None:
+                        # No chain ID, so the event was persisted out of band.
+                        # We add to list of events to calculate auth chains for.
+
+                        events_to_calc_chain_id_for.add(auth_id)
+
+                        event_to_auth_chain[
+                            auth_id
+                        ] = self.db_pool.simple_select_onecol_txn(
+                            txn,
+                            "event_auth",
+                            keyvalues={"event_id": auth_id},
+                            retcol="auth_id",
+                        )
+
+                        missing_auth_chains.update(
+                            e
+                            for e in event_to_auth_chain[auth_id]
+                            if e not in event_to_types
+                        )
+                    else:
+                        chain_map[auth_id] = (chain_id, sequence_number)
+
+            # We now calculate the chain IDs/sequence numbers for the events. We
+            # do this by looking at the chain ID and sequence number of any auth
+            # event with the same type/state_key and incrementing the sequence
+            # number by one. If there was no match or the chain ID/sequence
+            # number is already taken we generate a new chain.
+            #
+            # We need to do this in a topologically sorted order as we want to
+            # generate chain IDs/sequence numbers of an event's auth events
+            # before the event itself.
+            for event_id in sorted_topologically(
+                events_to_calc_chain_id_for, event_to_auth_chain
+            ):
+                existing_chain_id = None
+                for auth_id in event_to_auth_chain[event_id]:
+                    if event_to_types.get(event_id) == event_to_types.get(auth_id):
+                        existing_chain_id = chain_map[auth_id]
+
+                new_chain_id = None
+                if existing_chain_id:
+                    # We found a chain ID/sequence number candidate, check its
+                    # not already taken.
+                    row = self.db_pool.simple_select_one_onecol_txn(
+                        txn,
+                        table="event_auth_chains",
+                        keyvalues={
+                            "chain_id": existing_chain_id[0],
+                            "sequence_number": existing_chain_id[1] + 1,
+                        },
+                        retcol="event_id",
+                        allow_none=True,
+                    )
+                    if not row:
+                        new_chain_id = (existing_chain_id[0], existing_chain_id[1] + 1)
+
+                if not new_chain_id:
+                    new_chain_id = (self._event_chain_id_gen.get_next_id_txn(txn), 1)
+
+                chain_map[event_id] = new_chain_id
+                new_chains[event_id] = new_chain_id
+
+            self.db_pool.simple_insert_many_txn(
+                txn,
+                table="event_auth_chains",
+                values=[
+                    {"event_id": event_id, "chain_id": c_id, "sequence_number": seq}
+                    for event_id, (c_id, seq) in new_chains.items()
+                ],
+            )
+
+            # Now we need to calculate any new links between chains caused by
+            # the new events.
+            #
+            # Links are pairs of chain ID/sequence numbers such that for any
+            # event A (CA, SA) and any event B (CB, SB), B is in A's auth chain
+            # if and only if there is at least one link (CA, S1) -> (CB, S2)
+            # where SA >= S1 and S2 >= SB.
+            #
+            # We try and avoid adding redundant links to the table, e.g. if we
+            # have two links between two chains which both start/end at the
+            # sequence number event (or cross) then one can be safely dropped.
+            #
+            # To calculate new links we look at every new event and:
+            #   1. Fetch the chain ID/sequence numbers of its auth events,
+            #      discarding any that are reachable by other auth events, or
+            #      that have the same chain ID as the event.
+            #   2. For each retained auth event we:
+            #       1. propose adding a link from the event's to the auth
+            #          event's chain ID/sequence number; and
+            #       2. propose adding a link from the event to every chain
+            #          reachable by the auth event.
+            #   3. Filter redundant links from the list of proposed links.
+            #   4. Persist the new links
+            #
+
+            # Step 1, fetch all existing links
+            chain_links = {}  # type: Dict[Tuple[int, int], Set[Tuple[int, int]]]
+            rows = self.db_pool.simple_select_many_txn(
+                txn,
+                table="event_auth_chain_links",
+                column="origin_chain_id",
+                iterable={chain_id for chain_id, _ in chain_map.values()},
+                keyvalues={},
+                retcols=(
+                    "origin_chain_id",
+                    "origin_sequence_number",
+                    "target_chain_id",
+                    "target_sequence_number",
+                ),
+            )
+            for row in rows:
+                chain_links.setdefault(
+                    (row["origin_chain_id"], row["target_chain_id"]), set()
+                ).add((row["origin_sequence_number"], row["target_sequence_number"]),)
+
+            to_add = {}  # type: Dict[Tuple[int, int], Set[Tuple[int, int]]]
+            for event_id in events_to_calc_chain_id_for:
+                chain_id, sequence_number = chain_map[event_id]
+
+                # Filter out auth events that are reachable by other auth
+                # events. We do this by looking at every permutation of pairs of
+                # auth events (A, B) to check if B is reachable from B.
+                reduction = set(event_to_auth_chain[event_id])
+                for start_auth_id, end_auth_id in itertools.permutations(
+                    [
+                        auth_id
+                        for auth_id in event_to_auth_chain[event_id]
+                        if auth_id in chain_map
+                    ],
+                    r=2,
+                ):
+                    source_chain_id, source_seq_no = chain_map[start_auth_id]
+                    target_chain_id, target_seq_no = chain_map[end_auth_id]
+
+                    if source_chain_id == chain_id:
+                        # Discard auth events with in same chain.
+                        reduction.discard(start_auth_id)
+
+                    links = chain_links.get((source_chain_id, target_chain_id), set())
+                    for link_start_seq, link_end_seq in links:
+                        if (
+                            link_start_seq <= source_seq_no
+                            and target_seq_no <= link_end_seq
+                        ):
+                            reduction.discard(end_auth_id)
+                            break
+
+                # Step 2, figure out what the new links are from the reduced
+                # list of auth events.
+                for auth_id in reduction:
+                    auth_chain_id, auth_sequence_number = chain_map[auth_id]
+
+                    # Step 2a, add link from event -> auth event
+                    links = chain_links.setdefault((chain_id, auth_chain_id), set())
+                    links.add((sequence_number, auth_sequence_number))
+
+                    # Step 2b, lookup up all links from auth events and add them
+                    # as links from the event.
+                    for (source_id, target_id), auth_links in chain_links.items():
+                        if source_id != auth_chain_id or target_id == chain_id:
+                            continue
+
+                        for (source_seq, target_seq) in auth_links:
+                            if source_seq <= auth_sequence_number:
+                                to_add.setdefault((chain_id, target_id), set()).add(
+                                    (sequence_number, target_seq)
+                                )
+
+                    for key, values in to_add.items():
+                        chain_links.setdefault(key, set()).update(values)
+
+            # Step 3, filter out redundant links.
+            #
+            # We do this by comparing a proposed link with all existing links
+            # and other proposed links.
+            #
+            # Note: new links won't cause existing links in the DB to become
+            # redundant, as new links must start at newly persisted events
+            # (which won't be reachable by any existing events).
+            filtered_links = {}  # type: Dict[Tuple[int, int], Set[Tuple[int, int]]]
+            for ((source_chain, target_chain), links) in to_add.items():
+                filtered_chain_links = filtered_links.setdefault(
+                    (source_chain, target_chain), set()
+                )
+                for link_to_add in links:
+                    for existing_link in chain_links[(source_chain, target_chain)]:
+                        # If a link "crosses" another link then its redundant.
+                        # For example in the following link 1 (L1) is redundant,
+                        # as any event reachable via L1 is *also* reachable via
+                        # L2.
+                        #
+                        #   Chain A     Chain B
+                        #      |          |
+                        #   L1 |------    |
+                        #      |     |    |
+                        #   L2 |---- | -->|
+                        #      |     |    |
+                        #      |     |--->|
+                        #      |          |
+                        #      |          |
+                        #
+                        # So we only need to keep links which *do not* cross,
+                        # i.e. links that both start and end above or below an
+                        # existing link.
+                        if (
+                            link_to_add[0] < existing_link[0]
+                            and link_to_add[1] < existing_link[1]
+                        ) or (
+                            link_to_add[0] > existing_link[0]
+                            and link_to_add[1] > existing_link[1]
+                        ):
+                            filtered_chain_links.add(link_to_add)
+
+            self.db_pool.simple_insert_many_txn(
+                txn,
+                table="event_auth_chain_links",
+                values=[
+                    {
+                        "origin_chain_id": source_id,
+                        "origin_sequence_number": target_id,
+                        "target_chain_id": source_seq,
+                        "target_sequence_number": target_seq,
+                    }
+                    for (source_id, target_id), sequences in filtered_links.items()
+                    for source_seq, target_seq in sequences
+                ],
+            )
 
     def _persist_transaction_ids_txn(
         self,
