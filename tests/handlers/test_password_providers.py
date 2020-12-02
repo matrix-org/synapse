@@ -266,8 +266,9 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         # first delete should give a 401
         channel = self._delete_device(tok1, "dev2")
         self.assertEqual(channel.code, 401)
-        # there are no valid flows here!
-        self.assertEqual(channel.json_body["flows"], [])
+        # m.login.password UIA is permitted because the auth provider allows it,
+        # even though the localdb does not.
+        self.assertEqual(channel.json_body["flows"], [{"stages": ["m.login.password"]}])
         session = channel.json_body["session"]
         mock_password_provider.check_password.assert_not_called()
 
