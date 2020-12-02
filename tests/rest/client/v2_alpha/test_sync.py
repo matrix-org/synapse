@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+from collections import OrderedDict
 
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
@@ -364,35 +365,50 @@ class SyncKnockTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.room_state = {
-            # We need to set the room's join rules to allow knocking
-            EventTypes.JoinRules: {
-                "content": {"join_rule": "xyz.amorgan.knock"},
-                "state_key": "",
-            },
-            # The rest are state events that are recommended to strip and send to clients
-            EventTypes.Name: {"content": {"name": "A cool room"}, "state_key": ""},
-            EventTypes.RoomAvatar: {
-                "content": {
-                    "info": {
-                        "h": 398,
-                        "mimetype": "image/jpeg",
-                        "size": 31037,
-                        "w": 394,
+        # We use an OrderedDict here to ensure that the knock membership appears last
+        self.room_state = OrderedDict(
+            [
+                # We need to set the room's join rules to allow knocking
+                (
+                    EventTypes.JoinRules,
+                    {"content": {"join_rule": "xyz.amorgan.knock"}, "state_key": ""},
+                ),
+                # The rest are state events that are recommended to strip and send to clients
+                (
+                    EventTypes.Name,
+                    {"content": {"name": "A cool room"}, "state_key": ""},
+                ),
+                (
+                    EventTypes.RoomAvatar,
+                    {
+                        "content": {
+                            "info": {
+                                "h": 398,
+                                "mimetype": "image/jpeg",
+                                "size": 31037,
+                                "w": 394,
+                            },
+                            "url": "mxc://example.org/JWEIFJgwEIhweiWJE",
+                        },
+                        "state_key": "",
                     },
-                    "url": "mxc://example.org/JWEIFJgwEIhweiWJE",
-                },
-                "state_key": "",
-            },
-            EventTypes.RoomEncryption: {
-                "content": {"algorithm": "m.megolm.v1.aes-sha2"},
-                "state_key": "",
-            },
-            EventTypes.CanonicalAlias: {
-                "content": {"alias": canonical_alias, "alt_aliases": []},
-                "state_key": "",
-            },
-        }
+                ),
+                (
+                    EventTypes.RoomEncryption,
+                    {
+                        "content": {"algorithm": "m.megolm.v1.aes-sha2"},
+                        "state_key": "",
+                    },
+                ),
+                (
+                    EventTypes.CanonicalAlias,
+                    {
+                        "content": {"alias": canonical_alias, "alt_aliases": []},
+                        "state_key": "",
+                    },
+                ),
+            ]
+        )
 
         for event_type, event in self.room_state.items():
             self.helper.send_state(
@@ -451,6 +467,9 @@ class SyncKnockTestCase(unittest.HomeserverTestCase):
 
         # Check that all expected state events were accounted for
         self.assertEqual(len(self.room_state), 0)
+
+        # Ensure that the knock membership event came last
+        self.assertEqual(room_state_events[-1]["type"], EventTypes.Member)
 
 
 class UnreadMessagesTestCase(unittest.HomeserverTestCase):
