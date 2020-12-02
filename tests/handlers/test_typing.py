@@ -21,12 +21,13 @@ from mock import ANY, Mock, call
 from twisted.internet import defer
 
 from synapse.api.errors import AuthError
+from synapse.federation.transport import server as federation_server
 from synapse.types import UserID, create_requester
+from synapse.util.ratelimitutils import FederationRateLimiter
 
 from tests import unittest
 from tests.test_utils import make_awaitable
 from tests.unittest import override_config
-from tests.utils import register_federation_servlets
 
 # Some local users to test with
 U_APPLE = UserID.from_string("@apple:test")
@@ -50,6 +51,17 @@ def _expect_edu_transaction(edu_type, content, origin="test"):
 
 def _make_edu_transaction_json(edu_type, content):
     return json.dumps(_expect_edu_transaction(edu_type, content)).encode("utf8")
+
+
+def register_federation_servlets(hs, resource):
+    federation_server.register_servlets(
+        hs,
+        resource=resource,
+        authenticator=federation_server.Authenticator(hs),
+        ratelimiter=FederationRateLimiter(
+            hs.get_clock(), config=hs.config.rc_federation
+        ),
+    )
 
 
 class TypingNotificationsTestCase(unittest.HomeserverTestCase):
