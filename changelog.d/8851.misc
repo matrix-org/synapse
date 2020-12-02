@@ -1,0 +1,1 @@
+Simplify the way the `HomeServer` object caches its internal attributes.

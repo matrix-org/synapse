@@ -271,7 +271,7 @@ def setup_test_homeserver(
 
     # Install @cache_in_self attributes
     for key, val in kwargs.items():
-        setattr(hs, key, val)
+        setattr(hs, "_" + key, val)
 
     # Mock TLS
     hs.tls_server_context_factory = Mock()

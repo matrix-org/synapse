@@ -33,12 +33,15 @@ class PresenceTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
 
-        hs = self.setup_test_homeserver(
-            "red", http_client=None, federation_client=Mock()
-        )
+        presence_handler = Mock()
+        presence_handler.set_state.return_value = defer.succeed(None)
 
-        hs.presence_handler = Mock()
-        hs.presence_handler.set_state.return_value = defer.succeed(None)
+        hs = self.setup_test_homeserver(
+            "red",
+            http_client=None,
+            federation_client=Mock(),
+            presence_handler=presence_handler,
+        )
 
         return hs
 
@@ -55,7 +58,7 @@ class PresenceTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(channel.code, 200)
-        self.assertEqual(self.hs.presence_handler.set_state.call_count, 1)
+        self.assertEqual(self.hs.get_presence_handler().set_state.call_count, 1)
 
     def test_put_presence_disabled(self):
         """
@@ -70,4 +73,4 @@ class PresenceTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(channel.code, 200)
-        self.assertEqual(self.hs.presence_handler.set_state.call_count, 0)
+        self.assertEqual(self.hs.get_presence_handler().set_state.call_count, 0)

@@ -78,7 +78,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         self.worker_hs.get_datastore().db_pool = hs.get_datastore().db_pool
 
         self.test_handler = self._build_replication_data_handler()
-        self.worker_hs.replication_data_handler = self.test_handler
+        self.worker_hs._replication_data_handler = self.test_handler
 
         repl_handler = ReplicationCommandHandler(self.worker_hs)
         self.client = ClientReplicationStreamProtocol(
