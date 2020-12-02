@@ -450,9 +450,7 @@ class SyncKnockTestCase(unittest.HomeserverTestCase):
                 )
 
             # Check the state content matches
-            self.assertDictEqual(
-                self.room_state[event_type]["content"], event["content"]
-            )
+            self.assertEquals(self.room_state[event_type]["content"], event["content"])
 
             # Check the state key is correct
             self.assertEqual(
