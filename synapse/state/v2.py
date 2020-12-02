@@ -292,7 +292,7 @@ async def _get_auth_chain_difference(
         # of the event ids making up the state. This is similar to `state_sets`,
         # except that (a) we only have event ids, not the complete
         # ((type, state_key)->event_id) mappings; and (b) we have stripped out
-        # unpersisted events and replaced them with the persisted events in 
+        # unpersisted events and replaced them with the persisted events in
         # their auth chain.
         state_sets_ids = []  # type: List[Set[str]]
 
