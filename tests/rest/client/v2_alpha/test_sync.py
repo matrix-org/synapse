@@ -443,11 +443,7 @@ class SyncKnockTestCase(unittest.HomeserverTestCase):
         room_state_events = knock_entry[self.room_id]["knock_state"]["events"]
         for event in room_state_events:
             event_type = event["type"]
-            if event_type not in self.room_state:
-                raise Exception(
-                    "Unexpected room state type '%s' in knock sync result"
-                    % (event_type,)
-                )
+            self.assertIn(event_type, self.room_state)
 
             # Check the state content matches
             self.assertEquals(self.room_state[event_type]["content"], event["content"])
