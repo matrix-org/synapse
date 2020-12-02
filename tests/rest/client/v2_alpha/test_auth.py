@@ -38,11 +38,6 @@ class DummyRecaptchaChecker(UserInteractiveAuthChecker):
         return succeed(True)
 
 
-class DummyPasswordChecker(UserInteractiveAuthChecker):
-    def check_auth(self, authdict, clientip):
-        return succeed(authdict["identifier"]["user"])
-
-
 class FallbackAuthTests(unittest.HomeserverTestCase):
 
     servlets = [
@@ -162,9 +157,6 @@ class UIAuthTests(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        auth_handler = hs.get_auth_handler()
-        auth_handler.checkers[LoginType.PASSWORD] = DummyPasswordChecker(hs)
-
         self.user_pass = "pass"
         self.user = self.register_user("test", self.user_pass)
         self.user_tok = self.login("test", self.user_pass)
@@ -228,6 +220,31 @@ class UIAuthTests(unittest.HomeserverTestCase):
                 "auth": {
                     "type": "m.login.password",
                     "identifier": {"type": "m.id.user", "user": self.user},
+                    "password": self.user_pass,
+                    "session": session,
+                },
+            },
+        )
+
+    def test_grandfathered_identifier(self):
+        """Check behaviour without "identifier" dict
+
+        Synapse used to require clients to submit a "user" field for m.login.password
+        UIA - check that still works.
+        """
+
+        device_id = self.get_device_ids()[0]
+        channel = self.delete_device(device_id, 401)
+        session = channel.json_body["session"]
+
+        # Make another request providing the UI auth flow.
+        self.delete_device(
+            device_id,
+            200,
+            {
+                "auth": {
+                    "type": "m.login.password",
+                    "user": self.user,
                     "password": self.user_pass,
                     "session": session,
                 },

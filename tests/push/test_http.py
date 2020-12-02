@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from mock import Mock
 
 from twisted.internet.defer import Deferred
@@ -20,8 +19,9 @@ from twisted.internet.defer import Deferred
 import synapse.rest.admin
 from synapse.logging.context import make_deferred_yieldable
 from synapse.rest.client.v1 import login, room
+from synapse.rest.client.v2_alpha import receipts
 
-from tests.unittest import HomeserverTestCase
+from tests.unittest import HomeserverTestCase, override_config
 
 
 class HTTPPusherTests(HomeserverTestCase):
@@ -29,6 +29,7 @@ class HTTPPusherTests(HomeserverTestCase):
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,
+        receipts.register_servlets,
     ]
     user_id = True
     hijack_auth = False
@@ -499,3 +500,161 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # check that this is low-priority
         self.assertEqual(self.push_attempts[1][2]["notification"]["prio"], "low")
+
+    def test_push_unread_count_group_by_room(self):
+        """
+        The HTTP pusher will group unread count by number of unread rooms.
+        """
+        # Carry out common push count tests and setup
+        self._test_push_unread_count()
+
+        # Carry out our option-value specific test
+        #
+        # This push should still only contain an unread count of 1 (for 1 unread room)
+        self.assertEqual(
+            self.push_attempts[5][2]["notification"]["counts"]["unread"], 1
+        )
+
+    @override_config({"push": {"group_unread_count_by_room": False}})
+    def test_push_unread_count_message_count(self):
+        """
+        The HTTP pusher will send the total unread message count.
+        """
+        # Carry out common push count tests and setup
+        self._test_push_unread_count()
+
+        # Carry out our option-value specific test
+        #
+        # We're counting every unread message, so there should now be 4 since the
+        # last read receipt
+        self.assertEqual(
+            self.push_attempts[5][2]["notification"]["counts"]["unread"], 4
+        )
+
+    def _test_push_unread_count(self):
+        """
+        Tests that the correct unread count appears in sent push notifications
+
+        Note that:
+        * Sending messages will cause push notifications to go out to relevant users
+        * Sending a read receipt will cause a "badge update" notification to go out to
+          the user that sent the receipt
+        """
+        # Register the user who gets notified
+        user_id = self.register_user("user", "pass")
+        access_token = self.login("user", "pass")
+
+        # Register the user who sends the message
+        other_user_id = self.register_user("other_user", "pass")
+        other_access_token = self.login("other_user", "pass")
+
+        # Create a room (as other_user)
+        room_id = self.helper.create_room_as(other_user_id, tok=other_access_token)
+
+        # The user to get notified joins
+        self.helper.join(room=room_id, user=user_id, tok=access_token)
+
+        # Register the pusher
+        user_tuple = self.get_success(
+            self.hs.get_datastore().get_user_by_access_token(access_token)
+        )
+        token_id = user_tuple.token_id
+
+        self.get_success(
+            self.hs.get_pusherpool().add_pusher(
+                user_id=user_id,
+                access_token=token_id,
+                kind="http",
+                app_id="m.http",
+                app_display_name="HTTP Push Notifications",
+                device_display_name="pushy push",
+                pushkey="a@example.com",
+                lang=None,
+                data={"url": "example.com"},
+            )
+        )
+
+        # Send a message
+        response = self.helper.send(
+            room_id, body="Hello there!", tok=other_access_token
+        )
+        # To get an unread count, the user who is getting notified has to have a read
+        # position in the room. We'll set the read position to this event in a moment
+        first_message_event_id = response["event_id"]
+
+        # Advance time a bit (so the pusher will register something has happened) and
+        # make the push succeed
+        self.push_attempts[0][0].callback({})
+        self.pump()
+
+        # Check our push made it
+        self.assertEqual(len(self.push_attempts), 1)
+        self.assertEqual(self.push_attempts[0][1], "example.com")
+
+        # Check that the unread count for the room is 0
+        #
+        # The unread count is zero as the user has no read receipt in the room yet
+        self.assertEqual(
+            self.push_attempts[0][2]["notification"]["counts"]["unread"], 0
+        )
+
+        # Now set the user's read receipt position to the first event
+        #
+        # This will actually trigger a new notification to be sent out so that
+        # even if the user does not receive another message, their unread
+        # count goes down
+        request, channel = self.make_request(
+            "POST",
+            "/rooms/%s/receipt/m.read/%s" % (room_id, first_message_event_id),
+            {},
+            access_token=access_token,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        # Advance time and make the push succeed
+        self.push_attempts[1][0].callback({})
+        self.pump()
+
+        # Unread count is still zero as we've read the only message in the room
+        self.assertEqual(len(self.push_attempts), 2)
+        self.assertEqual(
+            self.push_attempts[1][2]["notification"]["counts"]["unread"], 0
+        )
+
+        # Send another message
+        self.helper.send(
+            room_id, body="How's the weather today?", tok=other_access_token
+        )
+
+        # Advance time and make the push succeed
+        self.push_attempts[2][0].callback({})
+        self.pump()
+
+        # This push should contain an unread count of 1 as there's now been one
+        # message since our last read receipt
+        self.assertEqual(len(self.push_attempts), 3)
+        self.assertEqual(
+            self.push_attempts[2][2]["notification"]["counts"]["unread"], 1
+        )
+
+        # Since we're grouping by room, sending more messages shouldn't increase the
+        # unread count, as they're all being sent in the same room
+        self.helper.send(room_id, body="Hello?", tok=other_access_token)
+
+        # Advance time and make the push succeed
+        self.pump()
+        self.push_attempts[3][0].callback({})
+
+        self.helper.send(room_id, body="Hello??", tok=other_access_token)
+
+        # Advance time and make the push succeed
+        self.pump()
+        self.push_attempts[4][0].callback({})
+
+        self.helper.send(room_id, body="HELLO???", tok=other_access_token)
+
+        # Advance time and make the push succeed
+        self.pump()
+        self.push_attempts[5][0].callback({})
+
+        self.assertEqual(len(self.push_attempts), 6)

@@ -12,9 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, List, Optional, Tuple
+
+from twisted.web.http import Request
 
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
@@ -52,16 +53,23 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
         self.clock = hs.get_clock()
 
     @staticmethod
-    async def _serialize_payload(
-        requester, room_id, user_id, remote_room_hosts, content
-    ):
+    async def _serialize_payload(  # type: ignore
+        requester: Requester,
+        room_id: str,
+        user_id: str,
+        remote_room_hosts: List[str],
+        content: JsonDict,
+    ) -> JsonDict:
         """
         Args:
-            requester(Requester)
-            room_id (str)
-            user_id (str)
-            remote_room_hosts (list[str]): Servers to try and join via
-            content(dict): The event content to use for the join event
+            requester: The user making the request according to the access token
+            room_id: The ID of the room.
+            user_id: The ID of the user.
+            remote_room_hosts: Servers to try and join via
+            content: The event content to use for the join event
+
+        Returns:
+            A dict representing the payload of the request.
         """
         return {
             "requester": requester.serialize(),
@@ -69,7 +77,9 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
             "content": content,
         }
 
-    async def _handle_request(self, request, room_id, user_id):
+    async def _handle_request(  # type: ignore
+        self, request: Request, room_id: str, user_id: str
+    ) -> Tuple[int, JsonDict]:
         content = parse_json_object_from_request(request)
 
         remote_room_hosts = content["remote_room_hosts"]
@@ -118,14 +128,17 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
         txn_id: Optional[str],
         requester: Requester,
         content: JsonDict,
-    ):
+    ) -> JsonDict:
         """
         Args:
-            invite_event_id: ID of the invite to be rejected
-            txn_id: optional transaction ID supplied by the client
-            requester: user making the rejection request, according to the access token
-            content: additional content to include in the rejection event.
+            invite_event_id: The ID of the invite to be rejected.
+            txn_id: Optional transaction ID supplied by the client
+            requester: User making the rejection request, according to the access token
+            content: Additional content to include in the rejection event.
                Normally an empty dict.
+
+        Returns:
+            A dict representing the payload of the request.
         """
         return {
             "txn_id": txn_id,
@@ -133,7 +146,9 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
             "content": content,
         }
 
-    async def _handle_request(self, request, invite_event_id):
+    async def _handle_request(  # type: ignore
+        self, request: Request, invite_event_id: str
+    ) -> Tuple[int, JsonDict]:
         content = parse_json_object_from_request(request)
 
         txn_id = content["txn_id"]
@@ -174,18 +189,25 @@ class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
         self.distributor = hs.get_distributor()
 
     @staticmethod
-    async def _serialize_payload(room_id, user_id, change):
+    async def _serialize_payload(  # type: ignore
+        room_id: str, user_id: str, change: str
+    ) -> JsonDict:
         """
         Args:
-            room_id (str)
-            user_id (str)
-            change (str): "left"
+            room_id: The ID of the room.
+            user_id: The ID of the user.
+            change: "left"
+
+        Returns:
+            A dict representing the payload of the request.
         """
         assert change == "left"
 
         return {}
 
-    def _handle_request(self, request, room_id, user_id, change):
+    def _handle_request(  # type: ignore
+        self, request: Request, room_id: str, user_id: str, change: str
+    ) -> Tuple[int, JsonDict]:
         logger.info("user membership change: %s in %s", user_id, room_id)
 
         user = UserID.from_string(user_id)
