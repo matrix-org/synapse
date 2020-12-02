@@ -902,8 +902,7 @@ class OidcHandler(BaseHandler):
             if self._allow_existing_users:
                 # If allowing existing users we want to generate a single localpart
                 # and attempt to match it.
-                failures = 0
-                attributes = await oidc_response_to_user_attributes(failures)
+                attributes = await oidc_response_to_user_attributes(failures=0)
 
                 user_id = UserID(attributes.localpart, self.server_name).to_string()
                 users = await self.store.get_users_by_id_case_insensitive(user_id)
