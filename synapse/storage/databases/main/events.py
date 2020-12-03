@@ -427,11 +427,26 @@ class PersistEventsStore:
         # room).
         #
         # See: docs/auth_chain_difference_algorithm.md
+
+        # We ignore rooms that we aren't filling the chain cover index for.
+        rows = self.db_pool.simple_select_many_txn(
+            txn,
+            table="rooms",
+            column="room_id",
+            iterable={event.room_id for event in events},
+            keyvalues={},
+            retcols=("room_id", "has_auth_chain_index"),
+        )
+        room_to_index = {
+            row["room_id"]: bool(row["has_auth_chain_index"]) for row in rows
+        }
+
         event_ids = {event.event_id for event in events}
         state_events = [
             event
             for event in events
             if event.is_state()
+            and room_to_index[event.room_id]
             and not event.internal_metadata.is_out_of_band_membership()
         ]
         if state_events:
