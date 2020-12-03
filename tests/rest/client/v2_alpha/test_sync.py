@@ -22,8 +22,7 @@ from synapse.rest.client.v2_alpha import knock, read_marker, sync
 
 from tests import unittest
 from tests.federation.transport.test_knocking import (
-    check_knock_room_state_against_room_state,
-    send_example_state_events_to_room,
+    KnockingStrippedStateEventHelperMixin,
 )
 from tests.server import TimedOutException
 
@@ -318,7 +317,9 @@ class SyncTypingTests(unittest.HomeserverTestCase):
             self.make_request("GET", sync_url % (access_token, next_batch))
 
 
-class SyncKnockTestCase(unittest.HomeserverTestCase):
+class SyncKnockTestCase(
+    unittest.HomeserverTestCase, KnockingStrippedStateEventHelperMixin
+):
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
@@ -358,8 +359,8 @@ class SyncKnockTestCase(unittest.HomeserverTestCase):
         self.next_batch = channel.json_body["next_batch"]
 
         # Set up some room state to test with.
-        self.expected_room_state = send_example_state_events_to_room(
-            self, hs, self.room_id, self.user_id
+        self.expected_room_state = self.send_example_state_events_to_room(
+            hs, self.room_id, self.user_id
         )
 
     def test_knock_room_state(self):
@@ -393,8 +394,8 @@ class SyncKnockTestCase(unittest.HomeserverTestCase):
         self.assertEqual(room_state_events[-1]["type"], EventTypes.Member)
 
         # Validate the stripped room state events
-        check_knock_room_state_against_room_state(
-            self, room_state_events, self.expected_room_state
+        self.check_knock_room_state_against_room_state(
+            room_state_events, self.expected_room_state
         )
 
 

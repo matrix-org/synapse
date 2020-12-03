@@ -32,7 +32,7 @@ from synapse.types import RoomAlias
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 from tests.test_utils import event_injection, make_awaitable
-from tests.unittest import FederatingHomeserverTestCase, HomeserverTestCase
+from tests.unittest import FederatingHomeserverTestCase, TestCase
 
 # An identifier to use while MSC2304 is not in a stable release of the spec
 KNOCK_UNSTABLE_IDENTIFIER = "xyz.amorgan.knock"
@@ -41,7 +41,9 @@ KNOCK_UNSTABLE_IDENTIFIER = "xyz.amorgan.knock"
 SECRET_STATE_EVENT_TYPE = "com.example.secret"
 
 
-class FederationKnockingTestCase(FederatingHomeserverTestCase):
+class FederationKnockingTestCase(
+    FederatingHomeserverTestCase, KnockingStrippedStateEventHelperMixin
+):
     servlets = [
         admin.register_servlets,
         room.register_servlets,
@@ -109,8 +111,8 @@ class FederationKnockingTestCase(FederatingHomeserverTestCase):
         )
 
         # Update the join rules and add additional state to the room to check for later
-        expected_room_state = send_example_state_events_to_room(
-            self, self.hs, room_id, user_id
+        expected_room_state = self.send_example_state_events_to_room(
+            self.hs, room_id, user_id
         )
 
         request, channel = self.make_request(
@@ -162,145 +164,143 @@ class FederationKnockingTestCase(FederatingHomeserverTestCase):
         room_state_events = channel.json_body["knock_state_events"]
 
         # Validate the stripped room state events
-        check_knock_room_state_against_room_state(
-            self, room_state_events, expected_room_state
+        self.check_knock_room_state_against_room_state(
+            room_state_events, expected_room_state
         )
 
 
-def send_example_state_events_to_room(
-    testcase: HomeserverTestCase, hs: "HomeServer", room_id: str, sender: str,
-) -> OrderedDict:
-    """Adds some state to a room. State events are those that should be sent to a knocking
-    user after they knock on the room, as well as some state that *shouldn't* be sent
-    to the knocking user.
+class KnockingStrippedStateEventHelperMixin(TestCase):
+    def send_example_state_events_to_room(
+        self, hs: "HomeServer", room_id: str, sender: str,
+    ) -> OrderedDict:
+        """Adds some state to a room. State events are those that should be sent to a knocking
+        user after they knock on the room, as well as some state that *shouldn't* be sent
+        to the knocking user.
 
-    Args:
-        testcase: The testcase that is currently active.
-        hs: The homeserver of the sender.
-        room_id: The ID of the room to send state into.
-        sender: The ID of the user to send state as. Must be in the room.
+        Args:
+            hs: The homeserver of the sender.
+            room_id: The ID of the room to send state into.
+            sender: The ID of the user to send state as. Must be in the room.
 
-    Returns:
-        The OrderedDict of event types and content that a user is expected to see
-        after knocking on a room.
-    """
-    # To set a canonical alias, we'll need to point an alias at the room first.
-    canonical_alias = "#fancy_alias:test"
-    testcase.get_success(
-        testcase.store.create_room_alias_association(
-            RoomAlias.from_string(canonical_alias), room_id, ["test"]
+        Returns:
+            The OrderedDict of event types and content that a user is expected to see
+            after knocking on a room.
+        """
+        # To set a canonical alias, we'll need to point an alias at the room first.
+        canonical_alias = "#fancy_alias:test"
+        self.get_success(
+            self.store.create_room_alias_association(
+                RoomAlias.from_string(canonical_alias), room_id, ["test"]
+            )
         )
-    )
 
-    # Send some state that we *don't* expect to be given to knocking users
-    secret_state_event_type = "com.example.secret"
-    testcase.get_success(
-        event_injection.inject_event(
-            hs,
-            room_version=RoomVersions.MSC2403_DEV.identifier,
-            room_id=room_id,
-            sender=sender,
-            type=secret_state_event_type,
-            state_key="",
-            content={"secret": "password"},
-        )
-    )
-
-    # We use an OrderedDict here to ensure that the knock membership appears last.
-    # Note that order only matters when sending stripped state to clients, not federated
-    # homeservers.
-    room_state = OrderedDict(
-        [
-            # We need to set the room's join rules to allow knocking
-            (
-                EventTypes.JoinRules,
-                {"content": {"join_rule": JoinRules.KNOCK}, "state_key": ""},
-            ),
-            # Below are state events that are to be stripped and sent to clients
-            (EventTypes.Name, {"content": {"name": "A cool room"}, "state_key": ""}),
-            (
-                EventTypes.RoomAvatar,
-                {
-                    "content": {
-                        "info": {
-                            "h": 398,
-                            "mimetype": "image/jpeg",
-                            "size": 31037,
-                            "w": 394,
-                        },
-                        "url": "mxc://example.org/JWEIFJgwEIhweiWJE",
-                    },
-                    "state_key": "",
-                },
-            ),
-            (
-                EventTypes.RoomEncryption,
-                {"content": {"algorithm": "m.megolm.v1.aes-sha2"}, "state_key": ""},
-            ),
-            (
-                EventTypes.CanonicalAlias,
-                {
-                    "content": {"alias": canonical_alias, "alt_aliases": []},
-                    "state_key": "",
-                },
-            ),
-        ]
-    )
-
-    for event_type, event_dict in room_state.items():
-        event_content, state_key = event_dict.values()
-
-        testcase.get_success(
+        # Send some state that we *don't* expect to be given to knocking users
+        self.get_success(
             event_injection.inject_event(
                 hs,
                 room_version=RoomVersions.MSC2403_DEV.identifier,
                 room_id=room_id,
                 sender=sender,
-                type=event_type,
-                state_key=state_key,
-                content=event_content,
+                type=SECRET_STATE_EVENT_TYPE,
+                state_key="",
+                content={"secret": "password"},
             )
         )
 
-    return room_state
-
-
-def check_knock_room_state_against_room_state(
-    testcase: HomeserverTestCase,
-    knock_room_state: List[Dict],
-    expected_room_state: Dict,
-) -> None:
-    """Test a list of stripped room state events received over federation against a
-    dict of expected state events.
-
-    Args:
-        testcase: The testcase that is currently active.
-        knock_room_state: The list of room state that was received over federation.
-        expected_room_state: A dict containing the room state we expect to see in
-            `knock_room_state`.
-    """
-    for event in knock_room_state:
-        event_type = event["type"]
-        testcase.assertIn(event_type, expected_room_state)
-
-        # Check the state content matches
-        testcase.assertEquals(
-            expected_room_state[event_type]["content"], event["content"]
+        # We use an OrderedDict here to ensure that the knock membership appears last.
+        # Note that order only matters when sending stripped state to clients, not federated
+        # homeservers.
+        room_state = OrderedDict(
+            [
+                # We need to set the room's join rules to allow knocking
+                (
+                    EventTypes.JoinRules,
+                    {"content": {"join_rule": JoinRules.KNOCK}, "state_key": ""},
+                ),
+                # Below are state events that are to be stripped and sent to clients
+                (
+                    EventTypes.Name,
+                    {"content": {"name": "A cool room"}, "state_key": ""},
+                ),
+                (
+                    EventTypes.RoomAvatar,
+                    {
+                        "content": {
+                            "info": {
+                                "h": 398,
+                                "mimetype": "image/jpeg",
+                                "size": 31037,
+                                "w": 394,
+                            },
+                            "url": "mxc://example.org/JWEIFJgwEIhweiWJE",
+                        },
+                        "state_key": "",
+                    },
+                ),
+                (
+                    EventTypes.RoomEncryption,
+                    {"content": {"algorithm": "m.megolm.v1.aes-sha2"}, "state_key": ""},
+                ),
+                (
+                    EventTypes.CanonicalAlias,
+                    {
+                        "content": {"alias": canonical_alias, "alt_aliases": []},
+                        "state_key": "",
+                    },
+                ),
+            ]
         )
 
-        # Check the state key is correct
-        testcase.assertEqual(
-            expected_room_state[event_type]["state_key"], event["state_key"]
-        )
+        for event_type, event_dict in room_state.items():
+            event_content, state_key = event_dict.values()
 
-        # Ensure the event has been stripped
-        testcase.assertNotIn("signatures", event)
+            self.get_success(
+                event_injection.inject_event(
+                    hs,
+                    room_version=RoomVersions.MSC2403_DEV.identifier,
+                    room_id=room_id,
+                    sender=sender,
+                    type=event_type,
+                    state_key=state_key,
+                    content=event_content,
+                )
+            )
 
-        # Pop once we've found and processed a state event
-        expected_room_state.pop(event_type)
+        return room_state
 
-    # Check that all expected state events were accounted for
-    testcase.assertEqual(len(expected_room_state), 0)
+    def check_knock_room_state_against_room_state(
+        self, knock_room_state: List[Dict], expected_room_state: Dict,
+    ) -> None:
+        """Test a list of stripped room state events received over federation against a
+        dict of expected state events.
 
-    # Ensure that no excess state was included
-    testcase.assertNotIn(SECRET_STATE_EVENT_TYPE, knock_room_state)
+        Args:
+            knock_room_state: The list of room state that was received over federation.
+            expected_room_state: A dict containing the room state we expect to see in
+                `knock_room_state`.
+        """
+        for event in knock_room_state:
+            event_type = event["type"]
+            self.assertIn(event_type, expected_room_state)
+
+            # Check the state content matches
+            self.assertEquals(
+                expected_room_state[event_type]["content"], event["content"]
+            )
+
+            # Check the state key is correct
+            self.assertEqual(
+                expected_room_state[event_type]["state_key"], event["state_key"]
+            )
+
+            # Ensure the event has been stripped
+            self.assertNotIn("signatures", event)
+
+            # Pop once we've found and processed a state event
+            expected_room_state.pop(event_type)
+
+        # Check that all expected state events were accounted for
+        self.assertEqual(len(expected_room_state), 0)
+
+        # Ensure that no excess state was included
+        self.assertNotIn(SECRET_STATE_EVENT_TYPE, knock_room_state)
