@@ -167,7 +167,7 @@ class FederationKnockingTestCase(FederatingHomeserverTestCase):
 def send_example_state_events_to_room(
     testcase: HomeserverTestCase, hs: "HomeServer", room_id: str, sender: str,
 ) -> OrderedDict:
-    """Adds some state a room. State events are those that should be sent to a knocking
+    """Adds some state to a room. State events are those that should be sent to a knocking
     user after they knock on the room, as well as some state that *shouldn't* be sent
     to the knocking user.
 
@@ -267,7 +267,7 @@ def check_knock_room_state_against_room_state(
     knock_room_state: List[Dict],
     expected_room_state: Dict,
 ) -> None:
-    """Test a list of stripped room state events received over federation against an
+    """Test a list of stripped room state events received over federation against a
     dict of expected state events.
 
     Args:
