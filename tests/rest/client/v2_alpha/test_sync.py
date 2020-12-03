@@ -429,7 +429,6 @@ class SyncKnockTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/unstable/xyz.amorgan.knock/%s" % (self.room_id,),
             b"{}",
             self.knocker_tok,
-            shorthand=False,
         )
         self.assertEquals(200, channel.code, channel.result)
 
