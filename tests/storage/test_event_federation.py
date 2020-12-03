@@ -13,6 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import attr
+
+from synapse.events import _EventInternalMetadata
+
 import tests.unittest
 import tests.utils
 
@@ -170,7 +174,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                     "creator": "room_creator_user_id",
                     "is_public": True,
                     "room_version": "6",
-                    "has_auth_chain_index": False,
+                    "has_auth_chain_index": True,
                 },
             )
 
@@ -179,42 +183,37 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # We rudely fiddle with the appropriate tables directly, as that's much
         # easier than constructing events properly.
 
-        def insert_event(txn, event_id, stream_ordering):
+        def insert_event(txn):
+            stream_ordering = 0
 
-            depth = depth_map[event_id]
+            for event_id in auth_graph:
+                stream_ordering += 1
+                depth = depth_map[event_id]
 
-            self.store.db_pool.simple_insert_txn(
+                self.store.db_pool.simple_insert_txn(
+                    txn,
+                    table="events",
+                    values={
+                        "event_id": event_id,
+                        "room_id": room_id,
+                        "depth": depth,
+                        "topological_ordering": depth,
+                        "type": "m.test",
+                        "processed": True,
+                        "outlier": False,
+                        "stream_ordering": stream_ordering,
+                    },
+                )
+
+            self.hs.datastores.persist_events._persist_event_auth_chain_txn(
                 txn,
-                table="events",
-                values={
-                    "event_id": event_id,
-                    "room_id": room_id,
-                    "depth": depth,
-                    "topological_ordering": depth,
-                    "type": "m.test",
-                    "processed": True,
-                    "outlier": False,
-                    "stream_ordering": stream_ordering,
-                },
-            )
-
-            self.store.db_pool.simple_insert_many_txn(
-                txn,
-                table="event_auth",
-                values=[
-                    {"event_id": event_id, "room_id": room_id, "auth_id": a}
-                    for a in auth_graph[event_id]
+                [
+                    FakeEvent(event_id, room_id, auth_graph[event_id])
+                    for event_id in auth_graph
                 ],
             )
 
-        next_stream_ordering = 0
-        for event_id in auth_graph:
-            next_stream_ordering += 1
-            self.get_success(
-                self.store.db_pool.runInteraction(
-                    "insert", insert_event, event_id, next_stream_ordering
-                )
-            )
+        self.get_success(self.store.db_pool.runInteraction("insert", insert_event,))
 
         # Now actually test that various combinations give the right result:
 
@@ -257,3 +256,21 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
             self.store.get_auth_chain_difference(room_id, [{"a"}])
         )
         self.assertSetEqual(difference, set())
+
+
+@attr.s
+class FakeEvent:
+    event_id = attr.ib()
+    room_id = attr.ib()
+    auth_events = attr.ib()
+
+    type = "foo"
+    state_key = "foo"
+
+    internal_metadata = _EventInternalMetadata({})
+
+    def auth_event_ids(self):
+        return self.auth_events
+
+    def is_state(self):
+        return True

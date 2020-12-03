@@ -17,7 +17,17 @@
 import itertools
 import logging
 from collections import OrderedDict, namedtuple
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Generator,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+)
 
 import attr
 from prometheus_client import Counter
@@ -400,6 +410,7 @@ class PersistEventsStore:
     def _persist_event_auth_chain_txn(
         self, txn: LoggingTransaction, events: List[EventBase],
     ):
+
         # We want to store event_auth mappings for rejected events, as they're
         # used in state res v2.
         # This is only necessary if the rejected event appears in an accepted
@@ -524,6 +535,7 @@ class PersistEventsStore:
             # We need to do this in a topologically sorted order as we want to
             # generate chain IDs/sequence numbers of an event's auth events
             # before the event itself.
+            chains_ids_allocated = set()
             for event_id in sorted_topologically(
                 events_to_calc_chain_id_for, event_to_auth_chain
             ):
@@ -536,21 +548,34 @@ class PersistEventsStore:
                 if existing_chain_id:
                     # We found a chain ID/sequence number candidate, check its
                     # not already taken.
-                    row = self.db_pool.simple_select_one_onecol_txn(
-                        txn,
-                        table="event_auth_chains",
-                        keyvalues={
-                            "chain_id": existing_chain_id[0],
-                            "sequence_number": existing_chain_id[1] + 1,
-                        },
-                        retcol="event_id",
-                        allow_none=True,
-                    )
-                    if not row:
-                        new_chain_id = (existing_chain_id[0], existing_chain_id[1] + 1)
+                    if (
+                        existing_chain_id[0],
+                        existing_chain_id[1] + 1,
+                    ) not in chains_ids_allocated:
+                        row = self.db_pool.simple_select_one_onecol_txn(
+                            txn,
+                            table="event_auth_chains",
+                            keyvalues={
+                                "chain_id": existing_chain_id[0],
+                                "sequence_number": existing_chain_id[1] + 1,
+                            },
+                            retcol="event_id",
+                            allow_none=True,
+                        )
+                        if row:
+                            chains_ids_allocated.add(
+                                (existing_chain_id[0], existing_chain_id[1] + 1,)
+                            )
+                        else:
+                            new_chain_id = (
+                                existing_chain_id[0],
+                                existing_chain_id[1] + 1,
+                            )
 
                 if not new_chain_id:
                     new_chain_id = (self._event_chain_id_gen.get_next_id_txn(txn), 1)
+
+                chains_ids_allocated.add(new_chain_id)
 
                 chain_map[event_id] = new_chain_id
                 new_chains[event_id] = new_chain_id
@@ -581,16 +606,13 @@ class PersistEventsStore:
             #      discarding any that are reachable by other auth events, or
             #      that have the same chain ID as the event.
             #   2. For each retained auth event we:
-            #       1. propose adding a link from the event's to the auth
-            #          event's chain ID/sequence number; and
-            #       2. propose adding a link from the event to every chain
-            #          reachable by the auth event.
-            #   3. Filter redundant links from the list of proposed links.
-            #   4. Persist the new links
-            #
+            #       a. Add a link from the event's to the auth event's chain
+            #          ID/sequence number; and
+            #       b. Add a link from the event to every chain reachable by the
+            #          auth event.
 
             # Step 1, fetch all existing links
-            chain_links = {}  # type: Dict[Tuple[int, int], Set[Tuple[int, int]]]
+            chain_links = _LinkMap()
             rows = self.db_pool.simple_select_many_txn(
                 txn,
                 table="event_auth_chain_links",
@@ -605,107 +627,54 @@ class PersistEventsStore:
                 ),
             )
             for row in rows:
-                chain_links.setdefault(
-                    (row["origin_chain_id"], row["target_chain_id"]), set()
-                ).add((row["origin_sequence_number"], row["target_sequence_number"]),)
+                chain_links.add_link(
+                    row["origin_chain_id"],
+                    row["origin_sequence_number"],
+                    row["target_chain_id"],
+                    row["target_sequence_number"],
+                    new=False,
+                )
 
-            to_add = {}  # type: Dict[Tuple[int, int], Set[Tuple[int, int]]]
-            for event_id in events_to_calc_chain_id_for:
+            # We do this in toplogical order to avoid adding redundant links.
+            for event_id in sorted_topologically(
+                events_to_calc_chain_id_for, event_to_auth_chain
+            ):
                 chain_id, sequence_number = chain_map[event_id]
 
                 # Filter out auth events that are reachable by other auth
                 # events. We do this by looking at every permutation of pairs of
-                # auth events (A, B) to check if B is reachable from B.
-                reduction = set(event_to_auth_chain[event_id])
+                # auth events (A, B) to check if B is reachable from A.
+                reduction = {
+                    a_id
+                    for a_id in event_to_auth_chain[event_id]
+                    if chain_map[a_id][0] != chain_id
+                }
                 for start_auth_id, end_auth_id in itertools.permutations(
-                    [
-                        auth_id
-                        for auth_id in event_to_auth_chain[event_id]
-                        if auth_id in chain_map
-                    ],
-                    r=2,
+                    event_to_auth_chain[event_id], r=2,
                 ):
-                    source_chain_id, source_seq_no = chain_map[start_auth_id]
-                    target_chain_id, target_seq_no = chain_map[end_auth_id]
-
-                    if source_chain_id == chain_id:
-                        # Discard auth events with in same chain.
-                        reduction.discard(start_auth_id)
-
-                    links = chain_links.get((source_chain_id, target_chain_id), set())
-                    for link_start_seq, link_end_seq in links:
-                        if (
-                            link_start_seq <= source_seq_no
-                            and target_seq_no <= link_end_seq
-                        ):
-                            reduction.discard(end_auth_id)
-                            break
+                    if chain_links.exists_path_from(
+                        *chain_map[start_auth_id], *chain_map[end_auth_id]
+                    ):
+                        reduction.discard(end_auth_id)
 
                 # Step 2, figure out what the new links are from the reduced
                 # list of auth events.
                 for auth_id in reduction:
                     auth_chain_id, auth_sequence_number = chain_map[auth_id]
 
-                    # Step 2a, add link from event -> auth event
-                    links = chain_links.setdefault((chain_id, auth_chain_id), set())
-                    links.add((sequence_number, auth_sequence_number))
+                    # Step 2a, add link between the event and auth event
+                    chain_links.add_link(
+                        chain_id, sequence_number, auth_chain_id, auth_sequence_number
+                    )
 
-                    # Step 2b, lookup up all links from auth events and add them
-                    # as links from the event.
-                    for (source_id, target_id), auth_links in chain_links.items():
-                        if source_id != auth_chain_id or target_id == chain_id:
-                            continue
-
-                        for (source_seq, target_seq) in auth_links:
-                            if source_seq <= auth_sequence_number:
-                                to_add.setdefault((chain_id, target_id), set()).add(
-                                    (sequence_number, target_seq)
-                                )
-
-                    for key, values in to_add.items():
-                        chain_links.setdefault(key, set()).update(values)
-
-            # Step 3, filter out redundant links.
-            #
-            # We do this by comparing a proposed link with all existing links
-            # and other proposed links.
-            #
-            # Note: new links won't cause existing links in the DB to become
-            # redundant, as new links must start at newly persisted events
-            # (which won't be reachable by any existing events).
-            filtered_links = {}  # type: Dict[Tuple[int, int], Set[Tuple[int, int]]]
-            for ((source_chain, target_chain), links) in to_add.items():
-                filtered_chain_links = filtered_links.setdefault(
-                    (source_chain, target_chain), set()
-                )
-                for link_to_add in links:
-                    for existing_link in chain_links[(source_chain, target_chain)]:
-                        # If a link "crosses" another link then its redundant.
-                        # For example in the following link 1 (L1) is redundant,
-                        # as any event reachable via L1 is *also* reachable via
-                        # L2.
-                        #
-                        #   Chain A     Chain B
-                        #      |          |
-                        #   L1 |------    |
-                        #      |     |    |
-                        #   L2 |---- | -->|
-                        #      |     |    |
-                        #      |     |--->|
-                        #      |          |
-                        #      |          |
-                        #
-                        # So we only need to keep links which *do not* cross,
-                        # i.e. links that both start and end above or below an
-                        # existing link.
-                        if (
-                            link_to_add[0] < existing_link[0]
-                            and link_to_add[1] < existing_link[1]
-                        ) or (
-                            link_to_add[0] > existing_link[0]
-                            and link_to_add[1] > existing_link[1]
-                        ):
-                            filtered_chain_links.add(link_to_add)
+                    # Step 2b, add a link to chains reachable from the auth
+                    # event.
+                    for target_id, target_seq in chain_links.get_links_from(
+                        auth_chain_id, auth_sequence_number
+                    ):
+                        chain_links.add_link(
+                            chain_id, sequence_number, target_id, target_seq
+                        )
 
             self.db_pool.simple_insert_many_txn(
                 txn,
@@ -713,12 +682,16 @@ class PersistEventsStore:
                 values=[
                     {
                         "origin_chain_id": source_id,
-                        "origin_sequence_number": target_id,
-                        "target_chain_id": source_seq,
+                        "origin_sequence_number": source_seq,
+                        "target_chain_id": target_id,
                         "target_sequence_number": target_seq,
                     }
-                    for (source_id, target_id), sequences in filtered_links.items()
-                    for source_seq, target_seq in sequences
+                    for (
+                        source_id,
+                        source_seq,
+                        target_id,
+                        target_seq,
+                    ) in chain_links.get_additions()
                 ],
             )
 
@@ -1835,3 +1808,114 @@ class PersistEventsStore:
                 if not ev.internal_metadata.is_outlier()
             ],
         )
+
+
+@attr.s
+class _LinkMap:
+    """A helper type for tracking links between chains.
+    """
+
+    maps = attr.ib(type=Dict[int, Dict[int, Dict[int, int]]], factory=dict)
+    additions = attr.ib(type=Set[Tuple[int, int, int, int]], factory=set)
+
+    def add_link(
+        self,
+        src_chain: int,
+        src_seq: int,
+        target_chain: int,
+        target_seq: int,
+        new=True,
+    ):
+        """Add a new link between two chains, ensuring no redundant links are added.
+
+        New links should be added in topological order.
+
+        Args:
+            src_chain,
+            src_seq,
+            target_chain,
+            target_seq,
+            new (bool): Whether this is a "new" link, i.e. should it be returned
+                by `get_additions`.
+        """
+        current_links = self.maps.setdefault(src_chain, {}).setdefault(target_chain, {})
+
+        if new:
+            # Check if the new link is redundant
+            for current_seq_src, current_seq_target in current_links.items():
+                # If a link "crosses" another link then its redundant. For example
+                # in the following link 1 (L1) is redundant, as any event reachable
+                # via L1 is *also* reachable via L2.
+                #
+                #   Chain A     Chain B
+                #      |          |
+                #   L1 |------    |
+                #      |     |    |
+                #   L2 |---- | -->|
+                #      |     |    |
+                #      |     |--->|
+                #      |          |
+                #      |          |
+                #
+                # So we only need to keep links which *do not* cross, i.e. links
+                # that both start and end above or below an existing link.
+                #
+                # Note, since we add links in topological ordering we should never
+                # see `src_seq` less than `current_seq_src`.
+
+                if current_seq_src <= src_seq and target_seq <= current_seq_target:
+                    # This new link is redundant, nothing to do.
+                    return
+
+            self.additions.add((src_chain, src_seq, target_chain, target_seq))
+
+        current_links[src_seq] = target_seq
+
+    def get_links_from(
+        self, source_id, src_seq
+    ) -> Generator[Tuple[int, int], None, None]:
+        """Gets the chains reachable from the given chain/sequence number.
+
+        Yields:
+            The chain ID and sequence number the link points to.
+        """
+        for target_id, sequence_numbers in self.maps.get(source_id, {}).items():
+            for link_src_seq, target_seq in sequence_numbers.items():
+                if link_src_seq <= src_seq:
+                    yield target_id, target_seq
+
+    def get_links_between(
+        self, source_chain: int, target_chain: int
+    ) -> Generator[Tuple[int, int], None, None]:
+        """Gets the links between two chains.
+
+        Yields:
+            The source and target sequence numbers.
+        """
+
+        yield from self.maps.get(source_chain, {}).get(target_chain, {}).items()
+
+    def get_additions(self) -> Generator[Tuple[int, int, int, int], None, None]:
+        """Gets any newly added links.
+
+        Yields:
+            The source chain ID/sequence number and target chain ID/sequence number
+        """
+
+        for src_chain, src_seq, target_chain, _ in self.additions:
+            target_seq = self.maps.get(src_chain, {}).get(target_chain, {}).get(src_seq)
+            if target_seq is not None:
+                yield (src_chain, src_seq, target_chain, target_seq)
+
+    def exists_path_from(
+        self, src_chain: int, src_seq: int, target_chain: int, target_seq: int,
+    ) -> bool:
+        """Checks if there is a path between the source chain ID/sequence and
+        target chain ID/sequence.
+        """
+        links = self.get_links_between(src_chain, target_chain)
+        for link_start_seq, link_end_seq in links:
+            if link_start_seq <= src_seq and target_seq <= link_end_seq:
+                return True
+
+        return False

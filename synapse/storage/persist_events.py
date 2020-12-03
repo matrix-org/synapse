@@ -388,6 +388,8 @@ class EventsPersistenceStorage:
                             (event, context)
                         )
 
+                        logger.info("Persisting event: %s", event)
+
                     for room_id, ev_ctx_rm in events_by_room.items():
                         latest_event_ids = await self.main_store.get_latest_event_ids_in_room(
                             room_id
@@ -400,6 +402,9 @@ class EventsPersistenceStorage:
                         if new_latest_event_ids == latest_event_ids:
                             # No change in extremities, so no change in state
                             continue
+
+                        logger.info("Old extrem: %s", latest_event_ids)
+                        logger.info("New extrem: %s", new_latest_event_ids)
 
                         # there should always be at least one forward extremity.
                         # (except during the initial persistence of the send_join

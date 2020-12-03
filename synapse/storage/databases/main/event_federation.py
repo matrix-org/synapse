@@ -247,12 +247,14 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                     # chains are only reachable if the origin sequence number of
                     # the link is less than the max sequence number in the
                     # origin chain.
-                    if origin_sequence_number <= chains.get(chain_id, 0):
+                    if origin_sequence_number <= chains.get(origin_chain_id, 0):
                         curr = chains.setdefault(
                             target_chain_id, target_sequence_number
                         )
                         if curr < target_sequence_number:
                             chains[target_chain_id] = target_sequence_number
+
+                seen_chains.add(target_chain_id)
 
         # Now for each chain we figure out the maximum sequence number reachable
         # from *any* state set and the minimum sequence number reachable from
@@ -275,7 +277,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 # we have, otherwise add them to the list of gaps to pull out
                 # from the DB.
                 for seq_no in range(min_seq_no + 1, max_seq_no + 1):
-                    event_id = chain_to_event[chain_id].get(seq_no)
+                    event_id = chain_to_event.get(chain_id, {}).get(seq_no)
                     if event_id:
                         result.add(event_id)
                     else:
