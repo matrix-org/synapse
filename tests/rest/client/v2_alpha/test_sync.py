@@ -14,15 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
-from collections import OrderedDict
 
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import knock, read_marker, sync
-from synapse.types import RoomAlias
 
 from tests import unittest
+from tests.federation.transport.test_knocking import (
+    check_knock_room_state_against_room_state,
+    send_example_state_events_to_room,
+)
 from tests.server import TimedOutException
 
 
@@ -346,7 +348,7 @@ class SyncKnockTestCase(unittest.HomeserverTestCase):
         self.knocker = self.register_user("knocker", "monkey")
         self.knocker_tok = self.login("knocker", "monkey")
 
-        # Perform an initial sync for the knocking user
+        # Perform an initial sync for the knocking user.
         request, channel = self.make_request(
             "GET", self.url % self.next_batch, access_token=self.tok,
         )
@@ -356,70 +358,9 @@ class SyncKnockTestCase(unittest.HomeserverTestCase):
         self.next_batch = channel.json_body["next_batch"]
 
         # Set up some room state to test with.
-
-        # To set a canonical alias, we'll need to point an alias at the room first.
-        canonical_alias = "#fancy_alias:test"
-        self.get_success(
-            self.store.create_room_alias_association(
-                RoomAlias.from_string(canonical_alias), self.room_id, ["test"]
-            )
+        self.expected_room_state = send_example_state_events_to_room(
+            self, hs, self.room_id, self.user_id
         )
-
-        # We use an OrderedDict here to ensure that the knock membership appears last
-        self.room_state = OrderedDict(
-            [
-                # We need to set the room's join rules to allow knocking
-                (
-                    EventTypes.JoinRules,
-                    {"content": {"join_rule": "xyz.amorgan.knock"}, "state_key": ""},
-                ),
-                # The rest are state events that are recommended to strip and send to clients
-                (
-                    EventTypes.Name,
-                    {"content": {"name": "A cool room"}, "state_key": ""},
-                ),
-                (
-                    EventTypes.RoomAvatar,
-                    {
-                        "content": {
-                            "info": {
-                                "h": 398,
-                                "mimetype": "image/jpeg",
-                                "size": 31037,
-                                "w": 394,
-                            },
-                            "url": "mxc://example.org/JWEIFJgwEIhweiWJE",
-                        },
-                        "state_key": "",
-                    },
-                ),
-                (
-                    EventTypes.RoomEncryption,
-                    {
-                        "content": {"algorithm": "m.megolm.v1.aes-sha2"},
-                        "state_key": "",
-                    },
-                ),
-                (
-                    EventTypes.CanonicalAlias,
-                    {
-                        "content": {"alias": canonical_alias, "alt_aliases": []},
-                        "state_key": "",
-                    },
-                ),
-            ]
-        )
-
-        for event_type, event in self.room_state.items():
-            self.helper.send_state(
-                self.room_id, event_type, event["content"], tok=self.tok,
-            )
-
-        # We expect the knock event to be included as well
-        self.room_state[EventTypes.Member] = {
-            "content": {"membership": "xyz.amorgan.knock", "displayname": "knocker"},
-            "state_key": "@knocker:test",
-        }
 
     def test_knock_room_state(self):
         """Tests that /sync returns state from a room after knocking on it."""
@@ -432,37 +373,29 @@ class SyncKnockTestCase(unittest.HomeserverTestCase):
         )
         self.assertEquals(200, channel.code, channel.result)
 
+        # We expect to see the knock event in the stripped room state later
+        self.expected_room_state[EventTypes.Member] = {
+            "content": {"membership": "xyz.amorgan.knock", "displayname": "knocker"},
+            "state_key": "@knocker:test",
+        }
+
         # Check that /sync includes stripped state from the room
         request, channel = self.make_request(
             "GET", self.url % self.next_batch, access_token=self.knocker_tok,
         )
         self.assertEqual(channel.code, 200, channel.json_body)
 
+        # Extract the stripped room state events from /sync
         knock_entry = channel.json_body["rooms"]["xyz.amorgan.knock"]
         room_state_events = knock_entry[self.room_id]["knock_state"]["events"]
-        for event in room_state_events:
-            event_type = event["type"]
-            self.assertIn(event_type, self.room_state)
 
-            # Check the state content matches
-            self.assertEquals(self.room_state[event_type]["content"], event["content"])
-
-            # Check the state key is correct
-            self.assertEqual(
-                self.room_state[event_type]["state_key"], event["state_key"]
-            )
-
-            # Ensure the event has been stripped
-            self.assertNotIn("signatures", event)
-
-            # Pop once we've found and processed a state event
-            self.room_state.pop(event_type)
-
-        # Check that all expected state events were accounted for
-        self.assertEqual(len(self.room_state), 0)
-
-        # Ensure that the knock membership event came last
+        # Validate that the knock membership event came last
         self.assertEqual(room_state_events[-1]["type"], EventTypes.Member)
+
+        # Validate the stripped room state events
+        check_knock_room_state_against_room_state(
+            self, room_state_events, self.expected_room_state
+        )
 
 
 class UnreadMessagesTestCase(unittest.HomeserverTestCase):
