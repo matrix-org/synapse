@@ -24,6 +24,7 @@ from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.signatures import SignatureWorkerStore
+from synapse.storage.engines import PostgresEngine
 from synapse.types import Collection
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.lrucache import LruCache
@@ -175,13 +176,20 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         See docs/auth_chain_difference_algorithm.md for details
         """
 
+        # First we look up the chain ID/sequence numbers for all the events, and
+        # work out the chain/sequence numbers reachable from each state set.
+
         initial_events = set(state_sets[0]).union(*state_sets[1:])
 
-        chain_info = {}
-        chain_to_event = {}
-        seen_chains = set()
+        # Map from event_id -> (chain ID, seq no)
+        chain_info = {}  # type: Dict[str, Tuple[int, int]]
 
-        # FIXME: Need to handle chains that point to chains not in state sets
+        # Map from chain ID -> seq no -> event Id
+        chain_to_event = {}  # type: Dict[int, Dict[int, str]]
+
+        # All the chains that we've found that are reachable from the state
+        # sets.
+        seen_chains = set()  # type: Set[str]
 
         sql = """
             SELECT event_id, chain_id, sequence_number
@@ -199,9 +207,13 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 seen_chains.add(chain_id)
                 chain_to_event.setdefault(chain_id, {})[sequence_number] = event_id
 
-        set_to_chain = {}
-        for set_id, state_set in enumerate(state_sets):
-            chains = set_to_chain.setdefault(set_id, {})
+        # Corresponds to `state_sets`, except as a map from chain ID to max
+        # sequence number reachable from the state set.
+        set_to_chain = []  # type: List[Dict[int, int]]
+        for state_set in state_sets:
+            chains = {}
+            set_to_chain.append(chains)
+
             for event_id in state_set:
                 chain_id, seq_no = chain_info[event_id]
 
@@ -209,6 +221,8 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 if curr < seq_no:
                     chains[chain_id] = seq_no
 
+        # Now we lok up all links for the chains we have, adding chains to
+        # set_to_chain that are reachable from each set.
         sql = """
             SELECT
                 origin_chain_id, origin_sequence_number,
@@ -217,7 +231,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             WHERE %s
         """
 
-        # chain_links = {}
         for batch in batch_iter(seen_chains, 1000):
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "origin_chain_id", batch
@@ -230,13 +243,10 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 target_chain_id,
                 target_sequence_number,
             ) in txn:
-                # chain_links.setdefault(
-                #     (origin_chain_id, origin_sequence_number), []
-                # ).append((target_chain_id, target_sequence_number))
-
-                # TODO: Handle this case, its valid for it to happen.
-                # DOES THIS WORK?
-                for chains in set_to_chain.values():
+                for chains in set_to_chain:
+                    # chains are only reachable if the origin sequence number of
+                    # the link is less than the max sequence number in the
+                    # origin chain.
                     if origin_sequence_number <= chains.get(chain_id, 0):
                         curr = chains.setdefault(
                             target_chain_id, target_sequence_number
@@ -244,21 +254,26 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                         if curr < target_sequence_number:
                             chains[target_chain_id] = target_sequence_number
 
+        # Now for each chain we figure out the maximum sequence number reachable
+        # from *any* state set and the minimum sequence number reachable from
+        # *all* state sets. Events in that range are in the auth chain
+        # difference.
         result = set()
 
         chain_to_gap = {}
         for chain_id in seen_chains:
-            min_seq_no = min(
-                chains.get(chain_id, 0) for chains in set_to_chain.values()
-            )
+            min_seq_no = min(chains.get(chain_id, 0) for chains in set_to_chain)
 
             max_seq_no = 0
-            for chains in set_to_chain.values():
+            for chains in set_to_chain:
                 s = chains.get(chain_id)
                 if s:
                     max_seq_no = max(max_seq_no, s)
 
             if min_seq_no < max_seq_no:
+                # We have a non empty gap, try and fill it from the events that
+                # we have, otherwise add them to the list of gaps to pull out
+                # from the DB.
                 for seq_no in range(min_seq_no + 1, max_seq_no + 1):
                     event_id = chain_to_event[chain_id].get(seq_no)
                     if event_id:
@@ -267,21 +282,37 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                         chain_to_gap[chain_id] = (min_seq_no, max_seq_no)
                         break
 
-        sql = """
-            SELECT event_id
-            FROM event_auth_chains AS c, (VALUES ?) AS l(chain_id, min_seq, max_seq)
-            WHERE
-                c.chain_id = l.chain_id
-                AND min_seq < sequence_number AND sequence_number <= max_seq
-        """
+        if not chain_to_gap:
+            # If there are no gaps to fetch, we're done!
+            return result
 
-        args = [
-            (chain_id, min_no, max_no)
-            for chain_id, (min_no, max_no) in chain_to_gap.items()
-        ]
+        if isinstance(self.database_engine, PostgresEngine):
+            # We can use `execute_values` to efficiently fetch the gaps when
+            # using postgres.
+            sql = """
+                SELECT event_id
+                FROM event_auth_chains AS c, (VALUES ?) AS l(chain_id, min_seq, max_seq)
+                WHERE
+                    c.chain_id = l.chain_id
+                    AND min_seq < sequence_number AND sequence_number <= max_seq
+            """
 
-        rows = txn.execute_values(sql, args, fetch=True)
-        result.update(r for r, in rows)
+            args = [
+                (chain_id, min_no, max_no)
+                for chain_id, (min_no, max_no) in chain_to_gap.items()
+            ]
+
+            rows = txn.execute_values(sql, args, fetch=True)
+            result.update(r for r, in rows)
+        else:
+            # For SQLite we just fall back to doing a noddy for loop.
+            sql = """
+                SELECT event_id FROM event_auth_chains
+                WHERE chain_id = ? AND ? < sequence_number AND sequence_number <= ?
+            """
+            for chain_id, (min_no, max_no) in chain_to_gap.items():
+                txn.execute(sql, (chain_id, min_no, max_no))
+                result.update(r for r, in txn)
 
         return result
 

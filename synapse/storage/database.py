@@ -268,6 +268,9 @@ class LoggingTransaction:
                 self.execute(sql, val)
 
     def execute_values(self, sql: str, *args: Any, **kwargs) -> None:
+        """Corresponds to psycopg2.extras.execute_values. Only available when
+        using postgres.
+        """
         assert isinstance(self.database_engine, PostgresEngine)
         from psycopg2.extras import execute_values  # type: ignore
 
