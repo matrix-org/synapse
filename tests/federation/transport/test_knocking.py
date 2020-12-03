@@ -51,7 +51,11 @@ class FederationKnockingTestCase(FederatingHomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
         self.store = homeserver.get_datastore()
 
-        # Have this homeserver auto-approve all event signature checking
+        # We're not going to be properly signing events as our remote homeserver is fake,
+        # therefore disable event signature checks.
+        # Note that these checks are not relevant to this test case.
+
+        # Have this homeserver auto-approve all event signature checking.
         def approve_all_signature_checking(_, ev):
             return [succeed(ev[0])]
 
@@ -59,16 +63,17 @@ class FederationKnockingTestCase(FederatingHomeserverTestCase):
             approve_all_signature_checking
         )
 
-        # Have this homeserver skip event auth checks.
-        #
-        # While this prevent membership transistion checks, that is already
-        # tested elsewhere
+        # Have this homeserver skip event auth checks. This is necessary due to
+        # event auth checks ensuring that events were signed the sender's homeserver.
         event_auth.check = Mock(return_value=make_awaitable(None))
 
+        # Bypass authentication checks for federation requests originating from our
+        # test homeserver.
         class Authenticator:
             def authenticate_request(self, request, content):
                 return make_awaitable("other.example.com")
 
+        # Override federation ratelimits
         ratelimiter = FederationRateLimiter(
             clock,
             FederationRateLimitConfig(
