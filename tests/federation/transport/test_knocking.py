@@ -41,134 +41,6 @@ KNOCK_UNSTABLE_IDENTIFIER = "xyz.amorgan.knock"
 SECRET_STATE_EVENT_TYPE = "com.example.secret"
 
 
-class FederationKnockingTestCase(
-    FederatingHomeserverTestCase, KnockingStrippedStateEventHelperMixin
-):
-    servlets = [
-        admin.register_servlets,
-        room.register_servlets,
-        login.register_servlets,
-    ]
-
-    def prepare(self, reactor, clock, homeserver):
-        self.store = homeserver.get_datastore()
-
-        # We're not going to be properly signing events as our remote homeserver is fake,
-        # therefore disable event signature checks.
-        # Note that these checks are not relevant to this test case.
-
-        # Have this homeserver auto-approve all event signature checking.
-        def approve_all_signature_checking(_, ev):
-            return [succeed(ev[0])]
-
-        homeserver.get_federation_server()._check_sigs_and_hashes = (
-            approve_all_signature_checking
-        )
-
-        # Have this homeserver skip event auth checks. This is necessary due to
-        # event auth checks ensuring that events were signed the sender's homeserver.
-        event_auth.check = Mock(return_value=make_awaitable(None))
-
-        # Bypass authentication checks for federation requests originating from our
-        # test homeserver.
-        class Authenticator:
-            def authenticate_request(self, request, content):
-                return make_awaitable("other.example.com")
-
-        # Override federation ratelimits
-        ratelimiter = FederationRateLimiter(
-            clock,
-            FederationRateLimitConfig(
-                window_size=1,
-                sleep_limit=1,
-                sleep_msec=1,
-                reject_limit=1000,
-                concurrent_requests=1000,
-            ),
-        )
-        federation_server.register_servlets(
-            homeserver, self.resource, Authenticator(), ratelimiter
-        )
-
-        return super().prepare(reactor, clock, homeserver)
-
-    def test_room_state_returned_when_knocking(self):
-        """
-        Tests that specific, stripped state events from a room are returned after
-        a remote homeserver successfully knocks on a local room.
-        """
-        user_id = self.register_user("u1", "you the one")
-        user_token = self.login("u1", "you the one")
-
-        fake_knocking_user_id = "@user:other.example.com"
-
-        # Create a room with a room version that includes knocking
-        room_id = self.helper.create_room_as(
-            "u1",
-            is_public=False,
-            room_version=RoomVersions.MSC2403_DEV.identifier,
-            tok=user_token,
-        )
-
-        # Update the join rules and add additional state to the room to check for later
-        expected_room_state = self.send_example_state_events_to_room(
-            self.hs, room_id, user_id
-        )
-
-        request, channel = self.make_request(
-            "GET",
-            "/_matrix/federation/unstable/%s/make_knock/%s/%s"
-            % (KNOCK_UNSTABLE_IDENTIFIER, room_id, fake_knocking_user_id),
-        )
-        self.assertEquals(200, channel.code, channel.result)
-
-        # Note: We don't expect the knock membership event to be sent over federation as
-        # part of the stripped room state, as the knocking homeserver already has that
-        # event. It is only done for clients during /sync
-
-        # Extract the generated knock event json
-        knock_event = channel.json_body["event"]
-
-        # Check that the event has things we expect in it
-        self.assertEquals(knock_event["room_id"], room_id)
-        self.assertEquals(knock_event["sender"], fake_knocking_user_id)
-        self.assertEquals(knock_event["state_key"], fake_knocking_user_id)
-        self.assertEquals(knock_event["type"], EventTypes.Member)
-        self.assertEquals(knock_event["content"]["membership"], Membership.KNOCK)
-
-        # Turn the event json dict into a proper event.
-        # We won't sign it properly, but that's OK as we stub out event auth in `prepare`
-        signed_knock_event = builder.create_local_event_from_event_dict(
-            self.clock,
-            self.hs.hostname,
-            self.hs.signing_key,
-            room_version=RoomVersions.MSC2403_DEV,
-            event_dict=knock_event,
-        )
-
-        # Convert our proper event back to json dict format
-        signed_knock_event_json = signed_knock_event.get_pdu_json(
-            self.clock.time_msec()
-        )
-
-        # Send the signed knock event into the room
-        request, channel = self.make_request(
-            "PUT",
-            "/_matrix/federation/unstable/%s/send_knock/%s/%s"
-            % (KNOCK_UNSTABLE_IDENTIFIER, room_id, signed_knock_event.event_id),
-            signed_knock_event_json,
-        )
-        self.assertEquals(200, channel.code, channel.result)
-
-        # Check that we got the stripped room state in return
-        room_state_events = channel.json_body["knock_state_events"]
-
-        # Validate the stripped room state events
-        self.check_knock_room_state_against_room_state(
-            room_state_events, expected_room_state
-        )
-
-
 class KnockingStrippedStateEventHelperMixin(TestCase):
     def send_example_state_events_to_room(
         self, hs: "HomeServer", room_id: str, sender: str,
@@ -304,3 +176,131 @@ class KnockingStrippedStateEventHelperMixin(TestCase):
 
         # Ensure that no excess state was included
         self.assertNotIn(SECRET_STATE_EVENT_TYPE, knock_room_state)
+
+
+class FederationKnockingTestCase(
+    FederatingHomeserverTestCase, KnockingStrippedStateEventHelperMixin
+):
+    servlets = [
+        admin.register_servlets,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, homeserver):
+        self.store = homeserver.get_datastore()
+
+        # We're not going to be properly signing events as our remote homeserver is fake,
+        # therefore disable event signature checks.
+        # Note that these checks are not relevant to this test case.
+
+        # Have this homeserver auto-approve all event signature checking.
+        def approve_all_signature_checking(_, ev):
+            return [succeed(ev[0])]
+
+        homeserver.get_federation_server()._check_sigs_and_hashes = (
+            approve_all_signature_checking
+        )
+
+        # Have this homeserver skip event auth checks. This is necessary due to
+        # event auth checks ensuring that events were signed the sender's homeserver.
+        event_auth.check = Mock(return_value=make_awaitable(None))
+
+        # Bypass authentication checks for federation requests originating from our
+        # test homeserver.
+        class Authenticator:
+            def authenticate_request(self, request, content):
+                return make_awaitable("other.example.com")
+
+        # Override federation ratelimits
+        ratelimiter = FederationRateLimiter(
+            clock,
+            FederationRateLimitConfig(
+                window_size=1,
+                sleep_limit=1,
+                sleep_msec=1,
+                reject_limit=1000,
+                concurrent_requests=1000,
+            ),
+        )
+        federation_server.register_servlets(
+            homeserver, self.resource, Authenticator(), ratelimiter
+        )
+
+        return super().prepare(reactor, clock, homeserver)
+
+    def test_room_state_returned_when_knocking(self):
+        """
+        Tests that specific, stripped state events from a room are returned after
+        a remote homeserver successfully knocks on a local room.
+        """
+        user_id = self.register_user("u1", "you the one")
+        user_token = self.login("u1", "you the one")
+
+        fake_knocking_user_id = "@user:other.example.com"
+
+        # Create a room with a room version that includes knocking
+        room_id = self.helper.create_room_as(
+            "u1",
+            is_public=False,
+            room_version=RoomVersions.MSC2403_DEV.identifier,
+            tok=user_token,
+        )
+
+        # Update the join rules and add additional state to the room to check for later
+        expected_room_state = self.send_example_state_events_to_room(
+            self.hs, room_id, user_id
+        )
+
+        request, channel = self.make_request(
+            "GET",
+            "/_matrix/federation/unstable/%s/make_knock/%s/%s"
+            % (KNOCK_UNSTABLE_IDENTIFIER, room_id, fake_knocking_user_id),
+        )
+        self.assertEquals(200, channel.code, channel.result)
+
+        # Note: We don't expect the knock membership event to be sent over federation as
+        # part of the stripped room state, as the knocking homeserver already has that
+        # event. It is only done for clients during /sync
+
+        # Extract the generated knock event json
+        knock_event = channel.json_body["event"]
+
+        # Check that the event has things we expect in it
+        self.assertEquals(knock_event["room_id"], room_id)
+        self.assertEquals(knock_event["sender"], fake_knocking_user_id)
+        self.assertEquals(knock_event["state_key"], fake_knocking_user_id)
+        self.assertEquals(knock_event["type"], EventTypes.Member)
+        self.assertEquals(knock_event["content"]["membership"], Membership.KNOCK)
+
+        # Turn the event json dict into a proper event.
+        # We won't sign it properly, but that's OK as we stub out event auth in `prepare`
+        signed_knock_event = builder.create_local_event_from_event_dict(
+            self.clock,
+            self.hs.hostname,
+            self.hs.signing_key,
+            room_version=RoomVersions.MSC2403_DEV,
+            event_dict=knock_event,
+        )
+
+        # Convert our proper event back to json dict format
+        signed_knock_event_json = signed_knock_event.get_pdu_json(
+            self.clock.time_msec()
+        )
+
+        # Send the signed knock event into the room
+        request, channel = self.make_request(
+            "PUT",
+            "/_matrix/federation/unstable/%s/send_knock/%s/%s"
+            % (KNOCK_UNSTABLE_IDENTIFIER, room_id, signed_knock_event.event_id),
+            signed_knock_event_json,
+        )
+        self.assertEquals(200, channel.code, channel.result)
+
+        # Check that we got the stripped room state in return
+        room_state_events = channel.json_body["knock_state_events"]
+
+        # Validate the stripped room state events
+        self.check_knock_room_state_against_room_state(
+            room_state_events, expected_room_state
+        )
