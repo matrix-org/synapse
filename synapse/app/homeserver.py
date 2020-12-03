@@ -19,7 +19,7 @@ import gc
 import logging
 import os
 import sys
-from typing import Iterable
+from typing import Iterable, Iterator
 
 from twisted.application import service
 from twisted.internet import defer, reactor
@@ -448,13 +448,36 @@ def setup(config_options):
     return hs
 
 
-def format_config_error(e: ConfigError):
+def format_config_error(e: ConfigError) -> Iterator[str]:
+    """
+    Formats a config error neatly
+
+    The idea is to format the immediate error, plus the "causes" of those errors,
+    hopefully in a way that makes sense to the user. For example:
+
+        Error in configuration at 'oidc_config.user_mapping_provider.config.display_name_template':
+          Failed to parse config for module 'JinjaOidcMappingProvider':
+            invalid jinja template:
+              unexpected end of template, expected 'end of print statement'.
+
+    Args:
+        e: the error to be formatted
+
+    Returns: An iterator which yields string fragments to be formatted
+    """
     yield "Error in configuration"
 
     if e.path:
         yield " at '%s'" % (".".join(e.path),)
 
     yield ":\n  %s" % (e.msg,)
+
+    e = e.__cause__
+    indent = 1
+    while e:
+        indent += 1
+        yield ":\n%s%s" % ("  " * indent, str(e))
+        e = e.__cause__
 
 
 class SynapseService(service.Service):
