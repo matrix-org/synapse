@@ -90,7 +90,7 @@ class SynapseHomeServer(HomeServer):
         tls = listener_config.tls
         site_tag = listener_config.http_options.tag
         if site_tag is None:
-            site_tag = port
+            site_tag = str(port)
 
         # We always include a health resource.
         resources = {"/health": HealthResource()}
@@ -107,7 +107,10 @@ class SynapseHomeServer(HomeServer):
         logger.debug("Configuring additional resources: %r", additional_resources)
         module_api = self.get_module_api()
         for path, resmodule in additional_resources.items():
-            handler_cls, config = load_module(resmodule)
+            handler_cls, config = load_module(
+                resmodule,
+                ("listeners", site_tag, "additional_resources", "<%s>" % (path,)),
+            )
             handler = handler_cls(config, module_api)
             if IResource.providedBy(handler):
                 resource = handler

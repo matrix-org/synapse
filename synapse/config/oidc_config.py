@@ -66,7 +66,7 @@ class OIDCConfig(Config):
         (
             self.oidc_user_mapping_provider_class,
             self.oidc_user_mapping_provider_config,
-        ) = load_module(ump_config)
+        ) = load_module(ump_config, ("oidc_config", "user_mapping_provider"))
 
         # Ensure loaded user mapping module has defined all necessary methods
         required_methods = [
