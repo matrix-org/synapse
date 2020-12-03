@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from typing import Optional
 
 from netaddr import IPSet
@@ -20,17 +19,16 @@ from netaddr import IPSet
 from synapse.config._base import Config, ConfigError
 from synapse.config._util import validate_config
 
-
 DEFAULT_IP_RANGE_BLACKLIST = [
-    '127.0.0.0/8',
-    '10.0.0.0/8',
-    '172.16.0.0/12',
-    '192.168.0.0/16',
-    '100.64.0.0/10',
-    '169.254.0.0/16',
-    '::1/128',
-    'fe80::/64',
-    'fc00::/7',
+    "127.0.0.0/8",
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+    "100.64.0.0/10",
+    "169.254.0.0/16",
+    "::1/128",
+    "fe80::/64",
+    "fc00::/7",
 ]
 
 
@@ -49,7 +47,9 @@ class FederationConfig(Config):
             for domain in federation_domain_whitelist:
                 self.federation_domain_whitelist[domain] = True
 
-        ip_range_blacklist = config.get("ip_range_blacklist") or DEFAULT_IP_RANGE_BLACKLIST
+        ip_range_blacklist = (
+            config.get("ip_range_blacklist") or DEFAULT_IP_RANGE_BLACKLIST
+        )
 
         # Attempt to create an IPSet from the given ranges
         try:
