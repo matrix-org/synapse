@@ -21,6 +21,19 @@ from synapse.config._base import Config, ConfigError
 from synapse.config._util import validate_config
 
 
+DEFAULT_IP_RANGE_BLACKLIST = [
+    '127.0.0.0/8',
+    '10.0.0.0/8',
+    '172.16.0.0/12',
+    '192.168.0.0/16',
+    '100.64.0.0/10',
+    '169.254.0.0/16',
+    '::1/128',
+    'fe80::/64',
+    'fc00::/7',
+]
+
+
 class FederationConfig(Config):
     section = "federation"
 
@@ -36,7 +49,7 @@ class FederationConfig(Config):
             for domain in federation_domain_whitelist:
                 self.federation_domain_whitelist[domain] = True
 
-        ip_range_blacklist = config.get("ip_range_blacklist", [])
+        ip_range_blacklist = config.get("ip_range_blacklist") or DEFAULT_IP_RANGE_BLACKLIST
 
         # Attempt to create an IPSet from the given ranges
         try:
@@ -85,8 +98,8 @@ class FederationConfig(Config):
         #  - syd.example.com
 
         # Prevent outgoing requests from being sent to the following blacklisted IP address
-        # CIDR ranges. If this option is not specified, or specified with an empty list,
-        # no IP range blacklist will be enforced.
+        # CIDR ranges. If this option is not specified or is empty then it defaults to
+        # private IP address ranges (see the example below).
         #
         # The blacklist applies to the outbound requests for federation, identity servers,
         # push servers, and for checking key validitity for third-party invite events.
@@ -97,15 +110,15 @@ class FederationConfig(Config):
         # This option replaces federation_ip_range_blacklist in Synapse v1.24.0.
         #
         ip_range_blacklist:
-          - '127.0.0.0/8'
-          - '10.0.0.0/8'
-          - '172.16.0.0/12'
-          - '192.168.0.0/16'
-          - '100.64.0.0/10'
-          - '169.254.0.0/16'
-          - '::1/128'
-          - 'fe80::/64'
-          - 'fc00::/7'
+          #- '127.0.0.0/8'
+          #- '10.0.0.0/8'
+          #- '172.16.0.0/12'
+          #- '192.168.0.0/16'
+          #- '100.64.0.0/10'
+          #- '169.254.0.0/16'
+          #- '::1/128'
+          #- 'fe80::/64'
+          #- 'fc00::/7'
 
         # Report prometheus metrics on the age of PDUs being sent to and received from
         # the following domains. This can be used to give an idea of "delay" on inbound
