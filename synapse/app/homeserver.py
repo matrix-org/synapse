@@ -342,7 +342,10 @@ def setup(config_options):
             "Synapse Homeserver", config_options
         )
     except ConfigError as e:
-        sys.stderr.write("\nERROR: %s\n" % (e,))
+        sys.stderr.write("\n")
+        for f in format_config_error(e):
+            sys.stderr.write(f)
+        sys.stderr.write("\n")
         sys.exit(1)
 
     if not config:
@@ -443,6 +446,15 @@ def setup(config_options):
     reactor.callWhenRunning(lambda: defer.ensureDeferred(start()))
 
     return hs
+
+
+def format_config_error(e: ConfigError):
+    yield "Error in configuration"
+
+    if e.path:
+        yield " at '%s'" % (".".join(e.path),)
+
+    yield ":\n  %s" % (e.msg,)
 
 
 class SynapseService(service.Service):

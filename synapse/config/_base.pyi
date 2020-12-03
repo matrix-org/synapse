@@ -1,4 +1,4 @@
-from typing import Any, List, Optional
+from typing import Any, Iterable, List, Optional
 
 from synapse.config import (
     api,
@@ -35,7 +35,10 @@ from synapse.config import (
     workers,
 )
 
-class ConfigError(Exception): ...
+class ConfigError(Exception):
+    def __init__(self, msg: str, path: Optional[Iterable[str]] = None):
+        self.msg = msg
+        self.path = path
 
 MISSING_REPORT_STATS_CONFIG_INSTRUCTIONS: str
 MISSING_REPORT_STATS_SPIEL: str
