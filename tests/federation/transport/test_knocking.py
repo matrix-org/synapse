@@ -20,7 +20,7 @@ from mock import Mock
 from twisted.internet.defer import succeed
 
 from synapse import event_auth
-from synapse.api.constants import EventTypes, JoinRules
+from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.events import builder
@@ -104,7 +104,7 @@ class FederationKnockingTestCase(FederatingHomeserverTestCase):
         room_id = self.helper.create_room_as(
             "u1",
             is_public=False,
-            room_version=KNOCK_UNSTABLE_IDENTIFIER,
+            room_version=RoomVersions.MSC2403_DEV.identifier,
             tok=user_token,
         )
 
@@ -132,9 +132,7 @@ class FederationKnockingTestCase(FederatingHomeserverTestCase):
         self.assertEquals(knock_event["sender"], fake_knocking_user_id)
         self.assertEquals(knock_event["state_key"], fake_knocking_user_id)
         self.assertEquals(knock_event["type"], EventTypes.Member)
-        self.assertEquals(
-            knock_event["content"]["membership"], KNOCK_UNSTABLE_IDENTIFIER
-        )
+        self.assertEquals(knock_event["content"]["membership"], Membership.KNOCK)
 
         # Turn the event json dict into a proper event.
         # We won't sign it properly, but that's OK as we stub out event auth in `prepare`
@@ -199,7 +197,7 @@ def send_example_state_events_to_room(
     testcase.get_success(
         event_injection.inject_event(
             hs,
-            room_version=KNOCK_UNSTABLE_IDENTIFIER,
+            room_version=RoomVersions.MSC2403_DEV.identifier,
             room_id=room_id,
             sender=sender,
             type=secret_state_event_type,
@@ -255,7 +253,7 @@ def send_example_state_events_to_room(
         testcase.get_success(
             event_injection.inject_event(
                 hs,
-                room_version=KNOCK_UNSTABLE_IDENTIFIER,
+                room_version=RoomVersions.MSC2403_DEV.identifier,
                 room_id=room_id,
                 sender=sender,
                 type=event_type,
