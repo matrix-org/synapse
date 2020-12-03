@@ -37,9 +37,6 @@ from tests.unittest import FederatingHomeserverTestCase, TestCase
 # An identifier to use while MSC2304 is not in a stable release of the spec
 KNOCK_UNSTABLE_IDENTIFIER = "xyz.amorgan.knock"
 
-# An event type that we do not expect to be given to users knocking on a room
-SECRET_STATE_EVENT_TYPE = "com.example.secret"
-
 
 class KnockingStrippedStateEventHelperMixin(TestCase):
     def send_example_state_events_to_room(
@@ -73,7 +70,7 @@ class KnockingStrippedStateEventHelperMixin(TestCase):
                 room_version=RoomVersions.MSC2403_DEV.identifier,
                 room_id=room_id,
                 sender=sender,
-                type=SECRET_STATE_EVENT_TYPE,
+                type="com.example.secret",
                 state_key="",
                 content={"secret": "password"},
             )
@@ -153,6 +150,9 @@ class KnockingStrippedStateEventHelperMixin(TestCase):
         """
         for event in knock_room_state:
             event_type = event["type"]
+
+            # Check that this event type is one of those that we expected.
+            # Note: This will also check that no excess state was included
             self.assertIn(event_type, expected_room_state)
 
             # Check the state content matches
@@ -173,9 +173,6 @@ class KnockingStrippedStateEventHelperMixin(TestCase):
 
         # Check that all expected state events were accounted for
         self.assertEqual(len(expected_room_state), 0)
-
-        # Ensure that no excess state was included
-        self.assertNotIn(SECRET_STATE_EVENT_TYPE, knock_room_state)
 
 
 class FederationKnockingTestCase(
