@@ -20,7 +20,7 @@ from mock import Mock
 from twisted.internet.defer import succeed
 
 from synapse import event_auth
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, JoinRules
 from synapse.api.room_versions import RoomVersions
 from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.events import builder
@@ -216,10 +216,10 @@ def send_example_state_events_to_room(
             # We need to set the room's join rules to allow knocking
             (
                 EventTypes.JoinRules,
-                {"content": {"join_rule": "xyz.amorgan.knock"}, "state_key": ""},
+                {"content": {"join_rule": JoinRules.KNOCK}, "state_key": ""},
             ),
             # Below are state events that are to be stripped and sent to clients
-            (EventTypes.Name, {"content": {"name": "A cool room"}, "state_key": ""},),
+            (EventTypes.Name, {"content": {"name": "A cool room"}, "state_key": ""}),
             (
                 EventTypes.RoomAvatar,
                 {
