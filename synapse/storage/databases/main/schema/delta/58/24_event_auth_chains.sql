@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-CREATE SEQUENCE IF NOT EXISTS event_auth_chain_id;
+-- See docs/auth_chain_difference_algorithm.md
 
 CREATE TABLE event_auth_chains (
   event_id TEXT PRIMARY KEY,
@@ -21,7 +21,7 @@ CREATE TABLE event_auth_chains (
   sequence_number BIGINT NOT NULL
 );
 
-CREATE UNIQUE INDEX ON event_auth_chains (chain_id, sequence_number);
+CREATE UNIQUE INDEX event_auth_chains_c_seq_index ON event_auth_chains (chain_id, sequence_number);
 
 
 CREATE TABLE event_auth_chain_links (
@@ -33,7 +33,7 @@ CREATE TABLE event_auth_chain_links (
 );
 
 
-CREATE INDEX ON event_auth_chain_links (origin_chain_id, target_chain_id);
+CREATE INDEX event_auth_chain_links_idx ON event_auth_chain_links (origin_chain_id, target_chain_id);
 
 
 -- Whether we've calculated the above index for a room.
