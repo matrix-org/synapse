@@ -211,7 +211,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         # sequence number reachable from the state set.
         set_to_chain = []  # type: List[Dict[int, int]]
         for state_set in state_sets:
-            chains = {}
+            chains = {}  # type: Dict[int, int]
             set_to_chain.append(chains)
 
             for event_id in state_set:
