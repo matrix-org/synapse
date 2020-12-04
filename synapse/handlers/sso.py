@@ -197,13 +197,9 @@ class SsoHandler(BaseHandler):
                 raise
             except Exception as e:
                 # Any other exception is unexpected.
-                logger.error(
-                    "Unexpected error when extracting user attributes from SSO response: %s"
-                    % (e,)
-                )
                 raise MappingException(
                     "Could not extract user attributes from SSO response."
-                )
+                ) from e
 
             logger.debug(
                 "Retrieved user attributes from user mapping provider: %r (attempt %d)",
