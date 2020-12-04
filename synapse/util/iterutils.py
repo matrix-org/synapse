@@ -58,6 +58,8 @@ def sorted_topologically(
     For example `sorted_topologically([1, 2], {1: [2]})` will yield `2, 1`.
     """
 
+    # This is implemented by Kahn's algorithm.
+
     degree_map = {node: 0 for node in nodes}
     reverse_graph = {}  # type: Dict[T, Set[T]]
 
