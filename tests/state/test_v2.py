@@ -623,7 +623,9 @@ class AuthChainDifferenceTestCase(unittest.TestCase):
 
         store = TestStateResolutionStore(persisted_events)
 
-        diff_d = _get_auth_chain_difference(state_sets, unpersited_events, store)
+        diff_d = _get_auth_chain_difference(
+            ROOM_ID, state_sets, unpersited_events, store
+        )
         difference = self.successResultOf(defer.ensureDeferred(diff_d))
 
         self.assertEqual(difference, {c.event_id})
@@ -662,7 +664,9 @@ class AuthChainDifferenceTestCase(unittest.TestCase):
 
         store = TestStateResolutionStore(persisted_events)
 
-        diff_d = _get_auth_chain_difference(state_sets, unpersited_events, store)
+        diff_d = _get_auth_chain_difference(
+            ROOM_ID, state_sets, unpersited_events, store
+        )
         difference = self.successResultOf(defer.ensureDeferred(diff_d))
 
         self.assertEqual(difference, {d.event_id, c.event_id})
@@ -707,7 +711,9 @@ class AuthChainDifferenceTestCase(unittest.TestCase):
 
         store = TestStateResolutionStore(persisted_events)
 
-        diff_d = _get_auth_chain_difference(state_sets, unpersited_events, store)
+        diff_d = _get_auth_chain_difference(
+            ROOM_ID, state_sets, unpersited_events, store
+        )
         difference = self.successResultOf(defer.ensureDeferred(diff_d))
 
         self.assertEqual(difference, {d.event_id, e.event_id})
@@ -773,7 +779,7 @@ class TestStateResolutionStore:
 
         return list(result)
 
-    def get_auth_chain_difference(self, auth_sets):
+    def get_auth_chain_difference(self, room_id, auth_sets):
         chains = [frozenset(self._get_auth_chain(a)) for a in auth_sets]
 
         common = set(chains[0]).intersection(*chains[1:])
