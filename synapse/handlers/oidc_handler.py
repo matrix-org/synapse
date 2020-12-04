@@ -888,7 +888,7 @@ class OidcHandler(BaseHandler):
                 # continue to already be in use. Note that the error raised is
                 # arbitrary and will get turned into a MappingException.
                 if failures:
-                    raise RuntimeError(
+                    raise MappingException(
                         "Mapping provider does not support de-duplicating Matrix IDs"
                     )
 

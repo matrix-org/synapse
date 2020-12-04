@@ -170,6 +170,13 @@ A custom mapping provider must specify the following methods:
                          the value of `mxid_localpart`.
        * `emails` - A list of emails for the new user. If not provided, will
                     default to an empty list.
+       
+       Alternatively it can raise a `synapse.api.errors.RedirectException` to
+       redirect the user to another page. This is useful to prompt the user for
+       additional information, e.g. if you want them to provide their own username.
+       It is the responsibility of the mapping provider to either redirect back
+       to `client_redirect_url` (including any additional information) or to
+       complete registration using methods from the `ModuleApi`.
 
 ### Default SAML Mapping Provider
 

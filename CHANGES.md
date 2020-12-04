@@ -1,3 +1,18 @@
+Synapse 1.24.0rc2 (2020-12-04)
+==============================
+
+Bugfixes
+--------
+
+- Fix a regression in v1.24.0rc1 which failed to allow SAML mapping providers which were unable to redirect users to an additional page. ([\#8878](https://github.com/matrix-org/synapse/issues/8878))
+
+
+Internal Changes
+----------------
+
+- Add support for the `prometheus_client` newer than 0.9.0. Contributed by Jordan Bancino. ([\#8875](https://github.com/matrix-org/synapse/issues/8875))
+
+
 Synapse 1.24.0rc1 (2020-12-02)
 ==============================
 
