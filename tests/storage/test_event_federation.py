@@ -17,6 +17,7 @@ import attr
 
 from synapse.events import _EventInternalMetadata
 
+from parameterized import parameterized
 import tests.unittest
 import tests.utils
 
@@ -117,7 +118,8 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         r = self.get_success(self.store.get_rooms_with_many_extremities(5, 1, [room1]))
         self.assertTrue(r == [room2] or r == [room3])
 
-    def test_auth_difference(self):
+    @parameterized.expand([(True,), (False,)])
+    def test_auth_difference(self, use_chain_cover_index: bool):
         room_id = "@ROOM:local"
 
         # The silly auth graph we use to test the auth difference algorithm,
@@ -174,7 +176,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                     "creator": "room_creator_user_id",
                     "is_public": True,
                     "room_version": "6",
-                    "has_auth_chain_index": True,
+                    "has_auth_chain_index": use_chain_cover_index,
                 },
             )
 
