@@ -1,0 +1,1 @@
+Fix a regression in v1.24.0rc1 which failed to allow SAML mapping providers which were unable to redirect users to an additional page.

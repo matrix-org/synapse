@@ -14,6 +14,7 @@
 
 import attr
 
+from synapse.api.errors import RedirectException
 from synapse.handlers.sso import MappingException
 
 from tests.unittest import HomeserverTestCase, override_config
@@ -47,6 +48,13 @@ class TestMappingProvider:
     ):
         localpart = saml_response.ava["username"] + (str(failures) if failures else "")
         return {"mxid_localpart": localpart, "displayname": None}
+
+
+class TestRedirectMappingProvider(TestMappingProvider):
+    def saml_response_to_user_attributes(
+        self, saml_response, failures, client_redirect_url
+    ):
+        raise RedirectException(b"https://custom-saml-redirect/")
 
 
 class SamlHandlerTestCase(HomeserverTestCase):
@@ -166,3 +174,23 @@ class SamlHandlerTestCase(HomeserverTestCase):
         self.assertEqual(
             str(e.value), "Unable to generate a Matrix ID from the SSO response"
         )
+
+    @override_config(
+        {
+            "saml2_config": {
+                "user_mapping_provider": {
+                    "module": __name__ + ".TestRedirectMappingProvider"
+                },
+            }
+        }
+    )
+    def test_map_saml_response_redirect(self):
+        saml_response = FakeAuthnResponse({"uid": "test", "username": "test_user"})
+        redirect_url = ""
+        e = self.get_failure(
+            self.handler._map_saml_response_to_user(
+                saml_response, redirect_url, "user-agent", "10.10.10.10"
+            ),
+            RedirectException,
+        )
+        self.assertEqual(e.value.location, b"https://custom-saml-redirect/")

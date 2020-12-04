@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional
 
 import attr
 
+from synapse.api.errors import RedirectException
 from synapse.handlers._base import BaseHandler
 from synapse.http.server import respond_with_html
 from synapse.types import UserID, contains_invalid_mxid_characters
@@ -28,7 +29,9 @@ logger = logging.getLogger(__name__)
 
 
 class MappingException(Exception):
-    """Used to catch errors when mapping the UserInfo object
+    """Used to catch errors when mapping an SSO response to user attributes.
+
+    Note that the msg that is raised is shown to end-users.
     """
 
 
@@ -145,6 +148,14 @@ class SsoHandler(BaseHandler):
             sso_to_matrix_id_mapper: A callable to generate the user attributes.
                 The only parameter is an integer which represents the amount of
                 times the returned mxid localpart mapping has failed.
+
+                It is expected that the mapper can raise two exceptions, which
+                will get passed through to the caller:
+
+                    MappingException if there was a problem mapping the response
+                        to the user.
+                    RedirectException to redirect to an additional page (e.g.
+                        to prompt the user for more information).
             grandfather_existing_users: A callable which can return an previously
                 existing matrix ID. The SSO ID is then linked to the returned
                 matrix ID.
@@ -154,8 +165,8 @@ class SsoHandler(BaseHandler):
 
         Raises:
             MappingException if there was a problem mapping the response to a user.
-            RedirectException: some mapping providers may raise this if they need
-                to redirect to an interstitial page.
+            RedirectException: if the mapping provider needs to redirect the user
+                to an additional page. (e.g. to prompt for more information)
 
         """
         # first of all, check if we already have a mapping for this user
@@ -179,9 +190,19 @@ class SsoHandler(BaseHandler):
         for i in range(self._MAP_USERNAME_RETRIES):
             try:
                 attributes = await sso_to_matrix_id_mapper(i)
+            except (RedirectException, MappingException):
+                # Mapping providers are allowed to issue a redirect (e.g. to ask
+                # the user for more information) and can issue a mapping exception
+                # if a name cannot be generated.
+                raise
             except Exception as e:
+                # Any other exception is unexpected.
+                logger.error(
+                    "Unexpected error when extracting user attributes from SSO response: %s"
+                    % (e,)
+                )
                 raise MappingException(
-                    "Could not extract user attributes from SSO response: " + str(e)
+                    "Could not extract user attributes from SSO response."
                 )
 
             logger.debug(
