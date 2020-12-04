@@ -36,5 +36,16 @@ CREATE TABLE event_auth_chain_links (
 CREATE INDEX event_auth_chain_links_idx ON event_auth_chain_links (origin_chain_id, target_chain_id);
 
 
+-- Events that we have persisted but not calculated auth chains for.
+CREATE TABLE event_auth_chain_to_calculate (
+  event_id TEXT PRIMARY KEY,
+  room_id TEXT NOT NULL,
+  type TEXT NOT NULL,
+  state_key TEXT NOT NULL
+);
+
+CREATE INDEX event_auth_chain_to_calculate_rm_id ON event_auth_chain_to_calculate(room_id);
+
+
 -- Whether we've calculated the above index for a room.
 ALTER TABLE rooms ADD COLUMN has_auth_chain_index BOOLEAN;

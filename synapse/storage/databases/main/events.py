@@ -452,13 +452,11 @@ class PersistEventsStore:
             row["room_id"]: bool(row["has_auth_chain_index"]) for row in rows
         }
 
-        event_ids = {event.event_id for event in events}
+        event_ids = {event.event_id: event for event in events}
         state_events = [
             event
             for event in events
-            if event.is_state()
-            and room_to_index[event.room_id]
-            and not event.internal_metadata.is_out_of_band_membership()
+            if event.is_state() and room_to_index[event.room_id]
         ]
         if state_events:
             chain_map = {}
@@ -467,6 +465,32 @@ class PersistEventsStore:
             event_to_types = {e.event_id: (e.type, e.state_key) for e in state_events}
             events_to_calc_chain_id_for = set(event_to_types)
             event_to_auth_chain = {e.event_id: e.auth_event_ids() for e in state_events}
+
+            rows = self.db_pool.simple_select_many_txn(
+                txn,
+                table="event_auth_chain_to_calculate",
+                keyvalues={},
+                column="room_id",
+                iterable={e.room_id for e in state_events},
+                retcols=("event_id", "type", "state_key"),
+            )
+            for row in rows:
+                event_id = row["event_id"]
+                etype = row["type"]
+                state_key = row["state_key"]
+
+                auth_events = self.db_pool.simple_select_onecol_txn(
+                    txn,
+                    "event_auth",
+                    keyvalues={"event_id": event_id},
+                    retcol="auth_id",
+                )
+                if set(auth_events) - events_to_calc_chain_id_for:
+                    continue
+
+                events_to_calc_chain_id_for.add(event_id)
+                event_to_types[event_id] = (etype, state_key)
+                event_to_auth_chain[event_id] = auth_events
 
             # First we get the chain ID and sequence numbers for the events'
             # auth events (that aren't also currently being persisted).
@@ -478,9 +502,9 @@ class PersistEventsStore:
 
             missing_auth_chains = {
                 a_id
-                for e in state_events
-                for a_id in e.auth_event_ids()
-                if a_id not in event_ids
+                for auth_events in event_to_auth_chain.values()
+                for a_id in auth_events
+                if a_id not in events_to_calc_chain_id_for
             }
 
             # We loop here in case we find an out of band membership and need to
@@ -525,6 +549,36 @@ class PersistEventsStore:
                         )
                     else:
                         chain_map[auth_id] = (chain_id, sequence_number)
+
+            for event_id in sorted_topologically(
+                event_to_auth_chain, event_to_auth_chain
+            ):
+                # if not event.internal_metadata.is_out_of_band_membership():
+                #     continue
+
+                for auth_id in event_to_auth_chain[event_id]:
+                    if (
+                        auth_id not in chain_map
+                        and auth_id not in events_to_calc_chain_id_for
+                    ):
+                        events_to_calc_chain_id_for.discard(event_id)
+
+                        if event_id in event_ids:
+                            event = event_ids[event_id]
+                            self.db_pool.simple_insert_txn(
+                                txn,
+                                table="event_auth_chain_to_calculate",
+                                values={
+                                    "event_id": event.event_id,
+                                    "room_id": event.room_id,
+                                    "type": event.type,
+                                    "state_key": event.state_key,
+                                },
+                            )
+                        break
+
+            if not events_to_calc_chain_id_for:
+                return
 
             # We now calculate the chain IDs/sequence numbers for the events. We
             # do this by looking at the chain ID and sequence number of any auth
@@ -587,6 +641,14 @@ class PersistEventsStore:
                     {"event_id": event_id, "chain_id": c_id, "sequence_number": seq}
                     for event_id, (c_id, seq) in new_chains.items()
                 ],
+            )
+
+            self.db_pool.simple_delete_many_txn(
+                txn,
+                table="event_auth_chain_to_calculate",
+                keyvalues={},
+                column="event_id",
+                iterable=new_chains,
             )
 
             # Now we need to calculate any new links between chains caused by
