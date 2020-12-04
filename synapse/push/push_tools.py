@@ -46,7 +46,7 @@ async def get_badge_count(store: DataStore, user_id: str, group_by_room: bool) -
     return badge
 
 
-async def get_context_for_event(storage: Storage, state_handler, ev, user_id):
+async def get_context_for_event(storage: Storage, ev, user_id):
     ctx = {}
 
     room_state_ids = await storage.state.get_state_ids_for_event(ev.event_id)
