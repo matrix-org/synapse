@@ -674,38 +674,43 @@ class OidcHandler(BaseHandler):
                 self._sso_handler.render_error(request, "invalid_token", str(e))
                 return
 
-        # Pull out the user-agent and IP from the request.
-        user_agent = request.get_user_agent("")
-        ip_address = self.hs.get_ip_from_request(request)
-
-        # Call the mapper to register/login the user
         try:
+            # first check if we're doing a UIA
+            if ui_auth_session_id:
+                return await self._sso_handler.complete_sso_ui_auth_request(
+                    self._auth_provider_id,
+                    self._remote_id_from_userinfo(userinfo),
+                    ui_auth_session_id,
+                    request,
+                )
+
+            # otherwise, it's a login
+
+            # Pull out the user-agent and IP from the request.
+            user_agent = request.get_user_agent("")
+            ip_address = self.hs.get_ip_from_request(request)
+
+            # Call the mapper to register/login the user
             user_id = await self._map_userinfo_to_user(
                 userinfo, token, user_agent, ip_address
+            )
+
+            # Mapping providers might not have get_extra_attributes: only call this
+            # method if it exists.
+            extra_attributes = None
+            get_extra_attributes = getattr(
+                self._user_mapping_provider, "get_extra_attributes", None
+            )
+            if get_extra_attributes:
+                extra_attributes = await get_extra_attributes(userinfo, token)
+
+            # and finally complete the login
+            await self._auth_handler.complete_sso_login(
+                user_id, request, client_redirect_url, extra_attributes
             )
         except MappingException as e:
             logger.exception("Could not map user")
             self._sso_handler.render_error(request, "mapping_error", str(e))
-            return
-
-        # Mapping providers might not have get_extra_attributes: only call this
-        # method if it exists.
-        extra_attributes = None
-        get_extra_attributes = getattr(
-            self._user_mapping_provider, "get_extra_attributes", None
-        )
-        if get_extra_attributes:
-            extra_attributes = await get_extra_attributes(userinfo, token)
-
-        # and finally complete the login
-        if ui_auth_session_id:
-            await self._auth_handler.complete_sso_ui_auth(
-                user_id, ui_auth_session_id, request
-            )
-        else:
-            await self._auth_handler.complete_sso_login(
-                user_id, request, client_redirect_url, extra_attributes
-            )
 
     def _generate_oidc_session_token(
         self,
@@ -855,15 +860,7 @@ class OidcHandler(BaseHandler):
         Returns:
             The mxid of the user
         """
-        try:
-            remote_user_id = self._user_mapping_provider.get_remote_user_id(userinfo)
-        except Exception as e:
-            raise MappingException(
-                "Failed to extract subject from OIDC response: %s" % (e,)
-            )
-        # Some OIDC providers use integer IDs, but Synapse expects external IDs
-        # to be strings.
-        remote_user_id = str(remote_user_id)
+        remote_user_id = self._remote_id_from_userinfo(userinfo)
 
         # Older mapping providers don't accept the `failures` argument, so we
         # try and detect support.
@@ -932,6 +929,26 @@ class OidcHandler(BaseHandler):
             oidc_response_to_user_attributes,
             grandfather_existing_users,
         )
+
+    def _remote_id_from_userinfo(self, userinfo: UserInfo) -> str:
+        """Extract the unique remote id from an OIDC UserInfo block
+
+        Args:
+            userinfo: An object representing the user given by the OIDC provider
+        Returns:
+            remote user id
+        Raises:
+            MappingException if there was an error extracting the user id
+        """
+        try:
+            remote_user_id = self._user_mapping_provider.get_remote_user_id(userinfo)
+            # Some OIDC providers use integer IDs, but Synapse expects external IDs
+            # to be strings.
+            return str(remote_user_id)
+        except Exception as e:
+            raise MappingException(
+                "Failed to extract subject from OIDC response: %s" % (e,)
+            )
 
 
 UserAttributeDict = TypedDict(

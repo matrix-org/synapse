@@ -17,6 +17,8 @@ from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional
 
 import attr
 
+from twisted.web.http import Request
+
 from synapse.api.errors import RedirectException
 from synapse.http.server import respond_with_html
 from synapse.types import UserID, contains_invalid_mxid_characters
@@ -50,6 +52,7 @@ class SsoHandler:
         self._server_name = hs.hostname
         self._registration_handler = hs.get_registration_handler()
         self._error_template = hs.config.sso_error_template
+        self._auth_handler = hs.get_auth_handler()
 
     def render_error(
         self, request, error: str, error_description: Optional[str] = None
@@ -242,3 +245,43 @@ class SsoHandler:
             auth_provider_id, remote_user_id, registered_user_id
         )
         return registered_user_id
+
+    async def complete_sso_ui_auth_request(
+        self,
+        auth_provider_id: str,
+        remote_user_id: str,
+        ui_auth_session_id: str,
+        request: Request,
+    ) -> None:
+        """
+        Given an SSO ID, retrieve the user ID for it and complete UIA.
+
+        Note that this requires that the user is mapped in the "user_external_ids"
+        table. This will be the case if they have ever logged in via SAML or OIDC in
+        recentish synapse versions, but may not be for older users.
+
+        Args:
+            auth_provider_id: A unique identifier for this SSO provider, e.g.
+                "oidc" or "saml".
+            remote_user_id: The unique identifier from the SSO provider.
+            ui_auth_session_id: The ID of the user-interactive auth session.
+            request: The request to complete.
+        """
+
+        user_id = await self.get_sso_user_by_remote_user_id(
+            auth_provider_id, remote_user_id,
+        )
+
+        if not user_id:
+            logger.warning(
+                "Remote user %s/%s has not previously logged in here: UIA will fail",
+                auth_provider_id,
+                remote_user_id,
+            )
+            # Let the UIA flow handle this the same as if they presented creds for a
+            # different user.
+            user_id = ""
+
+        await self._auth_handler.complete_sso_ui_auth(
+            user_id, ui_auth_session_id, request
+        )
