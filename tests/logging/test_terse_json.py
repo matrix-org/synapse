@@ -24,24 +24,28 @@ from tests.unittest import TestCase
 
 
 class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
+    def setUp(self):
+        self.output = StringIO()
+
+    def get_log_line(self):
+        # One log message, with a single trailing newline.
+        data = self.output.getvalue()
+        logs = data.splitlines()
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(data.count("\n"), 1)
+        return json.loads(logs[0])
+
     def test_terse_json_output(self):
         """
         The Terse JSON formatter converts log messages to JSON.
         """
-        output = StringIO()
-
-        handler = logging.StreamHandler(output)
+        handler = logging.StreamHandler(self.output)
         handler.setFormatter(TerseJsonFormatter())
         logger = self.get_logger(handler)
 
         logger.info("Hello there, %s!", "wally")
 
-        # One log message, with a single trailing newline.
-        data = output.getvalue()
-        logs = data.splitlines()
-        self.assertEqual(len(logs), 1)
-        self.assertEqual(data.count("\n"), 1)
-        log = json.loads(logs[0])
+        log = self.get_log_line()
 
         # The terse logger should give us these keys.
         expected_log_keys = [
@@ -57,9 +61,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         """
         Additional information can be included in the structured logging.
         """
-        output = StringIO()
-
-        handler = logging.StreamHandler(output)
+        handler = logging.StreamHandler(self.output)
         handler.setFormatter(TerseJsonFormatter())
         logger = self.get_logger(handler)
 
@@ -67,12 +69,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
             "Hello there, %s!", "wally", extra={"foo": "bar", "int": 3, "bool": True}
         )
 
-        # One log message, with a single trailing newline.
-        data = output.getvalue()
-        logs = data.splitlines()
-        self.assertEqual(len(logs), 1)
-        self.assertEqual(data.count("\n"), 1)
-        log = json.loads(logs[0])
+        log = self.get_log_line()
 
         # The terse logger should give us these keys.
         expected_log_keys = [
@@ -96,20 +93,13 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         """
         The Terse JSON formatter converts log messages to JSON.
         """
-        output = StringIO()
-
-        handler = logging.StreamHandler(output)
+        handler = logging.StreamHandler(self.output)
         handler.setFormatter(JsonFormatter())
         logger = self.get_logger(handler)
 
         logger.info("Hello there, %s!", "wally")
 
-        # One log message, with a single trailing newline.
-        data = output.getvalue()
-        logs = data.splitlines()
-        self.assertEqual(len(logs), 1)
-        self.assertEqual(data.count("\n"), 1)
-        log = json.loads(logs[0])
+        log = self.get_log_line()
 
         # The terse logger should give us these keys.
         expected_log_keys = [
