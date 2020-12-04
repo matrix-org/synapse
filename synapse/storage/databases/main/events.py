@@ -444,7 +444,7 @@ class PersistEventsStore:
             txn,
             table="rooms",
             column="room_id",
-            iterable={event.room_id for event in events},
+            iterable={event.room_id for event in events if event.is_state()},
             keyvalues={},
             retcols=("room_id", "has_auth_chain_index"),
         )

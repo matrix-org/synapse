@@ -53,6 +53,11 @@ def chunk_seq(iseq: ISeq, maxlen: int) -> Iterable[ISeq]:
 def sorted_topologically(
     nodes: Iterable[T], graph: Dict[T, Collection[T]],
 ) -> Generator[T, None, None]:
+    """Given a set of nodes and a graph, yield the nodes in toplogical order.
+
+    For example `sorted_topologically([1, 2], {1: [2]})` will yield `2, 1`.
+    """
+
     degree_map = {node: 0 for node in nodes}
     reverse_graph = {}  # type: Dict[T, Set[T]]
 
