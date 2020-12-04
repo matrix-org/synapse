@@ -1,1 +1,0 @@
-Fix a bug where synctl could spawn duplicate copies of a worker. Contributed by Waylon Cude.

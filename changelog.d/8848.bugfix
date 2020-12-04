@@ -1,1 +1,0 @@
-Fix a long-standing bug which caused Synapse to require unspecified parameters during user-interactive authentication.
