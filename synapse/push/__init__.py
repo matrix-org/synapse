@@ -15,5 +15,4 @@
 
 
 class PusherConfigException(Exception):
-    def __init__(self, msg):
-        super().__init__(msg)
+    """An error occurred when creating a pusher."""

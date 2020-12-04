@@ -1256,7 +1256,7 @@ class PushersRestTestCase(unittest.HomeserverTestCase):
                 device_display_name="pushy push",
                 pushkey="a@example.com",
                 lang=None,
-                data={"url": "example.com"},
+                data={"url": "https://example.com/_matrix/push/v1/notify"},
             )
         )
 

@@ -97,7 +97,9 @@ async def resolve_events_with_store(
 
     # Also fetch all auth events that appear in only some of the state sets'
     # auth chains.
-    auth_diff = await _get_auth_chain_difference(state_sets, event_map, state_res_store)
+    auth_diff = await _get_auth_chain_difference(
+        room_id, state_sets, event_map, state_res_store
+    )
 
     full_conflicted_set = set(
         itertools.chain(
@@ -236,6 +238,7 @@ async def _get_power_level_for_sender(
 
 
 async def _get_auth_chain_difference(
+    room_id: str,
     state_sets: Sequence[StateMap[str]],
     event_map: Dict[str, EventBase],
     state_res_store: "synapse.state.StateResolutionStore",
@@ -332,7 +335,9 @@ async def _get_auth_chain_difference(
         difference_from_event_map = ()
         state_sets_ids = [set(state_set.values()) for state_set in state_sets]
 
-    difference = await state_res_store.get_auth_chain_difference(state_sets_ids)
+    difference = await state_res_store.get_auth_chain_difference(
+        room_id, state_sets_ids
+    )
     difference.update(difference_from_event_map)
 
     return difference
