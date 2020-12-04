@@ -1,1 +1,1 @@
-Pass `room_id` to `get_auth_chain_difference`.
+Improve efficiency of large state resolutions for new rooms.
