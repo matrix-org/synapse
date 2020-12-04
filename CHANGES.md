@@ -10,7 +10,7 @@ Bugfixes
 Internal Changes
 ----------------
 
-- Add support for the latest third-party libraries. Contributed by Jordan Bancino. ([\#8875](https://github.com/matrix-org/synapse/issues/8875))
+- Add support for the `prometheus_client` newer than 0.9.0. Contributed by Jordan Bancino. ([\#8875](https://github.com/matrix-org/synapse/issues/8875))
 
 
 Synapse 1.24.0rc1 (2020-12-02)
