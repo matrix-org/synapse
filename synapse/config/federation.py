@@ -47,8 +47,8 @@ class FederationConfig(Config):
             for domain in federation_domain_whitelist:
                 self.federation_domain_whitelist[domain] = True
 
-        ip_range_blacklist = (
-            config.get("ip_range_blacklist") or DEFAULT_IP_RANGE_BLACKLIST
+        ip_range_blacklist = config.get(
+            "ip_range_blacklist", DEFAULT_IP_RANGE_BLACKLIST
         )
 
         # Attempt to create an IPSet from the given ranges
@@ -109,16 +109,16 @@ class FederationConfig(Config):
         #
         # This option replaces federation_ip_range_blacklist in Synapse v1.24.0.
         #
-        ip_range_blacklist:
-          #- '127.0.0.0/8'
-          #- '10.0.0.0/8'
-          #- '172.16.0.0/12'
-          #- '192.168.0.0/16'
-          #- '100.64.0.0/10'
-          #- '169.254.0.0/16'
-          #- '::1/128'
-          #- 'fe80::/64'
-          #- 'fc00::/7'
+        #ip_range_blacklist:
+        #  - '127.0.0.0/8'
+        #  - '10.0.0.0/8'
+        #  - '172.16.0.0/12'
+        #  - '192.168.0.0/16'
+        #  - '100.64.0.0/10'
+        #  - '169.254.0.0/16'
+        #  - '::1/128'
+        #  - 'fe80::/64'
+        #  - 'fc00::/7'
 
         # Report prometheus metrics on the age of PDUs being sent to and received from
         # the following domains. This can be used to give an idea of "delay" on inbound
