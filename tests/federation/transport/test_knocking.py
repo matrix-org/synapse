@@ -121,7 +121,8 @@ class KnockingStrippedStateEventHelperMixin(TestCase):
         )
 
         for event_type, event_dict in room_state.items():
-            event_content, state_key = event_dict.values()
+            event_content = event_dict["content"]
+            state_key = event_dict["state_key"]
 
             self.get_success(
                 event_injection.inject_event(
