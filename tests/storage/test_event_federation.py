@@ -14,10 +14,10 @@
 # limitations under the License.
 
 import attr
+from parameterized import parameterized
 
 from synapse.events import _EventInternalMetadata
 
-from parameterized import parameterized
 import tests.unittest
 import tests.utils
 
