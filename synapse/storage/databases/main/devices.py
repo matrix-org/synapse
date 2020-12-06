@@ -72,16 +72,16 @@ class DeviceWorkerStore(SQLBaseStore):
                 SELECT count(*)
                 FROM devices
                 WHERE
-                    hidden = False AND
-                    user_id IN (%s)
-            """ % (
-                ",".join(["?" for _ in user_ids]),
+                    hidden = '0' AND
+                    user_id IN ({})
+            """.format(
+                ",".join("?" for _ in user_ids)
             )
 
             txn.execute(sql, user_ids)
             return txn.fetchone()[0]
 
-        if user_ids is None:
+        if not user_ids:
             return 0
 
         return await self.db_pool.runInteraction(
