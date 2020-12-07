@@ -73,12 +73,13 @@ class DeviceWorkerStore(SQLBaseStore):
                 FROM devices
                 WHERE
                     hidden = '0' AND
-                    user_id IN ({})
-            """.format(
-                ",".join("?" for _ in user_ids)
+            """
+
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "user_id", user_ids
             )
 
-            txn.execute(sql, user_ids)
+            txn.execute(sql + clause, args)
             return txn.fetchone()[0]
 
         if not user_ids:
