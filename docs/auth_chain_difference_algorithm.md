@@ -62,7 +62,7 @@ state sets consisting of:
 1. `S1`: Alice's invite `(4,1)` and Bob's second join `(2,2)`; and
 2. `S2`: Alice's second join `(4,3)` and Bob's first join `(2,1)`.
 
-Using the index we see that the following chains are reachable from each:
+Using the index we see that the following auth chains are reachable from each:
 1. `S1`: `(1,1)`, `(2,2)`, `(3,1)` & `(4,1)`
 2. `S2`: `(1,1)`, `(2,1)`, `(3,2)` & `(4,3)`
 
