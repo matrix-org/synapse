@@ -190,6 +190,16 @@ class SsoHandler:
                 return previously_registered_user_id
 
         # Otherwise, generate a new user.
+        attributes = await self._call_attribute_mapper(sso_to_matrix_id_mapper)
+        user_id = await self._register_mapped_user(
+            attributes, auth_provider_id, remote_user_id, user_agent, ip_address,
+        )
+        return user_id
+
+    async def _call_attribute_mapper(
+        self, sso_to_matrix_id_mapper: Callable[[int], Awaitable[UserAttributes]],
+    ) -> UserAttributes:
+        """Call the attribute mapper function in a loop, until we get a unique userid"""
         for i in range(self._MAP_USERNAME_RETRIES):
             try:
                 attributes = await sso_to_matrix_id_mapper(i)
@@ -227,7 +237,16 @@ class SsoHandler:
             raise MappingException(
                 "Unable to generate a Matrix ID from the SSO response"
             )
+        return attributes
 
+    async def _register_mapped_user(
+        self,
+        attributes: UserAttributes,
+        auth_provider_id: str,
+        remote_user_id: str,
+        user_agent: str,
+        ip_address: str,
+    ) -> str:
         # Since the localpart is provided via a potentially untrusted module,
         # ensure the MXID is valid before registering.
         if contains_invalid_mxid_characters(attributes.localpart):
