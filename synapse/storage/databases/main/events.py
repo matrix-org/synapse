@@ -1901,7 +1901,7 @@ class _LinkMap:
         target_chain: int,
         target_seq: int,
         new=True,
-    ):
+    ) -> bool:
         """Add a new link between two chains, ensuring no redundant links are added.
 
         New links should be added in topological order.
@@ -1913,8 +1913,13 @@ class _LinkMap:
             target_seq,
             new (bool): Whether this is a "new" link, i.e. should it be returned
                 by `get_additions`.
+
+        Returns:
+            True if a link was added, false if the given link was dropped as redundant
         """
         current_links = self.maps.setdefault(src_chain, {}).setdefault(target_chain, {})
+
+        assert src_chain != target_chain
 
         if new:
             # Check if the new link is redundant
@@ -1941,11 +1946,12 @@ class _LinkMap:
 
                 if current_seq_src <= src_seq and target_seq <= current_seq_target:
                     # This new link is redundant, nothing to do.
-                    return
+                    return False
 
             self.additions.add((src_chain, src_seq, target_chain, target_seq))
 
         current_links[src_seq] = target_seq
+        return True
 
     def get_links_from(
         self, source_id, src_seq
