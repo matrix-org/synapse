@@ -1989,6 +1989,9 @@ class _LinkMap:
         """Checks if there is a path between the source chain ID/sequence and
         target chain ID/sequence.
         """
+        if src_chain == target_chain:
+            return target_seq <= src_seq
+
         links = self.get_links_between(src_chain, target_chain)
         for link_start_seq, link_end_seq in links:
             if link_start_seq <= src_seq and target_seq <= link_end_seq:
