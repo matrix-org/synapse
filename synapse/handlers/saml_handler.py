@@ -183,41 +183,48 @@ class SamlHandler(BaseHandler):
             saml2_auth.in_response_to, None
         )
 
-        try:
-            # first check if we're doing a UIA
-            if current_session and current_session.ui_auth_session_id:
-                return await self._sso_handler.complete_sso_ui_auth_request(
-                    self._auth_provider_id,
-                    self._remote_id_from_saml_response(saml2_auth, None),
-                    current_session.ui_auth_session_id,
-                    request,
+        # first check if we're doing a UIA
+        if current_session and current_session.ui_auth_session_id:
+            try:
+                remote_user_id = self._remote_id_from_saml_response(saml2_auth, None)
+            except MappingException as e:
+                logger.exception("Failed to extract remote user id from SAML response")
+                self._sso_handler.render_error(request, "mapping_error", str(e))
+                return
+
+            return await self._sso_handler.complete_sso_ui_auth_request(
+                self._auth_provider_id,
+                remote_user_id,
+                current_session.ui_auth_session_id,
+                request,
+            )
+
+        # otherwise, we're handling a login request.
+
+        # Ensure that the attributes of the logged in user meet the required
+        # attributes.
+        for requirement in self._saml2_attribute_requirements:
+            if not _check_attribute_requirement(saml2_auth.ava, requirement):
+                self._sso_handler.render_error(
+                    request, "unauthorised", "You are not authorised to log in here."
                 )
+                return
 
-            # otherwise, we're handling a login request.
+        # Pull out the user-agent and IP from the request.
+        user_agent = request.get_user_agent("")
+        ip_address = self.hs.get_ip_from_request(request)
 
-            # Ensure that the attributes of the logged in user meet the required
-            # attributes.
-            for requirement in self._saml2_attribute_requirements:
-                if not _check_attribute_requirement(saml2_auth.ava, requirement):
-                    self._sso_handler.render_error(
-                        request,
-                        "unauthorised",
-                        "You are not authorised to log in here.",
-                    )
-                    return
-
-            # Pull out the user-agent and IP from the request.
-            user_agent = request.get_user_agent("")
-            ip_address = self.hs.get_ip_from_request(request)
-
-            # Call the mapper to register/login the user
+        # Call the mapper to register/login the user
+        try:
             user_id = await self._map_saml_response_to_user(
                 saml2_auth, relay_state, user_agent, ip_address
             )
-            await self._auth_handler.complete_sso_login(user_id, request, relay_state)
         except MappingException as e:
             logger.exception("Could not map user")
             self._sso_handler.render_error(request, "mapping_error", str(e))
+            return
+
+        await self._auth_handler.complete_sso_login(user_id, request, relay_state)
 
     async def _map_saml_response_to_user(
         self,
