@@ -18,7 +18,7 @@ from collections import namedtuple
 from typing import Iterable, List
 
 from twisted.internet import defer
-from twisted.internet.defer import Deferred, DeferredList
+from twisted.internet.defer import Deferred, DeferredList, ensureDeferred
 from twisted.python.failure import Failure
 
 from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
@@ -35,6 +35,7 @@ from synapse.logging.context import (
     make_deferred_yieldable,
 )
 from synapse.types import JsonDict, get_domain_from_id
+from synapse.util.async_helpers import maybe_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -74,11 +75,11 @@ class FederationBase:
               * throws a SynapseError if the signature check failed.
             The deferreds run their callbacks in the sentinel
         """
-        deferreds = _check_sigs_on_pdus(self.keyring, room_version, pdus)
+        initial_deferreds = _check_sigs_on_pdus(self.keyring, room_version, pdus)
 
         ctx = current_context()
 
-        def callback(_, pdu: EventBase):
+        async def callback(_, pdu: EventBase):
             with PreserveLoggingContext(ctx):
                 if not check_event_content_hash(pdu):
                     # let's try to distinguish between failures because the event was
@@ -105,7 +106,7 @@ class FederationBase:
                         )
                     return redacted_event
 
-                if self.spam_checker.check_event_for_spam(pdu):
+                if await maybe_awaitable(self.spam_checker.check_event_for_spam(pdu)):
                     logger.warning(
                         "Event contains spam, redacting %s: %s",
                         pdu.event_id,
@@ -125,12 +126,23 @@ class FederationBase:
                 )
             return failure
 
-        for deferred, pdu in zip(deferreds, pdus):
-            deferred.addCallbacks(
-                callback, errback, callbackArgs=[pdu], errbackArgs=[pdu]
-            )
+        # Here, we require a little gymnastics to return
+        # deferreds that accept awaitables as callbacks
+        deferred_with_callbacks = []
+        for deferred, pdu in zip(initial_deferreds, pdus):
 
-        return deferreds
+            async def awaitable():
+                result = None
+                try:
+                    result = await deferred
+                except Exception as e:
+                    return errback(e, pdu)
+                else:
+                    return await callback(result, pdu)
+
+            deferred_with_callbacks.append(ensureDeferred(awaitable))
+
+        return deferred_with_callbacks
 
 
 class PduToCheckSig(

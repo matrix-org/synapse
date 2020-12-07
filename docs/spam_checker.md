@@ -37,7 +37,7 @@ class ExampleSpamChecker:
         self.config = config
         self.api = api
 
-    def check_event_for_spam(self, foo):
+    async def check_event_for_spam(self, foo):
         return False  # allow all events
 
     def user_may_invite(self, inviter_userid, invitee_userid, room_id):
