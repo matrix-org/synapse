@@ -745,6 +745,9 @@ class PersistEventsStore:
                 for target_id, target_seq in chain_links.get_links_from(
                     auth_chain_id, auth_sequence_number
                 ):
+                    if target_id == chain_id:
+                        continue
+
                     chain_links.add_link(
                         chain_id, sequence_number, target_id, target_seq
                     )
