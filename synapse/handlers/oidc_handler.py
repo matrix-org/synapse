@@ -115,8 +115,6 @@ class OidcHandler(BaseHandler):
         self._allow_existing_users = hs.config.oidc_allow_existing_users  # type: bool
 
         self._http_client = hs.get_proxied_http_client()
-        self._auth_handler = hs.get_auth_handler()
-        self._registration_handler = hs.get_registration_handler()
         self._server_name = hs.config.server_name  # type: str
         self._macaroon_secret_key = hs.config.macaroon_secret_key
 
@@ -689,33 +687,14 @@ class OidcHandler(BaseHandler):
 
         # otherwise, it's a login
 
-        # Pull out the user-agent and IP from the request.
-        user_agent = request.get_user_agent("")
-        ip_address = self.hs.get_ip_from_request(request)
-
         # Call the mapper to register/login the user
         try:
-            user_id = await self._map_userinfo_to_user(
-                userinfo, token, user_agent, ip_address
+            await self._complete_oidc_login(
+                userinfo, token, request, client_redirect_url
             )
         except MappingException as e:
             logger.exception("Could not map user")
             self._sso_handler.render_error(request, "mapping_error", str(e))
-            return
-
-        # Mapping providers might not have get_extra_attributes: only call this
-        # method if it exists.
-        extra_attributes = None
-        get_extra_attributes = getattr(
-            self._user_mapping_provider, "get_extra_attributes", None
-        )
-        if get_extra_attributes:
-            extra_attributes = await get_extra_attributes(userinfo, token)
-
-        # and finally complete the login
-        await self._auth_handler.complete_sso_login(
-            user_id, request, client_redirect_url, extra_attributes
-        )
 
     def _generate_oidc_session_token(
         self,
@@ -838,10 +817,14 @@ class OidcHandler(BaseHandler):
         now = self.clock.time_msec()
         return now < expiry
 
-    async def _map_userinfo_to_user(
-        self, userinfo: UserInfo, token: Token, user_agent: str, ip_address: str
-    ) -> str:
-        """Maps a UserInfo object to a mxid.
+    async def _complete_oidc_login(
+        self,
+        userinfo: UserInfo,
+        token: Token,
+        request: SynapseRequest,
+        client_redirect_url: str,
+    ):
+        """Given a UserInfo response, complete the login flow
 
         UserInfo should have a claim that uniquely identifies users. This claim
         is usually `sub`, but can be configured with `oidc_config.subject_claim`.
@@ -853,17 +836,16 @@ class OidcHandler(BaseHandler):
         If a user already exists with the mxid we've mapped and allow_existing_users
         is disabled, raise an exception.
 
+        Otherwise, render a redirect back to the client_redirect_url with a loginToken.
+
         Args:
             userinfo: an object representing the user
             token: a dict with the tokens obtained from the provider
-            user_agent: The user agent of the client making the request.
-            ip_address: The IP address of the client making the request.
+            request: The request to respond to
+            client_redirect_url: The redirect URL passed in by the client.
 
         Raises:
             MappingException: if there was an error while mapping some properties
-
-        Returns:
-            The mxid of the user
         """
         try:
             remote_user_id = self._remote_id_from_userinfo(userinfo)
@@ -931,13 +913,23 @@ class OidcHandler(BaseHandler):
 
             return None
 
-        return await self._sso_handler.get_mxid_from_sso(
+        # Mapping providers might not have get_extra_attributes: only call this
+        # method if it exists.
+        extra_attributes = None
+        get_extra_attributes = getattr(
+            self._user_mapping_provider, "get_extra_attributes", None
+        )
+        if get_extra_attributes:
+            extra_attributes = await get_extra_attributes(userinfo, token)
+
+        await self._sso_handler.complete_sso_login_request(
             self._auth_provider_id,
             remote_user_id,
-            user_agent,
-            ip_address,
+            request,
+            client_redirect_url,
             oidc_response_to_user_attributes,
             grandfather_existing_users,
+            extra_attributes,
         )
 
     def _remote_id_from_userinfo(self, userinfo: UserInfo) -> str:
