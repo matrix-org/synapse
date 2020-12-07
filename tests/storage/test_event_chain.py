@@ -28,6 +28,7 @@ from tests.unittest import HomeserverTestCase
 class EventChainStoreTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
+        self._next_stream_ordering = 1
 
     def test_simple(self):
         """Test that the example in `docs/auth_chain_difference_algorithm.md`
@@ -376,6 +377,10 @@ class EventChainStoreTestCase(HomeserverTestCase):
         """
 
         persist_events_store = self.hs.get_datastores().persist_events
+
+        for e in events:
+            e.internal_metadata.stream_ordering = self._next_stream_ordering
+            self._next_stream_ordering += 1
 
         def _persist(txn):
             # We need to persist the events to the events and state_events
