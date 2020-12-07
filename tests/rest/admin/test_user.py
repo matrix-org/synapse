@@ -561,7 +561,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
                 "admin": True,
                 "displayname": "Bob's name",
                 "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
-                "avatar_url": None,
+                "avatar_url": "mxc://fibble/wibble",
             }
         )
 
@@ -578,6 +578,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
         self.assertEqual(True, channel.json_body["admin"])
+        self.assertEqual("mxc://fibble/wibble", channel.json_body["avatar_url"])
 
         # Get user
         request, channel = self.make_request(
@@ -592,6 +593,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(True, channel.json_body["admin"])
         self.assertEqual(False, channel.json_body["is_guest"])
         self.assertEqual(False, channel.json_body["deactivated"])
+        self.assertEqual("mxc://fibble/wibble", channel.json_body["avatar_url"])
 
     def test_create_user(self):
         """
@@ -606,6 +608,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
                 "admin": False,
                 "displayname": "Bob's name",
                 "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
+                "avatar_url": "mxc://fibble/wibble",
             }
         )
 
@@ -622,6 +625,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
         self.assertEqual(False, channel.json_body["admin"])
+        self.assertEqual("mxc://fibble/wibble", channel.json_body["avatar_url"])
 
         # Get user
         request, channel = self.make_request(
@@ -636,6 +640,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(False, channel.json_body["admin"])
         self.assertEqual(False, channel.json_body["is_guest"])
         self.assertEqual(False, channel.json_body["deactivated"])
+        self.assertEqual("mxc://fibble/wibble", channel.json_body["avatar_url"])
 
     @override_config(
         {"limit_usage_by_mau": True, "max_mau_value": 2, "mau_trial_days": 0}
