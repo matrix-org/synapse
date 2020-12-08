@@ -75,6 +75,11 @@ class FederationConfig(Config):
         # Always blacklist 0.0.0.0, ::
         self.ip_range_blacklist.update(["0.0.0.0", "::"])
 
+        try:
+            self.ip_range_whitelist = IPSet(config.get("ip_range_whitelist", ()))
+        except Exception as e:
+            raise ConfigError("Invalid range(s) provided in ip_range_whitelist: %s" % e)
+
         # The federation_ip_range_blacklist is used for backwards-compatibility
         # and only applies to federation and identity servers. If it is not given,
         # default to ip_range_blacklist.
@@ -131,6 +136,18 @@ class FederationConfig(Config):
         #
         #ip_range_blacklist:
 %(ip_range_blacklist)s
+
+        # List of IP address CIDR ranges that should be allowed for federation,
+        # identity servers, push servers, and for checking key validitity for
+        # third-party invite events. This is useful for specifying exceptions to
+        # wide-ranging blacklisted target IP ranges - e.g. for communication with
+        # a push server only visible in your network.
+        #
+        # This whitelist overrides ip_range_blacklist and defaults to an empty
+        # list.
+        #
+        #ip_range_whitelist:
+        #   - '192.168.1.1'
 
         # Report prometheus metrics on the age of PDUs being sent to and received from
         # the following domains. This can be used to give an idea of "delay" on inbound
