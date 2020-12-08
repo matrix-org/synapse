@@ -65,6 +65,10 @@ by looking at the chain ID and sequence numbers reachable from each state set:
    numbers between the maximum sequence number reachable from *any* state set and
    the minimum reachable by *all* state sets (if any).
 
+Note that steps 2 is effectively calculating the auth chain for each state set
+(in terms of chain IDs and sequence numbers), and step 3 is calculating the
+difference between the union and intersection of the auth chains.
+
 ### Worked Examplee
 
 For example, if we take the above graph and try and get the difference between
