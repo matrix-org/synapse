@@ -364,10 +364,10 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             )
 
     def test_x_robots_tag_header(self):
-    """
-    Tests that the `X-Robots-Tag` is present, which informs web crawlers to not index, archive, or
-    follow links in media.
-    """
+        """
+        Tests that the `X-Robots-Tag` header is present, which informs web crawlers
+        to not index, archive, or follow links in media.
+        """
         channel = self._req(b"inline; filename=out" + self.test_image.extension)
 
         headers = channel.headers
