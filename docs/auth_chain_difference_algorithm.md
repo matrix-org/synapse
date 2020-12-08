@@ -23,13 +23,14 @@ sets.
 Synapse computes auth chain differences by pre-computing a "chain cover" index
 for the auth chain in a room, allowing efficient reachability queries like "is
 event A in the auth chain of event B". This is done by assigning every event a
-*chain ID* and *sequence number* and having map of *links* such that A is
-reachable by B (i.e. `A` is in the auth chain of `B`) if and only if either:
+*chain ID* and *sequence number* (e.g. `(5,3)`), and having a map of *links*
+between chains (e.g. `(5,3) -> (2,4)`) such that A is reachable by B (i.e. `A`
+is in the auth chain of `B`) if and only if either:
 
 1. A and B have the same chain ID and `A`'s sequence number is less than `B`'s
    sequence number; or
 2. there is a link `L` between `B`'s chain ID and `A`'s chain ID such that
-   `L.seq_no` <= `B.seq_no` and `A.seq_no` <= `L.seq_no`.
+   `L.start_seq_no` <= `B.seq_no` and `A.seq_no` <= `L.end_seq_no`.
 
 There are actually two variants, one where we store links from each chain to
 every other reachable chain (the transitive closure of the links graph), and one
