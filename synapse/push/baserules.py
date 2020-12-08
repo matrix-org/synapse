@@ -98,7 +98,9 @@ def list_with_base_rules(
 
 
 def make_base_append_rules(
-    kind: str, modified_base_rules: Dict[str, Dict[str, Any]], use_new_defaults: bool = False
+    kind: str,
+    modified_base_rules: Dict[str, Dict[str, Any]],
+    use_new_defaults: bool = False,
 ) -> List[Dict[str, Any]]:
     rules = []
 
@@ -130,7 +132,9 @@ def make_base_append_rules(
 
 
 def make_base_prepend_rules(
-    kind: str, modified_base_rules: Dict[str, Dict[str, Any]], use_new_defaults: bool = False
+    kind: str,
+    modified_base_rules: Dict[str, Dict[str, Any]],
+    use_new_defaults: bool = False,
 ) -> List[Dict[str, Any]]:
     rules = []
 

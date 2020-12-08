@@ -272,7 +272,9 @@ def _re_word_boundary(r: str) -> str:
 
 
 def _flatten_dict(
-    d: Union[EventBase, dict], prefix=None, result=None
+    d: Union[EventBase, dict],
+    prefix: Optional[List[str]] = None,
+    result: Optional[Dict[str, str]] = None,
 ) -> Dict[str, str]:
     if prefix is None:
         prefix = []
