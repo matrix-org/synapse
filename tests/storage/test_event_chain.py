@@ -465,30 +465,24 @@ class LinkMapTestCase(unittest.TestCase):
         link_map = _LinkMap()
 
         link_map.add_link(1, 1, 2, 1, new=False)
-        self.assertYieldsUnordered(link_map.get_links_between(1, 2), [(1, 1)])
-        self.assertYieldsUnordered(link_map.get_links_from(1, 1), [(2, 1)])
-        self.assertYieldsUnordered(link_map.get_additions(), [])
+        self.assertCountEqual(link_map.get_links_between(1, 2), [(1, 1)])
+        self.assertCountEqual(link_map.get_links_from(1, 1), [(2, 1)])
+        self.assertCountEqual(link_map.get_additions(), [])
         self.assertTrue(link_map.exists_path_from(1, 5, 2, 1))
         self.assertFalse(link_map.exists_path_from(1, 5, 2, 2))
         self.assertTrue(link_map.exists_path_from(1, 5, 1, 1))
         self.assertFalse(link_map.exists_path_from(1, 1, 1, 5))
 
         # Attempting to add a redundant link is ignored.
-        link_map.add_link(1, 4, 2, 1)
-        self.assertYieldsUnordered(link_map.get_links_between(1, 2), [(1, 1)])
+        self.assertFalse(link_map.add_link(1, 4, 2, 1))
+        self.assertCountEqual(link_map.get_links_between(1, 2), [(1, 1)])
 
         # Adding new non-redundant links works
-        link_map.add_link(1, 3, 2, 3)
-        self.assertYieldsUnordered(link_map.get_links_between(1, 2), [(1, 1), (3, 3)])
+        self.assertTrue(link_map.add_link(1, 3, 2, 3))
+        self.assertCountEqual(link_map.get_links_between(1, 2), [(1, 1), (3, 3)])
 
-        link_map.add_link(2, 5, 1, 3)
-        self.assertYieldsUnordered(link_map.get_links_between(2, 1), [(5, 3)])
+        self.assertTrue(link_map.add_link(2, 5, 1, 3))
+        self.assertCountEqual(link_map.get_links_between(2, 1), [(5, 3)])
+        self.assertCountEqual(link_map.get_links_between(1, 2), [(1, 1), (3, 3)])
 
-        self.assertYieldsUnordered(
-            link_map.get_additions(), [(1, 3, 2, 3), (2, 5, 1, 3)]
-        )
-
-    def assertYieldsUnordered(self, left, right):
-        """Test that the two iterables yield the same values, ignoring order.
-        """
-        self.assertEqual(set(left), set(right))
+        self.assertCountEqual(link_map.get_additions(), [(1, 3, 2, 3), (2, 5, 1, 3)])
