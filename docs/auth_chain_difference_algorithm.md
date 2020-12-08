@@ -69,7 +69,7 @@ Note that steps 2 is effectively calculating the auth chain for each state set
 (in terms of chain IDs and sequence numbers), and step 3 is calculating the
 difference between the union and intersection of the auth chains.
 
-### Worked Examplee
+### Worked Example
 
 For example, if we take the above graph and try and get the difference between
 state sets consisting of:
@@ -77,7 +77,9 @@ state sets consisting of:
 1. `S1`: Alice's invite `(4,1)` and Bob's second join `(2,2)`; and
 2. `S2`: Alice's second join `(4,3)` and Bob's first join `(2,1)`.
 
-Using the index we see that the following auth chains are reachable from each:
+Using the index we see that the following auth chains are reachable from each
+state set:
+
 1. `S1`: `(1,1)`, `(2,2)`, `(3,1)` & `(4,1)`
 2. `S2`: `(1,1)`, `(2,1)`, `(3,2)` & `(4,3)`
 
@@ -89,5 +91,5 @@ And so, for each the ranges that are in the auth chain difference:
    level).
 4. Chain 4: The range `(1, 3]` (corresponding to both of Alice's joins).
 
-So the final result is: Bob's second join, the second power level and both of
-Alice's joins.
+So the final result is: Bob's second join `(2,2)`, the second power level
+`(3,2)` and both of Alice's joins `(4,2)` & `(4,3)`.
