@@ -32,19 +32,19 @@ is in the auth chain of `B`) if and only if either:
 2. there is a link `L` between `B`'s chain ID and `A`'s chain ID such that
    `L.start_seq_no` <= `B.seq_no` and `A.seq_no` <= `L.end_seq_no`.
 
-There are actually two variants, one where we store links from each chain to
-every other reachable chain (the transitive closure of the links graph), and one
-where we remove redundant links (the transitive reduction of the links graph)
-e.g. if we have chains `C3 -> C2 -> C1` then the link `C3 -> C1` would not be
-stored. Synapse uses the former variant so that it doesn't need to recurse to
-test reachability between chains.
+There are actually two potential implementations, one where we store links from
+each chain to every other reachable chain (the transitive closure of the links
+graph), and one where we remove redundant links (the transitive reduction of the
+links graph) e.g. if we have chains `C3 -> C2 -> C1` then the link `C3 -> C1`
+would not be stored. Synapse uses the former implementations so that it doesn't
+need to recurse to test reachability between chains.
 
 ### Example
 
 An example auth graph would look like the following, where chains have been
 formed based on type/state_key and are denoted by colour and are labelled with
 `(chain ID, sequence number)`. Links are denoted by the arrows (links in grey
-are those that would be remove in the second variant described above).
+are those that would be remove in the second implementation described above).
 
 ![Example](auth_chain_diff.dot.png)
 
