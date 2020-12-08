@@ -159,7 +159,9 @@ class FederationConfig(Config):
         #federation_metrics_domains:
         #  - matrix.org
         #  - example.com
-        """ % {"ip_range_blacklist": ip_range_blacklist}
+        """ % {
+            "ip_range_blacklist": ip_range_blacklist
+        }
 
 
 _METRICS_FOR_DOMAINS_SCHEMA = {"type": "array", "items": {"type": "string"}}
