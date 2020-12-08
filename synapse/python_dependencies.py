@@ -97,7 +97,7 @@ CONDITIONAL_REQUIREMENTS = {
         'eliot<1.8.0;python_version<"3.5.3"',
     ],
     "saml2": [
-        # pysaml2 6.4.0 removed compatibility with Python 3.5.
+        # pysaml2 6.4.0 is incompatible with Python 3.5 (see https://github.com/IdentityPython/pysaml2/issues/749)
         "pysaml2>=4.5.0,<6.4.0;python_version<'3.6'",
         "pysaml2>=4.5.0;python_version>='3.6'",
     ],
