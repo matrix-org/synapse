@@ -20,14 +20,30 @@ from synapse.config._base import Config, ConfigError
 from synapse.config._util import validate_config
 
 DEFAULT_IP_RANGE_BLACKLIST = [
+    # Localhost
     "127.0.0.0/8",
+    # Private networks.
     "10.0.0.0/8",
     "172.16.0.0/12",
     "192.168.0.0/16",
+    # Carrier grade NAT.
     "100.64.0.0/10",
+    # Address registry.
+    "192.0.0.0/24",
+    # Link-local networks.
     "169.254.0.0/16",
+    # Testing networks.
+    "198.18.0.0/15",
+    "192.0.2.0/24",
+    "198.51.100.0/24",
+    "203.0.113.0/24",
+    # Multicast.
+    "224.0.0.0/4",
+    # Localhost
     "::1/128",
-    "fe80::/64",
+    # Link-local addresses.
+    "fe80::/10",
+    # Unique local addresses.
     "fc00::/7",
 ]
 
@@ -83,6 +99,10 @@ class FederationConfig(Config):
         self.federation_metrics_domains = set(federation_metrics_domains)
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
+        ip_range_blacklist = "\n".join(
+            "        #  - '%s'" % ip for ip in DEFAULT_IP_RANGE_BLACKLIST
+        )
+
         return """\
         ## Federation ##
 
@@ -110,15 +130,7 @@ class FederationConfig(Config):
         # This option replaces federation_ip_range_blacklist in Synapse v1.24.0.
         #
         #ip_range_blacklist:
-        #  - '127.0.0.0/8'
-        #  - '10.0.0.0/8'
-        #  - '172.16.0.0/12'
-        #  - '192.168.0.0/16'
-        #  - '100.64.0.0/10'
-        #  - '169.254.0.0/16'
-        #  - '::1/128'
-        #  - 'fe80::/64'
-        #  - 'fc00::/7'
+%(ip_range_blacklist)s
 
         # Report prometheus metrics on the age of PDUs being sent to and received from
         # the following domains. This can be used to give an idea of "delay" on inbound
@@ -130,7 +142,7 @@ class FederationConfig(Config):
         #federation_metrics_domains:
         #  - matrix.org
         #  - example.com
-        """
+        """ % {"ip_range_blacklist": ip_range_blacklist}
 
 
 _METRICS_FOR_DOMAINS_SCHEMA = {"type": "array", "items": {"type": "string"}}
