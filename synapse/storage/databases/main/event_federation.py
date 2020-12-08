@@ -158,7 +158,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         if room["has_auth_chain_index"]:
             return await self.db_pool.runInteraction(
                 "get_auth_chain_difference_chains",
-                self._get_auth_chain_difference_using_chains_txn,
+                self._get_auth_chain_difference_using_cover_index_txn,
                 state_sets,
             )
         else:
@@ -168,7 +168,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 state_sets,
             )
 
-    def _get_auth_chain_difference_using_chains_txn(
+    def _get_auth_chain_difference_using_cover_index_txn(
         self, txn, state_sets: List[Set[str]]
     ) -> Set[str]:
         """Calculates the auth chain difference using the chain index.
@@ -321,6 +321,10 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
     def _get_auth_chain_difference_txn(
         self, txn, state_sets: List[Set[str]]
     ) -> Set[str]:
+        """Calculates the auth chain difference using a breadth first search.
+
+        This is used when we don't have a cover index for the room.
+        """
 
         # Algorithm Description
         # ~~~~~~~~~~~~~~~~~~~~~
