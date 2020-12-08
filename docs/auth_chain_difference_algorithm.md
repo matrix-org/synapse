@@ -3,7 +3,16 @@
 The auth chain difference algorithm is used by V2 state resolution, where a
 naive implementation can be a significant source of CPU and DB usage.
 
-The auth chain difference of a set of state sets is the union minus the
+### Definitions
+
+A *state set* is a set of state events; e.g. the input of a state resolution
+algorithm is a collection of state sets.
+
+The *auth chain* of a set of events are all the events' auth events and *their*
+auth events, recursively (i.e. the events reachable by walking the graph induced
+by an event's auth events links).
+
+The *auth chain difference* of a collection of state sets is the union minus the
 intersection of the sets of auth chains corresponding to the state sets, i.e an
 event is in the auth chain difference if it is reachable by walking the auth
 event graph from at least one of the state sets but not from *all* of the state
