@@ -1886,12 +1886,17 @@ class PersistEventsStore:
         )
 
 
-@attr.s
+@attr.s(slots=True)
 class _LinkMap:
     """A helper type for tracking links between chains.
     """
 
+    # Stores the set of links as nested maps: source chain ID -> target chain ID
+    # -> source sequence number -> target sequence number.
     maps = attr.ib(type=Dict[int, Dict[int, Dict[int, int]]], factory=dict)
+
+    # Stores the links that have been added (with new set to true), as tuples of
+    # `(source chain ID, source sequence no, target chain ID, target sequence no.)`
     additions = attr.ib(type=Set[Tuple[int, int, int, int]], factory=set)
 
     def add_link(
@@ -1900,18 +1905,18 @@ class _LinkMap:
         src_seq: int,
         target_chain: int,
         target_seq: int,
-        new=True,
+        new: bool = True,
     ) -> bool:
         """Add a new link between two chains, ensuring no redundant links are added.
 
         New links should be added in topological order.
 
         Args:
-            src_chain,
-            src_seq,
-            target_chain,
-            target_seq,
-            new (bool): Whether this is a "new" link, i.e. should it be returned
+            src_chain: The chain ID of the source of the link,
+            src_seq: The sequence number of the source of the link,
+            target_chain: The chain ID of the target of the link,
+            target_seq: The sequence number of the target of the link,
+            new: Whether this is a "new" link, i.e. should it be returned
                 by `get_additions`.
 
         Returns:
@@ -1954,7 +1959,7 @@ class _LinkMap:
         return True
 
     def get_links_from(
-        self, source_id, src_seq
+        self, source_id: int, src_seq: int,
     ) -> Generator[Tuple[int, int], None, None]:
         """Gets the chains reachable from the given chain/sequence number.
 
