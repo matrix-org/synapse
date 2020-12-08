@@ -18,6 +18,19 @@ event is in the auth chain difference if it is reachable by walking the auth
 event graph from at least one of the state sets but not from *all* of the state
 sets.
 
+## Breadth First Walk Algorithm
+
+A way of calculating the auth chain difference without calculating the full auth
+chains for each state set is to do a parallel breadth first walk (ordered by
+depth) of each state set's auth chain. By tracking which events are reachable
+from each state set we can finish early if every pending event is reachable from
+every state set.
+
+This can work well for state sets that have a small auth chain difference, but
+can be very inefficient for larger differences. However, this algorithm is still
+used if we don't have a chain cover index for the room (e.g. because we're in
+the process of indexing it).
+
 ## Chain Cover Index
 
 Synapse computes auth chain differences by pre-computing a "chain cover" index
