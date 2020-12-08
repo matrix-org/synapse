@@ -84,7 +84,7 @@ difference between the union and intersection of the auth chains.
 
 ### Worked Example
 
-For example, if we take the above graph and try and get the difference between
+For example, given the above graph, we can calculate the difference between
 state sets consisting of:
 
 1. `S1`: Alice's invite `(4,1)` and Bob's second join `(2,2)`; and
