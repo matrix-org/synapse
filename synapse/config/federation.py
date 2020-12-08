@@ -127,7 +127,7 @@ class FederationConfig(Config):
         # private IP address ranges (see the example below).
         #
         # The blacklist applies to the outbound requests for federation, identity servers,
-        # push servers, and for checking key validitity for third-party invite events.
+        # push servers, and for checking key validity for third-party invite events.
         #
         # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
         # listed here, since they correspond to unroutable addresses.)
@@ -138,7 +138,7 @@ class FederationConfig(Config):
 %(ip_range_blacklist)s
 
         # List of IP address CIDR ranges that should be allowed for federation,
-        # identity servers, push servers, and for checking key validitity for
+        # identity servers, push servers, and for checking key validity for
         # third-party invite events. This is useful for specifying exceptions to
         # wide-ranging blacklisted target IP ranges - e.g. for communication with
         # a push server only visible in your network.
