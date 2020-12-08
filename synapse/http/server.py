@@ -275,6 +275,10 @@ class DirectServeJsonResource(_AsyncResource):
     formatting responses and errors as JSON.
     """
 
+    def __init__(self, canonical_json=False, extract_context=False):
+        super().__init__(extract_context)
+        self.canonical_json = canonical_json
+
     def _send_response(
         self, request: Request, code: int, response_object: Any,
     ):
@@ -318,9 +322,7 @@ class JsonResource(DirectServeJsonResource):
     )
 
     def __init__(self, hs, canonical_json=True, extract_context=False):
-        super().__init__(extract_context)
-
-        self.canonical_json = canonical_json
+        super().__init__(canonical_json, extract_context)
         self.clock = hs.get_clock()
         self.path_regexs = {}
         self.hs = hs
