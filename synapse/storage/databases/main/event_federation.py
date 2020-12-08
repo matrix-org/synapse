@@ -304,7 +304,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 for chain_id, (min_no, max_no) in chain_to_gap.items()
             ]
 
-            rows = txn.execute_values(sql, args, fetch=True)
+            rows = txn.execute_values(sql, args)
             result.update(r for r, in rows)
         else:
             # For SQLite we just fall back to doing a noddy for loop.
