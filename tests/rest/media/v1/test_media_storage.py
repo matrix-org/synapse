@@ -368,5 +368,6 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
         headers = channel.headers
         self.assertEqual(
-            headers.getRawHeaders(b"X-Robots-Tag"), [b"noindex, nofollow, noarchive, noimageindex"]
+            headers.getRawHeaders(b"X-Robots-Tag"),
+            [b"noindex, nofollow, noarchive, noimageindex"],
         )
