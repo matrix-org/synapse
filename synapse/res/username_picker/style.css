@@ -1,0 +1,179 @@
+body {
+  background: #ededf0;
+  color: #737373;
+  font-family: "Open Sans", sans-serif;
+  letter-spacing: 0.03em;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-rows: auto 1fr; }
+
+.card {
+  background-color: #fff;
+  padding: 2em;
+  position: relative;
+  margin: auto;
+  width: 100%;
+  box-shadow: 0 0.25em 0.25em 0 rgba(210, 210, 210, 0.5);
+  border-radius: 0.125em; }
+  @media (min-width: 25em) {
+    .card {
+      max-width: 26em;
+      padding: 2.5em; } }
+  @supports (display: grid) {
+    .card {
+      grid-row-start: 2; }
+      @media (min-height: 50em) {
+        .card {
+          top: -3em;
+          /* compensate for negative margin for footer links */ } } }
+  .card__back {
+    margin-bottom: 1em; }
+  .card__heading {
+    font-size: 1.4em;
+    font-weight: 400;
+    text-transform: capitalize;
+    padding-left: 2.125em;
+    position: relative;
+    min-height: 1.5em; }
+    .card__heading--iconless {
+      padding-left: 0; }
+    .card__heading img {
+      width: 1.5em;
+      height: 1.5em;
+      position: absolute;
+      left: 0;
+      top: 0; }
+    .card__heading--success {
+      color: #12bc00; }
+    .card__heading--error {
+      color: #ff0039; }
+  .card [data-screen]:focus {
+    outline: none; }
+
+* {
+  box-sizing: border-box; }
+
+form {
+  margin: 0; }
+  form * {
+    font-family: inherit; }
+
+label {
+  margin: 2em 0;
+  display: block; }
+
+input[type="text"],
+input[type="email"],
+input[type="password"] {
+  font-size: 100%;
+  background-color: #ededf0;
+  border: 1px solid #fff;
+  border-radius: .2em;
+  padding: .5em .9em;
+  display: block;
+  width: 100%;
+  margin-bottom: 1em; }
+  input[type="text"]:hover, input[type="text"]:focus,
+  input[type="email"]:hover,
+  input[type="email"]:focus,
+  input[type="password"]:hover,
+  input[type="password"]:focus {
+    border: 1px solid #0060df;
+    outline: none; }
+  .focus-styles input[type="text"]:focus, .focus-styles
+  input[type="email"]:focus, .focus-styles
+  input[type="password"]:focus {
+    border-color: transparent; }
+
+.form__input {
+  position: relative; }
+  p + .form__input {
+    margin-top: 2.5em;
+    /* leave space to fit a paragraph above a field */ }
+  .form__input label {
+    margin: 0;
+    position: absolute;
+    top: .5em;
+    left: .9em; }
+  .form__input input:focus + label,
+  .form__input input.has-contents + label {
+    position: absolute;
+    top: -1.5em;
+    color: #0060df;
+    font-weight: bold; }
+    .form__input input:focus + label > span,
+    .form__input input.has-contents + label > span {
+      font-size: 0.75em; }
+
+html,
+body {
+  height: 100%; }
+
+.button {
+  text-align: center;
+  text-decoration: none;
+  padding: .93em 2em;
+  display: block;
+  font-size: 87.5%;
+  letter-spacing: .04em;
+  line-height: 1.57;
+  font-family: inherit;
+  border-radius: 2em;
+  background-color: #0060df;
+  color: #fff;
+  border: 1px solid transparent;
+  transition: background-color .1s ease-in-out;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  cursor: pointer; }
+  .button:hover {
+    background-color: #fff;
+    color: #0060df;
+    border-color: currentColor;
+    text-decoration: none; }
+  .button:active {
+    background-color: #0060df;
+    color: #fff;
+    border-color: #0060df; }
+  .button--full-width {
+    width: 100%; }
+  .button--secondary {
+    border-color: #b1b1b3;
+    background-color: transparent;
+    color: #000;
+    text-transform: none; }
+    .button--secondary:hover {
+      background-color: #000;
+      color: #fff;
+      border-color: transparent; }
+      .button--secondary:hover svg > path {
+        fill: #fff; }
+    .button--secondary:active {
+      background-color: transparent;
+      border-color: #000;
+      color: #000; }
+  .button--disabled {
+    border-color: #fff;
+    background-color: transparent;
+    color: #000;
+    text-transform: none; }
+    .button--disabled:hover {
+      background-color: #fff;
+      color: #000;
+      border-color: transparent; }
+
+.hidden {
+  display: none; }
+
+.tooltip {
+  background-color: #f9f9fa;
+  padding: 1em;
+  margin: 1em 0; }
+  .tooltip p:last-child {
+    margin-bottom: 0; }
+  .tooltip a:last-child {
+    margin-left: .5em; }
+  .tooltip:target {
+    display: block; }
