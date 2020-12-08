@@ -48,9 +48,10 @@ are those that would be remove in the second variant described above).
 
 ![Example](auth_chain_diff.dot.png)
 
-Note that we don't add links between every event and its auth events, as that is
-redundant (under both variants), e.g. all events point to the create event, but
-each chain only needs the one link from it's base to the create event.
+Note that we don't include all links between events and their auth events, as
+most of those links would be redundant. For example, all events point to the
+create event, but each chain only needs the one link from it's base to the
+create event.
 
 ## Using the Index
 
