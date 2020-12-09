@@ -36,7 +36,8 @@ CREATE TABLE event_auth_chain_links (
 CREATE INDEX event_auth_chain_links_idx ON event_auth_chain_links (origin_chain_id, target_chain_id);
 
 
--- Events that we have persisted but not calculated auth chains for.
+-- Events that we have persisted but not calculated auth chains for,
+-- e.g. out of band memberships (where we don't have the auth chain)
 CREATE TABLE event_auth_chain_to_calculate (
   event_id TEXT PRIMARY KEY,
   room_id TEXT NOT NULL,

@@ -189,7 +189,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
         # All the chains that we've found that are reachable from the state
         # sets.
-        seen_chains = set()  # type: Set[str]
+        seen_chains = set()  # type: Set[int]
 
         sql = """
             SELECT event_id, chain_id, sequence_number
@@ -217,11 +217,9 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             for event_id in state_set:
                 chain_id, seq_no = chain_info[event_id]
 
-                curr = chains.setdefault(chain_id, seq_no)
-                if curr < seq_no:
-                    chains[chain_id] = seq_no
+                chains[chain_id] = max(seq_no, chains.get(chain_id, 0))
 
-        # Now we lok up all links for the chains we have, adding chains to
+        # Now we look up all links for the chains we have, adding chains to
         # set_to_chain that are reachable from each set.
         sql = """
             SELECT
@@ -231,7 +229,9 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             WHERE %s
         """
 
-        for batch in batch_iter(seen_chains, 1000):
+        # (We need to take a copy of `seen_chains` as we want to mutate it in
+        # the loop)
+        for batch in batch_iter(set(seen_chains), 1000):
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "origin_chain_id", batch
             )
@@ -248,11 +248,10 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                     # the link is less than the max sequence number in the
                     # origin chain.
                     if origin_sequence_number <= chains.get(origin_chain_id, 0):
-                        curr = chains.setdefault(
-                            target_chain_id, target_sequence_number
+                        chains[target_sequence_number] = max(
+                            target_sequence_number,
+                            chains.get(target_sequence_number, 0),
                         )
-                        if curr < target_sequence_number:
-                            chains[target_chain_id] = target_sequence_number
 
                 seen_chains.add(target_chain_id)
 
@@ -262,15 +261,13 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         # difference.
         result = set()
 
-        chain_to_gap = {}
+        # Mapping from chain ID to the range of sequence numbers that should be
+        # pulled from the database.
+        chain_to_gap = {}  # type: Dict[int, Tuple[int, int]]
+
         for chain_id in seen_chains:
             min_seq_no = min(chains.get(chain_id, 0) for chains in set_to_chain)
-
-            max_seq_no = 0
-            for chains in set_to_chain:
-                s = chains.get(chain_id)
-                if s:
-                    max_seq_no = max(max_seq_no, s)
+            max_seq_no = max(chains.get(chain_id, 0) for chains in set_to_chain)
 
             if min_seq_no < max_seq_no:
                 # We have a non empty gap, try and fill it from the events that
