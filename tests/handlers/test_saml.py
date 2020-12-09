@@ -19,7 +19,7 @@ from synapse.handlers.sso import MappingException
 
 from tests.unittest import HomeserverTestCase, override_config
 
-# Check if we have the tests.
+# Check if we have the dependencies to run the tests.
 try:
     import saml2.config
     from saml2.sigver import SigverError
@@ -35,7 +35,7 @@ try:
         has_xmlsec1 = False
 except ImportError:
     has_saml2 = False
-    has_xmlsec1 = None
+    has_xmlsec1 = False
 
 # These are a few constants that are used as config parameters in the tests.
 BASE_URL = "https://synapse/"
