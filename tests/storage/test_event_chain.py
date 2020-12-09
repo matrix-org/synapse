@@ -217,13 +217,13 @@ class EventChainStoreTestCase(HomeserverTestCase):
         for event in events[1:]:
             self.assertTrue(
                 link_map.exists_path_from(
-                    *chain_map[event.event_id], *chain_map[create.event_id]
+                    chain_map[event.event_id], chain_map[create.event_id]
                 ),
             )
 
             self.assertFalse(
                 link_map.exists_path_from(
-                    *chain_map[create.event_id], *chain_map[event.event_id],
+                    chain_map[create.event_id], chain_map[event.event_id],
                 ),
             )
 
@@ -446,10 +446,8 @@ class EventChainStoreTestCase(HomeserverTestCase):
         link_map = _LinkMap()
         for row in rows:
             added = link_map.add_link(
-                row["origin_chain_id"],
-                row["origin_sequence_number"],
-                row["target_chain_id"],
-                row["target_sequence_number"],
+                (row["origin_chain_id"], row["origin_sequence_number"]),
+                (row["target_chain_id"], row["target_sequence_number"]),
             )
 
             # We shouldn't have persisted any redundant links
@@ -464,24 +462,24 @@ class LinkMapTestCase(unittest.TestCase):
         """
         link_map = _LinkMap()
 
-        link_map.add_link(1, 1, 2, 1, new=False)
+        link_map.add_link((1, 1), (2, 1), new=False)
         self.assertCountEqual(link_map.get_links_between(1, 2), [(1, 1)])
-        self.assertCountEqual(link_map.get_links_from(1, 1), [(2, 1)])
+        self.assertCountEqual(link_map.get_links_from((1, 1)), [(2, 1)])
         self.assertCountEqual(link_map.get_additions(), [])
-        self.assertTrue(link_map.exists_path_from(1, 5, 2, 1))
-        self.assertFalse(link_map.exists_path_from(1, 5, 2, 2))
-        self.assertTrue(link_map.exists_path_from(1, 5, 1, 1))
-        self.assertFalse(link_map.exists_path_from(1, 1, 1, 5))
+        self.assertTrue(link_map.exists_path_from((1, 5), (2, 1)))
+        self.assertFalse(link_map.exists_path_from((1, 5), (2, 2)))
+        self.assertTrue(link_map.exists_path_from((1, 5), (1, 1)))
+        self.assertFalse(link_map.exists_path_from((1, 1), (1, 5)))
 
         # Attempting to add a redundant link is ignored.
-        self.assertFalse(link_map.add_link(1, 4, 2, 1))
+        self.assertFalse(link_map.add_link((1, 4), (2, 1)))
         self.assertCountEqual(link_map.get_links_between(1, 2), [(1, 1)])
 
         # Adding new non-redundant links works
-        self.assertTrue(link_map.add_link(1, 3, 2, 3))
+        self.assertTrue(link_map.add_link((1, 3), (2, 3)))
         self.assertCountEqual(link_map.get_links_between(1, 2), [(1, 1), (3, 3)])
 
-        self.assertTrue(link_map.add_link(2, 5, 1, 3))
+        self.assertTrue(link_map.add_link((2, 5), (1, 3)))
         self.assertCountEqual(link_map.get_links_between(2, 1), [(5, 3)])
         self.assertCountEqual(link_map.get_links_between(1, 2), [(1, 1), (3, 3)])
 

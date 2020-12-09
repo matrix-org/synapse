@@ -409,7 +409,11 @@ class PersistEventsStore:
 
     def _persist_event_auth_chain_txn(
         self, txn: LoggingTransaction, events: List[EventBase],
-    ):
+    ) -> None:
+
+        # We only care about state events, so this if there are no state events.
+        if not any(e.is_state() for e in events):
+            return
 
         # We want to store event_auth mappings for rejected events, as they're
         # used in state res v2.
@@ -439,7 +443,8 @@ class PersistEventsStore:
         #
         # See: docs/auth_chain_difference_algorithm.md
 
-        # We ignore rooms that we aren't filling the chain cover index for.
+        # We ignore legacy rooms that we aren't filling the chain cover index
+        # for.
         rows = self.db_pool.simple_select_many_txn(
             txn,
             table="rooms",
@@ -448,14 +453,14 @@ class PersistEventsStore:
             keyvalues={},
             retcols=("room_id", "has_auth_chain_index"),
         )
-        room_to_is_using_chain_index = {
-            row["room_id"]: bool(row["has_auth_chain_index"]) for row in rows
+        rooms_using_chain_index = {
+            row["room_id"] for row in rows if row["has_auth_chain_index"]
         }
 
         state_events = {
             event.event_id: event
             for event in events
-            if event.is_state() and room_to_is_using_chain_index[event.room_id]
+            if event.is_state() and event.room_id in rooms_using_chain_index
         }
 
         if not state_events:
@@ -478,9 +483,9 @@ class PersistEventsStore:
         # Set of event IDs to calculate chain ID/seq numbers for.
         events_to_calc_chain_id_for = set(state_events)
 
-        # We check if there are any events for the room that need to be handled.
-        # These should just be out of band memberships, where we didn't have the
-        # auth chain when we first persisted.
+        # We check if there are any events that need to be handled in the rooms
+        # we're looking at. These should just be out of band memberships, where
+        # we didn't have the auth chain when we first persisted.
         rows = self.db_pool.simple_select_many_txn(
             txn,
             table="event_auth_chain_to_calculate",
@@ -494,6 +499,9 @@ class PersistEventsStore:
             event_type = row["type"]
             state_key = row["state_key"]
 
+            # (We could pull out the auth events for all rows at once using
+            # simple_select_many, but this case happens rarely and almost always
+            # with a single row.)
             auth_events = self.db_pool.simple_select_onecol_txn(
                 txn, "event_auth", keyvalues={"event_id": event_id}, retcol="auth_id",
             )
@@ -570,7 +578,7 @@ class PersistEventsStore:
                 ):
                     events_to_calc_chain_id_for.discard(event_id)
 
-                    # If this is an event we're trying to persist we added it to
+                    # If this is an event we're trying to persist we add it to
                     # the list of events to calculate chain IDs for next time
                     # around. (Otherwise we will have already added it to the
                     # table).
@@ -586,6 +594,9 @@ class PersistEventsStore:
                                 "state_key": event.state_key,
                             },
                         )
+
+                    # We stop checking the event's auth events since we've
+                    # discarded it.
                     break
 
         if not events_to_calc_chain_id_for:
@@ -600,8 +611,8 @@ class PersistEventsStore:
         # We need to do this in a topologically sorted order as we want to
         # generate chain IDs/sequence numbers of an event's auth events
         # before the event itself.
-        chains_ids_allocated = set()  # type: Set[Tuple[int, int]]
-        new_chains = {}  # type: Dict[str, Tuple[int, int]]
+        chains_tuples_allocated = set()  # type: Set[Tuple[int, int]]
+        new_chain_tuples = {}  # type: Dict[str, Tuple[int, int]]
         for event_id in sorted_topologically(
             events_to_calc_chain_id_for, event_to_auth_chain
         ):
@@ -609,14 +620,15 @@ class PersistEventsStore:
             for auth_id in event_to_auth_chain[event_id]:
                 if event_to_types.get(event_id) == event_to_types.get(auth_id):
                     existing_chain_id = chain_map[auth_id]
+                    break
 
-            new_chain_id = None
+            new_chain_tuple = None
             if existing_chain_id:
                 # We found a chain ID/sequence number candidate, check its
                 # not already taken.
                 proposed_new_id = existing_chain_id[0]
                 proposed_new_seq = existing_chain_id[1] + 1
-                if (proposed_new_id, proposed_new_seq) not in chains_ids_allocated:
+                if (proposed_new_id, proposed_new_seq) not in chains_tuples_allocated:
                     already_allocated = self.db_pool.simple_select_one_onecol_txn(
                         txn,
                         table="event_auth_chains",
@@ -630,27 +642,27 @@ class PersistEventsStore:
                     if already_allocated:
                         # Mark it as already allocated so we don't need to hit
                         # the DB again.
-                        chains_ids_allocated.add((proposed_new_id, proposed_new_seq))
+                        chains_tuples_allocated.add((proposed_new_id, proposed_new_seq))
                     else:
-                        new_chain_id = (
+                        new_chain_tuple = (
                             proposed_new_id,
                             proposed_new_seq,
                         )
 
-            if not new_chain_id:
-                new_chain_id = (self._event_chain_id_gen.get_next_id_txn(txn), 1)
+            if not new_chain_tuple:
+                new_chain_tuple = (self._event_chain_id_gen.get_next_id_txn(txn), 1)
 
-            chains_ids_allocated.add(new_chain_id)
+            chains_tuples_allocated.add(new_chain_tuple)
 
-            chain_map[event_id] = new_chain_id
-            new_chains[event_id] = new_chain_id
+            chain_map[event_id] = new_chain_tuple
+            new_chain_tuples[event_id] = new_chain_tuple
 
         self.db_pool.simple_insert_many_txn(
             txn,
             table="event_auth_chains",
             values=[
                 {"event_id": event_id, "chain_id": c_id, "sequence_number": seq}
-                for event_id, (c_id, seq) in new_chains.items()
+                for event_id, (c_id, seq) in new_chain_tuples.items()
             ],
         )
 
@@ -659,7 +671,7 @@ class PersistEventsStore:
             table="event_auth_chain_to_calculate",
             keyvalues={},
             column="event_id",
-            iterable=new_chains,
+            iterable=new_chain_tuples,
         )
 
         # Now we need to calculate any new links between chains caused by
@@ -684,7 +696,8 @@ class PersistEventsStore:
         #       b. Add a link from the event to every chain reachable by the
         #          auth event.
 
-        # Step 1, fetch all existing links
+        # Step 1, fetch all existing links from all the chains we've seen
+        # referenced.
         chain_links = _LinkMap()
         rows = self.db_pool.simple_select_many_txn(
             txn,
@@ -701,10 +714,8 @@ class PersistEventsStore:
         )
         for row in rows:
             chain_links.add_link(
-                row["origin_chain_id"],
-                row["origin_sequence_number"],
-                row["target_chain_id"],
-                row["target_sequence_number"],
+                (row["origin_chain_id"], row["origin_sequence_number"]),
+                (row["target_chain_id"], row["target_sequence_number"]),
                 new=False,
             )
 
@@ -726,7 +737,7 @@ class PersistEventsStore:
                 event_to_auth_chain[event_id], r=2,
             ):
                 if chain_links.exists_path_from(
-                    *chain_map[start_auth_id], *chain_map[end_auth_id]
+                    chain_map[start_auth_id], chain_map[end_auth_id]
                 ):
                     reduction.discard(end_auth_id)
 
@@ -737,19 +748,19 @@ class PersistEventsStore:
 
                 # Step 2a, add link between the event and auth event
                 chain_links.add_link(
-                    chain_id, sequence_number, auth_chain_id, auth_sequence_number
+                    (chain_id, sequence_number), (auth_chain_id, auth_sequence_number)
                 )
 
                 # Step 2b, add a link to chains reachable from the auth
                 # event.
                 for target_id, target_seq in chain_links.get_links_from(
-                    auth_chain_id, auth_sequence_number
+                    (auth_chain_id, auth_sequence_number)
                 ):
                     if target_id == chain_id:
                         continue
 
                     chain_links.add_link(
-                        chain_id, sequence_number, target_id, target_seq
+                        (chain_id, sequence_number), (target_id, target_seq)
                     )
 
         self.db_pool.simple_insert_many_txn(
@@ -1901,10 +1912,8 @@ class _LinkMap:
 
     def add_link(
         self,
-        src_chain: int,
-        src_seq: int,
-        target_chain: int,
-        target_seq: int,
+        src_tuple: Tuple[int, int],
+        target_tuple: Tuple[int, int],
         new: bool = True,
     ) -> bool:
         """Add a new link between two chains, ensuring no redundant links are added.
@@ -1912,16 +1921,17 @@ class _LinkMap:
         New links should be added in topological order.
 
         Args:
-            src_chain: The chain ID of the source of the link,
-            src_seq: The sequence number of the source of the link,
-            target_chain: The chain ID of the target of the link,
-            target_seq: The sequence number of the target of the link,
+            src_tuple: The chain ID/sequence number of the source of the link.
+            target_tuple: The chain ID/sequence number of the target of the link.
             new: Whether this is a "new" link, i.e. should it be returned
                 by `get_additions`.
 
         Returns:
             True if a link was added, false if the given link was dropped as redundant
         """
+        src_chain, src_seq = src_tuple
+        target_chain, target_seq = target_tuple
+
         current_links = self.maps.setdefault(src_chain, {}).setdefault(target_chain, {})
 
         assert src_chain != target_chain
@@ -1959,14 +1969,15 @@ class _LinkMap:
         return True
 
     def get_links_from(
-        self, source_id: int, src_seq: int,
+        self, src_tuple: Tuple[int, int]
     ) -> Generator[Tuple[int, int], None, None]:
         """Gets the chains reachable from the given chain/sequence number.
 
         Yields:
             The chain ID and sequence number the link points to.
         """
-        for target_id, sequence_numbers in self.maps.get(source_id, {}).items():
+        src_chain, src_seq = src_tuple
+        for target_id, sequence_numbers in self.maps.get(src_chain, {}).items():
             for link_src_seq, target_seq in sequence_numbers.items():
                 if link_src_seq <= src_seq:
                     yield target_id, target_seq
@@ -1995,11 +2006,14 @@ class _LinkMap:
                 yield (src_chain, src_seq, target_chain, target_seq)
 
     def exists_path_from(
-        self, src_chain: int, src_seq: int, target_chain: int, target_seq: int,
+        self, src_tuple: Tuple[int, int], target_tuple: Tuple[int, int],
     ) -> bool:
         """Checks if there is a path between the source chain ID/sequence and
         target chain ID/sequence.
         """
+        src_chain, src_seq = src_tuple
+        target_chain, target_seq = target_tuple
+
         if src_chain == target_chain:
             return target_seq <= src_seq
 
