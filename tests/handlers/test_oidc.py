@@ -385,16 +385,6 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.handler._map_userinfo_to_user = simple_async_mock(return_value=user_id)
         auth_handler = self.hs.get_auth_handler()
         auth_handler.complete_sso_login = simple_async_mock()
-        request = Mock(
-            spec=[
-                "args",
-                "getCookie",
-                "addCookie",
-                "requestHeaders",
-                "getClientIP",
-                "get_user_agent",
-            ]
-        )
 
         code = "code"
         state = "state"
@@ -402,19 +392,15 @@ class OidcHandlerTestCase(HomeserverTestCase):
         client_redirect_url = "http://client/redirect"
         user_agent = "Browser"
         ip_address = "10.0.0.1"
-        request.getCookie.return_value = self.handler._generate_oidc_session_token(
+        session = self.handler._generate_oidc_session_token(
             state=state,
             nonce=nonce,
             client_redirect_url=client_redirect_url,
             ui_auth_session_id=None,
         )
-
-        request.args = {}
-        request.args[b"code"] = [code.encode("utf-8")]
-        request.args[b"state"] = [state.encode("utf-8")]
-
-        request.getClientIP.return_value = ip_address
-        request.get_user_agent.return_value = user_agent
+        request = self._build_callback_request(
+            code, state, session, user_agent=user_agent, ip_address=ip_address
+        )
 
         self.get_success(self.handler.handle_oidc_callback(request))
 
@@ -618,32 +604,16 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.handler._map_userinfo_to_user = simple_async_mock(return_value=user_id)
         auth_handler = self.hs.get_auth_handler()
         auth_handler.complete_sso_login = simple_async_mock()
-        request = Mock(
-            spec=[
-                "args",
-                "getCookie",
-                "addCookie",
-                "requestHeaders",
-                "getClientIP",
-                "get_user_agent",
-            ]
-        )
 
         state = "state"
         client_redirect_url = "http://client/redirect"
-        request.getCookie.return_value = self.handler._generate_oidc_session_token(
+        session = self.handler._generate_oidc_session_token(
             state=state,
             nonce="nonce",
             client_redirect_url=client_redirect_url,
             ui_auth_session_id=None,
         )
-
-        request.args = {}
-        request.args[b"code"] = [b"code"]
-        request.args[b"state"] = [state.encode("utf-8")]
-
-        request.getClientIP.return_value = "10.0.0.1"
-        request.get_user_agent.return_value = "Browser"
+        request = self._build_callback_request("code", state, session)
 
         self.get_success(self.handler.handle_oidc_callback(request))
 
@@ -849,3 +819,45 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(
             str(e.value), "Unable to generate a Matrix ID from the SSO response"
         )
+
+    def _build_callback_request(
+        self,
+        code: str,
+        state: str,
+        session: str,
+        user_agent: str = "Browser",
+        ip_address: str = "10.0.0.1",
+    ):
+        """Builds a fake SynapseRequest to mock the browser callback
+
+        Returns a Mock object which looks like the SynapseRequest we get from a browser
+        after SSO (before we return to the client)
+
+        Args:
+            code: the authorization code which would have been returned by the OIDC
+               provider
+            state: the "state" param which would have been passed around in the
+               query param. Should be the same as was embedded in the session in
+               _build_oidc_session.
+            session: the "session" which would have been passed around in the cookie.
+            user_agent: the user-agent to present
+            ip_address: the IP address to pretend the request came from
+        """
+        request = Mock(
+            spec=[
+                "args",
+                "getCookie",
+                "addCookie",
+                "requestHeaders",
+                "getClientIP",
+                "get_user_agent",
+            ]
+        )
+
+        request.getCookie.return_value = session
+        request.args = {}
+        request.args[b"code"] = [code.encode("utf-8")]
+        request.args[b"state"] = [state.encode("utf-8")]
+        request.getClientIP.return_value = ip_address
+        request.get_user_agent.return_value = user_agent
+        return request
