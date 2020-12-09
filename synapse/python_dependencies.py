@@ -96,7 +96,11 @@ CONDITIONAL_REQUIREMENTS = {
         # python 3.5.2, as per https://github.com/itamarst/eliot/issues/418
         'eliot<1.8.0;python_version<"3.5.3"',
     ],
-    "saml2": ["pysaml2>=4.5.0"],
+    "saml2": [
+        # pysaml2 6.4.0 is incompatible with Python 3.5 (see https://github.com/IdentityPython/pysaml2/issues/749)
+        "pysaml2>=4.5.0,<6.4.0;python_version<'3.6'",
+        "pysaml2>=4.5.0;python_version>='3.6'",
+    ],
     "oidc": ["authlib>=0.14.0"],
     "systemd": ["systemd-python>=231"],
     "url_preview": ["lxml>=3.5.0"],
