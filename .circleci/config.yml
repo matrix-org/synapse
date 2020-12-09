@@ -8,39 +8,14 @@ jobs:
       - docker_prepare
       - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
       - docker_build:
-          tag: -t matrixdotorg/synapse:${CIRCLE_TAG}
-          platforms: linux/amd64
-      - docker_build:
-          tag: -t matrixdotorg/synapse:${CIRCLE_TAG}
+          tag: -t matrixdotorg/synapse:v1.23.1
           platforms: linux/amd64,linux/arm/v7,linux/arm64
 
-  dockerhubuploadlatest:
-    docker:
-      - image: docker:git
-    steps:
-      - checkout
-      - docker_prepare
-      - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
-      - docker_build:
-          tag: -t matrixdotorg/synapse:latest
-          platforms: linux/amd64
-      - docker_build:
-          tag: -t matrixdotorg/synapse:latest
-          platforms: linux/amd64,linux/arm/v7,linux/arm64
 
 workflows:
   build:
     jobs:
-      - dockerhubuploadrelease:
-          filters:
-            tags:
-              only: /v[0-9].[0-9]+.[0-9]+.*/
-            branches:
-              ignore: /.*/
-      - dockerhubuploadlatest:
-          filters:
-            branches:
-              only: master
+      - dockerhubuploadrelease
 
 commands:
   docker_prepare:
