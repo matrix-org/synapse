@@ -13,8 +13,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import heapq
 from itertools import islice
-from typing import Dict, Generator, Iterable, Iterator, Sequence, Set, Tuple, TypeVar
+from typing import (
+    Dict,
+    Generator,
+    Iterable,
+    Iterator,
+    Mapping,
+    Sequence,
+    Set,
+    Tuple,
+    TypeVar,
+)
 
 from synapse.types import Collection
 
@@ -51,7 +62,7 @@ def chunk_seq(iseq: ISeq, maxlen: int) -> Iterable[ISeq]:
 
 
 def sorted_topologically(
-    nodes: Iterable[T], graph: Dict[T, Collection[T]],
+    nodes: Iterable[T], graph: Mapping[T, Collection[T]],
 ) -> Generator[T, None, None]:
     """Given a set of nodes and a graph, yield the nodes in toplogical order.
 
@@ -75,12 +86,14 @@ def sorted_topologically(
         reverse_graph.setdefault(node, set())
 
     zero_degree = [node for node, degree in degree_map.items() if degree == 0]
+    heapq.heapify(zero_degree)
+
     while zero_degree:
-        node = zero_degree.pop()
+        node = heapq.heappop(zero_degree)
         yield node
 
         for edge in reverse_graph[node]:
             if edge in degree_map:
                 degree_map[edge] -= 1
                 if degree_map[edge] == 0:
-                    zero_degree.append(edge)
+                    heapq.heappush(zero_degree, edge)
