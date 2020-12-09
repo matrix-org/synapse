@@ -144,6 +144,35 @@ pid_file: DATADIR/homeserver.pid
 #
 #enable_search: false
 
+# Prevent outgoing requests from being sent to the following blacklisted IP address
+# CIDR ranges. If this option is not specified then it defaults to private IP
+# address ranges (see the example below).
+#
+# The blacklist applies to the outbound requests for federation, identity servers,
+# push servers, and for checking key validity for third-party invite events.
+#
+# (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
+# listed here, since they correspond to unroutable addresses.)
+#
+# This option replaces federation_ip_range_blacklist in Synapse v1.25.0.
+#
+#ip_range_blacklist:
+#  - '127.0.0.0/8'
+#  - '10.0.0.0/8'
+#  - '172.16.0.0/12'
+#  - '192.168.0.0/16'
+#  - '100.64.0.0/10'
+#  - '192.0.0.0/24'
+#  - '169.254.0.0/16'
+#  - '198.18.0.0/15'
+#  - '192.0.2.0/24'
+#  - '198.51.100.0/24'
+#  - '203.0.113.0/24'
+#  - '224.0.0.0/4'
+#  - '::1/128'
+#  - 'fe80::/10'
+#  - 'fc00::/7'
+
 # List of ports that Synapse should listen on, their purpose and their
 # configuration.
 #
@@ -641,35 +670,6 @@ acme:
 #  - lon.example.com
 #  - nyc.example.com
 #  - syd.example.com
-
-# Prevent outgoing requests from being sent to the following blacklisted IP address
-# CIDR ranges. If this option is not specified or is empty then it defaults to
-# private IP address ranges (see the example below).
-#
-# The blacklist applies to the outbound requests for federation, identity servers,
-# push servers, and for checking key validity for third-party invite events.
-#
-# (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
-# listed here, since they correspond to unroutable addresses.)
-#
-# This option replaces federation_ip_range_blacklist in Synapse v1.24.0.
-#
-#ip_range_blacklist:
-#  - '127.0.0.0/8'
-#  - '10.0.0.0/8'
-#  - '172.16.0.0/12'
-#  - '192.168.0.0/16'
-#  - '100.64.0.0/10'
-#  - '192.0.0.0/24'
-#  - '169.254.0.0/16'
-#  - '198.18.0.0/15'
-#  - '192.0.2.0/24'
-#  - '198.51.100.0/24'
-#  - '203.0.113.0/24'
-#  - '224.0.0.0/4'
-#  - '::1/128'
-#  - 'fe80::/10'
-#  - 'fc00::/7'
 
 # List of IP address CIDR ranges that should be allowed for federation,
 # identity servers, push servers, and for checking key validity for

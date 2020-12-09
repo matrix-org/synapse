@@ -19,7 +19,7 @@ from typing import Dict, List
 
 from netaddr import IPSet
 
-from synapse.config.federation import DEFAULT_IP_RANGE_BLACKLIST
+from synapse.config.server import DEFAULT_IP_RANGE_BLACKLIST
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module
 
