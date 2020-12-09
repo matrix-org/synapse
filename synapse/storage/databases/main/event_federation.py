@@ -248,9 +248,8 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                     # the link is less than the max sequence number in the
                     # origin chain.
                     if origin_sequence_number <= chains.get(origin_chain_id, 0):
-                        chains[target_sequence_number] = max(
-                            target_sequence_number,
-                            chains.get(target_sequence_number, 0),
+                        chains[target_chain_id] = max(
+                            target_sequence_number, chains.get(target_chain_id, 0),
                         )
 
                 seen_chains.add(target_chain_id)
