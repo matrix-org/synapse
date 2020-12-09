@@ -36,6 +36,8 @@ import attr
 import bcrypt
 import pymacaroons
 
+from twisted.web.http import Request
+
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
     AuthError,
@@ -1331,15 +1333,14 @@ class AuthHandler(BaseHandler):
         )
 
     async def complete_sso_ui_auth(
-        self, registered_user_id: str, session_id: str, request: SynapseRequest,
+        self, registered_user_id: str, session_id: str, request: Request,
     ):
         """Having figured out a mxid for this user, complete the HTTP request
 
         Args:
             registered_user_id: The registered user ID to complete SSO login for.
+            session_id: The ID of the user-interactive auth session.
             request: The request to complete.
-            client_redirect_url: The URL to which to redirect the user at the end of the
-                process.
         """
         # Mark the stage of the authentication as successful.
         # Save the user who authenticated with SSO, this will be used to ensure
@@ -1355,7 +1356,7 @@ class AuthHandler(BaseHandler):
     async def complete_sso_login(
         self,
         registered_user_id: str,
-        request: SynapseRequest,
+        request: Request,
         client_redirect_url: str,
         extra_attributes: Optional[JsonDict] = None,
     ):
@@ -1383,7 +1384,7 @@ class AuthHandler(BaseHandler):
     def _complete_sso_login(
         self,
         registered_user_id: str,
-        request: SynapseRequest,
+        request: Request,
         client_redirect_url: str,
         extra_attributes: Optional[JsonDict] = None,
     ):
