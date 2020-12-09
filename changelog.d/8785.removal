@@ -1,1 +1,0 @@
-Remove old `/_matrix/client/*/admin` endpoints which was deprecated since Synapse 1.20.0.

@@ -642,17 +642,19 @@ acme:
 #  - nyc.example.com
 #  - syd.example.com
 
-# Prevent federation requests from being sent to the following
-# blacklist IP address CIDR ranges. If this option is not specified, or
-# specified with an empty list, no ip range blacklist will be enforced.
+# Prevent outgoing requests from being sent to the following blacklisted IP address
+# CIDR ranges. If this option is not specified, or specified with an empty list,
+# no IP range blacklist will be enforced.
 #
-# As of Synapse v1.4.0 this option also affects any outbound requests to identity
-# servers provided by user input.
+# The blacklist applies to the outbound requests for federation, identity servers,
+# push servers, and for checking key validitity for third-party invite events.
 #
 # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
 # listed here, since they correspond to unroutable addresses.)
 #
-federation_ip_range_blacklist:
+# This option replaces federation_ip_range_blacklist in Synapse v1.24.0.
+#
+ip_range_blacklist:
   - '127.0.0.0/8'
   - '10.0.0.0/8'
   - '172.16.0.0/12'
@@ -1877,11 +1879,8 @@ sso:
     #  - https://my.custom.client/
 
     # Directory in which Synapse will try to find the template files below.
-    # If not set, default templates from within the Synapse package will be used.
-    #
-    # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
-    # If you *do* uncomment it, you will need to make sure that all the templates
-    # below are in the directory.
+    # If not set, or the files named below are not found within the template
+    # directory, default templates from within the Synapse package will be used.
     #
     # Synapse will look for the following templates in this directory:
     #
@@ -2111,9 +2110,8 @@ email:
   #validation_token_lifetime: 15m
 
   # Directory in which Synapse will try to find the template files below.
-  # If not set, default templates from within the Synapse package will be used.
-  #
-  # Do not uncomment this setting unless you want to customise the templates.
+  # If not set, or the files named below are not found within the template
+  # directory, default templates from within the Synapse package will be used.
   #
   # Synapse will look for the following templates in this directory:
   #
@@ -2270,6 +2268,16 @@ push:
   # include the event ID and room ID in push notification payloads.
   #
   #include_content: false
+
+  # When a push notification is received, an unread count is also sent.
+  # This number can either be calculated as the number of unread messages
+  # for the user, or the number of *rooms* the user has unread messages in.
+  #
+  # The default value is "true", meaning push clients will see the number of
+  # rooms with unread messages in them. Uncomment to instead send the number
+  # of unread messages.
+  #
+  #group_unread_count_by_room: false
 
 
 # Spam checkers are third-party modules that can block specific actions
@@ -2576,6 +2584,13 @@ opentracing:
 # data). If not provided this defaults to the main process.
 #
 #run_background_tasks_on: worker1
+
+# A shared secret used by the replication APIs to authenticate HTTP requests
+# from workers.
+#
+# By default this is unused and traffic is not authenticated.
+#
+#worker_replication_secret: ""
 
 
 # Configuration for Redis when using workers. This *must* be enabled when

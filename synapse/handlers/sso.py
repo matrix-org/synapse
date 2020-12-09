@@ -17,7 +17,9 @@ from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional
 
 import attr
 
-from synapse.handlers._base import BaseHandler
+from twisted.web.http import Request
+
+from synapse.api.errors import RedirectException
 from synapse.http.server import respond_with_html
 from synapse.types import UserID, contains_invalid_mxid_characters
 
@@ -28,7 +30,9 @@ logger = logging.getLogger(__name__)
 
 
 class MappingException(Exception):
-    """Used to catch errors when mapping the UserInfo object
+    """Used to catch errors when mapping an SSO response to user attributes.
+
+    Note that the msg that is raised is shown to end-users.
     """
 
 
@@ -39,14 +43,16 @@ class UserAttributes:
     emails = attr.ib(type=List[str], default=attr.Factory(list))
 
 
-class SsoHandler(BaseHandler):
+class SsoHandler:
     # The number of attempts to ask the mapping provider for when generating an MXID.
     _MAP_USERNAME_RETRIES = 1000
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self._store = hs.get_datastore()
+        self._server_name = hs.hostname
         self._registration_handler = hs.get_registration_handler()
         self._error_template = hs.config.sso_error_template
+        self._auth_handler = hs.get_auth_handler()
 
     def render_error(
         self, request, error: str, error_description: Optional[str] = None
@@ -92,7 +98,7 @@ class SsoHandler(BaseHandler):
         )
 
         # Check if we already have a mapping for this user.
-        previously_registered_user_id = await self.store.get_user_by_external_id(
+        previously_registered_user_id = await self._store.get_user_by_external_id(
             auth_provider_id, remote_user_id,
         )
 
@@ -116,7 +122,7 @@ class SsoHandler(BaseHandler):
         user_agent: str,
         ip_address: str,
         sso_to_matrix_id_mapper: Callable[[int], Awaitable[UserAttributes]],
-        allow_existing_users: bool = False,
+        grandfather_existing_users: Optional[Callable[[], Awaitable[Optional[str]]]],
     ) -> str:
         """
         Given an SSO ID, retrieve the user ID for it and possibly register the user.
@@ -125,23 +131,16 @@ class SsoHandler(BaseHandler):
         if it has that matrix ID is returned regardless of the current mapping
         logic.
 
+        If a callable is provided for grandfathering users, it is called and can
+        potentially return a matrix ID to use. If it does, the SSO ID is linked to
+        this matrix ID for subsequent calls.
+
         The mapping function is called (potentially multiple times) to generate
         a localpart for the user.
 
         If an unused localpart is generated, the user is registered from the
         given user-agent and IP address and the SSO ID is linked to this matrix
         ID for subsequent calls.
-
-        If allow_existing_users is true the mapping function is only called once
-        and results in:
-
-            1. The use of a previously registered matrix ID. In this case, the
-               SSO ID is linked to the matrix ID. (Note it is possible that
-               other SSO IDs are linked to the same matrix ID.)
-            2. An unused localpart, in which case the user is registered (as
-               discussed above).
-            3. An error if the generated localpart matches multiple pre-existing
-               matrix IDs. Generally this should not happen.
 
         Args:
             auth_provider_id: A unique identifier for this SSO provider, e.g.
@@ -152,16 +151,25 @@ class SsoHandler(BaseHandler):
             sso_to_matrix_id_mapper: A callable to generate the user attributes.
                 The only parameter is an integer which represents the amount of
                 times the returned mxid localpart mapping has failed.
-            allow_existing_users: True if the localpart returned from the
-                mapping provider can be linked to an existing matrix ID.
+
+                It is expected that the mapper can raise two exceptions, which
+                will get passed through to the caller:
+
+                    MappingException if there was a problem mapping the response
+                        to the user.
+                    RedirectException to redirect to an additional page (e.g.
+                        to prompt the user for more information).
+            grandfather_existing_users: A callable which can return an previously
+                existing matrix ID. The SSO ID is then linked to the returned
+                matrix ID.
 
         Returns:
              The user ID associated with the SSO response.
 
         Raises:
             MappingException if there was a problem mapping the response to a user.
-            RedirectException: some mapping providers may raise this if they need
-                to redirect to an interstitial page.
+            RedirectException: if the mapping provider needs to redirect the user
+                to an additional page. (e.g. to prompt for more information)
 
         """
         # first of all, check if we already have a mapping for this user
@@ -171,14 +179,30 @@ class SsoHandler(BaseHandler):
         if previously_registered_user_id:
             return previously_registered_user_id
 
+        # Check for grandfathering of users.
+        if grandfather_existing_users:
+            previously_registered_user_id = await grandfather_existing_users()
+            if previously_registered_user_id:
+                # Future logins should also match this user ID.
+                await self._store.record_user_external_id(
+                    auth_provider_id, remote_user_id, previously_registered_user_id
+                )
+                return previously_registered_user_id
+
         # Otherwise, generate a new user.
         for i in range(self._MAP_USERNAME_RETRIES):
             try:
                 attributes = await sso_to_matrix_id_mapper(i)
+            except (RedirectException, MappingException):
+                # Mapping providers are allowed to issue a redirect (e.g. to ask
+                # the user for more information) and can issue a mapping exception
+                # if a name cannot be generated.
+                raise
             except Exception as e:
+                # Any other exception is unexpected.
                 raise MappingException(
-                    "Could not extract user attributes from SSO response: " + str(e)
-                )
+                    "Could not extract user attributes from SSO response."
+                ) from e
 
             logger.debug(
                 "Retrieved user attributes from user mapping provider: %r (attempt %d)",
@@ -193,34 +217,8 @@ class SsoHandler(BaseHandler):
                 )
 
             # Check if this mxid already exists
-            user_id = UserID(attributes.localpart, self.server_name).to_string()
-            users = await self.store.get_users_by_id_case_insensitive(user_id)
-            # Note, if allow_existing_users is true then the loop is guaranteed
-            # to end on the first iteration: either by matching an existing user,
-            # raising an error, or registering a new user. See the docstring for
-            # more in-depth an explanation.
-            if users and allow_existing_users:
-                # If an existing matrix ID is returned, then use it.
-                if len(users) == 1:
-                    previously_registered_user_id = next(iter(users))
-                elif user_id in users:
-                    previously_registered_user_id = user_id
-                else:
-                    # Do not attempt to continue generating Matrix IDs.
-                    raise MappingException(
-                        "Attempted to login as '{}' but it matches more than one user inexactly: {}".format(
-                            user_id, users
-                        )
-                    )
-
-                # Future logins should also match this user ID.
-                await self.store.record_user_external_id(
-                    auth_provider_id, remote_user_id, previously_registered_user_id
-                )
-
-                return previously_registered_user_id
-
-            elif not users:
+            user_id = UserID(attributes.localpart, self._server_name).to_string()
+            if not await self._store.get_users_by_id_case_insensitive(user_id):
                 # This mxid is free
                 break
         else:
@@ -243,7 +241,47 @@ class SsoHandler(BaseHandler):
             user_agent_ips=[(user_agent, ip_address)],
         )
 
-        await self.store.record_user_external_id(
+        await self._store.record_user_external_id(
             auth_provider_id, remote_user_id, registered_user_id
         )
         return registered_user_id
+
+    async def complete_sso_ui_auth_request(
+        self,
+        auth_provider_id: str,
+        remote_user_id: str,
+        ui_auth_session_id: str,
+        request: Request,
+    ) -> None:
+        """
+        Given an SSO ID, retrieve the user ID for it and complete UIA.
+
+        Note that this requires that the user is mapped in the "user_external_ids"
+        table. This will be the case if they have ever logged in via SAML or OIDC in
+        recentish synapse versions, but may not be for older users.
+
+        Args:
+            auth_provider_id: A unique identifier for this SSO provider, e.g.
+                "oidc" or "saml".
+            remote_user_id: The unique identifier from the SSO provider.
+            ui_auth_session_id: The ID of the user-interactive auth session.
+            request: The request to complete.
+        """
+
+        user_id = await self.get_sso_user_by_remote_user_id(
+            auth_provider_id, remote_user_id,
+        )
+
+        if not user_id:
+            logger.warning(
+                "Remote user %s/%s has not previously logged in here: UIA will fail",
+                auth_provider_id,
+                remote_user_id,
+            )
+            # Let the UIA flow handle this the same as if they presented creds for a
+            # different user.
+            user_id = ""
+
+        await self._auth_handler.complete_sso_ui_auth(
+            user_id, ui_auth_session_id, request
+        )

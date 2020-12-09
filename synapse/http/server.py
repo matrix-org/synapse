@@ -25,7 +25,7 @@ from io import BytesIO
 from typing import Any, Callable, Dict, Iterator, List, Tuple, Union
 
 import jinja2
-from canonicaljson import iterencode_canonical_json, iterencode_pretty_printed_json
+from canonicaljson import iterencode_canonical_json
 from zope.interface import implementer
 
 from twisted.internet import defer, interfaces
@@ -94,11 +94,7 @@ def return_json_error(f: failure.Failure, request: SynapseRequest) -> None:
                 pass
     else:
         respond_with_json(
-            request,
-            error_code,
-            error_dict,
-            send_cors=True,
-            pretty_print=_request_user_agent_is_curl(request),
+            request, error_code, error_dict, send_cors=True,
         )
 
 
@@ -290,7 +286,6 @@ class DirectServeJsonResource(_AsyncResource):
             code,
             response_object,
             send_cors=True,
-            pretty_print=_request_user_agent_is_curl(request),
             canonical_json=self.canonical_json,
         )
 
@@ -587,7 +582,6 @@ def respond_with_json(
     code: int,
     json_object: Any,
     send_cors: bool = False,
-    pretty_print: bool = False,
     canonical_json: bool = True,
 ):
     """Sends encoded JSON in response to the given request.
@@ -598,8 +592,6 @@ def respond_with_json(
         json_object: The object to serialize to JSON.
         send_cors: Whether to send Cross-Origin Resource Sharing headers
             https://fetch.spec.whatwg.org/#http-cors-protocol
-        pretty_print: Whether to include indentation and line-breaks in the
-            resulting JSON bytes.
         canonical_json: Whether to use the canonicaljson algorithm when encoding
             the JSON bytes.
 
@@ -615,13 +607,10 @@ def respond_with_json(
         )
         return None
 
-    if pretty_print:
-        encoder = iterencode_pretty_printed_json
+    if canonical_json:
+        encoder = iterencode_canonical_json
     else:
-        if canonical_json:
-            encoder = iterencode_canonical_json
-        else:
-            encoder = _encode_json_bytes
+        encoder = _encode_json_bytes
 
     request.setResponseCode(code)
     request.setHeader(b"Content-Type", b"application/json")
@@ -685,7 +674,7 @@ def set_cors_headers(request: Request):
     )
     request.setHeader(
         b"Access-Control-Allow-Headers",
-        b"Origin, X-Requested-With, Content-Type, Accept, Authorization",
+        b"Origin, X-Requested-With, Content-Type, Accept, Authorization, Date",
     )
 
 
@@ -759,11 +748,3 @@ def finish_request(request: Request):
         request.finish()
     except RuntimeError as e:
         logger.info("Connection disconnected before response was written: %r", e)
-
-
-def _request_user_agent_is_curl(request: Request) -> bool:
-    user_agents = request.requestHeaders.getRawHeaders(b"User-Agent", default=[])
-    for user_agent in user_agents:
-        if b"curl" in user_agent:
-            return True
-    return False

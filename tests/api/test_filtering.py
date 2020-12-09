@@ -16,8 +16,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock
-
 import jsonschema
 
 from twisted.internet import defer
@@ -28,7 +26,7 @@ from synapse.api.filtering import Filter
 from synapse.events import make_event_from_dict
 
 from tests import unittest
-from tests.utils import DeferredMockCallable, MockHttpResource, setup_test_homeserver
+from tests.utils import setup_test_homeserver
 
 user_localpart = "test_user"
 
@@ -42,19 +40,9 @@ def MockEvent(**kwargs):
 
 
 class FilteringTestCase(unittest.TestCase):
-    @defer.inlineCallbacks
     def setUp(self):
-        self.mock_federation_resource = MockHttpResource()
-
-        self.mock_http_client = Mock(spec=[])
-        self.mock_http_client.put_json = DeferredMockCallable()
-
-        hs = yield setup_test_homeserver(
-            self.addCleanup, http_client=self.mock_http_client, keyring=Mock(),
-        )
-
+        hs = setup_test_homeserver(self.addCleanup)
         self.filtering = hs.get_filtering()
-
         self.datastore = hs.get_datastore()
 
     def test_errors_on_invalid_filters(self):
