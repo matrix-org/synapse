@@ -383,7 +383,8 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.handler._parse_id_token = simple_async_mock(return_value=userinfo)
         self.handler._fetch_userinfo = simple_async_mock(return_value=userinfo)
         self.handler._map_userinfo_to_user = simple_async_mock(return_value=user_id)
-        self.handler._auth_handler.complete_sso_login = simple_async_mock()
+        auth_handler = self.hs.get_auth_handler()
+        auth_handler.complete_sso_login = simple_async_mock()
         request = Mock(
             spec=[
                 "args",
@@ -417,7 +418,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         self.get_success(self.handler.handle_oidc_callback(request))
 
-        self.handler._auth_handler.complete_sso_login.assert_called_once_with(
+        auth_handler.complete_sso_login.assert_called_once_with(
             user_id, request, client_redirect_url, {},
         )
         self.handler._exchange_code.assert_called_once_with(code)
@@ -441,7 +442,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.get_success(self.handler.handle_oidc_callback(request))
         self.assertRenderedError("invalid_token")
 
-        self.handler._auth_handler.complete_sso_login.reset_mock()
+        auth_handler.complete_sso_login.reset_mock()
         self.handler._exchange_code.reset_mock()
         self.handler._parse_id_token.reset_mock()
         self.handler._map_userinfo_to_user.reset_mock()
@@ -451,7 +452,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.handler._scopes = []  # do not ask the "openid" scope
         self.get_success(self.handler.handle_oidc_callback(request))
 
-        self.handler._auth_handler.complete_sso_login.assert_called_once_with(
+        auth_handler.complete_sso_login.assert_called_once_with(
             user_id, request, client_redirect_url, {},
         )
         self.handler._exchange_code.assert_called_once_with(code)
@@ -615,7 +616,8 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.handler._exchange_code = simple_async_mock(return_value=token)
         self.handler._parse_id_token = simple_async_mock(return_value=userinfo)
         self.handler._map_userinfo_to_user = simple_async_mock(return_value=user_id)
-        self.handler._auth_handler.complete_sso_login = simple_async_mock()
+        auth_handler = self.hs.get_auth_handler()
+        auth_handler.complete_sso_login = simple_async_mock()
         request = Mock(
             spec=[
                 "args",
@@ -645,7 +647,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         self.get_success(self.handler.handle_oidc_callback(request))
 
-        self.handler._auth_handler.complete_sso_login.assert_called_once_with(
+        auth_handler.complete_sso_login.assert_called_once_with(
             user_id, request, client_redirect_url, {"phone": "1234567"},
         )
 
