@@ -19,6 +19,24 @@ from synapse.handlers.sso import MappingException
 
 from tests.unittest import HomeserverTestCase, override_config
 
+# Check if we have the dependencies to run the tests.
+try:
+    import saml2.config
+    from saml2.sigver import SigverError
+
+    has_saml2 = True
+
+    # pysaml2 can be installed and imported, but might not be able to find xmlsec1.
+    config = saml2.config.SPConfig()
+    try:
+        config.load({"metadata": {}})
+        has_xmlsec1 = True
+    except SigverError:
+        has_xmlsec1 = False
+except ImportError:
+    has_saml2 = False
+    has_xmlsec1 = False
+
 # These are a few constants that are used as config parameters in the tests.
 BASE_URL = "https://synapse/"
 
@@ -85,6 +103,11 @@ class SamlHandlerTestCase(HomeserverTestCase):
         sso_handler._MAP_USERNAME_RETRIES = 3
 
         return hs
+
+    if not has_saml2:
+        skip = "Requires pysaml2"
+    elif not has_xmlsec1:
+        skip = "Requires xmlsec1"
 
     def test_map_saml_response_to_user(self):
         """Ensure that mapping the SAML response returned from a provider to an MXID works properly."""
