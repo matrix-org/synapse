@@ -4,9 +4,9 @@ Synapse 1.24.0 (2020-12-00)
 Removal warning
 ---------------
 
-The old [Purge room API](https://github.com/matrix-org/synapse/tree/master/docs/admin_api/purge_room.md)
-and [Shutdown room API](https://github.com/matrix-org/synapse/tree/master/docs/admin_api/shutdown_room.md)
-are deprecated and will be removed in a future release. They will be replaced by
+The old [Purge Room API](https://github.com/matrix-org/synapse/tree/master/docs/admin_api/purge_room.md)
+and [Shutdown Room API](https://github.com/matrix-org/synapse/tree/master/docs/admin_api/shutdown_room.md)
+are deprecated and will be removed in a future release. They will be replaced by the
 [Delete Room API](https://github.com/matrix-org/synapse/tree/master/docs/admin_api/rooms.md#delete-room-api).
 
 `POST /_synapse/admin/v1/rooms/<room_id>/delete` replaces `POST /_synapse/admin/v1/purge_room` and
