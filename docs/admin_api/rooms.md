@@ -1,3 +1,14 @@
+# Contents
+- [List Room API](#list-room-api)
+  * [Parameters](#parameters)
+  * [Usage](#usage)
+- [Room Details API](#room-details-api)
+- [Room Members API](#room-members-api)
+- [Delete Room API](#delete-room-api)
+  * [Parameters](#parameters-1)
+  * [Response](#response)
+  * [Undoing room shutdowns](#undoing-room-shutdowns)
+
 # List Room API
 
 The List Room admin API allows server admins to get a list of rooms on their
@@ -357,8 +368,6 @@ Response:
 
 The Delete Room admin API allows server admins to remove rooms from server
 and block these rooms.
-It is a combination and improvement of "[Shutdown room](shutdown_room.md)"
-and "[Purge room](purge_room.md)" API.
 
 Shuts down a room. Moves all local users and room aliases automatically to a
 new room if `new_room_user_id` is set. Otherwise local users only
@@ -455,3 +464,30 @@ The following fields are returned in the JSON response body:
 * `local_aliases` - An array of strings representing the local aliases that were migrated from
                     the old room to the new.
 * `new_room_id` - A string representing the room ID of the new room.
+
+## Undoing room shutdowns
+
+*Note*: This guide may be outdated by the time you read it. By nature of room shutdowns being performed at the database level,
+the structure can and does change without notice.
+
+First, it's important to understand that a room shutdown is very destructive. Undoing a shutdown is not as simple as pretending it
+never happened - work has to be done to move forward instead of resetting the past. In fact, in some cases it might not be possible
+to recover at all:
+
+* If the room was invite-only, your users will need to be re-invited.
+* If the room no longer has any members at all, it'll be impossible to rejoin.
+* The first user to rejoin will have to do so via an alias on a different server.
+
+With all that being said, if you still want to try and recover the room:
+
+1. For safety reasons, shut down Synapse.
+2. In the database, run `DELETE FROM blocked_rooms WHERE room_id = '!example:example.org';`
+   * For caution: it's recommended to run this in a transaction: `BEGIN; DELETE ...;`, verify you got 1 result, then `COMMIT;`.
+   * The room ID is the same one supplied to the shutdown room API, not the Content Violation room.
+3. Restart Synapse.
+
+You will have to manually handle, if you so choose, the following:
+
+* Aliases that would have been redirected to the Content Violation room.
+* Users that would have been booted from the room (and will have been force-joined to the Content Violation room).
+* Removal of the Content Violation room if desired.
