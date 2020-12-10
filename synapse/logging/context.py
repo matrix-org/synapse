@@ -564,6 +564,22 @@ class LoggingContextFilter(logging.Filter):
             # compatibility this is stored as the "request" on the record.
             record.request = str(context)  # type: ignore
 
+            # Add some data from the HTTP request.
+            request = context.request
+            if request is None:
+                return True
+
+            # Avoid a circular import.
+            from synapse.http import get_request_user_agent
+
+            record.ip_address = request.getClientIP()  # type: ignore
+            record.site_tag = request.site.site_tag  # type: ignore
+            record.authenticated_entity = request.get_authenticated_entity()  # type: ignore
+            record.method = request.get_method()  # type: ignore
+            record.url = request.get_redacted_uri()  # type: ignore
+            record.protocol = request.clientproto.decode("ascii", errors="replace")  # type: ignore
+            record.user_agent = get_request_user_agent(request)  # type: ignore
+
         return True
 
 

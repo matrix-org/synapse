@@ -126,6 +126,28 @@ class SynapseRequest(Request):
             return self.method.decode("ascii")
         return method
 
+    def get_authenticated_entity(self) -> Optional[str]:
+        # Convert the requester into a string that we can log
+        if isinstance(self.requester, str):
+            return self.requester
+        elif isinstance(self.requester, Requester):
+            authenticated_entity = self.requester.authenticated_entity
+
+            # If this is a request where the target user doesn't match the user who
+            # authenticated (e.g. and admin is puppetting a user) then we log both.
+            if self.requester.user.to_string() != authenticated_entity:
+                return "{},{}".format(
+                    authenticated_entity,
+                    self.requester.user.to_string(),
+                )
+            return authenticated_entity
+        elif self.requester is not None:
+            # This shouldn't happen, but we log it so we don't lose information
+            # and can see that we're doing something wrong.
+            return repr(self.requester)  # type: ignore[unreachable]
+
+        return None
+
     def render(self, resrc):
         # this is called once a Resource has been found to serve the request; in our
         # case the Resource in question will normally be a JsonResource.
@@ -312,7 +334,7 @@ class SynapseRequest(Request):
             ' %sB %s "%s %s %s" "%s" [%d dbevts]',
             self.getClientIP(),
             self.site.site_tag,
-            authenticated_entity,
+            self.get_authenticated_entity(),
             processing_time,
             response_send_time,
             usage.ru_utime,

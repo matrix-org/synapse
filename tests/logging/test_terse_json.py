@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import json
 import logging
 from io import BytesIO, StringIO
@@ -163,13 +162,27 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
 
         log = self.get_log_line()
 
-        # The terse logger should give us these keys.
+        # The terse logger includes additional request information, if possible.
         expected_log_keys = [
             "log",
             "level",
             "namespace",
             "request",
+            "ip_address",
+            "site_tag",
+            "authenticated_entity",
+            "method",
+            "url",
+            "protocol",
+            "user_agent",
         ]
         self.assertCountEqual(log.keys(), expected_log_keys)
         self.assertEqual(log["log"], "Hello there, wally!")
         self.assertTrue(log["request"].startswith("POST-"))
+        self.assertEqual(log["ip_address"], "127.0.0.1")
+        self.assertEqual(log["site_tag"], "test-site")
+        self.assertIsNone(log["authenticated_entity"])
+        self.assertEqual(log["method"], "POST")
+        self.assertEqual(log["url"], "/_matrix/client/versions")
+        self.assertEqual(log["protocol"], "1.1")
+        self.assertEqual(log["user_agent"], "")
