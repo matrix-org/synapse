@@ -121,6 +121,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(channel.json_body["error"], "Registration has been disabled")
+        self.assertEquals(channel.json_body["errcode"], "M_FORBIDDEN")
 
     def test_POST_guest_registration(self):
         self.hs.config.macaroon_secret_key = "test"
@@ -569,7 +570,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         tok = self.login("kermit", "monkey")
         # We need to manually add an email address otherwise the handler will do
         # nothing.
-        now = self.hs.clock.time_msec()
+        now = self.hs.get_clock().time_msec()
         self.get_success(
             self.store.user_add_threepid(
                 user_id=user_id,
@@ -587,7 +588,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
         # We need to manually add an email address otherwise the handler will do
         # nothing.
-        now = self.hs.clock.time_msec()
+        now = self.hs.get_clock().time_msec()
         self.get_success(
             self.store.user_add_threepid(
                 user_id=user_id,
@@ -646,7 +647,7 @@ class AccountValidityBackgroundJobTestCase(unittest.HomeserverTestCase):
 
         self.hs.config.account_validity.startup_job_max_delta = self.max_delta
 
-        now_ms = self.hs.clock.time_msec()
+        now_ms = self.hs.get_clock().time_msec()
         self.get_success(self.store._set_expiration_date_when_missing())
 
         res = self.get_success(self.store.get_expiration_ts_for_user(user_id))

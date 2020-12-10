@@ -89,7 +89,28 @@ Remove old Room Admin API:
 The new `Delete Room Admin API <https://github.com/matrix-org/synapse/tree/master/docs/admin_api/rooms.md#delete-room-api>`_
 is accessible under ``POST /_synapse/admin/v1/rooms/<room_id>/delete``.
 
-The deprecation of the old endpoints was announced with Synapse 1.xx.0 (released on 2020-xx-xx).
+The deprecation of the old endpoints was announced with Synapse 1.25.0 (released on 2020-xx-xx).
+
+Upgrading to v1.25.0
+====================
+
+Blacklisting IP ranges
+----------------------
+
+Synapse v1.25.0 includes new settings, ``ip_range_blacklist`` and
+``ip_range_whitelist``, for controlling outgoing requests from Synapse for federation,
+identity servers, push, and for checking key validity for third-party invite events.
+The previous setting, ``federation_ip_range_blacklist``, is deprecated. The new
+``ip_range_blacklist`` defaults to private IP ranges if it is not defined.
+
+If you have never customised ``federation_ip_range_blacklist`` it is recommended
+that you remove that setting.
+
+If you have customised ``federation_ip_range_blacklist`` you should update the
+setting name to ``ip_range_blacklist``.
+
+If you have a custom push server that is reached via private IP space you may
+need to customise ``ip_range_blacklist`` or ``ip_range_whitelist``.
 
 Upgrading to v1.24.0
 ====================

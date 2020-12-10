@@ -299,17 +299,22 @@ class PaginationHandler:
         """
         return self._purges_by_id.get(purge_id)
 
-    async def purge_room(self, room_id: str) -> None:
-        """Purge the given room from the database"""
+    async def purge_room(self, room_id: str, force: bool = False) -> None:
+        """Purge the given room from the database.
+
+        Args:
+            room_id: room to be purged
+            force: set true to skip checking for joined users.
+        """
         with await self.pagination_lock.write(room_id):
             # check we know about the room
             await self.store.get_room_version_id(room_id)
 
             # first check that we have no users in this room
-            joined = await self.store.is_host_joined(room_id, self._server_name)
-
-            if joined:
-                raise SynapseError(400, "Users are still joined to this room")
+            if not force:
+                joined = await self.store.is_host_joined(room_id, self._server_name)
+                if joined:
+                    raise SynapseError(400, "Users are still joined to this room")
 
             await self.storage.purge_events.purge_room(room_id)
 

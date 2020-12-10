@@ -116,11 +116,13 @@ comment these options out and use those specified by the module instead.
 
 A custom mapping provider must specify the following methods:
 
-* `__init__(self, parsed_config)`
+* `__init__(self, parsed_config, module_api)`
    - Arguments:
      - `parsed_config` - A configuration object that is the return value of the
        `parse_config` method. You should set any configuration options needed by
        the module here.
+     - `module_api` - a `synapse.module_api.ModuleApi` object which provides the
+       stable API available for extension modules.
 * `parse_config(config)`
     - This method should have the `@staticmethod` decoration.
     - Arguments:
@@ -168,6 +170,13 @@ A custom mapping provider must specify the following methods:
                          the value of `mxid_localpart`.
        * `emails` - A list of emails for the new user. If not provided, will
                     default to an empty list.
+       
+       Alternatively it can raise a `synapse.api.errors.RedirectException` to
+       redirect the user to another page. This is useful to prompt the user for
+       additional information, e.g. if you want them to provide their own username.
+       It is the responsibility of the mapping provider to either redirect back
+       to `client_redirect_url` (including any additional information) or to
+       complete registration using methods from the `ModuleApi`.
 
 ### Default SAML Mapping Provider
 
