@@ -262,6 +262,8 @@ def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerConfig]):
             # is so that we're in a sane state, e.g. flushing the logs may fail
             # if the sighup happens in the middle of writing a log entry.
             def run_sighup(*args, **kwargs):
+                # `callFromThread` should be "signal safe" as well as thread
+                # safe.
                 reactor.callFromThread(handle_sighup, *args, **kwargs)
 
             signal.signal(signal.SIGHUP, run_sighup)
