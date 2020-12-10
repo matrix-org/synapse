@@ -187,13 +187,13 @@ LoggingContextOrSentinel = Union["LoggingContext", "_Sentinel"]
 class _Sentinel:
     """Sentinel to represent the root context"""
 
-    __slots__ = ["previous_context", "finished", "request", "scope", "tag"]
+    __slots__ = ["previous_context", "finished", "request_id", "scope", "tag"]
 
     def __init__(self) -> None:
         # Minimal set for compatibility with LoggingContext
         self.previous_context = None
         self.finished = False
-        self.request = None
+        self.request_id = None
         self.scope = None
         self.tag = None
 
@@ -247,7 +247,7 @@ class LoggingContext:
         "usage_start",
         "main_thread",
         "finished",
-        "request",
+        "request_id",
         "tag",
         "scope",
     ]
@@ -256,7 +256,7 @@ class LoggingContext:
         self,
         name: Optional[str] = None,
         parent_context: "Optional[LoggingContext]" = None,
-        request: Optional[str] = None,
+        request_id: Optional[str] = None,
     ) -> None:
         self.previous_context = current_context()
         self.name = name
@@ -269,7 +269,7 @@ class LoggingContext:
         self.usage_start = None  # type: Optional[resource._RUsage]
 
         self.main_thread = get_thread_id()
-        self.request = None
+        self.request_id = None
         self.tag = ""
         self.scope = None  # type: Optional[_LogContextScope]
 
@@ -281,15 +281,19 @@ class LoggingContext:
         self.parent_context = parent_context
 
         if self.parent_context is not None:
-            self.parent_context.copy_to(self)
+            # we track the current request_id
+            self.request_id = self.parent_context.request_id
 
-        if request is not None:
-            # the request param overrides the request from the parent context
-            self.request = request
+            # we also track the current scope:
+            self.scope = self.parent_context.scope
+
+        if request_id is not None:
+            # the request_id param overrides the request_id from the parent context
+            self.request_id = request_id
 
     def __str__(self) -> str:
-        if self.request:
-            return str(self.request)
+        if self.request_id:
+            return self.request_id
         return "%s@%x" % (self.name, id(self))
 
     @classmethod
@@ -556,8 +560,9 @@ class LoggingContextFilter(logging.Filter):
         # we end up in a death spiral of infinite loops, so let's check, for
         # robustness' sake.
         if context is not None:
-            # Logging is interested in the request.
-            record.request = context.request  # type: ignore
+            # Logging is interested in the request ID. Note that for backwards
+            # compatibility this is stored as the "request" on the record.
+            record.request = context.request_id  # type: ignore
 
         return True
 
@@ -630,8 +635,8 @@ def set_current_context(context: LoggingContextOrSentinel) -> LoggingContextOrSe
 def nested_logging_context(suffix: str) -> LoggingContext:
     """Creates a new logging context as a child of another.
 
-    The nested logging context will have a 'request' made up of the parent context's
-    request, plus the given suffix.
+    The nested logging context will have a 'request_id' made up of the parent context's
+    request_id, plus the given suffix.
 
     CPU/db usage stats will be added to the parent context's on exit.
 
@@ -641,7 +646,7 @@ def nested_logging_context(suffix: str) -> LoggingContext:
             # ... do stuff
 
     Args:
-        suffix: suffix to add to the parent context's 'request'.
+        suffix: suffix to add to the parent context's 'request_id'.
 
     Returns:
         LoggingContext: new logging context.
@@ -656,8 +661,8 @@ def nested_logging_context(suffix: str) -> LoggingContext:
     else:
         assert isinstance(curr_context, LoggingContext)
         parent_context = curr_context
-        prefix = str(parent_context.request)
-    return LoggingContext(parent_context=parent_context, request=prefix + "-" + suffix)
+        prefix = str(parent_context.request_id)
+    return LoggingContext(parent_context=parent_context, request_id=prefix + "-" + suffix)
 
 
 def preserve_fn(f):

@@ -71,7 +71,7 @@ class MockPerspectiveServer:
 @logcontext_clean
 class KeyringTestCase(unittest.HomeserverTestCase):
     def check_context(self, val, expected):
-        self.assertEquals(getattr(current_context(), "request", None), expected)
+        self.assertEquals(getattr(current_context(), "request_id", None), expected)
         return val
 
     def test_verify_json_objects_for_server_awaits_previous_requests(self):
@@ -89,7 +89,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         first_lookup_deferred = Deferred()
 
         async def first_lookup_fetch(keys_to_fetch):
-            self.assertEquals(current_context().request, "context_11")
+            self.assertEquals(current_context().request_id, "context_11")
             self.assertEqual(keys_to_fetch, {"server10": {get_key_id(key1): 0}})
 
             await make_deferred_yieldable(first_lookup_deferred)
@@ -103,7 +103,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
 
         async def first_lookup():
             with LoggingContext("context_11") as context_11:
-                context_11.request = "context_11"
+                context_11.request_id = "context_11"
 
                 res_deferreds = kr.verify_json_objects_for_server(
                     [("server10", json1, 0, "test10"), ("server11", {}, 0, "test11")]
@@ -130,7 +130,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         # should block rather than start a second call
 
         async def second_lookup_fetch(keys_to_fetch):
-            self.assertEquals(current_context().request, "context_12")
+            self.assertEquals(current_context().request_id, "context_12")
             return {
                 "server10": {
                     get_key_id(key1): FetchKeyResult(get_verify_key(key1), 100)
@@ -143,7 +143,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
 
         async def second_lookup():
             with LoggingContext("context_12") as context_12:
-                context_12.request = "context_12"
+                context_12.request_id = "context_12"
 
                 res_deferreds_2 = kr.verify_json_objects_for_server(
                     [("server10", json1, 0, "test")]
@@ -592,7 +592,7 @@ def run_in_context(f, *args, **kwargs):
     with LoggingContext("testctx") as ctx:
         # we set the "request" prop to make it easier to follow what's going on in the
         # logs.
-        ctx.request = "testctx"
+        ctx.request_id = "testctx"
         rv = yield f(*args, **kwargs)
     return rv
 

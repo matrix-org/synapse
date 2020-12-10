@@ -132,7 +132,7 @@ class SynapseRequest(Request):
 
         # create a LogContext for this request
         request_id = self.get_request_id()
-        self.logcontext = LoggingContext(request_id, request=request_id)
+        self.logcontext = LoggingContext(request_id, request_id=request_id)
 
         # override the Server header which is set by twisted
         self.setHeader("Server", self.site.server_version_string)
