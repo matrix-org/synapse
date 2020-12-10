@@ -203,10 +203,6 @@ class _Sentinel:
     def copy_to(self, record):
         pass
 
-    def copy_to_twisted_log_entry(self, record):
-        record["request"] = None
-        record["scope"] = None
-
     def start(self, rusage: "Optional[resource._RUsage]"):
         pass
 
@@ -371,13 +367,6 @@ class LoggingContext:
 
         # we also track the current scope:
         record.scope = self.scope
-
-    def copy_to_twisted_log_entry(self, record) -> None:
-        """
-        Copy logging fields from this context to a Twisted log record.
-        """
-        record["request"] = self.request
-        record["scope"] = self.scope
 
     def start(self, rusage: "Optional[resource._RUsage]") -> None:
         """
