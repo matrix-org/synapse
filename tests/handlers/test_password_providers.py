@@ -266,8 +266,9 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         # first delete should give a 401
         channel = self._delete_device(tok1, "dev2")
         self.assertEqual(channel.code, 401)
-        # there are no valid flows here!
-        self.assertEqual(channel.json_body["flows"], [])
+        # m.login.password UIA is permitted because the auth provider allows it,
+        # even though the localdb does not.
+        self.assertEqual(channel.json_body["flows"], [{"stages": ["m.login.password"]}])
         session = channel.json_body["session"]
         mock_password_provider.check_password.assert_not_called()
 
@@ -358,9 +359,6 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
             "auth": {
                 "type": "test.login_type",
                 "identifier": {"type": "m.id.user", "user": "localuser"},
-                # FIXME "identifier" is ignored
-                #   https://github.com/matrix-org/synapse/issues/5665
-                "user": "localuser",
                 "session": session,
             },
         }
@@ -489,9 +487,6 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
             "auth": {
                 "type": "m.login.password",
                 "identifier": {"type": "m.id.user", "user": "localuser"},
-                # FIXME "identifier" is ignored
-                #   https://github.com/matrix-org/synapse/issues/5665
-                "user": "localuser",
                 "password": "localpass",
                 "session": session,
             },
@@ -541,7 +536,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         return self._send_login(type="m.login.password", user=user, password=password)
 
     def _send_login(self, type, user, **params) -> FakeChannel:
-        params.update({"user": user, "type": type})
+        params.update({"identifier": {"type": "m.id.user", "user": user}, "type": type})
         _, channel = self.make_request("POST", "/_matrix/client/r0/login", params)
         return channel
 
@@ -569,9 +564,6 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
                 "auth": {
                     "type": "m.login.password",
                     "identifier": {"type": "m.id.user", "user": user_id},
-                    # FIXME "identifier" is ignored
-                    #   https://github.com/matrix-org/synapse/issues/5665
-                    "user": user_id,
                     "password": password,
                     "session": session,
                 },

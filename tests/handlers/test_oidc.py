@@ -17,29 +17,14 @@ from urllib.parse import parse_qs, urlparse
 
 from mock import Mock, patch
 
-import attr
 import pymacaroons
 
-from twisted.python.failure import Failure
-from twisted.web._newclient import ResponseDone
-
-from synapse.handlers.oidc_handler import OidcError, OidcHandler, OidcMappingProvider
+from synapse.handlers.oidc_handler import OidcError, OidcMappingProvider
 from synapse.handlers.sso import MappingException
 from synapse.types import UserID
 
+from tests.test_utils import FakeResponse
 from tests.unittest import HomeserverTestCase, override_config
-
-
-@attr.s
-class FakeResponse:
-    code = attr.ib()
-    body = attr.ib()
-    phrase = attr.ib()
-
-    def deliverBody(self, protocol):
-        protocol.dataReceived(self.body)
-        protocol.connectionLost(Failure(ResponseDone()))
-
 
 # These are a few constants that are used as config parameters in the tests.
 ISSUER = "https://issuer/"
@@ -127,13 +112,8 @@ async def get_json(url):
 
 
 class OidcHandlerTestCase(HomeserverTestCase):
-    def make_homeserver(self, reactor, clock):
-
-        self.http_client = Mock(spec=["get_json"])
-        self.http_client.get_json.side_effect = get_json
-        self.http_client.user_agent = "Synapse Test"
-
-        config = self.default_config()
+    def default_config(self):
+        config = super().default_config()
         config["public_baseurl"] = BASE_URL
         oidc_config = {
             "enabled": True,
@@ -149,19 +129,24 @@ class OidcHandlerTestCase(HomeserverTestCase):
         oidc_config.update(config.get("oidc_config", {}))
         config["oidc_config"] = oidc_config
 
-        hs = self.setup_test_homeserver(
-            http_client=self.http_client,
-            proxied_http_client=self.http_client,
-            config=config,
-        )
+        return config
 
-        self.handler = OidcHandler(hs)
+    def make_homeserver(self, reactor, clock):
+
+        self.http_client = Mock(spec=["get_json"])
+        self.http_client.get_json.side_effect = get_json
+        self.http_client.user_agent = "Synapse Test"
+
+        hs = self.setup_test_homeserver(proxied_http_client=self.http_client)
+
+        self.handler = hs.get_oidc_handler()
+        sso_handler = hs.get_sso_handler()
         # Mock the render error method.
         self.render_error = Mock(return_value=None)
-        self.handler._sso_handler.render_error = self.render_error
+        sso_handler.render_error = self.render_error
 
         # Reduce the number of attempts when generating MXIDs.
-        self.handler._sso_handler._MAP_USERNAME_RETRIES = 3
+        sso_handler._MAP_USERNAME_RETRIES = 3
 
         return hs
 
@@ -705,8 +690,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             MappingException,
         )
         self.assertEqual(
-            str(e.value),
-            "Could not extract user attributes from SSO response: Mapping provider does not support de-duplicating Matrix IDs",
+            str(e.value), "Mapping provider does not support de-duplicating Matrix IDs",
         )
 
     @override_config({"oidc_config": {"allow_existing_users": True}})
@@ -724,6 +708,14 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "username": "test_user",
         }
         token = {}
+        mxid = self.get_success(
+            self.handler._map_userinfo_to_user(
+                userinfo, token, "user-agent", "10.10.10.10"
+            )
+        )
+        self.assertEqual(mxid, "@test_user:test")
+
+        # Subsequent calls should map to the same mxid.
         mxid = self.get_success(
             self.handler._map_userinfo_to_user(
                 userinfo, token, "user-agent", "10.10.10.10"
@@ -832,7 +824,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         # test_user is already taken, so test_user1 gets registered instead.
         self.assertEqual(mxid, "@test_user1:test")
 
-        # Register all of the potential users for a particular username.
+        # Register all of the potential mxids for a particular OIDC username.
         self.get_success(
             store.register_user(user_id="@tester:test", password_hash=None)
         )
