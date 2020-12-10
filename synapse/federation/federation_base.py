@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import inspect
 import logging
 from collections import namedtuple
 from typing import Iterable, List
@@ -107,9 +106,9 @@ class FederationBase:
                         )
                     return redacted_event
 
-                result = self.spam_checker.check_event_for_spam(pdu)
-                if inspect.isawaitable(result):
-                    result = yield defer.ensureDeferred(result)
+                result = yield defer.ensureDeferred(
+                    self.spam_checker.check_event_for_spam(pdu)
+                )
 
                 if result:
                     logger.warning(

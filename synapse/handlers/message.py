@@ -51,7 +51,7 @@ from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.state import StateFilter
 from synapse.types import Requester, RoomAlias, StreamToken, UserID, create_requester
 from synapse.util import json_decoder, json_encoder
-from synapse.util.async_helpers import Linearizer, maybe_awaitable
+from synapse.util.async_helpers import Linearizer
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_events_for_client
 
@@ -744,9 +744,7 @@ class EventCreationHandler:
                 event.sender,
             )
 
-            spam_error = await maybe_awaitable(
-                self.spam_checker.check_event_for_spam(event)
-            )
+            spam_error = await self.spam_checker.check_event_for_spam(event)
             if spam_error:
                 if not isinstance(spam_error, str):
                     spam_error = "Spam is not permitted here"

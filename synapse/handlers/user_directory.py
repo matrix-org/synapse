@@ -84,7 +84,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         results["results"] = [
             user
             for user in results["results"]
-            if not self.spam_checker.check_username_for_spam(user)
+            if not await self.spam_checker.check_username_for_spam(user)
         ]
 
         return results

@@ -15,10 +15,12 @@
 # limitations under the License.
 
 import collections
+import inspect
 import logging
 from contextlib import contextmanager
 from typing import (
     Any,
+    Awaitable,
     Callable,
     Dict,
     Hashable,
@@ -525,28 +527,9 @@ def timeout_deferred(
     return new_d
 
 
-@attr.s(slots=True, frozen=True)
-class DoneAwaitable:
-    """Simple awaitable that returns the provided value.
+async def maybe_awaitable(value: Union[Awaitable[R], R]) -> R:
+    """Awaits an awaitable and returns the value, otherwise just returns the input.
     """
-
-    value = attr.ib()
-
-    def __await__(self):
-        return self
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        raise StopIteration(self.value)
-
-
-def maybe_awaitable(value):
-    """Convert a value to an awaitable if not already an awaitable.
-    """
-
-    if hasattr(value, "__await__"):
-        return value
-
-    return DoneAwaitable(value)
+    if inspect.isawaitable(value):
+        return await value
+    return value
