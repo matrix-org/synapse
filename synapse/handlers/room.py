@@ -440,6 +440,7 @@ class RoomCreationHandler(BaseHandler):
             invite_list=[],
             initial_state=initial_state,
             creation_content=creation_content,
+            ratelimit=False,
         )
 
         # Transfer membership events
@@ -735,6 +736,7 @@ class RoomCreationHandler(BaseHandler):
             room_alias=room_alias,
             power_level_content_override=power_level_content_override,
             creator_join_profile=creator_join_profile,
+            ratelimit=ratelimit,
         )
 
         if "name" in config:
@@ -838,6 +840,7 @@ class RoomCreationHandler(BaseHandler):
         room_alias: Optional[RoomAlias] = None,
         power_level_content_override: Optional[JsonDict] = None,
         creator_join_profile: Optional[JsonDict] = None,
+        ratelimit: bool = True,
     ) -> int:
         """Sends the initial events into a new room.
 
@@ -884,7 +887,7 @@ class RoomCreationHandler(BaseHandler):
             creator.user,
             room_id,
             "join",
-            ratelimit=False,
+            ratelimit=ratelimit,
             content=creator_join_profile,
         )
 
