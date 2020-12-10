@@ -408,7 +408,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     )
                     block_invite = True
 
-                if not self.spam_checker.user_may_invite(
+                if not await self.spam_checker.user_may_invite(
                     requester.user.to_string(), target.to_string(), room_id
                 ):
                     logger.info("Blocking invite due to spam checker")
