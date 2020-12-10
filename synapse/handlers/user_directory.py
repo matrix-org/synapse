@@ -81,11 +81,11 @@ class UserDirectoryHandler(StateDeltasHandler):
         results = await self.store.search_user_dir(user_id, search_term, limit)
 
         # Remove any spammy users from the results.
-        results["results"] = [
-            user
-            for user in results["results"]
-            if not await self.spam_checker.check_username_for_spam(user)
-        ]
+        results = []
+        for user in results["results"]:
+            if not await self.spam_checker.check_username_for_spam(user):
+                results.append(user)
+        results["results"] = results
 
         return results
 
