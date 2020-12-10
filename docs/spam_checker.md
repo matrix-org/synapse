@@ -22,6 +22,8 @@ well as some specific methods:
 * `user_may_create_room`
 * `user_may_create_room_alias`
 * `user_may_publish_room`
+* `check_username_for_spam`
+* `check_registration_for_spam`
 
 The details of the each of these methods (as well as their inputs and outputs)
 are documented in the `synapse.events.spamcheck.SpamChecker` class.

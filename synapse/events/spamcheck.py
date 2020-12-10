@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import inspect
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.types import Collection
@@ -40,7 +40,9 @@ class SpamChecker:
             else:
                 self.spam_checkers.append(module(config=config))
 
-    async def check_event_for_spam(self, event: "synapse.events.EventBase") -> bool:
+    async def check_event_for_spam(
+        self, event: "synapse.events.EventBase"
+    ) -> Union[bool, str]:
         """Checks if a given event is considered "spammy" by this server.
 
         If the server considers an event spammy, then it will be rejected if
@@ -51,7 +53,8 @@ class SpamChecker:
             event: the event to be checked
 
         Returns:
-            True if the event is spammy.
+            True or a string if the event is spammy. If a string is returned it
+            will be used as the error message returned to the user.
         """
         for spam_checker in self.spam_checkers:
             if await maybe_awaitable(spam_checker.check_event_for_spam(event)):
