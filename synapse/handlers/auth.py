@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import inspect
 import logging
 import time
 import unicodedata
@@ -54,6 +53,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.module_api import ModuleApi
 from synapse.types import JsonDict, Requester, UserID
 from synapse.util import stringutils as stringutils
+from synapse.util.async_helpers import maybe_awaitable
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.threepids import canonicalise_email
 
@@ -1019,13 +1019,13 @@ class AuthHandler(BaseHandler):
             if hasattr(provider, "on_logged_out"):
                 # This might return an awaitable, if it does block the log out
                 # until it completes.
-                result = provider.on_logged_out(
-                    user_id=user_info.user_id,
-                    device_id=user_info.device_id,
-                    access_token=access_token,
+                await maybe_awaitable(
+                    provider.on_logged_out(
+                        user_id=user_info.user_id,
+                        device_id=user_info.device_id,
+                        access_token=access_token,
+                    )
                 )
-                if inspect.isawaitable(result):
-                    await result
 
         # delete pushers associated with this access token
         if user_info.token_id is not None:
