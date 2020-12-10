@@ -548,7 +548,8 @@ class LoggingContextFilter(logging.Filter):
         # we end up in a death spiral of infinite loops, so let's check, for
         # robustness' sake.
         if context is not None:
-            context.copy_to(record)
+            # Logging is interested in the request.
+            record.request = context.request
 
         return True
 

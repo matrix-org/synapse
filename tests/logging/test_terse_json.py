@@ -132,9 +132,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
             "level",
             "namespace",
             "request",
-            "scope",
         ]
         self.assertCountEqual(log.keys(), expected_log_keys)
         self.assertEqual(log["log"], "Hello there, wally!")
         self.assertEqual(log["request"], "test")
-        self.assertIsNone(log["scope"])
