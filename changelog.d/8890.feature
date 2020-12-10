@@ -1,1 +1,1 @@
-Spam-checkers may now define their method `check_event_for_spam` as `async`. This will simplify the work of spam-checkers that need to e.g. request data from a database without blocking the server.
+Spam-checkers may now define their methods as `async`.
