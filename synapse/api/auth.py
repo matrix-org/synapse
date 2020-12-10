@@ -31,7 +31,7 @@ from synapse.api.errors import (
     MissingClientTokenError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
-from synapse.appservice.api import ApplicationService
+from synapse.appservice import ApplicationService
 from synapse.events import EventBase
 from synapse.http.site import SynapseRequest
 from synapse.logging import opentracing as opentracing
