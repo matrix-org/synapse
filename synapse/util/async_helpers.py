@@ -531,5 +531,7 @@ async def maybe_awaitable(value: Union[Awaitable[R], R]) -> R:
     """Awaits an awaitable and returns the value, otherwise just returns the input.
     """
     if inspect.isawaitable(value):
+        assert isinstance(value, Awaitable)
         return await value
+    assert not isinstance(value, Awaitable)
     return value
