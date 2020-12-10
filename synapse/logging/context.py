@@ -531,13 +531,10 @@ class LoggingContext:
 class LoggingContextFilter(logging.Filter):
     """Logging filter that adds values from the current logging context to each
     record.
-    Args:
-        **defaults: Default values to avoid formatters complaining about
-            missing fields
     """
 
-    def __init__(self, **defaults) -> None:
-        self.defaults = defaults
+    def __init__(self, request: str = ""):
+        self._default_request = request
 
     def filter(self, record) -> Literal[True]:
         """Add each fields from the logging contexts to the record.
@@ -545,8 +542,7 @@ class LoggingContextFilter(logging.Filter):
             True to include the record in the log output.
         """
         context = current_context()
-        for key, value in self.defaults.items():
-            setattr(record, key, value)
+        record.request = self._default_request
 
         # context should never be None, but if it somehow ends up being, then
         # we end up in a death spiral of infinite loops, so let's check, for

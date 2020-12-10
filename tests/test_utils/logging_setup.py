@@ -48,7 +48,7 @@ def setup_logging():
     handler = ToTwistedHandler()
     formatter = logging.Formatter(log_format)
     handler.setFormatter(formatter)
-    handler.addFilter(LoggingContextFilter(request=""))
+    handler.addFilter(LoggingContextFilter())
     root_logger.addHandler(handler)
 
     log_level = os.environ.get("SYNAPSE_TEST_LOG_LEVEL", "ERROR")

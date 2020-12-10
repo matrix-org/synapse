@@ -117,7 +117,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         """
         handler = logging.StreamHandler(self.output)
         handler.setFormatter(JsonFormatter())
-        handler.addFilter(LoggingContextFilter(request=""))
+        handler.addFilter(LoggingContextFilter())
         logger = self.get_logger(handler)
 
         with LoggingContext() as context_one:
