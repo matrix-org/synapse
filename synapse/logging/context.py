@@ -252,7 +252,12 @@ class LoggingContext:
         "scope",
     ]
 
-    def __init__(self, name=None, parent_context=None, request=None) -> None:
+    def __init__(
+        self,
+        name: Optional[str] = None,
+        parent_context: "Optional[LoggingContext]" = None,
+        request: Optional[str] = None,
+    ) -> None:
         self.previous_context = current_context()
         self.name = name
 
@@ -536,20 +541,20 @@ class LoggingContextFilter(logging.Filter):
     def __init__(self, request: str = ""):
         self._default_request = request
 
-    def filter(self, record) -> Literal[True]:
+    def filter(self, record: logging.LogRecord) -> Literal[True]:
         """Add each fields from the logging contexts to the record.
         Returns:
             True to include the record in the log output.
         """
         context = current_context()
-        record.request = self._default_request
+        record.request = self._default_request  # type: ignore
 
         # context should never be None, but if it somehow ends up being, then
         # we end up in a death spiral of infinite loops, so let's check, for
         # robustness' sake.
         if context is not None:
             # Logging is interested in the request.
-            record.request = context.request
+            record.request = context.request  # type: ignore
 
         return True
 
@@ -820,6 +825,8 @@ def defer_to_threadpool(reactor, threadpool, f, *args, **kwargs):
     logcontext = current_context()
 
     def g():
+        # It is not expected that this gets called from the sentinel context.
+        assert isinstance(logcontext, LoggingContext)
         with LoggingContext(parent_context=logcontext):
             return f(*args, **kwargs)
 
