@@ -215,7 +215,14 @@ class GaugeBucketCollector:
     Prometheus, and optimise for that case.
     """
 
-    __slots__ = ("_name", "_documentation", "_bucket_bounds", "_metric")
+    __slots__ = (
+        "_name",
+        "_documentation",
+        "_bucket_bounds",
+        "_metric",
+        "_registry",
+        "_registered",
+    )
 
     def __init__(
         self,
@@ -234,6 +241,8 @@ class GaugeBucketCollector:
         """
         self._name = name
         self._documentation = documentation
+        self._registry = registry
+        self._registered = False
 
         # the tops of the buckets
         self._bucket_bounds = [float(b) for b in buckets]
@@ -244,7 +253,6 @@ class GaugeBucketCollector:
             self._bucket_bounds.append(float("inf"))
 
         self._metric = self._values_to_metric([])
-        registry.register(self)
 
     def collect(self):
         yield self._metric
@@ -255,6 +263,11 @@ class GaugeBucketCollector:
         The existing data is cleared, and each measurement in the input is assigned
         to the relevant bucket.
         """
+        # Wait until we have data to report before registering
+        if not self._registered:
+            self._registry.register(self)
+            self._registered = True
+
         self._metric = self._values_to_metric(values)
 
     def _values_to_metric(self, values: Iterable[float]) -> GaugeHistogramMetricFamily:
