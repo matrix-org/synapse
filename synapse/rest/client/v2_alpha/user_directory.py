@@ -207,8 +207,7 @@ class UserInfoServlet(RestServlet):
                 server_name, list(user_id_set)
             )
 
-            for user_id, info in res:
-                user_id_to_info_dict[user_id] = info
+            user_id_to_info_dict.update(res)
 
         return 200, user_id_to_info_dict
 
