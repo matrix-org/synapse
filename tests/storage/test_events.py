@@ -186,3 +186,33 @@ class ExtremPruneTestCase(HomeserverTestCase):
 
         # Check the new extremity is just the new remote event.
         self.assert_extremities([remote_event_2.event_id])
+
+    def test_do_not_prune_gap_if_other_server(self):
+        """Test that we do not drop extremities after a gap when we see an event
+        from a different domain.
+        """
+
+        # Fudge a second event which points to an event we don't have. This is a
+        # state event so that the state changes (otherwise we won't prune the
+        # extremity as they'll have the same state group).
+        remote_event_2 = event_from_pdu_json(
+            {
+                "type": EventTypes.Member,
+                "state_key": "@user:other2",
+                "content": {"membership": Membership.JOIN},
+                "room_id": self.room_id,
+                "sender": "@user:other2",
+                "depth": 10,
+                "prev_events": ["$some_unknown_message"],
+                "auth_events": [],
+                "origin_server_ts": self.clock.time_msec(),
+            },
+            RoomVersions.V6,
+        )
+
+        state_before_gap = self.get_success(self.state.get_current_state(self.room_id))
+
+        self.persist_event(remote_event_2, state=state_before_gap.values())
+
+        # Check the new extremity is just the new remote event.
+        self.assert_extremities([self.remote_event_1.event_id, remote_event_2.event_id])
