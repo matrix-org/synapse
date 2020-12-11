@@ -87,7 +87,7 @@ GET /_synapse/admin/v1/rooms
 
 Response:
 
-```
+```jsonc
 {
   "rooms": [
     {
@@ -139,7 +139,7 @@ GET /_synapse/admin/v1/rooms?search_term=TWIM
 
 Response:
 
-```
+```json
 {
   "rooms": [
     {
@@ -174,7 +174,7 @@ GET /_synapse/admin/v1/rooms?order_by=size
 
 Response:
 
-```
+```jsonc
 {
   "rooms": [
     {
@@ -230,14 +230,14 @@ GET /_synapse/admin/v1/rooms?order_by=size&from=100
 
 Response:
 
-```
+```jsonc
 {
   "rooms": [
     {
       "room_id": "!mscvqgqpHYjBGDxNym:matrix.org",
       "name": "Music Theory",
       "canonical_alias": "#musictheory:matrix.org",
-      "joined_members": 127
+      "joined_members": 127,
       "joined_local_members": 2,
       "version": "1",
       "creator": "@foo:matrix.org",
@@ -254,7 +254,7 @@ Response:
       "room_id": "!twcBhHVdZlQWuuxBhN:termina.org.uk",
       "name": "weechat-matrix",
       "canonical_alias": "#weechat-matrix:termina.org.uk",
-      "joined_members": 137
+      "joined_members": 137,
       "joined_local_members": 20,
       "version": "4",
       "creator": "@foo:termina.org.uk",
@@ -289,6 +289,7 @@ The following fields are possible in the JSON response body:
 * `canonical_alias` - The canonical (main) alias address of the room.
 * `joined_members` - How many users are currently in the room.
 * `joined_local_members` - How many local users are currently in the room.
+* `joined_local_devices` - How many local devices are currently in the room.
 * `version` - The version of the room as a string.
 * `creator` - The `user_id` of the room creator.
 * `encryption` - Algorithm of end-to-end encryption of messages. Is `null` if encryption is not active.
@@ -311,15 +312,16 @@ GET /_synapse/admin/v1/rooms/<room_id>
 
 Response:
 
-```
+```json
 {
   "room_id": "!mscvqgqpHYjBGDxNym:matrix.org",
   "name": "Music Theory",
   "avatar": "mxc://matrix.org/AQDaVFlbkQoErdOgqWRgiGSV",
   "topic": "Theory, Composition, Notation, Analysis",
   "canonical_alias": "#musictheory:matrix.org",
-  "joined_members": 127
+  "joined_members": 127,
   "joined_local_members": 2,
+  "joined_local_devices": 2,
   "version": "1",
   "creator": "@foo:matrix.org",
   "encryption": null,
@@ -353,13 +355,13 @@ GET /_synapse/admin/v1/rooms/<room_id>/members
 
 Response:
 
-```
+```json
 {
   "members": [
     "@foo:matrix.org",
     "@bar:matrix.org",
-    "@foobar:matrix.org
-    ],
+    "@foobar:matrix.org"
+  ],
   "total": 3
 }
 ```
