@@ -75,6 +75,21 @@ stale_forward_extremities_counter = Histogram(
     buckets=(0, 1, 2, 3, 5, 7, 10, 15, 20, 50, 100, 200, 500, "+Inf"),
 )
 
+state_resolutions_during_persistence = Counter(
+    "synapse_storage_events_state_resolutions_during_persistence",
+    "Number of times we had to do state res to calculate new current state",
+)
+
+potential_times_prune_extremities = Counter(
+    "synapse_storage_events_potential_times_prune_extremities",
+    "Number of times we might be able to prune extremities",
+)
+
+times_pruned_extremities = Counter(
+    "synapse_storage_events_times_pruned_extremities",
+    "Number of times we were actually be able to prune extremities",
+)
+
 
 class _EventPeristenceQueue:
     """Queues up events so that they can be persisted in bulk with only one
@@ -755,11 +770,15 @@ class EventsPersistenceStorage:
             state_res_store=StateResolutionStore(self.main_store),
         )
 
+        state_resolutions_during_persistence.inc()
+
         # If the returned state matches the state group of one of the new
         # forward extremities then we check if we are able to prune some state
         # extremities.
         if res.state_group and res.state_group in new_state_groups:
+
             new_latest_event_ids = await self._prune_extremities(
+                room_id,
                 new_latest_event_ids,
                 res.state_group,
                 event_id_to_state_group,
@@ -770,6 +789,7 @@ class EventsPersistenceStorage:
 
     async def _prune_extremities(
         self,
+        room_id: str,
         new_latest_event_ids: Set[str],
         resolved_state_group: int,
         event_id_to_state_group: Dict[str, int],
@@ -778,6 +798,8 @@ class EventsPersistenceStorage:
         """See if we can prune any of the extremities after calculating the
         resolved state.
         """
+        potential_times_prune_extremities.inc()
+
         # We keep all the extremities that have the same state group, and
         # see if we can drop the others.
         new_new_extrems = {
@@ -838,7 +860,14 @@ class EventsPersistenceStorage:
 
             return new_latest_event_ids
 
-        logger.debug("Dropping events %s", dropped)
+        times_pruned_extremities.inc()
+
+        logger.info(
+            "Pruning forward extremities in room %s: from %s -> %s",
+            room_id,
+            new_latest_event_ids,
+            new_new_extrems,
+        )
         return new_new_extrems
 
     async def _calculate_state_delta(
