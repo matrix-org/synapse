@@ -527,11 +527,28 @@ def timeout_deferred(
     return new_d
 
 
-async def maybe_awaitable(value: Union[Awaitable[R], R]) -> R:
+@attr.s(slots=True, frozen=True)
+class DoneAwaitable:
+    """Simple awaitable that returns the provided value.
+    """
+
+    value = attr.ib()
+
+    def __await__(self):
+        return self
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        raise StopIteration(self.value)
+
+
+def maybe_awaitable(value: Union[Awaitable[R], R]) -> Awaitable[R]:
     """Awaits an awaitable and returns the value, otherwise just returns the input.
     """
     if inspect.isawaitable(value):
         assert isinstance(value, Awaitable)
-        return await value
-    assert not isinstance(value, Awaitable)
-    return value
+        return value
+
+    return DoneAwaitable(value)
