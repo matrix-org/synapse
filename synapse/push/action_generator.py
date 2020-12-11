@@ -14,19 +14,22 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING
 
+from synapse.events import EventBase
+from synapse.events.snapshot import EventContext
+from synapse.push.bulk_push_rule_evaluator import BulkPushRuleEvaluator
 from synapse.util.metrics import Measure
 
-from .bulk_push_rule_evaluator import BulkPushRuleEvaluator
+if TYPE_CHECKING:
+    from synapse.app.homeserver import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
 class ActionGenerator:
-    def __init__(self, hs):
-        self.hs = hs
+    def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
         self.bulk_evaluator = BulkPushRuleEvaluator(hs)
         # really we want to get all user ids and all profile tags too,
         # since we want the actions for each profile tag for every user and
@@ -35,6 +38,8 @@ class ActionGenerator:
         # event stream, so we just run the rules for a client with no profile
         # tag (ie. we just need all the users).
 
-    async def handle_push_actions_for_event(self, event, context):
+    async def handle_push_actions_for_event(
+        self, event: EventBase, context: EventContext
+    ) -> None:
         with Measure(self.clock, "action_for_event_by_user"):
             await self.bulk_evaluator.action_for_event_by_user(event, context)
