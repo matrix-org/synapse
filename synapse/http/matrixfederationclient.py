@@ -46,7 +46,7 @@ from synapse.http.client import (
     BlacklistingAgentWrapper,
     BlacklistingReactorWrapper,
     encode_query_args,
-    readBodyToFile,
+    readBodyWithMaxSize,
 )
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.logging.context import make_deferred_yieldable
@@ -975,7 +975,7 @@ class MatrixFederationHttpClient:
         headers = dict(response.headers.getAllRawHeaders())
 
         try:
-            d = readBodyToFile(response, output_stream, max_size)
+            d = readBodyWithMaxSize(response, output_stream, max_size)
             d.addTimeout(self.default_timeout, self.reactor)
             length = await make_deferred_yieldable(d)
         except Exception as e:

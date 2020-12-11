@@ -15,17 +15,19 @@
 import logging
 import random
 import time
+from io import BytesIO
 from typing import Callable, Dict, Optional, Tuple
 
 import attr
 
 from twisted.internet import defer
 from twisted.internet.interfaces import IReactorTime
-from twisted.web.client import RedirectAgent, readBody
+from twisted.web.client import RedirectAgent
 from twisted.web.http import stringToDatetime
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent, IResponse
 
+from synapse.http.client import readBodyWithMaxSize
 from synapse.logging.context import make_deferred_yieldable
 from synapse.util import Clock, json_decoder
 from synapse.util.caches.ttlcache import TTLCache
@@ -52,6 +54,9 @@ WELL_KNOWN_MAX_CACHE_PERIOD = 48 * 3600
 
 # lower bound for .well-known cache period
 WELL_KNOWN_MIN_CACHE_PERIOD = 5 * 60
+
+# The maximum size (in bytes) to allow a well-known file to be.
+WELL_KNOW_MAX_SIZE = 50 * 1024  # 50 KiB
 
 # Attempt to refetch a cached well-known N% of the TTL before it expires.
 # e.g. if set to 0.2 and we have a cached entry with a TTL of 5mins, then
@@ -250,7 +255,11 @@ class WellKnownResolver:
                         b"GET", uri, headers=Headers(headers)
                     )
                 )
-                body = await make_deferred_yieldable(readBody(response))
+                body_stream = BytesIO()
+                await make_deferred_yieldable(
+                    readBodyWithMaxSize(response, body_stream, WELL_KNOW_MAX_SIZE)
+                )
+                body = body_stream.getvalue()
 
                 if 500 <= response.code < 600:
                     raise Exception("Non-200 response %s" % (response.code,))
