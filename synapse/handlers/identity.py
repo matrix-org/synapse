@@ -55,6 +55,14 @@ class IdentityHandler(BaseHandler):
         self.federation_http_client = hs.get_federation_http_client()
         self.hs = hs
 
+        # Only allow the web client location to be sent if it is an HTTP URL.
+        self._web_client_location = None
+        webclient_loc = hs.config.web_client_location
+        if webclient_loc and (
+            webclient_loc.startswith("http://") or webclient_loc.startswith("https://")
+        ):
+            self._web_client_location = webclient_loc
+
     async def threepid_from_creds(
         self, id_server: str, creds: Dict[str, str]
     ) -> Optional[JsonDict]:
@@ -803,6 +811,9 @@ class IdentityHandler(BaseHandler):
             "sender_display_name": inviter_display_name,
             "sender_avatar_url": inviter_avatar_url,
         }
+        # If a custom web client location is available, include it in the request.
+        if self._web_client_location:
+            invite_config["web_client_location"] = self._web_client_location
 
         # Add the identity service access token to the JSON body and use the v2
         # Identity Service endpoints if id_access_token is present
