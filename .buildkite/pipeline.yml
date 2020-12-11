@@ -29,17 +29,6 @@ steps:
           image: "python:3.6"
           mount-buildkite-agent: false
 
-  - label: ":newspaper: Newsfile"
-    command:
-      - "python -m pip install tox"
-      - "scripts-dev/check-newsfragment"
-    branches: "!master !develop !release-*"
-    plugins:
-      - docker#v3.0.1:
-          image: "python:3.6"
-          propagate-environment: true
-          mount-buildkite-agent: false
-
   - label: "\U0001F9F9 check-sample-config"
     command:
       - "python -m pip install tox"
