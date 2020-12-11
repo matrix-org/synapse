@@ -595,16 +595,16 @@ class EventsPersistenceStorage:
         a room
 
         Args:
-            room_id (str):
+            room_id:
                 room to which the events are being added. Used for logging etc
 
-            events_context (list[(EventBase, EventContext)]):
+            events_context:
                 events and contexts which are being added to the room
 
-            old_latest_event_ids (iterable[str]):
+            old_latest_event_ids:
                 the old forward extremities for the room.
 
-            new_latest_event_ids (iterable[str]):
+            new_latest_event_ids :
                 the new forward extremities for the room.
 
         Returns:
@@ -802,7 +802,7 @@ class EventsPersistenceStorage:
 
                 new_senders = {get_domain_from_id(e.sender) for e, _ in events_context}
 
-                one_day_ago = self._clock.time_msec() - 20 * 60 * 1000
+                one_day_ago = self._clock.time_msec() - 20 * 60 * 60 * 1000
                 current_depth = max(e.depth for e, _ in events_context)
                 for event in dropped_events.values():
                     if (

@@ -45,7 +45,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
         body = self.helper.send(self.room_id, body="Test", tok=token)
         local_message_event_id = body["event_id"]
 
-        # Fudge a remote event an persist it. This will be the extremity before
+        # Fudge a remote event and persist it. This will be the extremity before
         # the gap.
         self.remote_event_1 = event_from_pdu_json(
             {
