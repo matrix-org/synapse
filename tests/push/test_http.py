@@ -144,7 +144,7 @@ class HTTPPusherTests(HomeserverTestCase):
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
-        last_stream_ordering = pushers[0]["last_stream_ordering"]
+        last_stream_ordering = pushers[0].last_stream_ordering
 
         # Advance time a bit, so the pusher will register something has happened
         self.pump()
@@ -155,7 +155,7 @@ class HTTPPusherTests(HomeserverTestCase):
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
-        self.assertEqual(last_stream_ordering, pushers[0]["last_stream_ordering"])
+        self.assertEqual(last_stream_ordering, pushers[0].last_stream_ordering)
 
         # One push was attempted to be sent -- it'll be the first message
         self.assertEqual(len(self.push_attempts), 1)
@@ -176,8 +176,8 @@ class HTTPPusherTests(HomeserverTestCase):
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
-        self.assertTrue(pushers[0]["last_stream_ordering"] > last_stream_ordering)
-        last_stream_ordering = pushers[0]["last_stream_ordering"]
+        self.assertTrue(pushers[0].last_stream_ordering > last_stream_ordering)
+        last_stream_ordering = pushers[0].last_stream_ordering
 
         # Now it'll try and send the second push message, which will be the second one
         self.assertEqual(len(self.push_attempts), 2)
@@ -198,7 +198,7 @@ class HTTPPusherTests(HomeserverTestCase):
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
-        self.assertTrue(pushers[0]["last_stream_ordering"] > last_stream_ordering)
+        self.assertTrue(pushers[0].last_stream_ordering > last_stream_ordering)
 
     def test_sends_high_priority_for_encrypted(self):
         """

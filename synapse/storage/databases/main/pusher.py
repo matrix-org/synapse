@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, Iterator, List, Optional,
 
 from canonicaljson import encode_canonical_json
 
+from synapse.push import PusherConfig
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool
 from synapse.storage.types import Connection
@@ -39,7 +40,7 @@ class PusherWorkerStore(SQLBaseStore):
             db_conn, "pushers", "id", extra_tables=[("deleted_pushers", "stream_id")]
         )
 
-    def _decode_pushers_rows(self, rows: Iterable[dict]) -> Iterator[dict]:
+    def _decode_pushers_rows(self, rows: Iterable[dict]) -> Iterator[PusherConfig]:
         """JSON-decode the data in the rows returned from the `pushers` table
 
         Drops any rows whose data cannot be decoded
@@ -57,7 +58,7 @@ class PusherWorkerStore(SQLBaseStore):
                 )
                 continue
 
-            yield r
+            yield PusherConfig(**r)
 
     async def user_has_pusher(self, user_id: str) -> bool:
         ret = await self.db_pool.simple_select_one_onecol(
@@ -67,13 +68,13 @@ class PusherWorkerStore(SQLBaseStore):
 
     async def get_pushers_by_app_id_and_pushkey(
         self, app_id: str, pushkey: str
-    ) -> Iterator[dict]:
+    ) -> Iterator[PusherConfig]:
         return await self.get_pushers_by({"app_id": app_id, "pushkey": pushkey})
 
-    async def get_pushers_by_user_id(self, user_id: str) -> Iterator[dict]:
+    async def get_pushers_by_user_id(self, user_id: str) -> Iterator[PusherConfig]:
         return await self.get_pushers_by({"user_name": user_id})
 
-    async def get_pushers_by(self, keyvalues: Dict[str, Any]) -> Iterator[dict]:
+    async def get_pushers_by(self, keyvalues: Dict[str, Any]) -> Iterator[PusherConfig]:
         ret = await self.db_pool.simple_select_list(
             "pushers",
             keyvalues,
@@ -98,7 +99,7 @@ class PusherWorkerStore(SQLBaseStore):
         )
         return self._decode_pushers_rows(ret)
 
-    async def get_all_pushers(self) -> Iterator[dict]:
+    async def get_all_pushers(self) -> Iterator[PusherConfig]:
         def get_pushers(txn):
             txn.execute("SELECT * FROM pushers")
             rows = self.db_pool.cursor_to_dict(txn)
