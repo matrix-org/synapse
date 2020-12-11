@@ -463,6 +463,14 @@ class EventsPersistenceStorage:
                             )
                             current_state, delta_ids, new_latest_event_ids = res
 
+                            # there should always be at least one forward extremity.
+                            # (except during the initial persistence of the send_join
+                            # results, in which case there will be no existing
+                            # extremities, so we'll `continue` above and skip this bit.)
+                            assert new_latest_event_ids, "No forward extremities left!"
+
+                            new_forward_extremeties[room_id] = new_latest_event_ids
+
                         # If either are not None then there has been a change,
                         # and we need to work out the delta (or use that
                         # given)
@@ -760,22 +768,28 @@ class EventsPersistenceStorage:
 
             dropped = set(new_latest_event_ids) - new_new_extrems
 
+            logger.debug("Might drop events: %s", dropped)
+
             # We only drop events if:
             #   1. we're not currently persisting them;
             #   2. they're not our own events (or are dummy events); and
-            #   3. they're either over N minutes old or we have newer events
-            #      from the same domain.
+            #   3. they're either:
+            #       1. over N hours old and more than N events ago (we use depth
+            #          to calculate); or
+            #       2. we are persisting an event from the same domain.
             #
             # The idea is that we don't want to drop events that are "legitmate"
             # extremities (that we would want to include as prev events), only
             # "stuck" extremities that are e.g. due to a gap in the graph.
             #
             # Note that we either drop all of them or none of them. If we only
-            # drop some of the events we don't know if state res would come to the same conclusion.
+            # drop some of the events we don't know if state res would come to
+            # the same conclusion.
 
             drop = True
             for ev, _ in events_context:
                 if ev.event_id in dropped:
+                    logger.debug("Not dropping as in to persist list")
                     drop = False
                     break
 
@@ -786,26 +800,37 @@ class EventsPersistenceStorage:
                     redact_behaviour=EventRedactBehaviour.AS_IS,
                 )
 
-                new_senders = {e.sender for e, _ in events_context}
+                new_senders = {get_domain_from_id(e.sender) for e, _ in events_context}
 
-                twenty_minutes_ago = self._clock.time_msec() - 20 * 60 * 1000
+                one_day_ago = self._clock.time_msec() - 20 * 60 * 1000
+                current_depth = max(e.depth for e, _ in events_context)
                 for event in dropped_events.values():
                     if (
                         self.is_mine_id(event.sender)
                         and event.type != "org.matrix.dummy_event"
                     ):
+                        logger.debug("Not dropping own event")
                         drop = False
                         break
 
-                    if event.origin_server_ts < twenty_minutes_ago:
+                    if (
+                        event.origin_server_ts < one_day_ago
+                        and event.depth < current_depth - 100
+                    ):
                         continue
                     if get_domain_from_id(event.sender) in new_senders:
                         continue
+
+                    logger.debug(
+                        "Not dropping as too new and not in new_senders: %s",
+                        new_senders,
+                    )
 
                     drop = False
                     break
 
             if drop:
+                logger.debug("Dropping events %s", dropped)
                 new_latest_event_ids = new_new_extrems
 
         return res.state, None, new_latest_event_ids
