@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import inspect
 import logging
 import os
 import shutil
@@ -21,6 +20,7 @@ from typing import Optional
 
 from synapse.config._base import Config
 from synapse.logging.context import defer_to_thread, run_in_background
+from synapse.util.async_helpers import maybe_awaitable
 
 from ._base import FileInfo, Responder
 from .media_storage import FileResponder
@@ -91,16 +91,14 @@ class StorageProviderWrapper(StorageProvider):
         if self.store_synchronous:
             # store_file is supposed to return an Awaitable, but guard
             # against improper implementations.
-            result = self.backend.store_file(path, file_info)
-            if inspect.isawaitable(result):
-                return await result
+            return await maybe_awaitable(self.backend.store_file(path, file_info))
         else:
             # TODO: Handle errors.
             async def store():
                 try:
-                    result = self.backend.store_file(path, file_info)
-                    if inspect.isawaitable(result):
-                        return await result
+                    return await maybe_awaitable(
+                        self.backend.store_file(path, file_info)
+                    )
                 except Exception:
                     logger.exception("Error storing file")
 
@@ -110,9 +108,7 @@ class StorageProviderWrapper(StorageProvider):
     async def fetch(self, path, file_info):
         # store_file is supposed to return an Awaitable, but guard
         # against improper implementations.
-        result = self.backend.fetch(path, file_info)
-        if inspect.isawaitable(result):
-            return await result
+        return await maybe_awaitable(self.backend.fetch(path, file_info))
 
 
 class FileStorageProviderBackend(StorageProvider):
