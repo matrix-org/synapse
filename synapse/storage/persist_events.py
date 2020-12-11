@@ -31,7 +31,14 @@ from synapse.logging.context import PreserveLoggingContext, make_deferred_yielda
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.databases import Databases
 from synapse.storage.databases.main.events import DeltaState
-from synapse.types import Collection, PersistedEventPosition, RoomStreamToken, StateMap
+from synapse.storage.databases.main.events_worker import EventRedactBehaviour
+from synapse.types import (
+    Collection,
+    PersistedEventPosition,
+    RoomStreamToken,
+    StateMap,
+    get_domain_from_id,
+)
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.metrics import Measure
 
@@ -454,7 +461,7 @@ class EventsPersistenceStorage:
                                 latest_event_ids,
                                 new_latest_event_ids,
                             )
-                            current_state, delta_ids = res
+                            current_state, delta_ids, new_latest_event_ids = res
 
                         # If either are not None then there has been a change,
                         # and we need to work out the delta (or use that
@@ -573,9 +580,9 @@ class EventsPersistenceStorage:
         self,
         room_id: str,
         events_context: List[Tuple[EventBase, EventContext]],
-        old_latest_event_ids: Iterable[str],
-        new_latest_event_ids: Iterable[str],
-    ) -> Tuple[Optional[StateMap[str]], Optional[StateMap[str]]]:
+        old_latest_event_ids: Set[str],
+        new_latest_event_ids: Set[str],
+    ) -> Tuple[Optional[StateMap[str]], Optional[StateMap[str]], Set[str]]:
         """Calculate the current state dict after adding some new events to
         a room
 
@@ -593,9 +600,14 @@ class EventsPersistenceStorage:
                 the new forward extremities for the room.
 
         Returns:
-            Returns a tuple of two state maps, the first being the full new current
-            state and the second being the delta to the existing current state.
-            If both are None then there has been no change.
+            Returns a tuple of two state maps and a set of new forward
+            extremities.
+
+            The first state map is the full new current state and the second
+            is the delta to the existing current state. If both are None then
+            there has been no change.
+
+            The function may prune some old extremities if its safe to do so.
 
             If there has been a change then we only return the delta if its
             already been calculated. Conversely if we do know the delta then
@@ -672,7 +684,7 @@ class EventsPersistenceStorage:
         # If they old and new groups are the same then we don't need to do
         # anything.
         if old_state_groups == new_state_groups:
-            return None, None
+            return None, None, new_latest_event_ids
 
         if len(new_state_groups) == 1 and len(old_state_groups) == 1:
             # If we're going from one state group to another, lets check if
@@ -689,7 +701,7 @@ class EventsPersistenceStorage:
                 # the current state in memory then lets also return that,
                 # but it doesn't matter if we don't.
                 new_state = state_groups_map.get(new_state_group)
-                return new_state, delta_ids
+                return new_state, delta_ids, new_latest_event_ids
 
         # Now that we have calculated new_state_groups we need to get
         # their state IDs so we can resolve to a single state set.
@@ -701,7 +713,7 @@ class EventsPersistenceStorage:
         if len(new_state_groups) == 1:
             # If there is only one state group, then we know what the current
             # state is.
-            return state_groups_map[new_state_groups.pop()], None
+            return state_groups_map[new_state_groups.pop()], None, new_latest_event_ids
 
         # Ok, we need to defer to the state handler to resolve our state sets.
 
@@ -734,7 +746,69 @@ class EventsPersistenceStorage:
             state_res_store=StateResolutionStore(self.main_store),
         )
 
-        return res.state, None
+        # If the returned state matches the state group of one of the new
+        # forward extremities then we check if we are able to prune some state
+        # extremities.
+        if res.state_group and res.state_group in new_state_groups:
+            # We keep all the extremities that have the same state group, and
+            # see if we can drop the others.
+            new_new_extrems = {
+                e
+                for e in new_latest_event_ids
+                if event_id_to_state_group[e] == res.state_group
+            }
+
+            dropped = set(new_latest_event_ids) - new_new_extrems
+
+            # We only drop events if:
+            #   1. we're not currently persisting them;
+            #   2. they're not our own events (or are dummy events); and
+            #   3. they're either over N minutes old or we have newer events
+            #      from the same domain.
+            #
+            # The idea is that we don't want to drop events that are "legitmate"
+            # extremities (that we would want to include as prev events), only
+            # "stuck" extremities that are e.g. due to a gap in the graph.
+            #
+            # Note that we either drop all of them or none of them. If we only
+            # drop some of the events we don't know if state res would come to the same conclusion.
+
+            drop = True
+            for ev, _ in events_context:
+                if ev.event_id in dropped:
+                    drop = False
+                    break
+
+            if drop:
+                dropped_events = await self.main_store.get_events(
+                    dropped,
+                    allow_rejected=True,
+                    redact_behaviour=EventRedactBehaviour.AS_IS,
+                )
+
+                new_senders = {e.sender for e, _ in events_context}
+
+                twenty_minutes_ago = self._clock.time_msec() - 20 * 60 * 1000
+                for event in dropped_events.values():
+                    if (
+                        self.is_mine_id(event.sender)
+                        and event.type != "org.matrix.dummy_event"
+                    ):
+                        drop = False
+                        break
+
+                    if event.origin_server_ts < twenty_minutes_ago:
+                        continue
+                    if get_domain_from_id(event.sender) in new_senders:
+                        continue
+
+                    drop = False
+                    break
+
+            if drop:
+                new_latest_event_ids = new_new_extrems
+
+        return res.state, None, new_latest_event_ids
 
     async def _calculate_state_delta(
         self, room_id: str, current_state: StateMap[str]
