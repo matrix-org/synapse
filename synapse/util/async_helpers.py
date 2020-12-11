@@ -545,7 +545,7 @@ class DoneAwaitable:
 
 
 def maybe_awaitable(value: Union[Awaitable[R], R]) -> Awaitable[R]:
-    """Awaits an awaitable and returns the value, otherwise just returns the input.
+    """Convert a value to an awaitable if not already an awaitable.
     """
     if inspect.isawaitable(value):
         assert isinstance(value, Awaitable)
