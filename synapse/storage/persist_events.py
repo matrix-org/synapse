@@ -776,7 +776,6 @@ class EventsPersistenceStorage:
         # forward extremities then we check if we are able to prune some state
         # extremities.
         if res.state_group and res.state_group in new_state_groups:
-
             new_latest_event_ids = await self._prune_extremities(
                 room_id,
                 new_latest_event_ids,
@@ -808,9 +807,9 @@ class EventsPersistenceStorage:
             if event_id_to_state_group[e] == resolved_state_group
         }
 
-        dropped = set(new_latest_event_ids) - new_new_extrems
+        dropped_extrems = set(new_latest_event_ids) - new_new_extrems
 
-        logger.debug("Might drop events: %s", dropped)
+        logger.debug("Might drop extremities: %s", dropped_extrems)
 
         # We only drop events if:
         #   1. we're not currently persisting them;
@@ -829,12 +828,16 @@ class EventsPersistenceStorage:
         # the same conclusion.
 
         for ev, _ in events_context:
-            if ev.event_id in dropped:
-                logger.debug("Not dropping as in to persist list")
+            if ev.event_id in dropped_extrems:
+                logger.debug(
+                    "Not dropping extremities: %s is being persisted", ev.event_id
+                )
                 return new_latest_event_ids
 
         dropped_events = await self.main_store.get_events(
-            dropped, allow_rejected=True, redact_behaviour=EventRedactBehaviour.AS_IS,
+            dropped_extrems,
+            allow_rejected=True,
+            redact_behaviour=EventRedactBehaviour.AS_IS,
         )
 
         new_senders = {get_domain_from_id(e.sender) for e, _ in events_context}
