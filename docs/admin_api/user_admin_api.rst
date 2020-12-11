@@ -139,7 +139,6 @@ A JSON body is returned with the following shape:
         "users": [
             {
                 "name": "<user_id1>",
-                "password_hash": "<password_hash1>",
                 "is_guest": 0,
                 "admin": 0,
                 "user_type": null,
@@ -148,7 +147,6 @@ A JSON body is returned with the following shape:
                 "avatar_url": null
             }, {
                 "name": "<user_id2>",
-                "password_hash": "<password_hash2>",
                 "is_guest": 0,
                 "admin": 1,
                 "user_type": null,
