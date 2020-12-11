@@ -615,7 +615,8 @@ class EventsPersistenceStorage:
             is the delta to the existing current state. If both are None then
             there has been no change.
 
-            The function may prune some old extremities if its safe to do so.
+            The function may prune some old entries from the set of new
+            forward extremities if it's safe to do so.
 
             If there has been a change then we only return the delta if its
             already been calculated. Conversely if we do know the delta then
