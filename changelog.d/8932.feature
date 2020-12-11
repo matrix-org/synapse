@@ -1,0 +1,1 @@
+Remove user's avatar URL when deactivate an user with Admin API.

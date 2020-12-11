@@ -93,6 +93,7 @@ Body parameters:
 
 - ``deactivated``, optional. If unspecified, deactivation state will be left
   unchanged on existing accounts and set to ``false`` for new accounts.
+  For details to deactivation see also `Deactivate Account <#deactivate-account>`_.
 
 If the user already exists then optional parameters default to the current value.
 
@@ -245,6 +246,18 @@ server admin: see `README.rst <README.rst>`_.
 The erase parameter is optional and defaults to ``false``.
 An empty body may be passed for backwards compatibility.
 
+The following actions are performed when deactivating an user:
+
+- Try to unpind 3PIDs from Identity Server
+- Remove all 3PIDs from Homeserver
+- Delete any devices and E2E-Keys
+- Delete any access tokens
+- Delete passwort hash
+- Removal from all the rooms the user is a member of
+- Delete from user directory
+- Reject all pending invites
+- Remove all information on the user from the account_validity table
+- Remove avatar URL
 
 Reset password
 ==============

@@ -103,6 +103,11 @@ class DeactivateAccountHandler(BaseHandler):
         # Remove all 3PIDs this user has bound to the homeserver
         await self.store.user_delete_threepids(user_id)
 
+        # Remove avatar URL from this user
+        await self.store.set_profile_avatar_url(
+            UserID.from_string(user_id).localpart, None
+        )
+
         # delete any devices belonging to the user, which will also
         # delete corresponding access tokens.
         await self._device_handler.delete_all_devices_for_user(user_id)
