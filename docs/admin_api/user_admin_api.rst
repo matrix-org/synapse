@@ -30,7 +30,12 @@ It returns a JSON body like the following:
         ],
         "avatar_url": "<avatar_url>",
         "admin": false,
-        "deactivated": false
+        "deactivated": false,
+        "password_hash": "$2b$12$p9B4GkqYdRTPGD",
+        "creation_ts": 1560432506,
+        "appservice_id": null,
+        "consent_server_notice_sent": null,
+        "consent_version": null
     }
 
 URL parameters:
