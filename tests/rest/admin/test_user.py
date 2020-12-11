@@ -17,8 +17,8 @@ import hashlib
 import hmac
 import json
 import urllib.parse
-from typing import Optional
 from binascii import unhexlify
+from typing import Optional
 
 from mock import Mock
 
