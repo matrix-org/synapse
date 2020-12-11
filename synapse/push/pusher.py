@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
+from typing import TYPE_CHECKING, Callable, Dict, Optional
 
 from synapse.push import Pusher, PusherConfig
 from synapse.push.emailpusher import EmailPusher

@@ -20,7 +20,7 @@ from twisted.internet.base import DelayedCall
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.push import Pusher, PusherConfig
+from synapse.push import Pusher, PusherConfig, ThrottleParams
 from synapse.push.mailer import Mailer
 from synapse.types import RoomStreamToken
 
@@ -68,7 +68,7 @@ class EmailPusher(Pusher):
         self.store = self.hs.get_datastore()
         self.email = pusher_config.pushkey
         self.timed_call = None  # type: Optional[DelayedCall]
-        self.throttle_params = {}  # type: Dict[str, Dict[str, int]]
+        self.throttle_params = {}  # type: Dict[str, ThrottleParams]
         self._inited = False
 
         self._is_processing = False
@@ -261,13 +261,13 @@ class EmailPusher(Pusher):
 
     def get_room_throttle_ms(self, room_id: str) -> int:
         if room_id in self.throttle_params:
-            return self.throttle_params[room_id]["throttle_ms"]
+            return self.throttle_params[room_id].throttle_ms
         else:
             return 0
 
     def get_room_last_sent_ts(self, room_id: str) -> int:
         if room_id in self.throttle_params:
-            return self.throttle_params[room_id]["last_sent_ts"]
+            return self.throttle_params[room_id].last_sent_ts
         else:
             return 0
 
@@ -318,10 +318,9 @@ class EmailPusher(Pusher):
                 new_throttle_ms = min(
                     current_throttle_ms * THROTTLE_MULTIPLIER, THROTTLE_MAX_MS
                 )
-        self.throttle_params[room_id] = {
-            "last_sent_ts": self.clock.time_msec(),
-            "throttle_ms": new_throttle_ms,
-        }
+        self.throttle_params[room_id] = ThrottleParams(
+            self.clock.time_msec(), new_throttle_ms,
+        )
         assert self.pusher_id is not None
         await self.store.set_throttle_params(
             self.pusher_id, room_id, self.throttle_params[room_id]

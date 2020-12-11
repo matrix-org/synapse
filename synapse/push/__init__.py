@@ -56,6 +56,12 @@ class PusherConfig:
         }
 
 
+@attr.s(slots=True)
+class ThrottleParams:
+    last_sent_ts = attr.ib(type=int)
+    throttle_ms = attr.ib(type=int)
+
+
 class Pusher(metaclass=abc.ABCMeta):
     def __init__(self, hs: "HomeServer", pusher_config: PusherConfig):
         self.hs = hs
