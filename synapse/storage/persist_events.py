@@ -759,82 +759,87 @@ class EventsPersistenceStorage:
         # forward extremities then we check if we are able to prune some state
         # extremities.
         if res.state_group and res.state_group in new_state_groups:
-            # We keep all the extremities that have the same state group, and
-            # see if we can drop the others.
-            new_new_extrems = {
-                e
-                for e in new_latest_event_ids
-                if event_id_to_state_group[e] == res.state_group
-            }
-
-            dropped = set(new_latest_event_ids) - new_new_extrems
-
-            logger.debug("Might drop events: %s", dropped)
-
-            # We only drop events if:
-            #   1. we're not currently persisting them;
-            #   2. they're not our own events (or are dummy events); and
-            #   3. they're either:
-            #       1. over N hours old and more than N events ago (we use depth
-            #          to calculate); or
-            #       2. we are persisting an event from the same domain.
-            #
-            # The idea is that we don't want to drop events that are "legitmate"
-            # extremities (that we would want to include as prev events), only
-            # "stuck" extremities that are e.g. due to a gap in the graph.
-            #
-            # Note that we either drop all of them or none of them. If we only
-            # drop some of the events we don't know if state res would come to
-            # the same conclusion.
-
-            drop = True
-            for ev, _ in events_context:
-                if ev.event_id in dropped:
-                    logger.debug("Not dropping as in to persist list")
-                    drop = False
-                    break
-
-            if drop:
-                dropped_events = await self.main_store.get_events(
-                    dropped,
-                    allow_rejected=True,
-                    redact_behaviour=EventRedactBehaviour.AS_IS,
-                )
-
-                new_senders = {get_domain_from_id(e.sender) for e, _ in events_context}
-
-                one_day_ago = self._clock.time_msec() - 20 * 60 * 60 * 1000
-                current_depth = max(e.depth for e, _ in events_context)
-                for event in dropped_events.values():
-                    if (
-                        self.is_mine_id(event.sender)
-                        and event.type != "org.matrix.dummy_event"
-                    ):
-                        logger.debug("Not dropping own event")
-                        drop = False
-                        break
-
-                    if (
-                        event.origin_server_ts < one_day_ago
-                        and event.depth < current_depth - 100
-                    ):
-                        continue
-                    if get_domain_from_id(event.sender) in new_senders:
-                        continue
-
-                    logger.debug(
-                        "Not dropping as too new and not in new_senders: %s",
-                        new_senders,
-                    )
-
-                    drop = False
-                    break
-
-            if drop:
-                logger.debug("Dropping events %s", dropped)
-                new_latest_event_ids = new_new_extrems
+            new_latest_event_ids = await self._prune_extremities(
+                new_latest_event_ids,
+                res.state_group,
+                event_id_to_state_group,
+                events_context,
+            )
 
         return res.state, None, new_latest_event_ids
+
+    async def _prune_extremities(
+        self,
+        new_latest_event_ids: Set[str],
+        resolved_state_group: int,
+        event_id_to_state_group: Dict[str, int],
+        events_context: List[Tuple[EventBase, EventContext]],
+    ) -> Set[str]:
+        """See if we can prune any of the extremities after calculating the
+        resolved state.
+        """
+        # We keep all the extremities that have the same state group, and
+        # see if we can drop the others.
+        new_new_extrems = {
+            e
+            for e in new_latest_event_ids
+            if event_id_to_state_group[e] == resolved_state_group
+        }
+
+        dropped = set(new_latest_event_ids) - new_new_extrems
+
+        logger.debug("Might drop events: %s", dropped)
+
+        # We only drop events if:
+        #   1. we're not currently persisting them;
+        #   2. they're not our own events (or are dummy events); and
+        #   3. they're either:
+        #       1. over N hours old and more than N events ago (we use depth
+        #          to calculate); or
+        #       2. we are persisting an event from the same domain.
+        #
+        # The idea is that we don't want to drop events that are "legitmate"
+        # extremities (that we would want to include as prev events), only
+        # "stuck" extremities that are e.g. due to a gap in the graph.
+        #
+        # Note that we either drop all of them or none of them. If we only
+        # drop some of the events we don't know if state res would come to
+        # the same conclusion.
+
+        for ev, _ in events_context:
+            if ev.event_id in dropped:
+                logger.debug("Not dropping as in to persist list")
+                return new_latest_event_ids
+
+        dropped_events = await self.main_store.get_events(
+            dropped, allow_rejected=True, redact_behaviour=EventRedactBehaviour.AS_IS,
+        )
+
+        new_senders = {get_domain_from_id(e.sender) for e, _ in events_context}
+
+        one_day_ago = self._clock.time_msec() - 20 * 60 * 60 * 1000
+        current_depth = max(e.depth for e, _ in events_context)
+        for event in dropped_events.values():
+            if self.is_mine_id(event.sender) and event.type != "org.matrix.dummy_event":
+                logger.debug("Not dropping own event")
+                return new_latest_event_ids
+
+            if (
+                event.origin_server_ts < one_day_ago
+                and event.depth < current_depth - 100
+            ):
+                continue
+            if get_domain_from_id(event.sender) in new_senders:
+                continue
+
+            logger.debug(
+                "Not dropping as too new and not in new_senders: %s", new_senders,
+            )
+
+            return new_latest_event_ids
+
+        logger.debug("Dropping events %s", dropped)
+        return new_new_extrems
 
     async def _calculate_state_delta(
         self, room_id: str, current_state: StateMap[str]
