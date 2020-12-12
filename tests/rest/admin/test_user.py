@@ -508,7 +508,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
-        self.other_user = self.register_user("user", "pass")
+        self.other_user = self.register_user("user", "pass", displayname="User")
         self.other_user_token = self.login("user", "pass")
         self.url_other_user = "/_synapse/admin/v2/users/%s" % urllib.parse.quote(
             self.other_user
@@ -924,6 +924,54 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(True, channel.json_body["deactivated"])
+
+    @override_config({"user_directory": {"enabled": True, "search_all_users": True}})
+    def test_change_name_deactivate_user_user_directory(self):
+        """
+        Test change profile information of a deactivated user and
+        check that it does not appear in user directory
+        """
+
+        # is in user directory
+        profile = self.get_success(self.store.get_user_in_directory(self.other_user))
+        self.assertTrue(profile["display_name"] == "User")
+
+        # Deactivate user
+        body = json.dumps({"deactivated": True})
+
+        request, channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual(True, channel.json_body["deactivated"])
+
+        # is not in user directory
+        profile = self.get_success(self.store.get_user_in_directory(self.other_user))
+        self.assertTrue(profile is None)
+
+        # Set new displayname user
+        body = json.dumps({"displayname": "Foobar"})
+
+        request, channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual(True, channel.json_body["deactivated"])
+        self.assertEqual("Foobar", channel.json_body["displayname"])
+
+        # is not in user directory
+        profile = self.get_success(self.store.get_user_in_directory(self.other_user))
+        self.assertTrue(profile is None)
 
     def test_reactivate_user(self):
         """
