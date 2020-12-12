@@ -255,7 +255,7 @@ class UserRestServletV2(RestServlet):
 
                 if deactivate and not user["deactivated"]:
                     await self.deactivate_account_handler.deactivate_account(
-                        target_user.to_string(), False
+                        target_user.to_string(), False, requester
                     )
                 elif not deactivate and user["deactivated"]:
                     if "password" not in body:
@@ -503,6 +503,7 @@ class DeactivateAccountRestServlet(RestServlet):
 
     async def on_POST(self, request, target_user_id):
         await assert_requester_is_admin(self.auth, request)
+        requester = await self.auth.get_user_by_req(request)
         body = parse_json_object_from_request(request, allow_empty_body=True)
         erase = body.get("erase", False)
         if not isinstance(erase, bool):
@@ -515,7 +516,7 @@ class DeactivateAccountRestServlet(RestServlet):
         UserID.from_string(target_user_id)
 
         result = await self._deactivate_account_handler.deactivate_account(
-            target_user_id, erase
+            target_user_id, erase, requester
         )
         if result:
             id_server_unbind_result = "success"

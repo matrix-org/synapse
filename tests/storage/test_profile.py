@@ -48,6 +48,20 @@ class ProfileStoreTestCase(unittest.TestCase):
             ),
         )
 
+        # test set to None
+        yield defer.ensureDeferred(
+            self.store.set_profile_displayname(self.u_frank.localpart, None)
+        )
+
+        self.assertEquals(
+            None,
+            (
+                yield defer.ensureDeferred(
+                    self.store.get_profile_displayname(self.u_frank.localpart)
+                )
+            ),
+        )
+
     @defer.inlineCallbacks
     def test_avatar_url(self):
         yield defer.ensureDeferred(self.store.create_profile(self.u_frank.localpart))
@@ -60,6 +74,20 @@ class ProfileStoreTestCase(unittest.TestCase):
 
         self.assertEquals(
             "http://my.site/here",
+            (
+                yield defer.ensureDeferred(
+                    self.store.get_profile_avatar_url(self.u_frank.localpart)
+                )
+            ),
+        )
+
+        # test set to None
+        yield defer.ensureDeferred(
+            self.store.set_profile_avatar_url(self.u_frank.localpart, None)
+        )
+
+        self.assertEquals(
+            None,
             (
                 yield defer.ensureDeferred(
                     self.store.get_profile_avatar_url(self.u_frank.localpart)
