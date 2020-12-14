@@ -223,7 +223,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
         """
 
         body = self.helper.send_event(
-            self.room_id, type="org.matrix.dummy_event", content={}, tok=self.token
+            self.room_id, type=EventTypes.Dummy, content={}, tok=self.token
         )
         local_message_event_id = body["event_id"]
         self.assert_extremities([local_message_event_id])

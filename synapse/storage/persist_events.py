@@ -845,7 +845,7 @@ class EventsPersistenceStorage:
         one_day_ago = self._clock.time_msec() - 24 * 60 * 60 * 1000
         current_depth = max(e.depth for e, _ in events_context)
         for event in dropped_events.values():
-            if self.is_mine_id(event.sender) and event.type != "org.matrix.dummy_event":
+            if self.is_mine_id(event.sender) and event.type != EventTypes.Dummy:
                 logger.debug("Not dropping own event")
                 return new_latest_event_ids
 
