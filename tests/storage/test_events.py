@@ -98,7 +98,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
                 "content": {"membership": Membership.JOIN},
                 "room_id": self.room_id,
                 "sender": "@user:other",
-                "depth": 10,
+                "depth": 50,
                 "prev_events": ["$some_unknown_message"],
                 "auth_events": [],
                 "origin_server_ts": self.clock.time_msec(),

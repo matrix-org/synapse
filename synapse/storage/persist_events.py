@@ -815,17 +815,18 @@ class EventsPersistenceStorage:
         #   1. we're not currently persisting them;
         #   2. they're not our own events (or are dummy events); and
         #   3. they're either:
-        #       1. over N hours old and more than N events ago (we use depth
-        #          to calculate); or
-        #       2. we are persisting an event from the same domain.
+        #       1. over N hours old and more than N events ago (we use depth to
+        #          calculate); or
+        #       2. we are persisting an event from the same domain and more than
+        #          M events ago.
         #
         # The idea is that we don't want to drop events that are "legitimate"
         # extremities (that we would want to include as prev events), only
         # "stuck" extremities that are e.g. due to a gap in the graph.
         #
-        # Note that we either drop all of them or none of them. If we only
-        # drop some of the events we don't know if state res would come to
-        # the same conclusion.
+        # Note that we either drop all of them or none of them. If we only drop
+        # some of the events we don't know if state res would come to the same
+        # conclusion.
 
         for ev, _ in events_context:
             if ev.event_id in dropped_extrems:
@@ -854,7 +855,14 @@ class EventsPersistenceStorage:
                 and event.depth < current_depth - 100
             ):
                 continue
-            if get_domain_from_id(event.sender) in new_senders:
+
+            # We can be less conservative about dropping extremities from the
+            # same domain, though we do want to wait a little bit (otherwise
+            # we'll immediately remove all extremities from a given server).
+            if (
+                get_domain_from_id(event.sender) in new_senders
+                and event.depth < current_depth - 20
+            ):
                 continue
 
             logger.debug(
