@@ -791,7 +791,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         )
 
     def _make_callback_with_userinfo(
-        self, userinfo: dict, client_redirect_url="http://client/redirect"
+        self, userinfo: dict, client_redirect_url: str = "http://client/redirect"
     ) -> None:
         self.handler._exchange_code = simple_async_mock(return_value={})
         self.handler._parse_id_token = simple_async_mock(return_value=userinfo)
