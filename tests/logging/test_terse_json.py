@@ -117,11 +117,10 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         """
         handler = logging.StreamHandler(self.output)
         handler.setFormatter(JsonFormatter())
-        handler.addFilter(LoggingContextFilter(request=""))
+        handler.addFilter(LoggingContextFilter())
         logger = self.get_logger(handler)
 
-        with LoggingContext() as context_one:
-            context_one.request = "test"
+        with LoggingContext(request="test"):
             logger.info("Hello there, %s!", "wally")
 
         log = self.get_log_line()
@@ -132,9 +131,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
             "level",
             "namespace",
             "request",
-            "scope",
         ]
         self.assertCountEqual(log.keys(), expected_log_keys)
         self.assertEqual(log["log"], "Hello there, wally!")
         self.assertEqual(log["request"], "test")
-        self.assertIsNone(log["scope"])

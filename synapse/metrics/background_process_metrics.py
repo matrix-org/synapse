@@ -199,8 +199,7 @@ def run_as_background_process(desc: str, func, *args, bg_start_span=True, **kwar
         _background_process_start_count.labels(desc).inc()
         _background_process_in_flight_count.labels(desc).inc()
 
-        with BackgroundProcessLoggingContext(desc) as context:
-            context.request = "%s-%i" % (desc, count)
+        with BackgroundProcessLoggingContext(desc, "%s-%i" % (desc, count)) as context:
             try:
                 ctx = noop_context_manager()
                 if bg_start_span:
@@ -244,8 +243,8 @@ class BackgroundProcessLoggingContext(LoggingContext):
 
     __slots__ = ["_proc"]
 
-    def __init__(self, name: str):
-        super().__init__(name)
+    def __init__(self, name: str, request: Optional[str] = None):
+        super().__init__(name, request=request)
 
         self._proc = _BackgroundProcess(name, self)
 
