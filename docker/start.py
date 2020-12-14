@@ -177,7 +177,6 @@ def run_generate_config(environ, ownership):
     else:
         os.execv("/usr/local/bin/python", args)
 
-
 def main(args, environ):
     mode = args[1] if len(args) > 1 else "run"
     desired_uid = int(environ.get("UID", "991"))

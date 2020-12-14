@@ -27,8 +27,7 @@ log_config: "{{ SYNAPSE_LOG_CONFIG }}"
 
 listeners:
   {% if not SYNAPSE_NO_TLS %}
-  -
-    port: 8448
+  - port: 8448
     bind_addresses: ['::']
     type: http
     tls: true
@@ -51,6 +50,15 @@ listeners:
         compress: true
       - names: [federation]
         compress: false
+
+  {% if SYNAPSE_WORKERS %}
+  # The HTTP replication port
+  - port: 9093
+    bind_address: '127.0.0.1'
+    type: http
+    resources:
+      - names: [replication]
+  {% endif %}
 
 ## Database ##
 
