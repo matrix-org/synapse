@@ -120,8 +120,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         handler.addFilter(LoggingContextFilter())
         logger = self.get_logger(handler)
 
-        with LoggingContext() as context_one:
-            context_one.request = "test"
+        with LoggingContext(request="test"):
             logger.info("Hello there, %s!", "wally")
 
         log = self.get_log_line()
