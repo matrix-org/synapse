@@ -33,7 +33,7 @@ class WellKnownBuilder:
     def __init__(self, hs):
         self._config = hs.config
 
-    def get_well_known(self):
+    def get_well_known_client(self):
         # if we don't have a public_baseurl, we can't help much here.
         if self._config.public_baseurl is None:
             return None
@@ -47,6 +47,21 @@ class WellKnownBuilder:
 
         return result
 
+    def get_well_known_server(self):
+        if self._config.delegation_address is None:
+            return None
+
+        result = {"m.server": self._config.delegation_address}
+        return result
+
+    def get_well_known(self, request):
+        if request.path == b"/.well-known/matrix/client":
+            return self.get_well_known_client()
+        elif request.path == b"/.well-known/matrix/server":
+            return self.get_well_known_server()
+        else:
+            return None
+
 
 class WellKnownResource(Resource):
     """A Twisted web resource which renders the .well-known file"""
@@ -59,7 +74,7 @@ class WellKnownResource(Resource):
 
     def render_GET(self, request):
         set_cors_headers(request)
-        r = self._well_known_builder.get_well_known()
+        r = self._well_known_builder.get_well_known(request)
         if not r:
             request.setResponseCode(404)
             request.setHeader(b"Content-Type", b"text/plain")

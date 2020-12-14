@@ -24,7 +24,7 @@ class WellKnownTests(unittest.HomeserverTestCase):
         # replace the JsonResource with a WellKnownResource
         return WellKnownResource(self.hs)
 
-    def test_well_known(self):
+    def test_well_known_client(self):
         self.hs.config.public_baseurl = "https://tesths"
         self.hs.config.default_identity_server = "https://testis"
 
@@ -41,11 +41,32 @@ class WellKnownTests(unittest.HomeserverTestCase):
             },
         )
 
-    def test_well_known_no_public_baseurl(self):
+    def test_well_known_client_no_public_baseurl(self):
         self.hs.config.public_baseurl = None
 
         request, channel = self.make_request(
             "GET", "/.well-known/matrix/client", shorthand=False
+        )
+
+        self.assertEqual(request.code, 404)
+
+    def test_well_known_server(self):
+        self.hs.config.delegation_address = "https://tesths:8448"
+
+        request, channel = self.make_request(
+            "GET", "/.well-known/matrix/server", shorthand=False
+        )
+
+        self.assertEqual(request.code, 200)
+        self.assertEqual(
+            channel.json_body, {"m.server": "https://tesths:8448"},
+        )
+
+    def test_well_known_server_no_delegation_address(self):
+        self.hs.config.delegation_address = None
+
+        request, channel = self.make_request(
+            "GET", "/.well-known/matrix/server", shorthand=False
         )
 
         self.assertEqual(request.code, 404)

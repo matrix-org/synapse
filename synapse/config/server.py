@@ -162,6 +162,7 @@ class ServerConfig(Config):
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
         self.public_baseurl = config.get("public_baseurl")
+        self.delegation_address = config.get("delegation_address", None)
 
         # Whether to enable user presence.
         self.use_presence = config.get("use_presence", True)
@@ -747,6 +748,11 @@ class ServerConfig(Config):
         # synapse via the proxy.
         #
         #public_baseurl: https://example.com/
+
+        # The address (and optional port) to direct federation traffic to.
+        # Setting this option will enable .well-known delegation.
+        # See https://github.com/matrix-org/synapse/blob/master/docs/delegate.md
+        #delegation_address: synapse.example.com
 
         # Set the soft limit on the number of file descriptors synapse can use
         # Zero is used to indicate synapse should set the soft limit to the

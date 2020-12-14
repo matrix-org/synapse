@@ -182,6 +182,7 @@ class SynapseHomeServer(HomeServer):
             client_resource = ClientRestResource(self)
             if compress:
                 client_resource = gz_wrap(client_resource)
+            well_known_resource = WellKnownResource(self)
 
             resources.update(
                 {
@@ -190,7 +191,8 @@ class SynapseHomeServer(HomeServer):
                     "/_matrix/client/unstable": client_resource,
                     "/_matrix/client/v2_alpha": client_resource,
                     "/_matrix/client/versions": client_resource,
-                    "/.well-known/matrix/client": WellKnownResource(self),
+                    "/.well-known/matrix/client": well_known_resource,
+                    "/.well-known/matrix/server": well_known_resource,
                     "/_synapse/admin": AdminRestResource(self),
                 }
             )

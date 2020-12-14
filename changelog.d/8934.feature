@@ -1,0 +1,1 @@
+Add option for .well-known delegation.

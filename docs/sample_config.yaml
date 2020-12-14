@@ -75,6 +75,11 @@ pid_file: DATADIR/homeserver.pid
 #
 #public_baseurl: https://example.com/
 
+# The address (and optional port) to direct federation traffic to.
+# Setting this option will enable .well-known delegation.
+# See https://github.com/matrix-org/synapse/blob/master/docs/delegate.md
+#delegation_address: synapse.example.com
+
 # Set the soft limit on the number of file descriptors synapse can use
 # Zero is used to indicate synapse should set the soft limit to the
 # hard limit.

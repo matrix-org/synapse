@@ -133,7 +133,7 @@ class LoginRestServlet(RestServlet):
         except KeyError:
             raise SynapseError(400, "Missing JSON keys.")
 
-        well_known_data = self._well_known_builder.get_well_known()
+        well_known_data = self._well_known_builder.get_well_known_client()
         if well_known_data:
             result["well_known"] = well_known_data
         return 200, result
