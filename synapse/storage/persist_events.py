@@ -811,7 +811,7 @@ class EventsPersistenceStorage:
 
         logger.debug("Might drop extremities: %s", dropped_extrems)
 
-        # We only drop events if:
+        # We only drop events from the extremities list if:
         #   1. we're not currently persisting them;
         #   2. they're not our own events (or are dummy events); and
         #   3. they're either:
@@ -819,7 +819,7 @@ class EventsPersistenceStorage:
         #          to calculate); or
         #       2. we are persisting an event from the same domain.
         #
-        # The idea is that we don't want to drop events that are "legitmate"
+        # The idea is that we don't want to drop events that are "legitimate"
         # extremities (that we would want to include as prev events), only
         # "stuck" extremities that are e.g. due to a gap in the graph.
         #
