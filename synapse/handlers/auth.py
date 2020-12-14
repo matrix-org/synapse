@@ -198,27 +198,25 @@ class AuthHandler(BaseHandler):
         self._password_enabled = hs.config.password_enabled
         self._password_localdb_enabled = hs.config.password_localdb_enabled
 
-        # we keep this as a list despite the O(N^2) implication so that we can
-        # keep PASSWORD first and avoid confusing clients which pick the first
-        # type in the list. (NB that the spec doesn't require us to do so and
-        # clients which favour types that they don't understand over those that
-        # they do are technically broken)
-
         # start out by assuming PASSWORD is enabled; we will remove it later if not.
-        login_types = []
+        login_types = set()
         if self._password_localdb_enabled:
-            login_types.append(LoginType.PASSWORD)
+            login_types.add(LoginType.PASSWORD)
 
         for provider in self.password_providers:
-            if hasattr(provider, "get_supported_login_types"):
-                for t in provider.get_supported_login_types().keys():
-                    if t not in login_types:
-                        login_types.append(t)
+            login_types.update(provider.get_supported_login_types().keys())
 
         if not self._password_enabled:
-            login_types.remove(LoginType.PASSWORD)
+            login_types.discard(LoginType.PASSWORD)
 
-        self._supported_login_types = login_types
+        # Some clients just pick the first type in the list. In this case, we want
+        # them to use PASSWORD (rather than token or whatever), so we want to make sure
+        # that comes first, where it's present.
+        self._supported_login_types = []
+        if LoginType.PASSWORD in login_types:
+            self._supported_login_types.append(LoginType.PASSWORD)
+            login_types.remove(LoginType.PASSWORD)
+        self._supported_login_types.extend(login_types)
 
         # Ratelimiter for failed auth during UIA. Uses same ratelimit config
         # as per `rc_login.failed_attempts`.
