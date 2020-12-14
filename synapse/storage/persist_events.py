@@ -842,7 +842,7 @@ class EventsPersistenceStorage:
 
         new_senders = {get_domain_from_id(e.sender) for e, _ in events_context}
 
-        one_day_ago = self._clock.time_msec() - 20 * 60 * 60 * 1000
+        one_day_ago = self._clock.time_msec() - 24 * 60 * 60 * 1000
         current_depth = max(e.depth for e, _ in events_context)
         for event in dropped_events.values():
             if self.is_mine_id(event.sender) and event.type != "org.matrix.dummy_event":
