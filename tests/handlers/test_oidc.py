@@ -23,7 +23,7 @@ from synapse.handlers.oidc_handler import OidcError, OidcMappingProvider
 from synapse.handlers.sso import MappingException
 from synapse.types import UserID
 
-from tests.test_utils import FakeResponse
+from tests.test_utils import FakeResponse, simple_async_mock
 from tests.unittest import HomeserverTestCase, override_config
 
 # These are a few constants that are used as config parameters in the tests.
@@ -80,16 +80,6 @@ class TestMappingProviderFailures(TestMappingProvider):
             "localpart": userinfo["username"] + (str(failures) if failures else ""),
             "display_name": None,
         }
-
-
-def simple_async_mock(return_value=None, raises=None) -> Mock:
-    # AsyncMock is not available in python3.5, this mimics part of its behaviour
-    async def cb(*args, **kwargs):
-        if raises:
-            raise raises
-        return return_value
-
-    return Mock(side_effect=cb)
 
 
 async def get_json(url):
