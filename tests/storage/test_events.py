@@ -217,9 +217,9 @@ class ExtremPruneTestCase(HomeserverTestCase):
         # Check the new extremity is just the new remote event.
         self.assert_extremities([self.remote_event_1.event_id, remote_event_2.event_id])
 
-    def test_prune_gap_if_dummy(self):
+    def test_prune_gap_if_dummy_remote(self):
         """Test that we drop extremities after a gap when the previous extremity
-        is a local dummy event and "old".
+        is a local dummy event and only points to remote events.
         """
 
         body = self.helper.send_event(
@@ -256,6 +256,48 @@ class ExtremPruneTestCase(HomeserverTestCase):
 
         # Check the new extremity is just the new remote event.
         self.assert_extremities([remote_event_2.event_id])
+
+    def test_prune_gap_if_dummy_local(self):
+        """Test that we don't drop extremities after a gap when the previous
+        extremity is a local dummy event and points to local events.
+        """
+
+        body = self.helper.send(self.room_id, body="Test", tok=self.token)
+
+        body = self.helper.send_event(
+            self.room_id, type=EventTypes.Dummy, content={}, tok=self.token
+        )
+        local_message_event_id = body["event_id"]
+        self.assert_extremities([local_message_event_id])
+
+        # Advance the clock for many days to make the old extremity "old". We
+        # also set the depth to "lots".
+        self.reactor.advance(7 * 24 * 60 * 60)
+
+        # Fudge a second event which points to an event we don't have. This is a
+        # state event so that the state changes (otherwise we won't prune the
+        # extremity as they'll have the same state group).
+        remote_event_2 = event_from_pdu_json(
+            {
+                "type": EventTypes.Member,
+                "state_key": "@user:other2",
+                "content": {"membership": Membership.JOIN},
+                "room_id": self.room_id,
+                "sender": "@user:other2",
+                "depth": 10000,
+                "prev_events": ["$some_unknown_message"],
+                "auth_events": [],
+                "origin_server_ts": self.clock.time_msec(),
+            },
+            RoomVersions.V6,
+        )
+
+        state_before_gap = self.get_success(self.state.get_current_state(self.room_id))
+
+        self.persist_event(remote_event_2, state=state_before_gap.values())
+
+        # Check the new extremity is just the new remote event.
+        self.assert_extremities([remote_event_2.event_id, local_message_event_id])
 
     def test_do_not_prune_gap_if_not_dummy(self):
         """Test that we do not drop extremities after a gap when the previous extremity

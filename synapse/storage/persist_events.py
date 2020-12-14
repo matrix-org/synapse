@@ -846,9 +846,32 @@ class EventsPersistenceStorage:
         one_day_ago = self._clock.time_msec() - 24 * 60 * 60 * 1000
         current_depth = max(e.depth for e, _ in events_context)
         for event in dropped_events.values():
-            if self.is_mine_id(event.sender) and event.type != EventTypes.Dummy:
-                logger.debug("Not dropping own event")
-                return new_latest_event_ids
+            # If the event is a local dummy event then we should check it
+            # doesn't reference any local events, as we want to reference those
+            # if we send any new events.
+            #
+            # Note we do this recursively to handle the case where a dummy event
+            # references a dummy event that only references remote events.
+            #
+            # Ideally we'd figure out a way of still being able to drop old
+            # dummy events that reference local events, but this is good enough
+            # as a first cut.
+            events_to_check = [event]
+            while events_to_check:
+                new_events = set()
+                for event_to_check in events_to_check:
+                    if self.is_mine_id(event_to_check.sender):
+                        if event_to_check.type != EventTypes.Dummy:
+                            logger.debug("Not dropping own event")
+                            return new_latest_event_ids
+                        new_events.update(event_to_check.prev_event_ids())
+
+                prev_events = await self.main_store.get_events(
+                    new_events,
+                    allow_rejected=True,
+                    redact_behaviour=EventRedactBehaviour.AS_IS,
+                )
+                events_to_check = prev_events.values()
 
             if (
                 event.origin_server_ts < one_day_ago
