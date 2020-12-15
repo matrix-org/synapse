@@ -722,9 +722,12 @@ class SimpleHttpClient:
             length = await make_deferred_yieldable(
                 readBodyWithMaxSize(response, output_stream, max_size)
             )
-        except SynapseError:
-            # This can happen e.g. because the body is too large.
-            raise
+        except BodyExceededMaxSize:
+            SynapseError(
+                502,
+                "Requested file is too large > %r bytes" % (max_size,),
+                Codes.TOO_LARGE,
+            )
         except Exception as e:
             raise SynapseError(502, ("Failed to download remote body: %s" % e)) from e
 
@@ -746,6 +749,10 @@ def _timeout_to_request_timed_out_error(f: Failure):
         raise RequestTimedOutError("Timeout waiting for response from remote server")
 
     return f
+
+
+class BodyExceededMaxSize(Exception):
+    """The maximum allowed size of the HTTP body was exceeded."""
 
 
 class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):

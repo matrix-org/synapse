@@ -27,7 +27,7 @@ from twisted.web.http import stringToDatetime
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent, IResponse
 
-from synapse.http.client import readBodyWithMaxSize
+from synapse.http.client import BodyExceededMaxSize, readBodyWithMaxSize
 from synapse.logging.context import make_deferred_yieldable
 from synapse.util import Clock, json_decoder
 from synapse.util.caches.ttlcache import TTLCache
@@ -234,6 +234,9 @@ class WellKnownResolver:
             server_name: name of the server, from the requested url
             retry: Whether to retry the request if it fails.
 
+        Raises:
+            _FetchWellKnownFailure if we fail to lookup a result
+
         Returns:
             Returns the response object and body. Response may be a non-200 response.
         """
@@ -268,6 +271,15 @@ class WellKnownResolver:
             except defer.CancelledError:
                 # Bail if we've been cancelled
                 raise
+            except BodyExceededMaxSize:
+                # If the well-known file was too large, do not keep attempting
+                # to download it, but consider it a temporary error.
+                logger.warning(
+                    "Requested .well-known file for %s is too large > %r bytes",
+                    server_name.decode("ascii"),
+                    WELL_KNOW_MAX_SIZE,
+                )
+                raise _FetchWellKnownFailure(temporary=True)
             except Exception as e:
                 if not retry or i >= WELL_KNOWN_RETRY_ATTEMPTS:
                     logger.info("Error fetching %s: %s", uri_str, e)
