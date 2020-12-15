@@ -19,7 +19,7 @@ from mock import ANY, Mock, patch
 
 import pymacaroons
 
-from synapse.handlers.oidc_handler import OidcError, OidcMappingProvider
+from synapse.handlers.oidc_handler import OidcError
 from synapse.handlers.sso import MappingException
 from synapse.types import UserID
 
@@ -55,10 +55,13 @@ COOKIE_NAME = b"oidc_session"
 COOKIE_PATH = "/_synapse/oidc"
 
 
-class TestMappingProvider(OidcMappingProvider):
+class TestMappingProvider:
     @staticmethod
     def parse_config(config):
         return
+
+    def __init__(self, config):
+        pass
 
     def get_remote_user_id(self, userinfo):
         return userinfo["sub"]
@@ -360,6 +363,13 @@ class OidcHandlerTestCase(HomeserverTestCase):
          - when the userinfo fetching fails
          - when the code exchange fails
         """
+
+        # ensure that we are correctly testing the fallback when "get_extra_attributes"
+        # is not implemented.
+        mapping_provider = self.handler._user_mapping_provider
+        with self.assertRaises(AttributeError):
+            _ = mapping_provider.get_extra_attributes
+
         token = {
             "type": "bearer",
             "id_token": "id_token",
@@ -396,7 +406,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.get_success(self.handler.handle_oidc_callback(request))
 
         auth_handler.complete_sso_login.assert_called_once_with(
-            expected_user_id, request, client_redirect_url, {},
+            expected_user_id, request, client_redirect_url, None,
         )
         self.handler._exchange_code.assert_called_once_with(code)
         self.handler._parse_id_token.assert_called_once_with(token, nonce=nonce)
@@ -427,7 +437,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.get_success(self.handler.handle_oidc_callback(request))
 
         auth_handler.complete_sso_login.assert_called_once_with(
-            expected_user_id, request, client_redirect_url, {},
+            expected_user_id, request, client_redirect_url, None,
         )
         self.handler._exchange_code.assert_called_once_with(code)
         self.handler._parse_id_token.assert_not_called()
@@ -616,7 +626,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         }
         self._make_callback_with_userinfo(userinfo)
         auth_handler.complete_sso_login.assert_called_once_with(
-            "@test_user:test", ANY, ANY, {}
+            "@test_user:test", ANY, ANY, None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
@@ -627,7 +637,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         }
         self._make_callback_with_userinfo(userinfo)
         auth_handler.complete_sso_login.assert_called_once_with(
-            "@test_user_2:test", ANY, ANY, {}
+            "@test_user_2:test", ANY, ANY, None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
@@ -664,14 +674,14 @@ class OidcHandlerTestCase(HomeserverTestCase):
         }
         self._make_callback_with_userinfo(userinfo)
         auth_handler.complete_sso_login.assert_called_once_with(
-            user.to_string(), ANY, ANY, {},
+            user.to_string(), ANY, ANY, None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
         # Subsequent calls should map to the same mxid.
         self._make_callback_with_userinfo(userinfo)
         auth_handler.complete_sso_login.assert_called_once_with(
-            user.to_string(), ANY, ANY, {},
+            user.to_string(), ANY, ANY, None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
@@ -686,7 +696,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         }
         self._make_callback_with_userinfo(userinfo)
         auth_handler.complete_sso_login.assert_called_once_with(
-            user.to_string(), ANY, ANY, {},
+            user.to_string(), ANY, ANY, None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
@@ -722,7 +732,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         self._make_callback_with_userinfo(userinfo)
         auth_handler.complete_sso_login.assert_called_once_with(
-            "@TEST_USER_2:test", ANY, ANY, {},
+            "@TEST_USER_2:test", ANY, ANY, None,
         )
 
     def test_map_userinfo_to_invalid_localpart(self):
@@ -756,7 +766,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         # test_user is already taken, so test_user1 gets registered instead.
         auth_handler.complete_sso_login.assert_called_once_with(
-            "@test_user1:test", ANY, ANY, {},
+            "@test_user1:test", ANY, ANY, None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
