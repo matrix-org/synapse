@@ -64,11 +64,10 @@ class JsonResourceTests(unittest.TestCase):
             "test_servlet",
         )
 
-        request, channel = make_request(
+        make_request(
             self.reactor, FakeSite(res), b"GET", b"/_matrix/foo/%E2%98%83?a=%E2%98%83"
         )
 
-        self.assertEqual(request.args, {b"a": ["\N{SNOWMAN}".encode("utf8")]})
         self.assertEqual(got_kwargs, {"room_id": "\N{SNOWMAN}"})
 
     def test_callback_direct_exception(self):
