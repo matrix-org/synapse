@@ -228,7 +228,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
     def _req(self, content_disposition):
 
-        request, channel = make_request(
+        channel = make_request(
             self.reactor,
             FakeSite(self.download_resource),
             "GET",
@@ -324,7 +324,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
     def _test_thumbnail(self, method, expected_body, expected_found):
         params = "?width=32&height=32&method=" + method
-        request, channel = make_request(
+        channel = make_request(
             self.reactor,
             FakeSite(self.thumbnail_resource),
             "GET",

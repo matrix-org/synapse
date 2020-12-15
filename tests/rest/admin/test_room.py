@@ -79,7 +79,7 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
 
         # Test that the admin can still send shutdown
         url = "/_synapse/admin/v1/shutdown_room/" + room_id
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             url.encode("ascii"),
             json.dumps({"new_room_user_id": self.admin_user}),
@@ -103,7 +103,7 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
 
         # Enable world readable
         url = "rooms/%s/state/m.room.history_visibility" % (room_id,)
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             url.encode("ascii"),
             json.dumps({"history_visibility": "world_readable"}),
@@ -113,7 +113,7 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
 
         # Test that the admin can still send shutdown
         url = "/_synapse/admin/v1/shutdown_room/" + room_id
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             url.encode("ascii"),
             json.dumps({"new_room_user_id": self.admin_user}),
@@ -130,7 +130,7 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
         """
 
         url = "rooms/%s/initialSync" % (room_id,)
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok
         )
         self.assertEqual(
@@ -138,7 +138,7 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
         )
 
         url = "events?timeout=0&room_id=" + room_id
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok
         )
         self.assertEqual(
@@ -184,7 +184,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         If the user is not a server admin, an error 403 is returned.
         """
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", self.url, json.dumps({}), access_token=self.other_user_tok,
         )
 
@@ -197,7 +197,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         """
         url = "/_synapse/admin/v1/rooms/!unknown:test/delete"
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", url, json.dumps({}), access_token=self.admin_user_tok,
         )
 
@@ -210,7 +210,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         """
         url = "/_synapse/admin/v1/rooms/invalidroom/delete"
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", url, json.dumps({}), access_token=self.admin_user_tok,
         )
 
@@ -225,7 +225,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         """
         body = json.dumps({"new_room_user_id": "@unknown:test"})
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             self.url,
             content=body.encode(encoding="utf_8"),
@@ -244,7 +244,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         """
         body = json.dumps({"new_room_user_id": "@not:exist.bla"})
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             self.url,
             content=body.encode(encoding="utf_8"),
@@ -262,7 +262,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         """
         body = json.dumps({"block": "NotBool"})
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             self.url,
             content=body.encode(encoding="utf_8"),
@@ -278,7 +278,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         """
         body = json.dumps({"purge": "NotBool"})
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             self.url,
             content=body.encode(encoding="utf_8"),
@@ -304,7 +304,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
         body = json.dumps({"block": True, "purge": True})
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             self.url.encode("ascii"),
             content=body.encode(encoding="utf_8"),
@@ -337,7 +337,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
         body = json.dumps({"block": False, "purge": True})
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             self.url.encode("ascii"),
             content=body.encode(encoding="utf_8"),
@@ -371,7 +371,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
         body = json.dumps({"block": False, "purge": False})
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             self.url.encode("ascii"),
             content=body.encode(encoding="utf_8"),
@@ -418,7 +418,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
         # Test that the admin can still send shutdown
         url = "/_synapse/admin/v1/rooms/%s/delete" % self.room_id
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             url.encode("ascii"),
             json.dumps({"new_room_user_id": self.admin_user}),
@@ -448,7 +448,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
         # Enable world readable
         url = "rooms/%s/state/m.room.history_visibility" % (self.room_id,)
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             url.encode("ascii"),
             json.dumps({"history_visibility": "world_readable"}),
@@ -465,7 +465,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
         # Test that the admin can still send shutdown
         url = "/_synapse/admin/v1/rooms/%s/delete" % self.room_id
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             url.encode("ascii"),
             json.dumps({"new_room_user_id": self.admin_user}),
@@ -530,7 +530,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         """
 
         url = "rooms/%s/initialSync" % (room_id,)
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok
         )
         self.assertEqual(
@@ -538,7 +538,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         )
 
         url = "events?timeout=0&room_id=" + room_id
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok
         )
         self.assertEqual(
@@ -569,7 +569,7 @@ class PurgeRoomTestCase(unittest.HomeserverTestCase):
         self.helper.leave(room_id, user=self.admin_user, tok=self.admin_user_tok)
 
         url = "/_synapse/admin/v1/purge_room"
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             url.encode("ascii"),
             {"room_id": room_id},
@@ -623,7 +623,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
 
         # Request the list of rooms
         url = "/_synapse/admin/v1/rooms"
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok,
         )
 
@@ -704,7 +704,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
                 limit,
                 "name",
             )
-            request, channel = self.make_request(
+            channel = self.make_request(
                 "GET", url.encode("ascii"), access_token=self.admin_user_tok,
             )
             self.assertEqual(
@@ -744,7 +744,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(room_ids, returned_room_ids)
 
         url = "/_synapse/admin/v1/rooms?from=%d&limit=%d" % (start, limit)
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok,
         )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -764,7 +764,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
 
         # Create a new alias to this room
         url = "/_matrix/client/r0/directory/room/%s" % (urllib.parse.quote(test_alias),)
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             url.encode("ascii"),
             {"room_id": room_id},
@@ -794,7 +794,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
 
         # Request the list of rooms
         url = "/_synapse/admin/v1/rooms"
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok,
         )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -835,7 +835,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
             url = "/_matrix/client/r0/directory/room/%s" % (
                 urllib.parse.quote(test_alias),
             )
-            request, channel = self.make_request(
+            channel = self.make_request(
                 "PUT",
                 url.encode("ascii"),
                 {"room_id": room_id},
@@ -875,7 +875,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
             url = "/_synapse/admin/v1/rooms?order_by=%s" % (order_type,)
             if reverse:
                 url += "&dir=b"
-            request, channel = self.make_request(
+            channel = self.make_request(
                 "GET", url.encode("ascii"), access_token=self.admin_user_tok,
             )
             self.assertEqual(200, channel.code, msg=channel.json_body)
@@ -1011,7 +1011,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
                 expected_http_code: The expected http code for the request
             """
             url = "/_synapse/admin/v1/rooms?search_term=%s" % (search_term,)
-            request, channel = self.make_request(
+            channel = self.make_request(
                 "GET", url.encode("ascii"), access_token=self.admin_user_tok,
             )
             self.assertEqual(expected_http_code, channel.code, msg=channel.json_body)
@@ -1072,7 +1072,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         )
 
         url = "/_synapse/admin/v1/rooms/%s" % (room_id_1,)
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok,
         )
         self.assertEqual(200, channel.code, msg=channel.json_body)
@@ -1102,7 +1102,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         room_id_1 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
 
         url = "/_synapse/admin/v1/rooms/%s" % (room_id_1,)
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok,
         )
         self.assertEqual(200, channel.code, msg=channel.json_body)
@@ -1114,7 +1114,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.helper.join(room_id_1, user_1, tok=user_tok_1)
 
         url = "/_synapse/admin/v1/rooms/%s" % (room_id_1,)
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok,
         )
         self.assertEqual(200, channel.code, msg=channel.json_body)
@@ -1124,7 +1124,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.helper.leave(room_id_1, self.admin_user, tok=self.admin_user_tok)
         self.helper.leave(room_id_1, user_1, tok=user_tok_1)
         url = "/_synapse/admin/v1/rooms/%s" % (room_id_1,)
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok,
         )
         self.assertEqual(200, channel.code, msg=channel.json_body)
@@ -1153,7 +1153,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.helper.join(room_id_2, user_3, tok=user_tok_3)
 
         url = "/_synapse/admin/v1/rooms/%s/members" % (room_id_1,)
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok,
         )
         self.assertEqual(200, channel.code, msg=channel.json_body)
@@ -1164,7 +1164,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.json_body["total"], 3)
 
         url = "/_synapse/admin/v1/rooms/%s/members" % (room_id_2,)
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok,
         )
         self.assertEqual(200, channel.code, msg=channel.json_body)
@@ -1204,7 +1204,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         """
         body = json.dumps({"user_id": self.second_user_id})
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             self.url,
             content=body.encode(encoding="utf_8"),
@@ -1220,7 +1220,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         """
         body = json.dumps({"unknown_parameter": "@unknown:test"})
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             self.url,
             content=body.encode(encoding="utf_8"),
@@ -1236,7 +1236,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         """
         body = json.dumps({"user_id": "@unknown:test"})
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             self.url,
             content=body.encode(encoding="utf_8"),
@@ -1252,7 +1252,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         """
         body = json.dumps({"user_id": "@not:exist.bla"})
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             self.url,
             content=body.encode(encoding="utf_8"),
@@ -1272,7 +1272,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         body = json.dumps({"user_id": self.second_user_id})
         url = "/_synapse/admin/v1/join/!unknown:test"
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             url,
             content=body.encode(encoding="utf_8"),
@@ -1289,7 +1289,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         body = json.dumps({"user_id": self.second_user_id})
         url = "/_synapse/admin/v1/join/invalidroom"
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             url,
             content=body.encode(encoding="utf_8"),
@@ -1308,7 +1308,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         """
         body = json.dumps({"user_id": self.second_user_id})
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             self.url,
             content=body.encode(encoding="utf_8"),
@@ -1320,7 +1320,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
 
         # Validate if user is a member of the room
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/_matrix/client/r0/joined_rooms", access_token=self.second_tok,
         )
         self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -1337,7 +1337,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v1/join/{}".format(private_room_id)
         body = json.dumps({"user_id": self.second_user_id})
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             url,
             content=body.encode(encoding="utf_8"),
@@ -1367,7 +1367,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
 
         # Validate if server admin is a member of the room
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/_matrix/client/r0/joined_rooms", access_token=self.admin_user_tok,
         )
         self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -1378,7 +1378,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v1/join/{}".format(private_room_id)
         body = json.dumps({"user_id": self.second_user_id})
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             url,
             content=body.encode(encoding="utf_8"),
@@ -1389,7 +1389,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
 
         # Validate if user is a member of the room
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/_matrix/client/r0/joined_rooms", access_token=self.second_tok,
         )
         self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -1406,7 +1406,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v1/join/{}".format(private_room_id)
         body = json.dumps({"user_id": self.second_user_id})
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             url,
             content=body.encode(encoding="utf_8"),
@@ -1418,7 +1418,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
 
         # Validate if user is a member of the room
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/_matrix/client/r0/joined_rooms", access_token=self.second_tok,
         )
         self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])

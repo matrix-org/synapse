@@ -67,9 +67,7 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
 
     def register(self, expected_response: int, body: JsonDict) -> FakeChannel:
         """Make a register request."""
-        request, channel = self.make_request(
-            "POST", "register", body
-        )  # type: SynapseRequest, FakeChannel
+        channel = self.make_request("POST", "register", body)
 
         self.assertEqual(channel.code, expected_response)
         return channel
@@ -81,12 +79,12 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         if post_session is None:
             post_session = session
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "auth/m.login.recaptcha/fallback/web?session=" + session
-        )  # type: SynapseRequest, FakeChannel
+        )
         self.assertEqual(channel.code, 200)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "auth/m.login.recaptcha/fallback/web?session="
             + post_session
@@ -184,7 +182,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
 
     def get_device_ids(self, access_token: str) -> List[str]:
         # Get the list of devices so one can be deleted.
-        _, channel = self.make_request("GET", "devices", access_token=access_token,)
+        channel = self.make_request("GET", "devices", access_token=access_token,)
         self.assertEqual(channel.code, 200)
         return [d["device_id"] for d in channel.json_body["devices"]]
 
@@ -196,9 +194,9 @@ class UIAuthTests(unittest.HomeserverTestCase):
         body: Union[bytes, JsonDict] = b"",
     ) -> FakeChannel:
         """Delete an individual device."""
-        request, channel = self.make_request(
+        channel = self.make_request(
             "DELETE", "devices/" + device, body, access_token=access_token,
-        )  # type: SynapseRequest, FakeChannel
+        )
 
         # Ensure the response is sane.
         self.assertEqual(channel.code, expected_response)
@@ -209,9 +207,9 @@ class UIAuthTests(unittest.HomeserverTestCase):
         """Delete 1 or more devices."""
         # Note that this uses the delete_devices endpoint so that we can modify
         # the payload half-way through some tests.
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", "delete_devices", body, access_token=self.user_tok,
-        )  # type: SynapseRequest, FakeChannel
+        )
 
         # Ensure the response is sane.
         self.assertEqual(channel.code, expected_response)

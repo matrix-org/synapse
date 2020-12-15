@@ -84,7 +84,7 @@ class JsonResourceTests(unittest.TestCase):
             "GET", [re.compile("^/_matrix/foo$")], _callback, "test_servlet"
         )
 
-        _, channel = make_request(self.reactor, FakeSite(res), b"GET", b"/_matrix/foo")
+        channel = make_request(self.reactor, FakeSite(res), b"GET", b"/_matrix/foo")
 
         self.assertEqual(channel.result["code"], b"500")
 
@@ -108,7 +108,7 @@ class JsonResourceTests(unittest.TestCase):
             "GET", [re.compile("^/_matrix/foo$")], _callback, "test_servlet"
         )
 
-        _, channel = make_request(self.reactor, FakeSite(res), b"GET", b"/_matrix/foo")
+        channel = make_request(self.reactor, FakeSite(res), b"GET", b"/_matrix/foo")
 
         self.assertEqual(channel.result["code"], b"500")
 
@@ -126,7 +126,7 @@ class JsonResourceTests(unittest.TestCase):
             "GET", [re.compile("^/_matrix/foo$")], _callback, "test_servlet"
         )
 
-        _, channel = make_request(self.reactor, FakeSite(res), b"GET", b"/_matrix/foo")
+        channel = make_request(self.reactor, FakeSite(res), b"GET", b"/_matrix/foo")
 
         self.assertEqual(channel.result["code"], b"403")
         self.assertEqual(channel.json_body["error"], "Forbidden!!one!")
@@ -148,9 +148,7 @@ class JsonResourceTests(unittest.TestCase):
             "GET", [re.compile("^/_matrix/foo$")], _callback, "test_servlet"
         )
 
-        _, channel = make_request(
-            self.reactor, FakeSite(res), b"GET", b"/_matrix/foobar"
-        )
+        channel = make_request(self.reactor, FakeSite(res), b"GET", b"/_matrix/foobar")
 
         self.assertEqual(channel.result["code"], b"400")
         self.assertEqual(channel.json_body["error"], "Unrecognized request")
@@ -172,7 +170,7 @@ class JsonResourceTests(unittest.TestCase):
         )
 
         # The path was registered as GET, but this is a HEAD request.
-        _, channel = make_request(self.reactor, FakeSite(res), b"HEAD", b"/_matrix/foo")
+        channel = make_request(self.reactor, FakeSite(res), b"HEAD", b"/_matrix/foo")
 
         self.assertEqual(channel.result["code"], b"200")
         self.assertNotIn("body", channel.result)
@@ -204,7 +202,7 @@ class OptionsResourceTests(unittest.TestCase):
         )
 
         # render the request and return the channel
-        _, channel = make_request(self.reactor, site, method, path, shorthand=False)
+        channel = make_request(self.reactor, site, method, path, shorthand=False)
         return channel
 
     def test_unknown_options_request(self):
@@ -277,7 +275,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
         res = WrapHtmlRequestHandlerTests.TestResource()
         res.callback = callback
 
-        _, channel = make_request(self.reactor, FakeSite(res), b"GET", b"/path")
+        channel = make_request(self.reactor, FakeSite(res), b"GET", b"/path")
 
         self.assertEqual(channel.result["code"], b"200")
         body = channel.result["body"]
@@ -295,7 +293,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
         res = WrapHtmlRequestHandlerTests.TestResource()
         res.callback = callback
 
-        _, channel = make_request(self.reactor, FakeSite(res), b"GET", b"/path")
+        channel = make_request(self.reactor, FakeSite(res), b"GET", b"/path")
 
         self.assertEqual(channel.result["code"], b"301")
         headers = channel.result["headers"]
@@ -316,7 +314,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
         res = WrapHtmlRequestHandlerTests.TestResource()
         res.callback = callback
 
-        _, channel = make_request(self.reactor, FakeSite(res), b"GET", b"/path")
+        channel = make_request(self.reactor, FakeSite(res), b"GET", b"/path")
 
         self.assertEqual(channel.result["code"], b"304")
         headers = channel.result["headers"]
@@ -335,7 +333,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
         res = WrapHtmlRequestHandlerTests.TestResource()
         res.callback = callback
 
-        _, channel = make_request(self.reactor, FakeSite(res), b"HEAD", b"/path")
+        channel = make_request(self.reactor, FakeSite(res), b"HEAD", b"/path")
 
         self.assertEqual(channel.result["code"], b"200")
         self.assertNotIn("body", channel.result)
