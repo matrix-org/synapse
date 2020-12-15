@@ -796,8 +796,6 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.handler._exchange_code = simple_async_mock(return_value={})
         self.handler._parse_id_token = simple_async_mock(return_value=userinfo)
         self.handler._fetch_userinfo = simple_async_mock(return_value=userinfo)
-        auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = simple_async_mock()
 
         state = "state"
         session = self.handler._generate_oidc_session_token(
