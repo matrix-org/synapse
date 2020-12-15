@@ -19,7 +19,6 @@ import os
 import re
 from email.parser import Parser
 from typing import Optional
-from urllib.parse import urlencode
 
 import pkg_resources
 
@@ -268,20 +267,13 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         # Now POST to the same endpoint, mimicking the same behaviour as clicking the
         # password reset confirm button
 
-        # Send arguments as url-encoded form data, matching the template's behaviour
-        form_args = []
-        for key, value_list in request.args.items():
-            for value in value_list:
-                arg = (key, value)
-                form_args.append(arg)
-
         # Confirm the password reset
         request, channel = make_request(
             self.reactor,
             FakeSite(self.submit_token_resource),
             "POST",
             path,
-            content=urlencode(form_args).encode("utf8"),
+            content=b"",
             shorthand=False,
             content_is_form=True,
         )
