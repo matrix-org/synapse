@@ -5,21 +5,18 @@ FROM matrixdotorg/synapse
 RUN apt-get update
 RUN apt-get install -y supervisor redis nginx
 
-# A script to read environment variables and create the necessary
-# files to run the desired worker configuration
-COPY ./docker/create_worker_config_files.py /create_worker_config_files.py
-RUN /create_worker_config_files.py
-
-# Create a volume for logging. The official Synapse docker image
-# only logs to console, however this is inconvenient for multi-process
-# containers.
-VOLUME ["/logs"]
+# Copy the worker process and log configuration files
+COPY ./docker/workers /conf/workers/
 
 # Expose Synapse client, ACME challenge and federation ports
 EXPOSE 8008/tcp 8009/tcp 8448/tcp
 
-# Start supervisord
-COPY ./docker/worker_conf/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-ENTRYPOINT ["/usr/bin/supervisord"]
+# Volume for user-editable config files, logs etc.
+VOLUME ["/data"]
 
-# TODO: Healthcheck? Can we ask supervisord?
+# A script to read environment variables and create the necessary
+# files to run the desired worker configuration. Will start supervisord.
+COPY ./docker/configure_workers_and_start.py /configure_workers_and_start.py
+ENTRYPOINT ["/configure_workers_and_start.py"]
+
+# TODO: Healthcheck? Which worker to ask? Can we ask supervisord?
