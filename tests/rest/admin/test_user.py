@@ -25,6 +25,7 @@ from mock import Mock
 import synapse.rest.admin
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, HttpResponseException, ResourceLimitError
+from synapse.api.room_versions import RoomVersions
 from synapse.rest.client.v1 import login, logout, profile, room
 from synapse.rest.client.v2_alpha import devices, sync
 
@@ -166,7 +167,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
                 "mac": want_mac,
             }
         )
-        channel = self.make_request("POST", self.url, body.encode("utf8"))
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@bob:test", channel.json_body["user_id"])
@@ -1244,17 +1245,6 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
-    def test_user_is_not_local(self):
-        """
-        Tests that a lookup for a user that is not a local returns a 400
-        """
-        url = "/_synapse/admin/v1/users/@unknown_person:unknown_domain/joined_rooms"
-
-        channel = self.make_request("GET", url, access_token=self.admin_user_tok,)
-
-        self.assertEqual(400, channel.code, msg=channel.json_body)
-        self.assertEqual("Can only lookup local users", channel.json_body["error"])
-
     def test_no_memberships(self):
         """
         Tests that a normal lookup for rooms is successfully
@@ -1283,6 +1273,49 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(number_rooms, channel.json_body["total"])
         self.assertEqual(number_rooms, len(channel.json_body["joined_rooms"]))
+
+    def test_get_rooms_with_nonlocal_user(self):
+        """
+        Tests that a normal lookup for rooms is successful with a non-local user
+        """
+
+        other_user_tok = self.login("user", "pass")
+        event_builder_factory = self.hs.get_event_builder_factory()
+        event_creation_handler = self.hs.get_event_creation_handler()
+        storage = self.hs.get_storage()
+
+        # Create two rooms, one with a local user only and one with both a local
+        # and remote user.
+        self.helper.create_room_as(self.other_user, tok=other_user_tok)
+        local_and_remote_room_id = self.helper.create_room_as(
+            self.other_user, tok=other_user_tok
+        )
+
+        # Add a remote user to the room.
+        builder = event_builder_factory.for_room_version(
+            RoomVersions.V1,
+            {
+                "type": "m.room.member",
+                "sender": "@joiner:remote_hs",
+                "state_key": "@joiner:remote_hs",
+                "room_id": local_and_remote_room_id,
+                "content": {"membership": "join"},
+            },
+        )
+
+        event, context = self.get_success(
+            event_creation_handler.create_new_client_event(builder)
+        )
+
+        self.get_success(storage.persistence.persist_event(event, context))
+
+        # Now get rooms
+        url = "/_synapse/admin/v1/users/@joiner:remote_hs/joined_rooms"
+        channel = self.make_request("GET", url, access_token=self.admin_user_tok,)
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(1, channel.json_body["total"])
+        self.assertEqual([local_and_remote_room_id], channel.json_body["joined_rooms"])
 
 
 class PushersRestTestCase(unittest.HomeserverTestCase):
