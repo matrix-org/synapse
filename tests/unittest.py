@@ -20,7 +20,7 @@ import hmac
 import inspect
 import logging
 import time
-from typing import Dict, Optional, Tuple, Type, TypeVar, Union, overload
+from typing import Dict, Optional, Type, TypeVar, Union
 
 from mock import Mock, patch
 

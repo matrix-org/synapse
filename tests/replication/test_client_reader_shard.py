@@ -14,11 +14,10 @@
 # limitations under the License.
 import logging
 
-from synapse.http.site import SynapseRequest
 from synapse.rest.client.v2_alpha import register
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
-from tests.server import FakeChannel, make_request
+from tests.server import make_request
 
 logger = logging.getLogger(__name__)
 
