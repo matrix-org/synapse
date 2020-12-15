@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import abc
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict
 
 from synapse.types import RoomStreamToken
 
@@ -45,9 +45,7 @@ class Pusher(metaclass=abc.ABCMeta):
         # clock components.
         max_stream_ordering = max_token.stream
 
-        self.max_stream_ordering = max(
-            max_stream_ordering, self.max_stream_ordering
-        )
+        self.max_stream_ordering = max(max_stream_ordering, self.max_stream_ordering)
         self._start_processing()
 
     @abc.abstractmethod

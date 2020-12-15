@@ -26,7 +26,6 @@ from synapse.events import EventBase
 from synapse.logging import opentracing
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import Pusher, PusherConfigException
-from synapse.types import RoomStreamToken
 
 from . import push_rule_evaluator, push_tools
 

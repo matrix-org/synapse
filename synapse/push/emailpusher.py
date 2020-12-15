@@ -22,7 +22,6 @@ from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import Pusher
 from synapse.push.mailer import Mailer
-from synapse.types import RoomStreamToken
 
 if TYPE_CHECKING:
     from synapse.app.homeserver import HomeServer
