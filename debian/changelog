@@ -1,3 +1,15 @@
+matrix-synapse-py3 (1.24.0) stable; urgency=medium
+
+  * New synapse release 1.24.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 09 Dec 2020 10:14:30 +0000
+
+matrix-synapse-py3 (1.23.1) stable; urgency=medium
+
+  * New synapse release 1.23.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 09 Dec 2020 10:40:39 +0000
+
 matrix-synapse-py3 (1.23.0) stable; urgency=medium
 
   * New synapse release 1.23.0.

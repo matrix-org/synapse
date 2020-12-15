@@ -1,0 +1,1 @@
+Fix occasional deadlock when handling SIGHUP.

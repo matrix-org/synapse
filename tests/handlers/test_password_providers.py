@@ -432,6 +432,29 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
 
     @override_config(
         {
+            **providers_config(CustomAuthProvider),
+            "password_config": {"enabled": False, "localdb_enabled": False},
+        }
+    )
+    def test_custom_auth_password_disabled_localdb_enabled(self):
+        """Check the localdb_enabled == enabled == False
+
+        Regression test for https://github.com/matrix-org/synapse/issues/8914: check
+        that setting *both* `localdb_enabled` *and* `password: enabled` to False doesn't
+        cause an exception.
+        """
+        self.register_user("localuser", "localpass")
+
+        flows = self._get_login_flows()
+        self.assertEqual(flows, [{"type": "test.login_type"}] + ADDITIONAL_LOGIN_FLOWS)
+
+        # login shouldn't work and should be rejected with a 400 ("unknown login type")
+        channel = self._send_password_login("localuser", "localpass")
+        self.assertEqual(channel.code, 400, channel.result)
+        mock_password_provider.check_auth.assert_not_called()
+
+    @override_config(
+        {
             **providers_config(PasswordCustomAuthProvider),
             "password_config": {"enabled": False},
         }
