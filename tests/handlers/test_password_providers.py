@@ -17,7 +17,7 @@
 
 from typing import Any, Type, Union
 
-from mock import Mock
+from mock import ANY, Mock
 
 from twisted.internet import defer
 
@@ -86,6 +86,23 @@ class PasswordCustomAuthProvider:
 
     def check_auth(self, *args):
         return mock_password_provider.check_auth(*args)
+
+
+class CustomSkipUiAuthProvider:
+    """A password_provider which implements skip_ui_auth."""
+
+    @staticmethod
+    def parse_config(self):
+        pass
+
+    def __init__(self, config, account_handler):
+        pass
+
+    def get_supported_login_types(self):
+        return {}
+
+    def skip_ui_auth(self, *args, **kwargs):
+        return mock_password_provider.skip_ui_auth(*args, **kwargs)
 
 
 def providers_config(*providers: Type[Any]) -> dict:
@@ -549,6 +566,37 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         # ("unknown login type")
         channel = self._send_password_login("localuser", "localpass")
         self.assertEqual(channel.code, 400, channel.result)
+
+    @override_config(providers_config(CustomSkipUiAuthProvider))
+    def test_skip_ui_auth(self):
+        # The login flows should not be affected.
+        flows = self._get_login_flows()
+        self.assertEqual(flows, [{"type": "m.login.password"}] + ADDITIONAL_LOGIN_FLOWS)
+
+        self.register_user("localuser", "localpass")
+
+        # log in twice, to get two devices
+        tok1 = self.login("localuser", "localpass", device_id="dev1")
+        self.login("localuser", "localpass", device_id="dev2")
+
+        # first delete should give a 401
+        mock_password_provider.skip_ui_auth.return_value = False
+        session = self._start_delete_device_session(tok1, "dev2")
+        mock_password_provider.skip_ui_auth.assert_called_once_with(
+            user_id="@localuser:test", device_id="dev1", request=ANY
+        )
+        mock_password_provider.reset_mock()
+
+        # Wrong password
+        channel = self._authed_delete_device(tok1, "dev2", session, "localuser", "xxx")
+        self.assertEqual(channel.code, 401)  # XXX why not a 403?
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
+        mock_password_provider.reset_mock()
+
+        # Wrong password, but skip UI auth
+        mock_password_provider.skip_ui_auth.return_value = True
+        channel = self._authed_delete_device(tok1, "dev2", session, "localuser", "xxx")
+        self.assertEqual(channel.code, 200)
 
     def _get_login_flows(self) -> JsonDict:
         _, channel = self.make_request("GET", "/_matrix/client/r0/login")

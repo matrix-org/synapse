@@ -326,6 +326,14 @@ class AuthHandler(BaseHandler):
 
         user_id = requester.user.to_string()
 
+        # Check if any of our auth providers want us to skip UI auth.
+        for provider in self.password_providers:
+            skip_ui_auth = await provider.skip_ui_auth(
+                user_id, requester.device_id, request,
+            )
+            if skip_ui_auth:
+                return {}, ""
+
         # Check if we should be ratelimited due to too many previous failed attempts
         self._failed_uia_attempts_ratelimiter.ratelimit(user_id, update=False)
 
@@ -1627,6 +1635,34 @@ class PasswordProvider:
             return result, None
 
         return result
+
+    async def skip_ui_auth(
+        self, user_id: str, device_id: str, request: SynapseRequest
+    ) -> bool:
+        """Check if the user needs to perform UI authentication for this request.
+
+        The wrapper calls skip_ui_auth() if the underlying password provider
+        supports it, otherwise falls back to requiring UI auth.
+
+        Args:
+            user_id: The MXID of the user.
+            device_id: The device ID requesting the operation.
+            request: The request which triggered UI auth.
+
+        Returns:
+            True if the user-interactive authentication should continue, or
+            False if it should be skipped.
+        """
+        g = getattr(self._pp, "skip_ui_auth", None)
+        # If the method is not provided, require UI auth.
+        if not g:
+            return False
+
+        # This might return an awaitable, if it does block the log out
+        # until it completes.
+        return await maybe_awaitable(
+            g(user_id=user_id, device_id=device_id, request=request)
+        )
 
     async def on_logged_out(
         self, user_id: str, device_id: Optional[str], access_token: str

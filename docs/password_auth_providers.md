@@ -112,6 +112,17 @@ Password auth provider classes may optionally provide the following methods:
   The method should return an `Awaitable` object, which resolves
   to `True` if authentication is successful, and `False` if not.
 
+* `skip_ui_auth(self, user_id, device_id, request)`
+
+  This method, if implemented, is called before a user is prompted to perform
+  user-interactive authentication. It is passed the qualified user ID, and the
+  device ID making the request.
+
+  The method should return an `Awaitable` object, which resolves
+  to `True` if the user-interactive authentication process should be skipped
+  (and the request allowed to proceed),  and `False` if the user-interactive
+  authentication process should continue as normal.
+
 * `on_logged_out(self, user_id, device_id, access_token)`
 
   This method, if implemented, is called when a user logs out. It is
