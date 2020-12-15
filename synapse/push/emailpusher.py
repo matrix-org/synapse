@@ -93,17 +93,6 @@ class EmailPusher(Pusher):
                 pass
             self.timed_call = None
 
-    def on_new_notifications(self, max_token: RoomStreamToken) -> None:
-        # We just use the minimum stream ordering and ignore the vector clock
-        # component. This is safe to do as long as we *always* ignore the vector
-        # clock components.
-        max_stream_ordering = max_token.stream
-
-        self.max_stream_ordering = max(
-            max_stream_ordering, self.max_stream_ordering
-        )
-        self._start_processing()
-
     def on_new_receipts(self, min_stream_id: int, max_stream_id: int) -> None:
         # We could wake up and cancel the timer but there tend to be quite a
         # lot of read receipts so it's probably less work to just let the

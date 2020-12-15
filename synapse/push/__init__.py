@@ -39,8 +39,20 @@ class Pusher(metaclass=abc.ABCMeta):
         # because of potential out-of-order event serialisation.
         self.max_stream_ordering = self.store.get_room_max_stream_ordering()
 
-    @abc.abstractmethod
     def on_new_notifications(self, max_token: RoomStreamToken) -> None:
+        # We just use the minimum stream ordering and ignore the vector clock
+        # component. This is safe to do as long as we *always* ignore the vector
+        # clock components.
+        max_stream_ordering = max_token.stream
+
+        self.max_stream_ordering = max(
+            max_stream_ordering, self.max_stream_ordering
+        )
+        self._start_processing()
+
+    @abc.abstractmethod
+    def _start_processing(self):
+        """Start processing push notifications."""
         raise NotImplementedError()
 
     @abc.abstractmethod
