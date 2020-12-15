@@ -36,9 +36,8 @@ class Pusher(metaclass=abc.ABCMeta):
         # This is the highest stream ordering we know it's safe to process.
         # When new events arrive, we'll be given a window of new events: we
         # should honour this rather than just looking for anything higher
-        # because of potential out-of-order event serialisation. This starts
-        # off as None though as we don't know any better.
-        self.max_stream_ordering = None  # type: Optional[int]
+        # because of potential out-of-order event serialisation.
+        self.max_stream_ordering = self.store.get_room_max_stream_ordering()
 
     @abc.abstractmethod
     def on_new_notifications(self, max_token: RoomStreamToken) -> None:

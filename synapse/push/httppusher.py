@@ -129,7 +129,7 @@ class HttpPusher(Pusher):
         max_stream_ordering = max_token.stream
 
         self.max_stream_ordering = max(
-            max_stream_ordering, self.max_stream_ordering or 0
+            max_stream_ordering, self.max_stream_ordering
         )
         self._start_processing()
 

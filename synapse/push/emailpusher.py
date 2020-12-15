@@ -99,12 +99,9 @@ class EmailPusher(Pusher):
         # clock components.
         max_stream_ordering = max_token.stream
 
-        if self.max_stream_ordering:
-            self.max_stream_ordering = max(
-                max_stream_ordering, self.max_stream_ordering
-            )
-        else:
-            self.max_stream_ordering = max_stream_ordering
+        self.max_stream_ordering = max(
+            max_stream_ordering, self.max_stream_ordering
+        )
         self._start_processing()
 
     def on_new_receipts(self, min_stream_id: int, max_stream_id: int) -> None:
