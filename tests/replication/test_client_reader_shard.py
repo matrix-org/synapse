@@ -48,7 +48,7 @@ class ClientReaderTestCase(BaseMultiWorkerStreamTestCase):
             "register",
             {"username": "user", "type": "m.login.password", "password": "bar"},
         )  # type: SynapseRequest, FakeChannel
-        self.assertEqual(request_1.code, 401)
+        self.assertEqual(channel_1.code, 401)
 
         # Grab the session
         session = channel_1.json_body["session"]
@@ -61,7 +61,7 @@ class ClientReaderTestCase(BaseMultiWorkerStreamTestCase):
             "register",
             {"auth": {"session": session, "type": "m.login.dummy"}},
         )  # type: SynapseRequest, FakeChannel
-        self.assertEqual(request_2.code, 200)
+        self.assertEqual(channel_2.code, 200)
 
         # We're given a registered user.
         self.assertEqual(channel_2.json_body["user_id"], "@user:test")
@@ -80,7 +80,7 @@ class ClientReaderTestCase(BaseMultiWorkerStreamTestCase):
             "register",
             {"username": "user", "type": "m.login.password", "password": "bar"},
         )  # type: SynapseRequest, FakeChannel
-        self.assertEqual(request_1.code, 401)
+        self.assertEqual(channel_1.code, 401)
 
         # Grab the session
         session = channel_1.json_body["session"]
@@ -94,7 +94,7 @@ class ClientReaderTestCase(BaseMultiWorkerStreamTestCase):
             "register",
             {"auth": {"session": session, "type": "m.login.dummy"}},
         )  # type: SynapseRequest, FakeChannel
-        self.assertEqual(request_2.code, 200)
+        self.assertEqual(channel_2.code, 200)
 
         # We're given a registered user.
         self.assertEqual(channel_2.json_body["user_id"], "@user:test")

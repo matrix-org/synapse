@@ -559,7 +559,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", "account/deactivate", request_data, access_token=tok
         )
-        self.assertEqual(request.code, 200)
+        self.assertEqual(channel.code, 200)
 
         self.reactor.advance(datetime.timedelta(days=8).total_seconds())
 

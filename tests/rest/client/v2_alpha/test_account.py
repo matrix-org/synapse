@@ -353,7 +353,7 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
 
         # Check that this access token has been invalidated.
         request, channel = self.make_request("GET", "account/whoami")
-        self.assertEqual(request.code, 401)
+        self.assertEqual(channel.code, 401)
 
     def test_pending_invites(self):
         """Tests that deactivating a user rejects every pending invite for them."""
@@ -410,7 +410,7 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", "account/deactivate", request_data, access_token=tok
         )
-        self.assertEqual(request.code, 200)
+        self.assertEqual(channel.code, 200)
 
 
 class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):

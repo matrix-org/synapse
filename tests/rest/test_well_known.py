@@ -32,7 +32,7 @@ class WellKnownTests(unittest.HomeserverTestCase):
             "GET", "/.well-known/matrix/client", shorthand=False
         )
 
-        self.assertEqual(request.code, 200)
+        self.assertEqual(channel.code, 200)
         self.assertEqual(
             channel.json_body,
             {
@@ -48,4 +48,4 @@ class WellKnownTests(unittest.HomeserverTestCase):
             "GET", "/.well-known/matrix/client", shorthand=False
         )
 
-        self.assertEqual(request.code, 404)
+        self.assertEqual(channel.code, 404)

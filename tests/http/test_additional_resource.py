@@ -48,7 +48,7 @@ class AdditionalResourceTests(HomeserverTestCase):
 
         request, channel = make_request(self.reactor, FakeSite(resource), "GET", "/")
 
-        self.assertEqual(request.code, 200)
+        self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body, {"some_key": "some_value_async"})
 
     def test_sync(self):
@@ -57,5 +57,5 @@ class AdditionalResourceTests(HomeserverTestCase):
 
         request, channel = make_request(self.reactor, FakeSite(resource), "GET", "/")
 
-        self.assertEqual(request.code, 200)
+        self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body, {"some_key": "some_value_sync"})

@@ -66,7 +66,7 @@ class WorkerAuthenticationTestCase(BaseMultiWorkerStreamTestCase):
             "register",
             {"username": "user", "type": "m.login.password", "password": "bar"},
         )  # type: SynapseRequest, FakeChannel
-        self.assertEqual(request_1.code, 401)
+        self.assertEqual(channel_1.code, 401)
 
         # Grab the session
         session = channel_1.json_body["session"]
@@ -84,7 +84,7 @@ class WorkerAuthenticationTestCase(BaseMultiWorkerStreamTestCase):
         """With no authentication the request should finish.
         """
         request, channel = self._test_register()
-        self.assertEqual(request.code, 200)
+        self.assertEqual(channel.code, 200)
 
         # We're given a registered user.
         self.assertEqual(channel.json_body["user_id"], "@user:test")
@@ -94,7 +94,7 @@ class WorkerAuthenticationTestCase(BaseMultiWorkerStreamTestCase):
         """If the main process expects a secret that is not provided, an error results.
         """
         request, channel = self._test_register()
-        self.assertEqual(request.code, 500)
+        self.assertEqual(channel.code, 500)
 
     @override_config(
         {
@@ -106,14 +106,14 @@ class WorkerAuthenticationTestCase(BaseMultiWorkerStreamTestCase):
         """If the main process receives the wrong secret, an error results.
         """
         request, channel = self._test_register()
-        self.assertEqual(request.code, 500)
+        self.assertEqual(channel.code, 500)
 
     @override_config({"worker_replication_secret": "my-secret"})
     def test_authorized(self):
         """The request should finish when the worker provides the authentication header.
         """
         request, channel = self._test_register()
-        self.assertEqual(request.code, 200)
+        self.assertEqual(channel.code, 200)
 
         # We're given a registered user.
         self.assertEqual(channel.json_body["user_id"], "@user:test")

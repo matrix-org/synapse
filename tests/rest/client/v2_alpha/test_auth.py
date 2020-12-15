@@ -71,7 +71,7 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
             "POST", "register", body
         )  # type: SynapseRequest, FakeChannel
 
-        self.assertEqual(request.code, expected_response)
+        self.assertEqual(channel.code, expected_response)
         return channel
 
     def recaptcha(
@@ -84,7 +84,7 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "auth/m.login.recaptcha/fallback/web?session=" + session
         )  # type: SynapseRequest, FakeChannel
-        self.assertEqual(request.code, 200)
+        self.assertEqual(channel.code, 200)
 
         request, channel = self.make_request(
             "POST",
@@ -92,7 +92,7 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
             + post_session
             + "&g-recaptcha-response=a",
         )
-        self.assertEqual(request.code, expected_post_response)
+        self.assertEqual(channel.code, expected_post_response)
 
         # The recaptcha handler is called with the response given
         attempts = self.recaptcha_checker.recaptcha_attempts
@@ -201,7 +201,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
         )  # type: SynapseRequest, FakeChannel
 
         # Ensure the response is sane.
-        self.assertEqual(request.code, expected_response)
+        self.assertEqual(channel.code, expected_response)
 
         return channel
 
@@ -214,7 +214,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
         )  # type: SynapseRequest, FakeChannel
 
         # Ensure the response is sane.
-        self.assertEqual(request.code, expected_response)
+        self.assertEqual(channel.code, expected_response)
 
         return channel
 
