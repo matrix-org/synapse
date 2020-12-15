@@ -648,7 +648,7 @@ class Auth:
             )
             if (
                 visibility
-                and visibility.content["history_visibility"] == "world_readable"
+                and visibility.content.get("history_visibility") == "world_readable"
             ):
                 return Membership.JOIN, None
             raise AuthError(
