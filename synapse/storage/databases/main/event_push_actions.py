@@ -209,7 +209,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         self,
         user_id: str,
         min_stream_ordering: int,
-        max_stream_ordering: int,
+        max_stream_ordering: Optional[int],
         limit: int = 20,
     ) -> List[dict]:
         """Get a list of the most recent unread push actions for a given user,
@@ -314,7 +314,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         self,
         user_id: str,
         min_stream_ordering: int,
-        max_stream_ordering: int,
+        max_stream_ordering: Optional[int],
         limit: int = 20,
     ) -> List[dict]:
         """Get a list of the most recent unread push actions for a given user,
