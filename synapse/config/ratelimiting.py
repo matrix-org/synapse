@@ -102,6 +102,11 @@ class RatelimitConfig(Config):
             defaults={"per_second": 0.01, "burst_count": 3},
         )
 
+        self.rc_send_to_device = RateLimitConfig(
+            config.get("rc_send_to_device", {}),
+            defaults={"per_second": 0.1, "burst_count": 3},
+        )
+
         self.rc_federation_edu = RateLimitConfig(
             config.get("rc_federation", {}).get("edu", {}),
             defaults={"per_second": 0.1, "burst_count": 3},
@@ -136,6 +141,7 @@ class RatelimitConfig(Config):
         #     users are joining rooms the server is already in (this is cheap) vs
         #     "remote" for when users are trying to join rooms not on the server (which
         #     can be more expensive)
+        #   - one for ratelimiting how frequently to-device messages are sent
         #   - one that reatelimits EDUs received over federation based on the origin
         #     and type
         #
@@ -171,6 +177,10 @@ class RatelimitConfig(Config):
         #  remote:
         #    per_second: 0.01
         #    burst_count: 3
+        #
+        #rc_send_to_device:
+        #  per_second: 0.1
+        #  burst_count: 3
         #
         #rc_federation:
         #  edu:
