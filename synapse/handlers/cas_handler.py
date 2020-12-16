@@ -21,7 +21,7 @@ import attr
 
 from twisted.web.client import PartialDownloadError
 
-from synapse.api.errors import Codes, HttpResponseException, LoginError
+from synapse.api.errors import HttpResponseException
 from synapse.http.site import SynapseRequest
 from synapse.types import UserID, map_username_to_mxid_localpart
 
@@ -71,6 +71,8 @@ class CasHandler:
         self._cas_required_attributes = hs.config.cas_required_attributes
 
         self._http_client = hs.get_proxied_http_client()
+
+        self._sso_handler = hs.get_sso_handler()
 
     def _build_service_param(self, args: Dict[str, str]) -> str:
         """
@@ -229,19 +231,32 @@ class CasHandler:
         if session:
             args["session"] = session
 
-        cas_response = await self._validate_ticket(ticket, args)
+        try:
+            cas_response = await self._validate_ticket(ticket, args)
+        except CasError as e:
+            logger.exception("Could not validate ticket")
+            self._sso_handler.render_error(request, e.error, e.error_description)
+            return
 
         for required_attribute, required_value in self._cas_required_attributes.items():
             # If required attribute was not in CAS Response - Forbidden
             if required_attribute not in cas_response.attributes:
-                raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
+                self._sso_handler.render_error(
+                    request, "unauthorised", "You are not authorised to log in here."
+                )
+                return
 
             # Also need to check value
             if required_value is not None:
                 actual_value = cas_response.attributes[required_attribute]
                 # If required attribute value does not match expected - Forbidden
                 if required_value != actual_value:
-                    raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
+                    self._sso_handler.render_error(
+                        request,
+                        "unauthorised",
+                        "You are not authorised to log in here.",
+                    )
+                    return
 
         # Pull out the user-agent and IP from the request.
         user_agent = request.get_user_agent("")
