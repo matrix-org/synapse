@@ -110,6 +110,9 @@ class Measure:
         self.name = name
         curr_context = current_context()
         if not curr_context:
+            logger.warning(
+                "Starting metrics collection from sentinel context: metrics will be lost"
+            )
             parent_context = None
         else:
             assert isinstance(curr_context, LoggingContext)
