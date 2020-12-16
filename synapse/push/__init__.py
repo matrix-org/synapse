@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 @attr.s(slots=True)
 class PusherConfig:
     """Parameters necessary to configure a pusher."""
+
     id = attr.ib(type=Optional[str])
     user_name = attr.ib(type=str)
     access_token = attr.ib(type=Optional[int])
@@ -60,6 +61,7 @@ class PusherConfig:
 @attr.s(slots=True)
 class ThrottleParams:
     """Parameters for controlling the rate of sending pushes via email."""
+
     last_sent_ts = attr.ib(type=int)
     throttle_ms = attr.ib(type=int)
 
