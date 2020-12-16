@@ -315,7 +315,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
 class ServerKeyFetcherTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         self.http_client = Mock()
-        hs = self.setup_test_homeserver(handlers=None, http_client=self.http_client)
+        hs = self.setup_test_homeserver(http_client=self.http_client)
         return hs
 
     def test_get_keys_from_server(self):
@@ -395,9 +395,7 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
             }
         ]
 
-        return self.setup_test_homeserver(
-            handlers=None, http_client=self.http_client, config=config
-        )
+        return self.setup_test_homeserver(http_client=self.http_client, config=config)
 
     def build_perspectives_response(
         self, server_name: str, signing_key: SigningKey, valid_until_ts: int,

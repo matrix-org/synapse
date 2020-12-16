@@ -19,7 +19,7 @@ from typing import Dict, Optional, Tuple
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool, make_tuple_comparison_clause
-from synapse.util.caches.descriptors import Cache
+from synapse.util.caches.lrucache import LruCache
 
 logger = logging.getLogger(__name__)
 
@@ -351,16 +351,70 @@ class ClientIpBackgroundUpdateStore(SQLBaseStore):
         return updated
 
 
-class ClientIpStore(ClientIpBackgroundUpdateStore):
+class ClientIpWorkerStore(ClientIpBackgroundUpdateStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-
-        self.client_ip_last_seen = Cache(
-            name="client_ip_last_seen", keylen=4, max_entries=50000
-        )
-
         super().__init__(database, db_conn, hs)
 
         self.user_ips_max_age = hs.config.user_ips_max_age
+
+        if hs.config.run_background_tasks and self.user_ips_max_age:
+            self._clock.looping_call(self._prune_old_user_ips, 5 * 1000)
+
+    @wrap_as_background_process("prune_old_user_ips")
+    async def _prune_old_user_ips(self):
+        """Removes entries in user IPs older than the configured period.
+        """
+
+        if self.user_ips_max_age is None:
+            # Nothing to do
+            return
+
+        if not await self.db_pool.updates.has_completed_background_update(
+            "devices_last_seen"
+        ):
+            # Only start pruning if we have finished populating the devices
+            # last seen info.
+            return
+
+        # We do a slightly funky SQL delete to ensure we don't try and delete
+        # too much at once (as the table may be very large from before we
+        # started pruning).
+        #
+        # This works by finding the max last_seen that is less than the given
+        # time, but has no more than N rows before it, deleting all rows with
+        # a lesser last_seen time. (We COALESCE so that the sub-SELECT always
+        # returns exactly one row).
+        sql = """
+            DELETE FROM user_ips
+            WHERE last_seen <= (
+                SELECT COALESCE(MAX(last_seen), -1)
+                FROM (
+                    SELECT last_seen FROM user_ips
+                    WHERE last_seen <= ?
+                    ORDER BY last_seen ASC
+                    LIMIT 5000
+                ) AS u
+            )
+        """
+
+        timestamp = self.clock.time_msec() - self.user_ips_max_age
+
+        def _prune_old_user_ips_txn(txn):
+            txn.execute(sql, (timestamp,))
+
+        await self.db_pool.runInteraction(
+            "_prune_old_user_ips", _prune_old_user_ips_txn
+        )
+
+
+class ClientIpStore(ClientIpWorkerStore):
+    def __init__(self, database: DatabasePool, db_conn, hs):
+
+        self.client_ip_last_seen = LruCache(
+            cache_name="client_ip_last_seen", keylen=4, max_size=50000
+        )
+
+        super().__init__(database, db_conn, hs)
 
         # (user_id, access_token, ip,) -> (user_agent, device_id, last_seen)
         self._batch_row_update = {}
@@ -371,9 +425,6 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
         self.hs.get_reactor().addSystemEventTrigger(
             "before", "shutdown", self._update_client_ips_batch
         )
-
-        if self.user_ips_max_age:
-            self._clock.looping_call(self._prune_old_user_ips, 5 * 1000)
 
     async def insert_client_ip(
         self, user_id, access_token, ip, user_agent, device_id, now=None
@@ -391,7 +442,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
         if last_seen is not None and (now - last_seen) < LAST_SEEN_GRANULARITY:
             return
 
-        self.client_ip_last_seen.prefill(key, now)
+        self.client_ip_last_seen.set(key, now)
 
         self._batch_row_update[key] = (user_agent, device_id, now)
 
@@ -525,49 +576,3 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
             }
             for (access_token, ip), (user_agent, last_seen) in results.items()
         ]
-
-    @wrap_as_background_process("prune_old_user_ips")
-    async def _prune_old_user_ips(self):
-        """Removes entries in user IPs older than the configured period.
-        """
-
-        if self.user_ips_max_age is None:
-            # Nothing to do
-            return
-
-        if not await self.db_pool.updates.has_completed_background_update(
-            "devices_last_seen"
-        ):
-            # Only start pruning if we have finished populating the devices
-            # last seen info.
-            return
-
-        # We do a slightly funky SQL delete to ensure we don't try and delete
-        # too much at once (as the table may be very large from before we
-        # started pruning).
-        #
-        # This works by finding the max last_seen that is less than the given
-        # time, but has no more than N rows before it, deleting all rows with
-        # a lesser last_seen time. (We COALESCE so that the sub-SELECT always
-        # returns exactly one row).
-        sql = """
-            DELETE FROM user_ips
-            WHERE last_seen <= (
-                SELECT COALESCE(MAX(last_seen), -1)
-                FROM (
-                    SELECT last_seen FROM user_ips
-                    WHERE last_seen <= ?
-                    ORDER BY last_seen ASC
-                    LIMIT 5000
-                ) AS u
-            )
-        """
-
-        timestamp = self.clock.time_msec() - self.user_ips_max_age
-
-        def _prune_old_user_ips_txn(txn):
-            txn.execute(sql, (timestamp,))
-
-        await self.db_pool.runInteraction(
-            "_prune_old_user_ips", _prune_old_user_ips_txn
-        )

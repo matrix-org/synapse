@@ -34,7 +34,7 @@ class TTLCache:
         self._data = {}
 
         # the _CacheEntries, sorted by expiry time
-        self._expiry_list = SortedList()
+        self._expiry_list = SortedList()  # type: SortedList[_CacheEntry]
 
         self._timer = timer
 

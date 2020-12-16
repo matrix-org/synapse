@@ -236,9 +236,9 @@ class RedactionTestCase(unittest.HomeserverTestCase):
                 self._event_id = event_id
 
             @defer.inlineCallbacks
-            def build(self, prev_event_ids):
+            def build(self, prev_event_ids, auth_event_ids):
                 built_event = yield defer.ensureDeferred(
-                    self._base_builder.build(prev_event_ids)
+                    self._base_builder.build(prev_event_ids, auth_event_ids)
                 )
 
                 built_event._event_id = self._event_id

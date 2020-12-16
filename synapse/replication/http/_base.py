@@ -92,7 +92,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         if self.CACHE:
             self.response_cache = ResponseCache(
                 hs, "repl." + self.NAME, timeout_ms=30 * 60 * 1000
-            )
+            )  # type: ResponseCache[str]
 
         # We reserve `instance_name` as a parameter to sending requests, so we
         # assert here that sub classes don't try and use the name.

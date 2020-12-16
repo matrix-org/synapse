@@ -56,7 +56,7 @@ async def resolve_events_with_store(
         event_map:
             a dict from event_id to event, for any events that we happen to
             have in flight (eg, those currently being persisted). This will be
-            used as a starting point fof finding the state we need; any missing
+            used as a starting point for finding the state we need; any missing
             events will be requested via state_map_factory.
 
             If None, all events will be fetched via state_map_factory.

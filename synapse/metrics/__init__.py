@@ -502,6 +502,16 @@ build_info.labels(
 
 last_ticked = time.time()
 
+# 3PID send info
+threepid_send_requests = Histogram(
+    "synapse_threepid_send_requests_with_tries",
+    documentation="Number of requests for a 3pid token by try count. Note if"
+    " there is a request with try count of 4, then there would have been one"
+    " each for 1, 2 and 3",
+    buckets=(1, 2, 3, 4, 5, 10),
+    labelnames=("type", "reason"),
+)
+
 
 class ReactorLastSeenMetric:
     def collect(self):

@@ -38,11 +38,6 @@ class DummyRecaptchaChecker(UserInteractiveAuthChecker):
         return succeed(True)
 
 
-class DummyPasswordChecker(UserInteractiveAuthChecker):
-    def check_auth(self, authdict, clientip):
-        return succeed(authdict["identifier"]["user"])
-
-
 class FallbackAuthTests(unittest.HomeserverTestCase):
 
     servlets = [
@@ -72,7 +67,6 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", "register", body
         )  # type: SynapseRequest, FakeChannel
-        self.render(request)
 
         self.assertEqual(request.code, expected_response)
         return channel
@@ -87,7 +81,6 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "auth/m.login.recaptcha/fallback/web?session=" + session
         )  # type: SynapseRequest, FakeChannel
-        self.render(request)
         self.assertEqual(request.code, 200)
 
         request, channel = self.make_request(
@@ -96,7 +89,6 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
             + post_session
             + "&g-recaptcha-response=a",
         )
-        self.render(request)
         self.assertEqual(request.code, expected_post_response)
 
         # The recaptcha handler is called with the response given
@@ -104,7 +96,6 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         self.assertEqual(len(attempts), 1)
         self.assertEqual(attempts[0][0]["response"], "a")
 
-    @unittest.INFO
     def test_fallback_captcha(self):
         """Ensure that fallback auth via a captcha works."""
         # Returns a 401 as per the spec
@@ -166,9 +157,6 @@ class UIAuthTests(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        auth_handler = hs.get_auth_handler()
-        auth_handler.checkers[LoginType.PASSWORD] = DummyPasswordChecker(hs)
-
         self.user_pass = "pass"
         self.user = self.register_user("test", self.user_pass)
         self.user_tok = self.login("test", self.user_pass)
@@ -178,7 +166,6 @@ class UIAuthTests(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "devices", access_token=self.user_tok,
         )  # type: SynapseRequest, FakeChannel
-        self.render(request)
 
         # Get the ID of the device.
         self.assertEqual(request.code, 200)
@@ -191,7 +178,6 @@ class UIAuthTests(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "DELETE", "devices/" + device, body, access_token=self.user_tok
         )  # type: SynapseRequest, FakeChannel
-        self.render(request)
 
         # Ensure the response is sane.
         self.assertEqual(request.code, expected_response)
@@ -205,7 +191,6 @@ class UIAuthTests(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", "delete_devices", body, access_token=self.user_tok,
         )  # type: SynapseRequest, FakeChannel
-        self.render(request)
 
         # Ensure the response is sane.
         self.assertEqual(request.code, expected_response)
@@ -235,6 +220,31 @@ class UIAuthTests(unittest.HomeserverTestCase):
                 "auth": {
                     "type": "m.login.password",
                     "identifier": {"type": "m.id.user", "user": self.user},
+                    "password": self.user_pass,
+                    "session": session,
+                },
+            },
+        )
+
+    def test_grandfathered_identifier(self):
+        """Check behaviour without "identifier" dict
+
+        Synapse used to require clients to submit a "user" field for m.login.password
+        UIA - check that still works.
+        """
+
+        device_id = self.get_device_ids()[0]
+        channel = self.delete_device(device_id, 401)
+        session = channel.json_body["session"]
+
+        # Make another request providing the UI auth flow.
+        self.delete_device(
+            device_id,
+            200,
+            {
+                "auth": {
+                    "type": "m.login.password",
+                    "user": self.user,
                     "password": self.user_pass,
                     "session": session,
                 },

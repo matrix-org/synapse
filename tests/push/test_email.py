@@ -100,7 +100,7 @@ class EmailPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastore().get_user_by_access_token(self.access_token)
         )
-        token_id = user_tuple["token_id"]
+        token_id = user_tuple.token_id
 
         self.pusher = self.get_success(
             self.hs.get_pusherpool().add_pusher(
@@ -131,6 +131,35 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about that message
         self._check_for_mail()
 
+    def test_invite_sends_email(self):
+        # Create a room and invite the user to it
+        room = self.helper.create_room_as(self.others[0].id, tok=self.others[0].token)
+        self.helper.invite(
+            room=room,
+            src=self.others[0].id,
+            tok=self.others[0].token,
+            targ=self.user_id,
+        )
+
+        # We should get emailed about the invite
+        self._check_for_mail()
+
+    def test_invite_to_empty_room_sends_email(self):
+        # Create a room and invite the user to it
+        room = self.helper.create_room_as(self.others[0].id, tok=self.others[0].token)
+        self.helper.invite(
+            room=room,
+            src=self.others[0].id,
+            tok=self.others[0].token,
+            targ=self.user_id,
+        )
+
+        # Then have the original user leave
+        self.helper.leave(room, self.others[0].id, tok=self.others[0].token)
+
+        # We should get emailed about the invite
+        self._check_for_mail()
+
     def test_multiple_members_email(self):
         # We want to test multiple notifications, so we pause processing of push
         # while we send messages.
@@ -158,8 +187,21 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about those messages
         self._check_for_mail()
 
+    def test_encrypted_message(self):
+        room = self.helper.create_room_as(self.user_id, tok=self.access_token)
+        self.helper.invite(
+            room=room, src=self.user_id, tok=self.access_token, targ=self.others[0].id
+        )
+        self.helper.join(room=room, user=self.others[0].id, tok=self.others[0].token)
+
+        # The other user sends some messages
+        self.helper.send_event(room, "m.room.encrypted", {}, tok=self.others[0].token)
+
+        # We should get emailed about that message
+        self._check_for_mail()
+
     def _check_for_mail(self):
-        "Check that the user receives an email notification"
+        """Check that the user receives an email notification"""
 
         # Get the stream ordering before it gets sent
         pushers = self.get_success(

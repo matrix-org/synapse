@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
+# Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -224,3 +225,84 @@ class DeviceTestCase(unittest.HomeserverTestCase):
                 )
             )
             self.reactor.advance(1000)
+
+
+class DehydrationTestCase(unittest.HomeserverTestCase):
+    def make_homeserver(self, reactor, clock):
+        hs = self.setup_test_homeserver("server", http_client=None)
+        self.handler = hs.get_device_handler()
+        self.registration = hs.get_registration_handler()
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+        return hs
+
+    def test_dehydrate_and_rehydrate_device(self):
+        user_id = "@boris:dehydration"
+
+        self.get_success(self.store.register_user(user_id, "foobar"))
+
+        # First check if we can store and fetch a dehydrated device
+        stored_dehydrated_device_id = self.get_success(
+            self.handler.store_dehydrated_device(
+                user_id=user_id,
+                device_data={"device_data": {"foo": "bar"}},
+                initial_device_display_name="dehydrated device",
+            )
+        )
+
+        retrieved_device_id, device_data = self.get_success(
+            self.handler.get_dehydrated_device(user_id=user_id)
+        )
+
+        self.assertEqual(retrieved_device_id, stored_dehydrated_device_id)
+        self.assertEqual(device_data, {"device_data": {"foo": "bar"}})
+
+        # Create a new login for the user and dehydrated the device
+        device_id, access_token = self.get_success(
+            self.registration.register_device(
+                user_id=user_id, device_id=None, initial_display_name="new device",
+            )
+        )
+
+        # Trying to claim a nonexistent device should throw an error
+        self.get_failure(
+            self.handler.rehydrate_device(
+                user_id=user_id,
+                access_token=access_token,
+                device_id="not the right device ID",
+            ),
+            synapse.api.errors.NotFoundError,
+        )
+
+        # dehydrating the right devices should succeed and change our device ID
+        # to the dehydrated device's ID
+        res = self.get_success(
+            self.handler.rehydrate_device(
+                user_id=user_id,
+                access_token=access_token,
+                device_id=retrieved_device_id,
+            )
+        )
+
+        self.assertEqual(res, {"success": True})
+
+        # make sure that our device ID has changed
+        user_info = self.get_success(self.auth.get_user_by_access_token(access_token))
+
+        self.assertEqual(user_info.device_id, retrieved_device_id)
+
+        # make sure the device has the display name that was set from the login
+        res = self.get_success(self.handler.get_device(user_id, retrieved_device_id))
+
+        self.assertEqual(res["display_name"], "new device")
+
+        # make sure that the device ID that we were initially assigned no longer exists
+        self.get_failure(
+            self.handler.get_device(user_id, device_id),
+            synapse.api.errors.NotFoundError,
+        )
+
+        # make sure that there's no device available for dehydrating now
+        ret = self.get_success(self.handler.get_dehydrated_device(user_id=user_id))
+
+        self.assertIsNone(ret)

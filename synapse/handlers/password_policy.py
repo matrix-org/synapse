@@ -16,14 +16,18 @@
 
 import logging
 import re
+from typing import TYPE_CHECKING
 
 from synapse.api.errors import Codes, PasswordRefusedError
+
+if TYPE_CHECKING:
+    from synapse.app.homeserver import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
 class PasswordPolicyHandler:
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.policy = hs.config.password_policy
         self.enabled = hs.config.password_policy_enabled
 
@@ -33,11 +37,11 @@ class PasswordPolicyHandler:
         self.regexp_uppercase = re.compile("[A-Z]")
         self.regexp_lowercase = re.compile("[a-z]")
 
-    def validate_password(self, password):
+    def validate_password(self, password: str) -> None:
         """Checks whether a given password complies with the server's policy.
 
         Args:
-            password (str): The password to check against the server's policy.
+            password: The password to check against the server's policy.
 
         Raises:
             PasswordRefusedError: The password doesn't comply with the server's policy.

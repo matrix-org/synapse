@@ -46,7 +46,7 @@ locally. You'll need python 3.6 or later, and to install a number of tools:
 
 ```
 # Install the dependencies
-pip install -e ".[lint]"
+pip install -e ".[lint,mypy]"
 
 # Run the linter script
 ./scripts-dev/lint.sh
@@ -62,6 +62,10 @@ run-time:
 ```
 ./scripts-dev/lint.sh path/to/file1.py path/to/file2.py path/to/folder
 ```
+
+You can also provide the `-d` option, which will lint the files that have been
+changed since the last git commit. This will often be significantly faster than
+linting the whole codebase.
 
 Before pushing new changes, ensure they don't produce linting errors. Commit any
 files that were corrected.
@@ -151,6 +155,24 @@ If your change affects both the debian packaging *and* files outside the debian
 directory, you will need both a regular newsfragment *and* an entry in the
 debian changelog. (Though typically such changes should be submitted as two
 separate pull requests.)
+
+## Documentation
+
+There is a growing amount of documentation located in the [docs](docs)
+directory. This documentation is intended primarily for sysadmins running their
+own Synapse instance, as well as developers interacting externally with
+Synapse. [docs/dev](docs/dev) exists primarily to house documentation for
+Synapse developers. [docs/admin_api](docs/admin_api) houses documentation
+regarding Synapse's Admin API, which is used mostly by sysadmins and external
+service developers.
+
+New files added to both folders should be written in [Github-Flavoured
+Markdown](https://guides.github.com/features/mastering-markdown/), and attempts
+should be made to migrate existing documents to markdown where possible.
+
+Some documentation also exists in [Synapse's Github
+Wiki](https://github.com/matrix-org/synapse/wiki), although this is primarily
+contributed to by community authors.
 
 ## Sign off
 

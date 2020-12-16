@@ -3,7 +3,11 @@
 # This is a YAML file containing a standard Python logging configuration
 # dictionary. See [1] for details on the valid settings.
 #
+# Synapse also supports structured logging for machine readable logs which can
+# be ingested by ELK stacks. See [2] for details.
+#
 # [1]: https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
+# [2]: https://github.com/matrix-org/synapse/blob/master/docs/structured_logging.md
 
 version: 1
 
@@ -59,7 +63,7 @@ root:
     # then write them to a file.
     #
     # Replace "buffer" with "console" to log to stderr instead. (Note that you'll
-    # also need to update the configuation for the `twisted` logger above, in
+    # also need to update the configuration for the `twisted` logger above, in
     # this case.)
     #
     handlers: [buffer]

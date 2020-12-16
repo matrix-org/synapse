@@ -23,6 +23,7 @@ from synapse.api.constants import EventTypes
 from synapse.logging import opentracing
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import PusherConfigException
+from synapse.types import RoomStreamToken
 
 from . import push_rule_evaluator, push_tools
 
@@ -74,6 +75,7 @@ class HttpPusher:
         self.failing_since = pusherdict["failing_since"]
         self.timed_call = None
         self._is_processing = False
+        self._group_unread_count_by_room = hs.config.push_group_unread_count_by_room
 
         # This is the highest stream ordering we know it's safe to process.
         # When new events arrive, we'll be given a window of new events: we
@@ -114,7 +116,12 @@ class HttpPusher:
         if should_check_for_notifs:
             self._start_processing()
 
-    def on_new_notifications(self, max_stream_ordering):
+    def on_new_notifications(self, max_token: RoomStreamToken):
+        # We just use the minimum stream ordering and ignore the vector clock
+        # component. This is safe to do as long as we *always* ignore the vector
+        # clock components.
+        max_stream_ordering = max_token.stream
+
         self.max_stream_ordering = max(
             max_stream_ordering, self.max_stream_ordering or 0
         )
@@ -130,7 +137,11 @@ class HttpPusher:
     async def _update_badge(self):
         # XXX as per https://github.com/matrix-org/matrix-doc/issues/2627, this seems
         # to be largely redundant. perhaps we can remove it.
-        badge = await push_tools.get_badge_count(self.hs.get_datastore(), self.user_id)
+        badge = await push_tools.get_badge_count(
+            self.hs.get_datastore(),
+            self.user_id,
+            group_by_room=self._group_unread_count_by_room,
+        )
         await self._send_badge(badge)
 
     def on_timer(self):
@@ -277,7 +288,11 @@ class HttpPusher:
             return True
 
         tweaks = push_rule_evaluator.tweaks_for_actions(push_action["actions"])
-        badge = await push_tools.get_badge_count(self.hs.get_datastore(), self.user_id)
+        badge = await push_tools.get_badge_count(
+            self.hs.get_datastore(),
+            self.user_id,
+            group_by_room=self._group_unread_count_by_room,
+        )
 
         event = await self.store.get_event(push_action["event_id"], allow_none=True)
         if event is None:

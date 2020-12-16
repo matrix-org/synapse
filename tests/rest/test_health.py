@@ -20,15 +20,12 @@ from tests import unittest
 
 
 class HealthCheckTests(unittest.HomeserverTestCase):
-    def setUp(self):
-        super().setUp()
-
+    def create_test_resource(self):
         # replace the JsonResource with a HealthResource.
-        self.resource = HealthResource()
+        return HealthResource()
 
     def test_health(self):
         request, channel = self.make_request("GET", "/health", shorthand=False)
-        self.render(request)
 
         self.assertEqual(request.code, 200)
         self.assertEqual(channel.result["body"], b"OK")

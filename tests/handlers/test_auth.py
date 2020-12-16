@@ -21,24 +21,17 @@ from twisted.internet import defer
 import synapse
 import synapse.api.errors
 from synapse.api.errors import ResourceLimitError
-from synapse.handlers.auth import AuthHandler
 
 from tests import unittest
 from tests.test_utils import make_awaitable
 from tests.utils import setup_test_homeserver
 
 
-class AuthHandlers:
-    def __init__(self, hs):
-        self.auth_handler = AuthHandler(hs)
-
-
 class AuthTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        self.hs = yield setup_test_homeserver(self.addCleanup, handlers=None)
-        self.hs.handlers = AuthHandlers(self.hs)
-        self.auth_handler = self.hs.handlers.auth_handler
+        self.hs = yield setup_test_homeserver(self.addCleanup)
+        self.auth_handler = self.hs.get_auth_handler()
         self.macaroon_generator = self.hs.get_macaroon_generator()
 
         # MAU tests
@@ -59,7 +52,7 @@ class AuthTestCase(unittest.TestCase):
             self.fail("some_user was not in %s" % macaroon.inspect())
 
     def test_macaroon_caveats(self):
-        self.hs.clock.now = 5000
+        self.hs.get_clock().now = 5000
 
         token = self.macaroon_generator.generate_access_token("a_user")
         macaroon = pymacaroons.Macaroon.deserialize(token)
@@ -85,7 +78,7 @@ class AuthTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_short_term_login_token_gives_user_id(self):
-        self.hs.clock.now = 1000
+        self.hs.get_clock().now = 1000
 
         token = self.macaroon_generator.generate_short_term_login_token("a_user", 5000)
         user_id = yield defer.ensureDeferred(
@@ -94,7 +87,7 @@ class AuthTestCase(unittest.TestCase):
         self.assertEqual("a_user", user_id)
 
         # when we advance the clock, the token should be rejected
-        self.hs.clock.now = 6000
+        self.hs.get_clock().now = 6000
         with self.assertRaises(synapse.api.errors.AuthError):
             yield defer.ensureDeferred(
                 self.auth_handler.validate_short_term_login_token_and_get_user_id(token)

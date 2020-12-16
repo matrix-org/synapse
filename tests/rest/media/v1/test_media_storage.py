@@ -36,6 +36,7 @@ from synapse.rest.media.v1.media_storage import MediaStorage
 from synapse.rest.media.v1.storage_provider import FileStorageProviderBackend
 
 from tests import unittest
+from tests.server import FakeSite, make_request
 
 
 class MediaStorageTests(unittest.HomeserverTestCase):
@@ -227,8 +228,14 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
     def _req(self, content_disposition):
 
-        request, channel = self.make_request("GET", self.media_id, shorthand=False)
-        request.render(self.download_resource)
+        request, channel = make_request(
+            self.reactor,
+            FakeSite(self.download_resource),
+            "GET",
+            self.media_id,
+            shorthand=False,
+            await_result=False,
+        )
         self.pump()
 
         # We've made one fetch, to example.com, using the media URL, and asking
@@ -317,10 +324,14 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
     def _test_thumbnail(self, method, expected_body, expected_found):
         params = "?width=32&height=32&method=" + method
-        request, channel = self.make_request(
-            "GET", self.media_id + params, shorthand=False
+        request, channel = make_request(
+            self.reactor,
+            FakeSite(self.thumbnail_resource),
+            "GET",
+            self.media_id + params,
+            shorthand=False,
+            await_result=False,
         )
-        request.render(self.thumbnail_resource)
         self.pump()
 
         headers = {
@@ -348,7 +359,6 @@ class MediaRepoTests(unittest.HomeserverTestCase):
                 channel.json_body,
                 {
                     "errcode": "M_NOT_FOUND",
-                    "error": "Not found [b'example.com', b'12345?width=32&height=32&method=%s']"
-                    % method,
+                    "error": "Not found [b'example.com', b'12345']",
                 },
             )

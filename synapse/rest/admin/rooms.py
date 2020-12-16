@@ -29,7 +29,6 @@ from synapse.rest.admin._base import (
     admin_patterns,
     assert_requester_is_admin,
     assert_user_is_admin,
-    historical_admin_path_patterns,
 )
 from synapse.storage.databases.main.room import RoomSortOrder
 from synapse.types import RoomAlias, RoomID, UserID, create_requester
@@ -44,7 +43,7 @@ class ShutdownRoomRestServlet(RestServlet):
     joined to the new room.
     """
 
-    PATTERNS = historical_admin_path_patterns("/shutdown_room/(?P<room_id>[^/]+)")
+    PATTERNS = admin_patterns("/shutdown_room/(?P<room_id>[^/]+)")
 
     def __init__(self, hs):
         self.hs = hs
@@ -71,14 +70,18 @@ class ShutdownRoomRestServlet(RestServlet):
 
 
 class DeleteRoomRestServlet(RestServlet):
-    """Delete a room from server. It is a combination and improvement of
-    shut down and purge room.
+    """Delete a room from server.
+
+    It is a combination and improvement of shutdown and purge room.
+
     Shuts down a room by removing all local users from the room.
     Blocking all future invites and joins to the room is optional.
+
     If desired any local aliases will be repointed to a new room
-    created by `new_room_user_id` and kicked users will be auto
+    created by `new_room_user_id` and kicked users will be auto-
     joined to the new room.
-    It will remove all trace of a room from the database.
+
+    If 'purge' is true, it will remove all traces of a room from the database.
     """
 
     PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)/delete$")
@@ -111,6 +114,14 @@ class DeleteRoomRestServlet(RestServlet):
                 Codes.BAD_JSON,
             )
 
+        force_purge = content.get("force_purge", False)
+        if not isinstance(force_purge, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Param 'force_purge' must be a boolean, if given",
+                Codes.BAD_JSON,
+            )
+
         ret = await self.room_shutdown_handler.shutdown_room(
             room_id=room_id,
             new_room_user_id=content.get("new_room_user_id"),
@@ -122,7 +133,7 @@ class DeleteRoomRestServlet(RestServlet):
 
         # Purge room
         if purge:
-            await self.pagination_handler.purge_room(room_id)
+            await self.pagination_handler.purge_room(room_id, force=force_purge)
 
         return (200, ret)
 
@@ -138,7 +149,7 @@ class ListRoomRestServlet(RestServlet):
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
-        self.admin_handler = hs.get_handlers().admin_handler
+        self.admin_handler = hs.get_admin_handler()
 
     async def on_GET(self, request):
         requester = await self.auth.get_user_by_req(request)
@@ -273,7 +284,7 @@ class JoinRoomAliasServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.room_member_handler = hs.get_room_member_handler()
-        self.admin_handler = hs.get_handlers().admin_handler
+        self.admin_handler = hs.get_admin_handler()
         self.state_handler = hs.get_state_handler()
 
     async def on_POST(self, request, room_identifier):
@@ -309,7 +320,9 @@ class JoinRoomAliasServlet(RestServlet):
                 400, "%s was not legal room ID or room alias" % (room_identifier,)
             )
 
-        fake_requester = create_requester(target_user)
+        fake_requester = create_requester(
+            target_user, authenticated_entity=requester.authenticated_entity
+        )
 
         # send invite if room has "JoinRules.INVITE"
         room_state = await self.state_handler.get_current_state(room_id)

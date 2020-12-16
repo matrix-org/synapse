@@ -20,6 +20,7 @@ Add a new job to the main prometheus.conf file:
 ```
 
 ### for Prometheus v2
+
 Add a new job to the main prometheus.yml file:
 
 ```yaml
@@ -29,14 +30,17 @@ Add a new job to the main prometheus.yml file:
     scheme: "https"
 
     static_configs:
-    - targets: ['SERVER.LOCATION:PORT']
+    - targets: ["my.server.here:port"]
 ```
+
+An example of a Prometheus configuration with workers can be found in
+[metrics-howto.md](https://github.com/matrix-org/synapse/blob/master/docs/metrics-howto.md).
 
 To use `synapse.rules` add
 
 ```yaml
-    rule_files:
-      - "/PATH/TO/synapse-v2.rules"
+  rule_files:
+    - "/PATH/TO/synapse-v2.rules"
 ```
 
 Metrics are disabled by default when running synapse; they must be enabled

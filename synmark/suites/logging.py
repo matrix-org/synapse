@@ -13,20 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import warnings
 from io import StringIO
 
 from mock import Mock
 
 from pyperf import perf_counter
-from synmark import make_homeserver
 
 from twisted.internet.defer import Deferred
 from twisted.internet.protocol import ServerFactory
-from twisted.logger import LogBeginner, Logger, LogPublisher
+from twisted.logger import LogBeginner, LogPublisher
 from twisted.protocols.basic import LineOnlyReceiver
 
-from synapse.logging._structured import setup_structured_logging
+from synapse.config.logger import _setup_stdlib_logging
+from synapse.logging import RemoteHandler
+from synapse.util import Clock
 
 
 class LineCounter(LineOnlyReceiver):
@@ -62,7 +64,15 @@ async def main(reactor, loops):
     logger_factory.on_done = Deferred()
     port = reactor.listenTCP(0, logger_factory, interface="127.0.0.1")
 
-    hs, wait, cleanup = await make_homeserver(reactor)
+    # A fake homeserver config.
+    class Config:
+        server_name = "synmark-" + str(loops)
+        no_redirect_stdio = True
+
+    hs_config = Config()
+
+    # To be able to sleep.
+    clock = Clock(reactor)
 
     errors = StringIO()
     publisher = LogPublisher()
@@ -72,47 +82,49 @@ async def main(reactor, loops):
     )
 
     log_config = {
-        "loggers": {"synapse": {"level": "DEBUG"}},
-        "drains": {
+        "version": 1,
+        "loggers": {"synapse": {"level": "DEBUG", "handlers": ["tersejson"]}},
+        "formatters": {"tersejson": {"class": "synapse.logging.TerseJsonFormatter"}},
+        "handlers": {
             "tersejson": {
-                "type": "network_json_terse",
+                "class": "synapse.logging.RemoteHandler",
                 "host": "127.0.0.1",
                 "port": port.getHost().port,
                 "maximum_buffer": 100,
+                "_reactor": reactor,
             }
         },
     }
 
-    logger = Logger(namespace="synapse.logging.test_terse_json", observer=publisher)
-    logging_system = setup_structured_logging(
-        hs, hs.config, log_config, logBeginner=beginner, redirect_stdlib_logging=False
+    logger = logging.getLogger("synapse.logging.test_terse_json")
+    _setup_stdlib_logging(
+        hs_config, log_config, logBeginner=beginner,
     )
 
     # Wait for it to connect...
-    await logging_system._observers[0]._service.whenConnected()
+    for handler in logging.getLogger("synapse").handlers:
+        if isinstance(handler, RemoteHandler):
+            break
+    else:
+        raise RuntimeError("Improperly configured: no RemoteHandler found.")
+
+    await handler._service.whenConnected()
 
     start = perf_counter()
 
     # Send a bunch of useful messages
     for i in range(0, loops):
-        logger.info("test message %s" % (i,))
+        logger.info("test message %s", i)
 
-        if (
-            len(logging_system._observers[0]._buffer)
-            == logging_system._observers[0].maximum_buffer
-        ):
-            while (
-                len(logging_system._observers[0]._buffer)
-                > logging_system._observers[0].maximum_buffer / 2
-            ):
-                await wait(0.01)
+        if len(handler._buffer) == handler.maximum_buffer:
+            while len(handler._buffer) > handler.maximum_buffer / 2:
+                await clock.sleep(0.01)
 
     await logger_factory.on_done
 
     end = perf_counter() - start
 
-    logging_system.stop()
+    handler.close()
     port.stopListening()
-    cleanup()
 
     return end
