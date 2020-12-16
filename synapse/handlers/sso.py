@@ -21,7 +21,8 @@ from twisted.web.http import Request
 
 from synapse.api.errors import RedirectException
 from synapse.http.server import respond_with_html
-from synapse.types import UserID, contains_invalid_mxid_characters
+from synapse.http.site import SynapseRequest
+from synapse.types import JsonDict, UserID, contains_invalid_mxid_characters
 from synapse.util.async_helpers import Linearizer
 
 if TYPE_CHECKING:
@@ -119,15 +120,16 @@ class SsoHandler:
         # No match.
         return None
 
-    async def get_mxid_from_sso(
+    async def complete_sso_login_request(
         self,
         auth_provider_id: str,
         remote_user_id: str,
-        user_agent: str,
-        ip_address: str,
+        request: SynapseRequest,
+        client_redirect_url: str,
         sso_to_matrix_id_mapper: Callable[[int], Awaitable[UserAttributes]],
         grandfather_existing_users: Optional[Callable[[], Awaitable[Optional[str]]]],
-    ) -> str:
+        extra_login_attributes: Optional[JsonDict] = None,
+    ) -> None:
         """
         Given an SSO ID, retrieve the user ID for it and possibly register the user.
 
@@ -146,12 +148,18 @@ class SsoHandler:
         given user-agent and IP address and the SSO ID is linked to this matrix
         ID for subsequent calls.
 
+        Finally, we generate a redirect to the supplied redirect uri, with a login token
+
         Args:
             auth_provider_id: A unique identifier for this SSO provider, e.g.
                 "oidc" or "saml".
+
             remote_user_id: The unique identifier from the SSO provider.
-            user_agent: The user agent of the client making the request.
-            ip_address: The IP address of the client making the request.
+
+            request: The request to respond to
+
+            client_redirect_url: The redirect URL passed in by the client.
+
             sso_to_matrix_id_mapper: A callable to generate the user attributes.
                 The only parameter is an integer which represents the amount of
                 times the returned mxid localpart mapping has failed.
@@ -163,12 +171,13 @@ class SsoHandler:
                         to the user.
                     RedirectException to redirect to an additional page (e.g.
                         to prompt the user for more information).
+
             grandfather_existing_users: A callable which can return an previously
                 existing matrix ID. The SSO ID is then linked to the returned
                 matrix ID.
 
-        Returns:
-             The user ID associated with the SSO response.
+            extra_login_attributes: An optional dictionary of extra
+                attributes to be provided to the client in the login response.
 
         Raises:
             MappingException if there was a problem mapping the response to a user.
@@ -181,28 +190,33 @@ class SsoHandler:
         # interstitial pages.
         with await self._mapping_lock.queue(auth_provider_id):
             # first of all, check if we already have a mapping for this user
-            previously_registered_user_id = await self.get_sso_user_by_remote_user_id(
+            user_id = await self.get_sso_user_by_remote_user_id(
                 auth_provider_id, remote_user_id,
             )
-            if previously_registered_user_id:
-                return previously_registered_user_id
 
             # Check for grandfathering of users.
-            if grandfather_existing_users:
-                previously_registered_user_id = await grandfather_existing_users()
-                if previously_registered_user_id:
+            if not user_id and grandfather_existing_users:
+                user_id = await grandfather_existing_users()
+                if user_id:
                     # Future logins should also match this user ID.
                     await self._store.record_user_external_id(
-                        auth_provider_id, remote_user_id, previously_registered_user_id
+                        auth_provider_id, remote_user_id, user_id
                     )
-                    return previously_registered_user_id
 
             # Otherwise, generate a new user.
-            attributes = await self._call_attribute_mapper(sso_to_matrix_id_mapper)
-            user_id = await self._register_mapped_user(
-                attributes, auth_provider_id, remote_user_id, user_agent, ip_address,
-            )
-            return user_id
+            if not user_id:
+                attributes = await self._call_attribute_mapper(sso_to_matrix_id_mapper)
+                user_id = await self._register_mapped_user(
+                    attributes,
+                    auth_provider_id,
+                    remote_user_id,
+                    request.get_user_agent(""),
+                    request.getClientIP(),
+                )
+
+        await self._auth_handler.complete_sso_login(
+            user_id, request, client_redirect_url, extra_login_attributes
+        )
 
     async def _call_attribute_mapper(
         self, sso_to_matrix_id_mapper: Callable[[int], Awaitable[UserAttributes]],
