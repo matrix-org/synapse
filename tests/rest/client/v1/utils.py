@@ -81,7 +81,7 @@ class RestHelper:
         if tok:
             path = path + "?access_token=%s" % tok
 
-        _, channel = make_request(
+        channel = make_request(
             self.hs.get_reactor(),
             self.site,
             "POST",
@@ -157,7 +157,7 @@ class RestHelper:
         data = {"membership": membership}
         data.update(extra_data)
 
-        _, channel = make_request(
+        channel = make_request(
             self.hs.get_reactor(),
             self.site,
             "PUT",
@@ -192,7 +192,7 @@ class RestHelper:
         if tok:
             path = path + "?access_token=%s" % tok
 
-        _, channel = make_request(
+        channel = make_request(
             self.hs.get_reactor(),
             self.site,
             "PUT",
@@ -248,9 +248,7 @@ class RestHelper:
         if body is not None:
             content = json.dumps(body).encode("utf8")
 
-        _, channel = make_request(
-            self.hs.get_reactor(), self.site, method, path, content
-        )
+        channel = make_request(self.hs.get_reactor(), self.site, method, path, content)
 
         assert int(channel.result["code"]) == expect_code, (
             "Expected: %d, got: %d, resp: %r"
@@ -333,7 +331,7 @@ class RestHelper:
         """
         image_length = len(image_data)
         path = "/_matrix/media/r0/upload?filename=%s" % (filename,)
-        _, channel = make_request(
+        channel = make_request(
             self.hs.get_reactor(),
             FakeSite(resource),
             "POST",
@@ -366,7 +364,7 @@ class RestHelper:
         client_redirect_url = "https://x"
 
         # first hit the redirect url (which will issue a cookie and state)
-        _, channel = make_request(
+        channel = make_request(
             self.hs.get_reactor(),
             self.site,
             "GET",
@@ -411,7 +409,7 @@ class RestHelper:
 
         with patch.object(self.hs.get_proxied_http_client(), "request", mock_req):
             # now hit the callback URI with the right params and a made-up code
-            _, channel = make_request(
+            channel = make_request(
                 self.hs.get_reactor(),
                 self.site,
                 "GET",
@@ -434,7 +432,7 @@ class RestHelper:
 
         # finally, submit the matrix login token to the login API, which gives us our
         # matrix access token and device id.
-        _, channel = make_request(
+        channel = make_request(
             self.hs.get_reactor(),
             self.site,
             "POST",

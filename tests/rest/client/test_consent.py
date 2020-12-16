@@ -61,7 +61,7 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
     def test_render_public_consent(self):
         """You can observe the terms form without specifying a user"""
         resource = consent_resource.ConsentResource(self.hs)
-        request, channel = make_request(
+        channel = make_request(
             self.reactor, FakeSite(resource), "GET", "/consent?v=1", shorthand=False
         )
         self.assertEqual(channel.code, 200)
@@ -82,7 +82,7 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
             uri_builder.build_user_consent_uri(user_id).replace("_matrix/", "")
             + "&u=user"
         )
-        request, channel = make_request(
+        channel = make_request(
             self.reactor,
             FakeSite(resource),
             "GET",
@@ -97,7 +97,7 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
         self.assertEqual(consented, "False")
 
         # POST to the consent page, saying we've agreed
-        request, channel = make_request(
+        channel = make_request(
             self.reactor,
             FakeSite(resource),
             "POST",
@@ -109,7 +109,7 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
 
         # Fetch the consent page, to get the consent version -- it should have
         # changed
-        request, channel = make_request(
+        channel = make_request(
             self.reactor,
             FakeSite(resource),
             "GET",

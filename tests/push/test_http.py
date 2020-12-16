@@ -667,7 +667,7 @@ class HTTPPusherTests(HomeserverTestCase):
         # This will actually trigger a new notification to be sent out so that
         # even if the user does not receive another message, their unread
         # count goes down
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/rooms/%s/receipt/m.read/%s" % (room_id, first_message_event_id),
             {},

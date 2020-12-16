@@ -201,7 +201,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
             }
         )
 
-        request, channel = self.make_request("POST", "/register", request_data)
+        channel = self.make_request("POST", "/register", request_data)
 
         if channel.code != 200:
             raise HttpResponseException(
@@ -213,7 +213,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
         return access_token
 
     def do_sync_for_user(self, token):
-        request, channel = self.make_request("GET", "/sync", access_token=token)
+        channel = self.make_request("GET", "/sync", access_token=token)
 
         if channel.code != 200:
             raise HttpResponseException(
