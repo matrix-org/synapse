@@ -77,7 +77,7 @@ class HttpPusher(Pusher):
 
         self.data = pusher_config.data
         if self.data is None:
-            raise PusherConfigException("data can not be null for HTTP pusher")
+            raise PusherConfigException("'data' key can not be null for HTTP pusher")
 
         self.name = "%s/%s/%s" % (
             pusher_config.user_name,

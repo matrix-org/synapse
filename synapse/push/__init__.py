@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 
 @attr.s(slots=True)
 class PusherConfig:
+    """Parameters necessary to configure a pusher."""
     id = attr.ib(type=Optional[str])
     user_name = attr.ib(type=str)
     access_token = attr.ib(type=Optional[int])
@@ -42,7 +43,7 @@ class PusherConfig:
     last_success = attr.ib(type=Optional[int])
     failing_since = attr.ib(type=Optional[int])
 
-    def as_get(self) -> Dict[str, Any]:
+    def as_dict(self) -> Dict[str, Any]:
         """Information that can be retrieved about a pusher after creation."""
         return {
             "app_display_name": self.app_display_name,
@@ -58,6 +59,7 @@ class PusherConfig:
 
 @attr.s(slots=True)
 class ThrottleParams:
+    """Parameters for controlling the rate of sending pushes via email."""
     last_sent_ts = attr.ib(type=int)
     throttle_ms = attr.ib(type=int)
 
