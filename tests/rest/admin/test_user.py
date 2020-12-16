@@ -766,7 +766,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
-        self.assertEqual("@bob:test", pushers[0]["user_name"])
+        self.assertEqual("@bob:test", pushers[0].user_name)
 
     @override_config(
         {
