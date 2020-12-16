@@ -497,12 +497,21 @@ class WhoisRestServlet(RestServlet):
 class DeactivateAccountRestServlet(RestServlet):
     PATTERNS = admin_patterns("/deactivate/(?P<target_user_id>[^/]*)")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self._deactivate_account_handler = hs.get_deactivate_account_handler()
         self.auth = hs.get_auth()
+        self.is_mine = hs.is_mine
+        self.store = hs.get_datastore()
 
-    async def on_POST(self, request, target_user_id):
+    async def on_POST(self, request: str, target_user_id: str) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
+
+        if not self.is_mine(UserID.from_string(target_user_id)):
+            raise SynapseError(400, "Can only lookup local users")
+
+        if not await self.store.get_user_by_id(target_user_id):
+            raise NotFoundError("User not found")
+
         requester = await self.auth.get_user_by_req(request)
         body = parse_json_object_from_request(request, allow_empty_body=True)
         erase = body.get("erase", False)
@@ -512,8 +521,6 @@ class DeactivateAccountRestServlet(RestServlet):
                 "Param 'erase' must be a boolean, if given",
                 Codes.BAD_JSON,
             )
-
-        UserID.from_string(target_user_id)
 
         result = await self._deactivate_account_handler.deactivate_account(
             target_user_id, erase, requester

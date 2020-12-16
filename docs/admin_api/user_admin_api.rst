@@ -93,7 +93,8 @@ Body parameters:
 
 - ``deactivated``, optional. If unspecified, deactivation state will be left
   unchanged on existing accounts and set to ``false`` for new accounts.
-  For details to deactivation see also `Deactivate Account <#deactivate-account>`_.
+  It does not set ``erase``. For details to deactivation see also
+  `Deactivate Account <#deactivate-account>`_.
 
 If the user already exists then optional parameters default to the current value.
 
@@ -257,7 +258,13 @@ The following actions are performed when deactivating an user:
 - Delete from user directory
 - Reject all pending invites
 - Remove all information on the user from the account_validity table
+
+The following actions are additionally performed when deactivating an user and
+and you set ``erase`` to ``true``:
+
+- Remove displayname
 - Remove avatar URL
+
 
 Reset password
 ==============

@@ -109,11 +109,6 @@ class DeactivateAccountHandler(BaseHandler):
         # Remove all 3PIDs this user has bound to the homeserver
         await self.store.user_delete_threepids(user_id)
 
-        # Remove avatar URL from this user
-        await self._profile_handler.set_avatar_url(
-            UserID.from_string(user_id), requester, "", by_admin=True
-        )
-
         # delete any devices belonging to the user, which will also
         # delete corresponding access tokens.
         await self._device_handler.delete_all_devices_for_user(user_id)
@@ -132,6 +127,15 @@ class DeactivateAccountHandler(BaseHandler):
 
         # Mark the user as erased, if they asked for that
         if erase_data:
+            # Remove avatar URL from this user
+            await self._profile_handler.set_avatar_url(
+                UserID.from_string(user_id), requester, "", by_admin=True
+            )
+            # Remove displayname from this user
+            await self._profile_handler.set_displayname(
+                UserID.from_string(user_id), requester, "", by_admin=True
+            )
+
             logger.info("Marking %s as erased", user_id)
             await self.store.mark_user_erased(user_id)
 
