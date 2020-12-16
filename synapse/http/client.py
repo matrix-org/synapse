@@ -720,7 +720,7 @@ class SimpleHttpClient:
 
         try:
             length = await make_deferred_yieldable(
-                readBodyWithMaxSize(response, output_stream, max_size)
+                read_body_with_max_size(response, output_stream, max_size)
             )
         except BodyExceededMaxSize:
             SynapseError(
@@ -783,11 +783,14 @@ class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
             self.deferred.errback(reason)
 
 
-def readBodyWithMaxSize(
+def read_body_with_max_size(
     response: IResponse, stream: BinaryIO, max_size: Optional[int]
 ) -> defer.Deferred:
     """
     Read a HTTP response body to a file-object. Optionally enforcing a maximum file size.
+
+    If the maximum file size is reached, the returned Deferred will resolve to a
+    Failure with a BodyExceededMaxSize exception.
 
     Args:
         response: The HTTP response to read from.

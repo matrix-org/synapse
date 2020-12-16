@@ -36,7 +36,7 @@ from synapse.crypto.context_factory import FederationPolicyForHTTPS
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.http.federation.srv_resolver import Server
 from synapse.http.federation.well_known_resolver import (
-    WELL_KNOW_MAX_SIZE,
+    WELL_KNOWN_MAX_SIZE,
     WellKnownResolver,
     _cache_period_from_headers,
 )
@@ -1127,7 +1127,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
             client_factory,
             expected_sni=b"testserv",
             response_headers={b"Cache-Control": b"max-age=1000"},
-            content=b'{ "m.server": "' + (b"a" * WELL_KNOW_MAX_SIZE) + b'" }',
+            content=b'{ "m.server": "' + (b"a" * WELL_KNOWN_MAX_SIZE) + b'" }',
         )
 
         # The result is sucessful, but disabled delegation.

@@ -27,7 +27,7 @@ from twisted.web.http import stringToDatetime
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent, IResponse
 
-from synapse.http.client import BodyExceededMaxSize, readBodyWithMaxSize
+from synapse.http.client import BodyExceededMaxSize, read_body_with_max_size
 from synapse.logging.context import make_deferred_yieldable
 from synapse.util import Clock, json_decoder
 from synapse.util.caches.ttlcache import TTLCache
@@ -56,7 +56,7 @@ WELL_KNOWN_MAX_CACHE_PERIOD = 48 * 3600
 WELL_KNOWN_MIN_CACHE_PERIOD = 5 * 60
 
 # The maximum size (in bytes) to allow a well-known file to be.
-WELL_KNOW_MAX_SIZE = 50 * 1024  # 50 KiB
+WELL_KNOWN_MAX_SIZE = 50 * 1024  # 50 KiB
 
 # Attempt to refetch a cached well-known N% of the TTL before it expires.
 # e.g. if set to 0.2 and we have a cached entry with a TTL of 5mins, then
@@ -260,7 +260,7 @@ class WellKnownResolver:
                 )
                 body_stream = BytesIO()
                 await make_deferred_yieldable(
-                    readBodyWithMaxSize(response, body_stream, WELL_KNOW_MAX_SIZE)
+                    read_body_with_max_size(response, body_stream, WELL_KNOWN_MAX_SIZE)
                 )
                 body = body_stream.getvalue()
 
@@ -277,7 +277,7 @@ class WellKnownResolver:
                 logger.warning(
                     "Requested .well-known file for %s is too large > %r bytes",
                     server_name.decode("ascii"),
-                    WELL_KNOW_MAX_SIZE,
+                    WELL_KNOWN_MAX_SIZE,
                 )
                 raise _FetchWellKnownFailure(temporary=True)
             except Exception as e:
