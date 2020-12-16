@@ -27,6 +27,7 @@ There are also schemas that get applied to every database, regardless of the
 data stores associated with them (e.g. the schema version tables), which are
 stored in `synapse.storage.schema`.
 """
+from typing import TYPE_CHECKING
 
 from synapse.storage.databases import Databases
 from synapse.storage.databases.main import DataStore
@@ -34,14 +35,18 @@ from synapse.storage.persist_events import EventsPersistenceStorage
 from synapse.storage.purge_events import PurgeEventsStorage
 from synapse.storage.state import StateGroupStorage
 
-__all__ = ["DataStores", "DataStore"]
+if TYPE_CHECKING:
+    from synapse.app.homeserver import HomeServer
+
+
+__all__ = ["Databases", "DataStore"]
 
 
 class Storage:
     """The high level interfaces for talking to various storage layers.
     """
 
-    def __init__(self, hs, stores: Databases):
+    def __init__(self, hs: "HomeServer", stores: Databases):
         # We include the main data store here mainly so that we don't have to
         # rewrite all the existing code to split it into high vs low level
         # interfaces.
