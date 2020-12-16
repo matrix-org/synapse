@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from collections import OrderedDict
-from typing import Any, Optional, Tuple
+from typing import Hashable, Optional, Tuple
 
 from synapse.api.errors import LimitExceededError
 from synapse.types import Requester
@@ -42,7 +42,9 @@ class Ratelimiter:
         #   * How many times an action has occurred since a point in time
         #   * The point in time
         #   * The rate_hz of this particular entry. This can vary per request
-        self.actions = OrderedDict()  # type: OrderedDict[Any, Tuple[float, int, float]]
+        self.actions = (
+            OrderedDict()
+        )  # type: OrderedDict[Hashable, Tuple[float, int, float]]
 
     def can_requester_do_action(
         self,
@@ -82,7 +84,7 @@ class Ratelimiter:
 
     def can_do_action(
         self,
-        key: Any,
+        key: Hashable,
         rate_hz: Optional[float] = None,
         burst_count: Optional[int] = None,
         update: bool = True,
@@ -175,7 +177,7 @@ class Ratelimiter:
 
     def ratelimit(
         self,
-        key: Any,
+        key: Hashable,
         rate_hz: Optional[float] = None,
         burst_count: Optional[int] = None,
         update: bool = True,

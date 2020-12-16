@@ -43,6 +43,7 @@ from synapse.api.errors import (
     SynapseError,
     UnsupportedRoomVersionError,
 )
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
@@ -863,6 +864,13 @@ class FederationHandlerRegistry:
         # Map from type to instance name that we should route EDU handling to.
         self._edu_type_to_instance = {}  # type: Dict[str, str]
 
+        # A rate limiter for incoming EDUs per type/origin.
+        self._edu_rate_limiter = Ratelimiter(
+            clock=self.clock,
+            rate_hz=self.config.rc_federation_edu.per_second,
+            burst_count=self.config.rc_federation_edu.burst_count,
+        )
+
     def register_edu_handler(
         self, edu_type: str, handler: Callable[[str, JsonDict], Awaitable[None]]
     ):
@@ -909,6 +917,10 @@ class FederationHandlerRegistry:
 
     async def on_edu(self, edu_type: str, origin: str, content: dict):
         if not self.config.use_presence and edu_type == "m.presence":
+            return
+
+        # If the incoming EDUs from this origin/type are over the limit, drop them.
+        if not self._edu_rate_limiter.can_do_action(key=(edu_type, origin)):
             return
 
         # Check if we have a handler on this instance
