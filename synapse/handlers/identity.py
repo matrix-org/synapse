@@ -813,7 +813,7 @@ class IdentityHandler(BaseHandler):
         }
         # If a custom web client location is available, include it in the request.
         if self._web_client_location:
-            invite_config["web_client_location"] = self._web_client_location
+            invite_config["org.matrix.web_client_location"] = self._web_client_location
 
         # Add the identity service access token to the JSON body and use the v2
         # Identity Service endpoints if id_access_token is present
