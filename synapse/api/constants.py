@@ -160,3 +160,10 @@ class RoomEncryptionAlgorithms:
 class AccountDataTypes:
     DIRECT = "m.direct"
     IGNORED_USER_LIST = "m.ignored_user_list"
+
+
+class HistoryVisibility:
+    INVITED = "invited"
+    JOINED = "joined"
+    SHARED = "shared"
+    WORLD_READABLE = "world_readable"
