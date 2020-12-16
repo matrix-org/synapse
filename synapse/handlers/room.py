@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple
 
 from synapse.api.constants import (
     EventTypes,
+    HistoryVisibility,
     JoinRules,
     Membership,
     RoomCreationPreset,
@@ -81,21 +82,21 @@ class RoomCreationHandler(BaseHandler):
         self._presets_dict = {
             RoomCreationPreset.PRIVATE_CHAT: {
                 "join_rules": JoinRules.INVITE,
-                "history_visibility": "shared",
+                "history_visibility": HistoryVisibility.SHARED,
                 "original_invitees_have_ops": False,
                 "guest_can_join": True,
                 "power_level_content_override": {"invite": 0},
             },
             RoomCreationPreset.TRUSTED_PRIVATE_CHAT: {
                 "join_rules": JoinRules.INVITE,
-                "history_visibility": "shared",
+                "history_visibility": HistoryVisibility.SHARED,
                 "original_invitees_have_ops": True,
                 "guest_can_join": True,
                 "power_level_content_override": {"invite": 0},
             },
             RoomCreationPreset.PUBLIC_CHAT: {
                 "join_rules": JoinRules.PUBLIC,
-                "history_visibility": "shared",
+                "history_visibility": HistoryVisibility.SHARED,
                 "original_invitees_have_ops": False,
                 "guest_can_join": False,
                 "power_level_content_override": {},
