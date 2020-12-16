@@ -640,12 +640,18 @@ def nested_logging_context(suffix: str) -> LoggingContext:
     Returns:
         LoggingContext: new logging context.
     """
-    context = current_context()
-    # It is not expected that a nested context would be created in the sentinel context.
-    assert isinstance(context, LoggingContext)
-    return LoggingContext(
-        parent_context=context, request=str(context.request) + "-" + suffix
-    )
+    curr_context = current_context()
+    if not curr_context:
+        logger.warning(
+            "Starting nested logging context from sentinel context: metrics will be lost"
+        )
+        parent_context = None
+        prefix = ""
+    else:
+        assert isinstance(curr_context, LoggingContext)
+        parent_context = curr_context
+        prefix = str(parent_context.request)
+    return LoggingContext(parent_context=parent_context, request=prefix + "-" + suffix)
 
 
 def preserve_fn(f):
