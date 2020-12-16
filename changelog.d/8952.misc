@@ -1,0 +1,1 @@
+Fix bug in `generate_log_config` script which made it write empty files.
