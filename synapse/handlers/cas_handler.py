@@ -238,6 +238,37 @@ class CasHandler:
             self._sso_handler.render_error(request, e.error, e.error_description)
             return
 
+        await self._handle_cas_response(
+            request, cas_response, client_redirect_url, session
+        )
+
+    async def _handle_cas_response(
+        self,
+        request: SynapseRequest,
+        cas_response: CasResponse,
+        client_redirect_url: Optional[str],
+        session: Optional[str],
+    ) -> None:
+        """Handle a CAS response to a ticket request.
+
+        Assumes that the response has been validated. Maps the user onto an MXID,
+        registering them if necessary, and returns a response to the browser.
+
+        Args:
+            request: the incoming request from the browser. We'll respond to it with an
+                HTML page or a redirect
+
+            cas_response: The parsed CAS response.
+
+            client_redirect_url: the redirectUrl parameter from the `/cas/ticket` HTTP request, if given.
+                This should be the same as the redirectUrl from the original `/login/sso/redirect` request.
+
+            session: The session parameter from the `/cas/ticket` HTTP request, if given.
+                This should be the UI Auth session id.
+        """
+
+        # Ensure that the attributes of the logged in user meet the required
+        # attributes.
         for required_attribute, required_value in self._cas_required_attributes.items():
             # If required attribute was not in CAS Response - Forbidden
             if required_attribute not in cas_response.attributes:
