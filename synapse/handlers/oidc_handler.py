@@ -823,7 +823,7 @@ class OidcHandler(BaseHandler):
         token: Token,
         request: SynapseRequest,
         client_redirect_url: str,
-    ):
+    ) -> None:
         """Given a UserInfo response, complete the login flow
 
         UserInfo should have a claim that uniquely identifies users. This claim

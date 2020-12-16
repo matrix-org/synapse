@@ -128,7 +128,7 @@ class SsoHandler:
         client_redirect_url: str,
         sso_to_matrix_id_mapper: Callable[[int], Awaitable[UserAttributes]],
         grandfather_existing_users: Optional[Callable[[], Awaitable[Optional[str]]]],
-        extra_login_attributes: Optional[JsonDict],
+        extra_login_attributes: Optional[JsonDict] = None,
     ) -> None:
         """
         Given an SSO ID, retrieve the user ID for it and possibly register the user.

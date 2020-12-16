@@ -312,7 +312,6 @@ class SamlHandler(BaseHandler):
             client_redirect_url,
             saml_response_to_remapped_user_attributes,
             grandfather_existing_users,
-            None,
         )
 
     def _remote_id_from_saml_response(
