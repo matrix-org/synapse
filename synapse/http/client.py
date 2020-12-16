@@ -768,13 +768,7 @@ class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
         self.stream.write(data)
         self.length += len(data)
         if self.max_size is not None and self.length >= self.max_size:
-            self.deferred.errback(
-                SynapseError(
-                    502,
-                    "Requested file is too large > %r bytes" % (self.max_size,),
-                    Codes.TOO_LARGE,
-                )
-            )
+            self.deferred.errback(BodyExceededMaxSize())
             self.deferred = defer.Deferred()
             self.transport.loseConnection()
 
