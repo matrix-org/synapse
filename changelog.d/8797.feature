@@ -1,1 +1,1 @@
-Adds support for hCaptcha. Contributed by Mark Pugner.
+Add support for alternative captchas. Contributed by Mark Pugner.
