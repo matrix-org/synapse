@@ -50,7 +50,7 @@ class UserAttributes:
     emails = attr.ib(type=List[str], default=attr.Factory(list))
 
 
-@attr.s
+@attr.s(slots=True)
 class UsernameMappingSession:
     """Data we track about SSO sessions"""
 
@@ -249,7 +249,7 @@ class SsoHandler:
                 attributes = await self._call_attribute_mapper(sso_to_matrix_id_mapper)
 
                 if attributes.localpart is None:
-                    # the mapper didn't return a username. bail out with a redirect to
+                    # the mapper doesn't return a username. bail out with a redirect to
                     # the username picker.
                     await self._redirect_to_username_picker(
                         auth_provider_id,
