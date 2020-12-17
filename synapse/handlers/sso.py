@@ -320,6 +320,28 @@ class SsoHandler:
         client_redirect_url: str,
         extra_login_attributes: Optional[JsonDict],
     ) -> NoReturn:
+        """Creates a UsernameMappingSession and redirects the browser
+
+        Called if the user mapping provider doesn't return a localpart for a new user.
+        Raises a RedirectException which redirects the browser to the username picker.
+
+        Args:
+            auth_provider_id: A unique identifier for this SSO provider, e.g.
+                "oidc" or "saml".
+
+            remote_user_id: The unique identifier from the SSO provider.
+
+            attributes: the user attributes returned by the user mapping provider.
+
+            client_redirect_url: The redirect URL passed in by the client, which we
+                will eventually redirect back to.
+
+            extra_login_attributes: An optional dictionary of extra
+                attributes to be provided to the client in the login response.
+
+        Raises:
+            RedirectException
+        """
         session_id = random_string(16)
         now = self._clock.time_msec()
         session = UsernameMappingSession(
@@ -351,6 +373,33 @@ class SsoHandler:
         user_agent: str,
         ip_address: str,
     ) -> str:
+        """Register a new SSO user.
+
+        This is called once we have successfully mapped the remote user id onto a local
+        user id, one way or another.
+
+        Args:
+             attributes: user attributes returned by the user mapping provider,
+                including a non-empty localpart.
+
+            auth_provider_id: A unique identifier for this SSO provider, e.g.
+                "oidc" or "saml".
+
+            remote_user_id: The unique identifier from the SSO provider.
+
+            user_agent: The user-agent in the HTTP request (used for potential
+                shadow-banning.)
+
+            ip_address: The IP address of the requester (used for potential
+                shadow-banning.)
+
+        Raises:
+            a MappingException if the localpart is invalid.
+
+            a SynapseError with code 400 and errcode Codes.USER_IN_USE if the localpart
+            is already taken.
+        """
+
         # Since the localpart is provided via a potentially untrusted module,
         # ensure the MXID is valid before registering.
         if not attributes.localpart or contains_invalid_mxid_characters(
@@ -451,6 +500,15 @@ class SsoHandler:
     async def handle_submit_username_request(
         self, request: SynapseRequest, localpart: str, session_id: str
     ) -> None:
+        """Handle a request to the username-picker 'submit' endpoint
+
+        Will serve an HTTP response to the request.
+
+        Args:
+            request: HTTP request
+            localpart: localpart requested by the user
+            session_id: ID of the username mapping session, extracted from a cookie
+        """
         self._expire_old_sessions()
         session = self._username_mapping_sessions.get(session_id)
         if not session:
@@ -465,6 +523,8 @@ class SsoHandler:
             emails=session.emails,
         )
 
+        # the following will raise a 400 error if the username has been taken in the
+        # meantime.
         user_id = await self._register_mapped_user(
             attributes,
             session.auth_provider_id,

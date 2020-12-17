@@ -37,8 +37,8 @@ def pick_username_resource(hs: "HomeServer") -> Resource:
     resource is just a File resource which serves up the static files in the resources
     "res" directory, but it has a couple of children:
 
-   * "submit", which does the mechanics of registering the new user, and redirects the
-     browser back to the client URL
+    * "submit", which does the mechanics of registering the new user, and redirects the
+      browser back to the client URL
 
     * "check": checks if a userid is free.
     """

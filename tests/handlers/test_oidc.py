@@ -896,8 +896,7 @@ class UsernamePickerTestCase(HomeserverTestCase):
 
         # the expiry time should be about 15 minutes away
         expected_expiry = self.clock.time_msec() + (15 * 60 * 1000)
-        self.assertGreaterEqual(session.expiry_time_ms, expected_expiry - 1000)
-        self.assertLessEqual(session.expiry_time_ms, expected_expiry + 1000)
+        self.assertApproximates(session.expiry_time_ms, expected_expiry, tolerance=1000)
 
         # Now, submit a username to the username picker, which should serve a redirect
         # back to the client
@@ -917,11 +916,12 @@ class UsernamePickerTestCase(HomeserverTestCase):
         )
         self.assertEqual(chan.code, 302, chan.result)
         location_headers = chan.headers.getRawHeaders("Location")
+        # ensure that the returned location starts with the requested redirect URL
         self.assertEqual(
             location_headers[0][: len(client_redirect_url)], client_redirect_url
         )
 
-        # fish the login token out of the redirect uri
+        # fish the login token out of the returned redirect uri
         parts = urlparse(location_headers[0])
         query = parse_qs(parts.query)
         login_token = query["loginToken"][0]
