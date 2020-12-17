@@ -70,9 +70,9 @@ function submitUsername(username) {
     }).then((response) => {
         if(!response.ok) {
             // for non-200 responses, raise the body of the response as an exception
-            return response.text().then((text) => { throw text });
+            return response.text().then((text) => { throw text; });
         } else {
-            return response.json()
+            return response.json();
         }
     }).then((json) => {
         if(json.error) {
