@@ -332,10 +332,7 @@ class AuthHandler(BaseHandler):
             last_validated = await self.store.get_access_token_last_validated(
                 requester.access_token_id
             )
-            if (
-                self.clock.time_msec() - last_validated
-                < self._ui_auth_session_timeout
-            ):
+            if self.clock.time_msec() - last_validated < self._ui_auth_session_timeout:
                 # Return the input parameters, minus the auth key, which matches
                 # the logic in check_ui_auth.
                 request_body.pop("auth", None)
