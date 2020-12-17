@@ -113,9 +113,13 @@ class UserDirectoryHandler(StateDeltasHandler):
         """
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
-        is_support = await self.store.is_support_user(user_id)
+
         # Support users are for diagnostics and should not appear in the user directory.
-        if not is_support:
+        is_support = await self.store.is_support_user(user_id)
+        # When change profile information of deactivated user it should not appear in the user directory.
+        is_deactivated = await self.store.get_user_deactivated_status(user_id)
+
+        if not (is_support or is_deactivated):
             await self.store.update_profile_in_user_dir(
                 user_id, profile.display_name, profile.avatar_url
             )
