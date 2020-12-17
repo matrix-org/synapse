@@ -5,39 +5,39 @@ let message = document.getElementById("message");
 
 // Remove input field placeholder if the text field is not empty
 function switchClass(input) {
-  if (input.value.length > 0) {
-    input.classList.add('has-contents');
-  }
-  else {
-    input.classList.remove('has-contents');
-  }
+    if (input.value.length > 0) {
+        input.classList.add('has-contents');
+    }
+    else {
+        input.classList.remove('has-contents');
+    }
 };
 
 // Submit username and receive response
 function showMessage(messageText) {
-  // Unhide the message text
-  message.classList.remove("hidden");
+    // Unhide the message text
+    message.classList.remove("hidden");
 
-  message.innerHTML = messageText;
+    message.innerHTML = messageText;
 };
 
 function onResponse(response, success) {
-  // Display message
-  showMessage(response);
+    // Display message
+    showMessage(response);
 
-  if(success) {
-    inputForm.submit();
-    return;
-  }
+    if(success) {
+        inputForm.submit();
+        return;
+    }
 
-  // Enable submit button and input field
-  submitButton.classList.remove('button--disabled');
-  submitButton.value = "Submit"
+    // Enable submit button and input field
+    submitButton.classList.remove('button--disabled');
+    submitButton.value = "Submit";
 };
 
 let allowedUsernameCharacters = RegExp("[^a-z0-9\\.\\_\\=\\-\\/]");
 function usernameIsValid(username) {
-  return !allowedUsernameCharacters.test(username);
+    return !allowedUsernameCharacters.test(username);
 }
 let allowedCharactersString = "" +
 "lowercase letters, " +
@@ -55,14 +55,14 @@ function buildQueryString(params) {
 }
 
 function submitUsername(username) {
-  if(username.length == 0) {
-    onResponse("Please enter a username.", false);
-    return;
-  }
-  if(!usernameIsValid(username)) {
-    onResponse("Invalid username. Only the following characters are allowed: " + allowedCharactersString, false);
-    return;
-  }
+    if(username.length == 0) {
+        onResponse("Please enter a username.", false);
+        return;
+    }
+    if(!usernameIsValid(username)) {
+        onResponse("Invalid username. Only the following characters are allowed: " + allowedCharactersString, false);
+        return;
+    }
 
     let check_uri = 'check?' + buildQueryString({"username": username});
     fetch(check_uri, {
@@ -88,28 +88,28 @@ function submitUsername(username) {
 }
 
 function clickSubmit() {
-  if(submitButton.classList.contains('button--disabled')) { return; }
+    if(submitButton.classList.contains('button--disabled')) { return; }
 
-  // Disable submit button and input field
-  submitButton.classList.add('button--disabled');
+    // Disable submit button and input field
+    submitButton.classList.add('button--disabled');
 
-  // Submit username
-  submitButton.value = "Checking...";
-  submitUsername(inputField.value);
+    // Submit username
+    submitButton.value = "Checking...";
+    submitUsername(inputField.value);
 };
 
 submitButton.onclick = clickSubmit;
 
 // Listen for events on inputField
 inputField.addEventListener('keypress', function(event) {
-  // Listen for Enter on input field
-  if(event.which === 13) {
-    event.preventDefault();
-    clickSubmit();
-    return true;
-  }
-  switchClass(inputField);
+    // Listen for Enter on input field
+    if(event.which === 13) {
+        event.preventDefault();
+        clickSubmit();
+        return true;
+    }
+    switchClass(inputField);
 });
 inputField.addEventListener('change', function() {
-  switchClass(inputField);
+    switchClass(inputField);
 });
