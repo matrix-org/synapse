@@ -489,9 +489,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         """
         other_user_token = self.login("user1", "pass1")
 
-        request, channel = self.make_request(
-            "GET", self.url, access_token=other_user_token,
-        )
+        channel = self.make_request("GET", self.url, access_token=other_user_token)
 
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
@@ -540,7 +538,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
                 expected_http_code: The expected http code for the request
             """
             url = self.url + "?%s=%s" % (search_field, search_term,)
-            request, channel = self.make_request(
+            channel = self.make_request(
                 "GET", url.encode("ascii"), access_token=self.admin_user_tok,
             )
             self.assertEqual(expected_http_code, channel.code, msg=channel.json_body)
@@ -1026,7 +1024,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         # Deactivate user
         body = json.dumps({"deactivated": True})
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             self.url_other_user,
             access_token=self.admin_user_tok,
@@ -1044,7 +1042,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         # Set new displayname user
         body = json.dumps({"displayname": "Foobar"})
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             self.url_other_user,
             access_token=self.admin_user_tok,
