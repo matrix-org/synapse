@@ -22,14 +22,11 @@ from twisted.internet.defer import succeed
 from synapse import event_auth
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.room_versions import RoomVersions
-from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.events import builder
-from synapse.federation.transport import server as federation_server
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 from synapse.server import HomeServer
 from synapse.types import RoomAlias
-from synapse.util.ratelimitutils import FederationRateLimiter
 
 from tests.test_utils import event_injection, make_awaitable
 from tests.unittest import FederatingHomeserverTestCase, TestCase, override_config
@@ -203,27 +200,6 @@ class FederationKnockingTestCase(
         # Have this homeserver skip event auth checks. This is necessary due to
         # event auth checks ensuring that events were signed the sender's homeserver.
         event_auth.check = Mock(return_value=make_awaitable(None))
-
-        # Bypass authentication checks for federation requests originating from our
-        # test homeserver.
-        class Authenticator:
-            def authenticate_request(self, request, content):
-                return make_awaitable("other.example.com")
-
-        # Override federation ratelimits
-        ratelimiter = FederationRateLimiter(
-            clock,
-            FederationRateLimitConfig(
-                window_size=1,
-                sleep_limit=1,
-                sleep_msec=1,
-                reject_limit=1000,
-                concurrent_requests=1000,
-            ),
-        )
-        federation_server.register_servlets(
-            homeserver, self.resource, Authenticator(), ratelimiter
-        )
 
         return super().prepare(reactor, clock, homeserver)
 
