@@ -16,6 +16,8 @@ function onResponse(response, success) {
     showMessage(response);
 
     if(success) {
+        // remove the event handler before re-submitting the form.
+        delete inputForm.onsubmit;
         inputForm.submit();
         return;
     }
@@ -78,6 +80,7 @@ function submitUsername(username) {
 }
 
 function clickSubmit() {
+    event.preventDefault();
     if(submitButton.classList.contains('button--disabled')) { return; }
 
     // Disable submit button and input field
@@ -88,14 +91,4 @@ function clickSubmit() {
     submitUsername(inputField.value);
 };
 
-submitButton.onclick = clickSubmit;
-
-// Listen for events on inputField
-inputField.addEventListener('keypress', function(event) {
-    // Listen for Enter on input field
-    if(event.which === 13) {
-        event.preventDefault();
-        clickSubmit();
-        return true;
-    }
-});
+inputForm.onsubmit = clickSubmit;
