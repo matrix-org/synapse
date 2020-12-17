@@ -21,6 +21,7 @@ from tests.utils import setup_test_homeserver
 ALICE = "@alice:a"
 BOB = "@bob:b"
 BOBBY = "@bobby:a"
+# The localpart isn't 'Bela' on purpose so we can test looking up display names.
 BELA = "@somenickname:a"
 
 
