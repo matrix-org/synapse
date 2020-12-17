@@ -181,7 +181,7 @@ class AuthRestServlet(RestServlet):
                 html = self.success_template.render()
             else:
 
-                html = self.hcaptcha_template.render(
+                html = self.altcaptcha_template.render(
                     session=session,
                     myurl="%s/r0/auth/%s/fallback/web"
                     % (CLIENT_API_PREFIX, LoginType.ALTCAPTCHA),

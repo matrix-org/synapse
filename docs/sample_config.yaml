@@ -1067,14 +1067,14 @@ url_preview_accept_language:
 #
 #altcaptcha_private_key: "YOUR_PRIVATE_KEY"
 
-# This is the callback class used for altcaptcha validation, it is an 
+# This is the callback class used for altcaptcha validation, it is an
 # implementation specific detail used in the altcaptcha page for result.
 # validation. Example: "frc-captcha" or "h-captcha"
 #
 #altcaptcha_callback_class_target: "IMPLEMENTATION_SPECIFIC_CALLBACK_CLASS_TARGET"
 
 # This is the captcha script used in the template altcaptcha page.
-# Example: https://cdn.jsdelivr.net/npm/friendly-challenge@0.6.1/widget.module.min.js or 
+# Example: https://cdn.jsdelivr.net/npm/friendly-challenge@0.6.1/widget.module.min.js or
 # https://hcaptcha.com/1/api.js to use either FriendlyCaptcha or hCaptcha
 #
 #altcaptcha_template_script: "URL_TO_CAPTCHA_SCRIPT"
