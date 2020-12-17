@@ -3,16 +3,6 @@ let inputForm = document.getElementById("form");
 let submitButton = document.getElementById("button-submit");
 let message = document.getElementById("message");
 
-// Remove input field placeholder if the text field is not empty
-function switchClass(input) {
-    if (input.value.length > 0) {
-        input.classList.add('has-contents');
-    }
-    else {
-        input.classList.remove('has-contents');
-    }
-};
-
 // Submit username and receive response
 function showMessage(messageText) {
     // Unhide the message text
@@ -108,8 +98,4 @@ inputField.addEventListener('keypress', function(event) {
         clickSubmit();
         return true;
     }
-    switchClass(inputField);
-});
-inputField.addEventListener('change', function() {
-    switchClass(inputField);
 });
