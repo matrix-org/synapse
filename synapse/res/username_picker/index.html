@@ -7,12 +7,11 @@
   <body>
     <div class="card">
       <form method="post" class="form__input" id="form" action="submit">
+        <label for="field-username">Please pick your username:</label>
         <input type="text" name="username" id="field-username" autofocus="">
-        <label for="field-username">
-          <span><span aria-hidden="true">Please pick your </span>username</span>
-        </label>
         <input type="button" class="button button--full-width" id="button-submit" value="Submit">
       </form>
+      <!-- this is used for feedback -->
       <div role=alert class="tooltip hidden" id="message"></div>
       <script src="script.js"></script>
     </div>
