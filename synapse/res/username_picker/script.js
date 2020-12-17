@@ -4,7 +4,7 @@ let submitButton = document.getElementById("button-submit");
 let message = document.getElementById("message");
 
 // Remove input field placeholder if the text field is not empty
-let switchClass = function(input) {
+function switchClass(input) {
   if (input.value.length > 0) {
     input.classList.add('has-contents');
   }
@@ -14,14 +14,14 @@ let switchClass = function(input) {
 };
 
 // Submit username and receive response
-let showMessage = function(messageText) {
+function showMessage(messageText) {
   // Unhide the message text
   message.classList.remove("hidden");
 
   message.innerHTML = messageText;
 };
 
-let onResponse = function(response, success) {
+function onResponse(response, success) {
   // Display message
   showMessage(response);
 
@@ -36,7 +36,7 @@ let onResponse = function(response, success) {
 };
 
 let allowedUsernameCharacters = RegExp("[^a-z0-9\\.\\_\\=\\-\\/]");
-let usernameIsValid = function(username) {
+function usernameIsValid(username) {
   return !allowedUsernameCharacters.test(username);
 }
 let allowedCharactersString = "" +
@@ -48,13 +48,13 @@ let allowedCharactersString = "" +
 "<code>/</code>, " +
 "<code>=</code>";
 
-let buildQueryString = function(params) {
+function buildQueryString(params) {
     return Object.keys(params)
         .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k]))
         .join('&');
 }
 
-let submitUsername = function(username) {
+function submitUsername(username) {
   if(username.length == 0) {
     onResponse("Please enter a username.", false);
     return;
@@ -87,7 +87,7 @@ let submitUsername = function(username) {
     });
 }
 
-let clickSubmit = function() {
+function clickSubmit() {
   if(submitButton.classList.contains('button--disabled')) { return; }
 
   // Disable submit button and input field
@@ -113,4 +113,3 @@ inputField.addEventListener('keypress', function(event) {
 inputField.addEventListener('change', function() {
   switchClass(inputField);
 });
-
