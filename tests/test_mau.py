@@ -78,7 +78,8 @@ class TestMauLimit(unittest.HomeserverTestCase):
 
     def test_as_ignores_mau(self):
         """Test that application services can still create users when the MAU
-        limit has been reached.
+        limit has been reached. This only works when application service
+        user ip tracking is disabled.
         """
 
         # Create and sync so that the MAU counts get updated
