@@ -8,7 +8,7 @@ function showMessage(messageText) {
     // Unhide the message text
     message.classList.remove("hidden");
 
-    message.innerHTML = messageText;
+    message.textContent = messageText;
 };
 
 function doSubmit() {
