@@ -11,16 +11,17 @@ function showMessage(messageText) {
     message.innerHTML = messageText;
 };
 
-function onResponse(response, success) {
+function doSubmit() {
+    showMessage("Success. Please wait a moment for your browser to redirect.");
+
+    // remove the event handler before re-submitting the form.
+    delete inputForm.onsubmit;
+    inputForm.submit();
+}
+
+function onResponse(response) {
     // Display message
     showMessage(response);
-
-    if(success) {
-        // remove the event handler before re-submitting the form.
-        delete inputForm.onsubmit;
-        inputForm.submit();
-        return;
-    }
 
     // Enable submit button and input field
     submitButton.classList.remove('button--disabled');
@@ -48,11 +49,17 @@ function buildQueryString(params) {
 
 function submitUsername(username) {
     if(username.length == 0) {
-        onResponse("Please enter a username.", false);
+        onResponse("Please enter a username.");
         return;
     }
     if(!usernameIsValid(username)) {
-        onResponse("Invalid username. Only the following characters are allowed: " + allowedCharactersString, false);
+        onResponse("Invalid username. Only the following characters are allowed: " + allowedCharactersString);
+        return;
+    }
+
+    // if this browser doesn't support fetch, skip the availability check.
+    if(!window.fetch) {
+        doSubmit();
         return;
     }
 
@@ -70,12 +77,12 @@ function submitUsername(username) {
         if(json.error) {
             throw json.error;
         } else if(json.available) {
-            onResponse("Success. Please wait a moment for your browser to redirect.", true);
+            doSubmit();
         } else {
-            onResponse("This username is not available, please choose another.", false);
+            onResponse("This username is not available, please choose another.");
         }
     }).catch((err) => {
-        onResponse("Error checking username availability: " + err, false);
+        onResponse("Error checking username availability: " + err);
     });
 }
 
