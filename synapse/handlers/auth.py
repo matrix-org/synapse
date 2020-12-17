@@ -359,6 +359,9 @@ class AuthHandler(BaseHandler):
         if user_id != requester.user.to_string():
             raise AuthError(403, "Invalid auth")
 
+        # Note that the access token has been validated.
+        await self.store.update_access_token_last_validated(requester.access_token_id)
+
         return params, session_id
 
     async def _get_available_ui_auth_types(self, user: UserID) -> Iterable[str]:
@@ -563,6 +566,8 @@ class AuthHandler(BaseHandler):
 
         creds = await self.store.get_completed_ui_auth_stages(session.session_id)
         for f in flows:
+            # If all the required credentials have been supplied, the user has
+            # successfully completed the UI auth process!
             if len(set(f) - set(creds)) == 0:
                 # it's very useful to know what args are stored, but this can
                 # include the password in the case of registering, so only log
