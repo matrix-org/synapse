@@ -25,6 +25,7 @@ from tests.federation.transport.test_knocking import (
     KnockingStrippedStateEventHelperMixin,
 )
 from tests.server import TimedOutException
+from tests.unittest import override_config
 
 
 class FilterTestCase(unittest.HomeserverTestCase):
@@ -363,6 +364,7 @@ class SyncKnockTestCase(
             hs, self.room_id, self.user_id
         )
 
+    @override_config({"msc2403_enabled": True})
     def test_knock_room_state(self):
         """Tests that /sync returns state from a room after knocking on it."""
         # Knock on a room

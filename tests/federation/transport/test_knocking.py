@@ -32,7 +32,7 @@ from synapse.types import RoomAlias
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 from tests.test_utils import event_injection, make_awaitable
-from tests.unittest import FederatingHomeserverTestCase, TestCase
+from tests.unittest import FederatingHomeserverTestCase, TestCase, override_config
 
 # An identifier to use while MSC2304 is not in a stable release of the spec
 KNOCK_UNSTABLE_IDENTIFIER = "xyz.amorgan.knock"
@@ -227,6 +227,7 @@ class FederationKnockingTestCase(
 
         return super().prepare(reactor, clock, homeserver)
 
+    @override_config({"msc2403_enabled": True})
     def test_room_state_returned_when_knocking(self):
         """
         Tests that specific, stripped state events from a room are returned after
