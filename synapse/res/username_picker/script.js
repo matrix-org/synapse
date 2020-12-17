@@ -65,7 +65,8 @@ function submitUsername(username) {
 
     let check_uri = 'check?' + buildQueryString({"username": username});
     fetch(check_uri, {
-        "credentials": "include",
+        // include the cookie
+        "credentials": "same-origin",
     }).then((response) => {
         if(!response.ok) {
             // for non-200 responses, raise the body of the response as an exception
