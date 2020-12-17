@@ -35,7 +35,12 @@ class ApiConfig(Config):
         self.room_invite_state_types = config.get(
             "room_invite_state_types", DEFAULT_ROOM_STATE_TYPES
         )
-        self.msc2403_enabled = config.get("msc2403_enabled", False)
+        msc2403_enabled = config.get("msc2403_enabled", False)
+        if msc2403_enabled:
+            # Enable the MSC2403 unstable room version
+            KNOWN_ROOM_VERSIONS.update(
+                {RoomVersions.MSC2403_DEV.identifier: RoomVersions.MSC2403_DEV}
+            )
 
     def generate_config_section(cls, **kwargs):
         return """\
