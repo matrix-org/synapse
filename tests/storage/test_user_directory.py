@@ -21,6 +21,7 @@ from tests.utils import setup_test_homeserver
 ALICE = "@alice:a"
 BOB = "@bob:b"
 BOBBY = "@bobby:a"
+BELA = "@somenickname:a"
 
 
 class UserDirectoryStoreTestCase(unittest.TestCase):
@@ -39,6 +40,9 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
         )
         yield defer.ensureDeferred(
             self.store.update_profile_in_user_dir(BOBBY, "bobby", None)
+        )
+        yield defer.ensureDeferred(
+            self.store.update_profile_in_user_dir(BELA, "Bela", None)
         )
         yield defer.ensureDeferred(
             self.store.add_users_in_public_rooms("!room:id", (ALICE, BOB))
@@ -69,6 +73,24 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
             self.assertDictEqual(
                 r["results"][1],
                 {"user_id": BOBBY, "display_name": "bobby", "avatar_url": None},
+            )
+        finally:
+            self.hs.config.user_directory_search_all_users = False
+
+    @defer.inlineCallbacks
+    def test_search_user_dir_stop_words(self):
+        """Tests that a user can look up another user by searching for the start if its
+        display name even if that name happens to be a common English word that would
+        usually be ignored in full text searches.
+        """
+        self.hs.config.user_directory_search_all_users = True
+        try:
+            r = yield defer.ensureDeferred(self.store.search_user_dir(ALICE, "be", 10))
+            self.assertFalse(r["limited"])
+            self.assertEqual(1, len(r["results"]))
+            self.assertDictEqual(
+                r["results"][0],
+                {"user_id": BELA, "display_name": "Bela", "avatar_url": None},
             )
         finally:
             self.hs.config.user_directory_search_all_users = False
