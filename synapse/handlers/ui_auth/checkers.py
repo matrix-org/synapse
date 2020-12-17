@@ -132,15 +132,16 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
         raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
 
 
-class HcaptchaAuthChecker(UserInteractiveAuthChecker):
-    AUTH_TYPE = LoginType.HCAPTCHA
+class AltcaptchaAuthChecker(UserInteractiveAuthChecker):
+    AUTH_TYPE = LoginType.ALTCAPTCHA
 
     def __init__(self, hs):
         super().__init__(hs)
-        self._enabled = bool(hs.config.hcaptcha_private_key)
+        self._enabled = bool(hs.config.altcaptcha_private_key)
         self._http_client = hs.get_proxied_http_client()
-        self._url = hs.config.hcaptcha_siteverify_api
-        self._secret = hs.config.hcaptcha_private_key
+        self._url = hs.config.altcaptcha_siteverify_api
+        self._secret = hs.config.altcaptcha_private_key
+        self._response = hs.config.altcaptcha_siteverify_api_response
 
     def is_enabled(self):
         return self._enabled
@@ -152,11 +153,13 @@ class HcaptchaAuthChecker(UserInteractiveAuthChecker):
             # Client tried to provide captcha but didn't give the parameter:
             # bad request.
             raise LoginError(
-                400, "HCaptcha response is required", errcode=Codes.CAPTCHA_NEEDED
+                400, "AltCaptcha response is required", errcode=Codes.CAPTCHA_NEEDED
             )
 
         logger.info(
-            "Submitting hcaptcha response %s with remoteip %s", user_response, clientip
+            "Submitting altcaptcha response %s with remoteip %s",
+            user_response,
+            clientip,
         )
 
         # TODO: get this from the homeserver rather than creating a new one for
@@ -166,7 +169,7 @@ class HcaptchaAuthChecker(UserInteractiveAuthChecker):
                 self._url,
                 args={
                     "secret": self._secret,
-                    "response": user_response,
+                    self._response: user_response,
                     "remoteip": clientip,
                 },
             )
@@ -179,11 +182,9 @@ class HcaptchaAuthChecker(UserInteractiveAuthChecker):
             # Note that we do NOT check the hostname here: we explicitly
             # intend the CAPTCHA to be presented by whatever client the
             # user is using, we just care that they have completed a CAPTCHA.
-            # this seems like where it would be nice to also integrate in support for hcaptcha
-            # https://www.hcaptcha.com/
 
             logger.info(
-                "%s hCAPTCHA from hostname %s",
+                "%s altCAPTCHA from hostname %s",
                 "Successful" if resp_body["success"] else "Failed",
                 resp_body.get("hostname"),
             )
@@ -299,7 +300,7 @@ INTERACTIVE_AUTH_CHECKERS = [
     DummyAuthChecker,
     TermsAuthChecker,
     RecaptchaAuthChecker,
-    HcaptchaAuthChecker,
+    AltcaptchaAuthChecker,
     EmailIdentityAuthChecker,
     MsisdnAuthChecker,
 ]

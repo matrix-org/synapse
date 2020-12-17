@@ -60,7 +60,9 @@ class AuthRestServlet(RestServlet):
         self.recaptcha_template = hs.config.recaptcha_template
         self.altcaptcha_template = hs.config.altcaptcha_template
         self.altcaptcha_response_template = hs.config.altcaptcha_response_template
-        self.altcaptcha_callback_class_target = hs.config.altcaptcha_callback_class_target
+        self.altcaptcha_callback_class_target = (
+            hs.config.altcaptcha_callback_class_target
+        )
         self.altcaptcha_template_script = hs.config.altcaptcha_template_script
         self.altcaptcha_template_script2 = hs.config.altcaptcha_template_script2
         self.altcaptcha_siteverify_api = hs.config.altcaptcha_siteverify_api
@@ -89,7 +91,6 @@ class AuthRestServlet(RestServlet):
                 altcaptcha_callback_class_target=self.hs.config.altcaptcha_callback_class_target,
                 altcaptcha_template_script=self.hs.config.altcaptcha_template_script,
                 altcaptcha_template_script2=self.hs.config.altcaptcha_template_script2,
-                
             )
         elif stagetype == LoginType.TERMS:
             html = self.terms_template.render(
@@ -163,7 +164,7 @@ class AuthRestServlet(RestServlet):
                     myurl="%s/r0/auth/%s/fallback/web"
                     % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
                     sitekey=self.hs.config.recaptcha_public_key,
-                    )
+                )
         elif stagetype == LoginType.ALTCAPTCHA:
             response = parse_string(request, self.altcaptcha_response_template)
 

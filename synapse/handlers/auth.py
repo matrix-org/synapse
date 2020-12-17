@@ -655,8 +655,10 @@ class AuthHandler(BaseHandler):
     def _get_params_recaptcha(self) -> dict:
         return {"public_key": self.hs.config.recaptcha_public_key}
 
-    def _get_params_hcaptcha(self) -> dict:
-        return {"public_key": self.hs.config.hcaptcha_public_key}
+    # This is probably where we would hook for the non fallback workflows to extend
+    # The frontends to support configurable captchas
+    def _get_params_altcaptcha(self) -> dict:
+        return {"public_key": self.hs.config.altcaptcha_public_key}
 
     def _get_params_terms(self) -> dict:
         return {
@@ -684,7 +686,7 @@ class AuthHandler(BaseHandler):
 
         get_params = {
             LoginType.RECAPTCHA: self._get_params_recaptcha,
-            LoginType.HCAPTCHA: self._get_params_hcaptcha,
+            LoginType.ALTCAPTCHA: self._get_params_altcaptcha,
             LoginType.TERMS: self._get_params_terms,
         }
 

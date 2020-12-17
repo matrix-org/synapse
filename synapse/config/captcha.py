@@ -33,10 +33,18 @@ class CaptchaConfig(Config):
         )[0]
         self.altcaptcha_private_key = config.get("altcaptcha_private_key")
         self.altcaptcha_public_key = config.get("altcaptcha_public_key")
-        self.altcaptcha_callback_class_target = config.get("altcaptcha_callback_class_target","h-captcha")
-        self.altcaptcha_template_script = config.get("altcaptcha_template_script","https://hcaptcha.com/1/api.js")
-        self.altcaptcha_template_script2 = config.get("altcaptcha_template_script2", self.altcaptcha_template_script)
-        self.altcaptcha_response_template = config.get("altcaptcha_response_template","h-captcha-response")
+        self.altcaptcha_callback_class_target = config.get(
+            "altcaptcha_callback_class_target", "h-captcha"
+        )
+        self.altcaptcha_template_script = config.get(
+            "altcaptcha_template_script", "https://hcaptcha.com/1/api.js"
+        )
+        self.altcaptcha_template_script2 = config.get(
+            "altcaptcha_template_script2", self.altcaptcha_template_script
+        )
+        self.altcaptcha_response_template = config.get(
+            "altcaptcha_response_template", "h-captcha-response"
+        )
         self.enable_registration_altcaptcha = config.get(
             "enable_registration_altcaptcha", False
         )
@@ -49,7 +57,7 @@ class CaptchaConfig(Config):
         self.altcaptcha_template = self.read_templates(
             ["altcaptcha.html"], autoescape=True
         )[0]
-        
+
     def generate_config_section(self, **kwargs):
         return """\
         ## Captcha ##
@@ -88,14 +96,14 @@ class CaptchaConfig(Config):
         #
         #altcaptcha_private_key: "YOUR_PRIVATE_KEY"
 
-        # This is the callback class used for altcaptcha validation, it is an 
+        # This is the callback class used for altcaptcha validation, it is an
         # implementation specific detail used in the altcaptcha page for result.
         # validation. Example: "frc-captcha" or "h-captcha"
         #
         #altcaptcha_callback_class_target: "IMPLEMENTATION_SPECIFIC_CALLBACK_CLASS_TARGET"
 
         # This is the captcha script used in the template altcaptcha page.
-        # Example: https://cdn.jsdelivr.net/npm/friendly-challenge@0.6.1/widget.module.min.js or 
+        # Example: https://cdn.jsdelivr.net/npm/friendly-challenge@0.6.1/widget.module.min.js or
         # https://hcaptcha.com/1/api.js to use either FriendlyCaptcha or hCaptcha
         #
         #altcaptcha_template_script: "URL_TO_CAPTCHA_SCRIPT"
