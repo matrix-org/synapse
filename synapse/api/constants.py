@@ -60,7 +60,7 @@ class LoginType:
     EMAIL_IDENTITY = "m.login.email.identity"
     MSISDN = "m.login.msisdn"
     RECAPTCHA = "m.login.recaptcha"
-    HCAPTCHA = "org.matrix.msc2745.login.hcaptcha"
+    ALTCAPTCHA = "org.matrix.msc2745.login.altcaptcha"
     TERMS = "m.login.terms"
     SSO = "m.login.sso"
     DUMMY = "m.login.dummy"

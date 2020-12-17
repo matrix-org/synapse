@@ -779,12 +779,11 @@ def _calculate_registration_flows(
     if config.enable_registration_captcha:
         for flow in flows:
             flow.insert(0, LoginType.RECAPTCHA)
-
-    # Prepend hcaptcha to all flows if we're requiring captcha
-    if config.enable_registration_hcaptcha:
+    
+    # Prepend altcaptcha to all flows if we're requiring altcaptcha
+    if config.enable_registration_altcaptcha:
         for flow in flows:
-            flow.insert(0, LoginType.HCAPTCHA)
-
+            flow.insert(0, LoginType.ALTCAPTCHA)
     return flows
 
 

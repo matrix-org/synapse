@@ -58,7 +58,13 @@ class AuthRestServlet(RestServlet):
             self._cas_service_url = hs.config.cas_service_url
 
         self.recaptcha_template = hs.config.recaptcha_template
-        self.hcaptcha_template = hs.config.hcaptcha_template
+        self.altcaptcha_template = hs.config.altcaptcha_template
+        self.altcaptcha_response_template = hs.config.altcaptcha_response_template
+        self.altcaptcha_callback_class_target = hs.config.altcaptcha_callback_class_target
+        self.altcaptcha_template_script = hs.config.altcaptcha_template_script
+        self.altcaptcha_template_script2 = hs.config.altcaptcha_template_script2
+        self.altcaptcha_siteverify_api = hs.config.altcaptcha_siteverify_api
+
         self.terms_template = hs.config.terms_template
         self.success_template = hs.config.fallback_success_template
 
@@ -74,12 +80,16 @@ class AuthRestServlet(RestServlet):
                 % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
                 sitekey=self.hs.config.recaptcha_public_key,
             )
-        elif stagetype == LoginType.HCAPTCHA:
-            html = self.hcaptcha_template.render(
+        elif stagetype == LoginType.ALTCAPTCHA:
+            html = self.altcaptcha_template.render(
                 session=session,
                 myurl="%s/r0/auth/%s/fallback/web"
-                % (CLIENT_API_PREFIX, LoginType.HCAPTCHA),
-                sitekey=self.hs.config.hcaptcha_public_key,
+                % (CLIENT_API_PREFIX, LoginType.ALTCAPTCHA),
+                sitekey=self.hs.config.altcaptcha_public_key,
+                altcaptcha_callback_class_target=self.hs.config.altcaptcha_callback_class_target,
+                altcaptcha_template_script=self.hs.config.altcaptcha_template_script,
+                altcaptcha_template_script2=self.hs.config.altcaptcha_template_script2,
+                
             )
         elif stagetype == LoginType.TERMS:
             html = self.terms_template.render(
@@ -153,17 +163,17 @@ class AuthRestServlet(RestServlet):
                     myurl="%s/r0/auth/%s/fallback/web"
                     % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
                     sitekey=self.hs.config.recaptcha_public_key,
-                )
-        elif stagetype == LoginType.HCAPTCHA:
-            response = parse_string(request, "h-captcha-response")
+                    )
+        elif stagetype == LoginType.ALTCAPTCHA:
+            response = parse_string(request, self.altcaptcha_response_template)
 
             if not response:
-                raise SynapseError(400, "No hcaptcha response supplied")
+                raise SynapseError(400, "No altcaptcha response supplied")
 
             authdict = {"response": response, "session": session}
 
             success = await self.auth_handler.add_oob_auth(
-                LoginType.HCAPTCHA, authdict, self.hs.get_ip_from_request(request)
+                LoginType.ALTCAPTCHA, authdict, self.hs.get_ip_from_request(request)
             )
 
             if success:
@@ -173,8 +183,8 @@ class AuthRestServlet(RestServlet):
                 html = self.hcaptcha_template.render(
                     session=session,
                     myurl="%s/r0/auth/%s/fallback/web"
-                    % (CLIENT_API_PREFIX, LoginType.HCAPTCHA),
-                    sitekey=self.hs.config.hcaptcha_public_key,
+                    % (CLIENT_API_PREFIX, LoginType.ALTCAPTCHA),
+                    sitekey=self.hs.config.altcaptcha_public_key,
                 )
         elif stagetype == LoginType.TERMS:
             authdict = {"session": session}
