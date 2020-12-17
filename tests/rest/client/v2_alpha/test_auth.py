@@ -318,6 +318,8 @@ class UIAuthTests(unittest.HomeserverTestCase):
 
         # Make another request providing the UI auth flow, but try to delete the
         # second device. This results in an error.
+        #
+        # This makes use of the fact that the device ID is embedded into the URL.
         self.delete_device(
             self.user_tok,
             "dev2",
@@ -331,6 +333,52 @@ class UIAuthTests(unittest.HomeserverTestCase):
                 },
             },
         )
+
+    @unittest.override_config({"ui_auth": {"session_timeout": 5 * 1000}})
+    def test_can_reuse_session(self):
+        """
+        The session can be reused if configured.
+
+        Compare to test_cannot_change_uri.
+        """
+        # Create a second and third login.
+        self.login("test", self.user_pass, "dev2")
+        self.login("test", self.user_pass, "dev3")
+
+        # Attempt to delete a device. This works since the user just logged in.
+        self.delete_device(self.user_tok, "dev2", 200)
+
+        # Move the clock forward past the validation timeout.
+        self.reactor.advance(6)
+
+        # Deleting another devices throws the user into UI auth.
+        channel = self.delete_device(self.user_tok, "dev3", 401)
+
+        # Grab the session
+        session = channel.json_body["session"]
+        # Ensure that flows are what is expected.
+        self.assertIn({"stages": ["m.login.password"]}, channel.json_body["flows"])
+
+        # Make another request providing the UI auth flow.
+        self.delete_device(
+            self.user_tok,
+            "dev3",
+            200,
+            {
+                "auth": {
+                    "type": "m.login.password",
+                    "identifier": {"type": "m.id.user", "user": self.user},
+                    "password": self.user_pass,
+                    "session": session,
+                },
+            },
+        )
+
+        # Make another request, but try to delete the first device. This works
+        # due to re-using the previous session.
+        #
+        # Note that *no auth* information is provided, not even a session iD!
+        self.delete_device(self.user_tok, self.device_id, 200)
 
     def test_does_not_offer_password_for_sso_user(self):
         login_resp = self.helper.login_via_oidc("username")
