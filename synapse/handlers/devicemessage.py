@@ -26,7 +26,7 @@ from synapse.logging.opentracing import (
     set_tag,
     start_active_span,
 )
-from synapse.types import JsonDict, UserID, get_domain_from_id
+from synapse.types import JsonDict, Requester, UserID, get_domain_from_id
 from synapse.util import json_encoder
 from synapse.util.stringutils import random_string
 
@@ -152,20 +152,22 @@ class DeviceMessageHandler:
 
     async def send_device_message(
         self,
-        sender_user_id: str,
+        requester: Requester,
         message_type: str,
         messages: Dict[str, Dict[str, JsonDict]],
     ) -> None:
+        sender_user_id = requester.user.to_string()
+
         set_tag("number_of_messages", len(messages))
         set_tag("sender", sender_user_id)
         local_messages = {}
         remote_messages = {}  # type: Dict[str, Dict[str, Dict[str, JsonDict]]]
         for user_id, by_device in messages.items():
-            # Ratelimit local cross-user key requests by user/device.
+            # Ratelimit local cross-user key requests by the sending device.
             if (
                 message_type == EventTypes.RoomKeyRequest
                 and user_id != sender_user_id
-                and self._ratelimiter.can_do_action((user_id, by_device))
+                and self._ratelimiter.can_do_action(requester.device_id)
             ):
                 continue
 
