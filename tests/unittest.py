@@ -20,7 +20,7 @@ import hmac
 import inspect
 import logging
 import time
-from typing import Dict, Optional, Type, TypeVar, Union
+from typing import Dict, Iterable, Optional, Tuple, Type, TypeVar, Union
 
 from mock import Mock, patch
 
@@ -383,6 +383,9 @@ class HomeserverTestCase(TestCase):
         federation_auth_origin: str = None,
         content_is_form: bool = False,
         await_result: bool = True,
+        custom_headers: Optional[
+            Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
+        ] = None,
     ) -> FakeChannel:
         """
         Create a SynapseRequest at the path using the method and containing the
@@ -405,6 +408,8 @@ class HomeserverTestCase(TestCase):
                  true (the default), will pump the test reactor until the the renderer
                  tells the channel the request is finished.
 
+            custom_headers: (name, value) pairs to add as request headers
+
         Returns:
             The FakeChannel object which stores the result of the request.
         """
@@ -420,6 +425,7 @@ class HomeserverTestCase(TestCase):
             federation_auth_origin,
             content_is_form,
             await_result,
+            custom_headers,
         )
 
     def setup_test_homeserver(self, *args, **kwargs):
