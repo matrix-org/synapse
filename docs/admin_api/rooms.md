@@ -8,6 +8,7 @@
   * [Parameters](#parameters-1)
   * [Response](#response)
   * [Undoing room shutdowns](#undoing-room-shutdowns)
+- [Make Room Admin API](#make-room-admin-api)
 
 # List Room API
 
@@ -467,6 +468,7 @@ The following fields are returned in the JSON response body:
                     the old room to the new.
 * `new_room_id` - A string representing the room ID of the new room.
 
+
 ## Undoing room shutdowns
 
 *Note*: This guide may be outdated by the time you read it. By nature of room shutdowns being performed at the database level,
@@ -493,3 +495,19 @@ You will have to manually handle, if you so choose, the following:
 * Aliases that would have been redirected to the Content Violation room.
 * Users that would have been booted from the room (and will have been force-joined to the Content Violation room).
 * Removal of the Content Violation room if desired.
+
+
+# Make Room Admin API
+
+Grants another user the highest power available to a local user who is in the room.
+If the user is not in the room, and it is not publicly joinable, then invite the user.
+
+By default the server admin (the caller) is granted power, but another user can
+optionally be specified, e.g.:
+
+```
+    POST /_synapse/admin/v1/rooms/<room_id_or_alias>/make_room_admin
+    {
+        "user_id": "@foo:example.com"
+    }
+```
