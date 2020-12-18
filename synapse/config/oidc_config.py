@@ -54,140 +54,149 @@ class OIDCConfig(Config):
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
-        # Enable OpenID Connect (OIDC) / OAuth 2.0 for registration and login.
+        # List of OpenID Connect (OIDC) / OAuth 2.0 identity providers, for registration
+        # and login.
+        #
+        # Options for each entry include:
+        #
+        #   idp_id: a unique identifier for this identity provider. Used internally
+        #       by Synapse; should be a single word such as 'github'.
+        #
+        #       Note that, if this is changed, users authenticating via that provider
+        #       will no longer be recognised as the same user!
+        #
+        #   idp_name: A user-facing name for this identity provider, which is used to
+        #       offer the user a choice of login mechanisms.
+        #
+        #   discover: set to 'false' to disable the use of the OIDC discovery mechanism
+        #       to discover endpoints. Defaults to true.
+        #
+        #   issuer: Required. The OIDC issuer. Used to validate tokens and (if discovery
+        #       is enabled) to discover the provider's endpoints.
+        #
+        #   client_id: Required. oauth2 client id to use.
+        #
+        #   client_secret: Required. oauth2 client secret to use.
+        #
+        #   client_auth_method: auth method to use when exchanging the token. Valid
+        #       values are 'client_secret_basic' (default), 'client_secret_post' and
+        #       'none'.
+        #
+        #   scopes: list of scopes to request. This should normally include the "openid"
+        #       scope. Defaults to ["openid"].
+        #
+        #   authorization_endpoint: the oauth2 authorization endpoint. Required if
+        #       provider discovery is disabled.
+        #
+        #   token_endpoint: the oauth2 token endpoint. Required if provider discovery is
+        #       disabled.
+        #
+        #   userinfo_endpoint: the OIDC userinfo endpoint. Required if discovery is
+        #       disabled and the 'openid' scope is not requested.
+        #
+        #   jwks_uri: URI where to fetch the JWKS. Required if discovery is disabled and
+        #       the 'openid' scope is used.
+        #
+        #   skip_verification: set to 'true' to skip metadata verification. Use this if
+        #       you are connecting to a provider that is not OpenID Connect compliant.
+        #       Defaults to false. Avoid this in production.
+        #
+        #   user_profile_method: Whether to fetch the user profile from the userinfo
+        #       endpoint. Valid values are: 'auto' or 'userinfo_endpoint'.
+        #
+        #       Defaults to 'auto', which fetches the userinfo endpoint if 'openid' is
+        #       included in 'scopes'. Set to 'userinfo_endpoint' to always fetch the
+        #       userinfo endpoint.
+        #
+        #   allow_existing_users: set to 'true' to allow a user logging in via OIDC to
+        #       match a pre-existing account instead of failing. This could be used if
+        #       switching from password logins to OIDC. Defaults to false.
+        #
+        #   user_mapping_provider: Configuration for how attributes returned from a OIDC
+        #       provider are mapped onto a matrix user. This setting has the following
+        #       sub-properties:
+        #
+        #       module: The class name of a custom mapping module. Default is
+        #           {mapping_provider!r}.
+        #           See https://github.com/matrix-org/synapse/blob/master/docs/sso_mapping_providers.md#openid-mapping-providers
+        #           for information on implementing a custom mapping provider.
+        #
+        #       config: Configuration for the mapping provider module. This section will
+        #           be passed as a Python dictionary to the user mapping provider
+        #           module's `parse_config` method.
+        #
+        #           For the default provider, the following settings are available:
+        #
+        #             sub: name of the claim containing a unique identifier for the
+        #                 user. Defaults to 'sub', which OpenID Connect compliant
+        #                 providers should provide.
+        #
+        #             localpart_template: Jinja2 template for the localpart of the MXID.
+        #                 If this is not set, the user will be prompted to choose their
+        #                 own username.
+        #
+        #             display_name_template: Jinja2 template for the display name to set
+        #                 on first login. If unset, no displayname will be set.
+        #
+        #             extra_attributes: a map of Jinja2 templates for extra attributes
+        #                 to send back to the client during login.
+        #                 Note that these are non-standard and clients will ignore them
+        #                 without modifications.
+        #
+        #           When rendering, the Jinja2 templates are given a 'user' variable,
+        #           which is set to the claims returned by the UserInfo Endpoint and/or
+        #           in the ID Token.
         #
         # See https://github.com/matrix-org/synapse/blob/master/docs/openid.md
-        # for some example configurations.
+        # for information on how to configure these options.
         #
-        oidc_config:
-          # Uncomment the following to enable authorization against an OpenID Connect
-          # server. Defaults to false.
+        # For backwards compatibility, it is also possible to configure a single OIDC
+        # provider via an 'oidc_config' setting. This is now deprecated and admins are
+        # advised to migrate to the 'oidc_providers' format.
+        #
+        oidc_providers:
+          # Generic example
           #
-          #enabled: true
+          #- idp_id: my_idp
+          #  idp_name: "My OpenID provider"
+          #  discover: false
+          #  issuer: "https://accounts.example.com/"
+          #  client_id: "provided-by-your-issuer"
+          #  client_secret: "provided-by-your-issuer"
+          #  client_auth_method: client_secret_post
+          #  scopes: ["openid", "profile"]
+          #  authorization_endpoint: "https://accounts.example.com/oauth2/auth"
+          #  token_endpoint: "https://accounts.example.com/oauth2/token"
+          #  userinfo_endpoint: "https://accounts.example.com/userinfo"
+          #  jwks_uri: "https://accounts.example.com/.well-known/jwks.json"
+          #  skip_verification: true
 
-          # Uncomment the following to disable use of the OIDC discovery mechanism to
-          # discover endpoints. Defaults to true.
+          # For use with Keycloak
           #
-          #discover: false
+          #- idp_id: keycloak
+          #  idp_name: Keycloak
+          #  issuer: "https://127.0.0.1:8443/auth/realms/my_realm_name"
+          #  client_id: "synapse"
+          #  client_secret: "copy secret generated in Keycloak UI"
+          #  scopes: ["openid", "profile"]
 
-          # the OIDC issuer. Used to validate tokens and (if discovery is enabled) to
-          # discover the provider's endpoints.
+          # For use with Github
           #
-          # Required if 'enabled' is true.
-          #
-          #issuer: "https://accounts.example.com/"
-
-          # oauth2 client id to use.
-          #
-          # Required if 'enabled' is true.
-          #
-          #client_id: "provided-by-your-issuer"
-
-          # oauth2 client secret to use.
-          #
-          # Required if 'enabled' is true.
-          #
-          #client_secret: "provided-by-your-issuer"
-
-          # auth method to use when exchanging the token.
-          # Valid values are 'client_secret_basic' (default), 'client_secret_post' and
-          # 'none'.
-          #
-          #client_auth_method: client_secret_post
-
-          # list of scopes to request. This should normally include the "openid" scope.
-          # Defaults to ["openid"].
-          #
-          #scopes: ["openid", "profile"]
-
-          # the oauth2 authorization endpoint. Required if provider discovery is disabled.
-          #
-          #authorization_endpoint: "https://accounts.example.com/oauth2/auth"
-
-          # the oauth2 token endpoint. Required if provider discovery is disabled.
-          #
-          #token_endpoint: "https://accounts.example.com/oauth2/token"
-
-          # the OIDC userinfo endpoint. Required if discovery is disabled and the
-          # "openid" scope is not requested.
-          #
-          #userinfo_endpoint: "https://accounts.example.com/userinfo"
-
-          # URI where to fetch the JWKS. Required if discovery is disabled and the
-          # "openid" scope is used.
-          #
-          #jwks_uri: "https://accounts.example.com/.well-known/jwks.json"
-
-          # Uncomment to skip metadata verification. Defaults to false.
-          #
-          # Use this if you are connecting to a provider that is not OpenID Connect
-          # compliant.
-          # Avoid this in production.
-          #
-          #skip_verification: true
-
-          # Whether to fetch the user profile from the userinfo endpoint. Valid
-          # values are: "auto" or "userinfo_endpoint".
-          #
-          # Defaults to "auto", which fetches the userinfo endpoint if "openid" is included
-          # in `scopes`. Uncomment the following to always fetch the userinfo endpoint.
-          #
-          #user_profile_method: "userinfo_endpoint"
-
-          # Uncomment to allow a user logging in via OIDC to match a pre-existing account instead
-          # of failing. This could be used if switching from password logins to OIDC. Defaults to false.
-          #
-          #allow_existing_users: true
-
-          # An external module can be provided here as a custom solution to mapping
-          # attributes returned from a OIDC provider onto a matrix user.
-          #
-          user_mapping_provider:
-            # The custom module's class. Uncomment to use a custom module.
-            # Default is {mapping_provider!r}.
-            #
-            # See https://github.com/matrix-org/synapse/blob/master/docs/sso_mapping_providers.md#openid-mapping-providers
-            # for information on implementing a custom mapping provider.
-            #
-            #module: mapping_provider.OidcMappingProvider
-
-            # Custom configuration values for the module. This section will be passed as
-            # a Python dictionary to the user mapping provider module's `parse_config`
-            # method.
-            #
-            # The examples below are intended for the default provider: they should be
-            # changed if using a custom provider.
-            #
-            config:
-              # name of the claim containing a unique identifier for the user.
-              # Defaults to `sub`, which OpenID Connect compliant providers should provide.
-              #
-              #subject_claim: "sub"
-
-              # Jinja2 template for the localpart of the MXID.
-              #
-              # When rendering, this template is given the following variables:
-              #   * user: The claims returned by the UserInfo Endpoint and/or in the ID
-              #     Token
-              #
-              # If this is not set, the user will be prompted to choose their
-              # own username.
-              #
-              #localpart_template: "{{{{ user.preferred_username }}}}"
-
-              # Jinja2 template for the display name to set on first login.
-              #
-              # If unset, no displayname will be set.
-              #
-              #display_name_template: "{{{{ user.given_name }}}} {{{{ user.last_name }}}}"
-
-              # Jinja2 templates for extra attributes to send back to the client during
-              # login.
-              #
-              # Note that these are non-standard and clients will ignore them without modifications.
-              #
-              #extra_attributes:
-                #birthdate: "{{{{ user.birthdate }}}}"
+          #- idp_id: google
+          #  idp_name: Google
+          #  discover: false
+          #  issuer: "https://github.com/"
+          #  client_id: "your-client-id" # TO BE FILLED
+          #  client_secret: "your-client-secret" # TO BE FILLED
+          #  authorization_endpoint: "https://github.com/login/oauth/authorize"
+          #  token_endpoint: "https://github.com/login/oauth/access_token"
+          #  userinfo_endpoint: "https://api.github.com/user"
+          #  scopes: ["read:user"]
+          #  user_mapping_provider:
+          #    config:
+          #      subject_claim: "id"
+          #      localpart_template: "{{ user.login }}"
+          #      display_name_template: "{{ user.name }}"
         """.format(
             mapping_provider=DEFAULT_USER_MAPPING_PROVIDER
         )
