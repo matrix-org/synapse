@@ -29,7 +29,7 @@
                         {{ message.body_text_html }}
                     {%- elif message.msgtype == "m.notice" %}
                         {{ message.body_text_html }}
-                    {%- elif message.msgtype == "m.image" %}
+                    {%- elif message.msgtype == "m.image" and message.image_url %}
                         <img src="{{ message.image_url|mxc_to_http(640, 480, scale) }}" />
                     {%- elif message.msgtype == "m.file" %}
                         <span class="filename">{{ message.body_text_plain }}</span>
