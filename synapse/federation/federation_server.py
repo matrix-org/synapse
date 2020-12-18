@@ -916,11 +916,15 @@ class FederationHandlerRegistry:
         self._edu_type_to_instance[edu_type] = instance_name
 
     async def on_edu(self, edu_type: str, origin: str, content: dict):
-        if not self.config.use_presence and edu_type == "m.presence":
+        if not self.config.use_presence and edu_type == EventTypes.Presence:
             return
 
-        # If the incoming EDUs from this origin/type are over the limit, drop them.
-        if not self._edu_rate_limiter.can_do_action(key=(edu_type, origin)):
+        # If the incoming room key requests from a particular origin are over
+        # the limit, drop them.
+        if (
+            edu_type == EventTypes.RoomKeyRequest
+            and not self._edu_rate_limiter.can_do_action(key=origin)
+        ):
             return
 
         # Check if we have a handler on this instance

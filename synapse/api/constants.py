@@ -94,6 +94,7 @@ class EventTypes:
     Retention = "m.room.retention"
 
     Presence = "m.presence"
+    RoomKeyRequest = "m.room_key_request"
 
 
 class RejectedReason:
