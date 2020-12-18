@@ -1498,7 +1498,7 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # Now we test that we can join the room (we should have received an
-        # inviate) and can ban a user.
+        # invite) and can ban a user.
         self.helper.join(room_id, self.admin_user, tok=self.admin_user_tok)
         self.helper.change_membership(
             room_id,

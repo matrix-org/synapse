@@ -370,9 +370,9 @@ class JoinRoomAliasServlet(RestServlet):
         return 200, {"room_id": room_id}
 
 
-class MakeRoomAdminRoomServlet(RestServlet):
+class MakeRoomAdminRestServlet(RestServlet):
     """Allows a server admin to get power in a room if a local user has power in
-    a room. Will also invite the user if they're not in the room and its a
+    a room. Will also invite the user if they're not in the room and it's a
     private room. Can specify another user (rather than the admin user) to be
     granted power, e.g.:
 
@@ -424,9 +424,7 @@ class MakeRoomAdminRoomServlet(RestServlet):
             # We pick the local user with the highest power.
             user_power = power_levels.content.get("users", {})
             admin_users = [
-                user_id
-                for user_id, power in user_power.items()
-                if self.is_mine_id(user_id)
+                user_id for user_id in user_power if self.is_mine_id(user_id)
             ]
             admin_users.sort(key=lambda user: user_power[user])
 
@@ -473,7 +471,7 @@ class MakeRoomAdminRoomServlet(RestServlet):
             )
 
         # Now we check if the user we're granting admin rights to is already in
-        # the room. If not and its not a public room we invite them.
+        # the room. If not and it's not a public room we invite them.
         member_event = room_state.get((EventTypes.Member, user_to_add))
         is_joined = False
         if member_event:

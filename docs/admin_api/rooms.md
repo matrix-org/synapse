@@ -499,11 +499,11 @@ You will have to manually handle, if you so choose, the following:
 
 # Make Room Admin API
 
-Grants the server admin power in a room if a local user has power in the room;
-inviting the server admin if they're not in the room and its not a publically
-joinable room.
+Grants another user the highest power available to a local user who is in the room.
+If the user is not in the room, and it is not publicly joinable, then invite the user.
 
-The caller can optionally specify another user to be granted power, e.g.:
+By default the server admin (the caller) is granted power, but another user can
+optionally be specified, e.g.:
 
 ```
     POST /_synapse/admin/v1/make_room_admin/<room_id_or_alias>
