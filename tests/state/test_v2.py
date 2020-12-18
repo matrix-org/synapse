@@ -88,7 +88,7 @@ class FakeEvent:
         event_dict = {
             "auth_events": [(a, {}) for a in auth_events],
             "prev_events": [(p, {}) for p in prev_events],
-            "event_id": self.node_id,
+            "event_id": self.event_id,
             "sender": self.sender,
             "type": self.type,
             "content": self.content,
