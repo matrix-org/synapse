@@ -864,11 +864,11 @@ class FederationHandlerRegistry:
         # Map from type to instance name that we should route EDU handling to.
         self._edu_type_to_instance = {}  # type: Dict[str, str]
 
-        # A rate limiter for incoming EDUs per type/origin.
-        self._edu_rate_limiter = Ratelimiter(
+        # A rate limiter for incoming room key requests per origin.
+        self._room_key_request_rate_limiter = Ratelimiter(
             clock=self.clock,
-            rate_hz=self.config.rc_federation_edu.per_second,
-            burst_count=self.config.rc_federation_edu.burst_count,
+            rate_hz=self.config.rc_federation_room_key_request.per_second,
+            burst_count=self.config.rc_federation_room_key_request.burst_count,
         )
 
     def register_edu_handler(
@@ -923,7 +923,7 @@ class FederationHandlerRegistry:
         # the limit, drop them.
         if (
             edu_type == EventTypes.RoomKeyRequest
-            and not self._edu_rate_limiter.can_do_action(key=origin)
+            and not self._room_key_request_rate_limiter.can_do_action(key=origin)
         ):
             return
 
