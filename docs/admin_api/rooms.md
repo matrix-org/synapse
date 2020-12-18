@@ -506,7 +506,7 @@ By default the server admin (the caller) is granted power, but another user can
 optionally be specified, e.g.:
 
 ```
-    POST /_synapse/admin/v1/make_room_admin/<room_id_or_alias>
+    POST /_synapse/admin/v1/rooms/<room_id_or_alias>/make_room_admin
     {
         "user_id": "@foo:example.com"
     }

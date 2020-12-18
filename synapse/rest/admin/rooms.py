@@ -376,13 +376,13 @@ class MakeRoomAdminRestServlet(RestServlet):
     private room. Can specify another user (rather than the admin user) to be
     granted power, e.g.:
 
-        POST /_synapse/admin/v1/make_room_admin/<room_id_or_alias>
+        POST/_synapse/admin/v1/rooms/<room_id_or_alias>/make_room_admin
         {
             "user_id": "@foo:example.com"
         }
     """
 
-    PATTERNS = admin_patterns("/make_room_admin/(?P<room_identifier>[^/]*)")
+    PATTERNS = admin_patterns("/rooms/(?P<room_identifier>[^/]*)/make_room_admin")
 
     def __init__(self, hs: "HomeServer"):
         self.hs = hs

@@ -1453,7 +1453,9 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
         self.public_room_id = self.helper.create_room_as(
             self.creator, tok=self.creator_tok, is_public=True
         )
-        self.url = "/_synapse/admin/v1/make_room_admin/{}".format(self.public_room_id)
+        self.url = "/_synapse/admin/v1/rooms/{}/make_room_admin".format(
+            self.public_room_id
+        )
 
     def test_public_room(self):
         """Test that getting admin in a public room works.
@@ -1464,7 +1466,7 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "POST",
-            "/_synapse/admin/v1/make_room_admin/{}".format(room_id),
+            "/_synapse/admin/v1/rooms/{}/make_room_admin".format(room_id),
             content={},
             access_token=self.admin_user_tok,
         )
@@ -1490,7 +1492,7 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "POST",
-            "/_synapse/admin/v1/make_room_admin/{}".format(room_id),
+            "/_synapse/admin/v1/rooms/{}/make_room_admin".format(room_id),
             content={},
             access_token=self.admin_user_tok,
         )
@@ -1517,7 +1519,7 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "POST",
-            "/_synapse/admin/v1/make_room_admin/{}".format(room_id),
+            "/_synapse/admin/v1/rooms/{}/make_room_admin".format(room_id),
             content={"user_id": self.second_user_id},
             access_token=self.admin_user_tok,
         )
@@ -1552,13 +1554,20 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "POST",
-            "/_synapse/admin/v1/make_room_admin/{}".format(room_id),
+            "/_synapse/admin/v1/rooms/{}/make_room_admin".format(room_id),
             content={},
             access_token=self.admin_user_tok,
         )
 
         # We expect this to fail with a 400 as there are no room admins.
+        #
+        # (Note we assert the error message to ensure that it's not denied for
+        # some other reason)
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(
+            channel.json_body["error"],
+            "No local admin user in room with power to update power levels.",
+        )
 
 
 PURGE_TABLES = [
