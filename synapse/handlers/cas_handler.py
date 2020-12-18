@@ -235,7 +235,7 @@ class CasHandler:
             cas_response = await self._validate_ticket(ticket, args)
         except CasError as e:
             logger.exception("Could not validate ticket")
-            self._sso_handler.render_error(request, e.error, e.error_description)
+            self._sso_handler.render_error(request, e.error, e.error_description, 401)
             return
 
         await self._handle_cas_response(
@@ -273,7 +273,10 @@ class CasHandler:
             # If required attribute was not in CAS Response - Forbidden
             if required_attribute not in cas_response.attributes:
                 self._sso_handler.render_error(
-                    request, "unauthorised", "You are not authorised to log in here."
+                    request,
+                    "unauthorised",
+                    "You are not authorised to log in here.",
+                    401,
                 )
                 return
 
@@ -286,6 +289,7 @@ class CasHandler:
                         request,
                         "unauthorised",
                         "You are not authorised to log in here.",
+                        401,
                     )
                     return
 

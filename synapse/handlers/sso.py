@@ -60,7 +60,11 @@ class SsoHandler:
         self._mapping_lock = Linearizer(name="sso_user_mapping", clock=hs.get_clock())
 
     def render_error(
-        self, request, error: str, error_description: Optional[str] = None
+        self,
+        request: Request,
+        error: str,
+        error_description: Optional[str] = None,
+        code: int = 400,
     ) -> None:
         """Renders the error template and responds with it.
 
@@ -72,11 +76,12 @@ class SsoHandler:
                 We'll respond with an HTML page describing the error.
             error: A technical identifier for this error.
             error_description: A human-readable description of the error.
+            code: The integer error code (an HTTP response code)
         """
         html = self._error_template.render(
             error=error, error_description=error_description
         )
-        respond_with_html(request, 400, html)
+        respond_with_html(request, code, html)
 
     async def get_sso_user_by_remote_user_id(
         self, auth_provider_id: str, remote_user_id: str
