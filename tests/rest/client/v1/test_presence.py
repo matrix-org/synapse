@@ -53,7 +53,7 @@ class PresenceTestCase(unittest.HomeserverTestCase):
         self.hs.config.use_presence = True
 
         body = {"presence": "here", "status_msg": "beep boop"}
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT", "/presence/%s/status" % (self.user_id,), body
         )
 
@@ -68,7 +68,7 @@ class PresenceTestCase(unittest.HomeserverTestCase):
         self.hs.config.use_presence = False
 
         body = {"presence": "here", "status_msg": "beep boop"}
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT", "/presence/%s/status" % (self.user_id,), body
         )
 

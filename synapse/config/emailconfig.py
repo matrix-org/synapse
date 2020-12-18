@@ -322,6 +322,22 @@ class EmailConfig(Config):
 
         self.email_subjects = EmailSubjectConfig(**subjects)
 
+        # The invite client location should be a HTTP(S) URL or None.
+        self.invite_client_location = email_config.get("invite_client_location") or None
+        if self.invite_client_location:
+            if not isinstance(self.invite_client_location, str):
+                raise ConfigError(
+                    "Config option email.invite_client_location must be type str"
+                )
+            if not (
+                self.invite_client_location.startswith("http://")
+                or self.invite_client_location.startswith("https://")
+            ):
+                raise ConfigError(
+                    "Config option email.invite_client_location must be a http or https URL",
+                    path=("email", "invite_client_location"),
+                )
+
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return (
             """\
@@ -388,6 +404,12 @@ class EmailConfig(Config):
           # Defaults to 1h.
           #
           #validation_token_lifetime: 15m
+
+          # The web client location to direct users to during an invite. This is passed
+          # to the identity server as the org.matrix.web_client_location key. Defaults
+          # to unset, giving no guidance to the identity server.
+          #
+          #invite_client_location: https://app.element.io
 
           # Directory in which Synapse will try to find the template files below.
           # If not set, or the files named below are not found within the template

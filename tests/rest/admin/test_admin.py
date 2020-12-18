@@ -42,7 +42,7 @@ class VersionTestCase(unittest.HomeserverTestCase):
         return resource
 
     def test_version_string(self):
-        request, channel = self.make_request("GET", self.url, shorthand=False)
+        channel = self.make_request("GET", self.url, shorthand=False)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(
@@ -68,7 +68,7 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
 
     def test_delete_group(self):
         # Create a new group
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/create_group".encode("ascii"),
             access_token=self.admin_user_tok,
@@ -84,13 +84,13 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
         # Invite/join another user
 
         url = "/groups/%s/admin/users/invite/%s" % (group_id, self.other_user)
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT", url.encode("ascii"), access_token=self.admin_user_tok, content={}
         )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         url = "/groups/%s/self/accept_invite" % (group_id,)
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT", url.encode("ascii"), access_token=self.other_user_token, content={}
         )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -101,7 +101,7 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
 
         # Now delete the group
         url = "/_synapse/admin/v1/delete_group/" + group_id
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             url.encode("ascii"),
             access_token=self.admin_user_tok,
@@ -123,7 +123,7 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
         """
 
         url = "/groups/%s/profile" % (group_id,)
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok
         )
 
@@ -134,7 +134,7 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
     def _get_groups_user_is_in(self, access_token):
         """Returns the list of groups the user is in (given their access token)
         """
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/joined_groups".encode("ascii"), access_token=access_token
         )
 
@@ -216,7 +216,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
     def _ensure_quarantined(self, admin_user_tok, server_and_media_id):
         """Ensure a piece of media is quarantined when trying to access it."""
-        request, channel = make_request(
+        channel = make_request(
             self.reactor,
             FakeSite(self.download_resource),
             "GET",
@@ -241,7 +241,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         # Attempt quarantine media APIs as non-admin
         url = "/_synapse/admin/v1/media/quarantine/example.org/abcde12345"
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", url.encode("ascii"), access_token=non_admin_user_tok,
         )
 
@@ -254,7 +254,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         # And the roomID/userID endpoint
         url = "/_synapse/admin/v1/room/!room%3Aexample.com/media/quarantine"
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", url.encode("ascii"), access_token=non_admin_user_tok,
         )
 
@@ -282,7 +282,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         server_name, media_id = server_name_and_media_id.split("/")
 
         # Attempt to access the media
-        request, channel = make_request(
+        channel = make_request(
             self.reactor,
             FakeSite(self.download_resource),
             "GET",
@@ -299,7 +299,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             urllib.parse.quote(server_name),
             urllib.parse.quote(media_id),
         )
-        request, channel = self.make_request("POST", url, access_token=admin_user_tok,)
+        channel = self.make_request("POST", url, access_token=admin_user_tok,)
         self.pump(1.0)
         self.assertEqual(200, int(channel.code), msg=channel.result["body"])
 
@@ -351,7 +351,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             url = "/_synapse/admin/v1/room/%s/media/quarantine" % urllib.parse.quote(
                 room_id
             )
-        request, channel = self.make_request("POST", url, access_token=admin_user_tok,)
+        channel = self.make_request("POST", url, access_token=admin_user_tok,)
         self.pump(1.0)
         self.assertEqual(200, int(channel.code), msg=channel.result["body"])
         self.assertEqual(
@@ -395,7 +395,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v1/user/%s/media/quarantine" % urllib.parse.quote(
             non_admin_user
         )
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", url.encode("ascii"), access_token=admin_user_tok,
         )
         self.pump(1.0)
@@ -437,7 +437,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v1/user/%s/media/quarantine" % urllib.parse.quote(
             non_admin_user
         )
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", url.encode("ascii"), access_token=admin_user_tok,
         )
         self.pump(1.0)
@@ -453,7 +453,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         self._ensure_quarantined(admin_user_tok, server_and_media_id_1)
 
         # Attempt to access each piece of media
-        request, channel = make_request(
+        channel = make_request(
             self.reactor,
             FakeSite(self.download_resource),
             "GET",

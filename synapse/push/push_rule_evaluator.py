@@ -30,22 +30,30 @@ IS_GLOB = re.compile(r"[\?\*\[\]]")
 INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
 
 
-def _room_member_count(ev, condition, room_member_count):
+def _room_member_count(
+    ev: EventBase, condition: Dict[str, Any], room_member_count: int
+) -> bool:
     return _test_ineq_condition(condition, room_member_count)
 
 
-def _sender_notification_permission(ev, condition, sender_power_level, power_levels):
+def _sender_notification_permission(
+    ev: EventBase,
+    condition: Dict[str, Any],
+    sender_power_level: int,
+    power_levels: Dict[str, Union[int, Dict[str, int]]],
+) -> bool:
     notif_level_key = condition.get("key")
     if notif_level_key is None:
         return False
 
     notif_levels = power_levels.get("notifications", {})
+    assert isinstance(notif_levels, dict)
     room_notif_level = notif_levels.get(notif_level_key, 50)
 
     return sender_power_level >= room_notif_level
 
 
-def _test_ineq_condition(condition, number):
+def _test_ineq_condition(condition: Dict[str, Any], number: int) -> bool:
     if "is" not in condition:
         return False
     m = INEQUALITY_EXPR.match(condition["is"])
@@ -110,7 +118,7 @@ class PushRuleEvaluatorForEvent:
         event: EventBase,
         room_member_count: int,
         sender_power_level: int,
-        power_levels: dict,
+        power_levels: Dict[str, Union[int, Dict[str, int]]],
     ):
         self._event = event
         self._room_member_count = room_member_count
@@ -120,7 +128,9 @@ class PushRuleEvaluatorForEvent:
         # Maps strings of e.g. 'content.body' -> event["content"]["body"]
         self._value_cache = _flatten_dict(event)
 
-    def matches(self, condition: dict, user_id: str, display_name: str) -> bool:
+    def matches(
+        self, condition: Dict[str, Any], user_id: str, display_name: str
+    ) -> bool:
         if condition["kind"] == "event_match":
             return self._event_match(condition, user_id)
         elif condition["kind"] == "contains_display_name":
@@ -261,7 +271,13 @@ def _re_word_boundary(r: str) -> str:
     return r"(^|\W)%s(\W|$)" % (r,)
 
 
-def _flatten_dict(d, prefix=[], result=None):
+def _flatten_dict(
+    d: Union[EventBase, dict],
+    prefix: Optional[List[str]] = None,
+    result: Optional[Dict[str, str]] = None,
+) -> Dict[str, str]:
+    if prefix is None:
+        prefix = []
     if result is None:
         result = {}
     for key, value in d.items():

@@ -17,6 +17,7 @@ from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import shared_rooms
 
 from tests import unittest
+from tests.server import FakeChannel
 
 
 class UserSharedRoomsTest(unittest.HomeserverTestCase):
@@ -40,14 +41,13 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
         self.store = hs.get_datastore()
         self.handler = hs.get_user_directory_handler()
 
-    def _get_shared_rooms(self, token, other_user):
-        request, channel = self.make_request(
+    def _get_shared_rooms(self, token, other_user) -> FakeChannel:
+        return self.make_request(
             "GET",
             "/_matrix/client/unstable/uk.half-shot.msc2666/user/shared_rooms/%s"
             % other_user,
             access_token=token,
         )
-        return request, channel
 
     def test_shared_room_list_public(self):
         """
@@ -63,7 +63,7 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
         self.helper.invite(room, src=u1, targ=u2, tok=u1_token)
         self.helper.join(room, user=u2, tok=u2_token)
 
-        request, channel = self._get_shared_rooms(u1_token, u2)
+        channel = self._get_shared_rooms(u1_token, u2)
         self.assertEquals(200, channel.code, channel.result)
         self.assertEquals(len(channel.json_body["joined"]), 1)
         self.assertEquals(channel.json_body["joined"][0], room)
@@ -82,7 +82,7 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
         self.helper.invite(room, src=u1, targ=u2, tok=u1_token)
         self.helper.join(room, user=u2, tok=u2_token)
 
-        request, channel = self._get_shared_rooms(u1_token, u2)
+        channel = self._get_shared_rooms(u1_token, u2)
         self.assertEquals(200, channel.code, channel.result)
         self.assertEquals(len(channel.json_body["joined"]), 1)
         self.assertEquals(channel.json_body["joined"][0], room)
@@ -104,7 +104,7 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
         self.helper.join(room_public, user=u2, tok=u2_token)
         self.helper.join(room_private, user=u1, tok=u1_token)
 
-        request, channel = self._get_shared_rooms(u1_token, u2)
+        channel = self._get_shared_rooms(u1_token, u2)
         self.assertEquals(200, channel.code, channel.result)
         self.assertEquals(len(channel.json_body["joined"]), 2)
         self.assertTrue(room_public in channel.json_body["joined"])
@@ -125,13 +125,13 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
         self.helper.join(room, user=u2, tok=u2_token)
 
         # Assert user directory is not empty
-        request, channel = self._get_shared_rooms(u1_token, u2)
+        channel = self._get_shared_rooms(u1_token, u2)
         self.assertEquals(200, channel.code, channel.result)
         self.assertEquals(len(channel.json_body["joined"]), 1)
         self.assertEquals(channel.json_body["joined"][0], room)
 
         self.helper.leave(room, user=u1, tok=u1_token)
 
-        request, channel = self._get_shared_rooms(u2_token, u1)
+        channel = self._get_shared_rooms(u2_token, u1)
         self.assertEquals(200, channel.code, channel.result)
         self.assertEquals(len(channel.json_body["joined"]), 0)

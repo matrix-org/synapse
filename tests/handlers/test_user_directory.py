@@ -54,6 +54,10 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
                 user_id=support_user_id, password_hash=None, user_type=UserTypes.SUPPORT
             )
         )
+        regular_user_id = "@regular:test"
+        self.get_success(
+            self.store.register_user(user_id=regular_user_id, password_hash=None)
+        )
 
         self.get_success(
             self.handler.handle_local_profile_change(support_user_id, None)
@@ -63,12 +67,46 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         display_name = "display_name"
 
         profile_info = ProfileInfo(avatar_url="avatar_url", display_name=display_name)
-        regular_user_id = "@regular:test"
         self.get_success(
             self.handler.handle_local_profile_change(regular_user_id, profile_info)
         )
         profile = self.get_success(self.store.get_user_in_directory(regular_user_id))
         self.assertTrue(profile["display_name"] == display_name)
+
+    def test_handle_local_profile_change_with_deactivated_user(self):
+        # create user
+        r_user_id = "@regular:test"
+        self.get_success(
+            self.store.register_user(user_id=r_user_id, password_hash=None)
+        )
+
+        # update profile
+        display_name = "Regular User"
+        profile_info = ProfileInfo(avatar_url="avatar_url", display_name=display_name)
+        self.get_success(
+            self.handler.handle_local_profile_change(r_user_id, profile_info)
+        )
+
+        # profile is in directory
+        profile = self.get_success(self.store.get_user_in_directory(r_user_id))
+        self.assertTrue(profile["display_name"] == display_name)
+
+        # deactivate user
+        self.get_success(self.store.set_user_deactivated_status(r_user_id, True))
+        self.get_success(self.handler.handle_user_deactivated(r_user_id))
+
+        # profile is not in directory
+        profile = self.get_success(self.store.get_user_in_directory(r_user_id))
+        self.assertTrue(profile is None)
+
+        # update profile after deactivation
+        self.get_success(
+            self.handler.handle_local_profile_change(r_user_id, profile_info)
+        )
+
+        # profile is furthermore not in directory
+        profile = self.get_success(self.store.get_user_in_directory(r_user_id))
+        self.assertTrue(profile is None)
 
     def test_handle_user_deactivated_support_user(self):
         s_user_id = "@support:test"
@@ -270,7 +308,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         spam_checker = self.hs.get_spam_checker()
 
         class AllowAll:
-            def check_username_for_spam(self, user_profile):
+            async def check_username_for_spam(self, user_profile):
                 # Allow all users.
                 return False
 
@@ -283,7 +321,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # Configure a spam checker that filters all users.
         class BlockAll:
-            def check_username_for_spam(self, user_profile):
+            async def check_username_for_spam(self, user_profile):
                 # All users are spammy.
                 return True
 
@@ -534,7 +572,7 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         self.helper.join(room, user=u2)
 
         # Assert user directory is not empty
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", b"user_directory/search", b'{"search_term":"user2"}'
         )
         self.assertEquals(200, channel.code, channel.result)
@@ -542,7 +580,7 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
 
         # Disable user directory and check search returns nothing
         self.config.user_directory_search_enabled = False
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", b"user_directory/search", b'{"search_term":"user2"}'
         )
         self.assertEquals(200, channel.code, channel.result)

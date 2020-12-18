@@ -379,14 +379,14 @@ class RoomWorkerStore(SQLBaseStore):
         # Filter room names by a string
         where_statement = ""
         if search_term:
-            where_statement = "WHERE state.name LIKE ?"
+            where_statement = "WHERE LOWER(state.name) LIKE ?"
 
             # Our postgres db driver converts ? -> %s in SQL strings as that's the
             # placeholder for postgres.
             # HOWEVER, if you put a % into your SQL then everything goes wibbly.
             # To get around this, we're going to surround search_term with %'s
             # before giving it to the database in python instead
-            search_term = "%" + search_term + "%"
+            search_term = "%" + search_term.lower() + "%"
 
         # Set ordering
         if RoomSortOrder(order_by) == RoomSortOrder.SIZE:

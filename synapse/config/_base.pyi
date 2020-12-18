@@ -3,6 +3,7 @@ from typing import Any, Iterable, List, Optional
 from synapse.config import (
     api,
     appservice,
+    auth,
     captcha,
     cas,
     consent_config,
@@ -14,7 +15,6 @@ from synapse.config import (
     logger,
     metrics,
     oidc_config,
-    password,
     password_auth_providers,
     push,
     ratelimiting,
@@ -65,7 +65,7 @@ class RootConfig:
     sso: sso.SSOConfig
     oidc: oidc_config.OIDCConfig
     jwt: jwt_config.JWTConfig
-    password: password.PasswordConfig
+    auth: auth.AuthConfig
     email: emailconfig.EmailConfig
     worker: workers.WorkerConfig
     authproviders: password_auth_providers.PasswordAuthProviderConfig

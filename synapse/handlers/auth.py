@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import inspect
 import logging
 import time
 import unicodedata
@@ -22,6 +21,7 @@ import urllib.parse
 from typing import (
     TYPE_CHECKING,
     Any,
+    Awaitable,
     Callable,
     Dict,
     Iterable,
@@ -58,6 +58,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.module_api import ModuleApi
 from synapse.types import JsonDict, Requester, UserID
 from synapse.util import stringutils as stringutils
+from synapse.util.async_helpers import maybe_awaitable
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.threepids import canonicalise_email
 
@@ -197,27 +198,25 @@ class AuthHandler(BaseHandler):
         self._password_enabled = hs.config.password_enabled
         self._password_localdb_enabled = hs.config.password_localdb_enabled
 
-        # we keep this as a list despite the O(N^2) implication so that we can
-        # keep PASSWORD first and avoid confusing clients which pick the first
-        # type in the list. (NB that the spec doesn't require us to do so and
-        # clients which favour types that they don't understand over those that
-        # they do are technically broken)
-
         # start out by assuming PASSWORD is enabled; we will remove it later if not.
-        login_types = []
+        login_types = set()
         if self._password_localdb_enabled:
-            login_types.append(LoginType.PASSWORD)
+            login_types.add(LoginType.PASSWORD)
 
         for provider in self.password_providers:
-            if hasattr(provider, "get_supported_login_types"):
-                for t in provider.get_supported_login_types().keys():
-                    if t not in login_types:
-                        login_types.append(t)
+            login_types.update(provider.get_supported_login_types().keys())
 
         if not self._password_enabled:
-            login_types.remove(LoginType.PASSWORD)
+            login_types.discard(LoginType.PASSWORD)
 
-        self._supported_login_types = login_types
+        # Some clients just pick the first type in the list. In this case, we want
+        # them to use PASSWORD (rather than token or whatever), so we want to make sure
+        # that comes first, where it's present.
+        self._supported_login_types = []
+        if LoginType.PASSWORD in login_types:
+            self._supported_login_types.append(LoginType.PASSWORD)
+            login_types.remove(LoginType.PASSWORD)
+        self._supported_login_types.extend(login_types)
 
         # Ratelimiter for failed auth during UIA. Uses same ratelimit config
         # as per `rc_login.failed_attempts`.
@@ -226,6 +225,9 @@ class AuthHandler(BaseHandler):
             rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
             burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
         )
+
+        # The number of seconds to keep a UI auth session active.
+        self._ui_auth_session_timeout = hs.config.ui_auth_session_timeout
 
         # Ratelimitier for failed /login attempts
         self._failed_login_attempts_ratelimiter = Ratelimiter(
@@ -284,7 +286,7 @@ class AuthHandler(BaseHandler):
         request_body: Dict[str, Any],
         clientip: str,
         description: str,
-    ) -> Tuple[dict, str]:
+    ) -> Tuple[dict, Optional[str]]:
         """
         Checks that the user is who they claim to be, via a UI auth.
 
@@ -311,7 +313,8 @@ class AuthHandler(BaseHandler):
                 have been given only in a previous call).
 
                 'session_id' is the ID of this session, either passed in by the
-                client or assigned by this call
+                client or assigned by this call. This is None if UI auth was
+                skipped (by re-using a previous validation).
 
         Raises:
             InteractiveAuthIncompleteError if the client has not yet completed
@@ -324,6 +327,16 @@ class AuthHandler(BaseHandler):
                 user is too high to proceed
 
         """
+
+        if self._ui_auth_session_timeout:
+            last_validated = await self.store.get_access_token_last_validated(
+                requester.access_token_id
+            )
+            if self.clock.time_msec() - last_validated < self._ui_auth_session_timeout:
+                # Return the input parameters, minus the auth key, which matches
+                # the logic in check_ui_auth.
+                request_body.pop("auth", None)
+                return request_body, None
 
         user_id = requester.user.to_string()
 
@@ -359,6 +372,9 @@ class AuthHandler(BaseHandler):
         # check that the UI auth matched the access token
         if user_id != requester.user.to_string():
             raise AuthError(403, "Invalid auth")
+
+        # Note that the access token has been validated.
+        await self.store.update_access_token_last_validated(requester.access_token_id)
 
         return params, session_id
 
@@ -453,13 +469,10 @@ class AuthHandler(BaseHandler):
                 all the stages in any of the permitted flows.
         """
 
-        authdict = None
         sid = None  # type: Optional[str]
-        if clientdict and "auth" in clientdict:
-            authdict = clientdict["auth"]
-            del clientdict["auth"]
-            if "session" in authdict:
-                sid = authdict["session"]
+        authdict = clientdict.pop("auth", {})
+        if "session" in authdict:
+            sid = authdict["session"]
 
         # Convert the URI and method to strings.
         uri = request.uri.decode("utf-8")
@@ -564,6 +577,8 @@ class AuthHandler(BaseHandler):
 
         creds = await self.store.get_completed_ui_auth_stages(session.session_id)
         for f in flows:
+            # If all the required credentials have been supplied, the user has
+            # successfully completed the UI auth process!
             if len(set(f) - set(creds)) == 0:
                 # it's very useful to know what args are stored, but this can
                 # include the password in the case of registering, so only log
@@ -739,6 +754,7 @@ class AuthHandler(BaseHandler):
         device_id: Optional[str],
         valid_until_ms: Optional[int],
         puppets_user_id: Optional[str] = None,
+        is_appservice_ghost: bool = False,
     ) -> str:
         """
         Creates a new access token for the user with the given user ID.
@@ -755,6 +771,7 @@ class AuthHandler(BaseHandler):
                we should always have a device ID)
             valid_until_ms: when the token is valid until. None for
                 no expiry.
+            is_appservice_ghost: Whether the user is an application ghost user
         Returns:
               The access token for the user's session.
         Raises:
@@ -775,7 +792,11 @@ class AuthHandler(BaseHandler):
                 "Logging in user %s on device %s%s", user_id, device_id, fmt_expiry
             )
 
-        await self.auth.check_auth_blocking(user_id)
+        if (
+            not is_appservice_ghost
+            or self.hs.config.appservice.track_appservice_user_ips
+        ):
+            await self.auth.check_auth_blocking(user_id)
 
         access_token = self.macaroon_gen.generate_access_token(user_id)
         await self.store.add_access_token_to_user(
@@ -861,7 +882,7 @@ class AuthHandler(BaseHandler):
 
     async def validate_login(
         self, login_submission: Dict[str, Any], ratelimit: bool = False,
-    ) -> Tuple[str, Optional[Callable[[Dict[str, str]], None]]]:
+    ) -> Tuple[str, Optional[Callable[[Dict[str, str]], Awaitable[None]]]]:
         """Authenticates the user for the /login API
 
         Also used by the user-interactive auth flow to validate auth types which don't
@@ -1004,7 +1025,7 @@ class AuthHandler(BaseHandler):
 
     async def _validate_userid_login(
         self, username: str, login_submission: Dict[str, Any],
-    ) -> Tuple[str, Optional[Callable[[Dict[str, str]], None]]]:
+    ) -> Tuple[str, Optional[Callable[[Dict[str, str]], Awaitable[None]]]]:
         """Helper for validate_login
 
         Handles login, once we've mapped 3pids onto userids
@@ -1082,7 +1103,7 @@ class AuthHandler(BaseHandler):
 
     async def check_password_provider_3pid(
         self, medium: str, address: str, password: str
-    ) -> Tuple[Optional[str], Optional[Callable[[Dict[str, str]], None]]]:
+    ) -> Tuple[Optional[str], Optional[Callable[[Dict[str, str]], Awaitable[None]]]]:
         """Check if a password provider is able to validate a thirdparty login
 
         Args:
@@ -1638,6 +1659,6 @@ class PasswordProvider:
 
         # This might return an awaitable, if it does block the log out
         # until it completes.
-        result = g(user_id=user_id, device_id=device_id, access_token=access_token,)
-        if inspect.isawaitable(result):
-            await result
+        await maybe_awaitable(
+            g(user_id=user_id, device_id=device_id, access_token=access_token,)
+        )
