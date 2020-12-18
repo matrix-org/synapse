@@ -93,6 +93,8 @@ class EventTypes:
 
     Retention = "m.room.retention"
 
+
+class EduTypes:
     Presence = "m.presence"
     RoomKeyRequest = "m.room_key_request"
 

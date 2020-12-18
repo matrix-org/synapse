@@ -16,7 +16,7 @@
 import logging
 from typing import TYPE_CHECKING, Any, Dict
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EduTypes
 from synapse.api.errors import SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.logging.context import run_in_background
@@ -165,7 +165,7 @@ class DeviceMessageHandler:
         for user_id, by_device in messages.items():
             # Ratelimit local cross-user key requests by the sending device.
             if (
-                message_type == EventTypes.RoomKeyRequest
+                message_type == EduTypes.RoomKeyRequest
                 and user_id != sender_user_id
                 and self._ratelimiter.can_do_action(requester.device_id)
             ):

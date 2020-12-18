@@ -33,7 +33,7 @@ from twisted.internet import defer
 from twisted.internet.abstract import isIPAddress
 from twisted.python import failure
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EduTypes, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -916,13 +916,13 @@ class FederationHandlerRegistry:
         self._edu_type_to_instance[edu_type] = instance_name
 
     async def on_edu(self, edu_type: str, origin: str, content: dict):
-        if not self.config.use_presence and edu_type == EventTypes.Presence:
+        if not self.config.use_presence and edu_type == EduTypes.Presence:
             return
 
         # If the incoming room key requests from a particular origin are over
         # the limit, drop them.
         if (
-            edu_type == EventTypes.RoomKeyRequest
+            edu_type == EduTypes.RoomKeyRequest
             and not self._room_key_request_rate_limiter.can_do_action(origin)
         ):
             return
