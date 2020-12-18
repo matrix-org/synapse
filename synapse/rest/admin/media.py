@@ -22,7 +22,6 @@ from synapse.rest.admin._base import (
     admin_patterns,
     assert_requester_is_admin,
     assert_user_is_admin,
-    historical_admin_path_patterns,
 )
 
 logger = logging.getLogger(__name__)
@@ -34,10 +33,10 @@ class QuarantineMediaInRoom(RestServlet):
     """
 
     PATTERNS = (
-        historical_admin_path_patterns("/room/(?P<room_id>[^/]+)/media/quarantine")
+        admin_patterns("/room/(?P<room_id>[^/]+)/media/quarantine")
         +
         # This path kept around for legacy reasons
-        historical_admin_path_patterns("/quarantine_media/(?P<room_id>[^/]+)")
+        admin_patterns("/quarantine_media/(?P<room_id>[^/]+)")
     )
 
     def __init__(self, hs):
@@ -63,9 +62,7 @@ class QuarantineMediaByUser(RestServlet):
     this server.
     """
 
-    PATTERNS = historical_admin_path_patterns(
-        "/user/(?P<user_id>[^/]+)/media/quarantine"
-    )
+    PATTERNS = admin_patterns("/user/(?P<user_id>[^/]+)/media/quarantine")
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -90,7 +87,7 @@ class QuarantineMediaByID(RestServlet):
     it via this server.
     """
 
-    PATTERNS = historical_admin_path_patterns(
+    PATTERNS = admin_patterns(
         "/media/quarantine/(?P<server_name>[^/]+)/(?P<media_id>[^/]+)"
     )
 
@@ -116,7 +113,7 @@ class ListMediaInRoom(RestServlet):
     """Lists all of the media in a given room.
     """
 
-    PATTERNS = historical_admin_path_patterns("/room/(?P<room_id>[^/]+)/media")
+    PATTERNS = admin_patterns("/room/(?P<room_id>[^/]+)/media")
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -134,7 +131,7 @@ class ListMediaInRoom(RestServlet):
 
 
 class PurgeMediaCacheRestServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns("/purge_media_cache")
+    PATTERNS = admin_patterns("/purge_media_cache")
 
     def __init__(self, hs):
         self.media_repository = hs.get_media_repository()

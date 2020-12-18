@@ -16,7 +16,7 @@
 import logging
 
 import synapse.metrics
-from synapse.api.constants import EventTypes, JoinRules, Membership
+from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules, Membership
 from synapse.handlers.state_deltas import StateDeltasHandler
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.roommember import ProfileInfo
@@ -81,11 +81,11 @@ class UserDirectoryHandler(StateDeltasHandler):
         results = await self.store.search_user_dir(user_id, search_term, limit)
 
         # Remove any spammy users from the results.
-        results["results"] = [
-            user
-            for user in results["results"]
-            if not self.spam_checker.check_username_for_spam(user)
-        ]
+        non_spammy_users = []
+        for user in results["results"]:
+            if not await self.spam_checker.check_username_for_spam(user):
+                non_spammy_users.append(user)
+        results["results"] = non_spammy_users
 
         return results
 
@@ -113,9 +113,13 @@ class UserDirectoryHandler(StateDeltasHandler):
         """
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
-        is_support = await self.store.is_support_user(user_id)
+
         # Support users are for diagnostics and should not appear in the user directory.
-        if not is_support:
+        is_support = await self.store.is_support_user(user_id)
+        # When change profile information of deactivated user it should not appear in the user directory.
+        is_deactivated = await self.store.get_user_deactivated_status(user_id)
+
+        if not (is_support or is_deactivated):
             await self.store.update_profile_in_user_dir(
                 user_id, profile.display_name, profile.avatar_url
             )
@@ -250,7 +254,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                 prev_event_id,
                 event_id,
                 key_name="history_visibility",
-                public_value="world_readable",
+                public_value=HistoryVisibility.WORLD_READABLE,
             )
         elif typ == EventTypes.JoinRules:
             change = await self._get_key_change(

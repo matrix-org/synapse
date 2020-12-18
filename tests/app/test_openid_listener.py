@@ -20,14 +20,14 @@ from synapse.app.generic_worker import GenericWorkerServer
 from synapse.app.homeserver import SynapseHomeServer
 from synapse.config.server import parse_listener_def
 
-from tests.server import make_request, render
+from tests.server import make_request
 from tests.unittest import HomeserverTestCase
 
 
 class FederationReaderOpenIDListenerTests(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(
-            http_client=None, homeserver_to_use=GenericWorkerServer
+            federation_http_client=None, homeserver_to_use=GenericWorkerServer
         )
         return hs
 
@@ -67,16 +67,15 @@ class FederationReaderOpenIDListenerTests(HomeserverTestCase):
         # Grab the resource from the site that was told to listen
         site = self.reactor.tcpServers[0][1]
         try:
-            resource = site.resource.children[b"_matrix"].children[b"federation"]
+            site.resource.children[b"_matrix"].children[b"federation"]
         except KeyError:
             if expectation == "no_resource":
                 return
             raise
 
-        request, channel = make_request(
+        channel = make_request(
             self.reactor, site, "GET", "/_matrix/federation/v1/openid/userinfo"
         )
-        render(request, resource, self.reactor)
 
         self.assertEqual(channel.code, 401)
 
@@ -85,7 +84,7 @@ class FederationReaderOpenIDListenerTests(HomeserverTestCase):
 class SynapseHomeserverOpenIDListenerTests(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(
-            http_client=None, homeserver_to_use=SynapseHomeServer
+            federation_http_client=None, homeserver_to_use=SynapseHomeServer
         )
         return hs
 
@@ -116,15 +115,14 @@ class SynapseHomeserverOpenIDListenerTests(HomeserverTestCase):
         # Grab the resource from the site that was told to listen
         site = self.reactor.tcpServers[0][1]
         try:
-            resource = site.resource.children[b"_matrix"].children[b"federation"]
+            site.resource.children[b"_matrix"].children[b"federation"]
         except KeyError:
             if expectation == "no_resource":
                 return
             raise
 
-        request, channel = make_request(
+        channel = make_request(
             self.reactor, site, "GET", "/_matrix/federation/v1/openid/userinfo"
         )
-        render(request, resource, self.reactor)
 
         self.assertEqual(channel.code, 401)

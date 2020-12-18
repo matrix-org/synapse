@@ -1,0 +1,1 @@
+Add number of local devices to Room Details Admin API. Contributed by @dklimpel.

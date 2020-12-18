@@ -133,7 +133,9 @@ class DirectoryHandler(BaseHandler):
                         403, "You must be in the room to create an alias for it"
                     )
 
-            if not self.spam_checker.user_may_create_room_alias(user_id, room_alias):
+            if not await self.spam_checker.user_may_create_room_alias(
+                user_id, room_alias
+            ):
                 raise AuthError(403, "This user is not permitted to create this alias")
 
             if not self.config.is_alias_creation_allowed(
@@ -409,7 +411,7 @@ class DirectoryHandler(BaseHandler):
         """
         user_id = requester.user.to_string()
 
-        if not self.spam_checker.user_may_publish_room(user_id, room_id):
+        if not await self.spam_checker.user_may_publish_room(user_id, room_id):
             raise AuthError(
                 403, "This user is not permitted to publish rooms to the room list"
             )

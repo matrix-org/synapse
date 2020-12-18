@@ -317,14 +317,14 @@ mxid_localpart_allowed_characters = set(
 )
 
 
-def contains_invalid_mxid_characters(localpart):
+def contains_invalid_mxid_characters(localpart: str) -> bool:
     """Check for characters not allowed in an mxid or groupid localpart
 
     Args:
-        localpart (basestring): the localpart to be checked
+        localpart: the localpart to be checked
 
     Returns:
-        bool: True if there are any naughty characters
+        True if there are any naughty characters
     """
     return any(c not in mxid_localpart_allowed_characters for c in localpart)
 
@@ -349,15 +349,17 @@ NON_MXID_CHARACTER_PATTERN = re.compile(
 )
 
 
-def map_username_to_mxid_localpart(username, case_sensitive=False):
+def map_username_to_mxid_localpart(
+    username: Union[str, bytes], case_sensitive: bool = False
+) -> str:
     """Map a username onto a string suitable for a MXID
 
     This follows the algorithm laid out at
     https://matrix.org/docs/spec/appendices.html#mapping-from-other-character-sets.
 
     Args:
-        username (unicode|bytes): username to be mapped
-        case_sensitive (bool): true if TEST and test should be mapped
+        username: username to be mapped
+        case_sensitive: true if TEST and test should be mapped
             onto different mxids
 
     Returns:

@@ -226,7 +226,7 @@ class ApplicationServicesHandler:
         new_token: Optional[int],
         users: Collection[Union[str, UserID]],
     ):
-        logger.info("Checking interested services for %s" % (stream_key))
+        logger.debug("Checking interested services for %s" % (stream_key))
         with Measure(self.clock, "notify_interested_services_ephemeral"):
             for service in services:
                 # Only handle typing if we have the latest token

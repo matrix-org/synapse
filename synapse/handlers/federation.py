@@ -55,6 +55,7 @@ from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
 from synapse.handlers._base import BaseHandler
+from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import (
     make_deferred_yieldable,
     nested_logging_context,
@@ -139,7 +140,7 @@ class FederationHandler(BaseHandler):
         self._message_handler = hs.get_message_handler()
         self._server_notices_mxid = hs.config.server_notices_mxid
         self.config = hs.config
-        self.http_client = hs.get_simple_http_client()
+        self.http_client = hs.get_proxied_blacklisted_http_client()
         self._instance_name = hs.get_instance_name()
         self._replication = hs.get_replication_data_handler()
 
@@ -1592,7 +1593,7 @@ class FederationHandler(BaseHandler):
         if self.hs.config.block_non_admin_invites:
             raise SynapseError(403, "This server does not accept room invites")
 
-        if not self.spam_checker.user_may_invite(
+        if not await self.spam_checker.user_may_invite(
             event.sender, event.state_key, event.room_id
         ):
             raise SynapseError(
@@ -2688,7 +2689,7 @@ class FederationHandler(BaseHandler):
             )
 
     async def on_exchange_third_party_invite_request(
-        self, room_id: str, event_dict: JsonDict
+        self, event_dict: JsonDict
     ) -> None:
         """Handle an exchange_third_party_invite request from a remote server
 
@@ -2696,12 +2697,11 @@ class FederationHandler(BaseHandler):
         into a normal m.room.member invite.
 
         Args:
-            room_id: The ID of the room.
-
-            event_dict (dict[str, Any]): Dictionary containing the event body.
+            event_dict: Dictionary containing the event body.
 
         """
-        room_version = await self.store.get_room_version_id(room_id)
+        assert_params_in_dict(event_dict, ["room_id"])
+        room_version = await self.store.get_room_version_id(event_dict["room_id"])
 
         # NB: event_dict has a particular specced format we might need to fudge
         # if we change event formats too much.

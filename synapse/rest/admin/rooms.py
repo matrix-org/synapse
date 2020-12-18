@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
@@ -25,17 +25,18 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import (
     admin_patterns,
     assert_requester_is_admin,
     assert_user_is_admin,
-    historical_admin_path_patterns,
 )
 from synapse.storage.databases.main.room import RoomSortOrder
-from synapse.types import RoomAlias, RoomID, UserID, create_requester
+from synapse.types import JsonDict, RoomAlias, RoomID, UserID, create_requester
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+
 
 logger = logging.getLogger(__name__)
 
@@ -47,14 +48,16 @@ class ShutdownRoomRestServlet(RestServlet):
     joined to the new room.
     """
 
-    PATTERNS = historical_admin_path_patterns("/shutdown_room/(?P<room_id>[^/]+)")
+    PATTERNS = admin_patterns("/shutdown_room/(?P<room_id>[^/]+)")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
         self.room_shutdown_handler = hs.get_room_shutdown_handler()
 
-    async def on_POST(self, request, room_id):
+    async def on_POST(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
 
@@ -74,25 +77,31 @@ class ShutdownRoomRestServlet(RestServlet):
 
 
 class DeleteRoomRestServlet(RestServlet):
-    """Delete a room from server. It is a combination and improvement of
-    shut down and purge room.
+    """Delete a room from server.
+
+    It is a combination and improvement of shutdown and purge room.
+
     Shuts down a room by removing all local users from the room.
     Blocking all future invites and joins to the room is optional.
+
     If desired any local aliases will be repointed to a new room
-    created by `new_room_user_id` and kicked users will be auto
+    created by `new_room_user_id` and kicked users will be auto-
     joined to the new room.
-    It will remove all trace of a room from the database.
+
+    If 'purge' is true, it will remove all traces of a room from the database.
     """
 
     PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)/delete$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
         self.room_shutdown_handler = hs.get_room_shutdown_handler()
         self.pagination_handler = hs.get_pagination_handler()
 
-    async def on_POST(self, request, room_id):
+    async def on_POST(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
 
@@ -114,6 +123,14 @@ class DeleteRoomRestServlet(RestServlet):
                 Codes.BAD_JSON,
             )
 
+        force_purge = content.get("force_purge", False)
+        if not isinstance(force_purge, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Param 'force_purge' must be a boolean, if given",
+                Codes.BAD_JSON,
+            )
+
         ret = await self.room_shutdown_handler.shutdown_room(
             room_id=room_id,
             new_room_user_id=content.get("new_room_user_id"),
@@ -125,7 +142,7 @@ class DeleteRoomRestServlet(RestServlet):
 
         # Purge room
         if purge:
-            await self.pagination_handler.purge_room(room_id)
+            await self.pagination_handler.purge_room(room_id, force=force_purge)
 
         return (200, ret)
 
@@ -138,12 +155,12 @@ class ListRoomRestServlet(RestServlet):
 
     PATTERNS = admin_patterns("/rooms$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_admin_handler()
 
-    async def on_GET(self, request):
+    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
 
@@ -228,19 +245,24 @@ class RoomRestServlet(RestServlet):
 
     PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
 
-    async def on_GET(self, request, room_id):
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
         ret = await self.store.get_room_with_stats(room_id)
         if not ret:
             raise NotFoundError("Room not found")
 
-        return 200, ret
+        members = await self.store.get_users_in_room(room_id)
+        ret["joined_local_devices"] = await self.store.count_devices_by_users(members)
+
+        return (200, ret)
 
 
 class RoomMembersRestServlet(RestServlet):
@@ -250,12 +272,14 @@ class RoomMembersRestServlet(RestServlet):
 
     PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)/members")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
 
-    async def on_GET(self, request, room_id):
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
         ret = await self.store.get_room(room_id)
@@ -272,14 +296,16 @@ class JoinRoomAliasServlet(RestServlet):
 
     PATTERNS = admin_patterns("/join/(?P<room_identifier>[^/]*)")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
         self.room_member_handler = hs.get_room_member_handler()
         self.admin_handler = hs.get_admin_handler()
         self.state_handler = hs.get_state_handler()
 
-    async def on_POST(self, request, room_identifier):
+    async def on_POST(
+        self, request: SynapseRequest, room_identifier: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
 
@@ -306,7 +332,6 @@ class JoinRoomAliasServlet(RestServlet):
             handler = self.room_member_handler
             room_alias = RoomAlias.from_string(room_identifier)
             room_id, remote_room_hosts = await handler.lookup_room_alias(room_alias)
-            room_id = room_id.to_string()
         else:
             raise SynapseError(
                 400, "%s was not legal room ID or room alias" % (room_identifier,)

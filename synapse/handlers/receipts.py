@@ -18,7 +18,6 @@ from typing import List, Tuple
 from synapse.appservice import ApplicationService
 from synapse.handlers._base import BaseHandler
 from synapse.types import JsonDict, ReadReceipt, get_domain_from_id
-from synapse.util.async_helpers import maybe_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -98,10 +97,8 @@ class ReceiptsHandler(BaseHandler):
 
         self.notifier.on_new_event("receipt_key", max_batch_id, rooms=affected_room_ids)
         # Note that the min here shouldn't be relied upon to be accurate.
-        await maybe_awaitable(
-            self.hs.get_pusherpool().on_new_receipts(
-                min_batch_id, max_batch_id, affected_room_ids
-            )
+        await self.hs.get_pusherpool().on_new_receipts(
+            min_batch_id, max_batch_id, affected_room_ids
         )
 
         return True
@@ -158,7 +155,8 @@ class ReceiptEventSource:
         if from_key == to_key:
             return [], to_key
 
-        # We first need to fetch all new receipts
+        # Fetch all read receipts for all rooms, up to a limit of 100. This is ordered
+        # by most recent.
         rooms_to_events = await self.store.get_linearized_receipts_for_all_rooms(
             from_key=from_key, to_key=to_key
         )

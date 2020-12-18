@@ -203,10 +203,6 @@ class _Sentinel:
     def copy_to(self, record):
         pass
 
-    def copy_to_twisted_log_entry(self, record):
-        record["request"] = None
-        record["scope"] = None
-
     def start(self, rusage: "Optional[resource._RUsage]"):
         pass
 
@@ -372,13 +368,6 @@ class LoggingContext:
         # we also track the current scope:
         record.scope = self.scope
 
-    def copy_to_twisted_log_entry(self, record) -> None:
-        """
-        Copy logging fields from this context to a Twisted log record.
-        """
-        record["request"] = self.request
-        record["scope"] = self.scope
-
     def start(self, rusage: "Optional[resource._RUsage]") -> None:
         """
         Record that this logcontext is currently running.
@@ -542,13 +531,10 @@ class LoggingContext:
 class LoggingContextFilter(logging.Filter):
     """Logging filter that adds values from the current logging context to each
     record.
-    Args:
-        **defaults: Default values to avoid formatters complaining about
-            missing fields
     """
 
-    def __init__(self, **defaults) -> None:
-        self.defaults = defaults
+    def __init__(self, request: str = ""):
+        self._default_request = request
 
     def filter(self, record) -> Literal[True]:
         """Add each fields from the logging contexts to the record.
@@ -556,14 +542,14 @@ class LoggingContextFilter(logging.Filter):
             True to include the record in the log output.
         """
         context = current_context()
-        for key, value in self.defaults.items():
-            setattr(record, key, value)
+        record.request = self._default_request
 
         # context should never be None, but if it somehow ends up being, then
         # we end up in a death spiral of infinite loops, so let's check, for
         # robustness' sake.
         if context is not None:
-            context.copy_to(record)
+            # Logging is interested in the request.
+            record.request = context.request
 
         return True
 

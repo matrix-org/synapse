@@ -37,7 +37,7 @@ def request_registration(
     exit=sys.exit,
 ):
 
-    url = "%s/_matrix/client/r0/admin/register" % (server_location,)
+    url = "%s/_synapse/admin/v1/register" % (server_location.rstrip("/"),)
 
     # Get the nonce
     r = requests.get(url, verify=False)

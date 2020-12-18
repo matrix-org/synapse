@@ -32,6 +32,7 @@ from synapse.app.phone_stats_home import start_phone_stats_home
 from synapse.config.server import ListenerConfig
 from synapse.crypto import context_factory
 from synapse.logging.context import PreserveLoggingContext
+from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.util.async_helpers import Linearizer
 from synapse.util.daemonize import daemonize_process
 from synapse.util.rlimit import change_resource_limit
@@ -244,6 +245,9 @@ def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerConfig]):
         # Set up the SIGHUP machinery.
         if hasattr(signal, "SIGHUP"):
 
+            reactor = hs.get_reactor()
+
+            @wrap_as_background_process("sighup")
             def handle_sighup(*args, **kwargs):
                 # Tell systemd our state, if we're using it. This will silently fail if
                 # we're not using systemd.
@@ -254,7 +258,15 @@ def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerConfig]):
 
                 sdnotify(b"READY=1")
 
-            signal.signal(signal.SIGHUP, handle_sighup)
+            # We defer running the sighup handlers until next reactor tick. This
+            # is so that we're in a sane state, e.g. flushing the logs may fail
+            # if the sighup happens in the middle of writing a log entry.
+            def run_sighup(*args, **kwargs):
+                # `callFromThread` should be "signal safe" as well as thread
+                # safe.
+                reactor.callFromThread(handle_sighup, *args, **kwargs)
+
+            signal.signal(signal.SIGHUP, run_sighup)
 
             register_sighup(refresh_certificate, hs)
 

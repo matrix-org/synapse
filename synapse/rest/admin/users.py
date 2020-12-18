@@ -33,8 +33,8 @@ from synapse.rest.admin._base import (
     admin_patterns,
     assert_requester_is_admin,
     assert_user_is_admin,
-    historical_admin_path_patterns,
 )
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import JsonDict, UserID
 
 if TYPE_CHECKING:
@@ -42,20 +42,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_GET_PUSHERS_ALLOWED_KEYS = {
-    "app_display_name",
-    "app_id",
-    "data",
-    "device_display_name",
-    "kind",
-    "lang",
-    "profile_tag",
-    "pushkey",
-}
-
 
 class UsersRestServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns("/users/(?P<user_id>[^/]*)$")
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)$")
 
     def __init__(self, hs):
         self.hs = hs
@@ -320,9 +309,9 @@ class UserRestServletV2(RestServlet):
                             data={},
                         )
 
-            if "avatar_url" in body and type(body["avatar_url"]) == str:
+            if "avatar_url" in body and isinstance(body["avatar_url"], str):
                 await self.profile_handler.set_avatar_url(
-                    user_id, requester, body["avatar_url"], True
+                    target_user, requester, body["avatar_url"], True
                 )
 
             ret = await self.admin_handler.get_user(target_user)
@@ -338,7 +327,7 @@ class UserRegisterServlet(RestServlet):
              nonce to the time it was generated, in int seconds.
     """
 
-    PATTERNS = historical_admin_path_patterns("/register")
+    PATTERNS = admin_patterns("/register")
     NONCE_TIMEOUT = 60
 
     def __init__(self, hs):
@@ -420,6 +409,9 @@ class UserRegisterServlet(RestServlet):
         if user_type is not None and user_type not in UserTypes.ALL_USER_TYPES:
             raise SynapseError(400, "Invalid user type")
 
+        if "mac" not in body:
+            raise SynapseError(400, "mac must be specified", errcode=Codes.BAD_JSON)
+
         got_mac = body["mac"]
 
         want_mac_builder = hmac.new(
@@ -461,7 +453,14 @@ class UserRegisterServlet(RestServlet):
 
 
 class WhoisRestServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns("/whois/(?P<user_id>[^/]*)")
+    path_regex = "/whois/(?P<user_id>[^/]*)$"
+    PATTERNS = (
+        admin_patterns(path_regex)
+        +
+        # URL for spec reason
+        # https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-admin-whois-userid
+        client_patterns("/admin" + path_regex, v1=True)
+    )
 
     def __init__(self, hs):
         self.hs = hs
@@ -485,7 +484,7 @@ class WhoisRestServlet(RestServlet):
 
 
 class DeactivateAccountRestServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns("/deactivate/(?P<target_user_id>[^/]*)")
+    PATTERNS = admin_patterns("/deactivate/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
         self._deactivate_account_handler = hs.get_deactivate_account_handler()
@@ -516,7 +515,7 @@ class DeactivateAccountRestServlet(RestServlet):
 
 
 class AccountValidityRenewServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns("/account_validity/validity$")
+    PATTERNS = admin_patterns("/account_validity/validity$")
 
     def __init__(self, hs):
         """
@@ -559,9 +558,7 @@ class ResetPasswordRestServlet(RestServlet):
             200 OK with empty object if success otherwise an error.
         """
 
-    PATTERNS = historical_admin_path_patterns(
-        "/reset_password/(?P<target_user_id>[^/]*)"
-    )
+    PATTERNS = admin_patterns("/reset_password/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -603,7 +600,7 @@ class SearchUsersRestServlet(RestServlet):
             200 OK with json object {list[dict[str, Any]], count} or empty object.
     """
 
-    PATTERNS = historical_admin_path_patterns("/search_users/(?P<target_user_id>[^/]*)")
+    PATTERNS = admin_patterns("/search_users/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
         self.hs = hs
@@ -762,10 +759,7 @@ class PushersRestServlet(RestServlet):
 
         pushers = await self.store.get_pushers_by_user_id(user_id)
 
-        filtered_pushers = [
-            {k: v for k, v in p.items() if k in _GET_PUSHERS_ALLOWED_KEYS}
-            for p in pushers
-        ]
+        filtered_pushers = [p.as_dict() for p in pushers]
 
         return 200, {"pushers": filtered_pushers, "total": len(filtered_pushers)}
 

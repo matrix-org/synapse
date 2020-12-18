@@ -27,7 +27,8 @@ import logging
 import os
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, TypeVar, cast
 
-import twisted
+import twisted.internet.base
+import twisted.internet.tcp
 from twisted.mail.smtp import sendmail
 from twisted.web.iweb import IPolicyForHTTPS
 
@@ -89,6 +90,7 @@ from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.search import SearchHandler
 from synapse.handlers.set_password import SetPasswordHandler
+from synapse.handlers.sso import SsoHandler
 from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import FollowerTypingHandler, TypingWriterHandler
@@ -145,7 +147,8 @@ def cache_in_self(builder: T) -> T:
             "@cache_in_self can only be used on functions starting with `get_`"
         )
 
-    depname = builder.__name__[len("get_") :]
+    # get_attr -> _attr
+    depname = builder.__name__[len("get") :]
 
     building = [False]
 
@@ -233,15 +236,6 @@ class HomeServer(metaclass=abc.ABCMeta):
         self._instance_id = random_string(5)
         self._instance_name = config.worker_name or "master"
 
-        self.clock = Clock(reactor)
-        self.distributor = Distributor()
-
-        self.registration_ratelimiter = Ratelimiter(
-            clock=self.clock,
-            rate_hz=config.rc_registration.per_second,
-            burst_count=config.rc_registration.burst_count,
-        )
-
         self.version_string = version_string
 
         self.datastores = None  # type: Optional[Databases]
@@ -299,8 +293,9 @@ class HomeServer(metaclass=abc.ABCMeta):
     def is_mine_id(self, string: str) -> bool:
         return string.split(":", 1)[1] == self.hostname
 
+    @cache_in_self
     def get_clock(self) -> Clock:
-        return self.clock
+        return Clock(self._reactor)
 
     def get_datastore(self) -> DataStore:
         if not self.datastores:
@@ -317,11 +312,17 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_config(self) -> HomeServerConfig:
         return self.config
 
+    @cache_in_self
     def get_distributor(self) -> Distributor:
-        return self.distributor
+        return Distributor()
 
+    @cache_in_self
     def get_registration_ratelimiter(self) -> Ratelimiter:
-        return self.registration_ratelimiter
+        return Ratelimiter(
+            clock=self.get_clock(),
+            rate_hz=self.config.rc_registration.per_second,
+            burst_count=self.config.rc_registration.burst_count,
+        )
 
     @cache_in_self
     def get_federation_client(self) -> FederationClient:
@@ -349,15 +350,45 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_simple_http_client(self) -> SimpleHttpClient:
+        """
+        An HTTP client with no special configuration.
+        """
         return SimpleHttpClient(self)
 
     @cache_in_self
     def get_proxied_http_client(self) -> SimpleHttpClient:
+        """
+        An HTTP client that uses configured HTTP(S) proxies.
+        """
         return SimpleHttpClient(
             self,
             http_proxy=os.getenvb(b"http_proxy"),
             https_proxy=os.getenvb(b"HTTPS_PROXY"),
         )
+
+    @cache_in_self
+    def get_proxied_blacklisted_http_client(self) -> SimpleHttpClient:
+        """
+        An HTTP client that uses configured HTTP(S) proxies and blacklists IPs
+        based on the IP range blacklist/whitelist.
+        """
+        return SimpleHttpClient(
+            self,
+            ip_whitelist=self.config.ip_range_whitelist,
+            ip_blacklist=self.config.ip_range_blacklist,
+            http_proxy=os.getenvb(b"http_proxy"),
+            https_proxy=os.getenvb(b"HTTPS_PROXY"),
+        )
+
+    @cache_in_self
+    def get_federation_http_client(self) -> MatrixFederationHttpClient:
+        """
+        An HTTP client for federation.
+        """
+        tls_client_options_factory = context_factory.FederationPolicyForHTTPS(
+            self.config
+        )
+        return MatrixFederationHttpClient(self, tls_client_options_factory)
 
     @cache_in_self
     def get_room_creation_handler(self) -> RoomCreationHandler:
@@ -389,6 +420,10 @@ class HomeServer(metaclass=abc.ABCMeta):
             return TypingWriterHandler(self)
         else:
             return FollowerTypingHandler(self)
+
+    @cache_in_self
+    def get_sso_handler(self) -> SsoHandler:
+        return SsoHandler(self)
 
     @cache_in_self
     def get_sync_handler(self) -> SyncHandler:
@@ -510,13 +545,6 @@ class HomeServer(metaclass=abc.ABCMeta):
         return PusherPool(self)
 
     @cache_in_self
-    def get_http_client(self) -> MatrixFederationHttpClient:
-        tls_client_options_factory = context_factory.FederationPolicyForHTTPS(
-            self.config
-        )
-        return MatrixFederationHttpClient(self, tls_client_options_factory)
-
-    @cache_in_self
     def get_media_repository_resource(self) -> MediaRepositoryResource:
         # build the media repo resource. This indirects through the HomeServer
         # to ensure that we only have a single instance of
@@ -590,7 +618,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return StatsHandler(self)
 
     @cache_in_self
-    def get_spam_checker(self):
+    def get_spam_checker(self) -> SpamChecker:
         return SpamChecker(self)
 
     @cache_in_self
@@ -681,7 +709,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_federation_ratelimiter(self) -> FederationRateLimiter:
-        return FederationRateLimiter(self.clock, config=self.config.rc_federation)
+        return FederationRateLimiter(self.get_clock(), config=self.config.rc_federation)
 
     @cache_in_self
     def get_module_api(self) -> ModuleApi:

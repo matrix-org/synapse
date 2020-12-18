@@ -46,12 +46,11 @@ class FederationServerTests(unittest.FederatingHomeserverTestCase):
 
         "/get_missing_events/(?P<room_id>[^/]*)/?"
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/federation/v1/get_missing_events/%s" % (room_1,),
             query_content,
         )
-        self.render(request)
         self.assertEquals(400, channel.code, channel.result)
         self.assertEqual(channel.json_body["errcode"], "M_NOT_JSON")
 
@@ -96,10 +95,9 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
         room_1 = self.helper.create_room_as(u1, tok=u1_token)
         self.inject_room_member(room_1, "@user:other.example.com", "join")
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/_matrix/federation/v1/state/%s" % (room_1,)
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
 
         self.assertEqual(
@@ -129,10 +127,9 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
 
         room_1 = self.helper.create_room_as(u1, tok=u1_token)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/_matrix/federation/v1/state/%s" % (room_1,)
         )
-        self.render(request)
         self.assertEquals(403, channel.code, channel.result)
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
 

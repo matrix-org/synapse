@@ -19,7 +19,6 @@ from twisted.internet.interfaces import (
 )
 from twisted.python.failure import Failure
 from twisted.test.proto_helpers import AccumulatingProtocol, MemoryReactorClock
-from twisted.web.http import unquote
 from twisted.web.http_headers import Headers
 from twisted.web.resource import IResource
 from twisted.web.server import Site
@@ -171,16 +170,18 @@ def make_request(
     shorthand=True,
     federation_auth_origin=None,
     content_is_form=False,
+    await_result: bool = True,
     custom_headers: Optional[
         Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
     ] = None,
-):
+) -> FakeChannel:
     """
-    Make a web request using the given method and path, feed it the
-    content, and return the Request and the Channel underneath.
+    Make a web request using the given method, path and content, and render it
+
+    Returns the fake Channel object which records the response to the request.
 
     Args:
-        site: The twisted Site to associate with the Channel
+        site: The twisted Site to use to render the request
 
         method (bytes/unicode): The HTTP request method ("verb").
         path (bytes/unicode): The HTTP path, suitably URL encoded (e.g.
@@ -196,8 +197,12 @@ def make_request(
 
         custom_headers: (name, value) pairs to add as request headers
 
+        await_result: whether to wait for the request to complete rendering. If true,
+             will pump the reactor until the the renderer tells the channel the request
+             is finished.
+
     Returns:
-        Tuple[synapse.http.site.SynapseRequest, channel]
+        channel
     """
     if not isinstance(method, bytes):
         method = method.encode("ascii")
@@ -211,8 +216,9 @@ def make_request(
         and not path.startswith(b"/_matrix")
         and not path.startswith(b"/_synapse")
     ):
+        if path.startswith(b"/"):
+            path = path[1:]
         path = b"/_matrix/client/r0/" + path
-        path = path.replace(b"//", b"/")
 
     if not path.startswith(b"/"):
         path = b"/" + path
@@ -225,11 +231,9 @@ def make_request(
     channel = FakeChannel(site, reactor)
 
     req = request(channel)
-    req.process = lambda: b""
     req.content = BytesIO(content)
     # Twisted expects to be at the end of the content when parsing the request.
     req.content.seek(SEEK_END)
-    req.postpath = list(map(unquote, path[1:].split(b"/")))
 
     if access_token:
         req.requestHeaders.addRawHeader(
@@ -255,14 +259,13 @@ def make_request(
         for k, v in custom_headers:
             req.requestHeaders.addRawHeader(k, v)
 
+    req.parseCookies()
     req.requestReceived(method, path, b"1.1")
 
-    return req, channel
+    if await_result:
+        channel.await_result()
 
-
-def render(request, resource, clock):
-    request.render(resource)
-    request._channel.await_result()
+    return channel
 
 
 @implementer(IReactorPluggableNameResolver)
