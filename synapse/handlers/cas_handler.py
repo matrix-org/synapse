@@ -126,7 +126,7 @@ class CasHandler:
                     "while exchanging the authorization code."
                 ).format(status=e.code),
             )
-            raise CasError("server_error", description)
+            raise CasError("server_error", description) from e
 
         return self._parse_cas_response(body)
 
