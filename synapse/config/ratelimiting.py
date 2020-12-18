@@ -102,13 +102,13 @@ class RatelimitConfig(Config):
             defaults={"per_second": 0.01, "burst_count": 3},
         )
 
+        # Ratelimit cross-user key requests:
+        # * For locacl requests this is done by the sending devie.
+        # * For requests received over federation this is done by the origin.
+        #
+        # Note that this isn't exposed in the configuration as it is obscure.
         self.rc_key_requests = RateLimitConfig(
             config.get("rc_key_requests", {}),
-            defaults={"per_second": 0.1, "burst_count": 3},
-        )
-
-        self.rc_federation_room_key_request = RateLimitConfig(
-            config.get("rc_federation", {}).get("room_key_request", {}),
             defaults={"per_second": 0.1, "burst_count": 3},
         )
 
@@ -176,15 +176,6 @@ class RatelimitConfig(Config):
         #    burst_count: 3
         #  remote:
         #    per_second: 0.01
-        #    burst_count: 3
-        #
-        #rc_key_requests:
-        #  per_second: 0.1
-        #  burst_count: 3
-        #
-        #rc_federation:
-        #  room_key_request:
-        #    per_second: 0.1
         #    burst_count: 3
 
 

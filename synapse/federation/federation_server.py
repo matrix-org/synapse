@@ -867,8 +867,8 @@ class FederationHandlerRegistry:
         # A rate limiter for incoming room key requests per origin.
         self._room_key_request_rate_limiter = Ratelimiter(
             clock=self.clock,
-            rate_hz=self.config.rc_federation_room_key_request.per_second,
-            burst_count=self.config.rc_federation_room_key_request.burst_count,
+            rate_hz=self.config.rc_key_requests.per_second,
+            burst_count=self.config.rc_key_requests.burst_count,
         )
 
     def register_edu_handler(

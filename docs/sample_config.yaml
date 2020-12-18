@@ -855,15 +855,6 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #  remote:
 #    per_second: 0.01
 #    burst_count: 3
-#
-#rc_key_requests:
-#  per_second: 0.1
-#  burst_count: 3
-#
-#rc_federation:
-#  room_key_request:
-#    per_second: 0.1
-#    burst_count: 3
 
 
 # Ratelimiting settings for incoming federation
