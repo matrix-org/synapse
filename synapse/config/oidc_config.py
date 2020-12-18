@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import string
-from typing import Optional, Type
+from typing import Iterable, Optional, Type
 
 import attr
 
@@ -33,16 +33,8 @@ class OIDCConfig(Config):
     section = "oidc"
 
     def read_config(self, config, **kwargs):
-        validate_config(MAIN_CONFIG_SCHEMA, config, ())
-
-        self.oidc_provider = None  # type: Optional[OidcProviderConfig]
-
-        oidc_config = config.get("oidc_config")
-        if oidc_config and oidc_config.get("enabled", False):
-            validate_config(OIDC_PROVIDER_CONFIG_SCHEMA, oidc_config, "oidc_config")
-            self.oidc_provider = _parse_oidc_config_dict(oidc_config)
-
-        if not self.oidc_provider:
+        self.oidc_providers = tuple(_parse_oidc_provider_configs(config))
+        if not self.oidc_providers:
             return
 
         try:
@@ -58,7 +50,7 @@ class OIDCConfig(Config):
     @property
     def oidc_enabled(self) -> bool:
         # OIDC is enabled if we have a provider
-        return bool(self.oidc_provider)
+        return bool(self.oidc_providers)
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
@@ -234,7 +226,22 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
     },
 }
 
-# the `oidc_config` setting can either be None (as it is in the default
+# the same as OIDC_PROVIDER_CONFIG_SCHEMA, but with compulsory idp_id and idp_name
+OIDC_PROVIDER_CONFIG_WITH_ID_SCHEMA = {
+    "allOf": [OIDC_PROVIDER_CONFIG_SCHEMA, {"required": ["idp_id", "idp_name"]}]
+}
+
+
+# the `oidc_providers` list can either be None (as it is in the default config), or
+# a list of provider configs, each of which requires an explicit ID and name.
+OIDC_PROVIDER_LIST_SCHEMA = {
+    "oneOf": [
+        {"type": "null"},
+        {"type": "array", "items": OIDC_PROVIDER_CONFIG_WITH_ID_SCHEMA},
+    ]
+}
+
+# the `oidc_config` setting can either be None (which it used to be in the default
 # config), or an object. If an object, it is ignored unless it has an "enabled: True"
 # property.
 #
@@ -243,10 +250,32 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
 # additional checks in the code.
 OIDC_CONFIG_SCHEMA = {"oneOf": [{"type": "null"}, {"type": "object"}]}
 
+# the top-level schema can contain an "oidc_config" and/or an "oidc_providers".
 MAIN_CONFIG_SCHEMA = {
     "type": "object",
-    "properties": {"oidc_config": OIDC_CONFIG_SCHEMA},
+    "properties": {
+        "oidc_config": OIDC_CONFIG_SCHEMA,
+        "oidc_providers": OIDC_PROVIDER_LIST_SCHEMA,
+    },
 }
+
+
+def _parse_oidc_provider_configs(config: JsonDict,) -> Iterable["OidcProviderConfig"]:
+    """extract and parse the OIDC provider configs from the config dict
+
+    Returns a generator which yields the OidcProviderConfig objects
+    """
+    validate_config(MAIN_CONFIG_SCHEMA, config, ())
+
+    for p in config.get("oidc_providers") or []:
+        yield _parse_oidc_config_dict(p)
+
+    # for backwards-compatibility, it is also possible to provide a single "oidc_config"
+    # object with an "enabled: True" property.
+    oidc_config = config.get("oidc_config")
+    if oidc_config and oidc_config.get("enabled", False):
+        validate_config(OIDC_PROVIDER_CONFIG_SCHEMA, oidc_config, ("oidc_config",))
+        yield _parse_oidc_config_dict(oidc_config)
 
 
 def _parse_oidc_config_dict(oidc_config: JsonDict) -> "OidcProviderConfig":
