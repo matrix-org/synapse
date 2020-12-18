@@ -32,14 +32,7 @@ let allowedUsernameCharacters = RegExp("[^a-z0-9\\.\\_\\=\\-\\/]");
 function usernameIsValid(username) {
     return !allowedUsernameCharacters.test(username);
 }
-let allowedCharactersString = "" +
-"lowercase letters, " +
-"digits, " +
-"<code>.</code>, " +
-"<code>_</code>, " +
-"<code>-</code>, " +
-"<code>/</code>, " +
-"<code>=</code>";
+let allowedCharactersString = "lowercase letters, digits, ., _, -, /, =";
 
 function buildQueryString(params) {
     return Object.keys(params)
