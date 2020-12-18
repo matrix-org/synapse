@@ -658,7 +658,7 @@ async def _get_mainline_depth_for_event(
     # We do an iterative search, replacing `event with the power level in its
     # auth events (if any)
     while tmp_event:
-        depth = mainline_map.get(event.event_id)
+        depth = mainline_map.get(tmp_event.event_id)
         if depth is not None:
             return depth
 
