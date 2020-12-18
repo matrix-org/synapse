@@ -621,7 +621,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         """
         Try to deactivate users without authentication.
         """
-        request, channel = self.make_request("POST", self.url, b"{}")
+        channel = self.make_request("POST", self.url, b"{}")
 
         self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
@@ -705,7 +705,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         # Deactivate user
         body = json.dumps({"erase": True})
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             self.url,
             access_token=self.admin_user_tok,
@@ -1189,7 +1189,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         )
 
         # Get user
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", self.url_other_user, access_token=self.admin_user_tok,
         )
 
