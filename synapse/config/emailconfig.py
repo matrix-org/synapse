@@ -324,20 +324,19 @@ class EmailConfig(Config):
 
         # The invite client location should be a HTTP(S) URL or None.
         self.invite_client_location = email_config.get("invite_client_location") or None
-        if self.invite_client_location and not isinstance(
-            self.invite_client_location, str
-        ):
-            raise ConfigError(
-                "Config option email.invite_client_location must be type str"
-            )
-        if not (
-            self.invite_client_location.startswith("http://")
-            or self.invite_client_location.startswith("https://")
-        ):
-            raise ConfigError(
-                "Config option email.invite_client_location must be a http or https URL",
-                path=("email", "invite_client_location"),
-            )
+        if self.invite_client_location:
+            if not isinstance(self.invite_client_location, str):
+                raise ConfigError(
+                    "Config option email.invite_client_location must be type str"
+                )
+            if not (
+                self.invite_client_location.startswith("http://")
+                or self.invite_client_location.startswith("https://")
+            ):
+                raise ConfigError(
+                    "Config option email.invite_client_location must be a http or https URL",
+                    path=("email", "invite_client_location"),
+                )
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return (
