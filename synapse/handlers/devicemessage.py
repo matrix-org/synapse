@@ -16,7 +16,9 @@
 import logging
 from typing import TYPE_CHECKING, Any, Dict
 
+from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.logging.context import run_in_background
 from synapse.logging.opentracing import (
     get_active_span_text_map,
@@ -51,6 +53,12 @@ class DeviceMessageHandler:
         )
 
         self._device_list_updater = hs.get_device_handler().device_list_updater
+
+        self._ratelimiter = Ratelimiter(
+            clock=hs.get_clock(),
+            rate_hz=hs.config.rc_key_requests.per_second,
+            burst_count=hs.config.rc_key_requests.burst_count,
+        )
 
     async def on_direct_to_device_edu(self, origin: str, content: JsonDict) -> None:
         local_messages = {}
@@ -153,6 +161,14 @@ class DeviceMessageHandler:
         local_messages = {}
         remote_messages = {}  # type: Dict[str, Dict[str, Dict[str, JsonDict]]]
         for user_id, by_device in messages.items():
+            # Ratelimit local cross-user key requests by user/device.
+            if (
+                message_type == EventTypes.RoomKeyRequest
+                and user_id != sender_user_id
+                and self._ratelimiter.can_do_action((user_id, by_device))
+            ):
+                continue
+
             # we use UserID.from_string to catch invalid user ids
             if self.is_mine(UserID.from_string(user_id)):
                 messages_by_device = {

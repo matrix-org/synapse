@@ -16,7 +16,6 @@
 import logging
 from typing import Tuple
 
-from synapse.api.ratelimiting import Ratelimiter
 from synapse.http import servlet
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.logging.opentracing import set_tag, trace
@@ -43,12 +42,6 @@ class SendToDeviceRestServlet(servlet.RestServlet):
         self.txns = HttpTransactionCache(hs)
         self.device_message_handler = hs.get_device_message_handler()
 
-        self._ratelimiter = Ratelimiter(
-            clock=hs.get_clock(),
-            rate_hz=self.hs.config.rc_send_to_device.per_second,
-            burst_count=self.hs.config.rc_send_to_device.burst_count,
-        )
-
     @trace(opname="sendToDevice")
     def on_PUT(self, request, message_type, txn_id):
         set_tag("message_type", message_type)
@@ -59,11 +52,10 @@ class SendToDeviceRestServlet(servlet.RestServlet):
 
     async def _put(self, request, message_type, txn_id):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        sender_user_id = requester.user.to_string()
-
-        self._ratelimiter.ratelimit(sender_user_id)
 
         content = parse_json_object_from_request(request)
+
+        sender_user_id = requester.user.to_string()
 
         await self.device_message_handler.send_device_message(
             sender_user_id, message_type, content["messages"]
