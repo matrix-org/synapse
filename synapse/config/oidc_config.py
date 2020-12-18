@@ -18,6 +18,7 @@ from typing import Optional, Type
 
 import attr
 
+from synapse.config._util import validate_config
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.types import Collection, JsonDict
 from synapse.util.module_loader import load_module
@@ -31,10 +32,13 @@ class OIDCConfig(Config):
     section = "oidc"
 
     def read_config(self, config, **kwargs):
+        validate_config(MAIN_CONFIG_SCHEMA, config, ())
+
         self.oidc_provider = None  # type: Optional[OidcProviderConfig]
 
         oidc_config = config.get("oidc_config")
         if oidc_config and oidc_config.get("enabled", False):
+            validate_config(OIDC_PROVIDER_CONFIG_SCHEMA, oidc_config, "oidc_config")
             self.oidc_provider = _parse_oidc_config_dict(oidc_config)
 
         if not self.oidc_provider:
@@ -194,6 +198,52 @@ class OIDCConfig(Config):
         """.format(
             mapping_provider=DEFAULT_USER_MAPPING_PROVIDER
         )
+
+
+# jsonschema definition of the configuration settings for an oidc identity provider
+OIDC_PROVIDER_CONFIG_SCHEMA = {
+    "type": "object",
+    "required": ["issuer", "client_id", "client_secret"],
+    "properties": {
+        "discover": {"type": "boolean"},
+        "issuer": {"type": "string"},
+        "client_id": {"type": "string"},
+        "client_secret": {"type": "string"},
+        "client_auth_method": {
+            "type": "string",
+            # the following list is the same as the keys of
+            # authlib.oauth2.auth.ClientAuth.DEFAULT_AUTH_METHODS. We inline it
+            # to avoid importing authlib here.
+            "enum": ["client_secret_basic", "client_secret_post", "none"],
+        },
+        "scopes": {"type": "array", "items": {"type": "string"}},
+        "authorization_endpoint": {"type": "string"},
+        "token_endpoint": {"type": "string"},
+        "userinfo_endpoint": {"type": "string"},
+        "jwks_uri": {"type": "string"},
+        "skip_verification": {"type": "boolean"},
+        "user_profile_method": {
+            "type": "string",
+            "enum": ["auto", "userinfo_endpoint"],
+        },
+        "allow_existing_users": {"type": "boolean"},
+        "user_mapping_provider": {"type": ["object", "null"]},
+    },
+}
+
+# the `oidc_config` setting can either be None (as it is in the default
+# config), or an object. If an object, it is ignored unless it has an "enabled: True"
+# property.
+#
+# It's *possible* to represent this with jsonschema, but the resultant errors aren't
+# particularly clear, so we just check for either an object or a null here, and do
+# additional checks in the code.
+OIDC_CONFIG_SCHEMA = {"oneOf": [{"type": "null"}, {"type": "object"}]}
+
+MAIN_CONFIG_SCHEMA = {
+    "type": "object",
+    "properties": {"oidc_config": OIDC_CONFIG_SCHEMA},
+}
 
 
 def _parse_oidc_config_dict(oidc_config: JsonDict) -> "OidcProviderConfig":
