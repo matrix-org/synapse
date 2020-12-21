@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 def _validate_group_id(f):
     """Wrapper to validate the form of the group ID.
 
-    Can be applied to any on_FOO methods that accepted a group ID as a URL parameter.
+    Can be applied to any on_FOO methods that accepts a group ID as a URL parameter.
     """
 
     @wraps(f)
