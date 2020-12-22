@@ -464,7 +464,7 @@ class BackgroundUpdater:
         )
 
     def _background_update_progress_txn(
-        self, txn: LoggingTransaction, update_name: str, progress: JsonDict
+        self, txn: "LoggingTransaction", update_name: str, progress: JsonDict
     ) -> None:
         """Update the progress of a background update
 

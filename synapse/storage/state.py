@@ -29,11 +29,11 @@ import attr
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.storage.databases import Databases
 from synapse.types import MutableStateMap, StateMap
 
 if TYPE_CHECKING:
     from synapse.app.homeserver import HomeServer
+    from synapse.storage.databases import Databases
 
 logger = logging.getLogger(__name__)
 
@@ -343,7 +343,7 @@ class StateGroupStorage:
     """High level interface to fetching state for event.
     """
 
-    def __init__(self, hs: "HomeServer", stores: Databases):
+    def __init__(self, hs: "HomeServer", stores: "Databases"):
         self.stores = stores
 
     async def get_state_group_delta(
