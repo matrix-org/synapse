@@ -67,8 +67,9 @@ class RoomVersion:
     # MSC2209: Check 'notifications' key while verifying
     # m.room.power_levels auth rules.
     limit_notifications_power_levels = attr.ib(type=bool)
-    # MSC2176: Apply updated redaction rules algorithm.
+    # MSC2174/MSC2176: Apply updated redaction rules algorithm.
     msc2176_redaction_rules = attr.ib(type=bool)
+
 
 class RoomVersions:
     V1 = RoomVersion(

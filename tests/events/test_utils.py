@@ -159,6 +159,51 @@ class PruneEventTestCase(unittest.TestCase):
             room_version=RoomVersions.V6,
         )
 
+    def test_msc2176_event(self):
+        """Assert behaviour modified by MSC2432."""
+        # membership and prev_state are now redacted.
+        self.run_test(
+            {"type": "other_type", "membership": True, "prev_state": True},
+            {"type": "other_type", "content": {}, "signatures": {}, "unsigned": {}},
+            room_version=RoomVersions.MSC2176,
+        )
+
+        # Create events get nothing redacted.
+        self.run_test(
+            {"type": "m.room.create", "content": {"not_a_real_key": True}},
+            {
+                "type": "m.room.create",
+                "content": {"not_a_real_key": True},
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=RoomVersions.MSC2176,
+        )
+
+        # Redaction events keep the redacts content key from MSC2174.
+        self.run_test(
+            {"type": "m.room.redaction", "content": {"redacts": True}},
+            {
+                "type": "m.room.redaction",
+                "content": {"redacts": True},
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=RoomVersions.MSC2176,
+        )
+
+        # Power levels events keep the invite key.
+        self.run_test(
+            {"type": "m.room.power_levels", "content": {"invite": 75}},
+            {
+                "type": "m.room.power_levels",
+                "content": {"invite": 75},
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=RoomVersions.MSC2176,
+        )
+
 
 class SerializeEventTestCase(unittest.TestCase):
     def serialize(self, ev, fields):
