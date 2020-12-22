@@ -12,14 +12,32 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from enum import Enum
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
 
 BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD = (
     "media_repository_drop_index_wo_method"
 )
+
+
+class MediaSortOrder(Enum):
+    """
+    Enum to define the sorting method used when returning media with
+    get_local_media_by_user_paginate
+    """
+
+    MEDIA_ID = "media_id"
+    UPLOAD_NAME = "upload_name"
+    CREATED_TS = "created_ts"
+    LAST_ACCESS_TS = "last_access_ts"
+    MEDIA_LENGTH = "media_length"
+    MEDIA_TYPE = "media_type"
+    QUARANTINED_BY = "quarantined_by"
+    SAFE_FROM_QUARANTINE = "safe_from_quarantine"
 
 
 class MediaRepositoryBackgroundUpdateStore(SQLBaseStore):
@@ -117,7 +135,12 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         )
 
     async def get_local_media_by_user_paginate(
-        self, start: int, limit: int, user_id: str
+        self,
+        start: int,
+        limit: int,
+        user_id: str,
+        order_by: MediaSortOrder = MediaSortOrder.CREATED_TS.value,
+        direction: str = "f",
     ) -> Tuple[List[Dict[str, Any]], int]:
         """Get a paginated list of metadata for a local piece of media
         which an user_id has uploaded
@@ -126,12 +149,41 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             start: offset in the list
             limit: maximum amount of media_ids to retrieve
             user_id: fully-qualified user id
+            order_by: the sort order of the returned list
+            direction: sort ascending or descending
         Returns:
             A paginated list of all metadata of user's media,
             plus the total count of all the user's media
         """
 
         def get_local_media_by_user_paginate_txn(txn):
+
+            # Set ordering
+            if MediaSortOrder(order_by) == MediaSortOrder.MEDIA_ID:
+                order_by_column = "media_id"
+            elif MediaSortOrder(order_by) == MediaSortOrder.UPLOAD_NAME:
+                order_by_column = "upload_name"
+            elif MediaSortOrder(order_by) == MediaSortOrder.CREATED_TS:
+                order_by_column = "created_ts"
+            elif MediaSortOrder(order_by) == MediaSortOrder.LAST_ACCESS_TS:
+                order_by_column = "last_access_ts"
+            elif MediaSortOrder(order_by) == MediaSortOrder.MEDIA_LENGTH:
+                order_by_column = "media_length"
+            elif MediaSortOrder(order_by) == MediaSortOrder.MEDIA_TYPE:
+                order_by_column = "media_type"
+            elif MediaSortOrder(order_by) == MediaSortOrder.QUARANTINED_BY:
+                order_by_column = "quarantined_by"
+            elif MediaSortOrder(order_by) == MediaSortOrder.SAFE_FROM_QUARANTINE:
+                order_by_column = "safe_from_quarantine"
+            else:
+                raise StoreError(
+                    500, "Incorrect value for order_by provided: %s" % order_by
+                )
+
+            if direction == "b":
+                order = "DESC"
+            else:
+                order = "ASC"
 
             args = [user_id]
             sql = """
@@ -154,9 +206,11 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                     "safe_from_quarantine"
                 FROM local_media_repository
                 WHERE user_id = ?
-                ORDER BY created_ts DESC, media_id DESC
+                ORDER BY {order_by_column} {order}, media_id ASC
                 LIMIT ? OFFSET ?
-            """
+            """.format(
+                order_by_column=order_by_column, order=order,
+            )
 
             args += [limit, start]
             txn.execute(sql, args)

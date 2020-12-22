@@ -35,6 +35,7 @@ from synapse.rest.admin._base import (
     assert_user_is_admin,
 )
 from synapse.rest.client.v2_alpha._base import client_patterns
+from synapse.storage.databases.main.media_repository import MediaSortOrder
 from synapse.types import JsonDict, UserID
 
 if TYPE_CHECKING:
@@ -816,8 +817,33 @@ class UserMediaRestServlet(RestServlet):
                 errcode=Codes.INVALID_PARAM,
             )
 
+        order_by = parse_string(
+            request, "order_by", default=MediaSortOrder.CREATED_TS.value
+        )
+        if order_by not in (
+            MediaSortOrder.MEDIA_ID.value,
+            MediaSortOrder.UPLOAD_NAME.value,
+            MediaSortOrder.CREATED_TS.value,
+            MediaSortOrder.LAST_ACCESS_TS.value,
+            MediaSortOrder.MEDIA_LENGTH.value,
+            MediaSortOrder.MEDIA_TYPE.value,
+            MediaSortOrder.QUARANTINED_BY.value,
+            MediaSortOrder.SAFE_FROM_QUARANTINE.value,
+        ):
+            raise SynapseError(
+                400,
+                "Unknown value for order_by: %s" % (order_by,),
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        direction = parse_string(request, "dir", default="f")
+        if direction not in ("f", "b"):
+            raise SynapseError(
+                400, "Unknown direction: %s" % (direction,), errcode=Codes.INVALID_PARAM
+            )
+
         media, total = await self.store.get_local_media_by_user_paginate(
-            start, limit, user_id
+            start, limit, user_id, order_by, direction
         )
 
         ret = {"media": media, "total": total}

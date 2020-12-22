@@ -354,8 +354,8 @@ The following fields are returned in the JSON response body:
 List media of an user
 ================================
 Gets a list of all local media that a specific ``user_id`` has created.
-The response is ordered by creation date descending and media ID descending.
-The newest media is on top.
+The response is default ordered by creation date ascending and media ID ascending.
+The oldest media is on top. You can change the order with parameter ``order_by``.
 
 The API is::
 
@@ -412,6 +412,30 @@ The following parameters should be set in the URL:
   denoting the offset in the returned results. This should be treated as an opaque value and
   not explicitly set to anything other than the return value of ``next_token`` from a previous call.
   Defaults to ``0``.
+- ``order_by`` - The method in which to sort the returned list of media.
+  If the ordered field has duplicates, the second order is always by ``media_id`` ascending,
+  which guarantees a complete ordering. Valid values are:
+
+  - ``media_id`` - Media are ordered alphabetically by ``media_id``.
+  - ``upload_name`` - Media are ordered alphabetically by name the media was uploaded with.
+  - ``created_ts`` - Media are ordered by when the content was uploaded in ms.
+    Smallest to largest. This is the default.
+
+  - ``last_access_ts`` - Media are ordered by when the content was last accessed in ms.
+    Smallest to largest.
+
+  - ``media_length`` - Media are ordered by length of the media in bytes.
+    Smallest to largest.
+
+  - ``media_type`` - Media are ordered alphabetically by MIME-type.
+  - ``quarantined_by`` - Media are ordered alphabetically by the user ID that
+    initiated the quarantine request for this media.
+
+  - ``safe_from_quarantine`` - Media are ordered by the status if this media is safe
+    from quarantining.
+
+- ``dir`` - Direction of media order. Either ``f`` for forwards or ``b`` for backwards.
+  Setting this value to ``b`` will reverse the above sort order. Defaults to ``f``.
 
 **Response**
 

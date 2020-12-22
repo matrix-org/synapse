@@ -18,7 +18,7 @@ import hmac
 import json
 import urllib.parse
 from binascii import unhexlify
-from typing import Optional
+from typing import List, Optional
 
 from mock import Mock
 
@@ -27,8 +27,10 @@ from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, HttpResponseException, ResourceLimitError
 from synapse.rest.client.v1 import login, logout, profile, room
 from synapse.rest.client.v2_alpha import devices, sync
+from synapse.types import JsonDict
 
 from tests import unittest
+from tests.server import FakeSite, make_request
 from tests.test_utils import make_awaitable
 from tests.unittest import override_config
 
@@ -1460,7 +1462,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
 
         number_media = 20
         other_user_tok = self.login("user", "pass")
-        self._create_media(other_user_tok, number_media)
+        self._create_media_for_user(other_user_tok, number_media)
 
         channel = self.make_request(
             "GET", self.url + "?limit=5", access_token=self.admin_user_tok,
@@ -1479,7 +1481,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
 
         number_media = 20
         other_user_tok = self.login("user", "pass")
-        self._create_media(other_user_tok, number_media)
+        self._create_media_for_user(other_user_tok, number_media)
 
         channel = self.make_request(
             "GET", self.url + "?from=5", access_token=self.admin_user_tok,
@@ -1498,7 +1500,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
 
         number_media = 20
         other_user_tok = self.login("user", "pass")
-        self._create_media(other_user_tok, number_media)
+        self._create_media_for_user(other_user_tok, number_media)
 
         channel = self.make_request(
             "GET", self.url + "?from=5&limit=10", access_token=self.admin_user_tok,
@@ -1510,11 +1512,27 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(channel.json_body["media"]), 10)
         self._check_fields(channel.json_body["media"])
 
-    def test_limit_is_negative(self):
+    def test_invalid_parameter(self):
         """
-        Testing that a negative limit parameter returns a 400
+        If parameters are invalid, an error is returned.
         """
+        # unkown order_by
+        channel = self.make_request(
+            "GET", self.url + "?order_by=bar", access_token=self.admin_user_tok,
+        )
 
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+
+        # invalid search order
+        channel = self.make_request(
+            "GET", self.url + "?dir=bar", access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+
+        # negative limit
         channel = self.make_request(
             "GET", self.url + "?limit=-5", access_token=self.admin_user_tok,
         )
@@ -1522,11 +1540,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
-    def test_from_is_negative(self):
-        """
-        Testing that a negative from parameter returns a 400
-        """
-
+        # negative from
         channel = self.make_request(
             "GET", self.url + "?from=-5", access_token=self.admin_user_tok,
         )
@@ -1541,7 +1555,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
 
         number_media = 20
         other_user_tok = self.login("user", "pass")
-        self._create_media(other_user_tok, number_media)
+        self._create_media_for_user(other_user_tok, number_media)
 
         #  `next_token` does not appear
         # Number of results is the number of entries
@@ -1607,7 +1621,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
 
         number_media = 5
         other_user_tok = self.login("user", "pass")
-        self._create_media(other_user_tok, number_media)
+        self._create_media_for_user(other_user_tok, number_media)
 
         channel = self.make_request("GET", self.url, access_token=self.admin_user_tok,)
 
@@ -1617,11 +1631,106 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         self.assertNotIn("next_token", channel.json_body)
         self._check_fields(channel.json_body["media"])
 
-    def _create_media(self, user_token, number_media):
+    def test_order_by(self):
+        """
+        Testing order list with parameter `order_by`
+        """
+
+        other_user_tok = self.login("user", "pass")
+
+        # Resolution: 1×1, MIME type: image/png, Extension: png, Size: 67 B
+        image_data1 = unhexlify(
+            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
+            b"0000001f15c4890000000a49444154789c63000100000500010d"
+            b"0a2db40000000049454e44ae426082"
+        )
+        # Resolution: 1×1, MIME type: image/gif, Extension: gif, Size: 35 B
+        image_data2 = unhexlify(
+            b"47494638376101000100800100000000"
+            b"ffffff2c00000000010001000002024c"
+            b"01003b"
+        )
+        # Resolution: 1×1, MIME type: image/bmp, Extension: bmp, Size: 54 B
+        image_data3 = unhexlify(
+            b"424d3a0000000000000036000000280000000100000001000000"
+            b"0100180000000000040000000000000000000000000000000000"
+            b"0000"
+        )
+
+        # create media and make sure they do not have the same timestamp
+        media1 = self._create_media_and_access(other_user_tok, image_data1, "image.png")
+        self.pump(1.0)
+        media2 = self._create_media_and_access(other_user_tok, image_data2, "image.gif")
+        self.pump(1.0)
+        media3 = self._create_media_and_access(other_user_tok, image_data3, "image.bmp")
+        self.pump(1.0)
+
+        # Mark one media as safe from quarantine.
+        self.get_success(self.store.mark_local_media_as_safe(media2))
+        # Quarantine one media
+        self.get_success(
+            self.store.quarantine_media_by_id("test", media3, self.admin_user)
+        )
+
+        # sort by media_id
+        sorted_media = sorted([media1, media2, media3], reverse=False)
+        sorted_media_reverse = sorted(sorted_media, reverse=True)
+
+        # order by media_id
+        self._order_test("media_id", sorted_media)
+        self._order_test("media_id", sorted_media, "f")
+        self._order_test("media_id", sorted_media_reverse, "b")
+
+        # order by upload_name
+        self._order_test("upload_name", [media3, media2, media1])
+        self._order_test("upload_name", [media3, media2, media1], "f")
+        self._order_test("upload_name", [media1, media2, media3], "b")
+
+        # order by media_type
+        # result is ordered by media_id
+        # because of uploaded media_type is always 'application/json'
+        self._order_test("media_type", sorted_media)
+        self._order_test("media_type", sorted_media, "f")
+        self._order_test("media_type", sorted_media, "b")
+
+        # order by media_length
+        self._order_test("media_length", [media2, media3, media1])
+        self._order_test("media_length", [media2, media3, media1], "f")
+        self._order_test("media_length", [media1, media3, media2], "b")
+
+        # order by created_ts
+        self._order_test("created_ts", [media1, media2, media3])
+        self._order_test("created_ts", [media1, media2, media3], "f")
+        self._order_test("created_ts", [media3, media2, media1], "b")
+
+        # order by last_access_ts
+        self._order_test("last_access_ts", [media1, media2, media3])
+        self._order_test("last_access_ts", [media1, media2, media3], "f")
+        self._order_test("last_access_ts", [media3, media2, media1], "b")
+
+        # order by quarantined_by
+        # one media is in quarantine, others are ordered by media_ids
+        self._order_test("quarantined_by", sorted([media1, media2]) + [media3])
+        self._order_test("quarantined_by", sorted([media1, media2]) + [media3], "f")
+        self._order_test("quarantined_by", [media3] + sorted([media1, media2]), "b")
+
+        # order by safe_from_quarantine
+        # one media is safe from quarantine, others are ordered by media_ids
+        self._order_test("safe_from_quarantine", sorted([media1, media3]) + [media2])
+        self._order_test(
+            "safe_from_quarantine", sorted([media1, media3]) + [media2], "f"
+        )
+        self._order_test(
+            "safe_from_quarantine", [media2] + sorted([media1, media3]), "b"
+        )
+
+    def _create_media_for_user(self, user_token: str, number_media: int):
         """
         Create a number of media for a specific user
+        Args:
+            user_token: Access token of the user
+            number_media: Number of media to be created for the user
         """
-        upload_resource = self.media_repo.children[b"upload"]
         for i in range(number_media):
             # file size is 67 Byte
             image_data = unhexlify(
@@ -1630,13 +1739,56 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
                 b"0a2db40000000049454e44ae426082"
             )
 
-            # Upload some media into the room
-            self.helper.upload_media(
-                upload_resource, image_data, tok=user_token, expect_code=200
-            )
+            self._create_media_and_access(user_token, image_data)
 
-    def _check_fields(self, content):
+    def _create_media_and_access(
+        self, user_token: str, image_data: bytes, filename: str = "image1.png",
+    ) -> str:
+        """
+        Create one media for a specific user, access and returns `media_id`
+        Args:
+            user_token: Access token of the user
+            image_data: binary data of image
+            filename: The filename of the media to be uploaded
+        Returns:
+            The ID of the newly created media.
+        """
+        upload_resource = self.media_repo.children[b"upload"]
+        download_resource = self.media_repo.children[b"download"]
+
+        # Upload some media into the room
+        response = self.helper.upload_media(
+            upload_resource, image_data, user_token, filename, expect_code=200
+        )
+
+        # Extract media ID from the response
+        server_and_media_id = response["content_uri"][6:]  # Cut off 'mxc://'
+        media_id = server_and_media_id.split("/")[1]
+
+        # Try to access a media and to create `last_access_ts`
+        channel = make_request(
+            self.reactor,
+            FakeSite(download_resource),
+            "GET",
+            server_and_media_id,
+            shorthand=False,
+            access_token=user_token,
+        )
+
+        self.assertEqual(
+            200,
+            channel.code,
+            msg=(
+                "Expected to receive a 200 on accessing media: %s" % server_and_media_id
+            ),
+        )
+
+        return media_id
+
+    def _check_fields(self, content: JsonDict):
         """Checks that all attributes are present in content
+        Args:
+            content: List that is checked for content
         """
         for m in content:
             self.assertIn("media_id", m)
@@ -1647,6 +1799,31 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             self.assertIn("last_access_ts", m)
             self.assertIn("quarantined_by", m)
             self.assertIn("safe_from_quarantine", m)
+
+    def _order_test(
+        self, order_type: str, expected_media_list: List[str], dir: Optional[str] = None
+    ):
+        """Request the list of media in a certain order. Assert that order is what
+        we expect
+        Args:
+            order_type: The type of ordering to give the server
+            expected_media_list: The list of media_ids in the order we expect to get
+                back from the server
+            dir: The direction of ordering to give the server
+        """
+
+        url = self.url + "?order_by=%s" % (order_type,)
+        if dir is not None and dir in ("b", "f"):
+            url += "&dir=%s" % (dir,)
+        channel = self.make_request(
+            "GET", url.encode("ascii"), access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(channel.json_body["total"], len(expected_media_list))
+
+        returned_order = [row["media_id"] for row in channel.json_body["media"]]
+        self.assertListEqual(expected_media_list, returned_order)
+        self._check_fields(channel.json_body["media"])
 
 
 class UserTokenRestTestCase(unittest.HomeserverTestCase):
