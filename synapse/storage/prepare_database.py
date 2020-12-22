@@ -19,7 +19,6 @@ import os
 import re
 from collections import Counter
 from typing import (
-    Counter as CounterType,
     Generator,
     Iterable,
     List,
@@ -29,6 +28,7 @@ from typing import (
 )
 
 import attr
+from typing_extensions import Counter as CounterType
 
 from synapse.config.homeserver import HomeServerConfig
 from synapse.storage.database import LoggingDatabaseConnection
