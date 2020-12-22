@@ -18,14 +18,7 @@ import logging
 import os
 import re
 from collections import Counter
-from typing import (
-    Generator,
-    Iterable,
-    List,
-    Optional,
-    TextIO,
-    Tuple,
-)
+from typing import Generator, Iterable, List, Optional, TextIO, Tuple
 
 import attr
 from typing_extensions import Counter as CounterType
