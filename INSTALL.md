@@ -1,40 +1,42 @@
 # Installation Instructions
 
+There are 3 steps to follow under **Installation Instructions**.
+
 - [Installation Instructions](#installation-instructions)
   - [Choosing your server name](#choosing-your-server-name)
   - [Installing Synapse](#installing-synapse)
     - [Installing from source](#installing-from-source)
-    - [Platform-Specific Instructions](#platform-specific-instructions)
-      - [Debian/Ubuntu/Raspbian](#debianubunturaspbian)
-      - [ArchLinux](#archlinux)
-      - [CentOS/Fedora](#centosfedora)
-      - [macOS](#macos)
-      - [OpenSUSE](#opensuse)
-      - [OpenBSD](#openbsd)
-      - [Windows](#windows)
-  - [Prebuilt packages](#prebuilt-packages)
-    - [Docker images and Ansible playbooks](#docker-images-and-ansible-playbooks)
-    - [Debian/Ubuntu](#debianubuntu)
-      - [Matrix.org packages](#matrixorg-packages)
-      - [Downstream Debian packages](#downstream-debian-packages)
-      - [Downstream Ubuntu packages](#downstream-ubuntu-packages)
-    - [Fedora](#fedora)
-    - [OpenSUSE](#opensuse-1)
-    - [SUSE Linux Enterprise Server](#suse-linux-enterprise-server)
-    - [ArchLinux](#archlinux-1)
-    - [Void Linux](#void-linux)
-    - [FreeBSD](#freebsd)
-    - [OpenBSD](#openbsd-1)
-    - [NixOS](#nixos)
-- [Setting up Synapse](#setting-up-synapse)
-  - [Switching the database engine](#switching-the-database-engine)
-  - [TLS certificates](#tls-certificates)
-  - [Client Well-Known URI](#client-well-known-uri)
-  - [Email](#email)
-  - [Registering a user](#registering-a-user)
-  - [Setting up a TURN server](#setting-up-a-turn-server)
-  - [URL previews](#url-previews)
-  - [Troubleshooting Installation](#troubleshooting-installation)
+      - [Platform-Specific Instructions](#platform-specific-instructions)
+        - [Debian/Ubuntu/Raspbian](#debianubunturaspbian)
+        - [ArchLinux](#archlinux)
+        - [CentOS/Fedora](#centosfedora)
+        - [macOS](#macos)
+        - [OpenSUSE](#opensuse)
+        - [OpenBSD](#openbsd)
+        - [Windows](#windows)
+    - [Prebuilt packages](#prebuilt-packages)
+      - [Docker images and Ansible playbooks](#docker-images-and-ansible-playbooks)
+      - [Debian/Ubuntu](#debianubuntu)
+        - [Matrix.org packages](#matrixorg-packages)
+        - [Downstream Debian packages](#downstream-debian-packages)
+        - [Downstream Ubuntu packages](#downstream-ubuntu-packages)
+      - [Fedora](#fedora)
+      - [OpenSUSE](#opensuse-1)
+      - [SUSE Linux Enterprise Server](#suse-linux-enterprise-server)
+      - [ArchLinux](#archlinux-1)
+      - [Void Linux](#void-linux)
+      - [FreeBSD](#freebsd)
+      - [OpenBSD](#openbsd-1)
+      - [NixOS](#nixos)
+  - [Setting up Synapse](#setting-up-synapse)
+    - [Switching the database engine](#switching-the-database-engine)
+    - [TLS certificates](#tls-certificates)
+    - [Client Well-Known URI](#client-well-known-uri)
+    - [Email](#email)
+    - [Registering a user](#registering-a-user)
+    - [Setting up a TURN server](#setting-up-a-turn-server)
+    - [URL previews](#url-previews)
+    - [Troubleshooting Installation](#troubleshooting-installation)
 
 ## Choosing your server name
 
@@ -126,9 +128,9 @@ source env/bin/activate
 synctl start
 ```
 
-### Platform-Specific Instructions
+#### Platform-Specific Instructions
 
-#### Debian/Ubuntu/Raspbian
+##### Debian/Ubuntu/Raspbian
 
 Installing prerequisites on Ubuntu or Debian:
 
@@ -138,7 +140,7 @@ sudo apt install build-essential python3-dev libffi-dev \
                      libssl-dev virtualenv libjpeg-dev libxslt1-dev
 ```
 
-#### ArchLinux
+##### ArchLinux
 
 Installing prerequisites on ArchLinux:
 
@@ -147,7 +149,7 @@ sudo pacman -S base-devel python python-pip \
                python-setuptools python-virtualenv sqlite3
 ```
 
-#### CentOS/Fedora
+##### CentOS/Fedora
 
 Installing prerequisites on CentOS 8 or Fedora>26:
 
@@ -172,7 +174,7 @@ uses SQLite 3.7. You may be able to work around this by installing a more
 recent SQLite version, but it is recommended that you instead use a Postgres
 database: see [docs/postgres.md](docs/postgres.md).
 
-#### macOS
+##### macOS
 
 Installing prerequisites on macOS:
 
@@ -191,7 +193,7 @@ brew install openssl@1.1
 export LDFLAGS=-L/usr/local/Cellar/openssl\@1.1/1.1.1d/lib/
 ```
 
-#### OpenSUSE
+##### OpenSUSE
 
 Installing prerequisites on openSUSE:
 
@@ -201,7 +203,7 @@ sudo zypper in python-pip python-setuptools sqlite3 python-virtualenv \
                python-devel libffi-devel libopenssl-devel libjpeg62-devel
 ```
 
-#### OpenBSD
+##### OpenBSD
 
 A port of Synapse is available under `net/synapse`. The filesystem
 underlying the homeserver directory (defaults to `/var/synapse`) has to be
@@ -239,7 +241,7 @@ cd /usr/ports/net/synapse
 make install
 ```
 
-#### Windows
+##### Windows
 
 If you wish to run or develop Synapse on Windows, the Windows Subsystem For
 Linux provides a Linux environment on Windows 10 which is capable of using the
@@ -248,12 +250,12 @@ be found at <https://docs.microsoft.com/en-us/windows/wsl/install-win10> for
 Windows 10 and <https://docs.microsoft.com/en-us/windows/wsl/install-on-server>
 for Windows Server.
 
-## Prebuilt packages
+### Prebuilt packages
 
 As an alternative to installing from source, prebuilt packages are available
 for a number of platforms.
 
-### Docker images and Ansible playbooks
+#### Docker images and Ansible playbooks
 
 There is an offical synapse image available at
 <https://hub.docker.com/r/matrixdotorg/synapse> which can be used with
@@ -272,9 +274,9 @@ ma1sd, SSL support, etc.).
 For more details, see
 <https://github.com/spantaleev/matrix-docker-ansible-deploy>
 
-### Debian/Ubuntu
+#### Debian/Ubuntu
 
-#### Matrix.org packages
+##### Matrix.org packages
 
 Matrix.org provides Debian/Ubuntu packages of the latest stable version of
 Synapse via <https://packages.matrix.org/debian/>. They are available for Debian
@@ -300,7 +302,7 @@ The fingerprint of the repository signing key (as shown by `gpg
 /usr/share/keyrings/matrix-org-archive-keyring.gpg`) is
 `AAF9AE843A7584B5A3E4CD2BCF45A512DE2DA058`.
 
-#### Downstream Debian packages
+##### Downstream Debian packages
 
 We do not recommend using the packages from the default Debian `buster`
 repository at this time, as they are old and suffer from known security
@@ -316,13 +318,13 @@ repositories and it should be possible to install it simply with:
 sudo apt install matrix-synapse
 ```
 
-#### Downstream Ubuntu packages
+##### Downstream Ubuntu packages
 
 We do not recommend using the packages in the default Ubuntu repository
 at this time, as they are old and suffer from known security vulnerabilities.
 The latest version of Synapse can be installed from [our repository](#matrixorg-packages).
 
-### Fedora
+#### Fedora
 
 Synapse is in the Fedora repositories as `matrix-synapse`:
 
@@ -333,7 +335,7 @@ sudo dnf install matrix-synapse
 Oleg Girko provides Fedora RPMs at
 <https://obs.infoserver.lv/project/monitor/matrix-synapse>
 
-### OpenSUSE
+#### OpenSUSE
 
 Synapse is in the OpenSUSE repositories as `matrix-synapse`:
 
@@ -341,12 +343,12 @@ Synapse is in the OpenSUSE repositories as `matrix-synapse`:
 sudo zypper install matrix-synapse
 ```
 
-### SUSE Linux Enterprise Server
+#### SUSE Linux Enterprise Server
 
 Unofficial package are built for SLES 15 in the openSUSE:Backports:SLE-15 repository at
 <https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15/standard/>
 
-### ArchLinux
+#### ArchLinux
 
 The quickest way to get up and running with ArchLinux is probably with the community package
 <https://www.archlinux.org/packages/community/any/matrix-synapse/>, which should pull in most of
@@ -368,7 +370,7 @@ sudo pip uninstall py-bcrypt
 sudo pip install py-bcrypt
 ```
 
-### Void Linux
+#### Void Linux
 
 Synapse can be found in the void repositories as 'synapse':
 
@@ -377,14 +379,14 @@ xbps-install -Su
 xbps-install -S synapse
 ```
 
-### FreeBSD
+#### FreeBSD
 
 Synapse can be installed via FreeBSD Ports or Packages contributed by Brendan Molloy from:
 
 - Ports: `cd /usr/ports/net-im/py-matrix-synapse && make install clean`
 - Packages: `pkg install py37-matrix-synapse`
 
-### OpenBSD
+#### OpenBSD
 
 As of OpenBSD 6.7 Synapse is available as a pre-compiled binary. The filesystem
 underlying the homeserver directory (defaults to `/var/synapse`) has to be
@@ -397,16 +399,16 @@ Installing Synapse:
 doas pkg_add synapse
 ```
 
-### NixOS
+#### NixOS
 
 Robin Lambertz has packaged Synapse for NixOS at:
 <https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/misc/matrix-synapse.nix>
 
-# Setting up Synapse
+## Setting up Synapse
 
 Once you have installed synapse as above, you will need to configure it.
 
-## Switching the database engine
+### Switching the database engine
 
 By default Synapse gets setup using [SQLite](https://sqlite.org/) and in doing so trades performance for convenience.
 SQLite is only recommended in Synapse for testing purposes or for servers with
@@ -421,7 +423,7 @@ Almost all installations should opt to use [PostgreSQL](https://www.postgresql.o
 For information on how to install and use PostgreSQL, please see
 [docs/postgres.md](docs/postgres.md)
 
-## TLS certificates
+### TLS certificates
 
 The default configuration exposes a single HTTP port on the local
 interface: `http://localhost:8008`. It is suitable for local testing,
@@ -462,7 +464,7 @@ so, you will need to edit `homeserver.yaml`, as follows:
 For a more detailed guide to configuring your server for federation, see
 [federate.md](docs/federate.md).
 
-## Client Well-Known URI
+### Client Well-Known URI
 
 Setting up the client Well-Known URI is optional but if you set it up, it will
 allow users to enter their full username (e.g. `@user:<server_name>`) into clients
@@ -518,7 +520,7 @@ connect to your server. This is the same URL you put for the `m.homeserver`
 public_baseurl: "https://<matrix.example.com>"
 ```
 
-## Email
+### Email
 
 It is desirable for Synapse to have the capability to send email. This allows
 Synapse to send password reset emails, send verifications when an email address
@@ -533,7 +535,7 @@ and `notif_from` fields filled out.  You may also need to set `smtp_user`,
 If email is not configured, password reset, registration and notifications via
 email will be disabled.
 
-## Registering a user
+### Registering a user
 
 The easiest way to create a new user is to do so from a client like [Element](https://element.io/).
 
@@ -559,12 +561,12 @@ value is generated by `--generate-config`), but it should be kept secret, as
 anyone with knowledge of it can register users, including admin accounts,
 on your server even if `enable_registration` is `false`.
 
-## Setting up a TURN server
+### Setting up a TURN server
 
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
 a TURN server. See [docs/turn-howto.md](docs/turn-howto.md) for details.
 
-## URL previews
+### URL previews
 
 Synapse includes support for previewing URLs, which is disabled by default.  To
 turn it on you must enable the `url_preview_enabled: True` config parameter
@@ -578,7 +580,7 @@ This also requires the optional `lxml` python dependency to be  installed. This
 in turn requires the `libxml2` library to be available - on  Debian/Ubuntu this
 means `apt-get install libxml2-dev`, or equivalent for your OS.
 
-## Troubleshooting Installation
+### Troubleshooting Installation
 
 `pip` seems to leak *lots* of memory during installation. For instance, a Linux
 host with 512MB of RAM may run out of memory whilst installing Twisted. If this
