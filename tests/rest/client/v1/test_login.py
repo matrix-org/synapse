@@ -518,8 +518,12 @@ class JWTTestCase(unittest.HomeserverTestCase):
         self.hs.config.jwt_algorithm = self.jwt_algorithm
         return self.hs
 
-    def jwt_encode(self, token, secret=jwt_secret):
-        return jwt.encode(token, secret, self.jwt_algorithm).decode("ascii")
+    def jwt_encode(self, token: str, secret: str = jwt_secret) -> str:
+        # PyJWT 2.0.0 changed the return type of jwt.encode from bytes to str.
+        result = jwt.encode(token, secret, self.jwt_algorithm)
+        if isinstance(result, bytes):
+            return result.decode("ascii")
+        return result
 
     def jwt_login(self, *args):
         params = json.dumps(
@@ -725,8 +729,12 @@ class JWTPubKeyTestCase(unittest.HomeserverTestCase):
         self.hs.config.jwt_algorithm = "RS256"
         return self.hs
 
-    def jwt_encode(self, token, secret=jwt_privatekey):
-        return jwt.encode(token, secret, "RS256").decode("ascii")
+    def jwt_encode(self, token: str, secret: str = jwt_privatekey) -> str:
+        # PyJWT 2.0.0 changed the return type of jwt.encode from bytes to str.
+        result = jwt.encode(token, secret, "RS256")
+        if isinstance(result, bytes):
+            return result.decode("ascii")
+        return result
 
     def jwt_login(self, *args):
         params = json.dumps(
