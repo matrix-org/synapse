@@ -53,13 +53,12 @@ class ProfileStoreTestCase(unittest.TestCase):
             self.store.set_profile_displayname(self.u_frank.localpart, None)
         )
 
-        self.assertEquals(
-            None,
+        self.assertIsNone(
             (
                 yield defer.ensureDeferred(
                     self.store.get_profile_displayname(self.u_frank.localpart)
                 )
-            ),
+            )
         )
 
     @defer.inlineCallbacks
@@ -86,11 +85,10 @@ class ProfileStoreTestCase(unittest.TestCase):
             self.store.set_profile_avatar_url(self.u_frank.localpart, None)
         )
 
-        self.assertEquals(
-            None,
+        self.assertIsNone(
             (
                 yield defer.ensureDeferred(
                     self.store.get_profile_avatar_url(self.u_frank.localpart)
                 )
-            ),
+            )
         )

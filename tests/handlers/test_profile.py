@@ -105,20 +105,19 @@ class ProfileTestCase(unittest.TestCase):
             "Frank",
         )
 
-        # Set displayname to None
+        # Set displayname to an empty string
         yield defer.ensureDeferred(
             self.handler.set_displayname(
                 self.frank, synapse.types.create_requester(self.frank), ""
             )
         )
 
-        self.assertEquals(
+        self.assertIsNone(
             (
                 yield defer.ensureDeferred(
                     self.store.get_profile_displayname(self.frank.localpart)
                 )
-            ),
-            None,
+            )
         )
 
     @defer.inlineCallbacks
@@ -239,20 +238,19 @@ class ProfileTestCase(unittest.TestCase):
             "http://my.server/me.png",
         )
 
-        # Set avatar to None
+        # Set avatar to an empty string
         yield defer.ensureDeferred(
             self.handler.set_avatar_url(
                 self.frank, synapse.types.create_requester(self.frank), "",
             )
         )
 
-        self.assertEquals(
+        self.assertIsNone(
             (
                 yield defer.ensureDeferred(
                     self.store.get_profile_avatar_url(self.frank.localpart)
                 )
             ),
-            None,
         )
 
     @defer.inlineCallbacks
