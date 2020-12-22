@@ -98,7 +98,7 @@ Body parameters:
 
 - ``deactivated``, optional. If unspecified, deactivation state will be left
   unchanged on existing accounts and set to ``false`` for new accounts.
-  It does not set ``erase``. For details to deactivation see also
+  A user cannot be erased by deactivating with this API. For details on deactivating users see
   `Deactivate Account <#deactivate-account>`_.
 
 If the user already exists then optional parameters default to the current value.
@@ -256,7 +256,7 @@ The following actions are performed when deactivating an user:
 - Remove all 3PIDs from Homeserver
 - Delete any devices and E2E-Keys
 - Delete any access tokens
-- Delete passwort hash
+- Delete password hash
 - Removal from all the rooms the user is a member of
 - Delete from user directory
 - Reject all pending invites
@@ -267,6 +267,7 @@ and you set ``erase`` to ``true``:
 
 - Remove displayname
 - Remove avatar URL
+- Mark the user as erased
 
 
 Reset password
