@@ -32,5 +32,5 @@ class GroupsConfig(Config):
         # If enabled, non server admins can only create groups with local parts
         # starting with this prefix
         #
-        #group_creation_prefix: "unofficial/"
+        #group_creation_prefix: "unofficial_"
         """
