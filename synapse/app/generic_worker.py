@@ -89,7 +89,7 @@ from synapse.replication.tcp.streams import (
     ToDeviceStream,
 )
 from synapse.rest.admin import register_servlets_for_media_repo
-from synapse.rest.client.v1 import events
+from synapse.rest.client.v1 import events, room
 from synapse.rest.client.v1.initial_sync import InitialSyncRestServlet
 from synapse.rest.client.v1.login import LoginRestServlet
 from synapse.rest.client.v1.profile import (
@@ -98,20 +98,6 @@ from synapse.rest.client.v1.profile import (
     ProfileRestServlet,
 )
 from synapse.rest.client.v1.push_rule import PushRuleRestServlet
-from synapse.rest.client.v1.room import (
-    JoinedRoomMemberListRestServlet,
-    JoinRoomAliasServlet,
-    PublicRoomListRestServlet,
-    RoomEventContextServlet,
-    RoomInitialSyncRestServlet,
-    RoomMemberListRestServlet,
-    RoomMembershipRestServlet,
-    RoomMessageListRestServlet,
-    RoomSendEventRestServlet,
-    RoomStateEventRestServlet,
-    RoomStateRestServlet,
-    RoomTypingRestServlet,
-)
 from synapse.rest.client.v1.voip import VoipRestServlet
 from synapse.rest.client.v2_alpha import groups, sync, user_directory
 from synapse.rest.client.v2_alpha._base import client_patterns
@@ -522,23 +508,6 @@ class GenericWorkerServer(HomeServer):
                     PushRuleRestServlet(self).register(resource)
                     VersionsRestServlet(self).register(resource)
 
-                    # The below are all the servlets from rest/client/v1/room except
-                    # RoomCreateRestServlet, RoomForgetRestServlet,
-                    # RoomRedactEventRestServlet, SearchRestServlet,
-                    # JoinedRoomsRestServlet, RoomEventServlet, and
-                    # RoomAliasListServlet.
-                    RoomStateEventRestServlet(self).register(resource)
-                    RoomMemberListRestServlet(self).register(resource)
-                    JoinedRoomMemberListRestServlet(self).register(resource)
-                    RoomMessageListRestServlet(self).register(resource)
-                    JoinRoomAliasServlet(self).register(resource)
-                    RoomMembershipRestServlet(self).register(resource)
-                    RoomSendEventRestServlet(self).register(resource)
-                    PublicRoomListRestServlet(self).register(resource)
-                    RoomStateRestServlet(self).register(resource)
-                    RoomTypingRestServlet(self).register(resource)
-                    RoomEventContextServlet(self).register(resource)
-
                     ProfileAvatarURLRestServlet(self).register(resource)
                     ProfileDisplaynameRestServlet(self).register(resource)
                     ProfileRestServlet(self).register(resource)
@@ -548,8 +517,9 @@ class GenericWorkerServer(HomeServer):
 
                     sync.register_servlets(self, resource)
                     events.register_servlets(self, resource)
+                    room.register_servlets(self, resource, True)
+                    room.register_deprecated_servlets(self, resource)
                     InitialSyncRestServlet(self).register(resource)
-                    RoomInitialSyncRestServlet(self).register(resource)
 
                     user_directory.register_servlets(self, resource)
 
