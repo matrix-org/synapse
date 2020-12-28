@@ -139,7 +139,7 @@ class RoomVersions:
         msc2176_redaction_rules=False,
     )
     MSC2176 = RoomVersion(
-        "MSC2176",
+        "org.matrix.msc2176",
         RoomDisposition.UNSTABLE,
         EventFormatVersions.V3,
         StateResolutionVersions.V2,

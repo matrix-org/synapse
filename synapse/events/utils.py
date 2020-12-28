@@ -84,7 +84,7 @@ def prune_event_dict(room_version: RoomVersion, event_dict: dict) -> dict:
         "origin_server_ts",
     ]
 
-    # Room versions from before MSC 2176 had additional allowed keys.
+    # Room versions from before MSC2176 had additional allowed keys.
     if not room_version.msc2176_redaction_rules:
         allowed_keys.extend(["prev_state", "membership"])
 
