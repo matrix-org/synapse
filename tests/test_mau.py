@@ -19,6 +19,7 @@ import json
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
+from synapse.appservice import ApplicationService
 from synapse.rest.client.v2_alpha import register, sync
 
 from tests import unittest
@@ -74,6 +75,45 @@ class TestMauLimit(unittest.HomeserverTestCase):
         e = cm.exception
         self.assertEqual(e.code, 403)
         self.assertEqual(e.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
+
+    def test_as_ignores_mau(self):
+        """Test that application services can still create users when the MAU
+        limit has been reached. This only works when application service
+        user ip tracking is disabled.
+        """
+
+        # Create and sync so that the MAU counts get updated
+        token1 = self.create_user("kermit1")
+        self.do_sync_for_user(token1)
+        token2 = self.create_user("kermit2")
+        self.do_sync_for_user(token2)
+
+        # check we're testing what we think we are: there should be two active users
+        self.assertEqual(self.get_success(self.store.get_monthly_active_count()), 2)
+
+        # We've created and activated two users, we shouldn't be able to
+        # register new users
+        with self.assertRaises(SynapseError) as cm:
+            self.create_user("kermit3")
+
+        e = cm.exception
+        self.assertEqual(e.code, 403)
+        self.assertEqual(e.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
+
+        # Cheekily add an application service that we use to register a new user
+        # with.
+        as_token = "foobartoken"
+        self.store.services_cache.append(
+            ApplicationService(
+                token=as_token,
+                hostname=self.hs.hostname,
+                id="SomeASID",
+                sender="@as_sender:test",
+                namespaces={"users": [{"regex": "@as_*", "exclusive": True}]},
+            )
+        )
+
+        self.create_user("as_kermit4", token=as_token)
 
     def test_allowed_after_a_month_mau(self):
         # Create and sync so that the MAU counts get updated
@@ -192,7 +232,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
         self.reactor.advance(100)
         self.assertEqual(2, self.successResultOf(count))
 
-    def create_user(self, localpart):
+    def create_user(self, localpart, token=None):
         request_data = json.dumps(
             {
                 "username": localpart,
@@ -201,7 +241,9 @@ class TestMauLimit(unittest.HomeserverTestCase):
             }
         )
 
-        request, channel = self.make_request("POST", "/register", request_data)
+        channel = self.make_request(
+            "POST", "/register", request_data, access_token=token,
+        )
 
         if channel.code != 200:
             raise HttpResponseException(
@@ -213,7 +255,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
         return access_token
 
     def do_sync_for_user(self, token):
-        request, channel = self.make_request("GET", "/sync", access_token=token)
+        channel = self.make_request("GET", "/sync", access_token=token)
 
         if channel.code != 200:
             raise HttpResponseException(

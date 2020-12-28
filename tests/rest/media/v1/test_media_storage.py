@@ -214,7 +214,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         }
         config["media_storage_providers"] = [provider_config]
 
-        hs = self.setup_test_homeserver(config=config, http_client=client)
+        hs = self.setup_test_homeserver(config=config, federation_http_client=client)
 
         return hs
 
@@ -228,7 +228,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
     def _req(self, content_disposition):
 
-        request, channel = make_request(
+        channel = make_request(
             self.reactor,
             FakeSite(self.download_resource),
             "GET",
@@ -324,7 +324,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
     def _test_thumbnail(self, method, expected_body, expected_found):
         params = "?width=32&height=32&method=" + method
-        request, channel = make_request(
+        channel = make_request(
             self.reactor,
             FakeSite(self.thumbnail_resource),
             "GET",
@@ -362,3 +362,16 @@ class MediaRepoTests(unittest.HomeserverTestCase):
                     "error": "Not found [b'example.com', b'12345']",
                 },
             )
+
+    def test_x_robots_tag_header(self):
+        """
+        Tests that the `X-Robots-Tag` header is present, which informs web crawlers
+        to not index, archive, or follow links in media.
+        """
+        channel = self._req(b"inline; filename=out" + self.test_image.extension)
+
+        headers = channel.headers
+        self.assertEqual(
+            headers.getRawHeaders(b"X-Robots-Tag"),
+            [b"noindex, nofollow, noarchive, noimageindex"],
+        )

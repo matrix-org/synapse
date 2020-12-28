@@ -66,7 +66,7 @@ class OIDCConfig(Config):
         (
             self.oidc_user_mapping_provider_class,
             self.oidc_user_mapping_provider_config,
-        ) = load_module(ump_config)
+        ) = load_module(ump_config, ("oidc_config", "user_mapping_provider"))
 
         # Ensure loaded user mapping module has defined all necessary methods
         required_methods = [
@@ -203,9 +203,10 @@ class OIDCConfig(Config):
               #   * user: The claims returned by the UserInfo Endpoint and/or in the ID
               #     Token
               #
-              # This must be configured if using the default mapping provider.
+              # If this is not set, the user will be prompted to choose their
+              # own username.
               #
-              localpart_template: "{{{{ user.preferred_username }}}}"
+              #localpart_template: "{{{{ user.preferred_username }}}}"
 
               # Jinja2 template for the display name to set on first login.
               #

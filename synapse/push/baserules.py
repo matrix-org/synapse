@@ -15,16 +15,19 @@
 # limitations under the License.
 
 import copy
+from typing import Any, Dict, List
 
 from synapse.push.rulekinds import PRIORITY_CLASS_INVERSE_MAP, PRIORITY_CLASS_MAP
 
 
-def list_with_base_rules(rawrules, use_new_defaults=False):
+def list_with_base_rules(
+    rawrules: List[Dict[str, Any]], use_new_defaults: bool = False
+) -> List[Dict[str, Any]]:
     """Combine the list of rules set by the user with the default push rules
 
     Args:
-        rawrules(list): The rules the user has modified or set.
-        use_new_defaults(bool): Whether to use the new experimental default rules when
+        rawrules: The rules the user has modified or set.
+        use_new_defaults: Whether to use the new experimental default rules when
             appending or prepending default rules.
 
     Returns:
@@ -94,7 +97,11 @@ def list_with_base_rules(rawrules, use_new_defaults=False):
     return ruleslist
 
 
-def make_base_append_rules(kind, modified_base_rules, use_new_defaults=False):
+def make_base_append_rules(
+    kind: str,
+    modified_base_rules: Dict[str, Dict[str, Any]],
+    use_new_defaults: bool = False,
+) -> List[Dict[str, Any]]:
     rules = []
 
     if kind == "override":
@@ -116,6 +123,7 @@ def make_base_append_rules(kind, modified_base_rules, use_new_defaults=False):
     rules = copy.deepcopy(rules)
     for r in rules:
         # Only modify the actions, keep the conditions the same.
+        assert isinstance(r["rule_id"], str)
         modified = modified_base_rules.get(r["rule_id"])
         if modified:
             r["actions"] = modified["actions"]
@@ -123,7 +131,11 @@ def make_base_append_rules(kind, modified_base_rules, use_new_defaults=False):
     return rules
 
 
-def make_base_prepend_rules(kind, modified_base_rules, use_new_defaults=False):
+def make_base_prepend_rules(
+    kind: str,
+    modified_base_rules: Dict[str, Dict[str, Any]],
+    use_new_defaults: bool = False,
+) -> List[Dict[str, Any]]:
     rules = []
 
     if kind == "override":
@@ -133,6 +145,7 @@ def make_base_prepend_rules(kind, modified_base_rules, use_new_defaults=False):
     rules = copy.deepcopy(rules)
     for r in rules:
         # Only modify the actions, keep the conditions the same.
+        assert isinstance(r["rule_id"], str)
         modified = modified_base_rules.get(r["rule_id"])
         if modified:
             r["actions"] = modified["actions"]

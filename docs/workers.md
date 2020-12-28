@@ -89,7 +89,8 @@ shared configuration file.
 Normally, only a couple of changes are needed to make an existing configuration
 file suitable for use with workers. First, you need to enable an "HTTP replication
 listener" for the main process; and secondly, you need to enable redis-based
-replication. For example:
+replication. Optionally, a shared secret can be used to authenticate HTTP
+traffic between workers. For example:
 
 
 ```yaml
@@ -102,6 +103,9 @@ listeners:
     type: http
     resources:
      - names: [replication]
+
+# Add a random shared secret to authenticate traffic.
+worker_replication_secret: ""
 
 redis:
     enabled: true

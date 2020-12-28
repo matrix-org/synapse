@@ -144,6 +144,47 @@ pid_file: DATADIR/homeserver.pid
 #
 #enable_search: false
 
+# Prevent outgoing requests from being sent to the following blacklisted IP address
+# CIDR ranges. If this option is not specified then it defaults to private IP
+# address ranges (see the example below).
+#
+# The blacklist applies to the outbound requests for federation, identity servers,
+# push servers, and for checking key validity for third-party invite events.
+#
+# (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
+# listed here, since they correspond to unroutable addresses.)
+#
+# This option replaces federation_ip_range_blacklist in Synapse v1.25.0.
+#
+#ip_range_blacklist:
+#  - '127.0.0.0/8'
+#  - '10.0.0.0/8'
+#  - '172.16.0.0/12'
+#  - '192.168.0.0/16'
+#  - '100.64.0.0/10'
+#  - '192.0.0.0/24'
+#  - '169.254.0.0/16'
+#  - '198.18.0.0/15'
+#  - '192.0.2.0/24'
+#  - '198.51.100.0/24'
+#  - '203.0.113.0/24'
+#  - '224.0.0.0/4'
+#  - '::1/128'
+#  - 'fe80::/10'
+#  - 'fc00::/7'
+
+# List of IP address CIDR ranges that should be allowed for federation,
+# identity servers, push servers, and for checking key validity for
+# third-party invite events. This is useful for specifying exceptions to
+# wide-ranging blacklisted target IP ranges - e.g. for communication with
+# a push server only visible in your network.
+#
+# This whitelist overrides ip_range_blacklist and defaults to an empty
+# list.
+#
+#ip_range_whitelist:
+#   - '192.168.1.1'
+
 # List of ports that Synapse should listen on, their purpose and their
 # configuration.
 #
@@ -642,27 +683,6 @@ acme:
 #  - nyc.example.com
 #  - syd.example.com
 
-# Prevent federation requests from being sent to the following
-# blacklist IP address CIDR ranges. If this option is not specified, or
-# specified with an empty list, no ip range blacklist will be enforced.
-#
-# As of Synapse v1.4.0 this option also affects any outbound requests to identity
-# servers provided by user input.
-#
-# (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
-# listed here, since they correspond to unroutable addresses.)
-#
-federation_ip_range_blacklist:
-  - '127.0.0.0/8'
-  - '10.0.0.0/8'
-  - '172.16.0.0/12'
-  - '192.168.0.0/16'
-  - '100.64.0.0/10'
-  - '169.254.0.0/16'
-  - '::1/128'
-  - 'fe80::/64'
-  - 'fc00::/7'
-
 # Report prometheus metrics on the age of PDUs being sent to and received from
 # the following domains. This can be used to give an idea of "delay" on inbound
 # and outbound federation, though be aware that any delay can be due to problems
@@ -953,9 +973,15 @@ media_store_path: "DATADIR/media_store"
 #  - '172.16.0.0/12'
 #  - '192.168.0.0/16'
 #  - '100.64.0.0/10'
+#  - '192.0.0.0/24'
 #  - '169.254.0.0/16'
+#  - '198.18.0.0/15'
+#  - '192.0.2.0/24'
+#  - '198.51.100.0/24'
+#  - '203.0.113.0/24'
+#  - '224.0.0.0/4'
 #  - '::1/128'
-#  - 'fe80::/64'
+#  - 'fe80::/10'
 #  - 'fc00::/7'
 
 # List of IP address CIDR ranges that the URL preview spider is allowed
@@ -1799,9 +1825,10 @@ oidc_config:
       #   * user: The claims returned by the UserInfo Endpoint and/or in the ID
       #     Token
       #
-      # This must be configured if using the default mapping provider.
+      # If this is not set, the user will be prompted to choose their
+      # own username.
       #
-      localpart_template: "{{ user.preferred_username }}"
+      #localpart_template: "{{ user.preferred_username }}"
 
       # Jinja2 template for the display name to set on first login.
       #
@@ -1877,11 +1904,8 @@ sso:
     #  - https://my.custom.client/
 
     # Directory in which Synapse will try to find the template files below.
-    # If not set, default templates from within the Synapse package will be used.
-    #
-    # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
-    # If you *do* uncomment it, you will need to make sure that all the templates
-    # below are in the directory.
+    # If not set, or the files named below are not found within the template
+    # directory, default templates from within the Synapse package will be used.
     #
     # Synapse will look for the following templates in this directory:
     #
@@ -2045,6 +2069,21 @@ password_config:
       #
       #require_uppercase: true
 
+ui_auth:
+    # The number of milliseconds to allow a user-interactive authentication
+    # session to be active.
+    #
+    # This defaults to 0, meaning the user is queried for their credentials
+    # before every action, but this can be overridden to alow a single
+    # validation to be re-used.  This weakens the protections afforded by
+    # the user-interactive authentication process, by allowing for multiple
+    # (and potentially different) operations to use the same validation session.
+    #
+    # Uncomment below to allow for credential validation to last for 15
+    # seconds.
+    #
+    #session_timeout: 15000
+
 
 # Configuration for sending emails from Synapse.
 #
@@ -2110,10 +2149,15 @@ email:
   #
   #validation_token_lifetime: 15m
 
-  # Directory in which Synapse will try to find the template files below.
-  # If not set, default templates from within the Synapse package will be used.
+  # The web client location to direct users to during an invite. This is passed
+  # to the identity server as the org.matrix.web_client_location key. Defaults
+  # to unset, giving no guidance to the identity server.
   #
-  # Do not uncomment this setting unless you want to customise the templates.
+  #invite_client_location: https://app.element.io
+
+  # Directory in which Synapse will try to find the template files below.
+  # If not set, or the files named below are not found within the template
+  # directory, default templates from within the Synapse package will be used.
   #
   # Synapse will look for the following templates in this directory:
   #
@@ -2586,6 +2630,13 @@ opentracing:
 # data). If not provided this defaults to the main process.
 #
 #run_background_tasks_on: worker1
+
+# A shared secret used by the replication APIs to authenticate HTTP requests
+# from workers.
+#
+# By default this is unused and traffic is not authenticated.
+#
+#worker_replication_secret: ""
 
 
 # Configuration for Redis when using workers. This *must* be enabled when
