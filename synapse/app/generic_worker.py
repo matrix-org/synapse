@@ -513,12 +513,6 @@ class GenericWorkerServer(HomeServer):
                 elif name == "client":
                     resource = JsonResource(self, canonical_json=False)
 
-                    PublicRoomListRestServlet(self).register(resource)
-                    RoomMemberListRestServlet(self).register(resource)
-                    JoinedRoomMemberListRestServlet(self).register(resource)
-                    RoomStateRestServlet(self).register(resource)
-                    RoomEventContextServlet(self).register(resource)
-                    RoomMessageListRestServlet(self).register(resource)
                     RegisterRestServlet(self).register(resource)
                     LoginRestServlet(self).register(resource)
                     ThreepidRestServlet(self).register(resource)
@@ -527,17 +521,30 @@ class GenericWorkerServer(HomeServer):
                     VoipRestServlet(self).register(resource)
                     PushRuleRestServlet(self).register(resource)
                     VersionsRestServlet(self).register(resource)
-                    RoomSendEventRestServlet(self).register(resource)
-                    RoomMembershipRestServlet(self).register(resource)
+
+                    # The below are all the servlets from rest/client/v1/room except
+                    # RoomCreateRestServlet, RoomForgetRestServlet,
+                    # RoomRedactEventRestServlet, SearchRestServlet,
+                    # JoinedRoomsRestServlet, RoomEventServlet, and
+                    # RoomAliasListServlet.
                     RoomStateEventRestServlet(self).register(resource)
+                    RoomMemberListRestServlet(self).register(resource)
+                    JoinedRoomMemberListRestServlet(self).register(resource)
+                    RoomMessageListRestServlet(self).register(resource)
                     JoinRoomAliasServlet(self).register(resource)
+                    RoomMembershipRestServlet(self).register(resource)
+                    RoomSendEventRestServlet(self).register(resource)
+                    PublicRoomListRestServlet(self).register(resource)
+                    RoomStateRestServlet(self).register(resource)
+                    RoomTypingRestServlet(self).register(resource)
+                    RoomEventContextServlet(self).register(resource)
+
                     ProfileAvatarURLRestServlet(self).register(resource)
                     ProfileDisplaynameRestServlet(self).register(resource)
                     ProfileRestServlet(self).register(resource)
                     KeyUploadServlet(self).register(resource)
                     AccountDataServlet(self).register(resource)
                     RoomAccountDataServlet(self).register(resource)
-                    RoomTypingRestServlet(self).register(resource)
 
                     sync.register_servlets(self, resource)
                     events.register_servlets(self, resource)
