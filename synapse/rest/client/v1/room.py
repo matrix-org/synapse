@@ -973,6 +973,7 @@ def register_servlets(hs, http_server, is_worker=False):
     RoomSendEventRestServlet(hs).register(http_server)
     PublicRoomListRestServlet(hs).register(http_server)
     RoomStateRestServlet(hs).register(http_server)
+    RoomRedactEventRestServlet(hs).register(http_server)
     RoomTypingRestServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
 
@@ -980,7 +981,6 @@ def register_servlets(hs, http_server, is_worker=False):
     if not is_worker:
         RoomCreateRestServlet(hs).register(http_server)
         RoomForgetRestServlet(hs).register(http_server)
-        RoomRedactEventRestServlet(hs).register(http_server)
         SearchRestServlet(hs).register(http_server)
         JoinedRoomsRestServlet(hs).register(http_server)
         RoomEventServlet(hs).register(http_server)
