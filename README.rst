@@ -278,6 +278,16 @@ differ)::
 
     PASSED (skips=15, successes=1322)
 
+
+For the homeserver config, you can copy the sample config:
+
+    cp docs/sample_config.yaml homeserver.yaml
+
+Then finally start the app:
+
+    synctl start homeserver.yaml
+
+
 Running the Integration Tests
 =============================
 

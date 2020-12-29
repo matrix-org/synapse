@@ -189,6 +189,9 @@ brew install openssl@1.1
 export LDFLAGS=-L/usr/local/Cellar/openssl\@1.1/1.1.1d/lib/
 ```
 
+Alternatively, you can try https://stackoverflow.com/a/56228387/796832
+
+
 #### OpenSUSE
 
 Installing prerequisites on openSUSE:
