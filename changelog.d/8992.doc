@@ -1,1 +1,1 @@
-Changed value of group_creation_prefix in sample_config (unofficial/ -> unofficial_).
+Update the example value of `group_creation_prefix` in the sample configuration.
