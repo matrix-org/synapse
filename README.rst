@@ -278,14 +278,19 @@ differ)::
 
     PASSED (skips=15, successes=1322)
 
+We recommend using the demo which starts 3 federated instances running on ports `8080` - `8082`
 
-For the homeserver config, you can copy the sample config:
+    ./demo/start.sh
+
+(to stop, you can use `./demo/stop.sh`)
+
+If you just want to start a single instance of the app and run it directly,
+you can copy the sample homeserver config then start:
 
     cp docs/sample_config.yaml homeserver.yaml
-
-Then finally start the app:
-
     synctl start homeserver.yaml
+
+
 
 
 Running the Integration Tests
