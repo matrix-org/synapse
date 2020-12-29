@@ -105,7 +105,7 @@ class PruneEventTestCase(unittest.TestCase):
             },
         )
 
-        # MSC2176 now redact the membership and prev_states keys.
+        # As of MSC2176 we now redact the membership and prev_states keys.
         self.run_test(
             {"type": "A", "prev_state": "prev_state", "membership": "join"},
             {"type": "A", "content": {}, "signatures": {}, "unsigned": {}},
@@ -185,7 +185,7 @@ class PruneEventTestCase(unittest.TestCase):
             },
         )
 
-        # Create events get nothing redacted.
+        # After MSC2176, create events get nothing redacted.
         self.run_test(
             {"type": "m.room.create", "content": {"not_a_real_key": True}},
             {
@@ -290,7 +290,7 @@ class PruneEventTestCase(unittest.TestCase):
             room_version=RoomVersions.V6,
         )
 
-        # Redaction events keep the redacts content key from MSC2174.
+        # After MSC2174, redaction events keep the redacts content key.
         self.run_test(
             {"type": "m.room.redaction", "content": {"redacts": "$test2:domain"}},
             {
