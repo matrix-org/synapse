@@ -233,7 +233,7 @@ class ExfiltrationWriter(metaclass=abc.ABCMeta):
             room_id: The room ID the invite is for.
             event: The invite event.
             state: A subset of the state at the invite, with a subset of the
-                event keys (type, state_key content and sender)
+                event keys (type, state_key content and sender).
         """
         raise NotImplementedError()
 
