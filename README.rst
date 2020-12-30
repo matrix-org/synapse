@@ -284,10 +284,14 @@ We recommend using the demo which starts 3 federated instances running on ports 
 
 (to stop, you can use `./demo/stop.sh`)
 
-If you just want to start a single instance of the app and run it directly,
-you can copy the sample homeserver config then start:
+If you just want to start a single instance of the app and run it directly:
 
-    cp docs/sample_config.yaml homeserver.yaml
+    python -m synapse.app.homeserver \
+      --server-name my.domain.name \
+      --config-path homeserver.yaml \
+      --generate-config \
+      --report-stats=[yes|no]
+
     synctl start homeserver.yaml
 
 
