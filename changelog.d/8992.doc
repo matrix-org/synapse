@@ -1,1 +1,6 @@
+<<<<<<< HEAD
 Changed value of group_creation_prefix in sample_config (unofficial/ -> unofficial_).
+||||||| a80260647
+=======
+Update the example value of `group_creation_prefix` in the sample configuration.
+>>>>>>> upstream/develop
