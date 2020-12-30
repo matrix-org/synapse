@@ -29,7 +29,7 @@ def _create_rerouter(func_name):
 
     async def f(self, group_id, *args, **kwargs):
         if not GroupID.is_valid(group_id):
-            raise SynapseError(400, "%s was not legal group ID" % (group_id,))
+            raise SynapseError(400, "%s is not a legal group ID" % (group_id,))
 
         if self.is_mine_id(group_id):
             return await getattr(self.groups_server_handler, func_name)(
