@@ -29,7 +29,7 @@ There are 3 steps to follow under **Installation Instructions**.
       - [OpenBSD](#openbsd-1)
       - [NixOS](#nixos)
   - [Setting up Synapse](#setting-up-synapse)
-    - [Switching the database engine](#switching-the-database-engine)
+    - [Using PostgreSQL](#using-postgresql)
     - [TLS certificates](#tls-certificates)
     - [Client Well-Known URI](#client-well-known-uri)
     - [Email](#email)
