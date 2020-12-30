@@ -1,0 +1,1 @@
+Fix `tests.federation.transport.RoomDirectoryFederationTests` and ensure it runs in CI.
