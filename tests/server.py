@@ -174,11 +174,11 @@ def make_request(
     custom_headers: Optional[
         Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
     ] = None,
-):
+) -> FakeChannel:
     """
     Make a web request using the given method, path and content, and render it
 
-    Returns the Request and the Channel underneath.
+    Returns the fake Channel object which records the response to the request.
 
     Args:
         site: The twisted Site to use to render the request
@@ -202,7 +202,7 @@ def make_request(
              is finished.
 
     Returns:
-        Tuple[synapse.http.site.SynapseRequest, channel]
+        channel
     """
     if not isinstance(method, bytes):
         method = method.encode("ascii")
@@ -216,8 +216,9 @@ def make_request(
         and not path.startswith(b"/_matrix")
         and not path.startswith(b"/_synapse")
     ):
+        if path.startswith(b"/"):
+            path = path[1:]
         path = b"/_matrix/client/r0/" + path
-        path = path.replace(b"//", b"/")
 
     if not path.startswith(b"/"):
         path = b"/" + path
@@ -258,12 +259,13 @@ def make_request(
         for k, v in custom_headers:
             req.requestHeaders.addRawHeader(k, v)
 
+    req.parseCookies()
     req.requestReceived(method, path, b"1.1")
 
     if await_result:
         channel.await_result()
 
-    return req, channel
+    return channel
 
 
 @implementer(IReactorPluggableNameResolver)

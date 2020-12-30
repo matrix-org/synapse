@@ -33,13 +33,14 @@ class SpamCheckerConfig(Config):
             # spam checker, and thus was simply a dictionary with module
             # and config keys. Support this old behaviour by checking
             # to see if the option resolves to a dictionary
-            self.spam_checkers.append(load_module(spam_checkers))
+            self.spam_checkers.append(load_module(spam_checkers, ("spam_checker",)))
         elif isinstance(spam_checkers, list):
-            for spam_checker in spam_checkers:
+            for i, spam_checker in enumerate(spam_checkers):
+                config_path = ("spam_checker", "<item %i>" % i)
                 if not isinstance(spam_checker, dict):
-                    raise ConfigError("spam_checker syntax is incorrect")
+                    raise ConfigError("expected a mapping", config_path)
 
-                self.spam_checkers.append(load_module(spam_checker))
+                self.spam_checkers.append(load_module(spam_checker, config_path))
         else:
             raise ConfigError("spam_checker syntax is incorrect")
 

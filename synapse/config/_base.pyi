@@ -1,8 +1,9 @@
-from typing import Any, List, Optional
+from typing import Any, Iterable, List, Optional
 
 from synapse.config import (
     api,
     appservice,
+    auth,
     captcha,
     cas,
     consent_config,
@@ -14,7 +15,6 @@ from synapse.config import (
     logger,
     metrics,
     oidc_config,
-    password,
     password_auth_providers,
     push,
     ratelimiting,
@@ -35,7 +35,10 @@ from synapse.config import (
     workers,
 )
 
-class ConfigError(Exception): ...
+class ConfigError(Exception):
+    def __init__(self, msg: str, path: Optional[Iterable[str]] = None):
+        self.msg = msg
+        self.path = path
 
 MISSING_REPORT_STATS_CONFIG_INSTRUCTIONS: str
 MISSING_REPORT_STATS_SPIEL: str
@@ -62,7 +65,7 @@ class RootConfig:
     sso: sso.SSOConfig
     oidc: oidc_config.OIDCConfig
     jwt: jwt_config.JWTConfig
-    password: password.PasswordConfig
+    auth: auth.AuthConfig
     email: emailconfig.EmailConfig
     worker: workers.WorkerConfig
     authproviders: password_auth_providers.PasswordAuthProviderConfig

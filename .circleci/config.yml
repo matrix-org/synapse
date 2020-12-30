@@ -5,9 +5,10 @@ jobs:
       - image: docker:git
     steps:
       - checkout
-      - setup_remote_docker
       - docker_prepare
       - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
+      # for release builds, we want to get the amd64 image out asap, so first
+      # we do an amd64-only build, before following up with a multiarch build.
       - docker_build:
           tag: -t matrixdotorg/synapse:${CIRCLE_TAG}
           platforms: linux/amd64
@@ -20,12 +21,10 @@ jobs:
       - image: docker:git
     steps:
       - checkout
-      - setup_remote_docker
       - docker_prepare
       - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
-      - docker_build:
-          tag: -t matrixdotorg/synapse:latest
-          platforms: linux/amd64
+      # for `latest`, we don't want the arm images to disappear, so don't update the tag
+      # until all of the platforms are built.
       - docker_build:
           tag: -t matrixdotorg/synapse:latest
           platforms: linux/amd64,linux/arm/v7,linux/arm64
@@ -46,12 +45,16 @@ workflows:
 
 commands:
   docker_prepare:
-    description: Downloads the buildx cli plugin and enables multiarch images
+    description: Sets up a remote docker server, downloads the buildx cli plugin, and enables multiarch images
     parameters:
       buildx_version:
         type: string
         default: "v0.4.1"
     steps:
+      - setup_remote_docker:
+          # 19.03.13 was the most recent available on circleci at the time of
+          # writing.
+          version: 19.03.13
       - run: apk add --no-cache curl
       - run: mkdir -vp ~/.docker/cli-plugins/ ~/dockercache
       - run: curl --silent -L "https://github.com/docker/buildx/releases/download/<< parameters.buildx_version >>/buildx-<< parameters.buildx_version >>.linux-amd64" > ~/.docker/cli-plugins/docker-buildx

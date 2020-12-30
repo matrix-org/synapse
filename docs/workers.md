@@ -89,7 +89,8 @@ shared configuration file.
 Normally, only a couple of changes are needed to make an existing configuration
 file suitable for use with workers. First, you need to enable an "HTTP replication
 listener" for the main process; and secondly, you need to enable redis-based
-replication. For example:
+replication. Optionally, a shared secret can be used to authenticate HTTP
+traffic between workers. For example:
 
 
 ```yaml
@@ -102,6 +103,9 @@ listeners:
     type: http
     resources:
      - names: [replication]
+
+# Add a random shared secret to authenticate traffic.
+worker_replication_secret: ""
 
 redis:
     enabled: true
@@ -225,6 +229,7 @@ expressions:
     ^/_matrix/client/(r0|unstable)/auth/.*/fallback/web$
 
     # Event sending requests
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/redact
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/send
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/state/
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$

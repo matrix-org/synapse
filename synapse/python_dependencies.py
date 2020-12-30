@@ -40,6 +40,10 @@ logger = logging.getLogger(__name__)
 # Note that these both represent runtime dependencies (and the versions
 # installed are checked at runtime).
 #
+# Also note that we replicate these constraints in the Synapse Dockerfile while
+# pre-installing dependencies. If these constraints are updated here, the same
+# change should be made in the Dockerfile.
+#
 # [1] https://pip.pypa.io/en/stable/reference/pip_install/#requirement-specifiers.
 
 REQUIREMENTS = [
@@ -69,14 +73,7 @@ REQUIREMENTS = [
     "msgpack>=0.5.2",
     "phonenumbers>=8.2.0",
     # we use GaugeHistogramMetric, which was added in prom-client 0.4.0.
-    # prom-client has a history of breaking backwards compatibility between
-    # minor versions (https://github.com/prometheus/client_python/issues/317),
-    # so we also pin the minor version.
-    #
-    # Note that we replicate these constraints in the Synapse Dockerfile while
-    # pre-installing dependencies. If these constraints are updated here, the
-    # same change should be made in the Dockerfile.
-    "prometheus_client>=0.4.0,<0.9.0",
+    "prometheus_client>=0.4.0",
     # we use attr.validators.deep_iterable, which arrived in 19.1.0 (Note:
     # Fedora 31 only has 19.1, so if we want to upgrade we should wait until 33
     # is out in November.)
@@ -99,7 +96,11 @@ CONDITIONAL_REQUIREMENTS = {
         # python 3.5.2, as per https://github.com/itamarst/eliot/issues/418
         'eliot<1.8.0;python_version<"3.5.3"',
     ],
-    "saml2": ["pysaml2>=4.5.0"],
+    "saml2": [
+        # pysaml2 6.4.0 is incompatible with Python 3.5 (see https://github.com/IdentityPython/pysaml2/issues/749)
+        "pysaml2>=4.5.0,<6.4.0;python_version<'3.6'",
+        "pysaml2>=4.5.0;python_version>='3.6'",
+    ],
     "oidc": ["authlib>=0.14.0"],
     "systemd": ["systemd-python>=231"],
     "url_preview": ["lxml>=3.5.0"],

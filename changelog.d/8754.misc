@@ -1,1 +1,0 @@
-Generalise `RoomStore.maybe_store_room_on_invite` to handle other, non-invite membership events.

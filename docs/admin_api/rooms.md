@@ -1,3 +1,15 @@
+# Contents
+- [List Room API](#list-room-api)
+  * [Parameters](#parameters)
+  * [Usage](#usage)
+- [Room Details API](#room-details-api)
+- [Room Members API](#room-members-api)
+- [Delete Room API](#delete-room-api)
+  * [Parameters](#parameters-1)
+  * [Response](#response)
+  * [Undoing room shutdowns](#undoing-room-shutdowns)
+- [Make Room Admin API](#make-room-admin-api)
+
 # List Room API
 
 The List Room admin API allows server admins to get a list of rooms on their
@@ -76,7 +88,7 @@ GET /_synapse/admin/v1/rooms
 
 Response:
 
-```
+```jsonc
 {
   "rooms": [
     {
@@ -128,7 +140,7 @@ GET /_synapse/admin/v1/rooms?search_term=TWIM
 
 Response:
 
-```
+```json
 {
   "rooms": [
     {
@@ -163,7 +175,7 @@ GET /_synapse/admin/v1/rooms?order_by=size
 
 Response:
 
-```
+```jsonc
 {
   "rooms": [
     {
@@ -219,14 +231,14 @@ GET /_synapse/admin/v1/rooms?order_by=size&from=100
 
 Response:
 
-```
+```jsonc
 {
   "rooms": [
     {
       "room_id": "!mscvqgqpHYjBGDxNym:matrix.org",
       "name": "Music Theory",
       "canonical_alias": "#musictheory:matrix.org",
-      "joined_members": 127
+      "joined_members": 127,
       "joined_local_members": 2,
       "version": "1",
       "creator": "@foo:matrix.org",
@@ -243,7 +255,7 @@ Response:
       "room_id": "!twcBhHVdZlQWuuxBhN:termina.org.uk",
       "name": "weechat-matrix",
       "canonical_alias": "#weechat-matrix:termina.org.uk",
-      "joined_members": 137
+      "joined_members": 137,
       "joined_local_members": 20,
       "version": "4",
       "creator": "@foo:termina.org.uk",
@@ -278,6 +290,7 @@ The following fields are possible in the JSON response body:
 * `canonical_alias` - The canonical (main) alias address of the room.
 * `joined_members` - How many users are currently in the room.
 * `joined_local_members` - How many local users are currently in the room.
+* `joined_local_devices` - How many local devices are currently in the room.
 * `version` - The version of the room as a string.
 * `creator` - The `user_id` of the room creator.
 * `encryption` - Algorithm of end-to-end encryption of messages. Is `null` if encryption is not active.
@@ -300,15 +313,16 @@ GET /_synapse/admin/v1/rooms/<room_id>
 
 Response:
 
-```
+```json
 {
   "room_id": "!mscvqgqpHYjBGDxNym:matrix.org",
   "name": "Music Theory",
   "avatar": "mxc://matrix.org/AQDaVFlbkQoErdOgqWRgiGSV",
   "topic": "Theory, Composition, Notation, Analysis",
   "canonical_alias": "#musictheory:matrix.org",
-  "joined_members": 127
+  "joined_members": 127,
   "joined_local_members": 2,
+  "joined_local_devices": 2,
   "version": "1",
   "creator": "@foo:matrix.org",
   "encryption": null,
@@ -342,13 +356,13 @@ GET /_synapse/admin/v1/rooms/<room_id>/members
 
 Response:
 
-```
+```json
 {
   "members": [
     "@foo:matrix.org",
     "@bar:matrix.org",
-    "@foobar:matrix.org
-    ],
+    "@foobar:matrix.org"
+  ],
   "total": 3
 }
 ```
@@ -357,8 +371,6 @@ Response:
 
 The Delete Room admin API allows server admins to remove rooms from server
 and block these rooms.
-It is a combination and improvement of "[Shutdown room](shutdown_room.md)"
-and "[Purge room](purge_room.md)" API.
 
 Shuts down a room. Moves all local users and room aliases automatically to a
 new room if `new_room_user_id` is set. Otherwise local users only
@@ -382,7 +394,7 @@ the new room. Users on other servers will be unaffected.
 
 The API is:
 
-```json
+```
 POST /_synapse/admin/v1/rooms/<room_id>/delete
 ```
 
@@ -439,6 +451,10 @@ The following JSON body parameters are available:
             future attempts to join the room. Defaults to `false`.
 * `purge` - Optional. If set to `true`, it will remove all traces of the room from your database.
             Defaults to `true`.
+* `force_purge` - Optional, and ignored unless `purge` is `true`. If set to `true`, it
+  will force a purge to go ahead even if there are local users still in the room. Do not
+  use this unless a regular `purge` operation fails, as it could leave those users'
+  clients in a confused state.
 
 The JSON body must not be empty. The body must be at least `{}`.
 
@@ -451,3 +467,47 @@ The following fields are returned in the JSON response body:
 * `local_aliases` - An array of strings representing the local aliases that were migrated from
                     the old room to the new.
 * `new_room_id` - A string representing the room ID of the new room.
+
+
+## Undoing room shutdowns
+
+*Note*: This guide may be outdated by the time you read it. By nature of room shutdowns being performed at the database level,
+the structure can and does change without notice.
+
+First, it's important to understand that a room shutdown is very destructive. Undoing a shutdown is not as simple as pretending it
+never happened - work has to be done to move forward instead of resetting the past. In fact, in some cases it might not be possible
+to recover at all:
+
+* If the room was invite-only, your users will need to be re-invited.
+* If the room no longer has any members at all, it'll be impossible to rejoin.
+* The first user to rejoin will have to do so via an alias on a different server.
+
+With all that being said, if you still want to try and recover the room:
+
+1. For safety reasons, shut down Synapse.
+2. In the database, run `DELETE FROM blocked_rooms WHERE room_id = '!example:example.org';`
+   * For caution: it's recommended to run this in a transaction: `BEGIN; DELETE ...;`, verify you got 1 result, then `COMMIT;`.
+   * The room ID is the same one supplied to the shutdown room API, not the Content Violation room.
+3. Restart Synapse.
+
+You will have to manually handle, if you so choose, the following:
+
+* Aliases that would have been redirected to the Content Violation room.
+* Users that would have been booted from the room (and will have been force-joined to the Content Violation room).
+* Removal of the Content Violation room if desired.
+
+
+# Make Room Admin API
+
+Grants another user the highest power available to a local user who is in the room.
+If the user is not in the room, and it is not publicly joinable, then invite the user.
+
+By default the server admin (the caller) is granted power, but another user can
+optionally be specified, e.g.:
+
+```
+    POST /_synapse/admin/v1/rooms/<room_id_or_alias>/make_room_admin
+    {
+        "user_id": "@foo:example.com"
+    }
+```

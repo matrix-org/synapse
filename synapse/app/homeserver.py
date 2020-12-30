@@ -19,7 +19,7 @@ import gc
 import logging
 import os
 import sys
-from typing import Iterable
+from typing import Iterable, Iterator
 
 from twisted.application import service
 from twisted.internet import defer, reactor
@@ -63,6 +63,7 @@ from synapse.rest import ClientRestResource
 from synapse.rest.admin import AdminRestResource
 from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
+from synapse.rest.synapse.client.pick_username import pick_username_resource
 from synapse.rest.well_known import WellKnownResource
 from synapse.server import HomeServer
 from synapse.storage import DataStore
@@ -90,7 +91,7 @@ class SynapseHomeServer(HomeServer):
         tls = listener_config.tls
         site_tag = listener_config.http_options.tag
         if site_tag is None:
-            site_tag = port
+            site_tag = str(port)
 
         # We always include a health resource.
         resources = {"/health": HealthResource()}
@@ -107,7 +108,10 @@ class SynapseHomeServer(HomeServer):
         logger.debug("Configuring additional resources: %r", additional_resources)
         module_api = self.get_module_api()
         for path, resmodule in additional_resources.items():
-            handler_cls, config = load_module(resmodule)
+            handler_cls, config = load_module(
+                resmodule,
+                ("listeners", site_tag, "additional_resources", "<%s>" % (path,)),
+            )
             handler = handler_cls(config, module_api)
             if IResource.providedBy(handler):
                 resource = handler
@@ -189,6 +193,7 @@ class SynapseHomeServer(HomeServer):
                     "/_matrix/client/versions": client_resource,
                     "/.well-known/matrix/client": WellKnownResource(self),
                     "/_synapse/admin": AdminRestResource(self),
+                    "/_synapse/client/pick_username": pick_username_resource(self),
                 }
             )
 
@@ -342,7 +347,10 @@ def setup(config_options):
             "Synapse Homeserver", config_options
         )
     except ConfigError as e:
-        sys.stderr.write("\nERROR: %s\n" % (e,))
+        sys.stderr.write("\n")
+        for f in format_config_error(e):
+            sys.stderr.write(f)
+        sys.stderr.write("\n")
         sys.exit(1)
 
     if not config:
@@ -443,6 +451,38 @@ def setup(config_options):
     reactor.callWhenRunning(lambda: defer.ensureDeferred(start()))
 
     return hs
+
+
+def format_config_error(e: ConfigError) -> Iterator[str]:
+    """
+    Formats a config error neatly
+
+    The idea is to format the immediate error, plus the "causes" of those errors,
+    hopefully in a way that makes sense to the user. For example:
+
+        Error in configuration at 'oidc_config.user_mapping_provider.config.display_name_template':
+          Failed to parse config for module 'JinjaOidcMappingProvider':
+            invalid jinja template:
+              unexpected end of template, expected 'end of print statement'.
+
+    Args:
+        e: the error to be formatted
+
+    Returns: An iterator which yields string fragments to be formatted
+    """
+    yield "Error in configuration"
+
+    if e.path:
+        yield " at '%s'" % (".".join(e.path),)
+
+    yield ":\n  %s" % (e.msg,)
+
+    e = e.__cause__
+    indent = 1
+    while e:
+        indent += 1
+        yield ":\n%s%s" % ("  " * indent, str(e))
+        e = e.__cause__
 
 
 class SynapseService(service.Service):

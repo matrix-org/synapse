@@ -40,4 +40,6 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    args.output_file.write(DEFAULT_LOG_CONFIG.substitute(log_file=args.log_file))
+    out = args.output_file
+    out.write(DEFAULT_LOG_CONFIG.substitute(log_file=args.log_file))
+    out.flush()

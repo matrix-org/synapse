@@ -12,19 +12,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List, Union
+
+from typing import Union
 
 from twisted.internet.defer import succeed
 
 import synapse.rest.admin
 from synapse.api.constants import LoginType
 from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
-from synapse.http.site import SynapseRequest
 from synapse.rest.client.v1 import login
 from synapse.rest.client.v2_alpha import auth, devices, register
-from synapse.types import JsonDict
+from synapse.rest.oidc import OIDCResource
+from synapse.types import JsonDict, UserID
 
 from tests import unittest
+from tests.rest.client.v1.utils import TEST_OIDC_CONFIG
 from tests.server import FakeChannel
 
 
@@ -36,11 +38,6 @@ class DummyRecaptchaChecker(UserInteractiveAuthChecker):
     def check_auth(self, authdict, clientip):
         self.recaptcha_attempts.append((authdict, clientip))
         return succeed(True)
-
-
-class DummyPasswordChecker(UserInteractiveAuthChecker):
-    def check_auth(self, authdict, clientip):
-        return succeed(authdict["identifier"]["user"])
 
 
 class FallbackAuthTests(unittest.HomeserverTestCase):
@@ -69,11 +66,9 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
 
     def register(self, expected_response: int, body: JsonDict) -> FakeChannel:
         """Make a register request."""
-        request, channel = self.make_request(
-            "POST", "register", body
-        )  # type: SynapseRequest, FakeChannel
+        channel = self.make_request("POST", "register", body)
 
-        self.assertEqual(request.code, expected_response)
+        self.assertEqual(channel.code, expected_response)
         return channel
 
     def recaptcha(
@@ -83,18 +78,18 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         if post_session is None:
             post_session = session
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "auth/m.login.recaptcha/fallback/web?session=" + session
-        )  # type: SynapseRequest, FakeChannel
-        self.assertEqual(request.code, 200)
+        )
+        self.assertEqual(channel.code, 200)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "auth/m.login.recaptcha/fallback/web?session="
             + post_session
             + "&g-recaptcha-response=a",
         )
-        self.assertEqual(request.code, expected_post_response)
+        self.assertEqual(channel.code, expected_post_response)
 
         # The recaptcha handler is called with the response given
         attempts = self.recaptcha_checker.recaptcha_attempts
@@ -161,34 +156,44 @@ class UIAuthTests(unittest.HomeserverTestCase):
         register.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
-        auth_handler = hs.get_auth_handler()
-        auth_handler.checkers[LoginType.PASSWORD] = DummyPasswordChecker(hs)
+    def default_config(self):
+        config = super().default_config()
 
+        # we enable OIDC as a way of testing SSO flows
+        oidc_config = {}
+        oidc_config.update(TEST_OIDC_CONFIG)
+        oidc_config["allow_existing_users"] = True
+
+        config["oidc_config"] = oidc_config
+        config["public_baseurl"] = "https://synapse.test"
+        return config
+
+    def create_resource_dict(self):
+        resource_dict = super().create_resource_dict()
+        # mount the OIDC resource at /_synapse/oidc
+        resource_dict["/_synapse/oidc"] = OIDCResource(self.hs)
+        return resource_dict
+
+    def prepare(self, reactor, clock, hs):
         self.user_pass = "pass"
         self.user = self.register_user("test", self.user_pass)
-        self.user_tok = self.login("test", self.user_pass)
-
-    def get_device_ids(self) -> List[str]:
-        # Get the list of devices so one can be deleted.
-        request, channel = self.make_request(
-            "GET", "devices", access_token=self.user_tok,
-        )  # type: SynapseRequest, FakeChannel
-
-        # Get the ID of the device.
-        self.assertEqual(request.code, 200)
-        return [d["device_id"] for d in channel.json_body["devices"]]
+        self.device_id = "dev1"
+        self.user_tok = self.login("test", self.user_pass, self.device_id)
 
     def delete_device(
-        self, device: str, expected_response: int, body: Union[bytes, JsonDict] = b""
+        self,
+        access_token: str,
+        device: str,
+        expected_response: int,
+        body: Union[bytes, JsonDict] = b"",
     ) -> FakeChannel:
         """Delete an individual device."""
-        request, channel = self.make_request(
-            "DELETE", "devices/" + device, body, access_token=self.user_tok
-        )  # type: SynapseRequest, FakeChannel
+        channel = self.make_request(
+            "DELETE", "devices/" + device, body, access_token=access_token,
+        )
 
         # Ensure the response is sane.
-        self.assertEqual(request.code, expected_response)
+        self.assertEqual(channel.code, expected_response)
 
         return channel
 
@@ -196,12 +201,12 @@ class UIAuthTests(unittest.HomeserverTestCase):
         """Delete 1 or more devices."""
         # Note that this uses the delete_devices endpoint so that we can modify
         # the payload half-way through some tests.
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", "delete_devices", body, access_token=self.user_tok,
-        )  # type: SynapseRequest, FakeChannel
+        )
 
         # Ensure the response is sane.
-        self.assertEqual(request.code, expected_response)
+        self.assertEqual(channel.code, expected_response)
 
         return channel
 
@@ -209,11 +214,9 @@ class UIAuthTests(unittest.HomeserverTestCase):
         """
         Test user interactive authentication outside of registration.
         """
-        device_id = self.get_device_ids()[0]
-
         # Attempt to delete this device.
         # Returns a 401 as per the spec
-        channel = self.delete_device(device_id, 401)
+        channel = self.delete_device(self.user_tok, self.device_id, 401)
 
         # Grab the session
         session = channel.json_body["session"]
@@ -222,12 +225,38 @@ class UIAuthTests(unittest.HomeserverTestCase):
 
         # Make another request providing the UI auth flow.
         self.delete_device(
-            device_id,
+            self.user_tok,
+            self.device_id,
             200,
             {
                 "auth": {
                     "type": "m.login.password",
                     "identifier": {"type": "m.id.user", "user": self.user},
+                    "password": self.user_pass,
+                    "session": session,
+                },
+            },
+        )
+
+    def test_grandfathered_identifier(self):
+        """Check behaviour without "identifier" dict
+
+        Synapse used to require clients to submit a "user" field for m.login.password
+        UIA - check that still works.
+        """
+
+        channel = self.delete_device(self.user_tok, self.device_id, 401)
+        session = channel.json_body["session"]
+
+        # Make another request providing the UI auth flow.
+        self.delete_device(
+            self.user_tok,
+            self.device_id,
+            200,
+            {
+                "auth": {
+                    "type": "m.login.password",
+                    "user": self.user,
                     "password": self.user_pass,
                     "session": session,
                 },
@@ -245,14 +274,11 @@ class UIAuthTests(unittest.HomeserverTestCase):
         session ID should be rejected.
         """
         # Create a second login.
-        self.login("test", self.user_pass)
-
-        device_ids = self.get_device_ids()
-        self.assertEqual(len(device_ids), 2)
+        self.login("test", self.user_pass, "dev2")
 
         # Attempt to delete the first device.
         # Returns a 401 as per the spec
-        channel = self.delete_devices(401, {"devices": [device_ids[0]]})
+        channel = self.delete_devices(401, {"devices": [self.device_id]})
 
         # Grab the session
         session = channel.json_body["session"]
@@ -264,7 +290,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
         self.delete_devices(
             200,
             {
-                "devices": [device_ids[1]],
+                "devices": ["dev2"],
                 "auth": {
                     "type": "m.login.password",
                     "identifier": {"type": "m.id.user", "user": self.user},
@@ -279,14 +305,11 @@ class UIAuthTests(unittest.HomeserverTestCase):
         The initial requested URI cannot be modified during the user interactive authentication session.
         """
         # Create a second login.
-        self.login("test", self.user_pass)
-
-        device_ids = self.get_device_ids()
-        self.assertEqual(len(device_ids), 2)
+        self.login("test", self.user_pass, "dev2")
 
         # Attempt to delete the first device.
         # Returns a 401 as per the spec
-        channel = self.delete_device(device_ids[0], 401)
+        channel = self.delete_device(self.user_tok, self.device_id, 401)
 
         # Grab the session
         session = channel.json_body["session"]
@@ -295,8 +318,11 @@ class UIAuthTests(unittest.HomeserverTestCase):
 
         # Make another request providing the UI auth flow, but try to delete the
         # second device. This results in an error.
+        #
+        # This makes use of the fact that the device ID is embedded into the URL.
         self.delete_device(
-            device_ids[1],
+            self.user_tok,
+            "dev2",
             403,
             {
                 "auth": {
@@ -307,3 +333,83 @@ class UIAuthTests(unittest.HomeserverTestCase):
                 },
             },
         )
+
+    @unittest.override_config({"ui_auth": {"session_timeout": 5 * 1000}})
+    def test_can_reuse_session(self):
+        """
+        The session can be reused if configured.
+
+        Compare to test_cannot_change_uri.
+        """
+        # Create a second and third login.
+        self.login("test", self.user_pass, "dev2")
+        self.login("test", self.user_pass, "dev3")
+
+        # Attempt to delete a device. This works since the user just logged in.
+        self.delete_device(self.user_tok, "dev2", 200)
+
+        # Move the clock forward past the validation timeout.
+        self.reactor.advance(6)
+
+        # Deleting another devices throws the user into UI auth.
+        channel = self.delete_device(self.user_tok, "dev3", 401)
+
+        # Grab the session
+        session = channel.json_body["session"]
+        # Ensure that flows are what is expected.
+        self.assertIn({"stages": ["m.login.password"]}, channel.json_body["flows"])
+
+        # Make another request providing the UI auth flow.
+        self.delete_device(
+            self.user_tok,
+            "dev3",
+            200,
+            {
+                "auth": {
+                    "type": "m.login.password",
+                    "identifier": {"type": "m.id.user", "user": self.user},
+                    "password": self.user_pass,
+                    "session": session,
+                },
+            },
+        )
+
+        # Make another request, but try to delete the first device. This works
+        # due to re-using the previous session.
+        #
+        # Note that *no auth* information is provided, not even a session iD!
+        self.delete_device(self.user_tok, self.device_id, 200)
+
+    def test_does_not_offer_password_for_sso_user(self):
+        login_resp = self.helper.login_via_oidc("username")
+        user_tok = login_resp["access_token"]
+        device_id = login_resp["device_id"]
+
+        # now call the device deletion API: we should get the option to auth with SSO
+        # and not password.
+        channel = self.delete_device(user_tok, device_id, 401)
+
+        flows = channel.json_body["flows"]
+        self.assertEqual(flows, [{"stages": ["m.login.sso"]}])
+
+    def test_does_not_offer_sso_for_password_user(self):
+        # now call the device deletion API: we should get the option to auth with SSO
+        # and not password.
+        channel = self.delete_device(self.user_tok, self.device_id, 401)
+
+        flows = channel.json_body["flows"]
+        self.assertEqual(flows, [{"stages": ["m.login.password"]}])
+
+    def test_offers_both_flows_for_upgraded_user(self):
+        """A user that had a password and then logged in with SSO should get both flows
+        """
+        login_resp = self.helper.login_via_oidc(UserID.from_string(self.user).localpart)
+        self.assertEqual(login_resp["user_id"], self.user)
+
+        channel = self.delete_device(self.user_tok, self.device_id, 401)
+
+        flows = channel.json_body["flows"]
+        # we have no particular expectations of ordering here
+        self.assertIn({"stages": ["m.login.password"]}, flows)
+        self.assertIn({"stages": ["m.login.sso"]}, flows)
+        self.assertEqual(len(flows), 2)

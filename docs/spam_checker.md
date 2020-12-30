@@ -22,6 +22,8 @@ well as some specific methods:
 * `user_may_create_room`
 * `user_may_create_room_alias`
 * `user_may_publish_room`
+* `check_username_for_spam`
+* `check_registration_for_spam`
 
 The details of the each of these methods (as well as their inputs and outputs)
 are documented in the `synapse.events.spamcheck.SpamChecker` class.
@@ -32,28 +34,33 @@ call back into the homeserver internals.
 ### Example
 
 ```python
+from synapse.spam_checker_api import RegistrationBehaviour
+
 class ExampleSpamChecker:
     def __init__(self, config, api):
         self.config = config
         self.api = api
 
-    def check_event_for_spam(self, foo):
+    async def check_event_for_spam(self, foo):
         return False  # allow all events
 
-    def user_may_invite(self, inviter_userid, invitee_userid, room_id):
+    async def user_may_invite(self, inviter_userid, invitee_userid, room_id):
         return True  # allow all invites
 
-    def user_may_create_room(self, userid):
+    async def user_may_create_room(self, userid):
         return True  # allow all room creations
 
-    def user_may_create_room_alias(self, userid, room_alias):
+    async def user_may_create_room_alias(self, userid, room_alias):
         return True  # allow all room aliases
 
-    def user_may_publish_room(self, userid, room_id):
+    async def user_may_publish_room(self, userid, room_id):
         return True  # allow publishing of all rooms
 
-    def check_username_for_spam(self, user_profile):
+    async def check_username_for_spam(self, user_profile):
         return False  # allow all usernames
+
+    async def check_registration_for_spam(self, email_threepid, username, request_info):
+        return RegistrationBehaviour.ALLOW  # allow all registrations
 ```
 
 ## Configuration

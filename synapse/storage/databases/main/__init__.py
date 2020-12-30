@@ -149,9 +149,6 @@ class DataStore(
         self._event_reports_id_gen = IdGenerator(db_conn, "event_reports", "id")
         self._push_rule_id_gen = IdGenerator(db_conn, "push_rules", "id")
         self._push_rules_enable_id_gen = IdGenerator(db_conn, "push_rules_enable", "id")
-        self._pushers_id_gen = StreamIdGenerator(
-            db_conn, "pushers", "id", extra_tables=[("deleted_pushers", "stream_id")]
-        )
         self._group_updates_id_gen = StreamIdGenerator(
             db_conn, "local_group_updates", "stream_id"
         )
@@ -342,12 +339,13 @@ class DataStore(
             filters = []
             args = [self.hs.config.server_name]
 
+            # `name` is in database already in lower case
             if name:
-                filters.append("(name LIKE ? OR displayname LIKE ?)")
-                args.extend(["@%" + name + "%:%", "%" + name + "%"])
+                filters.append("(name LIKE ? OR LOWER(displayname) LIKE ?)")
+                args.extend(["@%" + name.lower() + "%:%", "%" + name.lower() + "%"])
             elif user_id:
                 filters.append("name LIKE ?")
-                args.extend(["%" + user_id + "%"])
+                args.extend(["%" + user_id.lower() + "%"])
 
             if not guests:
                 filters.append("is_guest = 0")
