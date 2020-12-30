@@ -23,26 +23,31 @@ class AccountValidityConfig(Config):
     section = "accountvalidity"
 
     def read_config(self, config, **kwargs):
-        self.enabled = config.get("enabled", False)
-        self.renew_by_email_enabled = "renew_at" in config
+        account_validity_config = config.get("account_validity", {})
+        self.account_validity_enabled = account_validity_config.get("enabled", False)
+        self.account_validity_renew_by_email_enabled = (
+            "renew_at" in account_validity_config
+        )
 
-        if self.enabled:
+        if self.account_validity_enabled:
             if "period" in config:
-                self.period = self.parse_duration(config["period"])
+                self.account_validity_period = self.parse_duration(config["period"])
             else:
                 raise ConfigError("'period' is required when using account validity")
 
             if "renew_at" in config:
-                self.renew_at = self.parse_duration(config["renew_at"])
+                self.account_validity_renew_at = self.parse_duration(config["renew_at"])
 
             if "renew_email_subject" in config:
-                self.renew_email_subject = config["renew_email_subject"]
+                self.account_validity_renew_email_subject = config[
+                    "renew_email_subject"
+                ]
             else:
-                self.renew_email_subject = "Renew your %(app)s account"
+                self.account_validity_renew_email_subject = "Renew your %(app)s account"
 
-            self.startup_job_max_delta = self.period * 10.0 / 100.0
+            self.account_validity_startup_job_max_delta = self.period * 10.0 / 100.0
 
-        if self.renew_by_email_enabled:
+        if self.account_validity_renew_by_email_enabled:
             if not self.public_baseurl:
                 raise ConfigError("Can't send renewal emails without 'public_baseurl'")
 
@@ -54,22 +59,22 @@ class AccountValidityConfig(Config):
         if "account_renewed_html_path" in config:
             file_path = os.path.join(template_dir, config["account_renewed_html_path"])
 
-            self.account_renewed_html_content = self.read_file(
+            self.account_validity_account_renewed_html_content = self.read_file(
                 file_path, "account_validity.account_renewed_html_path"
             )
         else:
-            self.account_renewed_html_content = (
+            self.account_validity_account_renewed_html_content = (
                 "<html><body>Your account has been successfully renewed.</body><html>"
             )
 
         if "invalid_token_html_path" in config:
             file_path = os.path.join(template_dir, config["invalid_token_html_path"])
 
-            self.invalid_token_html_content = self.read_file(
+            self.account_validity_invalid_token_html_content = self.read_file(
                 file_path, "account_validity.invalid_token_html_path"
             )
         else:
-            self.invalid_token_html_content = (
+            self.account_validity_invalid_token_html_content = (
                 "<html><body>Invalid renewal token.</body><html>"
             )
 

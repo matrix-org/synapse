@@ -40,11 +40,18 @@ class AccountValidityHandler:
         self.sendmail = self.hs.get_sendmail()
         self.clock = self.hs.get_clock()
 
-        self._account_validity = self.hs.config.account_validity
+        self._account_validity_period = self.hs.config.account_validity_period
+        self._account_validity_enabled = self.hs.config.account_validity_enabled
+        self._account_validity_renew_email_subject = (
+            self.hs.config.account_validity_renew_email_subject
+        )
+        self._account_validity_renew_by_email_enabled = (
+            self.hs.config.account_validity_renew_by_email_enabled
+        )
 
         if (
-            self._account_validity.enabled
-            and self._account_validity.renew_by_email_enabled
+            self._account_validity_enabled
+            and self._account_validity_renew_by_email_enabled
         ):
             # Don't do email-specific configuration if renewal by email is disabled.
             self._template_html = self.config.account_validity_template_html
@@ -53,14 +60,14 @@ class AccountValidityHandler:
             try:
                 app_name = self.hs.config.email_app_name
 
-                self._subject = self._account_validity.renew_email_subject % {
+                self._subject = self._account_validity_renew_email_subject % {
                     "app": app_name
                 }
 
                 self._from_string = self.hs.config.email_notif_from % {"app": app_name}
             except Exception:
                 # If substitution failed, fall back to the bare strings.
-                self._subject = self._account_validity.renew_email_subject
+                self._subject = self._account_validity_renew_email_subject
                 self._from_string = self.hs.config.email_notif_from
 
             self._raw_from = email.utils.parseaddr(self._from_string)[1]
@@ -258,7 +265,7 @@ class AccountValidityHandler:
             milliseconds since epoch.
         """
         if expiration_ts is None:
-            expiration_ts = self.clock.time_msec() + self._account_validity.period
+            expiration_ts = self.clock.time_msec() + self._account_validity_period
 
         await self.store.set_account_validity_for_user(
             user_id=user_id, expiration_ts=expiration_ts, email_sent=email_sent

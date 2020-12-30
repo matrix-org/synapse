@@ -37,8 +37,8 @@ class AccountValidityRenewServlet(RestServlet):
         self.hs = hs
         self.account_activity_handler = hs.get_account_validity_handler()
         self.auth = hs.get_auth()
-        self.success_html = hs.config.account_validity.account_renewed_html_content
-        self.failure_html = hs.config.account_validity.invalid_token_html_content
+        self.success_html = hs.config.account_validity_account_renewed_html_content
+        self.failure_html = hs.config.account_validity_invalid_token_html_content
 
     async def on_GET(self, request):
         if b"token" not in request.args:
