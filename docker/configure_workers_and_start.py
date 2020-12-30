@@ -43,7 +43,11 @@ WORKERS_CONFIG = {
         "app": "synapse.app.media_repository",
         "listener_resources": ["media"],
         "endpoint_patterns": [
-            "^/_matrix/media/.*$|^/_synapse/admin/v1/(purge_media_cache$|(room|user)/.*/media.*$|media/.*$|quarantine_media/.*$)"
+            "^/_synapse/admin/v1/purge_media_cache$",
+            "^/_synapse/admin/v1/room/.*/media.*$",
+            "^/_synapse/admin/v1/user/.*/media.*$",
+            "^/_synapse/admin/v1/media/.*$",
+            "^/_synapse/admin/v1/quarantine_media/.*$",
         ],
         "shared_extra_conf": "enable_media_repo: false"
     },
@@ -67,6 +71,39 @@ WORKERS_CONFIG = {
             "^/_matrix/client/(api/v1|v2_alpha|r0)/events$",
             "^/_matrix/client/(api/v1|r0)/initialSync$",
             "^/_matrix/client/(api/v1|r0)/rooms/[^/]+/initialSync$",
+        ],
+        "shared_extra_conf": ""
+    },
+    "federation_reader": {
+        "app": "synapse.app.generic_worker",
+        "listener_resources": DEFAULT_LISTENER_RESOURCES,
+        "endpoint_patterns": [
+            "^/_matrix/federation/(v1|v2)/event/",
+            "^/_matrix/federation/(v1|v2)/state/",
+            "^/_matrix/federation/(v1|v2)/state_ids/",
+            "^/_matrix/federation/(v1|v2)/backfill/",
+            "^/_matrix/federation/(v1|v2)/get_missing_events/",
+            "^/_matrix/federation/(v1|v2)/publicRooms",
+            "^/_matrix/federation/(v1|v2)/query/",
+            "^/_matrix/federation/(v1|v2)/make_join/",
+            "^/_matrix/federation/(v1|v2)/make_leave/",
+            "^/_matrix/federation/(v1|v2)/send_join/",
+            "^/_matrix/federation/(v1|v2)/send_leave/",
+            "^/_matrix/federation/(v1|v2)/invite/",
+            "^/_matrix/federation/(v1|v2)/query_auth/",
+            "^/_matrix/federation/(v1|v2)/event_auth/",
+            "^/_matrix/federation/(v1|v2)/exchange_third_party_invite/",
+            "^/_matrix/federation/(v1|v2)/user/devices/",
+            "^/_matrix/federation/(v1|v2)/get_groups_publicised$",
+            "^/_matrix/key/v2/query",
+        ],
+        "shared_extra_conf": ""
+    },
+    "federation_inbound": {
+        "app": "synapse.app.generic_worker",
+        "listener_resources": DEFAULT_LISTENER_RESOURCES,
+        "endpoint_patterns": [
+            "/_matrix/federation/(v1|v2)/send/",
         ],
         "shared_extra_conf": ""
     },
@@ -176,7 +213,6 @@ server {
     # Nginx by default only allows file uploads up to 1M in size
     # Increase client_max_body_size to match max_upload_size defined in homeserver.yaml
     client_max_body_size 100M;
-
     """
     nginx_config_body = ""  # to modify below
     nginx_config_template_end = """
