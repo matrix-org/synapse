@@ -119,14 +119,14 @@ class FederationClient(FederationBase):
                 self.pdu_destination_tried[event_id] = destination_dict
 
     @log_function
-    def make_query(
+    async def make_query(
         self,
         destination: str,
         query_type: str,
         args: dict,
         retry_on_dns_fail: bool = False,
         ignore_backoff: bool = False,
-    ) -> Awaitable[JsonDict]:
+    ) -> JsonDict:
         """Sends a federation Query to a remote homeserver of the given type
         and arguments.
 
@@ -140,12 +140,11 @@ class FederationClient(FederationBase):
                 and try the request anyway.
 
         Returns:
-            An Awaitable which will eventually yield a JSON object from the
-            response
+            The JSON object from the response
         """
         sent_queries_counter.labels(query_type).inc()
 
-        return self.transport_layer.make_query(
+        return await self.transport_layer.make_query(
             destination,
             query_type,
             args,
@@ -154,9 +153,9 @@ class FederationClient(FederationBase):
         )
 
     @log_function
-    def query_client_keys(
+    async def query_client_keys(
         self, destination: str, content: JsonDict, timeout: int
-    ) -> Awaitable[JsonDict]:
+    ) -> JsonDict:
         """Query device keys for a device hosted on a remote server.
 
         Args:
@@ -164,26 +163,29 @@ class FederationClient(FederationBase):
             content: The query content.
 
         Returns:
-            An Awaitable which will eventually yield a JSON object from the
-            response
+            The JSON object from the response
         """
         sent_queries_counter.labels("client_device_keys").inc()
-        return self.transport_layer.query_client_keys(destination, content, timeout)
+        return await self.transport_layer.query_client_keys(
+            destination, content, timeout
+        )
 
     @log_function
-    def query_user_devices(
+    async def query_user_devices(
         self, destination: str, user_id: str, timeout: int = 30000
-    ) -> Awaitable[JsonDict]:
+    ) -> JsonDict:
         """Query the device keys for a list of user ids hosted on a remote
         server.
         """
         sent_queries_counter.labels("user_devices").inc()
-        return self.transport_layer.query_user_devices(destination, user_id, timeout)
+        return await self.transport_layer.query_user_devices(
+            destination, user_id, timeout
+        )
 
     @log_function
-    def claim_client_keys(
+    async def claim_client_keys(
         self, destination: str, content: JsonDict, timeout: int
-    ) -> Awaitable[JsonDict]:
+    ) -> JsonDict:
         """Claims one-time keys for a device hosted on a remote server.
 
         Args:
@@ -191,11 +193,12 @@ class FederationClient(FederationBase):
             content: The query content.
 
         Returns:
-            An Awaitable which will eventually yield a JSON object from the
-            response
+            The JSON object from the response
         """
         sent_queries_counter.labels("client_one_time_keys").inc()
-        return self.transport_layer.claim_client_keys(destination, content, timeout)
+        return await self.transport_layer.claim_client_keys(
+            destination, content, timeout
+        )
 
     async def backfill(
         self, dest: str, room_id: str, limit: int, extremities: Iterable[str]
@@ -890,7 +893,7 @@ class FederationClient(FederationBase):
         # content.
         return resp[1]
 
-    def get_public_rooms(
+    async def get_public_rooms(
         self,
         remote_server: str,
         limit: Optional[int] = None,
@@ -898,7 +901,7 @@ class FederationClient(FederationBase):
         search_filter: Optional[Dict] = None,
         include_all_networks: bool = False,
         third_party_instance_id: Optional[str] = None,
-    ) -> Awaitable[JsonDict]:
+    ) -> JsonDict:
         """Get the list of public rooms from a remote homeserver
 
         Args:
@@ -920,7 +923,7 @@ class FederationClient(FederationBase):
                 requests over federation
 
         """
-        return self.transport_layer.get_public_rooms(
+        return await self.transport_layer.get_public_rooms(
             remote_server,
             limit,
             since_token,
