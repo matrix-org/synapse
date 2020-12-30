@@ -408,11 +408,11 @@ Robin Lambertz has packaged Synapse for NixOS at:
 
 Once you have installed synapse as above, you will need to configure it.
 
-### Switching the database engine
+### Using PostgreSQL
 
-By default Synapse gets setup using [SQLite](https://sqlite.org/) and in doing so trades performance for convenience.
+By default Synapse uses [SQLite](https://sqlite.org/) and in doing so trades performance for convenience.
 SQLite is only recommended in Synapse for testing purposes or for servers with
-light workloads.
+very light workloads.
 
 Almost all installations should opt to use [PostgreSQL](https://www.postgresql.org). Advantages include:
 
@@ -420,7 +420,7 @@ Almost all installations should opt to use [PostgreSQL](https://www.postgresql.o
   caching model, smarter query optimiser
 - allowing the DB to be run on separate hardware
 
-For information on how to install and use PostgreSQL, please see
+For information on how to install and use PostgreSQL in Synapse, please see
 [docs/postgres.md](docs/postgres.md)
 
 ### TLS certificates
@@ -516,7 +516,7 @@ correctly. `public_baseurl` should be set to the URL that clients will use to
 connect to your server. This is the same URL you put for the `m.homeserver`
 `base_url` above.
 
-```nginx
+```yaml
 public_baseurl: "https://<matrix.example.com>"
 ```
 
