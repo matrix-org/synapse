@@ -35,7 +35,7 @@ def _validate_group_id(f):
     @wraps(f)
     def wrapper(self, request, group_id, *args, **kwargs):
         if not GroupID.is_valid(group_id):
-            raise SynapseError(400, "%s was not legal group ID" % (group_id,))
+            raise SynapseError(400, "%s is not a legal group ID" % (group_id,))
 
         return f(self, request, group_id, *args, **kwargs)
 
