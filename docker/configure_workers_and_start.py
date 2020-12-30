@@ -117,12 +117,9 @@ exitcodes=0
     # An nginx site config. Will live in /etc/nginx/conf.d
     nginx_config_template_header = """
 server {
-    listen 80;
-    listen [::]:80;
-
-    # For the federation port
-    listen 8448 default_server;
-    listen [::]:8448 default_server;
+    # Listen on Synapse's default HTTP port number
+    listen 8008;
+    listen [::]:8008;
 
     server_name localhost;
     """
@@ -130,7 +127,7 @@ server {
     nginx_config_template_end = """
     # Send all other traffic to the main process
     location ~* ^(\/_matrix|\/_synapse) {
-        proxy_pass http://localhost:8008;
+        proxy_pass http://localhost:18008;
         proxy_set_header X-Forwarded-For $remote_addr;
 
         # TODO: Can we move this to the default nginx.conf so all locations are
@@ -179,7 +176,7 @@ stderr_logfile_maxbytes=0
         elif worker_type == "appservice":
             # Disable appservice traffic sending from the main process
             homeserver_config += """
-            notify_appservices: false
+notify_appservices: false
             """
 
             # Enable the pusher worker in supervisord
@@ -226,6 +223,58 @@ stderr_logfile_maxbytes=0
         proxy_pass http://localhost:8010;
         proxy_set_header X-Forwarded-For $remote_addr;
     }
+            """
+
+        elif worker_type == "federation_sender":
+            # Disable user directory updates on the main process
+            homeserver_config += """
+send_federation: False
+            """
+
+            # Enable the user directory worker in supervisord
+            supervisord_config += """
+[program:synapse_user_dir]
+command=/usr/local/bin/python -m synapse.app.user_dir \
+    --config-path="%s" \
+    --config-path=/conf/workers/shared.yaml \
+    --config-path=/conf/workers/user_dir.yaml
+autorestart=unexpected
+exitcodes=0
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
+            """ % (config_path,)
+
+            # This worker does not handle any REST endpoints
+
+        elif worker_type == "media_repository":
+            # Disable user directory updates on the main process
+            homeserver_config += """
+    update_user_directory: false
+            """
+
+            # Enable the user directory worker in supervisord
+            supervisord_config += """
+    [program:synapse_user_dir]
+    command=/usr/local/bin/python -m synapse.app.user_dir \
+        --config-path="%s" \
+        --config-path=/conf/workers/shared.yaml \
+        --config-path=/conf/workers/user_dir.yaml
+    autorestart=unexpected
+    exitcodes=0
+    stdout_logfile=/dev/stdout
+    stdout_logfile_maxbytes=0
+    stderr_logfile=/dev/stderr
+    stderr_logfile_maxbytes=0
+            """ % (config_path,)
+
+            # Route user directory requests to this worker
+            nginx_config_body += """
+        location ~* (^/_matrix/media/.*$|^/_synapse/admin/v1/(purge_media_cache$|(room|user)/.*/media.*$|media/.*$|quarantine_media/.*$) {
+            proxy_pass http://localhost:8010;
+            proxy_set_header X-Forwarded-For $remote_addr;
+        }
             """
 
     # Write out the config files

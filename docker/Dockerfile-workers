@@ -8,8 +8,8 @@ RUN apt-get install -y supervisor redis nginx
 # Copy the worker process and log configuration files
 COPY ./docker/workers /conf/workers/
 
-# Expose Synapse client, ACME challenge and federation ports
-EXPOSE 8008/tcp 8009/tcp 8448/tcp
+# Expose nginx listener port
+EXPOSE 8008/tcp
 
 # Volume for user-editable config files, logs etc.
 VOLUME ["/data"]
