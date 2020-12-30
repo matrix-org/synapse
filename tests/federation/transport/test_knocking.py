@@ -15,11 +15,8 @@
 from collections import OrderedDict
 from typing import Dict, List
 
-from mock import Mock
-
 from twisted.internet.defer import succeed
 
-from synapse import event_auth
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.events import builder
@@ -28,7 +25,7 @@ from synapse.rest.client.v1 import login, room
 from synapse.server import HomeServer
 from synapse.types import RoomAlias
 
-from tests.test_utils import event_injection, make_awaitable
+from tests.test_utils import event_injection
 from tests.unittest import FederatingHomeserverTestCase, TestCase, override_config
 
 # An identifier to use while MSC2304 is not in a stable release of the spec
@@ -199,7 +196,10 @@ class FederationKnockingTestCase(
 
         # Have this homeserver skip event auth checks. This is necessary due to
         # event auth checks ensuring that events were signed the sender's homeserver.
-        event_auth.check = Mock(return_value=make_awaitable(None))
+        async def do_auth(origin, event, context, auth_events):
+            return context
+
+        homeserver.get_federation_handler().do_auth = do_auth
 
         return super().prepare(reactor, clock, homeserver)
 
