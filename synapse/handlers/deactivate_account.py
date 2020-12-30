@@ -46,7 +46,7 @@ class DeactivateAccountHandler(BaseHandler):
         if hs.config.worker_app is None:
             hs.get_reactor().callWhenRunning(self._start_user_parting)
 
-        self._account_validity_enabled = hs.config.account_validity.enabled
+        self._account_validity_enabled = hs.config.account_validity_enabled
 
     async def deactivate_account(
         self, user_id: str, erase_data: bool, id_server: Optional[str] = None
