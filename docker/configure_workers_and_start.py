@@ -27,7 +27,7 @@ DEFAULT_LISTENER_RESOURCES = ["client", "federation"]
 WORKERS_CONFIG = {
     "pusher": {
         "app": "synapse.app.pusher",
-        "listener_resources": DEFAULT_LISTENER_RESOURCES,
+        "listener_resources": [],
         "endpoint_patterns": [],
         "shared_extra_conf": "start_pushers: false"
     },
@@ -40,13 +40,36 @@ WORKERS_CONFIG = {
         "shared_extra_conf": "update_user_directory: false"
     },
     "media_repository": {
-        "app": "synapse.app.user_dir",
+        "app": "synapse.app.media_repository",
         "listener_resources": ["media"],
         "endpoint_patterns": [
             "^/_matrix/media/.*$|^/_synapse/admin/v1/(purge_media_cache$|(room|user)/.*/media.*$|media/.*$|quarantine_media/.*$)"
         ],
         "shared_extra_conf": "enable_media_repo: false"
-    }
+    },
+    "appservice": {
+        "app": "synapse.app.appservice",
+        "listener_resources": [],
+        "endpoint_patterns": [],
+        "shared_extra_conf": "notify_appservices: false"
+    },
+    "federation_sender": {
+        "app": "synapse.app.federation_sender",
+        "listener_resources": [],
+        "endpoint_patterns": [],
+        "shared_extra_conf": "send_federation: false"
+    },
+    "synchrotron": {
+        "app": "synapse.app.generic_worker",
+        "listener_resources": DEFAULT_LISTENER_RESOURCES,
+        "endpoint_patterns": [
+            "^/_matrix/client/(v2_alpha|r0)/sync$",
+            "^/_matrix/client/(api/v1|v2_alpha|r0)/events$",
+            "^/_matrix/client/(api/v1|r0)/initialSync$",
+            "^/_matrix/client/(api/v1|r0)/rooms/[^/]+/initialSync$",
+        ],
+        "shared_extra_conf": ""
+    },
 }
 
 # Utility functions
@@ -191,7 +214,7 @@ server {
         worker_config.update({"port": worker_port})
         worker_config.update({"config_path": config_path})
 
-        homeserver_config += worker_config['shared_extra_conf']
+        homeserver_config += worker_config['shared_extra_conf'] + "\n"
 
             # Enable the pusher worker in supervisord
         supervisord_config += """
