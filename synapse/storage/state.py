@@ -357,7 +357,7 @@ class StateGroupStorage:
 
         Returns:
             A tuple of the previous group and a state map of the event IDs which
-            make up the delta between the old ad new state groups.
+            make up the delta between the old and new state groups.
         """
 
         return await self.stores.state.get_state_group_delta(state_group)

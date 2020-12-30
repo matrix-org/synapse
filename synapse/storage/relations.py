@@ -91,7 +91,7 @@ class AggregationPaginationToken:
     aggregation groups, we can just use them as our pagination token.
 
     Attributes:
-        count: The count of relations in the boundar group.
+        count: The count of relations in the boundary group.
         stream: The MAX stream ordering in the boundary group.
     """
 
