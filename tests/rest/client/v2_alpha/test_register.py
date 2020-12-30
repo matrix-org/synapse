@@ -492,8 +492,8 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
         (user_id, tok) = self.create_user()
 
-        # Move 6 days forward. This should trigger a renewal email to be sent.
-        self.reactor.advance(datetime.timedelta(days=6).total_seconds())
+        # Move 5 days forward. This should trigger a renewal email to be sent.
+        self.reactor.advance(datetime.timedelta(days=5).total_seconds())
         self.assertEqual(len(self.email_attempts), 1)
 
         # Retrieving the URL from the email is too much pain for now, so we
@@ -504,14 +504,34 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # Check that we're getting HTML back.
-        content_type = None
-        for header in channel.result.get("headers", []):
-            if header[0] == b"Content-Type":
-                content_type = header[1]
-        self.assertEqual(content_type, b"text/html; charset=utf-8", channel.result)
+        content_type = channel.headers.getRawHeaders(b"Content-Type")
+        self.assertEqual(content_type, [b"text/html; charset=utf-8"], channel.result)
 
         # Check that the HTML we're getting is the one we expect on a successful renewal.
-        expected_html = self.hs.config.account_validity.account_renewed_html_content
+        expiration_ts = self.get_success(self.store.get_expiration_ts_for_user(user_id))
+        expected_html = self.hs.config.account_validity_account_renewed_template.render(
+            expiration_ts=expiration_ts
+        )
+        self.assertEqual(
+            channel.result["body"], expected_html.encode("utf8"), channel.result
+        )
+
+        # Move 1 day forward. Try to renew with the same token again.
+        url = "/_matrix/client/unstable/account_validity/renew?token=%s" % renewal_token
+        channel = self.make_request(b"GET", url)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        # Check that we're getting HTML back.
+        content_type = channel.headers.getRawHeaders(b"Content-Type")
+        self.assertEqual(content_type, [b"text/html; charset=utf-8"], channel.result)
+
+        # Check that the HTML we're getting is the one we expect when reusing a
+        # token. The account expiration date should not have changed.
+        expected_html = (
+            self.hs.config.account_validity_account_previously_renewed_template.render(
+                expiration_ts=expiration_ts
+            )
+        )
         self.assertEqual(
             channel.result["body"], expected_html.encode("utf8"), channel.result
         )
@@ -531,15 +551,12 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"404", channel.result)
 
         # Check that we're getting HTML back.
-        content_type = None
-        for header in channel.result.get("headers", []):
-            if header[0] == b"Content-Type":
-                content_type = header[1]
-        self.assertEqual(content_type, b"text/html; charset=utf-8", channel.result)
+        content_type = channel.headers.getRawHeaders(b"Content-Type")
+        self.assertEqual(content_type, [b"text/html; charset=utf-8"], channel.result)
 
         # Check that the HTML we're getting is the one we expect when using an
         # invalid/unknown token.
-        expected_html = self.hs.config.account_validity.invalid_token_html_content
+        expected_html = self.hs.config.account_validity_invalid_token_template.render()
         self.assertEqual(
             channel.result["body"], expected_html.encode("utf8"), channel.result
         )
@@ -647,7 +664,12 @@ class AccountValidityBackgroundJobTestCase(unittest.HomeserverTestCase):
         config["account_validity"] = {"enabled": False}
 
         self.hs = self.setup_test_homeserver(config=config)
-        self.hs.config.account_validity.period = self.validity_period
+
+        # We need to set these directly, instead of in the homeserver config dict above.
+        # This is due to account validity-related config options not being read by
+        # Synapse when account_validity.enabled is False.
+        self.hs.get_datastore()._account_validity_period = self.validity_period
+        self.hs.get_datastore()._account_validity_startup_job_max_delta = self.max_delta
 
         self.store = self.hs.get_datastore()
 
