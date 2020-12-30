@@ -48,7 +48,11 @@ class SQLBaseStore(metaclass=ABCMeta):
         self.rand = random.SystemRandom()
 
     def process_replication_rows(
-        self, stream_name: str, instance_name: str, token: StreamToken, rows
+        self,
+        stream_name: str,
+        instance_name: str,
+        token: StreamToken,
+        rows: Iterable[Any],
     ) -> None:
         pass
 
