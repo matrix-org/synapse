@@ -6,10 +6,10 @@ RUN apt-get update
 RUN apt-get install -y supervisor redis nginx
 
 # Copy the worker process and log configuration files
-COPY ./docker/workers /conf/workers/
+COPY ./docker/worker.yaml.j2 /conf/worker.yaml.j2
 
 # Expose nginx listener port
-EXPOSE 8008/tcp
+EXPOSE 80/tcp
 
 # Volume for user-editable config files, logs etc.
 VOLUME ["/data"]

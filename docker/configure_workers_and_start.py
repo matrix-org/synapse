@@ -22,6 +22,32 @@ import sys
 import subprocess
 import jinja2
 
+DEFAULT_LISTENER_RESOURCES = ["client", "federation"]
+
+WORKERS_CONFIG = {
+    "pusher": {
+        "app": "synapse.app.pusher",
+        "listener_resources": DEFAULT_LISTENER_RESOURCES,
+        "endpoint_patterns": [],
+        "shared_extra_conf": "start_pushers: false"
+    },
+    "user_dir": {
+        "app": "synapse.app.user_dir",
+        "listener_resources": DEFAULT_LISTENER_RESOURCES,
+        "endpoint_patterns": [
+            "^/_matrix/client/(api/v1|r0|unstable)/user_directory/search$"
+        ],
+        "shared_extra_conf": "update_user_directory: false"
+    },
+    "media_repository": {
+        "app": "synapse.app.user_dir",
+        "listener_resources": ["media"],
+        "endpoint_patterns": [
+            "^/_matrix/media/.*$|^/_synapse/admin/v1/(purge_media_cache$|(room|user)/.*/media.*$|media/.*$|quarantine_media/.*$)"
+        ],
+        "shared_extra_conf": "enable_media_repo: false"
+    }
+}
 
 # Utility functions
 def log(txt):
@@ -44,6 +70,7 @@ def convert(src, dst, environ):
     with open(src) as infile:
         template = infile.read()
     rendered = jinja2.Template(template, autoescape=True).render(**environ)
+    print(rendered)
     with open(dst, "w") as outfile:
         outfile.write(rendered)
 
@@ -81,7 +108,7 @@ redis:
 
 # TODO: remove before prod
 suppress_key_server_warning: true
-    """
+"""
 
     # The supervisord config
     supervisord_config = """
@@ -112,14 +139,14 @@ stderr_logfile_maxbytes=0
 autorestart=unexpected
 exitcodes=0
 
-    """ % (config_path,)
+""" % (config_path,)
 
     # An nginx site config. Will live in /etc/nginx/conf.d
     nginx_config_template_header = """
 server {
     # Listen on Synapse's default HTTP port number
-    listen 8008;
-    listen [::]:8008;
+    listen 80;
+    listen [::]:80;
 
     server_name localhost;
     """
@@ -127,7 +154,7 @@ server {
     nginx_config_template_end = """
     # Send all other traffic to the main process
     location ~* ^(\/_matrix|\/_synapse) {
-        proxy_pass http://localhost:18008;
+        proxy_pass http://localhost:8008;
         proxy_set_header X-Forwarded-For $remote_addr;
 
         # TODO: Can we move this to the default nginx.conf so all locations are
@@ -138,7 +165,7 @@ server {
         client_max_body_size 50M;
     }
 }
-    """
+"""
 
     # Read desired worker configuration from environment
     if "SYNAPSE_WORKERS" not in environ:
@@ -147,135 +174,51 @@ server {
     worker_types = environ.get("SYNAPSE_WORKERS")
     worker_types = worker_types.split(",")
 
+    os.mkdir("/conf/workers")
+
+    worker_port = 18009
     for worker_type in worker_types:
         worker_type = worker_type.strip()
 
-        if worker_type == "pusher":
-            # Disable push handling from the main process
-            homeserver_config += """
-start_pushers: false
-            """
+        # TODO handle wrong worker type
+        worker_config = WORKERS_CONFIG.get(worker_type).copy()
+
+        # this is not hardcoded bc we want to be able to have several workers
+        # of each type ultimately (not supported for now)
+        worker_name = worker_type
+        worker_config.update({"name": worker_name})
+
+        worker_config.update({"port": worker_port})
+        worker_config.update({"config_path": config_path})
+
+        homeserver_config += worker_config['shared_extra_conf']
 
             # Enable the pusher worker in supervisord
-            supervisord_config += """
-[program:synapse_pusher]
-command=/usr/local/bin/python -m synapse.app.pusher \
-    --config-path="%s" \
+        supervisord_config += """
+[program:synapse_{name}]
+command=/usr/local/bin/python -m {app} \
+    --config-path="{config_path}" \
     --config-path=/conf/workers/shared.yaml \
-    --config-path=/conf/workers/pusher.yaml
+    --config-path=/conf/workers/{name}.yaml
 autorestart=unexpected
 exitcodes=0
 stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0
-            """ % (config_path,)
+stderr_logfile_maxbytes=0""".format_map(worker_config)
 
-            # This worker does not handle any REST endpoints
 
-        elif worker_type == "appservice":
-            # Disable appservice traffic sending from the main process
-            homeserver_config += """
-notify_appservices: false
-            """
-
-            # Enable the pusher worker in supervisord
-            supervisord_config += """
-[program:synapse_appservice]
-command=/usr/local/bin/python -m synapse.app.appservice \
-    --config-path="%s" \
-    --config-path=/conf/workers/shared.yaml \
-    --config-path=/conf/workers/appservice.yaml
-autorestart=unexpected
-exitcodes=0
-stdout_logfile=/dev/stdout
-stdout_logfile_maxbytes=0
-stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0
-            """ % (config_path,)
-
-            # This worker does not handle any REST endpoints
-
-        elif worker_type == "user_dir":
-            # Disable user directory updates on the main process
-            homeserver_config += """
-update_user_directory: false
-            """
-
-            # Enable the user directory worker in supervisord
-            supervisord_config += """
-[program:synapse_user_dir]
-command=/usr/local/bin/python -m synapse.app.user_dir \
-    --config-path="%s" \
-    --config-path=/conf/workers/shared.yaml \
-    --config-path=/conf/workers/user_dir.yaml
-autorestart=unexpected
-exitcodes=0
-stdout_logfile=/dev/stdout
-stdout_logfile_maxbytes=0
-stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0
-            """ % (config_path,)
-
-            # Route user directory requests to this worker
+        for pattern in worker_config['endpoint_patterns']:
             nginx_config_body += """
-    location ~* ^/_matrix/client/(api/v1|r0|unstable)/user_directory/search$ {
-        proxy_pass http://localhost:8010;
+    location ~* %s {
+        proxy_pass http://localhost:%s;
         proxy_set_header X-Forwarded-For $remote_addr;
     }
-            """
+""" % (pattern, worker_port)
 
-        elif worker_type == "federation_sender":
-            # Disable user directory updates on the main process
-            homeserver_config += """
-send_federation: False
-            """
+        convert("/conf/worker.yaml.j2", "/conf/workers/{name}.yaml".format(name=worker_name), worker_config)
 
-            # Enable the user directory worker in supervisord
-            supervisord_config += """
-[program:synapse_user_dir]
-command=/usr/local/bin/python -m synapse.app.user_dir \
-    --config-path="%s" \
-    --config-path=/conf/workers/shared.yaml \
-    --config-path=/conf/workers/user_dir.yaml
-autorestart=unexpected
-exitcodes=0
-stdout_logfile=/dev/stdout
-stdout_logfile_maxbytes=0
-stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0
-            """ % (config_path,)
-
-            # This worker does not handle any REST endpoints
-
-        elif worker_type == "media_repository":
-            # Disable user directory updates on the main process
-            homeserver_config += """
-    update_user_directory: false
-            """
-
-            # Enable the user directory worker in supervisord
-            supervisord_config += """
-    [program:synapse_user_dir]
-    command=/usr/local/bin/python -m synapse.app.user_dir \
-        --config-path="%s" \
-        --config-path=/conf/workers/shared.yaml \
-        --config-path=/conf/workers/user_dir.yaml
-    autorestart=unexpected
-    exitcodes=0
-    stdout_logfile=/dev/stdout
-    stdout_logfile_maxbytes=0
-    stderr_logfile=/dev/stderr
-    stderr_logfile_maxbytes=0
-            """ % (config_path,)
-
-            # Route user directory requests to this worker
-            nginx_config_body += """
-        location ~* (^/_matrix/media/.*$|^/_synapse/admin/v1/(purge_media_cache$|(room|user)/.*/media.*$|media/.*$|quarantine_media/.*$) {
-            proxy_pass http://localhost:8010;
-            proxy_set_header X-Forwarded-For $remote_addr;
-        }
-            """
+        worker_port += 1
 
     # Write out the config files
 
@@ -299,17 +242,6 @@ stderr_logfile_maxbytes=0
     print(supervisord_config)
     with open("/etc/supervisor/conf.d/supervisord.conf", "w") as f:
         f.write(supervisord_config)
-
-    # Generate worker log config files from the templates.
-    # The templates are mainly there so that we can inject some environment variable
-    # values into them.
-    log_config_template_dir = "/conf/workers/log_config_templates/"
-    log_config_dir = "/conf/workers/"
-    for log_config_filename in os.listdir(log_config_template_dir):
-        template_path = log_config_template_dir + log_config_filename
-        out_path = log_config_dir + log_config_filename
-
-        convert(template_path, out_path, environ)
 
     # Ensure the logging directory exists
     log_dir = data_dir + "/logs"
