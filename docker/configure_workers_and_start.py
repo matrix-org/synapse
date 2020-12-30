@@ -172,6 +172,11 @@ server {
     listen [::]:80;
 
     server_name localhost;
+
+    # Nginx by default only allows file uploads up to 1M in size
+    # Increase client_max_body_size to match max_upload_size defined in homeserver.yaml
+    client_max_body_size 100M;
+
     """
     nginx_config_body = ""  # to modify below
     nginx_config_template_end = """
@@ -179,13 +184,6 @@ server {
     location ~* ^(\/_matrix|\/_synapse) {
         proxy_pass http://localhost:8008;
         proxy_set_header X-Forwarded-For $remote_addr;
-
-        # TODO: Can we move this to the default nginx.conf so all locations are
-        # affected?
-        #
-        # Nginx by default only allows file uploads up to 1M in size
-        # Increase client_max_body_size to match max_upload_size defined in homeserver.yaml
-        client_max_body_size 50M;
     }
 }
 """
