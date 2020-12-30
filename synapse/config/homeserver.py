@@ -13,8 +13,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from ._base import RootConfig
+from .account_validity import AccountValidityConfig
 from .api import ApiConfig
 from .appservice import AppServiceConfig
 from .cache import CacheConfig
@@ -66,6 +66,7 @@ class HomeServerConfig(RootConfig):
         ContentRepositoryConfig,
         CaptchaConfig,
         VoipConfig,
+        AccountValidityConfig,
         RegistrationConfig,
         MetricsConfig,
         ApiConfig,
