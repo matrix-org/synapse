@@ -463,7 +463,7 @@ class KeyFetcher(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     async def get_keys(
         self, keys_to_fetch: Dict[str, Dict[str, int]]
-    ) -> Dict[str, Dict[str, Optional[FetchKeyResult]]]:
+    ) -> Dict[str, Dict[str, FetchKeyResult]]:
         """
         Args:
             keys_to_fetch:
@@ -483,7 +483,7 @@ class StoreKeyFetcher(KeyFetcher):
 
     async def get_keys(
         self, keys_to_fetch: Dict[str, Dict[str, int]]
-    ) -> Dict[str, Dict[str, Optional[FetchKeyResult]]]:
+    ) -> Dict[str, Dict[str, FetchKeyResult]]:
         """see KeyFetcher.get_keys"""
 
         key_ids_to_fetch = (
@@ -493,7 +493,7 @@ class StoreKeyFetcher(KeyFetcher):
         )
 
         res = await self.store.get_server_verify_keys(key_ids_to_fetch)
-        keys = {}  # type: Dict[str, Dict[str, Optional[FetchKeyResult]]]
+        keys = {}  # type: Dict[str, Dict[str, FetchKeyResult]]
         for (server_name, key_id), key in res.items():
             keys.setdefault(server_name, {})[key_id] = key
         return keys
@@ -610,15 +610,14 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
 
     async def get_keys(
         self, keys_to_fetch: Dict[str, Dict[str, int]]
-    ) -> Dict[str, Dict[str, Optional[FetchKeyResult]]]:
+    ) -> Dict[str, Dict[str, FetchKeyResult]]:
         """see KeyFetcher.get_keys"""
 
-        async def get_key(key_server):
+        async def get_key(key_server: TrustedKeyServer) -> Dict:
             try:
-                result = await self.get_server_verify_key_v2_indirect(
+                return await self.get_server_verify_key_v2_indirect(
                     keys_to_fetch, key_server
                 )
-                return result
             except KeyLookupError as e:
                 logger.warning(
                     "Key lookup failed from %r: %s", key_server.server_name, e
@@ -640,7 +639,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
             ).addErrback(unwrapFirstError)
         )
 
-        union_of_keys = {}  # type: Dict[str, Dict[str, Optional[FetchKeyResult]]]
+        union_of_keys = {}  # type: Dict[str, Dict[str, FetchKeyResult]]
         for result in results:
             for server_name, keys in result.items():
                 union_of_keys.setdefault(server_name, {}).update(keys)
@@ -649,7 +648,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
 
     async def get_server_verify_key_v2_indirect(
         self, keys_to_fetch: Dict[str, Dict[str, int]], key_server: TrustedKeyServer
-    ) -> Dict[str, Dict[str, Optional[FetchKeyResult]]]:
+    ) -> Dict[str, Dict[str, FetchKeyResult]]:
         """
         Args:
             keys_to_fetch:
@@ -691,7 +690,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         except HttpResponseException as e:
             raise KeyLookupError("Remote server returned an error: %s" % (e,))
 
-        keys = {}  # type: Dict[str, Dict[str, Optional[FetchKeyResult]]]
+        keys = {}  # type: Dict[str, Dict[str, FetchKeyResult]]
         added_keys = []  # type: List[Tuple[str, str, FetchKeyResult]]
 
         time_now_ms = self.clock.time_msec()
@@ -783,7 +782,7 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
 
     async def get_keys(
         self, keys_to_fetch: Dict[str, Dict[str, int]]
-    ) -> Dict[str, Dict[str, Optional[FetchKeyResult]]]:
+    ) -> Dict[str, Dict[str, FetchKeyResult]]:
         """
         Args:
             keys_to_fetch:
