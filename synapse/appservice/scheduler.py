@@ -60,6 +60,13 @@ from synapse.types import JsonDict
 logger = logging.getLogger(__name__)
 
 
+# Maximum number of events to provide in an AS transaction.
+MAX_PERSISTENT_EVENTS_PER_TRANSACTION = 100
+
+# Maximum number of ephemeral events to provide in an AS transaction.
+MAX_EPHEMERAL_EVENTS_PER_TRANSACTION = 100
+
+
 class ApplicationServiceScheduler:
     """ Public facing API for this module. Does the required DI to tie the
     components together. This also serves as the "event_pool", which in this
@@ -136,10 +143,17 @@ class _ServiceQueuer:
         self.requests_in_flight.add(service.id)
         try:
             while True:
-                events = self.queued_events.pop(service.id, [])
-                ephemeral = self.queued_ephemeral.pop(service.id, [])
+                all_events = self.queued_events.get(service.id, [])
+                events = all_events[:MAX_PERSISTENT_EVENTS_PER_TRANSACTION]
+                del all_events[:MAX_PERSISTENT_EVENTS_PER_TRANSACTION]
+
+                all_events_ephemeral = self.queued_ephemeral.get(service.id, [])
+                ephemeral = all_events_ephemeral[:MAX_EPHEMERAL_EVENTS_PER_TRANSACTION]
+                del all_events_ephemeral[:MAX_EPHEMERAL_EVENTS_PER_TRANSACTION]
+
                 if not events and not ephemeral:
                     return
+
                 try:
                     await self.txn_ctrl.send(service, events, ephemeral)
                 except Exception:
