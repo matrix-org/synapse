@@ -256,6 +256,12 @@ class SAML2Config(Config):
             #  remote:
             #    - url: https://our_idp/metadata.xml
 
+            # Allowed clock difference in seconds between the homeserver and IdP.
+            #
+            # Uncomment the below to increase the accepted time difference from 0 to 3 seconds.
+            #
+            #accepted_time_diff: 3
+
             # By default, the user has to go to our login page first. If you'd like
             # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
             # 'service.sp' section:
