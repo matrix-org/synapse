@@ -21,6 +21,7 @@ import os
 import sys
 import subprocess
 import jinja2
+import yaml
 
 DEFAULT_LISTENER_RESOURCES = ["client", "federation"]
 
@@ -143,7 +144,7 @@ def generate_base_homeserver_config():
     """
     # start.py already does this for us, so just call that.
     # note that this script is copied in in the official, monolith dockerfile
-    subprocess.check_output(["/usr/local/bin/python", "/start.py", "generate"])
+    subprocess.check_output(["/usr/local/bin/python", "/start.py", "migrate_config"])
 
 
 def generate_worker_files(environ, config_path: str, data_dir: str):
@@ -161,8 +162,27 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
 
     # The contents of a Synapse config file that will be added alongside the generated
     # config when running the main Synapse process.
-    # It is intended mainly for disabling functionality when certain workers are spun up.
-    homeserver_config = """
+    # It is intended mainly for disabling functionality when certain workers are spun up,
+    # and add the replication listener
+
+    # first read the original config file to take listeners config and add the replication one
+    listeners = [{
+        "port": 9093,
+        "bind_address": "127.0.0.1",
+        "type": "http",
+        "resources":[{
+            "names": ["replication"]
+        }]
+    }]
+    with open(config_path) as file_stream:
+        original_config = yaml.safe_load(file_stream)
+        original_listeners = original_config.get("listeners")
+        if original_listeners:
+            listeners += original_listeners
+
+    homeserver_config = yaml.dump({"listeners": listeners})
+
+    homeserver_config += """
 redis:
     enabled: true
 
@@ -177,7 +197,7 @@ nodaemon=true
 
 [program:nginx]
 command=/usr/sbin/nginx -g "daemon off;"
-priority=900
+priority=500
 stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
@@ -189,7 +209,7 @@ autorestart=true
 command=/usr/local/bin/python -m synapse.app.homeserver \
     --config-path="%s" \
     --config-path=/conf/workers/shared.yaml
-
+priority=1
 # Log startup failures to supervisord's stdout/err
 # Regular synapse logs will still go in the configured data directory
 stdout_logfile=/dev/stdout
@@ -226,10 +246,10 @@ server {
 
     # Read desired worker configuration from environment
     if "SYNAPSE_WORKERS" not in environ:
-        error("Environment variable 'SYNAPSE_WORKERS' is mandatory.")
-
-    worker_types = environ.get("SYNAPSE_WORKERS")
-    worker_types = worker_types.split(",")
+        worker_types = []
+    else:
+        worker_types = environ.get("SYNAPSE_WORKERS")
+        worker_types = worker_types.split(",")
 
     os.mkdir("/conf/workers")
 
@@ -237,8 +257,12 @@ server {
     for worker_type in worker_types:
         worker_type = worker_type.strip()
 
-        # TODO handle wrong worker type
-        worker_config = WORKERS_CONFIG.get(worker_type).copy()
+        worker_config = WORKERS_CONFIG.get(worker_type)
+        if worker_config:
+            worker_config = worker_config.copy()
+        else:
+            log(worker_type + " is a wrong worker type ! It will be ignored")
+            continue
 
         # this is not hardcoded bc we want to be able to have several workers
         # of each type ultimately (not supported for now)
@@ -258,6 +282,7 @@ command=/usr/local/bin/python -m {app} \
     --config-path=/conf/workers/shared.yaml \
     --config-path=/conf/workers/{name}.yaml
 autorestart=unexpected
+priority=500
 exitcodes=0
 stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0
@@ -318,6 +343,10 @@ def main(args, environ):
     config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
     config_path = environ.get("SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml")
     data_dir = environ.get("SYNAPSE_DATA_DIR", "/data")
+
+    # override SYNAPSE_NO_TLS, we don't support TLS in worker mode,
+    # this needs to be handled by a frontend proxy
+    environ["SYNAPSE_NO_TLS"] = "yes"
 
     # Generate the base homeserver config if one does not yet exist
     if not os.path.exists(config_path):

@@ -43,7 +43,7 @@ listeners:
     tls: false
     bind_addresses: ['::']
     type: http
-    x_forwarded: false
+    x_forwarded: true
 
     resources:
       - names: [client]
