@@ -1,0 +1,1 @@
+Fix bug where the `/_synapse/admin/v1/send_server_notice` API could send notices to non-notice rooms.

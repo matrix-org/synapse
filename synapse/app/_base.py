@@ -49,7 +49,6 @@ def register_sighup(func, *args, **kwargs):
 
     Args:
         func (function): Function to be called when sent a SIGHUP signal.
-            Will be called with a single default argument, the homeserver.
         *args, **kwargs: args and kwargs to be passed to the target function.
     """
     _sighup_callbacks.append((func, args, kwargs))
@@ -251,13 +250,13 @@ def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerConfig]):
                 sdnotify(b"RELOADING=1")
 
                 for i, args, kwargs in _sighup_callbacks:
-                    i(hs, *args, **kwargs)
+                    i(*args, **kwargs)
 
                 sdnotify(b"READY=1")
 
             signal.signal(signal.SIGHUP, handle_sighup)
 
-            register_sighup(refresh_certificate)
+            register_sighup(refresh_certificate, hs)
 
         # Load the certificate from disk.
         refresh_certificate(hs)
