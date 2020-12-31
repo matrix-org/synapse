@@ -117,7 +117,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
                 # comments for request_token_inhibit_3pid_errors.
                 # Also wait for some random amount of time between 100ms and 1s to make it
                 # look like we did something.
-                await self.hs.clock.sleep(random.randint(1, 10) / 10)
+                await self.hs.get_clock().sleep(random.randint(1, 10) / 10)
                 return 200, {"sid": random_string(16)}
 
             raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
@@ -417,7 +417,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
                 # comments for request_token_inhibit_3pid_errors.
                 # Also wait for some random amount of time between 100ms and 1s to make it
                 # look like we did something.
-                await self.hs.clock.sleep(random.randint(1, 10) / 10)
+                await self.hs.get_clock().sleep(random.randint(1, 10) / 10)
                 return 200, {"sid": random_string(16)}
 
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
@@ -496,7 +496,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
                 # comments for request_token_inhibit_3pid_errors.
                 # Also wait for some random amount of time between 100ms and 1s to make it
                 # look like we did something.
-                await self.hs.clock.sleep(random.randint(1, 10) / 10)
+                await self.hs.get_clock().sleep(random.randint(1, 10) / 10)
                 return 200, {"sid": random_string(16)}
 
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
