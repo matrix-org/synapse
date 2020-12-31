@@ -1,3 +1,13 @@
+Synapse 1.22.0 (2020-10-30)
+===========================
+
+Bugfixes
+--------
+
+- Fix a bug where an appservice may not be forwarded events for a room it was recently invited to. Broken in v1.22.0. ([\#8676](https://github.com/matrix-org/synapse/issues/8676))
+- Fix `Object of type frozendict is not JSON serializable` exceptions when using third-party event rules. ([\#8678](https://github.com/matrix-org/synapse/issues/8678))
+
+
 Synapse 1.22.0 (2020-10-27)
 ===========================
 
