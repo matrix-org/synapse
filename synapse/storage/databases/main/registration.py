@@ -18,6 +18,8 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
+import attr
+
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, StoreError, SynapseError, ThreepidValidationError
 from synapse.metrics.background_process_metrics import wrap_as_background_process
@@ -36,6 +38,35 @@ if TYPE_CHECKING:
 THIRTY_MINUTES_IN_MS = 30 * 60 * 1000
 
 logger = logging.getLogger(__name__)
+
+
+@attr.s(frozen=True, slots=True)
+class TokenLookupResult:
+    """Result of looking up an access token.
+
+    Attributes:
+        user_id: The user that this token authenticates as
+        is_guest
+        shadow_banned
+        token_id: The ID of the access token looked up
+        device_id: The device associated with the token, if any.
+        valid_until_ms: The timestamp the token expires, if any.
+        token_owner: The "owner" of the token. This is either the same as the
+            user, or a server admin who is logged in as the user.
+    """
+
+    user_id = attr.ib(type=str)
+    is_guest = attr.ib(type=bool, default=False)
+    shadow_banned = attr.ib(type=bool, default=False)
+    token_id = attr.ib(type=Optional[int], default=None)
+    device_id = attr.ib(type=Optional[str], default=None)
+    valid_until_ms = attr.ib(type=Optional[int], default=None)
+    token_owner = attr.ib(type=str)
+
+    # Make the token owner default to the user ID, which is the common case.
+    @token_owner.default
+    def _default_token_owner(self):
+        return self.user_id
 
 
 class RegistrationWorkerStore(CacheInvalidationWorkerStore):
@@ -108,15 +139,13 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         return is_trial
 
     @cached()
-    async def get_user_by_access_token(self, token: str) -> Optional[dict]:
+    async def get_user_by_access_token(self, token: str) -> Optional[TokenLookupResult]:
         """Get a user from the given access token.
 
         Args:
             token: The access token of a user.
         Returns:
-            None, if the token did not match, otherwise dict
-            including the keys `name`, `is_guest`, `device_id`, `token_id`,
-            `valid_until_ms`.
+            None, if the token did not match, otherwise a `TokenLookupResult`
         """
         return await self.db_pool.runInteraction(
             "get_user_by_access_token", self._query_for_auth, token
@@ -224,7 +253,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             return [UserID.from_string(row[0]) for row in rows]
 
         res = await self.db_pool.runInteraction(
-            "get_expired_users", get_expired_users_txn, self.clock.time_msec()
+            "get_expired_users", get_expired_users_txn, self._clock.time_msec()
         )
 
         return res
@@ -390,7 +419,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         return {
             user_id: {
                 "expired": (
-                    expiration is not None and self.clock.time_msec() >= expiration
+                    expiration is not None and self._clock.time_msec() >= expiration
                 ),
                 "deactivated": deactivated == 1,
             }
@@ -434,23 +463,24 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
         await self.db_pool.runInteraction("set_server_admin", set_server_admin_txn)
 
-    def _query_for_auth(self, txn, token):
+    def _query_for_auth(self, txn, token: str) -> Optional[TokenLookupResult]:
         sql = """
-            SELECT users.name,
+            SELECT users.name as user_id,
                 users.is_guest,
                 users.shadow_banned,
                 access_tokens.id as token_id,
                 access_tokens.device_id,
-                access_tokens.valid_until_ms
+                access_tokens.valid_until_ms,
+                access_tokens.user_id as token_owner
             FROM users
-            INNER JOIN access_tokens on users.name = access_tokens.user_id
+            INNER JOIN access_tokens on users.name = COALESCE(puppets_user_id, access_tokens.user_id)
             WHERE token = ?
         """
 
         txn.execute(sql, (token,))
         rows = self.db_pool.cursor_to_dict(txn)
         if rows:
-            return rows[0]
+            return TokenLookupResult(**rows[0])
 
         return None
 

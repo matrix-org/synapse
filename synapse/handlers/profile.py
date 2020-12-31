@@ -274,7 +274,7 @@ class ProfileHandler(BaseHandler):
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this homeserver")
 
-        if not by_admin and requester and target_user != requester.user:
+        if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's displayname")
 
         if not by_admin and not self.hs.config.enable_set_displayname:
@@ -305,12 +305,6 @@ class ProfileHandler(BaseHandler):
             new_batchnum = 0 if cur_batchnum is None else cur_batchnum + 1
         else:
             new_batchnum = None
-
-        # If the admin changes the display name of a user, the requesting user cannot send
-        # the join event to update the displayname in the rooms.
-        # This must be done by the target user himself.
-        if by_admin:
-            requester = create_requester(target_user)
 
         await self.store.set_profile_displayname(
             target_user.localpart, displayname_to_set, new_batchnum

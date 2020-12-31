@@ -1,0 +1,1 @@
+Change schema to support access tokens belonging to one user but granting access to another.

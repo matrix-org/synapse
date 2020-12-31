@@ -130,7 +130,10 @@ class RegistrationHandler(BaseHandler):
 
             # Retrieve guest user information from provided access token
             user_data = await self.auth.get_user_by_access_token(guest_access_token)
-            if not user_data["is_guest"] or user_data["user"].localpart != localpart:
+            if (
+                not user_data.is_guest
+                or UserID.from_string(user_data.user_id).localpart != localpart
+            ):
                 raise AuthError(
                     403,
                     "Cannot register taken user ID without valid guest "
@@ -239,8 +242,9 @@ class RegistrationHandler(BaseHandler):
             )
 
             if default_display_name:
+                requester = create_requester(user)
                 await self.profile_handler.set_displayname(
-                    user, None, default_display_name, by_admin=True
+                    user, requester, default_display_name, by_admin=True
                 )
 
             if self.hs.config.user_directory_search_all_users:
@@ -274,8 +278,9 @@ class RegistrationHandler(BaseHandler):
                         shadow_banned=shadow_banned,
                     )
 
+                    requester = create_requester(user)
                     await self.profile_handler.set_displayname(
-                        user, None, default_display_name, by_admin=True
+                        user, requester, default_display_name, by_admin=True
                     )
 
                     # Successfully registered
@@ -542,8 +547,9 @@ class RegistrationHandler(BaseHandler):
             create_profile_with_displayname=display_name,
         )
 
+        requester = create_requester(user)
         await self.profile_handler.set_displayname(
-            user, None, display_name, by_admin=True
+            user, requester, display_name, by_admin=True
         )
 
         if self.hs.config.user_directory_search_all_users:
@@ -858,7 +864,7 @@ class RegistrationHandler(BaseHandler):
             # up when the access token is saved, but that's quite an
             # invasive change I'd rather do separately.
             user_tuple = await self.store.get_user_by_access_token(token)
-            token_id = user_tuple["token_id"]
+            token_id = user_tuple.token_id
 
             await self.pusher_pool.add_pusher(
                 user_id=user_id,

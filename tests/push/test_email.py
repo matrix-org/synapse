@@ -100,7 +100,7 @@ class EmailPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastore().get_user_by_access_token(self.access_token)
         )
-        token_id = user_tuple["token_id"]
+        token_id = user_tuple.token_id
 
         self.pusher = self.get_success(
             self.hs.get_pusherpool().add_pusher(

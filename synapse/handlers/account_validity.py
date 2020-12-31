@@ -299,7 +299,7 @@ class AccountValidityHandler:
         self,
         user_id: str,
         expiration_ts: Optional[int] = None,
-        email_sent: Optional[bool] = False,
+        email_sent: bool = False,
         renewal_token: Optional[str] = None,
     ) -> int:
         """Renews the account attached to a given user by pushing back the

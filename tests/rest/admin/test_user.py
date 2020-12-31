@@ -1206,7 +1206,7 @@ class PushersRestTestCase(unittest.HomeserverTestCase):
         user_tuple = self.get_success(
             self.store.get_user_by_access_token(other_user_token)
         )
-        token_id = user_tuple["token_id"]
+        token_id = user_tuple.token_id
 
         self.get_success(
             self.hs.get_pusherpool().add_pusher(

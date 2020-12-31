@@ -115,8 +115,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             ratelimit = content["ratelimit"]
             extra_users = [UserID.from_string(u) for u in content["extra_users"]]
 
-        if requester.user:
-            request.authenticated_entity = requester.user.to_string()
+        request.requester = requester
 
         logger.info(
             "Got event to send with ID: %s into room: %s", event.event_id, event.room_id
