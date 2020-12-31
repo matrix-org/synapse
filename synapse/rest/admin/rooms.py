@@ -309,7 +309,9 @@ class JoinRoomAliasServlet(RestServlet):
                 400, "%s was not legal room ID or room alias" % (room_identifier,)
             )
 
-        fake_requester = create_requester(target_user)
+        fake_requester = create_requester(
+            target_user, authenticated_entity=requester.authenticated_entity
+        )
 
         # send invite if room has "JoinRules.INVITE"
         room_state = await self.state_handler.get_current_state(room_id)

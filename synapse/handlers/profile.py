@@ -300,6 +300,14 @@ class ProfileHandler(BaseHandler):
         if new_displayname == "":
             displayname_to_set = None
 
+        # If the admin changes the display name of a user, the requesting user cannot send
+        # the join event to update the displayname in the rooms.
+        # This must be done by the target user himself.
+        if by_admin:
+            requester = create_requester(
+                target_user, authenticated_entity=requester.authenticated_entity,
+            )
+
         if len(self.hs.config.replicate_user_profiles_to) > 0:
             cur_batchnum = (
                 await self.store.get_latest_profile_replication_batch_number()
@@ -456,7 +464,9 @@ class ProfileHandler(BaseHandler):
 
         # Same like set_displayname
         if by_admin:
-            requester = create_requester(target_user)
+            requester = create_requester(
+                target_user, authenticated_entity=requester.authenticated_entity
+            )
 
         if len(self.hs.config.replicate_user_profiles_to) > 0:
             cur_batchnum = (

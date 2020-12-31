@@ -254,7 +254,7 @@ with a body of:
 
    {
        "new_password": "<secret>",
-       "logout_devices": true,
+       "logout_devices": true
    }
 
 To use it, you will need to authenticate by providing an ``access_token`` for a
@@ -423,6 +423,41 @@ The following fields are returned in the JSON response body:
 
 - ``next_token``: integer - Indication for pagination. See above.
 - ``total`` - integer - Total number of media.
+
+Login as a user
+===============
+
+Get an access token that can be used to authenticate as that user. Useful for
+when admins wish to do actions on behalf of a user.
+
+The API is::
+
+    POST /_synapse/admin/v1/users/<user_id>/login
+    {}
+
+An optional ``valid_until_ms`` field can be specified in the request body as an
+integer timestamp that specifies when the token should expire. By default tokens
+do not expire.
+
+A response body like the following is returned:
+
+.. code:: json
+
+    {
+        "access_token": "<opaque_access_token_string>"
+    }
+
+
+This API does *not* generate a new device for the user, and so will not appear
+their ``/devices`` list, and in general the target user should not be able to
+tell they have been logged in as.
+
+To expire the token call the standard ``/logout`` API with the token.
+
+Note: The token will expire if the *admin* user calls ``/logout/all`` from any
+of their devices, but the token will *not* expire if the target user does the
+same.
+
 
 User devices
 ============

@@ -40,6 +40,7 @@ class DeactivateAccountHandler(BaseHandler):
         self._identity_handler = hs.get_identity_handler()
         self._profile_handler = hs.get_profile_handler()
         self.user_directory_handler = hs.get_user_directory_handler()
+        self._server_name = hs.hostname
 
         # Flag that indicates whether the process to part users from rooms is running
         self._user_parter_running = False
@@ -156,7 +157,7 @@ class DeactivateAccountHandler(BaseHandler):
         for room in pending_invites:
             try:
                 await self._room_member_handler.update_membership(
-                    create_requester(user),
+                    create_requester(user, authenticated_entity=self._server_name),
                     user,
                     room.room_id,
                     "leave",
@@ -212,7 +213,7 @@ class DeactivateAccountHandler(BaseHandler):
             logger.info("User parter parting %r from %r", user_id, room_id)
             try:
                 await self._room_member_handler.update_membership(
-                    create_requester(user),
+                    create_requester(user, authenticated_entity=self._server_name),
                     user,
                     room_id,
                     "leave",

@@ -105,12 +105,9 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
         config["enable_3pid_lookup"] = True
         config["trusted_third_party_id_servers"] = ["testis"]
 
-        # Add a DNS entry for the test IS
-        self.reactor.lookups["testis"] = "1.2.3.4"
-
         mock_http_client = Mock(spec=["get_json", "post_json_get_json"])
-        mock_http_client.get_json.return_value = defer.succeed((200, "{}"))
-        mock_http_client.post_json_get_json.return_value = defer.succeed((200, "{}"))
+        mock_http_client.get_json.return_value = defer.succeed({"mxid": "@f:test"})
+        mock_http_client.post_json_get_json.return_value = defer.succeed({})
 
         self.hs = self.setup_test_homeserver(
             config=config, simple_http_client=mock_http_client
@@ -134,14 +131,6 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"200", channel.result)
         room_id = channel.json_body["room_id"]
 
-        # Replace the blacklisting SimpleHttpClient with our mock
-        self.hs.get_room_member_handler().simple_http_client = Mock(
-            spec=["get_json", "post_json_get_json"]
-        )
-        self.hs.get_room_member_handler().simple_http_client.get_json.return_value = defer.succeed(
-            (200, "{}")
-        )
-
         params = {
             "id_server": "testis",
             "medium": "email",
@@ -158,14 +147,14 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
             "https://testis/_matrix/identity/api/v1/lookup",
             {"address": "test@example.com", "medium": "email"},
         )
-        self.assertEquals(channel.result["code"], b"403", channel.result)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
 
     def test_3pid_lookup_enabled(self):
         url = (
             "/_matrix/client/unstable/account/3pid/lookup"
             "?id_server=testis&medium=email&address=foo@bar.baz"
         )
-        request, channel = self.make_request("GET", url, access_token=self.tok)
+        self.make_request("GET", url, access_token=self.tok)
 
         get_json = self.hs.get_simple_http_client().get_json
         get_json.assert_called_once_with(
@@ -180,9 +169,7 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
             "threepids": [["email", "foo@bar.baz"], ["email", "john.doe@matrix.org"]],
         }
         request_data = json.dumps(data)
-        request, channel = self.make_request(
-            "POST", url, request_data, access_token=self.tok
-        )
+        self.make_request("POST", url, request_data, access_token=self.tok)
 
         post_json = self.hs.get_simple_http_client().post_json_get_json
         post_json.assert_called_once_with(

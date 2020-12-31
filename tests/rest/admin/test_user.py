@@ -24,8 +24,8 @@ from mock import Mock
 import synapse.rest.admin
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, HttpResponseException, ResourceLimitError
-from synapse.rest.client.v1 import login, profile, room
-from synapse.rest.client.v2_alpha import sync
+from synapse.rest.client.v1 import login, logout, profile, room
+from synapse.rest.client.v2_alpha import devices, sync
 
 from tests import unittest
 from tests.test_utils import make_awaitable
@@ -1543,3 +1543,228 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             self.assertIn("last_access_ts", m)
             self.assertIn("quarantined_by", m)
             self.assertIn("safe_from_quarantine", m)
+
+
+class UserTokenRestTestCase(unittest.HomeserverTestCase):
+    """Test for /_synapse/admin/v1/users/<user>/login
+    """
+
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+        sync.register_servlets,
+        room.register_servlets,
+        devices.register_servlets,
+        logout.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
+
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.other_user = self.register_user("user", "pass")
+        self.other_user_tok = self.login("user", "pass")
+        self.url = "/_synapse/admin/v1/users/%s/login" % urllib.parse.quote(
+            self.other_user
+        )
+
+    def _get_token(self) -> str:
+        request, channel = self.make_request(
+            "POST", self.url, b"{}", access_token=self.admin_user_tok
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        return channel.json_body["access_token"]
+
+    def test_no_auth(self):
+        """Try to login as a user without authentication.
+        """
+        request, channel = self.make_request("POST", self.url, b"{}")
+
+        self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
+
+    def test_not_admin(self):
+        """Try to login as a user as a non-admin user.
+        """
+        request, channel = self.make_request(
+            "POST", self.url, b"{}", access_token=self.other_user_tok
+        )
+
+        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+
+    def test_send_event(self):
+        """Test that sending event as a user works.
+        """
+        # Create a room.
+        room_id = self.helper.create_room_as(self.other_user, tok=self.other_user_tok)
+
+        # Login in as the user
+        puppet_token = self._get_token()
+
+        # Test that sending works, and generates the event as the right user.
+        resp = self.helper.send_event(room_id, "com.example.test", tok=puppet_token)
+        event_id = resp["event_id"]
+        event = self.get_success(self.store.get_event(event_id))
+        self.assertEqual(event.sender, self.other_user)
+
+    def test_devices(self):
+        """Tests that logging in as a user doesn't create a new device for them.
+        """
+        # Login in as the user
+        self._get_token()
+
+        # Check that we don't see a new device in our devices list
+        request, channel = self.make_request(
+            "GET", "devices", b"{}", access_token=self.other_user_tok
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # We should only see the one device (from the login in `prepare`)
+        self.assertEqual(len(channel.json_body["devices"]), 1)
+
+    def test_logout(self):
+        """Test that calling `/logout` with the token works.
+        """
+        # Login in as the user
+        puppet_token = self._get_token()
+
+        # Test that we can successfully make a request
+        request, channel = self.make_request(
+            "GET", "devices", b"{}", access_token=puppet_token
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # Logout with the puppet token
+        request, channel = self.make_request(
+            "POST", "logout", b"{}", access_token=puppet_token
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # The puppet token should no longer work
+        request, channel = self.make_request(
+            "GET", "devices", b"{}", access_token=puppet_token
+        )
+        self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
+
+        # .. but the real user's tokens should still work
+        request, channel = self.make_request(
+            "GET", "devices", b"{}", access_token=self.other_user_tok
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+    def test_user_logout_all(self):
+        """Tests that the target user calling `/logout/all` does *not* expire
+        the token.
+        """
+        # Login in as the user
+        puppet_token = self._get_token()
+
+        # Test that we can successfully make a request
+        request, channel = self.make_request(
+            "GET", "devices", b"{}", access_token=puppet_token
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # Logout all with the real user token
+        request, channel = self.make_request(
+            "POST", "logout/all", b"{}", access_token=self.other_user_tok
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # The puppet token should still work
+        request, channel = self.make_request(
+            "GET", "devices", b"{}", access_token=puppet_token
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # .. but the real user's tokens shouldn't
+        request, channel = self.make_request(
+            "GET", "devices", b"{}", access_token=self.other_user_tok
+        )
+        self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
+
+    def test_admin_logout_all(self):
+        """Tests that the admin user calling `/logout/all` does expire the
+        token.
+        """
+        # Login in as the user
+        puppet_token = self._get_token()
+
+        # Test that we can successfully make a request
+        request, channel = self.make_request(
+            "GET", "devices", b"{}", access_token=puppet_token
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # Logout all with the admin user token
+        request, channel = self.make_request(
+            "POST", "logout/all", b"{}", access_token=self.admin_user_tok
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # The puppet token should no longer work
+        request, channel = self.make_request(
+            "GET", "devices", b"{}", access_token=puppet_token
+        )
+        self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
+
+        # .. but the real user's tokens should still work
+        request, channel = self.make_request(
+            "GET", "devices", b"{}", access_token=self.other_user_tok
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+    @unittest.override_config(
+        {
+            "public_baseurl": "https://example.org/",
+            "user_consent": {
+                "version": "1.0",
+                "policy_name": "My Cool Privacy Policy",
+                "template_dir": "/",
+                "require_at_registration": True,
+                "block_events_error": "You should accept the policy",
+            },
+            "form_secret": "123secret",
+        }
+    )
+    def test_consent(self):
+        """Test that sending a message is not subject to the privacy policies.
+        """
+        # Have the admin user accept the terms.
+        self.get_success(self.store.user_set_consent_version(self.admin_user, "1.0"))
+
+        # First, cheekily accept the terms and create a room
+        self.get_success(self.store.user_set_consent_version(self.other_user, "1.0"))
+        room_id = self.helper.create_room_as(self.other_user, tok=self.other_user_tok)
+        self.helper.send_event(room_id, "com.example.test", tok=self.other_user_tok)
+
+        # Now unaccept it and check that we can't send an event
+        self.get_success(self.store.user_set_consent_version(self.other_user, "0.0"))
+        self.helper.send_event(
+            room_id, "com.example.test", tok=self.other_user_tok, expect_code=403
+        )
+
+        # Login in as the user
+        puppet_token = self._get_token()
+
+        # Sending an event on their behalf should work fine
+        self.helper.send_event(room_id, "com.example.test", tok=puppet_token)
+
+    @override_config(
+        {"limit_usage_by_mau": True, "max_mau_value": 1, "mau_trial_days": 0}
+    )
+    def test_mau_limit(self):
+        # Create a room as the admin user. This will bump the monthly active users to 1.
+        room_id = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+
+        # Trying to join as the other user should fail due to reaching MAU limit.
+        self.helper.join(
+            room_id, user=self.other_user, tok=self.other_user_tok, expect_code=403
+        )
+
+        # Logging in as the other user and joining a room should work, even
+        # though the MAU limit would stop the user doing so.
+        puppet_token = self._get_token()
+        self.helper.join(room_id, user=self.other_user, tok=puppet_token)

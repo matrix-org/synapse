@@ -309,36 +309,6 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         )
         self.assertTrue(len(latest_event_ids) < 10, len(latest_event_ids))
 
-    @patch("synapse.handlers.message._DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY", new=0)
-    def test_send_dummy_event_without_consent(self):
-        self._create_extremity_rich_graph()
-        self._enable_consent_checking()
-
-        # Pump the reactor repeatedly so that the background updates have a
-        # chance to run. Attempt to add dummy event with user that has not consented
-        # Check that dummy event send fails.
-        self.pump(10 * 60)
-        latest_event_ids = self.get_success(
-            self.store.get_latest_event_ids_in_room(self.room_id)
-        )
-        self.assertTrue(len(latest_event_ids) == self.EXTREMITIES_COUNT)
-
-        # Create new user, and add consent
-        user2 = self.register_user("user2", "password")
-        token2 = self.login("user2", "password")
-        self.get_success(
-            self.store.user_set_consent_version(user2, self.CONSENT_VERSION)
-        )
-        self.helper.join(self.room_id, user2, tok=token2)
-
-        # Background updates should now cause a dummy event to be added to the graph
-        self.pump(10 * 60)
-
-        latest_event_ids = self.get_success(
-            self.store.get_latest_event_ids_in_room(self.room_id)
-        )
-        self.assertTrue(len(latest_event_ids) < 10, len(latest_event_ids))
-
     @patch("synapse.handlers.message._DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY", new=250)
     def test_expiry_logic(self):
         """Simple test to ensure that _expire_rooms_to_exclude_from_dummy_event_insertion()
