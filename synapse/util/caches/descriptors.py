@@ -201,14 +201,16 @@ class CacheDescriptor(_CacheDescriptorBase):
 
             cache_key = get_cache_key(args, kwargs)
 
-            # Add our own `cache_context` to argument list if the wrapped function
-            # has asked for one
-            if self.add_cache_context:
-                kwargs["cache_context"] = _CacheContext.get_instance(cache, cache_key)
-
             try:
                 ret = cache.get(cache_key, callback=invalidate_callback)
             except KeyError:
+                # Add our own `cache_context` to argument list if the wrapped function
+                # has asked for one
+                if self.add_cache_context:
+                    kwargs["cache_context"] = _CacheContext.get_instance(
+                        cache, cache_key
+                    )
+
                 ret = defer.maybeDeferred(preserve_fn(self.orig), obj, *args, **kwargs)
                 ret = cache.set(cache_key, ret, callback=invalidate_callback)
 
