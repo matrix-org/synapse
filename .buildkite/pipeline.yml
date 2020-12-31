@@ -1,3 +1,15 @@
+# This is just a dummy entry (the `x-yaml-aliases` key is not an official pipeline key, and will be ignored by BuildKite)
+# that we use only to store YAML anchors (`&xxx`), that we plan to use and reference later in the YAML file (using `*xxx`)
+# without having to copy/paste the same values over and over.
+# Note: keys like `agent`, `env`, … used here are totally arbitrary; the only point is to define various separate `&xxx` anchors there.
+#
+x-yaml-aliases:
+  commands:
+    - &trial_setup |
+      # Install additional packages that are not part of buildpack-deps / python images.
+      apt-get update && apt-get install -y xmlsec1
+      python -m pip install tox
+
 env:
   COVERALLS_REPO_TOKEN: wsJWOby6j0uCYFiCes3r0XauxO27mx8lD
 
@@ -79,7 +91,7 @@ steps:
 
   - label: ":python: 3.5 / SQLite"
     command:
-      - "python -m pip install tox"
+      - *trial_setup
       - "tox -e py35,combine"
     env:
       TRIAL_FLAGS: "-j 2"
@@ -102,7 +114,7 @@ steps:
 
   - label: ":python: 3.6 / SQLite"
     command:
-      - "python -m pip install tox"
+      - *trial_setup
       - "tox -e py36,combine"
     env:
       TRIAL_FLAGS: "-j 2"
@@ -125,7 +137,7 @@ steps:
 
   - label: ":python: 3.7 / SQLite"
     command:
-      - "python -m pip install tox"
+      - *trial_setup
       - "tox -e py37,combine"
     env:
       TRIAL_FLAGS: "-j 2"
@@ -151,18 +163,17 @@ steps:
       queue: "medium"
     env:
       TRIAL_FLAGS: "-j 8"
+      PYTHON_VERSION: "3.5"
+      POSTGRES_VERSION: "9.5"
     command:
-      - "bash -c 'python -m pip install tox && python -m tox -e py35-postgres,combine'"
+      - *trial_setup
+      - "python -m tox -e py35-postgres,combine"
     plugins:
-      - matrix-org/download#v1.1.0:
-          urls:
-            - https://raw.githubusercontent.com/matrix-org/synapse-dinsic/dinsic/.buildkite/docker-compose.py35.pg95.yaml
-            - https://raw.githubusercontent.com/matrix-org/synapse-dinsic/dinsic/.buildkite/docker-compose-env
-      - docker-compose#v2.1.0:
+      - docker-compose#v3.7.0:
           run: testenv
           config:
-            - /tmp/download-${BUILDKITE_BUILD_ID}/docker-compose.py35.pg95.yaml
-      - artifacts#v1.2.0:
+            - .buildkite/docker-compose.yaml
+      - artifacts#v1.3.0:
           upload: [ "_trial_temp/*/*.log" ]
 #      - matrix-org/coveralls#v1.0:
 #          parallel: "true"
@@ -178,18 +189,17 @@ steps:
       queue: "medium"
     env:
       TRIAL_FLAGS: "-j 8"
+      PYTHON_VERSION: "3.7"
+      POSTGRES_VERSION: "11"
     command:
-      - "bash -c 'python -m pip install tox && python -m tox -e py37-postgres,combine'"
+      - *trial_setup
+      - "tox -e py37-postgres,combine"
     plugins:
-      - matrix-org/download#v1.1.0:
-          urls:
-            - https://raw.githubusercontent.com/matrix-org/synapse-dinsic/dinsic/.buildkite/docker-compose.py37.pg11.yaml
-            - https://raw.githubusercontent.com/matrix-org/synapse-dinsic/dinsic/.buildkite/docker-compose-env
-      - docker-compose#v2.1.0:
+      - docker-compose#v3.7.0:
           run: testenv
           config:
-            - /tmp/download-${BUILDKITE_BUILD_ID}/docker-compose.py37.pg11.yaml
-      - artifacts#v1.2.0:
+            - .buildkite/docker-compose.yaml
+      - artifacts#v1.3.0:
           upload: [ "_trial_temp/*/*.log" ]
 #      - matrix-org/coveralls#v1.0:
 #          parallel: "true"
@@ -205,18 +215,17 @@ steps:
       queue: "medium"
     env:
       TRIAL_FLAGS: "-j 8"
+      PYTHON_VERSION: "3.8"
+      POSTGRES_VERSION: "12"
     command:
-      - "bash -c 'python -m pip install tox && python -m tox -e py38-postgres,combine'"
+      - *trial_setup
+      - "tox -e py38-postgres,combine"
     plugins:
-      - matrix-org/download#v1.1.0:
-          urls:
-            - https://raw.githubusercontent.com/matrix-org/synapse-dinsic/dinsic/.buildkite/docker-compose.py38.pg12.yaml
-            - https://raw.githubusercontent.com/matrix-org/synapse-dinsic/dinsic/.buildkite/docker-compose-env
-      - docker-compose#v2.1.0:
+      - docker-compose#v3.7.0:
           run: testenv
           config:
-            - /tmp/download-${BUILDKITE_BUILD_ID}/docker-compose.py38.pg12.yaml
-      - artifacts#v1.2.0:
+            - .buildkite/docker-compose.yaml
+      - artifacts#v1.3.0:
           upload: [ "_trial_temp/*/*.log" ]
 #      - matrix-org/coveralls#v1.0:
 #          parallel: "true"
