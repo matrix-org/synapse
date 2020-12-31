@@ -253,7 +253,7 @@ class HomeserverTestCase(TestCase):
 
         from tests.rest.client.v1.utils import RestHelper
 
-        self.helper = RestHelper(self.hs, self.resource, getattr(self, "user_id", None))
+        self.helper = RestHelper(self.hs, self.site, getattr(self, "user_id", None))
 
         if hasattr(self, "user_id"):
             if self.hijack_auth:
@@ -434,6 +434,7 @@ class HomeserverTestCase(TestCase):
 
         return make_request(
             self.reactor,
+            self.site,
             method,
             path,
             content,
