@@ -17,7 +17,7 @@
 import logging
 
 from synapse.api.errors import HttpResponseException, RequestSendFailed, SynapseError
-from synapse.types import get_domain_from_id
+from synapse.types import GroupID, get_domain_from_id
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,9 @@ def _create_rerouter(func_name):
     """
 
     async def f(self, group_id, *args, **kwargs):
+        if not GroupID.is_valid(group_id):
+            raise SynapseError(400, "%s was not legal group ID" % (group_id,))
+
         if self.is_mine_id(group_id):
             return await getattr(self.groups_server_handler, func_name)(
                 group_id, *args, **kwargs
