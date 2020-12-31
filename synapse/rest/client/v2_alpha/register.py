@@ -718,9 +718,6 @@ class RegisterRestServlet(RestServlet):
 
         return 200, return_dict
 
-    def on_OPTIONS(self, _):
-        return 200, {}
-
     async def _do_appservice_registration(
         self, username, password, display_name, as_token, body
     ):
@@ -733,7 +730,6 @@ class RegisterRestServlet(RestServlet):
             # In mainline hashing of the password was moved further on in the registration
             # flow, but we need it here for the AS use-case of shadow servers
             password = await self.auth_handler.hash(password)
-
         user_id = await self.registration_handler.appservice_register(
             username, as_token, password, display_name
         )

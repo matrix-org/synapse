@@ -84,9 +84,6 @@ class PresenceStatusRestServlet(RestServlet):
 
         return 200, {}
 
-    def on_OPTIONS(self, request):
-        return 200, {}
-
 
 def register_servlets(hs, http_server):
     PresenceStatusRestServlet(hs).register(http_server)
