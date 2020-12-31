@@ -1510,18 +1510,9 @@ class FederationHandler(BaseHandler):
             event, context = await self.event_creation_handler.create_new_client_event(
                 builder=builder
             )
-        except AuthError as e:
+        except SynapseError as e:
             logger.warning("Failed to create join to %s because %s", room_id, e)
-            raise e
-
-        event_allowed = await self.third_party_event_rules.check_event_allowed(
-            event, context
-        )
-        if not event_allowed:
-            logger.info("Creation of join %s forbidden by third-party rules", event)
-            raise SynapseError(
-                403, "This event is not allowed in this context", Codes.FORBIDDEN
-            )
+            raise
 
         # The remote hasn't signed it yet, obviously. We'll do the full checks
         # when we get the event back in `on_send_join_request`
@@ -1569,15 +1560,6 @@ class FederationHandler(BaseHandler):
         event.internal_metadata.send_on_behalf_of = origin
 
         context = await self._handle_new_event(origin, event)
-
-        event_allowed = await self.third_party_event_rules.check_event_allowed(
-            event, context
-        )
-        if not event_allowed:
-            logger.info("Sending of join %s forbidden by third-party rules", event)
-            raise SynapseError(
-                403, "This event is not allowed in this context", Codes.FORBIDDEN
-            )
 
         logger.debug(
             "on_send_join_request: After _handle_new_event: %s, sigs: %s",
@@ -1758,15 +1740,6 @@ class FederationHandler(BaseHandler):
             builder=builder
         )
 
-        event_allowed = await self.third_party_event_rules.check_event_allowed(
-            event, context
-        )
-        if not event_allowed:
-            logger.warning("Creation of leave %s forbidden by third-party rules", event)
-            raise SynapseError(
-                403, "This event is not allowed in this context", Codes.FORBIDDEN
-            )
-
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_leave_request`
@@ -1799,16 +1772,7 @@ class FederationHandler(BaseHandler):
 
         event.internal_metadata.outlier = False
 
-        context = await self._handle_new_event(origin, event)
-
-        event_allowed = await self.third_party_event_rules.check_event_allowed(
-            event, context
-        )
-        if not event_allowed:
-            logger.info("Sending of leave %s forbidden by third-party rules", event)
-            raise SynapseError(
-                403, "This event is not allowed in this context", Codes.FORBIDDEN
-            )
+        await self._handle_new_event(origin, event)
 
         logger.debug(
             "on_send_leave_request: After _handle_new_event: %s, sigs: %s",
@@ -2704,18 +2668,6 @@ class FederationHandler(BaseHandler):
                 builder=builder
             )
 
-            event_allowed = await self.third_party_event_rules.check_event_allowed(
-                event, context
-            )
-            if not event_allowed:
-                logger.info(
-                    "Creation of threepid invite %s forbidden by third-party rules",
-                    event,
-                )
-                raise SynapseError(
-                    403, "This event is not allowed in this context", Codes.FORBIDDEN
-                )
-
             event, context = await self.add_display_name_to_third_party_invite(
                 room_version, event_dict, event, context
             )
@@ -2766,18 +2718,6 @@ class FederationHandler(BaseHandler):
         event, context = await self.event_creation_handler.create_new_client_event(
             builder=builder
         )
-
-        event_allowed = await self.third_party_event_rules.check_event_allowed(
-            event, context
-        )
-        if not event_allowed:
-            logger.warning(
-                "Exchange of threepid invite %s forbidden by third-party rules", event
-            )
-            raise SynapseError(
-                403, "This event is not allowed in this context", Codes.FORBIDDEN
-            )
-
         event, context = await self.add_display_name_to_third_party_invite(
             room_version, event_dict, event, context
         )
