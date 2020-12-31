@@ -31,6 +31,7 @@ from synapse.rest.client.v2_alpha import account, register
 from synapse.rest.synapse.client.password_reset import PasswordResetSubmitTokenResource
 
 from tests import unittest
+from tests.server import FakeSite, make_request
 from tests.unittest import override_config
 
 
@@ -255,9 +256,14 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         path = link.replace("https://example.com", "")
 
         # Load the password reset confirmation page
-        request, channel = self.make_request("GET", path, shorthand=False)
-        request.render(self.submit_token_resource)
-        self.pump()
+        request, channel = make_request(
+            self.reactor,
+            FakeSite(self.submit_token_resource),
+            "GET",
+            path,
+            shorthand=False,
+        )
+
         self.assertEquals(200, channel.code, channel.result)
 
         # Now POST to the same endpoint, mimicking the same behaviour as clicking the
@@ -271,15 +277,15 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
                 form_args.append(arg)
 
         # Confirm the password reset
-        request, channel = self.make_request(
+        request, channel = make_request(
+            self.reactor,
+            FakeSite(self.submit_token_resource),
             "POST",
             path,
             content=urlencode(form_args).encode("utf8"),
             shorthand=False,
             content_is_form=True,
         )
-        request.render(self.submit_token_resource)
-        self.pump()
         self.assertEquals(200, channel.code, channel.result)
 
     def _get_link_from_email(self):

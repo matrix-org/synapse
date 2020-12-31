@@ -30,6 +30,7 @@ from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import groups
 
 from tests import unittest
+from tests.server import FakeSite, make_request
 
 
 class VersionTestCase(unittest.HomeserverTestCase):
@@ -222,11 +223,14 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
     def _ensure_quarantined(self, admin_user_tok, server_and_media_id):
         """Ensure a piece of media is quarantined when trying to access it."""
-        request, channel = self.make_request(
-            "GET", server_and_media_id, shorthand=False, access_token=admin_user_tok,
+        request, channel = make_request(
+            self.reactor,
+            FakeSite(self.download_resource),
+            "GET",
+            server_and_media_id,
+            shorthand=False,
+            access_token=admin_user_tok,
         )
-        request.render(self.download_resource)
-        self.pump(1.0)
 
         # Should be quarantined
         self.assertEqual(
@@ -287,14 +291,14 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         server_name, media_id = server_name_and_media_id.split("/")
 
         # Attempt to access the media
-        request, channel = self.make_request(
+        request, channel = make_request(
+            self.reactor,
+            FakeSite(self.download_resource),
             "GET",
             server_name_and_media_id,
             shorthand=False,
             access_token=non_admin_user_tok,
         )
-        request.render(self.download_resource)
-        self.pump(1.0)
 
         # Should be successful
         self.assertEqual(200, int(channel.code), msg=channel.result["body"])
@@ -462,14 +466,14 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         self._ensure_quarantined(admin_user_tok, server_and_media_id_1)
 
         # Attempt to access each piece of media
-        request, channel = self.make_request(
+        request, channel = make_request(
+            self.reactor,
+            FakeSite(self.download_resource),
             "GET",
             server_and_media_id_2,
             shorthand=False,
             access_token=non_admin_user_tok,
         )
-        request.render(self.download_resource)
-        self.pump(1.0)
 
         # Shouldn't be quarantined
         self.assertEqual(
