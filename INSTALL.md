@@ -487,7 +487,7 @@ In nginx this would be something like:
 ```
 location /.well-known/matrix/client {
     return 200 '{"m.homeserver": {"base_url": "https://<matrix.example.com>"}}';
-    add_header Content-Type application/json;
+    default_type application/json;
     add_header Access-Control-Allow-Origin *;
 }
 ```

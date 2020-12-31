@@ -75,6 +75,36 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+Upgrading to v1.24.0
+====================
+
+Custom OpenID Connect mapping provider breaking change
+------------------------------------------------------
+
+This release allows the OpenID Connect mapping provider to perform normalisation
+of the localpart of the Matrix ID. This allows for the mapping provider to
+specify different algorithms, instead of the [default way](https://matrix.org/docs/spec/appendices#mapping-from-other-character-sets).
+
+If your Synapse configuration uses a custom mapping provider
+(`oidc_config.user_mapping_provider.module` is specified and not equal to
+`synapse.handlers.oidc_handler.JinjaOidcMappingProvider`) then you *must* ensure
+that `map_user_attributes` of the mapping provider performs some normalisation
+of the `localpart` returned. To match previous behaviour you can use the
+`map_username_to_mxid_localpart` function provided by Synapse. An example is
+shown below:
+
+.. code-block:: python
+
+  from synapse.types import map_username_to_mxid_localpart
+
+  class MyMappingProvider:
+      def map_user_attributes(self, userinfo, token):
+          # ... your custom logic ...
+          sso_user_id = ...
+          localpart = map_username_to_mxid_localpart(sso_user_id)
+
+          return {"localpart": localpart}
+
 Upgrading to v1.23.0
 ====================
 

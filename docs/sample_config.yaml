@@ -1852,6 +1852,14 @@ saml2_config:
   #  - attribute: department
   #    value: "sales"
 
+  # If the metadata XML contains multiple IdP entities then the `idp_entityid`
+  # option must be set to the entity to redirect users to.
+  #
+  # Most deployments only have a single IdP entity and so should omit this
+  # option.
+  #
+  #idp_entityid: 'https://our_idp/entityid'
+
 
 # Enable OpenID Connect (OIDC) / OAuth 2.0 for registration and login.
 #

@@ -15,8 +15,15 @@ where SAML mapping providers come into play.
 SSO mapping providers are currently supported for OpenID and SAML SSO
 configurations. Please see the details below for how to implement your own.
 
+It is the responsibility of the mapping provider to normalise the SSO attributes
+and map them to a valid Matrix ID. The
+[specification for Matrix IDs](https://matrix.org/docs/spec/appendices#user-identifiers)
+has some information about what is considered valid. Alternately an easy way to
+ensure it is valid is to use a Synapse utility function:
+`synapse.types.map_username_to_mxid_localpart`.
+
 External mapping providers are provided to Synapse in the form of an external
-Python module. You can retrieve this module from [PyPi](https://pypi.org) or elsewhere,
+Python module. You can retrieve this module from [PyPI](https://pypi.org) or elsewhere,
 but it must be importable via Synapse (e.g. it must be in the same virtualenv
 as Synapse). The Synapse config is then modified to point to the mapping provider
 (and optionally provide additional configuration for it).

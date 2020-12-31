@@ -49,6 +49,7 @@ from synapse.federation.federation_base import FederationBase, event_from_pdu_js
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
 from synapse.http.endpoint import parse_server_name
+from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import (
     make_deferred_yieldable,
     nested_logging_context,
@@ -391,7 +392,7 @@ class FederationServer(FederationBase):
             TRANSACTION_CONCURRENCY_LIMIT,
         )
 
-    async def on_context_state_request(
+    async def on_room_state_request(
         self, origin: str, room_id: str, event_id: str
     ) -> Tuple[int, Dict[str, Any]]:
         origin_host, _ = parse_server_name(origin)
@@ -514,11 +515,12 @@ class FederationServer(FederationBase):
         return {"event": ret_pdu.get_pdu_json(time_now)}
 
     async def on_send_join_request(
-        self, origin: str, content: JsonDict, room_id: str
+        self, origin: str, content: JsonDict
     ) -> Dict[str, Any]:
         logger.debug("on_send_join_request: content: %s", content)
 
-        room_version = await self.store.get_room_version(room_id)
+        assert_params_in_dict(content, ["room_id"])
+        room_version = await self.store.get_room_version(content["room_id"])
         pdu = event_from_pdu_json(content, room_version)
 
         origin_host, _ = parse_server_name(origin)
@@ -547,12 +549,11 @@ class FederationServer(FederationBase):
         time_now = self._clock.time_msec()
         return {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
 
-    async def on_send_leave_request(
-        self, origin: str, content: JsonDict, room_id: str
-    ) -> dict:
+    async def on_send_leave_request(self, origin: str, content: JsonDict) -> dict:
         logger.debug("on_send_leave_request: content: %s", content)
 
-        room_version = await self.store.get_room_version(room_id)
+        assert_params_in_dict(content, ["room_id"])
+        room_version = await self.store.get_room_version(content["room_id"])
         pdu = event_from_pdu_json(content, room_version)
 
         origin_host, _ = parse_server_name(origin)
@@ -748,12 +749,8 @@ class FederationServer(FederationBase):
         )
         return ret
 
-    async def on_exchange_third_party_invite_request(
-        self, room_id: str, event_dict: Dict
-    ):
-        ret = await self.handler.on_exchange_third_party_invite_request(
-            room_id, event_dict
-        )
+    async def on_exchange_third_party_invite_request(self, event_dict: Dict):
+        ret = await self.handler.on_exchange_third_party_invite_request(event_dict)
         return ret
 
     async def check_server_matches_acl(self, server_name: str, room_id: str):

@@ -158,7 +158,8 @@ class ReceiptEventSource:
         if from_key == to_key:
             return [], to_key
 
-        # We first need to fetch all new receipts
+        # Fetch all read receipts for all rooms, up to a limit of 100. This is ordered
+        # by most recent.
         rooms_to_events = await self.store.get_linearized_receipts_for_all_rooms(
             from_key=from_key, to_key=to_key
         )
