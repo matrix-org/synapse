@@ -59,7 +59,7 @@ class DictProperty:
             #
             # To exclude the KeyError from the traceback, we explicitly
             # 'raise from e1.__context__' (which is better than 'raise from None',
-            # becuase that would omit any *earlier* exceptions).
+            # because that would omit any *earlier* exceptions).
             #
             raise AttributeError(
                 "'%s' has no '%s' property" % (type(instance), self.key)

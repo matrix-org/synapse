@@ -42,7 +42,6 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         hs.get_clock.return_value = MockClock()
         self.handler = ApplicationServicesHandler(hs)
 
-    @defer.inlineCallbacks
     def test_notify_interested_services(self):
         interested_service = self._mkservice(is_interested=True)
         services = [
@@ -62,14 +61,12 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             defer.succeed((0, [event])),
             defer.succeed((0, [])),
         ]
-        yield defer.ensureDeferred(
-            self.handler.notify_interested_services(RoomStreamToken(None, 0))
-        )
+        self.handler.notify_interested_services(RoomStreamToken(None, 0))
+
         self.mock_scheduler.submit_event_for_as.assert_called_once_with(
             interested_service, event
         )
 
-    @defer.inlineCallbacks
     def test_query_user_exists_unknown_user(self):
         user_id = "@someone:anywhere"
         services = [self._mkservice(is_interested=True)]
@@ -83,12 +80,11 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             defer.succeed((0, [event])),
             defer.succeed((0, [])),
         ]
-        yield defer.ensureDeferred(
-            self.handler.notify_interested_services(RoomStreamToken(None, 0))
-        )
+
+        self.handler.notify_interested_services(RoomStreamToken(None, 0))
+
         self.mock_as_api.query_user.assert_called_once_with(services[0], user_id)
 
-    @defer.inlineCallbacks
     def test_query_user_exists_known_user(self):
         user_id = "@someone:anywhere"
         services = [self._mkservice(is_interested=True)]
@@ -102,9 +98,9 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             defer.succeed((0, [event])),
             defer.succeed((0, [])),
         ]
-        yield defer.ensureDeferred(
-            self.handler.notify_interested_services(RoomStreamToken(None, 0))
-        )
+
+        self.handler.notify_interested_services(RoomStreamToken(None, 0))
+
         self.assertFalse(
             self.mock_as_api.query_user.called,
             "query_user called when it shouldn't have been.",

@@ -2064,7 +2064,7 @@ sso:
 # and issued at ("iat") claims are validated if present.
 #
 # Note that this is a non-standard login type and client support is
-# expected to be non-existant.
+# expected to be non-existent.
 #
 # See https://github.com/matrix-org/synapse/blob/master/docs/jwt.md.
 #
@@ -2585,7 +2585,7 @@ spam_checker:
 #
 # Options for the rules include:
 #
-#   user_id: Matches agaisnt the creator of the alias
+#   user_id: Matches against the creator of the alias
 #   room_id: Matches against the room ID being published
 #   alias: Matches against any current local or canonical aliases
 #            associated with the room
@@ -2631,7 +2631,7 @@ opentracing:
     # This is a list of regexes which are matched against the server_name of the
     # homeserver.
     #
-    # By defult, it is empty, so no servers are matched.
+    # By default, it is empty, so no servers are matched.
     #
     #homeserver_whitelist:
     #  - ".*"

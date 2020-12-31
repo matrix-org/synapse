@@ -349,7 +349,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
                 server_name=get_domain_from_id(group_id),
             )
 
-        # TODO: Check that the group is public and we're being added publically
+        # TODO: Check that the group is public and we're being added publicly
         is_publicised = content.get("publicise", False)
 
         token = await self.store.register_user_group_membership(
@@ -394,7 +394,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
                 server_name=get_domain_from_id(group_id),
             )
 
-        # TODO: Check that the group is public and we're being added publically
+        # TODO: Check that the group is public and we're being added publicly
         is_publicised = content.get("publicise", False)
 
         token = await self.store.register_user_group_membership(
