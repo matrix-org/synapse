@@ -92,7 +92,7 @@ class PaginationHandler:
         self._retention_allowed_lifetime_min = hs.config.retention_allowed_lifetime_min
         self._retention_allowed_lifetime_max = hs.config.retention_allowed_lifetime_max
 
-        if hs.config.retention_enabled:
+        if hs.config.run_background_tasks and hs.config.retention_enabled:
             # Run the purge jobs described in the configuration file.
             for job in hs.config.retention_purge_jobs:
                 logger.info("Setting up purge job with config: %s", job)
@@ -383,7 +383,7 @@ class PaginationHandler:
                             "room_key", leave_token
                         )
 
-                await self.hs.get_handlers().federation_handler.maybe_backfill(
+                await self.hs.get_federation_handler().maybe_backfill(
                     room_id, curr_topo, limit=pagin_config.limit,
                 )
 

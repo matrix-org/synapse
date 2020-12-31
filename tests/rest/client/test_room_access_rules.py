@@ -98,9 +98,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         # TODO: This class does not use a singleton to get it's http client
         # This should be fixed for easier testing
         # https://github.com/matrix-org/synapse-dinsic/issues/26
-        self.hs.get_handlers().identity_handler.blacklisting_http_client = (
-            mock_http_client
-        )
+        self.hs.get_identity_handler().blacklisting_http_client = mock_http_client
 
         self.third_party_event_rules = self.hs.get_third_party_event_rules()
 

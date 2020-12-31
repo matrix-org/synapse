@@ -112,7 +112,6 @@ class RoomCreateRestServlet(TransactionRestServlet):
 class RoomStateEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
         super().__init__(hs)
-        self.handlers = hs.get_handlers()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.message_handler = hs.get_message_handler()
@@ -799,7 +798,6 @@ class RoomMembershipRestServlet(TransactionRestServlet):
 class RoomRedactEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
         super().__init__(hs)
-        self.handlers = hs.get_handlers()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
 
@@ -904,7 +902,7 @@ class RoomAliasListServlet(RestServlet):
     def __init__(self, hs: "synapse.server.HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.directory_handler = hs.get_handlers().directory_handler
+        self.directory_handler = hs.get_directory_handler()
 
     async def on_GET(self, request, room_id):
         requester = await self.auth.get_user_by_req(request)
@@ -921,7 +919,7 @@ class SearchRestServlet(RestServlet):
 
     def __init__(self, hs):
         super().__init__()
-        self.handlers = hs.get_handlers()
+        self.search_handler = hs.get_search_handler()
         self.auth = hs.get_auth()
 
     async def on_POST(self, request):
@@ -930,9 +928,7 @@ class SearchRestServlet(RestServlet):
         content = parse_json_object_from_request(request)
 
         batch = parse_string(request, "next_batch")
-        results = await self.handlers.search_handler.search(
-            requester.user, content, batch
-        )
+        results = await self.search_handler.search(requester.user, content, batch)
 
         return 200, results
 

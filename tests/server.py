@@ -1,8 +1,11 @@
 import json
 import logging
+from collections import deque
 from io import SEEK_END, BytesIO
+from typing import Callable
 
 import attr
+from typing_extensions import Deque
 from zope.interface import implementer
 
 from twisted.internet import address, threads, udp
@@ -251,6 +254,7 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         self._tcp_callbacks = {}
         self._udp = []
         lookups = self.lookups = {}
+        self._thread_callbacks = deque()  # type: Deque[Callable[[], None]]()
 
         @implementer(IResolverSimple)
         class FakeResolver:
@@ -272,10 +276,10 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         """
         Make the callback fire in the next reactor iteration.
         """
-        d = Deferred()
-        d.addCallback(lambda x: callback(*args, **kwargs))
-        self.callLater(0, d.callback, True)
-        return d
+        cb = lambda: callback(*args, **kwargs)
+        # it's not safe to call callLater() here, so we append the callback to a
+        # separate queue.
+        self._thread_callbacks.append(cb)
 
     def getThreadPool(self):
         return self.threadpool
@@ -302,6 +306,30 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
             callback()
 
         return conn
+
+    def advance(self, amount):
+        # first advance our reactor's time, and run any "callLater" callbacks that
+        # makes ready
+        super().advance(amount)
+
+        # now run any "callFromThread" callbacks
+        while True:
+            try:
+                callback = self._thread_callbacks.popleft()
+            except IndexError:
+                break
+            callback()
+
+            # check for more "callLater" callbacks added by the thread callback
+            # This isn't required in a regular reactor, but it ends up meaning that
+            # our database queries can complete in a single call to `advance` [1] which
+            # simplifies tests.
+            #
+            # [1]: we replace the threadpool backing the db connection pool with a
+            # mock ThreadPool which doesn't really use threads; but we still use
+            # reactor.callFromThread to feed results back from the db functions to the
+            # main thread.
+            super().advance(0)
 
 
 class ThreadPool:
@@ -339,8 +367,6 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
     """
     server = _sth(cleanup_func, *args, **kwargs)
 
-    database = server.config.database.get_single_database()
-
     # Make the thread pool synchronous.
     clock = server.get_clock()
 
@@ -371,6 +397,10 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
         pool.runInteraction = runInteraction
         pool.threadpool = ThreadPool(clock._reactor)
         pool.running = True
+
+    # We've just changed the Databases to run DB transactions on the same
+    # thread, so we need to disable the dedicated thread behaviour.
+    server.get_datastores().main.USE_DEDICATED_DB_THREADS_FOR_EVENT_FETCHING = False
 
     return server
 

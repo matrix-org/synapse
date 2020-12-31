@@ -127,12 +127,16 @@ from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.server import HomeServer, cache_in_self
 from synapse.storage.databases.main.censor_events import CensorEventsStore
+from synapse.storage.databases.main.client_ips import ClientIpWorkerStore
 from synapse.storage.databases.main.media_repository import MediaRepositoryStore
+from synapse.storage.databases.main.metrics import ServerMetricsStore
 from synapse.storage.databases.main.monthly_active_users import (
     MonthlyActiveUsersWorkerStore,
 )
 from synapse.storage.databases.main.presence import UserPresenceState
 from synapse.storage.databases.main.search import SearchWorkerStore
+from synapse.storage.databases.main.stats import StatsStore
+from synapse.storage.databases.main.transactions import TransactionWorkerStore
 from synapse.storage.databases.main.ui_auth import UIAuthWorkerStore
 from synapse.storage.databases.main.user_directory import UserDirectoryStore
 from synapse.types import ReadReceipt
@@ -454,6 +458,7 @@ class GenericWorkerSlavedStore(
     # FIXME(#3714): We need to add UserDirectoryStore as we write directly
     # rather than going via the correct worker.
     UserDirectoryStore,
+    StatsStore,
     UIAuthWorkerStore,
     SlavedDeviceInboxStore,
     SlavedDeviceStore,
@@ -463,6 +468,7 @@ class GenericWorkerSlavedStore(
     SlavedAccountDataStore,
     SlavedPusherStore,
     CensorEventsStore,
+    ClientIpWorkerStore,
     SlavedEventStore,
     SlavedKeyStore,
     RoomStore,
@@ -476,7 +482,9 @@ class GenericWorkerSlavedStore(
     SlavedFilteringStore,
     MonthlyActiveUsersWorkerStore,
     MediaRepositoryStore,
+    ServerMetricsStore,
     SearchWorkerStore,
+    TransactionWorkerStore,
     BaseSlavedStore,
 ):
     pass
@@ -781,10 +789,6 @@ class FederationSenderHandler:
         if stream_name == "federation":
             send_queue.process_rows_for_federation(self.federation_sender, rows)
             await self.update_token(token)
-
-        # We also need to poke the federation sender when new events happen
-        elif stream_name == "events":
-            self.federation_sender.notify_new_events(token)
 
         # ... and when new receipts happen
         elif stream_name == ReceiptsStream.NAME:

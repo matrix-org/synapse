@@ -42,13 +42,15 @@ MAX_DISPLAYNAME_LEN = 256
 MAX_AVATAR_URL_LEN = 1000
 
 
-class BaseProfileHandler(BaseHandler):
+class ProfileHandler(BaseHandler):
     """Handles fetching and updating user profile information.
 
-    BaseProfileHandler can be instantiated directly on workers and will
-    delegate to master when necessary. The master process should use the
-    subclass MasterProfileHandler
+    ProfileHandler can be instantiated directly on workers and will
+    delegate to master when necessary.
     """
+
+    PROFILE_UPDATE_MS = 60 * 1000
+    PROFILE_UPDATE_EVERY_MS = 24 * 60 * 60 * 1000
 
     PROFILE_REPLICATE_INTERVAL = 2 * 60 * 1000
 
@@ -68,7 +70,7 @@ class BaseProfileHandler(BaseHandler):
         self.allowed_avatar_mimetypes = hs.config.allowed_avatar_mimetypes
         self.replicate_user_profiles_to = hs.config.replicate_user_profiles_to
 
-        if hs.config.worker_app is None:
+        if hs.config.run_background_tasks:
             self.clock.looping_call(
                 self._start_update_remote_profile_cache, self.PROFILE_UPDATE_MS
             )
@@ -570,20 +572,6 @@ class BaseProfileHandler(BaseHandler):
                 # so we act as if we couldn't find the profile.
                 raise SynapseError(403, "Profile isn't available", Codes.FORBIDDEN)
             raise
-
-
-class MasterProfileHandler(BaseProfileHandler):
-    PROFILE_UPDATE_MS = 60 * 1000
-    PROFILE_UPDATE_EVERY_MS = 24 * 60 * 60 * 1000
-
-    def __init__(self, hs):
-        super().__init__(hs)
-
-        assert hs.config.worker_app is None
-
-        self.clock.looping_call(
-            self._start_update_remote_profile_cache, self.PROFILE_UPDATE_MS
-        )
 
     def _start_update_remote_profile_cache(self):
         return run_as_background_process(

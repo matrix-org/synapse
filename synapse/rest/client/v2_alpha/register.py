@@ -80,7 +80,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         """
         super().__init__()
         self.hs = hs
-        self.identity_handler = hs.get_handlers().identity_handler
+        self.identity_handler = hs.get_identity_handler()
         self.config = hs.config
 
         if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
@@ -178,7 +178,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         """
         super().__init__()
         self.hs = hs
-        self.identity_handler = hs.get_handlers().identity_handler
+        self.identity_handler = hs.get_identity_handler()
 
     async def on_POST(self, request):
         body = parse_json_object_from_request(request)
@@ -368,7 +368,7 @@ class RegisterRestServlet(RestServlet):
         self.store = hs.get_datastore()
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
-        self.identity_handler = hs.get_handlers().identity_handler
+        self.identity_handler = hs.get_identity_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.macaroon_gen = hs.get_macaroon_generator()
         self.ratelimiter = hs.get_registration_ratelimiter()

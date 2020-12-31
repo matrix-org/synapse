@@ -158,6 +158,7 @@ class PerDestinationQueue:
             # yet know if we have anything to catch up (None)
             self._pending_pdus.append(pdu)
         else:
+            assert pdu.internal_metadata.stream_ordering
             self._catchup_last_skipped = pdu.internal_metadata.stream_ordering
 
         self.attempt_new_transaction()
@@ -361,6 +362,7 @@ class PerDestinationQueue:
                         last_successful_stream_ordering = (
                             final_pdu.internal_metadata.stream_ordering
                         )
+                        assert last_successful_stream_ordering
                         await self._store.set_destination_last_successful_stream_ordering(
                             self._destination, last_successful_stream_ordering
                         )

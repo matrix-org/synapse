@@ -45,7 +45,7 @@ class UsersRestServlet(RestServlet):
         self.hs = hs
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
-        self.admin_handler = hs.get_handlers().admin_handler
+        self.admin_handler = hs.get_admin_handler()
 
     async def on_GET(self, request, user_id):
         target_user = UserID.from_string(user_id)
@@ -82,7 +82,7 @@ class UsersRestServletV2(RestServlet):
         self.hs = hs
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
-        self.admin_handler = hs.get_handlers().admin_handler
+        self.admin_handler = hs.get_admin_handler()
 
     async def on_GET(self, request):
         await assert_requester_is_admin(self.auth, request)
@@ -135,7 +135,7 @@ class UserRestServletV2(RestServlet):
     def __init__(self, hs):
         self.hs = hs
         self.auth = hs.get_auth()
-        self.admin_handler = hs.get_handlers().admin_handler
+        self.admin_handler = hs.get_admin_handler()
         self.store = hs.get_datastore()
         self.auth_handler = hs.get_auth_handler()
         self.profile_handler = hs.get_profile_handler()
@@ -448,7 +448,7 @@ class WhoisRestServlet(RestServlet):
     def __init__(self, hs):
         self.hs = hs
         self.auth = hs.get_auth()
-        self.handlers = hs.get_handlers()
+        self.admin_handler = hs.get_admin_handler()
 
     async def on_GET(self, request, user_id):
         target_user = UserID.from_string(user_id)
@@ -461,7 +461,7 @@ class WhoisRestServlet(RestServlet):
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Can only whois a local user")
 
-        ret = await self.handlers.admin_handler.get_whois(target_user)
+        ret = await self.admin_handler.get_whois(target_user)
 
         return 200, ret
 
@@ -591,7 +591,6 @@ class SearchUsersRestServlet(RestServlet):
         self.hs = hs
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
-        self.handlers = hs.get_handlers()
 
     async def on_GET(self, request, target_user_id):
         """Get request to search user table for specific users according to
@@ -612,7 +611,7 @@ class SearchUsersRestServlet(RestServlet):
         term = parse_string(request, "term", required=True)
         logger.info("term: %s ", term)
 
-        ret = await self.handlers.store.search_users(term)
+        ret = await self.store.search_users(term)
         return 200, ret
 
 

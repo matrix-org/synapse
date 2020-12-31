@@ -319,6 +319,23 @@ stream_writers:
     events: event_persister1
 ```
 
+#### Background tasks
+
+There is also *experimental* support for moving background tasks to a separate
+worker. Background tasks are run periodically or started via replication. Exactly
+which tasks are configured to run depends on your Synapse configuration (e.g. if
+stats is enabled).
+
+To enable this, the worker must have a `worker_name` and can be configured to run
+background tasks. For example, to move background tasks to a dedicated worker,
+the shared configuration would include:
+
+```yaml
+run_background_tasks_on: background_worker
+```
+
+You might also wish to investigate the `update_user_directory` and
+`media_instance_running_background_jobs` settings.
 
 ### `synapse.app.pusher`
 

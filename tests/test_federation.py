@@ -75,7 +75,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
             }
         )
 
-        self.handler = self.homeserver.get_handlers().federation_handler
+        self.handler = self.homeserver.get_federation_handler()
         self.handler.do_auth = lambda origin, event, context, auth_events: succeed(
             context
         )

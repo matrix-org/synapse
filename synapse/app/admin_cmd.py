@@ -89,7 +89,7 @@ async def export_data_command(hs, args):
     user_id = args.user_id
     directory = args.output_directory
 
-    res = await hs.get_handlers().admin_handler.export_user_data(
+    res = await hs.get_admin_handler().export_user_data(
         user_id, FileExfiltrationWriter(user_id, directory=directory)
     )
     print(res)
@@ -208,6 +208,7 @@ def start(config_options):
 
     # Explicitly disable background processes
     config.update_user_directory = False
+    config.run_background_tasks = False
     config.start_pushers = False
     config.send_federation = False
 

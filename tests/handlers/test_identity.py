@@ -63,7 +63,7 @@ class ThreepidISRewrittenURLTestCase(unittest.HomeserverTestCase):
         # TODO: This class does not use a singleton to get it's http client
         # This should be fixed for easier testing
         # https://github.com/matrix-org/synapse-dinsic/issues/26
-        self.hs.get_handlers().identity_handler.blacklisting_http_client = (
+        self.hs.get_identity_handler().blacklisting_http_client = (
             mock_blacklisting_http_client
         )
 
@@ -79,7 +79,7 @@ class ThreepidISRewrittenURLTestCase(unittest.HomeserverTestCase):
         * the bind request is done against the rewritten hostname
         * the original, non-rewritten, server name is stored in the database
         """
-        handler = self.hs.get_handlers().identity_handler
+        handler = self.hs.get_identity_handler()
         post_json_get_json = handler.blacklisting_http_client.post_json_get_json
         store = self.hs.get_datastore()
 

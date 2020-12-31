@@ -738,7 +738,7 @@ def _make_state_cache_entry(
 
     # failing that, look for the closest match.
     prev_group = None
-    delta_ids = None
+    delta_ids = None  # type: Optional[StateMap[str]]
 
     for old_group, old_state in state_groups_ids.items():
         n_delta_ids = {k: v for k, v in new_state.items() if old_state.get(k) != v}

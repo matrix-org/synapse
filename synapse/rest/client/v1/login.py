@@ -67,7 +67,6 @@ class LoginRestServlet(RestServlet):
 
         self.auth_handler = self.hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
-        self.handlers = hs.get_handlers()
         self._well_known_builder = WellKnownBuilder(hs)
         self._address_ratelimiter = Ratelimiter(
             clock=hs.get_clock(),

@@ -15,6 +15,7 @@
 import logging
 from typing import Dict, List
 
+from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool, make_in_list_sql_clause
 from synapse.util.caches.descriptors import cached
@@ -31,6 +32,9 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
         super().__init__(database, db_conn, hs)
         self._clock = hs.get_clock()
         self.hs = hs
+
+        self._limit_usage_by_mau = hs.config.limit_usage_by_mau
+        self._max_mau_value = hs.config.max_mau_value
 
     @cached(num_args=0)
     async def get_monthly_active_count(self) -> int:
@@ -124,60 +128,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
             desc="user_last_seen_monthly_active",
         )
 
-
-class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
-    def __init__(self, database: DatabasePool, db_conn, hs):
-        super().__init__(database, db_conn, hs)
-
-        self._limit_usage_by_mau = hs.config.limit_usage_by_mau
-        self._mau_stats_only = hs.config.mau_stats_only
-        self._max_mau_value = hs.config.max_mau_value
-
-        # Do not add more reserved users than the total allowable number
-        # cur = LoggingTransaction(
-        self.db_pool.new_transaction(
-            db_conn,
-            "initialise_mau_threepids",
-            [],
-            [],
-            self._initialise_reserved_users,
-            hs.config.mau_limits_reserved_threepids[: self._max_mau_value],
-        )
-
-    def _initialise_reserved_users(self, txn, threepids):
-        """Ensures that reserved threepids are accounted for in the MAU table, should
-        be called on start up.
-
-        Args:
-            txn (cursor):
-            threepids (list[dict]): List of threepid dicts to reserve
-        """
-
-        # XXX what is this function trying to achieve?  It upserts into
-        # monthly_active_users for each *registered* reserved mau user, but why?
-        #
-        #  - shouldn't there already be an entry for each reserved user (at least
-        #    if they have been active recently)?
-        #
-        #  - if it's important that the timestamp is kept up to date, why do we only
-        #    run this at startup?
-
-        for tp in threepids:
-            user_id = self.get_user_id_by_threepid_txn(txn, tp["medium"], tp["address"])
-
-            if user_id:
-                is_support = self.is_support_user_txn(txn, user_id)
-                if not is_support:
-                    # We do this manually here to avoid hitting #6791
-                    self.db_pool.simple_upsert_txn(
-                        txn,
-                        table="monthly_active_users",
-                        keyvalues={"user_id": user_id},
-                        values={"timestamp": int(self._clock.time_msec())},
-                    )
-            else:
-                logger.warning("mau limit reserved threepid %s not found in db" % tp)
-
+    @wrap_as_background_process("reap_monthly_active_users")
     async def reap_monthly_active_users(self):
         """Cleans out monthly active user table to ensure that no stale
         entries exist.
@@ -256,6 +207,57 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
         await self.db_pool.runInteraction(
             "reap_monthly_active_users", _reap_users, reserved_users
         )
+
+
+class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
+    def __init__(self, database: DatabasePool, db_conn, hs):
+        super().__init__(database, db_conn, hs)
+
+        self._mau_stats_only = hs.config.mau_stats_only
+
+        # Do not add more reserved users than the total allowable number
+        self.db_pool.new_transaction(
+            db_conn,
+            "initialise_mau_threepids",
+            [],
+            [],
+            self._initialise_reserved_users,
+            hs.config.mau_limits_reserved_threepids[: self._max_mau_value],
+        )
+
+    def _initialise_reserved_users(self, txn, threepids):
+        """Ensures that reserved threepids are accounted for in the MAU table, should
+        be called on start up.
+
+        Args:
+            txn (cursor):
+            threepids (list[dict]): List of threepid dicts to reserve
+        """
+
+        # XXX what is this function trying to achieve?  It upserts into
+        # monthly_active_users for each *registered* reserved mau user, but why?
+        #
+        #  - shouldn't there already be an entry for each reserved user (at least
+        #    if they have been active recently)?
+        #
+        #  - if it's important that the timestamp is kept up to date, why do we only
+        #    run this at startup?
+
+        for tp in threepids:
+            user_id = self.get_user_id_by_threepid_txn(txn, tp["medium"], tp["address"])
+
+            if user_id:
+                is_support = self.is_support_user_txn(txn, user_id)
+                if not is_support:
+                    # We do this manually here to avoid hitting #6791
+                    self.db_pool.simple_upsert_txn(
+                        txn,
+                        table="monthly_active_users",
+                        keyvalues={"user_id": user_id},
+                        values={"timestamp": int(self._clock.time_msec())},
+                    )
+            else:
+                logger.warning("mau limit reserved threepid %s not found in db" % tp)
 
     async def upsert_monthly_active_user(self, user_id: str) -> None:
         """Updates or inserts the user into the monthly active user table, which

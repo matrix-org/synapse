@@ -78,7 +78,7 @@ class RoomTestCase(_ShadowBannedBase):
 
     def test_invite_3pid(self):
         """Ensure that a 3PID invite does not attempt to contact the identity server."""
-        identity_handler = self.hs.get_handlers().identity_handler
+        identity_handler = self.hs.get_identity_handler()
         identity_handler.lookup_3pid = Mock(
             side_effect=AssertionError("This should not get called")
         )

@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from functools import partial
 
 import mock
 
@@ -40,49 +39,6 @@ def run_on_reactor():
     d = defer.Deferred()
     reactor.callLater(0, d.callback, 0)
     return make_deferred_yieldable(d)
-
-
-class CacheTestCase(unittest.TestCase):
-    def test_invalidate_all(self):
-        cache = descriptors.Cache("testcache")
-
-        callback_record = [False, False]
-
-        def record_callback(idx):
-            callback_record[idx] = True
-
-        # add a couple of pending entries
-        d1 = defer.Deferred()
-        cache.set("key1", d1, partial(record_callback, 0))
-
-        d2 = defer.Deferred()
-        cache.set("key2", d2, partial(record_callback, 1))
-
-        # lookup should return observable deferreds
-        self.assertFalse(cache.get("key1").has_called())
-        self.assertFalse(cache.get("key2").has_called())
-
-        # let one of the lookups complete
-        d2.callback("result2")
-
-        # for now at least, the cache will return real results rather than an
-        # observabledeferred
-        self.assertEqual(cache.get("key2"), "result2")
-
-        # now do the invalidation
-        cache.invalidate_all()
-
-        # lookup should return none
-        self.assertIsNone(cache.get("key1", None))
-        self.assertIsNone(cache.get("key2", None))
-
-        # both callbacks should have been callbacked
-        self.assertTrue(callback_record[0], "Invalidation callback for key1 not called")
-        self.assertTrue(callback_record[1], "Invalidation callback for key2 not called")
-
-        # letting the other lookup complete should do nothing
-        d1.callback("result1")
-        self.assertIsNone(cache.get("key1", None))
 
 
 class DescriptorTestCase(unittest.TestCase):

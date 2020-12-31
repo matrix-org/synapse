@@ -1,10 +1,6 @@
-================
-Synapse |shield|
-================
-
-.. |shield| image:: https://img.shields.io/matrix/synapse:matrix.org?label=support&logo=matrix
-  :alt: (get support on #synapse:matrix.org)
-  :target: https://matrix.to/#/#synapse:matrix.org
+=========================================================
+Synapse |support| |development| |license| |pypi| |python|
+=========================================================
 
 .. contents::
 
@@ -290,19 +286,6 @@ Testing with SyTest is recommended for verifying that changes related to the
 Client-Server API are functioning correctly. See the `installation instructions
 <https://github.com/matrix-org/sytest#installing>`_ for details.
 
-Building Internal API Documentation
-===================================
-
-Before building internal API documentation install sphinx and
-sphinxcontrib-napoleon::
-
-    pip install sphinx
-    pip install sphinxcontrib-napoleon
-
-Building internal API documentation::
-
-    python setup.py build_sphinx
-
 Troubleshooting
 ===============
 
@@ -387,3 +370,23 @@ something like the following in their logs::
 
 This is normally caused by a misconfiguration in your reverse-proxy. See
 `<docs/reverse_proxy.md>`_ and double-check that your settings are correct.
+
+.. |support| image:: https://img.shields.io/matrix/synapse:matrix.org?label=support&logo=matrix
+  :alt: (get support on #synapse:matrix.org)
+  :target: https://matrix.to/#/#synapse:matrix.org
+
+.. |development| image:: https://img.shields.io/matrix/synapse-dev:matrix.org?label=development&logo=matrix
+  :alt: (discuss development on #synapse-dev:matrix.org)
+  :target: https://matrix.to/#/#synapse-dev:matrix.org
+
+.. |license| image:: https://img.shields.io/github/license/matrix-org/synapse
+  :alt: (check license in LICENSE file)
+  :target: LICENSE
+
+.. |pypi| image:: https://img.shields.io/pypi/v/matrix-synapse
+  :alt: (latest version released on PyPi)
+  :target: https://pypi.org/project/matrix-synapse
+
+.. |python| image:: https://img.shields.io/pypi/pyversions/matrix-synapse
+  :alt: (supported python versions)
+  :target: https://pypi.org/project/matrix-synapse

@@ -143,7 +143,7 @@ class _BaseThreepidAuthChecker:
 
         threepid_creds = authdict["threepid_creds"]
 
-        identity_handler = self.hs.get_handlers().identity_handler
+        identity_handler = self.hs.get_identity_handler()
 
         logger.info("Getting validated threepid. threepidcreds: %r", (threepid_creds,))
 

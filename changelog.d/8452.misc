@@ -1,0 +1,1 @@
+Remove redundant databae loads of stream_ordering for events we already have.

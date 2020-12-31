@@ -132,6 +132,19 @@ class WorkerConfig(Config):
 
         self.events_shard_config = ShardedWorkerHandlingConfig(self.writers.events)
 
+        # Whether this worker should run background tasks or not.
+        #
+        # As a note for developers, the background tasks guarded by this should
+        # be able to run on only a single instance (meaning that they don't
+        # depend on any in-memory state of a particular worker).
+        #
+        # No effort is made to ensure only a single instance of these tasks is
+        # running.
+        background_tasks_instance = config.get("run_background_tasks_on") or "master"
+        self.run_background_tasks = (
+            self.worker_name is None and background_tasks_instance == "master"
+        ) or self.worker_name == background_tasks_instance
+
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
         ## Workers ##
@@ -167,6 +180,11 @@ class WorkerConfig(Config):
         #stream_writers:
         #  events: worker1
         #  typing: worker1
+
+        # The worker that is used to run background tasks (e.g. cleaning up expired
+        # data). If not provided this defaults to the main process.
+        #
+        #run_background_tasks_on: worker1
         """
 
     def read_arguments(self, args):

@@ -64,7 +64,8 @@ class LruCache:
         Args:
             max_size: The maximum amount of entries the cache can hold
 
-            keylen: The length of the tuple used as the cache key
+            keylen: The length of the tuple used as the cache key. Ignored unless
+                cache_type is `TreeCache`.
 
             cache_type (type):
                 type of underlying cache to be used. Typically one of dict

@@ -49,7 +49,7 @@ class RegistrationHandler(BaseHandler):
         self.profile_handler = hs.get_profile_handler()
         self.user_directory_handler = hs.get_user_directory_handler()
         self.http_client = hs.get_simple_http_client()
-        self.identity_handler = self.hs.get_handlers().identity_handler
+        self.identity_handler = self.hs.get_identity_handler()
         self.ratelimiter = hs.get_registration_ratelimiter()
         self.macaroon_gen = hs.get_macaroon_generator()
         self._server_notices_mxid = hs.config.server_notices_mxid

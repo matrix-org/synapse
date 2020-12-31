@@ -2976,17 +2976,20 @@ class FederationHandler(BaseHandler):
             return result["max_stream_id"]
         else:
             assert self.storage.persistence
-            max_stream_token = await self.storage.persistence.persist_events(
+
+            # Note that this returns the events that were persisted, which may not be
+            # the same as were passed in if some were deduplicated due to transaction IDs.
+            events, max_stream_token = await self.storage.persistence.persist_events(
                 event_and_contexts, backfilled=backfilled
             )
 
             if self._ephemeral_messages_enabled:
-                for (event, context) in event_and_contexts:
+                for event in events:
                     # If there's an expiry timestamp on the event, schedule its expiry.
                     self._message_handler.maybe_schedule_expiry(event)
 
             if not backfilled:  # Never notify for backfilled events
-                for event, _ in event_and_contexts:
+                for event in events:
                     await self._notify_persisted_event(event, max_stream_token)
 
             return max_stream_token.stream
@@ -3017,6 +3020,9 @@ class FederationHandler(BaseHandler):
             extra_users.append(target_user)
         elif event.internal_metadata.is_outlier():
             return
+
+        # the event has been persisted so it should have a stream ordering.
+        assert event.internal_metadata.stream_ordering
 
         event_pos = PersistedEventPosition(
             self._instance_name, event.internal_metadata.stream_ordering

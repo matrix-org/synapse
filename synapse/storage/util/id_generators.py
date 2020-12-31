@@ -55,7 +55,7 @@ def _load_current_id(db_conn, table, column, step=1):
     """
     # debug logging for https://github.com/matrix-org/synapse/issues/7968
     logger.info("initialising stream generator for %s(%s)", table, column)
-    cur = db_conn.cursor()
+    cur = db_conn.cursor(txn_name="_load_current_id")
     if step == 1:
         cur.execute("SELECT MAX(%s) FROM %s" % (column, table))
     else:
@@ -270,7 +270,7 @@ class MultiWriterIdGenerator:
     def _load_current_ids(
         self, db_conn, table: str, instance_column: str, id_column: str
     ):
-        cur = db_conn.cursor()
+        cur = db_conn.cursor(txn_name="_load_current_ids")
 
         # Load the current positions of all writers for the stream.
         if self._writers:
@@ -284,15 +284,12 @@ class MultiWriterIdGenerator:
                     stream_name = ?
                     AND instance_name != ALL(?)
             """
-            sql = self._db.engine.convert_param_style(sql)
             cur.execute(sql, (self._stream_name, self._writers))
 
             sql = """
                 SELECT instance_name, stream_id FROM stream_positions
                 WHERE stream_name = ?
             """
-            sql = self._db.engine.convert_param_style(sql)
-
             cur.execute(sql, (self._stream_name,))
 
             self._current_positions = {
@@ -341,7 +338,6 @@ class MultiWriterIdGenerator:
                 "instance": instance_column,
                 "cmp": "<=" if self._positive else ">=",
             }
-            sql = self._db.engine.convert_param_style(sql)
             cur.execute(sql, (min_stream_id * self._return_factor,))
 
             self._persisted_upto_position = min_stream_id
@@ -422,7 +418,7 @@ class MultiWriterIdGenerator:
             self._unfinished_ids.discard(next_id)
             self._finished_ids.add(next_id)
 
-            new_cur = None
+            new_cur = None  # type: Optional[int]
 
             if self._unfinished_ids:
                 # If there are unfinished IDs then the new position will be the
@@ -527,6 +523,16 @@ class MultiWriterIdGenerator:
         assert self._lock.locked()
 
         heapq.heappush(self._known_persisted_positions, new_id)
+
+        # If we're a writer and we don't have any active writes we update our
+        # current position to the latest position seen. This allows the instance
+        # to report a recent position when asked, rather than a potentially old
+        # one (if this instance hasn't written anything for a while).
+        our_current_position = self._current_positions.get(self._instance_name)
+        if our_current_position and not self._unfinished_ids:
+            self._current_positions[self._instance_name] = max(
+                our_current_position, new_id
+            )
 
         # We move the current min position up if the minimum current positions
         # of all instances is higher (since by definition all positions less

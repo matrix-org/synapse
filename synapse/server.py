@@ -54,25 +54,28 @@ from synapse.federation.sender import FederationSender
 from synapse.federation.transport.client import TransportLayerClient
 from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
 from synapse.groups.groups_server import GroupsServerHandler, GroupsServerWorkerHandler
-from synapse.handlers import Handlers
 from synapse.handlers.account_validity import AccountValidityHandler
 from synapse.handlers.acme import AcmeHandler
+from synapse.handlers.admin import AdminHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler, MacaroonGenerator
 from synapse.handlers.cas_handler import CasHandler
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
 from synapse.handlers.device import DeviceHandler, DeviceWorkerHandler
 from synapse.handlers.devicemessage import DeviceMessageHandler
+from synapse.handlers.directory import DirectoryHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.e2e_room_keys import E2eRoomKeysHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
+from synapse.handlers.federation import FederationHandler
 from synapse.handlers.groups_local import GroupsLocalHandler, GroupsLocalWorkerHandler
+from synapse.handlers.identity import IdentityHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.message import EventCreationHandler, MessageHandler
 from synapse.handlers.pagination import PaginationHandler
 from synapse.handlers.password_policy import PasswordPolicyHandler
 from synapse.handlers.presence import PresenceHandler
-from synapse.handlers.profile import BaseProfileHandler, MasterProfileHandler
+from synapse.handlers.profile import ProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.receipts import ReceiptsHandler
 from synapse.handlers.register import RegistrationHandler
@@ -84,6 +87,7 @@ from synapse.handlers.room import (
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
+from synapse.handlers.search import SearchHandler
 from synapse.handlers.set_password import SetPasswordHandler
 from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
@@ -91,6 +95,7 @@ from synapse.handlers.typing import FollowerTypingHandler, TypingWriterHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
 from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpClient
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
+from synapse.module_api import ModuleApi
 from synapse.notifier import Notifier
 from synapse.push.action_generator import ActionGenerator
 from synapse.push.pusherpool import PusherPool
@@ -185,7 +190,15 @@ class HomeServer(metaclass=abc.ABCMeta):
             we are listening on to provide HTTP services.
     """
 
-    REQUIRED_ON_MASTER_STARTUP = ["user_directory_handler", "stats_handler"]
+    REQUIRED_ON_BACKGROUND_TASK_STARTUP = [
+        "account_validity",
+        "auth",
+        "deactivate_account",
+        "message",
+        "pagination",
+        "profile",
+        "stats",
+    ]
 
     # This is overridden in derived application classes
     # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
@@ -251,14 +264,20 @@ class HomeServer(metaclass=abc.ABCMeta):
         self.datastores = Databases(self.DATASTORE_CLASS, self)
         logger.info("Finished setting up.")
 
-    def setup_master(self) -> None:
+        # Register background tasks required by this server. This must be done
+        # somewhat manually due to the background tasks not being registered
+        # unless handlers are instantiated.
+        if self.config.run_background_tasks:
+            self.setup_background_tasks()
+
+    def setup_background_tasks(self) -> None:
         """
         Some handlers have side effects on instantiation (like registering
         background updates). This function causes them to be fetched, and
         therefore instantiated, to run those side effects.
         """
-        for i in self.REQUIRED_ON_MASTER_STARTUP:
-            getattr(self, "get_" + i)()
+        for i in self.REQUIRED_ON_BACKGROUND_TASK_STARTUP:
+            getattr(self, "get_" + i + "_handler")()
 
     def get_reactor(self) -> twisted.internet.base.ReactorBase:
         """
@@ -307,10 +326,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_federation_server(self) -> FederationServer:
         return FederationServer(self)
-
-    @cache_in_self
-    def get_handlers(self) -> Handlers:
-        return Handlers(self)
 
     @cache_in_self
     def get_notifier(self) -> Notifier:
@@ -399,6 +414,10 @@ class HomeServer(metaclass=abc.ABCMeta):
         return DeviceMessageHandler(self)
 
     @cache_in_self
+    def get_directory_handler(self) -> DirectoryHandler:
+        return DirectoryHandler(self)
+
+    @cache_in_self
     def get_e2e_keys_handler(self) -> E2eKeysHandler:
         return E2eKeysHandler(self)
 
@@ -409,6 +428,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_acme_handler(self) -> AcmeHandler:
         return AcmeHandler(self)
+
+    @cache_in_self
+    def get_admin_handler(self) -> AdminHandler:
+        return AdminHandler(self)
 
     @cache_in_self
     def get_application_service_api(self) -> ApplicationServiceApi:
@@ -431,15 +454,20 @@ class HomeServer(metaclass=abc.ABCMeta):
         return EventStreamHandler(self)
 
     @cache_in_self
+    def get_federation_handler(self) -> FederationHandler:
+        return FederationHandler(self)
+
+    @cache_in_self
+    def get_identity_handler(self) -> IdentityHandler:
+        return IdentityHandler(self)
+
+    @cache_in_self
     def get_initial_sync_handler(self) -> InitialSyncHandler:
         return InitialSyncHandler(self)
 
     @cache_in_self
     def get_profile_handler(self):
-        if self.config.worker_app:
-            return BaseProfileHandler(self)
-        else:
-            return MasterProfileHandler(self)
+        return ProfileHandler(self)
 
     @cache_in_self
     def get_event_creation_handler(self) -> EventCreationHandler:
@@ -448,6 +476,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_deactivate_account_handler(self) -> DeactivateAccountHandler:
         return DeactivateAccountHandler(self)
+
+    @cache_in_self
+    def get_search_handler(self) -> SearchHandler:
+        return SearchHandler(self)
 
     @cache_in_self
     def get_set_password_handler(self) -> SetPasswordHandler:
@@ -646,6 +678,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_federation_ratelimiter(self) -> FederationRateLimiter:
         return FederationRateLimiter(self.clock, config=self.config.rc_federation)
+
+    @cache_in_self
+    def get_module_api(self) -> ModuleApi:
+        return ModuleApi(self, self.get_auth_handler())
 
     async def remove_pusher(self, app_id: str, push_key: str, user_id: str):
         return await self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

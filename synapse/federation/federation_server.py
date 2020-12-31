@@ -22,7 +22,6 @@ from typing import (
     Callable,
     Dict,
     List,
-    Match,
     Optional,
     Tuple,
     Union,
@@ -100,10 +99,15 @@ class FederationServer(FederationBase):
         super().__init__(hs)
 
         self.auth = hs.get_auth()
-        self.handler = hs.get_handlers().federation_handler
+        self.handler = hs.get_federation_handler()
         self.state = hs.get_state_handler()
 
         self.device_handler = hs.get_device_handler()
+
+        # Ensure the following handlers are loaded since they register callbacks
+        # with FederationHandlerRegistry.
+        hs.get_directory_handler()
+
         self._federation_ratelimiter = hs.get_federation_ratelimiter()
 
         self._server_linearizer = Linearizer("fed_server")
@@ -112,7 +116,7 @@ class FederationServer(FederationBase):
         # We cache results for transaction with the same ID
         self._transaction_resp_cache = ResponseCache(
             hs, "fed_txn_handler", timeout_ms=30000
-        )
+        )  # type: ResponseCache[Tuple[str, str]]
 
         self.transaction_actions = TransactionActions(self.store)
 
@@ -120,10 +124,12 @@ class FederationServer(FederationBase):
 
         # We cache responses to state queries, as they take a while and often
         # come in waves.
-        self._state_resp_cache = ResponseCache(hs, "state_resp", timeout_ms=30000)
+        self._state_resp_cache = ResponseCache(
+            hs, "state_resp", timeout_ms=30000
+        )  # type: ResponseCache[Tuple[str, str]]
         self._state_ids_resp_cache = ResponseCache(
             hs, "state_ids_resp", timeout_ms=30000
-        )
+        )  # type: ResponseCache[Tuple[str, str]]
 
         self._federation_metrics_domains = (
             hs.get_config().federation.federation_metrics_domains
@@ -825,14 +831,14 @@ def server_matches_acl_event(server_name: str, acl_event: EventBase) -> bool:
     return False
 
 
-def _acl_entry_matches(server_name: str, acl_entry: str) -> Match:
+def _acl_entry_matches(server_name: str, acl_entry: Any) -> bool:
     if not isinstance(acl_entry, str):
         logger.warning(
             "Ignoring non-str ACL entry '%s' (is %s)", acl_entry, type(acl_entry)
         )
         return False
     regex = glob_to_regex(acl_entry)
-    return regex.match(server_name)
+    return bool(regex.match(server_name))
 
 
 class FederationHandlerRegistry:
@@ -862,7 +868,7 @@ class FederationHandlerRegistry:
         self._edu_type_to_instance = {}  # type: Dict[str, str]
 
     def register_edu_handler(
-        self, edu_type: str, handler: Callable[[str, dict], Awaitable[None]]
+        self, edu_type: str, handler: Callable[[str, JsonDict], Awaitable[None]]
     ):
         """Sets the handler callable that will be used to handle an incoming
         federation EDU of the given type.

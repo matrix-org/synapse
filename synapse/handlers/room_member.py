@@ -17,12 +17,10 @@ import abc
 import logging
 import random
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple, Union
-
-from unpaddedbase64 import encode_base64
+from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 
 from synapse import types
-from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
+from synapse.api.constants import AccountDataTypes, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -31,12 +29,8 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.api.ratelimiting import Ratelimiter
-from synapse.api.room_versions import EventFormatVersions
-from synapse.crypto.event_signing import compute_event_reference_hash
 from synapse.events import EventBase
-from synapse.events.builder import create_local_event_from_event_dict
 from synapse.events.snapshot import EventContext
-from synapse.events.validator import EventValidator
 from synapse.storage.roommember import RoomsForUser
 from synapse.types import JsonDict, Requester, RoomAlias, RoomID, StateMap, UserID
 from synapse.util.async_helpers import Linearizer
@@ -64,13 +58,12 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.state_handler = hs.get_state_handler()
         self.config = hs.config
 
-        self.federation_handler = hs.get_handlers().federation_handler
-        self.directory_handler = hs.get_handlers().directory_handler
-        self.identity_handler = hs.get_handlers().identity_handler
+        self.federation_handler = hs.get_federation_handler()
+        self.directory_handler = hs.get_directory_handler()
+        self.identity_handler = hs.get_identity_handler()
         self.registration_handler = hs.get_registration_handler()
         self.profile_handler = hs.get_profile_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
-        self.identity_handler = hs.get_handlers().identity_handler
 
         self.member_linearizer = Linearizer(name="member")
 
@@ -172,6 +165,17 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         if requester.is_guest:
             content["kind"] = "guest"
 
+        # Check if we already have an event with a matching transaction ID. (We
+        # do this check just before we persist an event as well, but may as well
+        # do it up front for efficiency.)
+        if txn_id and requester.access_token_id:
+            existing_event_id = await self.store.get_event_id_from_transaction_id(
+                room_id, requester.user.to_string(), requester.access_token_id, txn_id,
+            )
+            if existing_event_id:
+                event_pos = await self.store.get_position_for_event(existing_event_id)
+                return existing_event_id, event_pos.stream
+
         event, context = await self.event_creation_handler.create_event(
             requester,
             {
@@ -183,20 +187,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 # For backwards compatibility:
                 "membership": membership,
             },
-            token_id=requester.access_token_id,
             txn_id=txn_id,
             prev_event_ids=prev_event_ids,
             require_consent=require_consent,
         )
-
-        # Check if this event matches the previous membership event for the user.
-        duplicate = await self.event_creation_handler.deduplicate_state_event(
-            event, context
-        )
-        if duplicate is not None:
-            # Discard the new event since this membership change is a no-op.
-            _, stream_id = await self.store.get_event_ordering(duplicate.event_id)
-            return duplicate.event_id, stream_id
 
         prev_state_ids = await context.get_prev_state_ids()
 
@@ -222,7 +216,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                         retry_after_ms=int(1000 * (time_allowed - time_now_s))
                     )
 
-        stream_id = await self.event_creation_handler.handle_new_client_event(
+        result_event = await self.event_creation_handler.handle_new_client_event(
             requester, event, context, extra_users=[target], ratelimit=ratelimit,
         )
 
@@ -232,7 +226,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 if prev_member_event.membership == Membership.JOIN:
                     await self._user_left_room(target, room_id)
 
-        return event.event_id, stream_id
+        # we know it was persisted, so should have a stream ordering
+        assert result_event.internal_metadata.stream_ordering
+        return result_event.event_id, result_event.internal_metadata.stream_ordering
 
     async def copy_room_tags_and_direct_to_room(
         self, old_room_id, new_room_id, user_id
@@ -248,7 +244,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         user_account_data, _ = await self.store.get_account_data_for_user(user_id)
 
         # Copy direct message state if applicable
-        direct_rooms = user_account_data.get("m.direct", {})
+        direct_rooms = user_account_data.get(AccountDataTypes.DIRECT, {})
 
         # Check which key this room is under
         if isinstance(direct_rooms, dict):
@@ -259,7 +255,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
                     # Save back to user's m.direct account data
                     await self.store.add_account_data_for_user(
-                        user_id, "m.direct", direct_rooms
+                        user_id, AccountDataTypes.DIRECT, direct_rooms
                     )
                     break
 
@@ -460,12 +456,12 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 same_membership = old_membership == effective_membership_state
                 same_sender = requester.user.to_string() == old_state.sender
                 if same_sender and same_membership and same_content:
-                    _, stream_id = await self.store.get_event_ordering(
-                        old_state.event_id
-                    )
+                    # duplicate event.
+                    # we know it was persisted, so must have a stream ordering.
+                    assert old_state.internal_metadata.stream_ordering
                     return (
                         old_state.event_id,
-                        stream_id,
+                        old_state.internal_metadata.stream_ordering,
                     )
 
             if old_membership in ["ban", "leave"] and action == "kick":
@@ -680,7 +676,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
     async def send_membership_event(
         self,
-        requester: Requester,
+        requester: Optional[Requester],
         event: EventBase,
         context: EventContext,
         ratelimit: bool = True,
@@ -710,12 +706,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         else:
             requester = types.create_requester(target_user)
 
-        prev_event = await self.event_creation_handler.deduplicate_state_event(
-            event, context
-        )
-        if prev_event is not None:
-            return
-
         prev_state_ids = await context.get_prev_state_ids()
         if event.membership == Membership.JOIN:
             if requester.is_guest:
@@ -730,7 +720,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             if is_blocked:
                 raise SynapseError(403, "This room has been blocked on this server")
 
-        await self.event_creation_handler.handle_new_client_event(
+        event = await self.event_creation_handler.handle_new_client_event(
             requester, event, context, extra_users=[target_user], ratelimit=ratelimit
         )
 
@@ -1197,31 +1187,10 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         room_id = invite_event.room_id
         target_user = invite_event.state_key
-        room_version = await self.store.get_room_version(room_id)
 
         content["membership"] = Membership.LEAVE
 
-        # the auth events for the new event are the same as that of the invite, plus
-        # the invite itself.
-        #
-        # the prev_events are just the invite.
-        invite_hash = invite_event.event_id  # type: Union[str, Tuple]
-        if room_version.event_format == EventFormatVersions.V1:
-            alg, h = compute_event_reference_hash(invite_event)
-            invite_hash = (invite_event.event_id, {alg: encode_base64(h)})
-
-        auth_events = tuple(invite_event.auth_events) + (invite_hash,)
-        prev_events = (invite_hash,)
-
-        # we cap depth of generated events, to ensure that they are not
-        # rejected by other servers (and so that they can be persisted in
-        # the db)
-        depth = min(invite_event.depth + 1, MAX_DEPTH)
-
         event_dict = {
-            "depth": depth,
-            "auth_events": auth_events,
-            "prev_events": prev_events,
             "type": EventTypes.Member,
             "room_id": room_id,
             "sender": target_user,
@@ -1229,28 +1198,30 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             "state_key": target_user,
         }
 
-        event = create_local_event_from_event_dict(
-            clock=self.clock,
-            hostname=self.hs.hostname,
-            signing_key=self.hs.signing_key,
-            room_version=room_version,
-            event_dict=event_dict,
+        # the auth events for the new event are the same as that of the invite, plus
+        # the invite itself.
+        #
+        # the prev_events are just the invite.
+        prev_event_ids = [invite_event.event_id]
+        auth_event_ids = invite_event.auth_event_ids() + prev_event_ids
+
+        event, context = await self.event_creation_handler.create_event(
+            requester,
+            event_dict,
+            txn_id=txn_id,
+            prev_event_ids=prev_event_ids,
+            auth_event_ids=auth_event_ids,
         )
         event.internal_metadata.outlier = True
         event.internal_metadata.out_of_band_membership = True
-        if txn_id is not None:
-            event.internal_metadata.txn_id = txn_id
-        if requester.access_token_id is not None:
-            event.internal_metadata.token_id = requester.access_token_id
 
-        EventValidator().validate_new(event, self.config)
-
-        context = await self.state_handler.compute_event_context(event)
-        context.app_service = requester.app_service
-        stream_id = await self.event_creation_handler.handle_new_client_event(
+        result_event = await self.event_creation_handler.handle_new_client_event(
             requester, event, context, extra_users=[UserID.from_string(target_user)],
         )
-        return event.event_id, stream_id
+        # we know it was persisted, so must have a stream ordering
+        assert result_event.internal_metadata.stream_ordering
+
+        return result_event.event_id, result_event.internal_metadata.stream_ordering
 
     async def _user_left_room(self, target: UserID, room_id: str) -> None:
         """Implements RoomMemberHandler._user_left_room

@@ -18,7 +18,6 @@ from mock import Mock
 from synapse.api.auth import Auth
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, ResourceLimitError, SynapseError
-from synapse.handlers.register import RegistrationHandler
 from synapse.http.site import SynapseRequest
 from synapse.rest.client.v2_alpha.register import (
     _map_email_to_displayname,
@@ -33,11 +32,6 @@ from tests.unittest import override_config
 from tests.utils import mock_getRawHeaders
 
 from .. import unittest
-
-
-class RegistrationHandlers:
-    def __init__(self, hs):
-        self.registration_handler = RegistrationHandler(hs)
 
 
 class RegistrationTestCase(unittest.HomeserverTestCase):
@@ -164,7 +158,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         room_alias_str = "#room:test"
         user_id = self.get_success(self.handler.register_user(localpart="jeff"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
-        directory_handler = self.hs.get_handlers().directory_handler
+        directory_handler = self.hs.get_directory_handler()
         room_alias = RoomAlias.from_string(room_alias_str)
         room_id = self.get_success(directory_handler.get_association(room_alias))
 
@@ -203,7 +197,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         user_id = self.get_success(self.handler.register_user(localpart="support"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
-        directory_handler = self.hs.get_handlers().directory_handler
+        directory_handler = self.hs.get_directory_handler()
         room_alias = RoomAlias.from_string(room_alias_str)
         self.get_failure(directory_handler.get_association(room_alias), SynapseError)
 
@@ -215,7 +209,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.store.is_real_user = Mock(return_value=make_awaitable(True))
         user_id = self.get_success(self.handler.register_user(localpart="real"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
-        directory_handler = self.hs.get_handlers().directory_handler
+        directory_handler = self.hs.get_directory_handler()
         room_alias = RoomAlias.from_string(room_alias_str)
         room_id = self.get_success(directory_handler.get_association(room_alias))
 
@@ -247,7 +241,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         user_id = self.get_success(self.handler.register_user(localpart="jeff"))
 
         # Ensure the room was created.
-        directory_handler = self.hs.get_handlers().directory_handler
+        directory_handler = self.hs.get_directory_handler()
         room_alias = RoomAlias.from_string(room_alias_str)
         room_id = self.get_success(directory_handler.get_association(room_alias))
 
@@ -276,7 +270,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         user_id = self.get_success(self.handler.register_user(localpart="jeff"))
 
         # Ensure the room was created.
-        directory_handler = self.hs.get_handlers().directory_handler
+        directory_handler = self.hs.get_directory_handler()
         room_alias = RoomAlias.from_string(room_alias_str)
         room_id = self.get_success(directory_handler.get_association(room_alias))
 
@@ -314,7 +308,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         user_id = self.get_success(self.handler.register_user(localpart="jeff"))
 
         # Ensure the room was created.
-        directory_handler = self.hs.get_handlers().directory_handler
+        directory_handler = self.hs.get_directory_handler()
         room_alias = RoomAlias.from_string(room_alias_str)
         room_id = self.get_success(directory_handler.get_association(room_alias))
 
@@ -357,7 +351,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         )
 
         # Ensure the room was created.
-        directory_handler = self.hs.get_handlers().directory_handler
+        directory_handler = self.hs.get_directory_handler()
         room_alias = RoomAlias.from_string(room_alias_str)
         room_id = self.get_success(directory_handler.get_association(room_alias))
 
@@ -394,7 +388,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         user_id = self.get_success(self.handler.register_user(localpart="jeff"))
 
         # Ensure the room was created.
-        directory_handler = self.hs.get_handlers().directory_handler
+        directory_handler = self.hs.get_directory_handler()
         room_alias = RoomAlias.from_string(room_alias_str)
         room_id = self.get_success(directory_handler.get_association(room_alias))
 
@@ -423,7 +417,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             )
         )
         self.get_success(
-            event_creation_handler.send_nonmember_event(requester, event, context)
+            event_creation_handler.handle_new_client_event(requester, event, context)
         )
 
         # Register a second user, which won't be be in the room (or even have an invite)
