@@ -287,7 +287,9 @@ class ProfileHandler(BaseHandler):
                 )
 
         if not isinstance(new_displayname, str):
-            raise SynapseError(400, "Invalid displayname")
+            raise SynapseError(
+                400, "'displayname' must be a string", errcode=Codes.INVALID_PARAM
+            )
 
         if len(new_displayname) > MAX_DISPLAYNAME_LEN:
             raise SynapseError(
@@ -413,7 +415,9 @@ class ProfileHandler(BaseHandler):
                 )
 
         if not isinstance(new_avatar_url, str):
-            raise SynapseError(400, "Invalid displayname")
+            raise SynapseError(
+                400, "'avatar_url' must be a string", errcode=Codes.INVALID_PARAM
+            )
 
         if len(new_avatar_url) > MAX_AVATAR_URL_LEN:
             raise SynapseError(

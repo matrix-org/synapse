@@ -18,7 +18,8 @@ To fetch the nonce, you need to request one from the API::
 
 Once you have the nonce, you can make a ``POST`` to the same URL with a JSON
 body containing the nonce, username, password, whether they are an admin
-(optional, False by default), and a HMAC digest of the content.
+(optional, False by default), and a HMAC digest of the content. Also you can
+set the displayname (optional, ``username`` by default).
 
 As an example::
 
@@ -26,6 +27,7 @@ As an example::
   > {
      "nonce": "thisisanonce",
      "username": "pepper_roni",
+     "displayname": "Pepper Roni",
      "password": "pizza",
      "admin": true,
      "mac": "mac_digest_here"
