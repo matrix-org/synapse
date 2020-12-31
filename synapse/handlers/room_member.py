@@ -31,7 +31,6 @@ from synapse.api.errors import (
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
-from synapse.storage.roommember import RoomsForUser
 from synapse.types import JsonDict, Requester, RoomAlias, RoomID, StateMap, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_left_room
@@ -552,10 +551,16 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         elif effective_membership_state == Membership.LEAVE:
             if not is_host_in_room:
                 # perhaps we've been invited
-                invite = await self.store.get_invite_for_local_user_in_room(
-                    user_id=target.to_string(), room_id=room_id
-                )  # type: Optional[RoomsForUser]
-                if not invite:
+                (
+                    current_membership_type,
+                    current_membership_event_id,
+                ) = await self.store.get_local_current_membership_for_user_in_room(
+                    target.to_string(), room_id
+                )
+                if (
+                    current_membership_type != Membership.INVITE
+                    or not current_membership_event_id
+                ):
                     logger.info(
                         "%s sent a leave request to %s, but that is not an active room "
                         "on this server, and there is no pending invite",
@@ -565,6 +570,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
                     raise SynapseError(404, "Not a known room")
 
+                invite = await self.store.get_event(current_membership_event_id)
                 logger.info(
                     "%s rejects invite to %s from %s", target, room_id, invite.sender
                 )

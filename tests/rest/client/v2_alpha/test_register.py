@@ -381,7 +381,7 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         self.register_user("admin", "adminpassword", admin=True)
         admin_tok = self.login("admin", "adminpassword")
 
-        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        url = "/_synapse/admin/v1/account_validity/validity"
         params = {"user_id": user_id}
         request_data = json.dumps(params)
         request, channel = self.make_request(
@@ -401,7 +401,7 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         self.register_user("admin", "adminpassword", admin=True)
         admin_tok = self.login("admin", "adminpassword")
 
-        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        url = "/_synapse/admin/v1/account_validity/validity"
         params = {
             "user_id": user_id,
             "expiration_ts": 0,
@@ -428,7 +428,7 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         self.register_user("admin", "adminpassword", admin=True)
         admin_tok = self.login("admin", "adminpassword")
 
-        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        url = "/_synapse/admin/v1/account_validity/validity"
         params = {
             "user_id": user_id,
             "expiration_ts": 0,
@@ -492,7 +492,7 @@ class AccountValidityUserDirectoryTestCase(unittest.HomeserverTestCase):
         admin_tok = self.login("admin", "adminpassword")
 
         # Ensure the admin never expires
-        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        url = "/_synapse/admin/v1/account_validity/validity"
         params = {
             "user_id": admin_id,
             "expiration_ts": 999999999999,
@@ -532,7 +532,7 @@ class AccountValidityUserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertIsNotNone(replicated_content)
 
         # Expire the user
-        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        url = "/_synapse/admin/v1/account_validity/validity"
         params = {
             "user_id": user_id,
             "expiration_ts": 0,
@@ -565,7 +565,7 @@ class AccountValidityUserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertIsNone(replicated_content)
 
         # Now renew the user, and check they get replicated again to the identity server
-        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        url = "/_synapse/admin/v1/account_validity/validity"
         params = {
             "user_id": user_id,
             "expiration_ts": 99999999999,

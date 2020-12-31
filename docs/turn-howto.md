@@ -42,10 +42,10 @@ This will install and start a systemd service called `coturn`.
 
         ./configure
 
-    > You may need to install `libevent2`: if so, you should do so in
-    > the way recommended by your operating system. You can ignore
-    > warnings about lack of database support: a database is unnecessary
-    > for this purpose.
+    You may need to install `libevent2`: if so, you should do so in
+    the way recommended by your operating system. You can ignore
+    warnings about lack of database support: a database is unnecessary
+    for this purpose.
 
 1.  Build and install it:
 
@@ -65,6 +65,19 @@ This will install and start a systemd service called `coturn`.
     the `static-auth-secret` is with `pwgen`:
 
         pwgen -s 64 1
+
+    A `realm` must be specified, but its value is somewhat arbitrary. (It is
+    sent to clients as part of the authentication flow.) It is conventional to
+    set it to be your server name.
+
+1.  You will most likely want to configure coturn to write logs somewhere. The
+    easiest way is normally to send them to the syslog:
+
+        syslog
+
+    (in which case, the logs will be available via `journalctl -u coturn` on a
+    systemd system). Alternatively, coturn can be configured to write to a
+    logfile - check the example config file supplied with coturn.
 
 1.  Consider your security settings. TURN lets users request a relay which will
     connect to arbitrary IP addresses and ports. The following configuration is
@@ -96,10 +109,30 @@ This will install and start a systemd service called `coturn`.
         # TLS private key file
         pkey=/path/to/privkey.pem
 
+    In this case, replace the `turn:` schemes in the `turn_uri` settings below
+    with `turns:`.
+
+    We recommend that you only try to set up TLS/DTLS once you have set up a
+    basic installation and got it working.
+
 1.  Ensure your firewall allows traffic into the TURN server on the ports
-    you've configured it to listen on (By default: 3478 and 5349 for the TURN(s)
+    you've configured it to listen on (By default: 3478 and 5349 for TURN
     traffic (remember to allow both TCP and UDP traffic), and ports 49152-65535
     for the UDP relay.)
+
+1.  We do not recommend running a TURN server behind NAT, and are not aware of
+    anyone doing so successfully.
+
+    If you want to try it anyway, you will at least need to tell coturn its
+    external IP address:
+
+        external-ip=192.88.99.1
+
+    ... and your NAT gateway must forward all of the relayed ports directly
+    (eg, port 56789 on the external IP must be always be forwarded to port
+    56789 on the internal IP).
+
+    If you get this working, let us know!
 
 1.  (Re)start the turn server:
 
@@ -137,9 +170,10 @@ Your home server configuration file needs the following extra keys:
     without having gone through a CAPTCHA or similar to register a
     real account.
 
-As an example, here is the relevant section of the config file for matrix.org:
+As an example, here is the relevant section of the config file for `matrix.org`. The
+`turn_uris` are appropriate for TURN servers listening on the default ports, with no TLS.
 
-    turn_uris: [ "turn:turn.matrix.org:3478?transport=udp", "turn:turn.matrix.org:3478?transport=tcp" ]
+    turn_uris: [ "turn:turn.matrix.org?transport=udp", "turn:turn.matrix.org?transport=tcp" ]
     turn_shared_secret: "n0t4ctuAllymatr1Xd0TorgSshar3d5ecret4obvIousreAsons"
     turn_user_lifetime: 86400000
     turn_allow_guests: True
@@ -155,5 +189,86 @@ After updating the homeserver configuration, you must restart synapse:
     ```
     systemctl restart synapse.service
     ```
+... and then reload any clients (or wait an hour for them to refresh their
+settings).
 
-..and your Home Server now supports VoIP relaying!
+## Troubleshooting
+
+The normal symptoms of a misconfigured TURN server are that calls between
+devices on different networks ring, but get stuck at "call
+connecting". Unfortunately, troubleshooting this can be tricky.
+
+Here are a few things to try:
+
+ * Check that your TURN server is not behind NAT. As above, we're not aware of
+   anyone who has successfully set this up.
+
+ * Check that you have opened your firewall to allow TCP and UDP traffic to the
+   TURN ports (normally 3478 and 5479).
+
+ * Check that you have opened your firewall to allow UDP traffic to the UDP
+   relay ports (49152-65535 by default).
+
+ * Some WebRTC implementations (notably, that of Google Chrome) appear to get
+   confused by TURN servers which are reachable over IPv6 (this appears to be
+   an unexpected side-effect of its handling of multiple IP addresses as
+   defined by
+   [`draft-ietf-rtcweb-ip-handling`](https://tools.ietf.org/html/draft-ietf-rtcweb-ip-handling-12)).
+
+   Try removing any AAAA records for your TURN server, so that it is only
+   reachable over IPv4.
+
+ * Enable more verbose logging in coturn via the `verbose` setting:
+
+   ```
+   verbose
+   ```
+
+   ... and then see if there are any clues in its logs.
+
+ * If you are using a browser-based client under Chrome, check
+   `chrome://webrtc-internals/` for insights into the internals of the
+   negotiation. On Firefox, check the "Connection Log" on `about:webrtc`.
+
+   (Understanding the output is beyond the scope of this document!)
+
+ * There is a WebRTC test tool at
+   https://webrtc.github.io/samples/src/content/peerconnection/trickle-ice/. To
+   use it, you will need a username/password for your TURN server. You can
+   either:
+
+    * look for the `GET /_matrix/client/r0/voip/turnServer` request made by a
+      matrix client to your homeserver in your browser's network inspector. In
+      the response you should see `username` and `password`. Or:
+
+    * Use the following shell commands:
+
+      ```sh
+      secret=staticAuthSecretHere
+
+      u=$((`date +%s` + 3600)):test
+      p=$(echo -n $u | openssl dgst -hmac $secret -sha1 -binary | base64)
+      echo -e "username: $u\npassword: $p"
+      ```
+
+      Or:
+
+    * Temporarily configure coturn to accept a static username/password. To do
+      this, comment out `use-auth-secret` and `static-auth-secret` and add the
+      following:
+
+      ```
+      lt-cred-mech
+      user=username:password
+      ```
+
+      **Note**: these settings will not take effect unless `use-auth-secret`
+      and `static-auth-secret` are disabled.
+
+      Restart coturn after changing the configuration file.
+
+      Remember to restore the original settings to go back to testing with
+      Matrix clients!
+
+   If the TURN server is working correctly, you should see at least one `relay`
+   entry in the results.

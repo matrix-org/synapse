@@ -78,7 +78,7 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
         )
 
         # Test that the admin can still send shutdown
-        url = "admin/shutdown_room/" + room_id
+        url = "/_synapse/admin/v1/shutdown_room/" + room_id
         request, channel = self.make_request(
             "POST",
             url.encode("ascii"),
@@ -112,7 +112,7 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # Test that the admin can still send shutdown
-        url = "admin/shutdown_room/" + room_id
+        url = "/_synapse/admin/v1/shutdown_room/" + room_id
         request, channel = self.make_request(
             "POST",
             url.encode("ascii"),

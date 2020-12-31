@@ -176,6 +176,13 @@ The api is::
 
     GET /_synapse/admin/v1/whois/<user_id>
 
+and::
+
+    GET /_matrix/client/r0/admin/whois/<userId>
+
+See also: `Client Server API Whois
+<https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-admin-whois-userid>`_
+
 To use it, you will need to authenticate by providing an ``access_token`` for a
 server admin: see `README.rst <README.rst>`_.
 

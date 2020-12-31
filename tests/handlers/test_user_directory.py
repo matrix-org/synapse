@@ -656,7 +656,7 @@ class UserInfoTestCase(unittest.FederatingHomeserverTestCase):
         return user_one, user_two, user_three, user_three_token
 
     def expire(self, user_id_to_expire, admin_tok):
-        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        url = "/_synapse/admin/v1/account_validity/validity"
         request_data = {
             "user_id": user_id_to_expire,
             "expiration_ts": 0,

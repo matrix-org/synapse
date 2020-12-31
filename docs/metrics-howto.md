@@ -13,10 +13,12 @@
     can be enabled by adding the \"metrics\" resource to the existing
     listener as such:
 
-        resources:
-          - names:
-            - client
-            - metrics
+    ```yaml
+      resources:
+        - names:
+          - client
+          - metrics
+    ```
 
     This provides a simple way of adding metrics to your Synapse
     installation, and serves under `/_synapse/metrics`. If you do not
@@ -31,11 +33,13 @@
 
     Add a new listener to homeserver.yaml:
 
-        listeners:
-          - type: metrics
-            port: 9000
-            bind_addresses:
-              - '0.0.0.0'
+    ```yaml
+      listeners:
+        - type: metrics
+          port: 9000
+          bind_addresses:
+            - '0.0.0.0'
+    ```
 
     For both options, you will need to ensure that `enable_metrics` is
     set to `True`.
@@ -47,10 +51,13 @@
     It needs to set the `metrics_path` to a non-default value (under
     `scrape_configs`):
 
-        - job_name: "synapse"
-          metrics_path: "/_synapse/metrics"
-          static_configs:
-            - targets: ["my.server.here:port"]
+    ```yaml
+      - job_name: "synapse"
+        scrape_interval: 15s
+        metrics_path: "/_synapse/metrics"
+        static_configs:
+          - targets: ["my.server.here:port"]
+    ```
 
     where `my.server.here` is the IP address of Synapse, and `port` is
     the listener port configured with the `metrics` resource.
@@ -60,7 +67,8 @@
 
 1.  Restart Prometheus.
 
-1.  Consider using the [grafana dashboard](https://github.com/matrix-org/synapse/tree/master/contrib/grafana/) and required [recording rules](https://github.com/matrix-org/synapse/tree/master/contrib/prometheus/) 
+1.  Consider using the [grafana dashboard](https://github.com/matrix-org/synapse/tree/master/contrib/grafana/)
+    and required [recording rules](https://github.com/matrix-org/synapse/tree/master/contrib/prometheus/) 
 
 ## Monitoring workers
 
@@ -76,9 +84,9 @@ To allow collecting metrics from a worker, you need to add a
 under `worker_listeners`:
 
 ```yaml
- - type: metrics
-   bind_address: ''
-   port: 9101
+  - type: metrics
+    bind_address: ''
+    port: 9101
 ```
 
 The `bind_address` and `port` parameters should be set so that
@@ -86,6 +94,38 @@ the resulting listener can be reached by prometheus, and they
 don't clash with an existing worker.
 With this example, the worker's metrics would then be available
 on `http://127.0.0.1:9101`.
+
+Example Prometheus target for Synapse with workers:
+
+```yaml
+  - job_name: "synapse"
+    scrape_interval: 15s
+    metrics_path: "/_synapse/metrics"
+    static_configs:
+      - targets: ["my.server.here:port"]
+        labels:
+          instance: "my.server"
+          job: "master"
+          index: 1
+      - targets: ["my.workerserver.here:port"]
+        labels:
+          instance: "my.server"
+          job: "generic_worker"
+          index: 1
+      - targets: ["my.workerserver.here:port"]
+        labels:
+          instance: "my.server"
+          job: "generic_worker"
+          index: 2
+      - targets: ["my.workerserver.here:port"]
+        labels:
+          instance: "my.server"
+          job: "media_repository"
+          index: 1
+```
+
+Labels (`instance`, `job`, `index`) can be defined as anything.
+The labels are used to group graphs in grafana.
 
 ## Renaming of metrics & deprecation of old names in 1.2
 
