@@ -269,7 +269,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
             homeserver_to_use=GenericWorkerServer,
             config=config,
             reactor=self.reactor,
-            **kwargs
+            **kwargs,
         )
 
         # If the instance is in the `instance_map` config then workers may try

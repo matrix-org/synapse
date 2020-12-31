@@ -1,0 +1,1 @@
+Fix `Object of type frozendict is not JSON serializable` exceptions when using third-party event rules.

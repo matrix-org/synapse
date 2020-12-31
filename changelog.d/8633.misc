@@ -1,0 +1,1 @@
+Run `mypy` as part of the lint.sh script.
