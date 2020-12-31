@@ -131,7 +131,7 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     async def set_profile_displayname(
-        self, user_localpart: str, new_displayname: str, batchnum: int
+        self, user_localpart: str, new_displayname: Optional[str], batchnum: int
     ) -> None:
         # Invalidate the read cache for this user
         self.get_profile_displayname.invalidate((user_localpart,))
@@ -266,7 +266,7 @@ class ProfileWorkerStore(SQLBaseStore):
 
     async def get_remote_profile_cache_entries_that_expire(
         self, last_checked: int
-    ) -> Dict[str, str]:
+    ) -> List[Dict[str, str]]:
         """Get all users who haven't been checked since `last_checked`
         """
 

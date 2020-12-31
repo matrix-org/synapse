@@ -22,6 +22,7 @@ from mock import Mock
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules, Membership, RoomCreationPreset
+from synapse.api.errors import SynapseError
 from synapse.rest import admin
 from synapse.rest.client.v1 import directory, login, room
 from synapse.third_party_rules.access_rules import (
@@ -783,8 +784,8 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         allowed_requester = create_requester("@user:allowed_domain")
         forbidden_requester = create_requester("@user:forbidden_domain")
 
-        # Create a join event for a forbidden user
-        forbidden_join_event, forbidden_join_event_context = self.get_success(
+        # Assert a join event from a forbidden user to a restricted room is rejected
+        self.get_failure(
             event_creator.create_event(
                 forbidden_requester,
                 {
@@ -794,11 +795,12 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
                     "content": {"membership": Membership.JOIN},
                     "state_key": forbidden_requester.user.to_string(),
                 },
-            )
+            ),
+            SynapseError,
         )
 
-        # Create a join event for an allowed user
-        allowed_join_event, allowed_join_event_context = self.get_success(
+        # A join event from an non-forbidden user to a restricted room is allowed
+        self.get_success(
             event_creator.create_event(
                 allowed_requester,
                 {
@@ -811,26 +813,10 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        # Assert a join event from a forbidden user to a restricted room is rejected
-        can_join = self.get_success(
-            self.third_party_event_rules.check_event_allowed(
-                forbidden_join_event, forbidden_join_event_context
-            )
-        )
-        self.assertFalse(can_join)
-
-        # But a join event from an non-forbidden user to a restricted room is allowed
-        can_join = self.get_success(
-            self.third_party_event_rules.check_event_allowed(
-                allowed_join_event, allowed_join_event_context
-            )
-        )
-        self.assertTrue(can_join)
-
         # Test that forbidden users can only join unrestricted rooms if they have an invite
 
-        # Recreate the forbidden join event for the unrestricted room instead
-        forbidden_join_event, forbidden_join_event_context = self.get_success(
+        # A forbidden user without an invite should not be able to join an unrestricted room
+        self.get_failure(
             event_creator.create_event(
                 forbidden_requester,
                 {
@@ -840,16 +826,9 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
                     "content": {"membership": Membership.JOIN},
                     "state_key": forbidden_requester.user.to_string(),
                 },
-            )
+            ),
+            SynapseError,
         )
-
-        # A forbidden user without an invite should not be able to join an unrestricted room
-        can_join = self.get_success(
-            self.third_party_event_rules.check_event_allowed(
-                forbidden_join_event, forbidden_join_event_context
-            )
-        )
-        self.assertFalse(can_join)
 
         # However, if we then invite this user...
         self.helper.invite(
@@ -861,7 +840,8 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
 
         # And create another join event, making sure that its context states it's coming
         # in after the above invite was made...
-        forbidden_join_event, forbidden_join_event_context = self.get_success(
+        # Then the forbidden user should be able to join!
+        self.get_success(
             event_creator.create_event(
                 forbidden_requester,
                 {
@@ -873,14 +853,6 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
                 },
             )
         )
-
-        # Then the forbidden user should be able to join!
-        can_join = self.get_success(
-            self.third_party_event_rules.check_event_allowed(
-                forbidden_join_event, forbidden_join_event_context
-            )
-        )
-        self.assertTrue(can_join)
 
     def test_freezing_a_room(self):
         """Tests that the power levels in a room change to prevent new events from

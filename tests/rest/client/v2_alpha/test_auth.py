@@ -104,7 +104,6 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         self.assertEqual(len(attempts), 1)
         self.assertEqual(attempts[0][0]["response"], "a")
 
-    @unittest.INFO
     def test_fallback_captcha(self):
         """Ensure that fallback auth via a captcha works."""
         # Returns a 401 as per the spec

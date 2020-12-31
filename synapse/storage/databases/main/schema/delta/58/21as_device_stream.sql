@@ -13,6 +13,5 @@
  * limitations under the License.
  */
 
-ALTER TABLE application_services_state
-    ADD COLUMN read_receipt_stream_id INT,
-    ADD COLUMN presence_stream_id INT;
+ALTER TABLE application_services_state ADD COLUMN read_receipt_stream_id INT;
+ALTER TABLE application_services_state ADD COLUMN presence_stream_id INT;

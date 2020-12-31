@@ -22,6 +22,7 @@ import logging
 import sys
 import time
 import traceback
+from typing import Optional
 
 import yaml
 
@@ -153,7 +154,7 @@ IGNORED_TABLES = {
 
 # Error returned by the run function. Used at the top-level part of the script to
 # handle errors and return codes.
-end_error = None
+end_error = None  # type: Optional[str]
 # The exec_info for the error, if any. If error is defined but not exec_info the script
 # will show only the error message without the stacktrace, if exec_info is defined but
 # not the error then the script will show nothing outside of what's printed in the run
@@ -637,7 +638,7 @@ class Porter(object):
             self.progress.done()
         except Exception as e:
             global end_error_exec_info
-            end_error = e
+            end_error = str(e)
             end_error_exec_info = sys.exc_info()
             logger.exception("")
         finally:

@@ -38,6 +38,22 @@ class DeferredCacheTestCase(unittest.TestCase):
 
         self.assertEquals(cache.get("foo"), 123)
 
+    def test_get_immediate(self):
+        cache = DeferredCache("test")
+        d1 = defer.Deferred()
+        cache.set("key1", d1)
+
+        # get_immediate should return default
+        v = cache.get_immediate("key1", 1)
+        self.assertEqual(v, 1)
+
+        # now complete the set
+        d1.callback(2)
+
+        # get_immediate should return result
+        v = cache.get_immediate("key1", 1)
+        self.assertEqual(v, 2)
+
     def test_invalidate(self):
         cache = DeferredCache("test")
         cache.prefill(("foo",), 123)
@@ -80,9 +96,11 @@ class DeferredCacheTestCase(unittest.TestCase):
         # now do the invalidation
         cache.invalidate_all()
 
-        # lookup should return none
-        self.assertIsNone(cache.get("key1", None))
-        self.assertIsNone(cache.get("key2", None))
+        # lookup should fail
+        with self.assertRaises(KeyError):
+            cache.get("key1")
+        with self.assertRaises(KeyError):
+            cache.get("key2")
 
         # both callbacks should have been callbacked
         self.assertTrue(callback_record[0], "Invalidation callback for key1 not called")
@@ -90,7 +108,8 @@ class DeferredCacheTestCase(unittest.TestCase):
 
         # letting the other lookup complete should do nothing
         d1.callback("result1")
-        self.assertIsNone(cache.get("key1", None))
+        with self.assertRaises(KeyError):
+            cache.get("key1", None)
 
     def test_eviction(self):
         cache = DeferredCache(

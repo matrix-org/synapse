@@ -158,8 +158,21 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about those messages
         self._check_for_mail()
 
+    def test_encrypted_message(self):
+        room = self.helper.create_room_as(self.user_id, tok=self.access_token)
+        self.helper.invite(
+            room=room, src=self.user_id, tok=self.access_token, targ=self.others[0].id
+        )
+        self.helper.join(room=room, user=self.others[0].id, tok=self.others[0].token)
+
+        # The other user sends some messages
+        self.helper.send_event(room, "m.room.encrypted", {}, tok=self.others[0].token)
+
+        # We should get emailed about that message
+        self._check_for_mail()
+
     def _check_for_mail(self):
-        "Check that the user receives an email notification"
+        """Check that the user receives an email notification"""
 
         # Get the stream ordering before it gets sent
         pushers = self.get_success(
