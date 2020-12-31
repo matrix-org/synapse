@@ -1,0 +1,1 @@
+Fix minor long-standing bug in login, where we would offer the `password` login type if a custom auth provider supported it, even if password login was disabled.

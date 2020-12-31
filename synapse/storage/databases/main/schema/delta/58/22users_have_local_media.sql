@@ -1,2 +1,2 @@
-INSERT INTO background_updates (update_name, progress_json) VALUES
-  ('users_have_local_media', '{}');
+INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
+  (5822, 'users_have_local_media', '{}');
