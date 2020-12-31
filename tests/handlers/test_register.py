@@ -620,7 +620,6 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", "register", body
         )  # type: SynapseRequest, FakeChannel
-        self.render(request)
 
         self.assertEqual(request.code, expected_response)
         return channel

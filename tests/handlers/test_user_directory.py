@@ -537,7 +537,6 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", b"user_directory/search", b'{"search_term":"user2"}'
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["results"]) > 0)
 
@@ -546,7 +545,6 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", b"user_directory/search", b'{"search_term":"user2"}'
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["results"]) == 0)
 
@@ -587,7 +585,6 @@ class UserInfoTestCase(unittest.FederatingHomeserverTestCase):
             access_token=user_three_token,
             shorthand=False,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
 
         # Check the state of user_one matches
@@ -617,7 +614,6 @@ class UserInfoTestCase(unittest.FederatingHomeserverTestCase):
             path="/_matrix/federation/unstable/users/info",
             content={"user_ids": [user_one, user_two, user_three]},
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
 
         # Check the state of user_one matches
@@ -669,7 +665,6 @@ class UserInfoTestCase(unittest.FederatingHomeserverTestCase):
         request, channel = self.make_request(
             "POST", url, request_data, access_token=admin_tok
         )
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
     def deactivate(self, user_id, tok):
@@ -680,5 +675,4 @@ class UserInfoTestCase(unittest.FederatingHomeserverTestCase):
         request, channel = self.make_request(
             "POST", "account/deactivate", request_data, access_token=tok
         )
-        self.render(request)
         self.assertEqual(request.code, 200)

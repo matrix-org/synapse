@@ -22,7 +22,7 @@ from synapse.rest.client.v1 import login, room
 from synapse.rulecheck.domain_rule_checker import DomainRuleChecker
 
 from tests import unittest
-from tests.server import make_request, render
+from tests.server import make_request
 
 
 class DomainRuleCheckerTestCase(unittest.TestCase):
@@ -317,7 +317,6 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
             {"address": "foo@bar.com", "medium": "email", "id_server": "localhost"},
             access_token=self.normal_access_token,
         )
-        self.render(request)
         self.assertEqual(channel.code, 403, channel.result["body"])
 
     def _create_room(self, token, content={}):
@@ -330,6 +329,5 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
             path,
             content=json.dumps(content).encode("utf8"),
         )
-        render(request, self.resource, self.hs.get_reactor())
 
         return channel

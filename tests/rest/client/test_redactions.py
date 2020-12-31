@@ -72,7 +72,6 @@ class RedactionsTestCase(HomeserverTestCase):
         request, channel = self.make_request(
             "POST", path, content={}, access_token=access_token
         )
-        self.render(request)
         self.assertEqual(int(channel.result["code"]), expect_code)
         return channel.json_body
 
@@ -80,7 +79,6 @@ class RedactionsTestCase(HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "sync", access_token=self.mod_access_token
         )
-        self.render(request)
         self.assertEqual(channel.result["code"], b"200")
         room_sync = channel.json_body["rooms"]["join"][room_id]
         return room_sync["timeline"]["events"]

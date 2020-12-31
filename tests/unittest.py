@@ -48,13 +48,7 @@ from synapse.server import HomeServer
 from synapse.types import UserID, create_requester
 from synapse.util.ratelimitutils import FederationRateLimiter
 
-from tests.server import (
-    FakeChannel,
-    get_clock,
-    make_request,
-    render,
-    setup_test_homeserver,
-)
+from tests.server import FakeChannel, get_clock, make_request, setup_test_homeserver
 from tests.test_utils import event_injection, setup_awaitable_errors
 from tests.test_utils.logging_setup import setup_logging
 from tests.utils import default_config, setupdb
@@ -446,16 +440,6 @@ class HomeserverTestCase(TestCase):
             await_result,
         )
 
-    def render(self, request):
-        """
-        Render a request against the resources registered by the test class's
-        servlets.
-
-        Args:
-            request (synapse.http.site.SynapseRequest): The request to render.
-        """
-        render(request, self.resource, self.reactor)
-
     def setup_test_homeserver(self, *args, **kwargs):
         """
         Set up the test homeserver, meant to be called by the overridable
@@ -571,7 +555,6 @@ class HomeserverTestCase(TestCase):
 
         # Create the user
         request, channel = self.make_request("GET", "/_matrix/client/r0/admin/register")
-        self.render(request)
         self.assertEqual(channel.code, 200, msg=channel.result)
         nonce = channel.json_body["nonce"]
 
@@ -599,7 +582,6 @@ class HomeserverTestCase(TestCase):
         request, channel = self.make_request(
             "POST", "/_matrix/client/r0/admin/register", body.encode("utf8")
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.json_body)
 
         user_id = channel.json_body["user_id"]
@@ -618,7 +600,6 @@ class HomeserverTestCase(TestCase):
         request, channel = self.make_request(
             "POST", "/_matrix/client/r0/login", json.dumps(body).encode("utf8")
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         access_token = channel.json_body["access_token"]
@@ -687,7 +668,6 @@ class HomeserverTestCase(TestCase):
         request, channel = self.make_request(
             "POST", "/_matrix/client/r0/login", json.dumps(body).encode("utf8")
         )
-        self.render(request)
         self.assertEqual(channel.code, 403, channel.result)
 
     def inject_room_member(self, room: str, user: str, membership: Membership) -> None:

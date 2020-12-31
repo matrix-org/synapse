@@ -53,7 +53,6 @@ class IdentityDisabledTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"POST", "/createRoom", b"{}", access_token=self.tok
         )
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
         room_id = channel.json_body["room_id"]
 
@@ -67,7 +66,6 @@ class IdentityDisabledTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"POST", request_url, request_data, access_token=self.tok
         )
-        self.render(request)
         self.assertEquals(channel.result["code"], b"403", channel.result)
 
     def test_3pid_lookup_disabled(self):
@@ -76,7 +74,6 @@ class IdentityDisabledTestCase(unittest.HomeserverTestCase):
             "?id_server=testis&medium=email&address=foo@bar.baz"
         )
         request, channel = self.make_request("GET", url, access_token=self.tok)
-        self.render(request)
         self.assertEqual(channel.result["code"], b"403", channel.result)
 
     def test_3pid_bulk_lookup_disabled(self):
@@ -89,7 +86,6 @@ class IdentityDisabledTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", url, request_data, access_token=self.tok
         )
-        self.render(request)
         self.assertEqual(channel.result["code"], b"403", channel.result)
 
 
@@ -108,6 +104,9 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
         config = self.default_config()
         config["enable_3pid_lookup"] = True
         config["trusted_third_party_id_servers"] = ["testis"]
+
+        # Add a DNS entry for the test IS
+        self.reactor.lookups["testis"] = "1.2.3.4"
 
         mock_http_client = Mock(spec=["get_json", "post_json_get_json"])
         mock_http_client.get_json.return_value = defer.succeed((200, "{}"))
@@ -132,7 +131,6 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"POST", "/createRoom", b"{}", access_token=self.tok
         )
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
         room_id = channel.json_body["room_id"]
 
@@ -154,13 +152,13 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"POST", request_url, request_data, access_token=self.tok
         )
-        self.render(request)
 
         get_json = self.hs.get_identity_handler().http_client.get_json
         get_json.assert_called_once_with(
             "https://testis/_matrix/identity/api/v1/lookup",
             {"address": "test@example.com", "medium": "email"},
         )
+        self.assertEquals(channel.result["code"], b"403", channel.result)
 
     def test_3pid_lookup_enabled(self):
         url = (
@@ -168,7 +166,6 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
             "?id_server=testis&medium=email&address=foo@bar.baz"
         )
         request, channel = self.make_request("GET", url, access_token=self.tok)
-        self.render(request)
 
         get_json = self.hs.get_simple_http_client().get_json
         get_json.assert_called_once_with(
@@ -186,7 +183,6 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", url, request_data, access_token=self.tok
         )
-        self.render(request)
 
         post_json = self.hs.get_simple_http_client().post_json_get_json
         post_json.assert_called_once_with(

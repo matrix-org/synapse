@@ -278,7 +278,6 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             {"visibility": "public"},
             access_token=self.tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         # List init_state_room_id in the public room list
@@ -288,7 +287,6 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             {"visibility": "public"},
             access_token=self.tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         # Changing access rule to unrestricted should fail.
@@ -363,7 +361,6 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         data = {"visibility": "public"}
 
         request, channel = self.make_request("PUT", url, data, access_token=self.tok)
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         # We are allowed to remove the room from the public room list
@@ -371,7 +368,6 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         data = {"visibility": "private"}
 
         request, channel = self.make_request("PUT", url, data, access_token=self.tok)
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
     def test_direct(self):
@@ -474,7 +470,6 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         data = {"visibility": "public"}
 
         request, channel = self.make_request("PUT", url, data, access_token=self.tok)
-        self.render(request)
         self.assertEqual(channel.code, 403, channel.result)
 
     def test_unrestricted(self):
@@ -554,7 +549,6 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         data = {"visibility": "public"}
 
         request, channel = self.make_request("PUT", url, data, access_token=self.tok)
-        self.render(request)
         self.assertEqual(channel.code, 403, channel.result)
 
     def test_change_rules(self):
@@ -613,7 +607,6 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         data = {"visibility": "public"}
 
         request, channel = self.make_request("PUT", url, data, access_token=self.tok)
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         # Attempt to switch the room to "unrestricted"
@@ -1010,7 +1003,6 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", "/_matrix/client/r0/createRoom", content, access_token=self.tok,
         )
-        self.render(request)
 
         self.assertEqual(channel.code, expected_code, channel.result)
 
@@ -1023,7 +1015,6 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/r0/rooms/%s/state/%s" % (room_id, ACCESS_RULES_TYPE),
             access_token=self.tok,
         )
-        self.render(request)
 
         self.assertEqual(channel.code, 200, channel.result)
         return channel.json_body["rule"]
@@ -1036,7 +1027,6 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             json.dumps(data),
             access_token=self.tok,
         )
-        self.render(request)
 
         self.assertEqual(channel.code, expected_code, channel.result)
 
@@ -1048,7 +1038,6 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             json.dumps(data),
             access_token=self.tok,
         )
-        self.render(request)
 
         self.assertEqual(channel.code, expected_code, channel.result)
 
@@ -1061,7 +1050,6 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             json.dumps(params),
             access_token=self.tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, expected_code, channel.result)
 
     def send_state_with_state_key(
@@ -1076,7 +1064,6 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "PUT", path, json.dumps(body), access_token=tok
         )
-        self.render(request)
 
         self.assertEqual(channel.code, expect_code, channel.result)
 

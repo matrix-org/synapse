@@ -36,7 +36,6 @@ class FilterTestCase(unittest.HomeserverTestCase):
 
     def test_sync_argless(self):
         request, channel = self.make_request("GET", "/sync")
-        self.render(request)
 
         self.assertEqual(channel.code, 200)
         self.assertTrue(
@@ -57,7 +56,6 @@ class FilterTestCase(unittest.HomeserverTestCase):
         self.hs.config.use_presence = False
 
         request, channel = self.make_request("GET", "/sync")
-        self.render(request)
 
         self.assertEqual(channel.code, 200)
         self.assertTrue(
@@ -199,7 +197,6 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "/sync?filter=%s" % sync_filter, access_token=tok
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         return channel.json_body["rooms"]["join"][room_id]["timeline"]["events"]
@@ -253,13 +250,11 @@ class SyncTypingTests(unittest.HomeserverTestCase):
             typing_url % (room, other_user_id, other_access_token),
             b'{"typing": true, "timeout": 30000}',
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
 
         request, channel = self.make_request(
             "GET", "/sync?access_token=%s" % (access_token,)
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
         next_batch = channel.json_body["next_batch"]
 
@@ -269,7 +264,6 @@ class SyncTypingTests(unittest.HomeserverTestCase):
             typing_url % (room, other_user_id, other_access_token),
             b'{"typing": false}',
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
 
         # Start typing.
@@ -278,14 +272,12 @@ class SyncTypingTests(unittest.HomeserverTestCase):
             typing_url % (room, other_user_id, other_access_token),
             b'{"typing": true, "timeout": 30000}',
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
 
         # Should return immediately
         request, channel = self.make_request(
             "GET", sync_url % (access_token, next_batch)
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
         next_batch = channel.json_body["next_batch"]
 
@@ -300,7 +292,6 @@ class SyncTypingTests(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", sync_url % (access_token, next_batch)
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
         next_batch = channel.json_body["next_batch"]
 
@@ -311,7 +302,6 @@ class SyncTypingTests(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", sync_url % (access_token, next_batch)
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
         next_batch = channel.json_body["next_batch"]
 
@@ -320,10 +310,8 @@ class SyncTypingTests(unittest.HomeserverTestCase):
         typing._reset()
 
         # Now it SHOULD fail as it never completes!
-        request, channel = self.make_request(
-            "GET", sync_url % (access_token, next_batch)
-        )
-        self.assertRaises(TimedOutException, self.render, request)
+        with self.assertRaises(TimedOutException):
+            self.make_request("GET", sync_url % (access_token, next_batch))
 
 
 class UnreadMessagesTestCase(unittest.HomeserverTestCase):
@@ -401,7 +389,6 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
             body,
             access_token=self.tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.json_body)
 
         # Check that the unread counter is back to 0.
@@ -466,7 +453,6 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url % self.next_batch, access_token=self.tok,
         )
-        self.render(request)
 
         self.assertEqual(channel.code, 200, channel.json_body)
 
