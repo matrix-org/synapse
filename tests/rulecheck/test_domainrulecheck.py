@@ -325,6 +325,7 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
 
         request, channel = make_request(
             self.hs.get_reactor(),
+            self.site,
             "POST",
             path,
             content=json.dumps(content).encode("utf8"),

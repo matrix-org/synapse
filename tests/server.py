@@ -2,7 +2,7 @@ import json
 import logging
 from collections import deque
 from io import SEEK_END, BytesIO
-from typing import Callable
+from typing import Callable, Iterable, Optional, Tuple, Union
 
 import attr
 from typing_extensions import Deque
@@ -118,6 +118,25 @@ class FakeChannel:
     def transport(self):
         return self
 
+    def await_result(self, timeout: int = 100) -> None:
+        """
+        Wait until the request is finished.
+        """
+        self._reactor.run()
+        x = 0
+
+        while not self.result.get("done"):
+            # If there's a producer, tell it to resume producing so we get content
+            if self._producer:
+                self._producer.resumeProducing()
+
+            x += 1
+
+            if x > timeout:
+                raise TimedOutException("Timed out waiting for request to finish.")
+
+            self._reactor.advance(0.1)
+
 
 class FakeSite:
     """
@@ -152,6 +171,9 @@ def make_request(
     shorthand=True,
     federation_auth_origin=None,
     content_is_form=False,
+    custom_headers: Optional[
+        Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
+    ] = None,
 ):
     """
     Make a web request using the given method and path, feed it the
@@ -171,6 +193,8 @@ def make_request(
             Authorization header pretenting to be the given server name.
         content_is_form: Whether the content is URL encoded form data. Adds the
             'Content-Type': 'application/x-www-form-urlencoded' header.
+
+        custom_headers: (name, value) pairs to add as request headers
 
     Returns:
         Tuple[synapse.http.site.SynapseRequest, channel]
@@ -225,35 +249,18 @@ def make_request(
             # Assume the body is JSON
             req.requestHeaders.addRawHeader(b"Content-Type", b"application/json")
 
+    if custom_headers:
+        for k, v in custom_headers:
+            req.requestHeaders.addRawHeader(k, v)
+
     req.requestReceived(method, path, b"1.1")
 
     return req, channel
 
 
-def wait_until_result(clock, request, timeout=100):
-    """
-    Wait until the request is finished.
-    """
-    clock.run()
-    x = 0
-
-    while not request.finished:
-
-        # If there's a producer, tell it to resume producing so we get content
-        if request._channel._producer:
-            request._channel._producer.resumeProducing()
-
-        x += 1
-
-        if x > timeout:
-            raise TimedOutException("Timed out waiting for request to finish.")
-
-        clock.advance(0.1)
-
-
 def render(request, resource, clock):
     request.render(resource)
-    wait_until_result(clock, request)
+    request._channel.await_result()
 
 
 @implementer(IReactorPluggableNameResolver)
