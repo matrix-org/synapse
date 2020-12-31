@@ -1,1 +1,0 @@
-Generalise `RoomMemberHandler._locally_reject_invite` to apply to more flows than just invite.

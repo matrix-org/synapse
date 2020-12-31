@@ -1,1 +1,0 @@
-Allow for specifying a room version when creating a room in unit tests via `RestHelper.create_room_as`.
