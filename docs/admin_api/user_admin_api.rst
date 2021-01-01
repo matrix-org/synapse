@@ -220,8 +220,8 @@ Deactivate Account
 ==================
 
 This API deactivates an account. It removes active access tokens, resets the
-password, and deletes third-party IDs (to prevent the user requesting a
-password reset).
+password, deletes third-party IDs (to prevent the user requesting a
+password reset), and makes the user leave all rooms.
 
 It can also mark the user as GDPR-erased. This means messages sent by the
 user will still be visible by anyone that was in the room when these messages
