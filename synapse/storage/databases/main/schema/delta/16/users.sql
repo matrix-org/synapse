@@ -5,12 +5,11 @@ CREATE TABLE IF NOT EXISTS new_access_tokens(
     user_id TEXT NOT NULL,
     device_id TEXT,
     token TEXT NOT NULL,
-    last_used BIGINT UNSIGNED,
     UNIQUE(token)
 );
 
 INSERT INTO new_access_tokens
-    SELECT a.id, u.name, a.device_id, a.token, a.last_used
+    SELECT a.id, u.name, a.device_id, a.token
     FROM access_tokens as a
     INNER JOIN users as u ON u.id = a.user_id;
 

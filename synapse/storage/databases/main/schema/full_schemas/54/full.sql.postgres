@@ -7,8 +7,7 @@ CREATE TABLE access_tokens (
     id bigint NOT NULL,
     user_id text NOT NULL,
     device_id text,
-    token text NOT NULL,
-    last_used bigint
+    token text NOT NULL
 );
 
 

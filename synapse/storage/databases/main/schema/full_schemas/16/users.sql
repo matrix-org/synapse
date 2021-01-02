@@ -25,7 +25,6 @@ CREATE TABLE IF NOT EXISTS access_tokens(
     user_id TEXT NOT NULL,
     device_id TEXT,
     token TEXT NOT NULL,
-    last_used BIGINT,
     UNIQUE(token)
 );
 
