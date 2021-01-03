@@ -390,7 +390,9 @@ class SAMLRedirectServlet(BaseSSORedirectServlet):
     async def get_sso_url(
         self, request: SynapseRequest, client_redirect_url: bytes
     ) -> bytes:
-        return self._saml_handler.handle_redirect_request(client_redirect_url)
+        return await self._saml_handler.handle_redirect_request(
+            request, client_redirect_url
+        ).encode("utf8")
 
 
 class OIDCRedirectServlet(BaseSSORedirectServlet):
