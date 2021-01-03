@@ -343,14 +343,16 @@ class BaseSSORedirectServlet(RestServlet):
 
 
 class CasRedirectServlet(BaseSSORedirectServlet):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self._cas_handler = hs.get_cas_handler()
 
     async def get_sso_url(
         self, request: SynapseRequest, client_redirect_url: bytes
     ) -> bytes:
-        return self._cas_handler.get_redirect_url(
-            {"redirectUrl": client_redirect_url}
+        return (
+            await self._cas_handler.handle_redirect_request(
+                request, client_redirect_url
+            )
         ).encode("ascii")
 
 
