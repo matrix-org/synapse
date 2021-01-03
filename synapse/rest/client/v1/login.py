@@ -404,9 +404,11 @@ class OIDCRedirectServlet(BaseSSORedirectServlet):
     async def get_sso_url(
         self, request: SynapseRequest, client_redirect_url: bytes
     ) -> bytes:
-        return await self._oidc_handler.handle_redirect_request(
-            request, client_redirect_url
-        )
+        return (
+            await self._oidc_handler.handle_redirect_request(
+                request, client_redirect_url
+            )
+        ).encode("utf8")
 
 
 def register_servlets(hs, http_server):

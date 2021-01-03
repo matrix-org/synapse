@@ -106,9 +106,8 @@ class AuthRestServlet(RestServlet):
                 )
 
             elif self._oidc_enabled:
-                client_redirect_url = b""
                 sso_redirect_url = await self._oidc_handler.handle_redirect_request(
-                    request, client_redirect_url, session
+                    request, None, session
                 )
 
             else:
