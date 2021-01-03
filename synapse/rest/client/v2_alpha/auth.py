@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 from synapse.api.constants import LoginType
 from synapse.api.errors import SynapseError
 from synapse.api.urls import CLIENT_API_PREFIX
+from synapse.handlers.sso import SsoIdentityProvider
 from synapse.http.server import respond_with_html
 from synapse.http.servlet import RestServlet, parse_string
 
@@ -89,25 +90,19 @@ class AuthRestServlet(RestServlet):
         elif stagetype == LoginType.SSO:
             # Display a confirmation page which prompts the user to
             # re-authenticate with their SSO provider.
+
             if self._cas_enabled:
-                # Generate a request to CAS that redirects back to an endpoint
-                # to verify the successful authentication.
-                sso_redirect_url = await self._cas_handler.handle_redirect_request(
-                    request, None, session
-                )
-
+                sso_auth_provider = self._cas_handler  # type: SsoIdentityProvider
             elif self._saml_enabled:
-                sso_redirect_url = await self._saml_handler.handle_redirect_request(
-                    request, None, session
-                )
-
+                sso_auth_provider = self._saml_handler
             elif self._oidc_enabled:
-                sso_redirect_url = await self._oidc_handler.handle_redirect_request(
-                    request, None, session
-                )
-
+                sso_auth_provider = self._oidc_handler
             else:
                 raise SynapseError(400, "Homeserver not configured for SSO.")
+
+            sso_redirect_url = await sso_auth_provider.handle_redirect_request(
+                request, None, session
+            )
 
             html = await self.auth_handler.start_sso_ui_auth(sso_redirect_url, session)
 
