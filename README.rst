@@ -286,13 +286,15 @@ We recommend using the demo which starts 3 federated instances running on ports 
 
 If you just want to start a single instance of the app and run it directly:
 
+    # Create the homeserver.yaml config once
     python -m synapse.app.homeserver \
       --server-name my.domain.name \
       --config-path homeserver.yaml \
       --generate-config \
       --report-stats=[yes|no]
 
-    synctl start homeserver.yaml
+    # Start the app
+    python -m synapse.app.homeserver --config-path homeserver.yaml
 
 
 
