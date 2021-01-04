@@ -1672,6 +1672,12 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             self.store.quarantine_media_by_id("test", media3, self.admin_user)
         )
 
+        # order by default ("created_ts")
+        # default is backwards
+        self._order_test(None, [media3, media2, media1])
+        self._order_test(None, [media1, media2, media3], "f")
+        self._order_test(None, [media3, media2, media1], "b")
+
         # sort by media_id
         sorted_media = sorted([media1, media2, media3], reverse=False)
         sorted_media_reverse = sorted(sorted_media, reverse=True)
@@ -1802,7 +1808,10 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             self.assertIn("safe_from_quarantine", m)
 
     def _order_test(
-        self, order_type: str, expected_media_list: List[str], dir: Optional[str] = None
+        self,
+        order_type: Optional[str],
+        expected_media_list: List[str],
+        dir: Optional[str] = None,
     ):
         """Request the list of media in a certain order. Assert that order is what
         we expect
@@ -1813,9 +1822,11 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             dir: The direction of ordering to give the server
         """
 
-        url = self.url + "?order_by=%s" % (order_type,)
+        url = self.url + "?"
+        if order_type is not None:
+            url += "order_by=%s&" % (order_type,)
         if dir is not None and dir in ("b", "f"):
-            url += "&dir=%s" % (dir,)
+            url += "dir=%s" % (dir,)
         channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok,
         )

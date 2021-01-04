@@ -355,7 +355,8 @@ List media of an user
 ================================
 Gets a list of all local media that a specific ``user_id`` has created.
 The response is default ordered by creation date ascending and media ID ascending.
-The oldest media is on top. You can change the order with parameter ``order_by``.
+The newest media is on top. You can change the order with parameters
+``order_by`` and ``dir``.
 
 The API is::
 
@@ -436,6 +437,9 @@ The following parameters should be set in the URL:
 
 - ``dir`` - Direction of media order. Either ``f`` for forwards or ``b`` for backwards.
   Setting this value to ``b`` will reverse the above sort order. Defaults to ``f``.
+
+If neither ``order_by`` nor ``dir`` is set, the default order is newest media on top
+(corresponds to ``order_by`` = ``created_ts`` and ``dir`` = ``b``).
 
 **Response**
 

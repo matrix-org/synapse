@@ -1,1 +1,1 @@
-Add `order_by` to the admin API `GET /_synapse/admin/v1/users/<user_id>/media`. This is a breaking change for default sort order to #8647 which was introduced in Synapse v1.23.0. Those who already use this API should check their scripts. Contributed by @dklimpel.
+Add `order_by` to the admin API `GET /_synapse/admin/v1/users/<user_id>/media`. Contributed by @dklimpel.

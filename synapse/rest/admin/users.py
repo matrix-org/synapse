@@ -842,6 +842,15 @@ class UserMediaRestServlet(RestServlet):
                 400, "Unknown direction: %s" % (direction,), errcode=Codes.INVALID_PARAM
             )
 
+        # If neither `order_by` nor `dir` is set, set the default order
+        # to newest media is on top for backward compatibility.
+        if (
+            parse_string(request, "order_by") is None
+            and parse_string(request, "dir") is None
+        ):
+            order_by = MediaSortOrder.CREATED_TS.value
+            direction = "b"
+
         media, total = await self.store.get_local_media_by_user_paginate(
             start, limit, user_id, order_by, direction
         )
