@@ -554,7 +554,7 @@ class SyncHandler:
             event.event_id, state_filter=state_filter
         )
         if event.is_state():
-            state_ids = state_ids.copy()
+            state_ids = dict(state_ids)
             state_ids[(event.type, event.state_key)] = event.event_id
         return state_ids
 

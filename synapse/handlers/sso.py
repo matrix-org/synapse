@@ -173,7 +173,7 @@ class SsoHandler:
         request: SynapseRequest,
         client_redirect_url: str,
         sso_to_matrix_id_mapper: Callable[[int], Awaitable[UserAttributes]],
-        grandfather_existing_users: Optional[Callable[[], Awaitable[Optional[str]]]],
+        grandfather_existing_users: Callable[[], Awaitable[Optional[str]]],
         extra_login_attributes: Optional[JsonDict] = None,
     ) -> None:
         """
@@ -241,7 +241,7 @@ class SsoHandler:
             )
 
             # Check for grandfathering of users.
-            if not user_id and grandfather_existing_users:
+            if not user_id:
                 user_id = await grandfather_existing_users()
                 if user_id:
                     # Future logins should also match this user ID.
