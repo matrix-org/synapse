@@ -14,7 +14,8 @@
 # limitations under the License.
 import abc
 import logging
-from typing import TYPE_CHECKING, Awaitable, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Awaitable, Callable, Dict, List, Mapping, Optional
+from urllib.parse import urlencode
 
 import attr
 from typing_extensions import NoReturn, Protocol
@@ -65,6 +66,11 @@ class SsoIdentityProvider(Protocol):
 
         Eg, "saml", "cas", "github"
         """
+
+    @property
+    @abc.abstractmethod
+    def idp_name(self) -> str:
+        """User-facing name for this provider"""
 
     @abc.abstractmethod
     async def handle_redirect_request(
@@ -156,6 +162,10 @@ class SsoHandler:
         assert p_id not in self._identity_providers
         self._identity_providers[p_id] = p
 
+    def get_identity_providers(self) -> Mapping[str, SsoIdentityProvider]:
+        """Get the configured identity providers"""
+        return self._identity_providers
+
     def render_error(
         self,
         request: Request,
@@ -203,8 +213,10 @@ class SsoHandler:
             ap = next(iter(self._identity_providers.values()))
             return await ap.handle_redirect_request(request, client_redirect_url)
 
-        # otherwise, we have a configuration error
-        raise Exception("Multiple SSO identity providers have been configured!")
+        # otherwise, redirect to the IDP picker
+        return "/_synapse/client/pick_idp?" + urlencode(
+            (("redirectUrl", client_redirect_url),)
+        )
 
     async def get_sso_user_by_remote_user_id(
         self, auth_provider_id: str, remote_user_id: str
