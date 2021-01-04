@@ -21,7 +21,7 @@ from typing_extensions import NoReturn, Protocol
 
 from twisted.web.http import Request
 
-from synapse.api.errors import RedirectException, SynapseError
+from synapse.api.errors import Codes, RedirectException, SynapseError
 from synapse.http.server import respond_with_html
 from synapse.http.site import SynapseRequest
 from synapse.types import JsonDict, UserID, contains_invalid_mxid_characters
@@ -179,6 +179,32 @@ class SsoHandler:
             error=error, error_description=error_description
         )
         respond_with_html(request, code, html)
+
+    async def handle_redirect_request(
+        self, request: SynapseRequest, client_redirect_url: bytes,
+    ) -> str:
+        """Handle a request to /login/sso/redirect
+
+        Args:
+            request: incoming HTTP request
+            client_redirect_url: the URL that we should redirect the
+                client to after login.
+
+        Returns:
+             the URI to redirect to
+        """
+        if not self._identity_providers:
+            raise SynapseError(
+                400, "Homeserver not configured for SSO.", errcode=Codes.UNRECOGNIZED
+            )
+
+        # if we only have one auth provider, redirect to it directly
+        if len(self._identity_providers) == 1:
+            ap = next(iter(self._identity_providers.values()))
+            return await ap.handle_redirect_request(request, client_redirect_url)
+
+        # otherwise, we have a configuration error
+        raise Exception("Multiple SSO identity providers have been configured!")
 
     async def get_sso_user_by_remote_user_id(
         self, auth_provider_id: str, remote_user_id: str
