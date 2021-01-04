@@ -16,12 +16,12 @@
 
 import logging
 
-from synapse.api.errors import AuthError
-from synapse.http.servlet import RestServlet, parse_integer
+from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
+from synapse.http.servlet import RestServlet, parse_boolean, parse_integer
 from synapse.rest.admin._base import (
+    admin_patterns,
     assert_requester_is_admin,
     assert_user_is_admin,
-    historical_admin_path_patterns,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,10 +33,10 @@ class QuarantineMediaInRoom(RestServlet):
     """
 
     PATTERNS = (
-        historical_admin_path_patterns("/room/(?P<room_id>[^/]+)/media/quarantine")
+        admin_patterns("/room/(?P<room_id>[^/]+)/media/quarantine")
         +
         # This path kept around for legacy reasons
-        historical_admin_path_patterns("/quarantine_media/(?P<room_id>[^/]+)")
+        admin_patterns("/quarantine_media/(?P<room_id>[^/]+)")
     )
 
     def __init__(self, hs):
@@ -62,9 +62,7 @@ class QuarantineMediaByUser(RestServlet):
     this server.
     """
 
-    PATTERNS = historical_admin_path_patterns(
-        "/user/(?P<user_id>[^/]+)/media/quarantine"
-    )
+    PATTERNS = admin_patterns("/user/(?P<user_id>[^/]+)/media/quarantine")
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -89,7 +87,7 @@ class QuarantineMediaByID(RestServlet):
     it via this server.
     """
 
-    PATTERNS = historical_admin_path_patterns(
+    PATTERNS = admin_patterns(
         "/media/quarantine/(?P<server_name>[^/]+)/(?P<media_id>[^/]+)"
     )
 
@@ -115,7 +113,7 @@ class ListMediaInRoom(RestServlet):
     """Lists all of the media in a given room.
     """
 
-    PATTERNS = historical_admin_path_patterns("/room/(?P<room_id>[^/]+)/media")
+    PATTERNS = admin_patterns("/room/(?P<room_id>[^/]+)/media")
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -133,7 +131,7 @@ class ListMediaInRoom(RestServlet):
 
 
 class PurgeMediaCacheRestServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns("/purge_media_cache")
+    PATTERNS = admin_patterns("/purge_media_cache")
 
     def __init__(self, hs):
         self.media_repository = hs.get_media_repository()
@@ -150,6 +148,80 @@ class PurgeMediaCacheRestServlet(RestServlet):
         return 200, ret
 
 
+class DeleteMediaByID(RestServlet):
+    """Delete local media by a given ID. Removes it from this server.
+    """
+
+    PATTERNS = admin_patterns("/media/(?P<server_name>[^/]+)/(?P<media_id>[^/]+)")
+
+    def __init__(self, hs):
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.server_name = hs.hostname
+        self.media_repository = hs.get_media_repository()
+
+    async def on_DELETE(self, request, server_name: str, media_id: str):
+        await assert_requester_is_admin(self.auth, request)
+
+        if self.server_name != server_name:
+            raise SynapseError(400, "Can only delete local media")
+
+        if await self.store.get_local_media(media_id) is None:
+            raise NotFoundError("Unknown media")
+
+        logging.info("Deleting local media by ID: %s", media_id)
+
+        deleted_media, total = await self.media_repository.delete_local_media(media_id)
+        return 200, {"deleted_media": deleted_media, "total": total}
+
+
+class DeleteMediaByDateSize(RestServlet):
+    """Delete local media and local copies of remote media by
+    timestamp and size.
+    """
+
+    PATTERNS = admin_patterns("/media/(?P<server_name>[^/]+)/delete")
+
+    def __init__(self, hs):
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.server_name = hs.hostname
+        self.media_repository = hs.get_media_repository()
+
+    async def on_POST(self, request, server_name: str):
+        await assert_requester_is_admin(self.auth, request)
+
+        before_ts = parse_integer(request, "before_ts", required=True)
+        size_gt = parse_integer(request, "size_gt", default=0)
+        keep_profiles = parse_boolean(request, "keep_profiles", default=True)
+
+        if before_ts < 0:
+            raise SynapseError(
+                400,
+                "Query parameter before_ts must be a string representing a positive integer.",
+                errcode=Codes.INVALID_PARAM,
+            )
+        if size_gt < 0:
+            raise SynapseError(
+                400,
+                "Query parameter size_gt must be a string representing a positive integer.",
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        if self.server_name != server_name:
+            raise SynapseError(400, "Can only delete local media")
+
+        logging.info(
+            "Deleting local media by timestamp: %s, size larger than: %s, keep profile media: %s"
+            % (before_ts, size_gt, keep_profiles)
+        )
+
+        deleted_media, total = await self.media_repository.delete_old_local_media(
+            before_ts, size_gt, keep_profiles
+        )
+        return 200, {"deleted_media": deleted_media, "total": total}
+
+
 def register_servlets_for_media_repo(hs, http_server):
     """
     Media repo specific APIs.
@@ -159,3 +231,5 @@ def register_servlets_for_media_repo(hs, http_server):
     QuarantineMediaByID(hs).register(http_server)
     QuarantineMediaByUser(hs).register(http_server)
     ListMediaInRoom(hs).register(http_server)
+    DeleteMediaByID(hs).register(http_server)
+    DeleteMediaByDateSize(hs).register(http_server)

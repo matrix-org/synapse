@@ -1,1 +1,0 @@
-Add the ability to send non-membership events into a room via the `ModuleApi`.

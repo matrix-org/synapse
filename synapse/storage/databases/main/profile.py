@@ -45,7 +45,7 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     @cached(max_entries=5000)
-    async def get_profile_displayname(self, user_localpart: str) -> str:
+    async def get_profile_displayname(self, user_localpart: str) -> Optional[str]:
         return await self.db_pool.simple_select_one_onecol(
             table="profiles",
             keyvalues={"user_id": user_localpart},
@@ -54,7 +54,7 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     @cached(max_entries=5000)
-    async def get_profile_avatar_url(self, user_localpart: str) -> str:
+    async def get_profile_avatar_url(self, user_localpart: str) -> Optional[str]:
         return await self.db_pool.simple_select_one_onecol(
             table="profiles",
             keyvalues={"user_id": user_localpart},
@@ -131,7 +131,7 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     async def set_profile_displayname(
-        self, user_localpart: str, new_displayname: str, batchnum: int
+        self, user_localpart: str, new_displayname: Optional[str], batchnum: int
     ) -> None:
         # Invalidate the read cache for this user
         self.get_profile_displayname.invalidate((user_localpart,))
@@ -194,19 +194,6 @@ class ProfileWorkerStore(SQLBaseStore):
             value_values=values,
         )
 
-
-class ProfileStore(ProfileWorkerStore):
-    def __init__(self, database, db_conn, hs):
-        super().__init__(database, db_conn, hs)
-
-        self.db_pool.updates.register_background_index_update(
-            "profile_replication_status_host_index",
-            index_name="profile_replication_status_idx",
-            table="profile_replication_status",
-            columns=["host"],
-            unique=True,
-        )
-
     async def add_remote_profile_cache(
         self, user_id: str, displayname: str, avatar_url: str
     ) -> None:
@@ -252,28 +239,6 @@ class ProfileStore(ProfileWorkerStore):
                 desc="delete_remote_profile_cache",
             )
 
-    async def get_remote_profile_cache_entries_that_expire(
-        self, last_checked: int
-    ) -> Dict[str, str]:
-        """Get all users who haven't been checked since `last_checked`
-        """
-
-        def _get_remote_profile_cache_entries_that_expire_txn(txn):
-            sql = """
-                SELECT user_id, displayname, avatar_url
-                FROM remote_profile_cache
-                WHERE last_check < ?
-            """
-
-            txn.execute(sql, (last_checked,))
-
-            return self.db_pool.cursor_to_dict(txn)
-
-        return await self.db_pool.runInteraction(
-            "get_remote_profile_cache_entries_that_expire",
-            _get_remote_profile_cache_entries_that_expire_txn,
-        )
-
     async def is_subscribed_remote_profile_for_user(self, user_id):
         """Check whether we are interested in a remote user's profile.
         """
@@ -298,3 +263,57 @@ class ProfileStore(ProfileWorkerStore):
 
         if res:
             return True
+
+    async def get_remote_profile_cache_entries_that_expire(
+        self, last_checked: int
+    ) -> List[Dict[str, str]]:
+        """Get all users who haven't been checked since `last_checked`
+        """
+
+        def _get_remote_profile_cache_entries_that_expire_txn(txn):
+            sql = """
+                SELECT user_id, displayname, avatar_url
+                FROM remote_profile_cache
+                WHERE last_check < ?
+            """
+
+            txn.execute(sql, (last_checked,))
+
+            return self.db_pool.cursor_to_dict(txn)
+
+        return await self.db_pool.runInteraction(
+            "get_remote_profile_cache_entries_that_expire",
+            _get_remote_profile_cache_entries_that_expire_txn,
+        )
+
+
+class ProfileStore(ProfileWorkerStore):
+    def __init__(self, database, db_conn, hs):
+        super().__init__(database, db_conn, hs)
+
+        self.db_pool.updates.register_background_index_update(
+            "profile_replication_status_host_index",
+            index_name="profile_replication_status_idx",
+            table="profile_replication_status",
+            columns=["host"],
+            unique=True,
+        )
+
+    async def add_remote_profile_cache(
+        self, user_id: str, displayname: str, avatar_url: str
+    ) -> None:
+        """Ensure we are caching the remote user's profiles.
+
+        This should only be called when `is_subscribed_remote_profile_for_user`
+        would return true for the user.
+        """
+        await self.db_pool.simple_upsert(
+            table="remote_profile_cache",
+            keyvalues={"user_id": user_id},
+            values={
+                "displayname": displayname,
+                "avatar_url": avatar_url,
+                "last_check": self._clock.time_msec(),
+            },
+            desc="add_remote_profile_cache",
+        )

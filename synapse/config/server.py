@@ -39,7 +39,7 @@ logger = logging.Logger(__name__)
 # in the list.
 DEFAULT_BIND_ADDRESSES = ["::", "0.0.0.0"]
 
-DEFAULT_ROOM_VERSION = "5"
+DEFAULT_ROOM_VERSION = "6"
 
 ROOM_COMPLEXITY_TOO_GREAT = (
     "Your homeserver is unable to join rooms this large or complex. "

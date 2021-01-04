@@ -39,6 +39,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.metrics import threepid_send_requests
 from synapse.push.mailer import Mailer
 from synapse.types import UserID
 from synapse.util.msisdn import phone_number_to_msisdn
@@ -58,7 +59,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         self.hs = hs
         self.datastore = hs.get_datastore()
         self.config = hs.config
-        self.identity_handler = hs.get_handlers().identity_handler
+        self.identity_handler = hs.get_identity_handler()
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self.mailer = Mailer(
@@ -116,7 +117,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
                 # comments for request_token_inhibit_3pid_errors.
                 # Also wait for some random amount of time between 100ms and 1s to make it
                 # look like we did something.
-                await self.hs.clock.sleep(random.randint(1, 10) / 10)
+                await self.hs.get_clock().sleep(random.randint(1, 10) / 10)
                 return 200, {"sid": random_string(16)}
 
             raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
@@ -144,6 +145,10 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
 
             # Wrap the session id in a JSON object
             ret = {"sid": sid}
+
+        threepid_send_requests.labels(type="email", reason="password_reset").observe(
+            send_attempt
+        )
 
         return 200, ret
 
@@ -354,7 +359,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         super().__init__()
         self.hs = hs
         self.config = hs.config
-        self.identity_handler = hs.get_handlers().identity_handler
+        self.identity_handler = hs.get_identity_handler()
         self.store = self.hs.get_datastore()
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
@@ -412,7 +417,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
                 # comments for request_token_inhibit_3pid_errors.
                 # Also wait for some random amount of time between 100ms and 1s to make it
                 # look like we did something.
-                await self.hs.clock.sleep(random.randint(1, 10) / 10)
+                await self.hs.get_clock().sleep(random.randint(1, 10) / 10)
                 return 200, {"sid": random_string(16)}
 
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
@@ -441,6 +446,10 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
             # Wrap the session id in a JSON object
             ret = {"sid": sid}
 
+        threepid_send_requests.labels(type="email", reason="add_threepid").observe(
+            send_attempt
+        )
+
         return 200, ret
 
 
@@ -451,7 +460,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         self.hs = hs
         super().__init__()
         self.store = self.hs.get_datastore()
-        self.identity_handler = hs.get_handlers().identity_handler
+        self.identity_handler = hs.get_identity_handler()
 
     async def on_POST(self, request):
         body = parse_json_object_from_request(request)
@@ -487,7 +496,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
                 # comments for request_token_inhibit_3pid_errors.
                 # Also wait for some random amount of time between 100ms and 1s to make it
                 # look like we did something.
-                await self.hs.clock.sleep(random.randint(1, 10) / 10)
+                await self.hs.get_clock().sleep(random.randint(1, 10) / 10)
                 return 200, {"sid": random_string(16)}
 
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
@@ -509,6 +518,10 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
             client_secret,
             send_attempt,
             next_link,
+        )
+
+        threepid_send_requests.labels(type="msisdn", reason="add_threepid").observe(
+            send_attempt
         )
 
         return 200, ret
@@ -601,7 +614,7 @@ class AddThreepidMsisdnSubmitTokenServlet(RestServlet):
         self.config = hs.config
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
-        self.identity_handler = hs.get_handlers().identity_handler
+        self.identity_handler = hs.get_identity_handler()
 
     async def on_POST(self, request):
         if not self.config.account_threepid_delegate_msisdn:
@@ -631,7 +644,7 @@ class ThreepidRestServlet(RestServlet):
     def __init__(self, hs):
         super().__init__()
         self.hs = hs
-        self.identity_handler = hs.get_handlers().identity_handler
+        self.identity_handler = hs.get_identity_handler()
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.datastore = hs.get_datastore()
@@ -734,7 +747,7 @@ class ThreepidAddRestServlet(RestServlet):
     def __init__(self, hs):
         super().__init__()
         self.hs = hs
-        self.identity_handler = hs.get_handlers().identity_handler
+        self.identity_handler = hs.get_identity_handler()
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.http_client = hs.get_simple_http_client()
@@ -807,7 +820,7 @@ class ThreepidBindRestServlet(RestServlet):
     def __init__(self, hs):
         super().__init__()
         self.hs = hs
-        self.identity_handler = hs.get_handlers().identity_handler
+        self.identity_handler = hs.get_identity_handler()
         self.auth = hs.get_auth()
 
     async def on_POST(self, request):
@@ -836,7 +849,7 @@ class ThreepidUnbindRestServlet(RestServlet):
     def __init__(self, hs):
         super().__init__()
         self.hs = hs
-        self.identity_handler = hs.get_handlers().identity_handler
+        self.identity_handler = hs.get_identity_handler()
         self.auth = hs.get_auth()
         self.datastore = self.hs.get_datastore()
 
@@ -925,7 +938,7 @@ class ThreepidLookupRestServlet(RestServlet):
     def __init__(self, hs):
         super(ThreepidLookupRestServlet, self).__init__()
         self.auth = hs.get_auth()
-        self.identity_handler = hs.get_handlers().identity_handler
+        self.identity_handler = hs.get_identity_handler()
 
     async def on_GET(self, request):
         """Proxy a /_matrix/identity/api/v1/lookup request to an identity
@@ -955,7 +968,7 @@ class ThreepidBulkLookupRestServlet(RestServlet):
     def __init__(self, hs):
         super(ThreepidBulkLookupRestServlet, self).__init__()
         self.auth = hs.get_auth()
-        self.identity_handler = hs.get_handlers().identity_handler
+        self.identity_handler = hs.get_identity_handler()
 
     async def on_POST(self, request):
         """Proxy a /_matrix/identity/api/v1/bulk_lookup request to an identity

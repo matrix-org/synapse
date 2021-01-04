@@ -16,7 +16,7 @@
 
 import logging
 from sys import intern
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, Sized
 
 import attr
 from prometheus_client.core import Gauge
@@ -92,7 +92,7 @@ class CacheMetric:
 def register_cache(
     cache_type: str,
     cache_name: str,
-    cache,
+    cache: Sized,
     collect_callback: Optional[Callable] = None,
     resizable: bool = True,
     resize_callback: Optional[Callable] = None,
@@ -100,12 +100,15 @@ def register_cache(
     """Register a cache object for metric collection and resizing.
 
     Args:
-        cache_type
+        cache_type: a string indicating the "type" of the cache. This is used
+            only for deduplication so isn't too important provided it's constant.
         cache_name: name of the cache
-        cache: cache itself
+        cache: cache itself, which must implement __len__(), and may optionally implement
+             a max_size property
         collect_callback: If given, a function which is called during metric
             collection to update additional metrics.
-        resizable: Whether this cache supports being resized.
+        resizable: Whether this cache supports being resized, in which case either
+            resize_callback must be provided, or the cache must support set_max_size().
         resize_callback: A function which can be called to resize the cache.
 
     Returns:

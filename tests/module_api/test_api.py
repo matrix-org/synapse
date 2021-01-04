@@ -15,7 +15,6 @@
 from mock import Mock
 
 from synapse.events import EventBase
-from synapse.module_api import ModuleApi
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 from synapse.types import create_requester
@@ -32,7 +31,7 @@ class ModuleApiTestCase(HomeserverTestCase):
 
     def prepare(self, reactor, clock, homeserver):
         self.store = homeserver.get_datastore()
-        self.module_api = ModuleApi(homeserver, homeserver.get_auth_handler())
+        self.module_api = homeserver.get_module_api()
         self.event_creation_handler = homeserver.get_event_creation_handler()
 
     def test_can_register_user(self):
@@ -95,9 +94,13 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.assertFalse(hasattr(event, "state_key"))
         self.assertDictEqual(event.content, content)
 
+        expected_requester = create_requester(
+            user_id, authenticated_entity=self.hs.hostname
+        )
+
         # Check that the event was sent
         self.event_creation_handler.create_and_send_nonmember_event.assert_called_with(
-            create_requester(user_id), event_dict, ratelimit=False,
+            expected_requester, event_dict, ratelimit=False, ignore_shadow_ban=True,
         )
 
         # Create and send a state event
@@ -126,7 +129,7 @@ class ModuleApiTestCase(HomeserverTestCase):
 
         # Check that the event was sent
         self.event_creation_handler.create_and_send_nonmember_event.assert_called_with(
-            create_requester(user_id),
+            expected_requester,
             {
                 "type": "m.room.power_levels",
                 "content": content,
@@ -135,6 +138,7 @@ class ModuleApiTestCase(HomeserverTestCase):
                 "state_key": "",
             },
             ratelimit=False,
+            ignore_shadow_ban=True,
         )
 
         # Check that we can't send membership events

@@ -26,9 +26,9 @@ from synapse.util import Clock
 
 from tests import unittest
 from tests.server import (
+    FakeSite,
     ThreadedMemoryReactorClock,
     make_request,
-    render,
     setup_test_homeserver,
 )
 
@@ -62,9 +62,8 @@ class JsonResourceTests(unittest.TestCase):
         )
 
         request, channel = make_request(
-            self.reactor, b"GET", b"/_matrix/foo/%E2%98%83?a=%E2%98%83"
+            self.reactor, FakeSite(res), b"GET", b"/_matrix/foo/%E2%98%83?a=%E2%98%83"
         )
-        render(request, res, self.reactor)
 
         self.assertEqual(request.args, {b"a": ["\N{SNOWMAN}".encode("utf8")]})
         self.assertEqual(got_kwargs, {"room_id": "\N{SNOWMAN}"})
@@ -83,8 +82,7 @@ class JsonResourceTests(unittest.TestCase):
             "GET", [re.compile("^/_matrix/foo$")], _callback, "test_servlet"
         )
 
-        request, channel = make_request(self.reactor, b"GET", b"/_matrix/foo")
-        render(request, res, self.reactor)
+        _, channel = make_request(self.reactor, FakeSite(res), b"GET", b"/_matrix/foo")
 
         self.assertEqual(channel.result["code"], b"500")
 
@@ -108,8 +106,7 @@ class JsonResourceTests(unittest.TestCase):
             "GET", [re.compile("^/_matrix/foo$")], _callback, "test_servlet"
         )
 
-        request, channel = make_request(self.reactor, b"GET", b"/_matrix/foo")
-        render(request, res, self.reactor)
+        _, channel = make_request(self.reactor, FakeSite(res), b"GET", b"/_matrix/foo")
 
         self.assertEqual(channel.result["code"], b"500")
 
@@ -127,8 +124,7 @@ class JsonResourceTests(unittest.TestCase):
             "GET", [re.compile("^/_matrix/foo$")], _callback, "test_servlet"
         )
 
-        request, channel = make_request(self.reactor, b"GET", b"/_matrix/foo")
-        render(request, res, self.reactor)
+        _, channel = make_request(self.reactor, FakeSite(res), b"GET", b"/_matrix/foo")
 
         self.assertEqual(channel.result["code"], b"403")
         self.assertEqual(channel.json_body["error"], "Forbidden!!one!")
@@ -150,8 +146,9 @@ class JsonResourceTests(unittest.TestCase):
             "GET", [re.compile("^/_matrix/foo$")], _callback, "test_servlet"
         )
 
-        request, channel = make_request(self.reactor, b"GET", b"/_matrix/foobar")
-        render(request, res, self.reactor)
+        _, channel = make_request(
+            self.reactor, FakeSite(res), b"GET", b"/_matrix/foobar"
+        )
 
         self.assertEqual(channel.result["code"], b"400")
         self.assertEqual(channel.json_body["error"], "Unrecognized request")
@@ -173,8 +170,7 @@ class JsonResourceTests(unittest.TestCase):
         )
 
         # The path was registered as GET, but this is a HEAD request.
-        request, channel = make_request(self.reactor, b"HEAD", b"/_matrix/foo")
-        render(request, res, self.reactor)
+        _, channel = make_request(self.reactor, FakeSite(res), b"HEAD", b"/_matrix/foo")
 
         self.assertEqual(channel.result["code"], b"200")
         self.assertNotIn("body", channel.result)
@@ -196,9 +192,6 @@ class OptionsResourceTests(unittest.TestCase):
 
     def _make_request(self, method, path):
         """Create a request from the method/path and return a channel with the response."""
-        request, channel = make_request(self.reactor, method, path, shorthand=False)
-        request.prepath = []  # This doesn't get set properly by make_request.
-
         # Create a site and query for the resource.
         site = SynapseSite(
             "test",
@@ -207,11 +200,9 @@ class OptionsResourceTests(unittest.TestCase):
             self.resource,
             "1.0",
         )
-        request.site = site
-        resource = site.getResourceFor(request)
 
-        # Finally, render the resource and return the channel.
-        render(request, resource, self.reactor)
+        # render the request and return the channel
+        _, channel = make_request(self.reactor, site, method, path, shorthand=False)
         return channel
 
     def test_unknown_options_request(self):
@@ -284,8 +275,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
         res = WrapHtmlRequestHandlerTests.TestResource()
         res.callback = callback
 
-        request, channel = make_request(self.reactor, b"GET", b"/path")
-        render(request, res, self.reactor)
+        _, channel = make_request(self.reactor, FakeSite(res), b"GET", b"/path")
 
         self.assertEqual(channel.result["code"], b"200")
         body = channel.result["body"]
@@ -303,8 +293,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
         res = WrapHtmlRequestHandlerTests.TestResource()
         res.callback = callback
 
-        request, channel = make_request(self.reactor, b"GET", b"/path")
-        render(request, res, self.reactor)
+        _, channel = make_request(self.reactor, FakeSite(res), b"GET", b"/path")
 
         self.assertEqual(channel.result["code"], b"301")
         headers = channel.result["headers"]
@@ -325,8 +314,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
         res = WrapHtmlRequestHandlerTests.TestResource()
         res.callback = callback
 
-        request, channel = make_request(self.reactor, b"GET", b"/path")
-        render(request, res, self.reactor)
+        _, channel = make_request(self.reactor, FakeSite(res), b"GET", b"/path")
 
         self.assertEqual(channel.result["code"], b"304")
         headers = channel.result["headers"]
@@ -345,8 +333,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
         res = WrapHtmlRequestHandlerTests.TestResource()
         res.callback = callback
 
-        request, channel = make_request(self.reactor, b"HEAD", b"/path")
-        render(request, res, self.reactor)
+        _, channel = make_request(self.reactor, FakeSite(res), b"HEAD", b"/path")
 
         self.assertEqual(channel.result["code"], b"200")
         self.assertNotIn("body", channel.result)

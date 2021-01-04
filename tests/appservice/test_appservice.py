@@ -31,6 +31,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
     def setUp(self):
         self.service = ApplicationService(
             id="unique_identifier",
+            sender="@as:test",
             url="some_url",
             token="some_token",
             hostname="matrix.org",  # only used by get_groups_for_user

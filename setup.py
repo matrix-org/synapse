@@ -15,12 +15,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import glob
 import os
-from setuptools import setup, find_packages, Command
-import sys
 
+from setuptools import Command, find_packages, setup
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -104,6 +102,8 @@ CONDITIONAL_REQUIREMENTS["lint"] = [
     "flake8",
 ]
 
+CONDITIONAL_REQUIREMENTS["mypy"] = ["mypy==0.790", "mypy-zope==0.2.8"]
+
 # Dependencies which are exclusively required by unit test code. This is
 # NOT a list of all modules that are necessary to run the unit tests.
 # Tests assume that all optional dependencies are installed.
@@ -131,6 +131,7 @@ setup(
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
     ],
     scripts=["synctl"] + glob.glob("scripts/*"),
     cmdclass={"test": TestCommand},

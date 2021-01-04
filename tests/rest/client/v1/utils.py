@@ -23,10 +23,11 @@ from typing import Any, Dict, Optional
 import attr
 
 from twisted.web.resource import Resource
+from twisted.web.server import Site
 
 from synapse.api.constants import Membership
 
-from tests.server import make_request, render
+from tests.server import FakeSite, make_request
 
 
 @attr.s
@@ -36,25 +37,51 @@ class RestHelper:
     """
 
     hs = attr.ib()
-    resource = attr.ib()
+    site = attr.ib(type=Site)
     auth_user_id = attr.ib()
 
     def create_room_as(
-        self, room_creator=None, is_public=True, tok=None, expect_code=200,
-    ):
+        self,
+        room_creator: str = None,
+        is_public: bool = True,
+        room_version: str = None,
+        tok: str = None,
+        expect_code: int = 200,
+    ) -> str:
+        """
+        Create a room.
+
+        Args:
+            room_creator: The user ID to create the room with.
+            is_public: If True, the `visibility` parameter will be set to the
+                default (public). Otherwise, the `visibility` parameter will be set
+                to "private".
+            room_version: The room version to create the room as. Defaults to Synapse's
+                default room version.
+            tok: The access token to use in the request.
+            expect_code: The expected HTTP response code.
+
+        Returns:
+            The ID of the newly created room.
+        """
         temp_id = self.auth_user_id
         self.auth_user_id = room_creator
         path = "/_matrix/client/r0/createRoom"
         content = {}
         if not is_public:
             content["visibility"] = "private"
+        if room_version:
+            content["room_version"] = room_version
         if tok:
             path = path + "?access_token=%s" % tok
 
-        request, channel = make_request(
-            self.hs.get_reactor(), "POST", path, json.dumps(content).encode("utf8")
+        _, channel = make_request(
+            self.hs.get_reactor(),
+            self.site,
+            "POST",
+            path,
+            json.dumps(content).encode("utf8"),
         )
-        render(request, self.resource, self.hs.get_reactor())
 
         assert channel.result["code"] == b"%d" % expect_code, channel.result
         self.auth_user_id = temp_id
@@ -124,11 +151,13 @@ class RestHelper:
         data = {"membership": membership}
         data.update(extra_data)
 
-        request, channel = make_request(
-            self.hs.get_reactor(), "PUT", path, json.dumps(data).encode("utf8")
+        _, channel = make_request(
+            self.hs.get_reactor(),
+            self.site,
+            "PUT",
+            path,
+            json.dumps(data).encode("utf8"),
         )
-
-        render(request, self.resource, self.hs.get_reactor())
 
         assert int(channel.result["code"]) == expect_code, (
             "Expected: %d, got: %d, resp: %r"
@@ -157,10 +186,13 @@ class RestHelper:
         if tok:
             path = path + "?access_token=%s" % tok
 
-        request, channel = make_request(
-            self.hs.get_reactor(), "PUT", path, json.dumps(content).encode("utf8")
+        _, channel = make_request(
+            self.hs.get_reactor(),
+            self.site,
+            "PUT",
+            path,
+            json.dumps(content).encode("utf8"),
         )
-        render(request, self.resource, self.hs.get_reactor())
 
         assert int(channel.result["code"]) == expect_code, (
             "Expected: %d, got: %d, resp: %r"
@@ -210,9 +242,9 @@ class RestHelper:
         if body is not None:
             content = json.dumps(body).encode("utf8")
 
-        request, channel = make_request(self.hs.get_reactor(), method, path, content)
-
-        render(request, self.resource, self.hs.get_reactor())
+        _, channel = make_request(
+            self.hs.get_reactor(), self.site, method, path, content
+        )
 
         assert int(channel.result["code"]) == expect_code, (
             "Expected: %d, got: %d, resp: %r"
@@ -295,14 +327,15 @@ class RestHelper:
         """
         image_length = len(image_data)
         path = "/_matrix/media/r0/upload?filename=%s" % (filename,)
-        request, channel = make_request(
-            self.hs.get_reactor(), "POST", path, content=image_data, access_token=tok
+        _, channel = make_request(
+            self.hs.get_reactor(),
+            FakeSite(resource),
+            "POST",
+            path,
+            content=image_data,
+            access_token=tok,
+            custom_headers=[(b"Content-Length", str(image_length))],
         )
-        request.requestHeaders.addRawHeader(
-            b"Content-Length", str(image_length).encode("UTF-8")
-        )
-        request.render(resource)
-        self.hs.get_reactor().pump([100])
 
         assert channel.code == expect_code, "Expected: %d, got: %d, resp: %r" % (
             expect_code,

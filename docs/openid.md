@@ -37,7 +37,7 @@ as follows:
    provided by `matrix.org` so no further action is needed.
 
  * If you installed Synapse into a virtualenv, run `/path/to/env/bin/pip
-   install synapse[oidc]` to install the necessary dependencies.
+   install matrix-synapse[oidc]` to install the necessary dependencies.
 
  * For other installation mechanisms, see the documentation provided by the
    maintainer.
@@ -52,14 +52,39 @@ specific providers.
 
 Here are a few configs for providers that should work with Synapse.
 
+### Microsoft Azure Active Directory
+Azure AD can act as an OpenID Connect Provider. Register a new application under 
+*App registrations* in the Azure AD management console. The RedirectURI for your
+application should point to your matrix server: `[synapse public baseurl]/_synapse/oidc/callback`
+
+Go to *Certificates & secrets* and register a new client secret. Make note of your 
+Directory (tenant) ID as it will be used in the Azure links.
+Edit your Synapse config file and change the `oidc_config` section:
+
+```yaml
+oidc_config:
+   enabled: true
+   issuer: "https://login.microsoftonline.com/<tenant id>/v2.0"
+   client_id: "<client id>"
+   client_secret: "<client secret>"
+   scopes: ["openid", "profile"]
+   authorization_endpoint: "https://login.microsoftonline.com/<tenant id>/oauth2/v2.0/authorize"
+   token_endpoint: "https://login.microsoftonline.com/<tenant id>/oauth2/v2.0/token"
+   userinfo_endpoint: "https://graph.microsoft.com/oidc/userinfo"
+
+   user_mapping_provider:
+     config:
+       localpart_template: "{{ user.preferred_username.split('@')[0] }}"
+       display_name_template: "{{ user.name }}"
+```
+
 ### [Dex][dex-idp]
 
 [Dex][dex-idp] is a simple, open-source, certified OpenID Connect Provider.
 Although it is designed to help building a full-blown provider with an
 external database, it can be configured with static passwords in a config file.
 
-Follow the [Getting Started
-guide](https://github.com/dexidp/dex/blob/master/Documentation/getting-started.md)
+Follow the [Getting Started guide](https://dexidp.io/docs/getting-started/)
 to install Dex.
 
 Edit `examples/config-dev.yaml` config file from the Dex repo to add a client:
@@ -73,7 +98,7 @@ staticClients:
   name: 'Synapse'
 ```
 
-Run with `dex serve examples/config-dex.yaml`.
+Run with `dex serve examples/config-dev.yaml`.
 
 Synapse config:
 
@@ -180,7 +205,7 @@ GitHub is a bit special as it is not an OpenID Connect compliant provider, but
 just a regular OAuth2 provider.
 
 The [`/user` API endpoint](https://developer.github.com/v3/users/#get-the-authenticated-user)
-can be used to retrieve information on the authenticated user. As the Synaspse
+can be used to retrieve information on the authenticated user. As the Synapse
 login mechanism needs an attribute to uniquely identify users, and that endpoint
 does not return a `sub` property, an alternative `subject_claim` has to be set.
 
@@ -238,13 +263,36 @@ Synapse config:
 
 ```yaml
 oidc_config:
-   enabled: true
-   issuer: "https://id.twitch.tv/oauth2/"
-   client_id: "your-client-id" # TO BE FILLED
-   client_secret: "your-client-secret" # TO BE FILLED
-   client_auth_method: "client_secret_post"
-   user_mapping_provider:
-     config:
-       localpart_template: '{{ user.preferred_username }}'
-       display_name_template: '{{ user.name }}'
+  enabled: true
+  issuer: "https://id.twitch.tv/oauth2/"
+  client_id: "your-client-id" # TO BE FILLED
+  client_secret: "your-client-secret" # TO BE FILLED
+  client_auth_method: "client_secret_post"
+  user_mapping_provider:
+    config:
+      localpart_template: "{{ user.preferred_username }}"
+      display_name_template: "{{ user.name }}"
+```
+
+### GitLab
+
+1. Create a [new application](https://gitlab.com/profile/applications).
+2. Add the `read_user` and `openid` scopes.
+3. Add this Callback URL: `[synapse public baseurl]/_synapse/oidc/callback`
+
+Synapse config:
+
+```yaml
+oidc_config:
+  enabled: true
+  issuer: "https://gitlab.com/"
+  client_id: "your-client-id" # TO BE FILLED
+  client_secret: "your-client-secret" # TO BE FILLED
+  client_auth_method: "client_secret_post"
+  scopes: ["openid", "read_user"]
+  user_profile_method: "userinfo_endpoint"
+  user_mapping_provider:
+    config:
+      localpart_template: '{{ user.nickname }}'
+      display_name_template: '{{ user.name }}'
 ```

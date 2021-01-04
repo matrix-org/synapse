@@ -14,57 +14,33 @@
 # limitations under the License.
 
 import json
-from collections import Counter
+import logging
+from io import StringIO
 
-from twisted.logger import Logger
+from synapse.logging._terse_json import JsonFormatter, TerseJsonFormatter
 
-from synapse.logging._structured import setup_structured_logging
-
-from tests.server import connect_client
-from tests.unittest import HomeserverTestCase
-
-from .test_structured import FakeBeginner, StructuredLoggingTestBase
+from tests.logging import LoggerCleanupMixin
+from tests.unittest import TestCase
 
 
-class TerseJSONTCPTestCase(StructuredLoggingTestBase, HomeserverTestCase):
-    def test_log_output(self):
+class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
+    def test_terse_json_output(self):
         """
-        The Terse JSON outputter delivers simplified structured logs over TCP.
+        The Terse JSON formatter converts log messages to JSON.
         """
-        log_config = {
-            "drains": {
-                "tersejson": {
-                    "type": "network_json_terse",
-                    "host": "127.0.0.1",
-                    "port": 8000,
-                }
-            }
-        }
+        output = StringIO()
 
-        # Begin the logger with our config
-        beginner = FakeBeginner()
-        setup_structured_logging(
-            self.hs, self.hs.config, log_config, logBeginner=beginner
-        )
+        handler = logging.StreamHandler(output)
+        handler.setFormatter(TerseJsonFormatter())
+        logger = self.get_logger(handler)
 
-        logger = Logger(
-            namespace="tests.logging.test_terse_json", observer=beginner.observers[0]
-        )
-        logger.info("Hello there, {name}!", name="wally")
+        logger.info("Hello there, %s!", "wally")
 
-        # Trigger the connection
-        self.pump()
-
-        _, server = connect_client(self.reactor, 0)
-
-        # Trigger data being sent
-        self.pump()
-
-        # One log message, with a single trailing newline
-        logs = server.data.decode("utf8").splitlines()
+        # One log message, with a single trailing newline.
+        data = output.getvalue()
+        logs = data.splitlines()
         self.assertEqual(len(logs), 1)
-        self.assertEqual(server.data.count(b"\n"), 1)
-
+        self.assertEqual(data.count("\n"), 1)
         log = json.loads(logs[0])
 
         # The terse logger should give us these keys.
@@ -72,163 +48,74 @@ class TerseJSONTCPTestCase(StructuredLoggingTestBase, HomeserverTestCase):
             "log",
             "time",
             "level",
-            "log_namespace",
-            "request",
-            "scope",
-            "server_name",
-            "name",
+            "namespace",
         ]
-        self.assertEqual(set(log.keys()), set(expected_log_keys))
+        self.assertCountEqual(log.keys(), expected_log_keys)
+        self.assertEqual(log["log"], "Hello there, wally!")
 
-        # It contains the data we expect.
-        self.assertEqual(log["name"], "wally")
-
-    def test_log_backpressure_debug(self):
+    def test_extra_data(self):
         """
-        When backpressure is hit, DEBUG logs will be shed.
+        Additional information can be included in the structured logging.
         """
-        log_config = {
-            "loggers": {"synapse": {"level": "DEBUG"}},
-            "drains": {
-                "tersejson": {
-                    "type": "network_json_terse",
-                    "host": "127.0.0.1",
-                    "port": 8000,
-                    "maximum_buffer": 10,
-                }
-            },
-        }
+        output = StringIO()
 
-        # Begin the logger with our config
-        beginner = FakeBeginner()
-        setup_structured_logging(
-            self.hs,
-            self.hs.config,
-            log_config,
-            logBeginner=beginner,
-            redirect_stdlib_logging=False,
+        handler = logging.StreamHandler(output)
+        handler.setFormatter(TerseJsonFormatter())
+        logger = self.get_logger(handler)
+
+        logger.info(
+            "Hello there, %s!", "wally", extra={"foo": "bar", "int": 3, "bool": True}
         )
 
-        logger = Logger(
-            namespace="synapse.logging.test_terse_json", observer=beginner.observers[0]
-        )
+        # One log message, with a single trailing newline.
+        data = output.getvalue()
+        logs = data.splitlines()
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(data.count("\n"), 1)
+        log = json.loads(logs[0])
 
-        # Send some debug messages
-        for i in range(0, 3):
-            logger.debug("debug %s" % (i,))
+        # The terse logger should give us these keys.
+        expected_log_keys = [
+            "log",
+            "time",
+            "level",
+            "namespace",
+            # The additional keys given via extra.
+            "foo",
+            "int",
+            "bool",
+        ]
+        self.assertCountEqual(log.keys(), expected_log_keys)
 
-        # Send a bunch of useful messages
-        for i in range(0, 7):
-            logger.info("test message %s" % (i,))
+        # Check the values of the extra fields.
+        self.assertEqual(log["foo"], "bar")
+        self.assertEqual(log["int"], 3)
+        self.assertIs(log["bool"], True)
 
-        # The last debug message pushes it past the maximum buffer
-        logger.debug("too much debug")
-
-        # Allow the reconnection
-        _, server = connect_client(self.reactor, 0)
-        self.pump()
-
-        # Only the 7 infos made it through, the debugs were elided
-        logs = server.data.splitlines()
-        self.assertEqual(len(logs), 7)
-
-    def test_log_backpressure_info(self):
+    def test_json_output(self):
         """
-        When backpressure is hit, DEBUG and INFO logs will be shed.
+        The Terse JSON formatter converts log messages to JSON.
         """
-        log_config = {
-            "loggers": {"synapse": {"level": "DEBUG"}},
-            "drains": {
-                "tersejson": {
-                    "type": "network_json_terse",
-                    "host": "127.0.0.1",
-                    "port": 8000,
-                    "maximum_buffer": 10,
-                }
-            },
-        }
+        output = StringIO()
 
-        # Begin the logger with our config
-        beginner = FakeBeginner()
-        setup_structured_logging(
-            self.hs,
-            self.hs.config,
-            log_config,
-            logBeginner=beginner,
-            redirect_stdlib_logging=False,
-        )
+        handler = logging.StreamHandler(output)
+        handler.setFormatter(JsonFormatter())
+        logger = self.get_logger(handler)
 
-        logger = Logger(
-            namespace="synapse.logging.test_terse_json", observer=beginner.observers[0]
-        )
+        logger.info("Hello there, %s!", "wally")
 
-        # Send some debug messages
-        for i in range(0, 3):
-            logger.debug("debug %s" % (i,))
+        # One log message, with a single trailing newline.
+        data = output.getvalue()
+        logs = data.splitlines()
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(data.count("\n"), 1)
+        log = json.loads(logs[0])
 
-        # Send a bunch of useful messages
-        for i in range(0, 10):
-            logger.warn("test warn %s" % (i,))
-
-        # Send a bunch of info messages
-        for i in range(0, 3):
-            logger.info("test message %s" % (i,))
-
-        # The last debug message pushes it past the maximum buffer
-        logger.debug("too much debug")
-
-        # Allow the reconnection
-        client, server = connect_client(self.reactor, 0)
-        self.pump()
-
-        # The 10 warnings made it through, the debugs and infos were elided
-        logs = list(map(json.loads, server.data.decode("utf8").splitlines()))
-        self.assertEqual(len(logs), 10)
-
-        self.assertEqual(Counter([x["level"] for x in logs]), {"WARN": 10})
-
-    def test_log_backpressure_cut_middle(self):
-        """
-        When backpressure is hit, and no more DEBUG and INFOs cannot be culled,
-        it will cut the middle messages out.
-        """
-        log_config = {
-            "loggers": {"synapse": {"level": "DEBUG"}},
-            "drains": {
-                "tersejson": {
-                    "type": "network_json_terse",
-                    "host": "127.0.0.1",
-                    "port": 8000,
-                    "maximum_buffer": 10,
-                }
-            },
-        }
-
-        # Begin the logger with our config
-        beginner = FakeBeginner()
-        setup_structured_logging(
-            self.hs,
-            self.hs.config,
-            log_config,
-            logBeginner=beginner,
-            redirect_stdlib_logging=False,
-        )
-
-        logger = Logger(
-            namespace="synapse.logging.test_terse_json", observer=beginner.observers[0]
-        )
-
-        # Send a bunch of useful messages
-        for i in range(0, 20):
-            logger.warn("test warn", num=i)
-
-        # Allow the reconnection
-        client, server = connect_client(self.reactor, 0)
-        self.pump()
-
-        # The first five and last five warnings made it through, the debugs and
-        # infos were elided
-        logs = list(map(json.loads, server.data.decode("utf8").splitlines()))
-        self.assertEqual(len(logs), 10)
-        self.assertEqual(Counter([x["level"] for x in logs]), {"WARN": 10})
-        self.assertEqual([0, 1, 2, 3, 4, 15, 16, 17, 18, 19], [x["num"] for x in logs])
+        # The terse logger should give us these keys.
+        expected_log_keys = [
+            "log",
+            "level",
+            "namespace",
+        ]
+        self.assertCountEqual(log.keys(), expected_log_keys)
+        self.assertEqual(log["log"], "Hello there, wally!")

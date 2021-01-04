@@ -59,7 +59,7 @@ class DictProperty:
             #
             # To exclude the KeyError from the traceback, we explicitly
             # 'raise from e1.__context__' (which is better than 'raise from None',
-            # becuase that would omit any *earlier* exceptions).
+            # because that would omit any *earlier* exceptions).
             #
             raise AttributeError(
                 "'%s' has no '%s' property" % (type(instance), self.key)
@@ -97,12 +97,15 @@ class DefaultDictProperty(DictProperty):
 
 
 class _EventInternalMetadata:
-    __slots__ = ["_dict"]
+    __slots__ = ["_dict", "stream_ordering"]
 
     def __init__(self, internal_metadata_dict: JsonDict):
         # we have to copy the dict, because it turns out that the same dict is
         # reused. TODO: fix that
         self._dict = dict(internal_metadata_dict)
+
+        # the stream ordering of this event. None, until it has been persisted.
+        self.stream_ordering = None  # type: Optional[int]
 
     outlier = DictProperty("outlier")  # type: bool
     out_of_band_membership = DictProperty("out_of_band_membership")  # type: bool
@@ -113,7 +116,6 @@ class _EventInternalMetadata:
     redacted = DictProperty("redacted")  # type: bool
     txn_id = DictProperty("txn_id")  # type: str
     token_id = DictProperty("token_id")  # type: str
-    stream_ordering = DictProperty("stream_ordering")  # type: int
 
     # XXX: These are set by StreamWorkerStore._set_before_and_after.
     # I'm pretty sure that these are never persisted to the database, so shouldn't
@@ -310,6 +312,12 @@ class EventBase(metaclass=abc.ABCMeta):
         """
         return [e for e, _ in self.auth_events]
 
+    def freeze(self):
+        """'Freeze' the event dict, so it cannot be modified by accident"""
+
+        # this will be a no-op if the event dict is already frozen.
+        self._dict = freeze(self._dict)
+
 
 class FrozenEvent(EventBase):
     format_version = EventFormatVersions.V1  # All events of this type are V1
@@ -360,7 +368,7 @@ class FrozenEvent(EventBase):
         return self.__repr__()
 
     def __repr__(self):
-        return "<FrozenEvent event_id='%s', type='%s', state_key='%s'>" % (
+        return "<FrozenEvent event_id=%r, type=%r, state_key=%r>" % (
             self.get("event_id", None),
             self.get("type", None),
             self.get("state_key", None),
@@ -443,7 +451,7 @@ class FrozenEventV2(EventBase):
         return self.__repr__()
 
     def __repr__(self):
-        return "<%s event_id='%s', type='%s', state_key='%s'>" % (
+        return "<%s event_id=%r, type=%r, state_key=%r>" % (
             self.__class__.__name__,
             self.event_id,
             self.get("type", None),

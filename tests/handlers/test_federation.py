@@ -38,7 +38,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(http_client=None)
-        self.handler = hs.get_handlers().federation_handler
+        self.handler = hs.get_federation_handler()
         self.store = hs.get_datastore()
         return hs
 
@@ -59,7 +59,6 @@ class FederationTestCase(unittest.HomeserverTestCase):
         )
 
         d = self.handler.on_exchange_third_party_invite_request(
-            room_id=room_id,
             event_dict={
                 "type": EventTypes.Member,
                 "room_id": room_id,

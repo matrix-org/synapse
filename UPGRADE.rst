@@ -75,6 +75,91 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+Upgrading to v1.24.0
+====================
+
+Custom OpenID Connect mapping provider breaking change
+------------------------------------------------------
+
+This release allows the OpenID Connect mapping provider to perform normalisation
+of the localpart of the Matrix ID. This allows for the mapping provider to
+specify different algorithms, instead of the [default way](https://matrix.org/docs/spec/appendices#mapping-from-other-character-sets).
+
+If your Synapse configuration uses a custom mapping provider
+(`oidc_config.user_mapping_provider.module` is specified and not equal to
+`synapse.handlers.oidc_handler.JinjaOidcMappingProvider`) then you *must* ensure
+that `map_user_attributes` of the mapping provider performs some normalisation
+of the `localpart` returned. To match previous behaviour you can use the
+`map_username_to_mxid_localpart` function provided by Synapse. An example is
+shown below:
+
+.. code-block:: python
+
+  from synapse.types import map_username_to_mxid_localpart
+
+  class MyMappingProvider:
+      def map_user_attributes(self, userinfo, token):
+          # ... your custom logic ...
+          sso_user_id = ...
+          localpart = map_username_to_mxid_localpart(sso_user_id)
+
+          return {"localpart": localpart}
+
+Removal historical Synapse Admin API 
+------------------------------------
+
+Historically, the Synapse Admin API has been accessible under:
+
+* ``/_matrix/client/api/v1/admin``
+* ``/_matrix/client/unstable/admin``
+* ``/_matrix/client/r0/admin``
+* ``/_synapse/admin/v1``
+
+The endpoints with ``/_matrix/client/*`` prefixes have been removed as of v1.24.0.
+The Admin API is now only accessible under:
+
+* ``/_synapse/admin/v1``
+
+The only exception is the `/admin/whois` endpoint, which is
+`also available via the client-server API <https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-admin-whois-userid>`_.
+
+The deprecation of the old endpoints was announced with Synapse 1.20.0 (released
+on 2020-09-22) and makes it easier for homeserver admins to lock down external
+access to the Admin API endpoints.
+
+Upgrading to v1.23.0
+====================
+
+Structured logging configuration breaking changes
+-------------------------------------------------
+
+This release deprecates use of the ``structured: true`` logging configuration for
+structured logging. If your logging configuration contains ``structured: true``
+then it should be modified based on the `structured logging documentation
+<https://github.com/matrix-org/synapse/blob/master/docs/structured_logging.md>`_.
+
+The ``structured`` and ``drains`` logging options are now deprecated and should
+be replaced by standard logging configuration of ``handlers`` and ``formatters``.
+
+A future will release of Synapse will make using ``structured: true`` an error.
+
+Upgrading to v1.22.0
+====================
+
+ThirdPartyEventRules breaking changes
+-------------------------------------
+
+This release introduces a backwards-incompatible change to modules making use of
+``ThirdPartyEventRules`` in Synapse. If you make use of a module defined under the
+``third_party_event_rules`` config option, please make sure it is updated to handle
+the below change:
+
+The ``http_client`` argument is no longer passed to modules as they are initialised. Instead,
+modules are expected to make use of the ``http_client`` property on the ``ModuleApi`` class.
+Modules are now passed a ``module_api`` argument during initialisation, which is an instance of
+``ModuleApi``. ``ModuleApi`` instances have a ``http_client`` property which acts the same as
+the ``http_client`` argument previously passed to ``ThirdPartyEventRules`` modules.
+
 Upgrading to v1.21.0
 ====================
 

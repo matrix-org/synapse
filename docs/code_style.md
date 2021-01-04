@@ -64,8 +64,6 @@ save as it takes a while and is very resource intensive.
     -   Use underscores for functions and variables.
 -   **Docstrings**: should follow the [google code
     style](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings).
-    This is so that we can generate documentation with
-    [sphinx](http://sphinxcontrib-napoleon.readthedocs.org/en/latest/).
     See the
     [examples](http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html)
     in the sphinx documentation.

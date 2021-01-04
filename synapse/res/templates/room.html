@@ -1,23 +1,23 @@
 <table class="room">
     <tr class="room_header">
         <td class="room_avatar">
-            {% if room.avatar_url %}
+            {%- if room.avatar_url %}
                 <img alt="" src="{{ room.avatar_url|mxc_to_http(48,48) }}" />
-            {% else %}
-                {% if room.hash % 3 == 0 %}
+            {%- else %}
+                {%- if room.hash % 3 == 0 %}
                     <img alt="" src="https://riot.im/img/external/avatar-1.png"  />
-                {% elif room.hash % 3 == 1 %}
+                {%- elif room.hash % 3 == 1 %}
                     <img alt="" src="https://riot.im/img/external/avatar-2.png"  />
-                {% else %}
+                {%- else %}
                     <img alt="" src="https://riot.im/img/external/avatar-3.png"  />
-                {% endif %}
-            {% endif %}
+                {%- endif %}
+            {%- endif %}
         </td>
         <td class="room_name" colspan="2">
             {{ room.title }}
         </td>
     </tr>
-    {% if room.invite %}
+    {%- if room.invite %}
         <tr>
             <td></td>
             <td>
@@ -25,9 +25,9 @@
             </td>
             <td></td>
         </tr>
-    {% else %}
-        {% for notif in room.notifs %}
-            {% include 'notif.html' with context %}
-        {% endfor %}
-    {% endif %}
+    {%- else %}
+        {%- for notif in room.notifs %}
+            {%- include 'notif.html' with context %}
+        {%- endfor %}
+    {%- endif %}
 </table>

@@ -57,7 +57,7 @@ light workloads.
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 3.5.2 or later, up to Python 3.8.
+- Python 3.5.2 or later, up to Python 3.9.
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
 Synapse is written in Python but some of the libraries it uses are written in
@@ -487,7 +487,7 @@ In nginx this would be something like:
 ```
 location /.well-known/matrix/client {
     return 200 '{"m.homeserver": {"base_url": "https://<matrix.example.com>"}}';
-    add_header Content-Type application/json;
+    default_type application/json;
     add_header Access-Control-Allow-Origin *;
 }
 ```

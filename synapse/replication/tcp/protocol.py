@@ -51,10 +51,11 @@ import fcntl
 import logging
 import struct
 from inspect import isawaitable
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Optional
 
 from prometheus_client import Counter
 
+from twisted.internet import task
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.python.failure import Failure
 
@@ -152,9 +153,10 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
 
         self.last_received_command = self.clock.time_msec()
         self.last_sent_command = 0
-        self.time_we_closed = None  # When we requested the connection be closed
+        # When we requested the connection be closed
+        self.time_we_closed = None  # type: Optional[int]
 
-        self.received_ping = False  # Have we reecived a ping from the other side
+        self.received_ping = False  # Have we received a ping from the other side
 
         self.state = ConnectionStates.CONNECTING
 
@@ -165,7 +167,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         self.pending_commands = []  # type: List[Command]
 
         # The LoopingCall for sending pings.
-        self._send_ping_loop = None
+        self._send_ping_loop = None  # type: Optional[task.LoopingCall]
 
         # a logcontext which we use for processing incoming commands. We declare it as a
         # background process so that the CPU stats get reported to prometheus.

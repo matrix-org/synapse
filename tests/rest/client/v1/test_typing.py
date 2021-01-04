@@ -44,7 +44,7 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
 
         self.event_source = hs.get_event_sources().sources["typing"]
 
-        hs.get_handlers().federation_handler = Mock()
+        hs.get_federation_handler = Mock()
 
         async def get_user_by_access_token(token=None, allow_guest=False):
             return {
@@ -99,7 +99,6 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             b'{"typing": true, "timeout": 30000}',
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
 
         self.assertEquals(self.event_source.get_current_key(), 1)
@@ -123,7 +122,6 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             b'{"typing": false}',
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
 
     def test_typing_timeout(self):
@@ -132,7 +130,6 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             b'{"typing": true, "timeout": 30000}',
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
 
         self.assertEquals(self.event_source.get_current_key(), 1)
@@ -146,7 +143,6 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             b'{"typing": true, "timeout": 30000}',
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
 
         self.assertEquals(self.event_source.get_current_key(), 3)

@@ -18,7 +18,7 @@
 
 import logging
 import re
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from urllib import parse as urlparse
 
 from synapse.api.constants import EventTypes, Membership
@@ -48,8 +48,7 @@ from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, 
 from synapse.util import json_decoder
 from synapse.util.stringutils import random_string
 
-MYPY = False
-if MYPY:
+if TYPE_CHECKING:
     import synapse.server
 
 logger = logging.getLogger(__name__)
@@ -72,20 +71,6 @@ class RoomCreateRestServlet(TransactionRestServlet):
     def register(self, http_server):
         PATTERNS = "/createRoom"
         register_txn_path(self, PATTERNS, http_server)
-        # define CORS for all of /rooms in RoomCreateRestServlet for simplicity
-        http_server.register_paths(
-            "OPTIONS",
-            client_patterns("/rooms(?:/.*)?$", v1=True),
-            self.on_OPTIONS,
-            self.__class__.__name__,
-        )
-        # define CORS for /createRoom[/txnid]
-        http_server.register_paths(
-            "OPTIONS",
-            client_patterns("/createRoom(?:/.*)?$", v1=True),
-            self.on_OPTIONS,
-            self.__class__.__name__,
-        )
 
     def on_PUT(self, request, txn_id):
         set_tag("txn_id", txn_id)
@@ -104,15 +89,11 @@ class RoomCreateRestServlet(TransactionRestServlet):
         user_supplied_config = parse_json_object_from_request(request)
         return user_supplied_config
 
-    def on_OPTIONS(self, request):
-        return 200, {}
-
 
 # TODO: Needs unit testing for generic events
 class RoomStateEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
         super().__init__(hs)
-        self.handlers = hs.get_handlers()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.message_handler = hs.get_message_handler()
@@ -799,7 +780,6 @@ class RoomMembershipRestServlet(TransactionRestServlet):
 class RoomRedactEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
         super().__init__(hs)
-        self.handlers = hs.get_handlers()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
 
@@ -904,7 +884,7 @@ class RoomAliasListServlet(RestServlet):
     def __init__(self, hs: "synapse.server.HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.directory_handler = hs.get_handlers().directory_handler
+        self.directory_handler = hs.get_directory_handler()
 
     async def on_GET(self, request, room_id):
         requester = await self.auth.get_user_by_req(request)
@@ -921,7 +901,7 @@ class SearchRestServlet(RestServlet):
 
     def __init__(self, hs):
         super().__init__()
-        self.handlers = hs.get_handlers()
+        self.search_handler = hs.get_search_handler()
         self.auth = hs.get_auth()
 
     async def on_POST(self, request):
@@ -930,9 +910,7 @@ class SearchRestServlet(RestServlet):
         content = parse_json_object_from_request(request)
 
         batch = parse_string(request, "next_batch")
-        results = await self.handlers.search_handler.search(
-            requester.user, content, batch
-        )
+        results = await self.search_handler.search(requester.user, content, batch)
 
         return 200, results
 

@@ -358,6 +358,13 @@ def main():
         for worker in workers:
             env = os.environ.copy()
 
+            # Skip starting a worker if its already running
+            if os.path.exists(worker.pidfile) and pid_running(
+                int(open(worker.pidfile).read())
+            ):
+                print(worker.app + " already running")
+                continue
+
             if worker.cache_factor:
                 os.environ["SYNAPSE_CACHE_FACTOR"] = str(worker.cache_factor)
 

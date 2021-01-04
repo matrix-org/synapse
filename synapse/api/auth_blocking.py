@@ -14,10 +14,12 @@
 # limitations under the License.
 
 import logging
+from typing import Optional
 
 from synapse.api.constants import LimitBlockingTypes, UserTypes
 from synapse.api.errors import Codes, ResourceLimitError
 from synapse.config.server import is_threepid_reserved
+from synapse.types import Requester
 
 logger = logging.getLogger(__name__)
 
@@ -33,24 +35,47 @@ class AuthBlocking:
         self._max_mau_value = hs.config.max_mau_value
         self._limit_usage_by_mau = hs.config.limit_usage_by_mau
         self._mau_limits_reserved_threepids = hs.config.mau_limits_reserved_threepids
+        self._server_name = hs.hostname
 
-    async def check_auth_blocking(self, user_id=None, threepid=None, user_type=None):
+    async def check_auth_blocking(
+        self,
+        user_id: Optional[str] = None,
+        threepid: Optional[dict] = None,
+        user_type: Optional[str] = None,
+        requester: Optional[Requester] = None,
+    ):
         """Checks if the user should be rejected for some external reason,
         such as monthly active user limiting or global disable flag
 
         Args:
-            user_id(str|None): If present, checks for presence against existing
+            user_id: If present, checks for presence against existing
                 MAU cohort
 
-            threepid(dict|None): If present, checks for presence against configured
+            threepid: If present, checks for presence against configured
                 reserved threepid. Used in cases where the user is trying register
                 with a MAU blocked server, normally they would be rejected but their
                 threepid is on the reserved list. user_id and
                 threepid should never be set at the same time.
 
-            user_type(str|None): If present, is used to decide whether to check against
+            user_type: If present, is used to decide whether to check against
                 certain blocking reasons like MAU.
+
+            requester: If present, and the authenticated entity is a user, checks for
+                presence against existing MAU cohort. Passing in both a `user_id` and
+                `requester` is an error.
         """
+        if requester and user_id:
+            raise Exception(
+                "Passed in both 'user_id' and 'requester' to 'check_auth_blocking'"
+            )
+
+        if requester:
+            if requester.authenticated_entity.startswith("@"):
+                user_id = requester.authenticated_entity
+            elif requester.authenticated_entity == self._server_name:
+                # We never block the server from doing actions on behalf of
+                # users.
+                return
 
         # Never fail an auth check for the server notices users or support user
         # This can be a problem where event creation is prohibited due to blocking

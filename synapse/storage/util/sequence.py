@@ -17,6 +17,7 @@ import logging
 import threading
 from typing import Callable, List, Optional
 
+from synapse.storage.database import LoggingDatabaseConnection
 from synapse.storage.engines import (
     BaseDatabaseEngine,
     IncorrectDatabaseSetup,
@@ -53,7 +54,11 @@ class SequenceGenerator(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def check_consistency(
-        self, db_conn: Connection, table: str, id_column: str, positive: bool = True
+        self,
+        db_conn: LoggingDatabaseConnection,
+        table: str,
+        id_column: str,
+        positive: bool = True,
     ):
         """Should be called during start up to test that the current value of
         the sequence is greater than or equal to the maximum ID in the table.
@@ -82,9 +87,13 @@ class PostgresSequenceGenerator(SequenceGenerator):
         return [i for (i,) in txn]
 
     def check_consistency(
-        self, db_conn: Connection, table: str, id_column: str, positive: bool = True
+        self,
+        db_conn: LoggingDatabaseConnection,
+        table: str,
+        id_column: str,
+        positive: bool = True,
     ):
-        txn = db_conn.cursor()
+        txn = db_conn.cursor(txn_name="sequence.check_consistency")
 
         # First we get the current max ID from the table.
         table_sql = "SELECT GREATEST(%(agg)s(%(id)s), 0) FROM %(table)s" % {
@@ -117,6 +126,8 @@ class PostgresSequenceGenerator(SequenceGenerator):
         if max_stream_id > last_value:
             logger.warning(
                 "Postgres sequence %s is behind table %s: %d < %d",
+                self._sequence_name,
+                table,
                 last_value,
                 max_stream_id,
             )

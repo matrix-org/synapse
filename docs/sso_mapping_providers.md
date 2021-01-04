@@ -15,8 +15,15 @@ where SAML mapping providers come into play.
 SSO mapping providers are currently supported for OpenID and SAML SSO
 configurations. Please see the details below for how to implement your own.
 
+It is the responsibility of the mapping provider to normalise the SSO attributes
+and map them to a valid Matrix ID. The
+[specification for Matrix IDs](https://matrix.org/docs/spec/appendices#user-identifiers)
+has some information about what is considered valid. Alternately an easy way to
+ensure it is valid is to use a Synapse utility function:
+`synapse.types.map_username_to_mxid_localpart`.
+
 External mapping providers are provided to Synapse in the form of an external
-Python module. You can retrieve this module from [PyPi](https://pypi.org) or elsewhere,
+Python module. You can retrieve this module from [PyPI](https://pypi.org) or elsewhere,
 but it must be importable via Synapse (e.g. it must be in the same virtualenv
 as Synapse). The Synapse config is then modified to point to the mapping provider
 (and optionally provide additional configuration for it).
@@ -56,13 +63,22 @@ A custom mapping provider must specify the following methods:
                      information from.
     - This method must return a string, which is the unique identifier for the
       user. Commonly the ``sub`` claim of the response.
-* `map_user_attributes(self, userinfo, token)`
+* `map_user_attributes(self, userinfo, token, failures)`
     - This method must be async.
     - Arguments:
       - `userinfo` - A `authlib.oidc.core.claims.UserInfo` object to extract user
                      information from.
       - `token` - A dictionary which includes information necessary to make
                   further requests to the OpenID provider.
+      - `failures` - An `int` that represents the amount of times the returned
+                     mxid localpart mapping has failed.  This should be used
+                     to create a deduplicated mxid localpart which should be
+                     returned instead. For example, if this method returns
+                     `john.doe` as the value of `localpart` in the returned
+                     dict, and that is already taken on the homeserver, this
+                     method will be called again with the same parameters but
+                     with failures=1. The method should then return a different
+                     `localpart` value, such as `john.doe1`.
     - Returns a dictionary with two keys:
       - localpart: A required string, used to generate the Matrix ID.
       - displayname: An optional string, the display name for the user.
@@ -152,6 +168,13 @@ A custom mapping provider must specify the following methods:
                          the value of `mxid_localpart`.
        * `emails` - A list of emails for the new user. If not provided, will
                     default to an empty list.
+       
+       Alternatively it can raise a `synapse.api.errors.RedirectException` to
+       redirect the user to another page. This is useful to prompt the user for
+       additional information, e.g. if you want them to provide their own username.
+       It is the responsibility of the mapping provider to either redirect back
+       to `client_redirect_url` (including any additional information) or to
+       complete registration using methods from the `ModuleApi`.
 
 ### Default SAML Mapping Provider
 

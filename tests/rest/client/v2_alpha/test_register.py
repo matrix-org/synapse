@@ -59,6 +59,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             self.hs.config.server_name,
             id="1234",
             namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
+            sender="@as:test",
         )
 
         self.hs.get_datastore().services_cache.append(appservice)
@@ -67,7 +68,6 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"POST", self.url + b"?access_token=i_am_an_app_service", request_data
         )
-        self.render(request)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
         det_data = {"user_id": user_id, "home_server": self.hs.hostname}
@@ -79,14 +79,12 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"POST", self.url + b"?access_token=i_am_an_app_service", request_data
         )
-        self.render(request)
 
         self.assertEquals(channel.result["code"], b"401", channel.result)
 
     def test_POST_bad_password(self):
         request_data = json.dumps({"username": "kermit", "password": 666})
         request, channel = self.make_request(b"POST", self.url, request_data)
-        self.render(request)
 
         self.assertEquals(channel.result["code"], b"400", channel.result)
         self.assertEquals(channel.json_body["error"], "Invalid password")
@@ -102,7 +100,6 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         }
         request_data = json.dumps(params)
         request, channel = self.make_request(b"POST", self.url, request_data)
-        self.render(request)
 
         det_data = {
             "user_id": user_id,
@@ -118,7 +115,6 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.auth_result = (None, {"username": "kermit", "password": "monkey"}, None)
 
         request, channel = self.make_request(b"POST", self.url, request_data)
-        self.render(request)
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(channel.json_body["error"], "Registration has been disabled")
@@ -128,7 +124,6 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.hs.config.allow_guest_access = True
 
         request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
-        self.render(request)
 
         det_data = {"home_server": self.hs.hostname, "device_id": "guest_device"}
         self.assertEquals(channel.result["code"], b"200", channel.result)
@@ -138,7 +133,6 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.hs.config.allow_guest_access = False
 
         request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
-        self.render(request)
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(channel.json_body["error"], "Guest access is disabled")
@@ -148,7 +142,6 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         for i in range(0, 6):
             url = self.url + b"?kind=guest"
             request, channel = self.make_request(b"POST", url, b"{}")
-            self.render(request)
 
             if i == 5:
                 self.assertEquals(channel.result["code"], b"429", channel.result)
@@ -159,7 +152,6 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.reactor.advance(retry_after_ms / 1000.0 + 1.0)
 
         request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
-        self.render(request)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
@@ -174,7 +166,6 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             }
             request_data = json.dumps(params)
             request, channel = self.make_request(b"POST", self.url, request_data)
-            self.render(request)
 
             if i == 5:
                 self.assertEquals(channel.result["code"], b"429", channel.result)
@@ -185,13 +176,11 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.reactor.advance(retry_after_ms / 1000.0 + 1.0)
 
         request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
-        self.render(request)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
     def test_advertised_flows(self):
         request, channel = self.make_request(b"POST", self.url, b"{}")
-        self.render(request)
         self.assertEquals(channel.result["code"], b"401", channel.result)
         flows = channel.json_body["flows"]
 
@@ -215,7 +204,6 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
     )
     def test_advertised_flows_captcha_and_terms_and_3pids(self):
         request, channel = self.make_request(b"POST", self.url, b"{}")
-        self.render(request)
         self.assertEquals(channel.result["code"], b"401", channel.result)
         flows = channel.json_body["flows"]
 
@@ -248,7 +236,6 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
     )
     def test_advertised_flows_no_msisdn_email_required(self):
         request, channel = self.make_request(b"POST", self.url, b"{}")
-        self.render(request)
         self.assertEquals(channel.result["code"], b"401", channel.result)
         flows = channel.json_body["flows"]
 
@@ -293,7 +280,6 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             b"register/email/requestToken",
             {"client_secret": "foobar", "email": email, "send_attempt": 1},
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
 
         self.assertIsNotNone(channel.json_body.get("sid"))
@@ -371,14 +357,12 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         # The specific endpoint doesn't matter, all we need is an authenticated
         # endpoint.
         request, channel = self.make_request(b"GET", "/sync", access_token=tok)
-        self.render(request)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         self.reactor.advance(datetime.timedelta(weeks=1).total_seconds())
 
         request, channel = self.make_request(b"GET", "/sync", access_token=tok)
-        self.render(request)
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(
@@ -397,19 +381,17 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         self.register_user("admin", "adminpassword", admin=True)
         admin_tok = self.login("admin", "adminpassword")
 
-        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        url = "/_synapse/admin/v1/account_validity/validity"
         params = {"user_id": user_id}
         request_data = json.dumps(params)
         request, channel = self.make_request(
             b"POST", url, request_data, access_token=admin_tok
         )
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # The specific endpoint doesn't matter, all we need is an authenticated
         # endpoint.
         request, channel = self.make_request(b"GET", "/sync", access_token=tok)
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
     def test_manual_expire(self):
@@ -419,7 +401,7 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         self.register_user("admin", "adminpassword", admin=True)
         admin_tok = self.login("admin", "adminpassword")
 
-        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        url = "/_synapse/admin/v1/account_validity/validity"
         params = {
             "user_id": user_id,
             "expiration_ts": 0,
@@ -429,13 +411,11 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"POST", url, request_data, access_token=admin_tok
         )
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # The specific endpoint doesn't matter, all we need is an authenticated
         # endpoint.
         request, channel = self.make_request(b"GET", "/sync", access_token=tok)
-        self.render(request)
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(
             channel.json_body["errcode"], Codes.EXPIRED_ACCOUNT, channel.result
@@ -448,7 +428,7 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         self.register_user("admin", "adminpassword", admin=True)
         admin_tok = self.login("admin", "adminpassword")
 
-        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        url = "/_synapse/admin/v1/account_validity/validity"
         params = {
             "user_id": user_id,
             "expiration_ts": 0,
@@ -458,12 +438,10 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"POST", url, request_data, access_token=admin_tok
         )
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # Try to log the user out
         request, channel = self.make_request(b"POST", "/logout", access_token=tok)
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # Log the user in again (allowed for expired accounts)
@@ -471,7 +449,6 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
 
         # Try to log out all of the user's sessions
         request, channel = self.make_request(b"POST", "/logout/all", access_token=tok)
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
 
@@ -515,7 +492,7 @@ class AccountValidityUserDirectoryTestCase(unittest.HomeserverTestCase):
         admin_tok = self.login("admin", "adminpassword")
 
         # Ensure the admin never expires
-        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        url = "/_synapse/admin/v1/account_validity/validity"
         params = {
             "user_id": admin_id,
             "expiration_ts": 999999999999,
@@ -525,7 +502,6 @@ class AccountValidityUserDirectoryTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"POST", url, request_data, access_token=admin_tok
         )
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # Mock the homeserver's HTTP client
@@ -556,7 +532,7 @@ class AccountValidityUserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertIsNotNone(replicated_content)
 
         # Expire the user
-        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        url = "/_synapse/admin/v1/account_validity/validity"
         params = {
             "user_id": user_id,
             "expiration_ts": 0,
@@ -566,7 +542,6 @@ class AccountValidityUserDirectoryTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"POST", url, request_data, access_token=admin_tok
         )
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # Wait for the background job to run which hides expired users in the directory
@@ -590,7 +565,7 @@ class AccountValidityUserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertIsNone(replicated_content)
 
         # Now renew the user, and check they get replicated again to the identity server
-        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        url = "/_synapse/admin/v1/account_validity/validity"
         params = {
             "user_id": user_id,
             "expiration_ts": 99999999999,
@@ -600,7 +575,6 @@ class AccountValidityUserDirectoryTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"POST", url, request_data, access_token=admin_tok
         )
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         self.pump(10)
@@ -695,7 +669,6 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         renewal_token = self.get_success(self.store.get_renewal_token_for_user(user_id))
         url = "/_matrix/client/unstable/account_validity/renew?token=%s" % renewal_token
         request, channel = self.make_request(b"GET", url)
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # Check that we're getting HTML back.
@@ -714,7 +687,6 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         # Move 1 day forward. Try to renew with the same token again.
         url = "/_matrix/client/unstable/account_validity/renew?token=%s" % renewal_token
         request, channel = self.make_request(b"GET", url)
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # Check that we're getting HTML back.
@@ -735,7 +707,6 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         # succeed.
         self.reactor.advance(datetime.timedelta(days=3).total_seconds())
         request, channel = self.make_request(b"GET", "/sync", access_token=tok)
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
     def test_renewal_invalid_token(self):
@@ -743,7 +714,6 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         # expected, i.e. that it responds with 404 Not Found and the correct HTML.
         url = "/_matrix/client/unstable/account_validity/renew?token=123"
         request, channel = self.make_request(b"GET", url)
-        self.render(request)
         self.assertEquals(channel.result["code"], b"404", channel.result)
 
         # Check that we're getting HTML back.
@@ -766,7 +736,6 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/unstable/account_validity/send_mail",
             access_token=tok,
         )
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         self.assertEqual(len(self.email_attempts), 1)
@@ -789,8 +758,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", "account/deactivate", request_data, access_token=tok
         )
-        self.render(request)
-        self.assertEqual(request.code, 200, channel.result)
+        self.assertEqual(request.code, 200)
 
         self.reactor.advance(datetime.timedelta(days=8).total_seconds())
 
@@ -801,7 +769,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         tok = self.login("kermit", "monkey")
         # We need to manually add an email address otherwise the handler will do
         # nothing.
-        now = self.hs.clock.time_msec()
+        now = self.hs.get_clock().time_msec()
         self.get_success(
             self.store.user_add_threepid(
                 user_id=user_id,
@@ -819,7 +787,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
         # We need to manually add an email address otherwise the handler will do
         # nothing.
-        now = self.hs.clock.time_msec()
+        now = self.hs.get_clock().time_msec()
         self.get_success(
             self.store.user_add_threepid(
                 user_id=user_id,
@@ -843,7 +811,6 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/unstable/account_validity/send_mail",
             access_token=tok,
         )
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         self.assertEqual(len(self.email_attempts), 1)
@@ -882,7 +849,7 @@ class AccountValidityBackgroundJobTestCase(unittest.HomeserverTestCase):
         """
         user_id = self.register_user("kermit_delta", "user")
 
-        now_ms = self.hs.clock.time_msec()
+        now_ms = self.hs.get_clock().time_msec()
         self.get_success(self.store._set_expiration_date_when_missing())
 
         res = self.get_success(self.store.get_expiration_ts_for_user(user_id))

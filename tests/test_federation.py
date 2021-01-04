@@ -20,7 +20,7 @@ from twisted.internet.defer import succeed
 from synapse.api.errors import FederationError
 from synapse.events import make_event_from_dict
 from synapse.logging.context import LoggingContext
-from synapse.types import Requester, UserID
+from synapse.types import UserID, create_requester
 from synapse.util import Clock
 from synapse.util.retryutils import NotRetryingDestination
 
@@ -43,7 +43,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         )
 
         user_id = UserID("us", "test")
-        our_user = Requester(user_id, None, False, False, None, None)
+        our_user = create_requester(user_id)
         room_creator = self.homeserver.get_room_creation_handler()
         self.room_id = self.get_success(
             room_creator.create_room(
@@ -75,7 +75,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
             }
         )
 
-        self.handler = self.homeserver.get_handlers().federation_handler
+        self.handler = self.homeserver.get_federation_handler()
         self.handler.do_auth = lambda origin, event, context, auth_events: succeed(
             context
         )

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
+# Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -67,6 +68,7 @@ class KeyUploadServlet(RestServlet):
         super().__init__()
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
+        self.device_handler = hs.get_device_handler()
 
     @trace(opname="upload_keys")
     async def on_POST(self, request, device_id):
@@ -75,23 +77,28 @@ class KeyUploadServlet(RestServlet):
         body = parse_json_object_from_request(request)
 
         if device_id is not None:
-            # passing the device_id here is deprecated; however, we allow it
-            # for now for compatibility with older clients.
+            # Providing the device_id should only be done for setting keys
+            # for dehydrated devices; however, we allow it for any device for
+            # compatibility with older clients.
             if requester.device_id is not None and device_id != requester.device_id:
-                set_tag("error", True)
-                log_kv(
-                    {
-                        "message": "Client uploading keys for a different device",
-                        "logged_in_id": requester.device_id,
-                        "key_being_uploaded": device_id,
-                    }
+                dehydrated_device = await self.device_handler.get_dehydrated_device(
+                    user_id
                 )
-                logger.warning(
-                    "Client uploading keys for a different device "
-                    "(logged in as %s, uploading for %s)",
-                    requester.device_id,
-                    device_id,
-                )
+                if dehydrated_device is not None and device_id != dehydrated_device[0]:
+                    set_tag("error", True)
+                    log_kv(
+                        {
+                            "message": "Client uploading keys for a different device",
+                            "logged_in_id": requester.device_id,
+                            "key_being_uploaded": device_id,
+                        }
+                    )
+                    logger.warning(
+                        "Client uploading keys for a different device "
+                        "(logged in as %s, uploading for %s)",
+                        requester.device_id,
+                        device_id,
+                    )
         else:
             device_id = requester.device_id
 

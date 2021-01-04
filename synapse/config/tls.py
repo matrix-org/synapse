@@ -18,7 +18,7 @@ import os
 import warnings
 from datetime import datetime
 from hashlib import sha256
-from typing import List
+from typing import List, Optional
 
 from unpaddedbase64 import encode_base64
 
@@ -177,8 +177,8 @@ class TlsConfig(Config):
             "use_insecure_ssl_client_just_for_testing_do_not_use"
         )
 
-        self.tls_certificate = None
-        self.tls_private_key = None
+        self.tls_certificate = None  # type: Optional[crypto.X509]
+        self.tls_private_key = None  # type: Optional[crypto.PKey]
 
     def is_disk_cert_valid(self, allow_self_signed=True):
         """
@@ -226,12 +226,12 @@ class TlsConfig(Config):
         days_remaining = (expires_on - now).days
         return days_remaining
 
-    def read_certificate_from_disk(self, require_cert_and_key):
+    def read_certificate_from_disk(self, require_cert_and_key: bool):
         """
         Read the certificates and private key from disk.
 
         Args:
-            require_cert_and_key (bool): set to True to throw an error if the certificate
+            require_cert_and_key: set to True to throw an error if the certificate
                 and key file are not given
         """
         if require_cert_and_key:
@@ -479,13 +479,13 @@ class TlsConfig(Config):
             }
         )
 
-    def read_tls_certificate(self):
+    def read_tls_certificate(self) -> crypto.X509:
         """Reads the TLS certificate from the configured file, and returns it
 
         Also checks if it is self-signed, and warns if so
 
         Returns:
-            OpenSSL.crypto.X509: the certificate
+            The certificate
         """
         cert_path = self.tls_certificate_file
         logger.info("Loading TLS certificate from %s", cert_path)
@@ -504,11 +504,11 @@ class TlsConfig(Config):
 
         return cert
 
-    def read_tls_private_key(self):
+    def read_tls_private_key(self) -> crypto.PKey:
         """Reads the TLS private key from the configured file, and returns it
 
         Returns:
-            OpenSSL.crypto.PKey: the private key
+            The private key
         """
         private_key_path = self.tls_private_key_file
         logger.info("Loading TLS key from %s", private_key_path)

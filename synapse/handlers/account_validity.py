@@ -18,19 +18,25 @@ import email.utils
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
-from synapse.api.errors import StoreError
+from synapse.api.errors import StoreError, SynapseError
 from synapse.logging.context import make_deferred_yieldable
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.metrics.background_process_metrics import (
+    run_as_background_process,
+    wrap_as_background_process,
+)
 from synapse.types import UserID
 from synapse.util import stringutils
+
+if TYPE_CHECKING:
+    from synapse.app.homeserver import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
 class AccountValidityHandler:
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.config = hs.config
         self.store = self.hs.get_datastore()
@@ -73,14 +79,8 @@ class AccountValidityHandler:
             self._raw_from = email.utils.parseaddr(self._from_string)[1]
 
             # Check the renewal emails to send and send them every 30min.
-            def send_emails():
-                # run as a background process to make sure that the database transactions
-                # have a logcontext to report to
-                return run_as_background_process(
-                    "send_renewals", self._send_renewal_emails
-                )
-
-            self.clock.looping_call(send_emails, 30 * 60 * 1000)
+            if hs.config.run_background_tasks:
+                self.clock.looping_call(self._send_renewal_emails, 30 * 60 * 1000)
 
         # Mark users as inactive when they expired. Check once every hour
         if self._account_validity_enabled:
@@ -94,7 +94,8 @@ class AccountValidityHandler:
 
             self.clock.looping_call(mark_expired_users_as_inactive, 60 * 60 * 1000)
 
-    async def _send_renewal_emails(self):
+    @wrap_as_background_process("send_renewals")
+    async def _send_renewal_emails(self) -> None:
         """Gets the list of users whose account is expiring in the amount of time
         configured in the ``renew_at`` parameter from the ``account_validity``
         configuration, and sends renewal emails to all of these users as long as they
@@ -108,11 +109,25 @@ class AccountValidityHandler:
                     user_id=user["user_id"], expiration_ts=user["expiration_ts_ms"]
                 )
 
-    async def send_renewal_email_to_user(self, user_id: str):
+    async def send_renewal_email_to_user(self, user_id: str) -> None:
+        """
+        Send a renewal email for a specific user.
+
+        Args:
+            user_id: The user ID to send a renewal email for.
+
+        Raises:
+            SynapseError if the user is not set to renew.
+        """
         expiration_ts = await self.store.get_expiration_ts_for_user(user_id)
+
+        # If this user isn't set to be expired, raise an error.
+        if expiration_ts is None:
+            raise SynapseError(400, "User has no expiration time: %s" % (user_id,))
+
         await self._send_renewal_email(user_id, expiration_ts)
 
-    async def _send_renewal_email(self, user_id: str, expiration_ts: int):
+    async def _send_renewal_email(self, user_id: str, expiration_ts: int) -> None:
         """Sends out a renewal email to every email address attached to the given user
         with a unique link allowing them to renew their account.
 
@@ -284,7 +299,7 @@ class AccountValidityHandler:
         self,
         user_id: str,
         expiration_ts: Optional[int] = None,
-        email_sent: Optional[bool] = False,
+        email_sent: bool = False,
         renewal_token: Optional[str] = None,
     ) -> int:
         """Renews the account attached to a given user by pushing back the
