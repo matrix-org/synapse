@@ -52,7 +52,19 @@ class SsoIdentityProvider(Protocol):
 
     The main entry point is `handle_redirect_request`, which should return a URI to
     redirect the user's browser to the IdP's authentication page.
+
+    Each IdP should be registered with the SsoHandler via
+    `hs.get_sso_handler().register_identity_provider()`, so that requests to
+    `/_matrix/client/r0/login/sso/redirect` can be correctly dispatched.
     """
+
+    @property
+    @abc.abstractmethod
+    def idp_id(self) -> str:
+        """A unique identifier for this SSO provider
+
+        Eg, "saml", "cas", "github"
+        """
 
     @abc.abstractmethod
     async def handle_redirect_request(
@@ -135,6 +147,14 @@ class SsoHandler:
 
         # a map from session id to session data
         self._username_mapping_sessions = {}  # type: Dict[str, UsernameMappingSession]
+
+        # map from idp_id to SsoIdentityProvider
+        self._identity_providers = {}  # type: Dict[str, SsoIdentityProvider]
+
+    def register_identity_provider(self, p: SsoIdentityProvider):
+        p_id = p.idp_id
+        assert p_id not in self._identity_providers
+        self._identity_providers[p_id] = p
 
     def render_error(
         self,

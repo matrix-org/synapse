@@ -73,12 +73,13 @@ class SamlHandler(BaseHandler):
         )
 
         # identifier for the external_ids table
-        self._auth_provider_id = "saml"
+        self.idp_id = "saml"
 
         # a map from saml session id to Saml2SessionData object
         self._outstanding_requests_dict = {}  # type: Dict[str, Saml2SessionData]
 
         self._sso_handler = hs.get_sso_handler()
+        self._sso_handler.register_identity_provider(self)
 
     async def handle_redirect_request(
         self,
@@ -220,7 +221,7 @@ class SamlHandler(BaseHandler):
                 return
 
             return await self._sso_handler.complete_sso_ui_auth_request(
-                self._auth_provider_id,
+                self.idp_id,
                 remote_user_id,
                 current_session.ui_auth_session_id,
                 request,
@@ -316,7 +317,7 @@ class SamlHandler(BaseHandler):
             return None
 
         await self._sso_handler.complete_sso_login_request(
-            self._auth_provider_id,
+            self.idp_id,
             remote_user_id,
             request,
             client_redirect_url,

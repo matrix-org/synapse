@@ -119,9 +119,11 @@ class OidcHandler(BaseHandler):
         self._macaroon_secret_key = hs.config.macaroon_secret_key
 
         # identifier for the external_ids table
-        self._auth_provider_id = "oidc"
+        self.idp_id = "oidc"
 
         self._sso_handler = hs.get_sso_handler()
+
+        self._sso_handler.register_identity_provider(self)
 
     def _validate_metadata(self):
         """Verifies the provider metadata.
@@ -685,7 +687,7 @@ class OidcHandler(BaseHandler):
                 return
 
             return await self._sso_handler.complete_sso_ui_auth_request(
-                self._auth_provider_id, remote_user_id, ui_auth_session_id, request
+                self.idp_id, remote_user_id, ui_auth_session_id, request
             )
 
         # otherwise, it's a login
@@ -926,7 +928,7 @@ class OidcHandler(BaseHandler):
             extra_attributes = await get_extra_attributes(userinfo, token)
 
         await self._sso_handler.complete_sso_login_request(
-            self._auth_provider_id,
+            self.idp_id,
             remote_user_id,
             request,
             client_redirect_url,
