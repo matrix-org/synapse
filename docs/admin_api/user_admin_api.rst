@@ -252,21 +252,21 @@ An empty body may be passed for backwards compatibility.
 
 The following actions are performed when deactivating an user:
 
-- Try to unpind 3PIDs from Identity Server
-- Remove all 3PIDs from Homeserver
-- Delete any devices and E2E-Keys
-- Delete any access tokens
-- Delete password hash
-- Removal from all the rooms the user is a member of
-- Delete from user directory
+- Try to unpind 3PIDs from the identity server
+- Remove all 3PIDs from the homeserver
+- Delete all devices and E2EE keys
+- Delete all access tokens
+- Delete the password hash
+- Removal from all rooms the user is a member of
+- Remove the user from the user directory
 - Reject all pending invites
-- Remove all information on the user from the account_validity table
+- Remove all account validity information related to the user
 
-The following actions are additionally performed when deactivating an user and
-and you set ``erase`` to ``true``:
+The following additional actions are performed during deactivation if``erase``
+is set to ``true``:
 
-- Remove displayname
-- Remove avatar URL
+- Remove the user's display name
+- Remove the user's avatar URL
 - Mark the user as erased
 
 
