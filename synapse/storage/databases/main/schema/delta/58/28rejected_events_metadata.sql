@@ -14,4 +14,4 @@
  */
 
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
-  (5826, 'rejected_events_metadata', '{}');
+  (5828, 'rejected_events_metadata', '{}');
