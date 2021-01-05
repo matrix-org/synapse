@@ -121,6 +121,9 @@ class OidcHandler(BaseHandler):
         # identifier for the external_ids table
         self.idp_id = "oidc"
 
+        # user-facing name of this auth provider
+        self.idp_name = "OIDC"
+
         self._sso_handler = hs.get_sso_handler()
 
         self._sso_handler.register_identity_provider(self)

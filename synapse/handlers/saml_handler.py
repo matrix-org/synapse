@@ -75,6 +75,9 @@ class SamlHandler(BaseHandler):
         # identifier for the external_ids table
         self.idp_id = "saml"
 
+        # user-facing name of this auth provider
+        self.idp_name = "SAML"
+
         # a map from saml session id to Saml2SessionData object
         self._outstanding_requests_dict = {}  # type: Dict[str, Saml2SessionData]
 
