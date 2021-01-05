@@ -89,7 +89,7 @@ class RoomTestCase(_ShadowBannedBase):
         )
 
         # Inviting the user completes successfully.
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/rooms/%s/invite" % (room_id,),
             {"id_server": "test", "medium": "email", "address": "test@test.test"},
@@ -103,7 +103,7 @@ class RoomTestCase(_ShadowBannedBase):
     def test_create_room(self):
         """Invitations during a room creation should be discarded, but the room still gets created."""
         # The room creation is successful.
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/client/r0/createRoom",
             {"visibility": "public", "invite": [self.other_user_id]},
@@ -158,7 +158,7 @@ class RoomTestCase(_ShadowBannedBase):
             self.banned_user_id, tok=self.banned_access_token
         )
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/%s/upgrade" % (room_id,),
             {"new_version": "6"},
@@ -183,7 +183,7 @@ class RoomTestCase(_ShadowBannedBase):
             self.banned_user_id, tok=self.banned_access_token
         )
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/rooms/%s/typing/%s" % (room_id, self.banned_user_id),
             {"typing": True, "timeout": 30000},
@@ -198,7 +198,7 @@ class RoomTestCase(_ShadowBannedBase):
         # The other user can join and send typing events.
         self.helper.join(room_id, self.other_user_id, tok=self.other_access_token)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/rooms/%s/typing/%s" % (room_id, self.other_user_id),
             {"typing": True, "timeout": 30000},
@@ -244,7 +244,7 @@ class ProfileTestCase(_ShadowBannedBase):
         )
 
         # The update should succeed.
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/profile/%s/displayname" % (self.banned_user_id,),
             {"displayname": new_display_name},
@@ -254,7 +254,7 @@ class ProfileTestCase(_ShadowBannedBase):
         self.assertEqual(channel.json_body, {})
 
         # The user's display name should be updated.
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/profile/%s/displayname" % (self.banned_user_id,)
         )
         self.assertEqual(channel.code, 200, channel.result)
@@ -282,7 +282,7 @@ class ProfileTestCase(_ShadowBannedBase):
         )
 
         # The update should succeed.
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/rooms/%s/state/m.room.member/%s"
             % (room_id, self.banned_user_id),

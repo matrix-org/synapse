@@ -13,17 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
-from urllib.parse import parse_qs, urlparse
+import re
+from typing import Dict
+from urllib.parse import parse_qs, urlencode, urlparse
 
 from mock import ANY, Mock, patch
 
 import pymacaroons
 
-from synapse.handlers.oidc_handler import OidcError, OidcMappingProvider
+from twisted.web.resource import Resource
+
+from synapse.api.errors import RedirectException
+from synapse.handlers.oidc_handler import OidcError
 from synapse.handlers.sso import MappingException
+from synapse.rest.client.v1 import login
+from synapse.rest.synapse.client.pick_username import pick_username_resource
+from synapse.server import HomeServer
 from synapse.types import UserID
 
-from tests.test_utils import FakeResponse
+from tests.test_utils import FakeResponse, simple_async_mock
 from tests.unittest import HomeserverTestCase, override_config
 
 # These are a few constants that are used as config parameters in the tests.
@@ -55,10 +63,13 @@ COOKIE_NAME = b"oidc_session"
 COOKIE_PATH = "/_synapse/oidc"
 
 
-class TestMappingProvider(OidcMappingProvider):
+class TestMappingProvider:
     @staticmethod
     def parse_config(config):
         return
+
+    def __init__(self, config):
+        pass
 
     def get_remote_user_id(self, userinfo):
         return userinfo["sub"]
@@ -80,16 +91,6 @@ class TestMappingProviderFailures(TestMappingProvider):
             "localpart": userinfo["username"] + (str(failures) if failures else ""),
             "display_name": None,
         }
-
-
-def simple_async_mock(return_value=None, raises=None) -> Mock:
-    # AsyncMock is not available in python3.5, this mimics part of its behaviour
-    async def cb(*args, **kwargs):
-        if raises:
-            raise raises
-        return return_value
-
-    return Mock(side_effect=cb)
 
 
 async def get_json(url):
@@ -370,6 +371,13 @@ class OidcHandlerTestCase(HomeserverTestCase):
          - when the userinfo fetching fails
          - when the code exchange fails
         """
+
+        # ensure that we are correctly testing the fallback when "get_extra_attributes"
+        # is not implemented.
+        mapping_provider = self.handler._user_mapping_provider
+        with self.assertRaises(AttributeError):
+            _ = mapping_provider.get_extra_attributes
+
         token = {
             "type": "bearer",
             "id_token": "id_token",
@@ -399,14 +407,14 @@ class OidcHandlerTestCase(HomeserverTestCase):
             client_redirect_url=client_redirect_url,
             ui_auth_session_id=None,
         )
-        request = self._build_callback_request(
+        request = _build_callback_request(
             code, state, session, user_agent=user_agent, ip_address=ip_address
         )
 
         self.get_success(self.handler.handle_oidc_callback(request))
 
         auth_handler.complete_sso_login.assert_called_once_with(
-            expected_user_id, request, client_redirect_url, {},
+            expected_user_id, request, client_redirect_url, None,
         )
         self.handler._exchange_code.assert_called_once_with(code)
         self.handler._parse_id_token.assert_called_once_with(token, nonce=nonce)
@@ -437,7 +445,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.get_success(self.handler.handle_oidc_callback(request))
 
         auth_handler.complete_sso_login.assert_called_once_with(
-            expected_user_id, request, client_redirect_url, {},
+            expected_user_id, request, client_redirect_url, None,
         )
         self.handler._exchange_code.assert_called_once_with(code)
         self.handler._parse_id_token.assert_not_called()
@@ -607,7 +615,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             client_redirect_url=client_redirect_url,
             ui_auth_session_id=None,
         )
-        request = self._build_callback_request("code", state, session)
+        request = _build_callback_request("code", state, session)
 
         self.get_success(self.handler.handle_oidc_callback(request))
 
@@ -624,9 +632,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "sub": "test_user",
             "username": "test_user",
         }
-        self._make_callback_with_userinfo(userinfo)
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_called_once_with(
-            "@test_user:test", ANY, ANY, {}
+            "@test_user:test", ANY, ANY, None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
@@ -635,9 +643,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "sub": 1234,
             "username": "test_user_2",
         }
-        self._make_callback_with_userinfo(userinfo)
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_called_once_with(
-            "@test_user_2:test", ANY, ANY, {}
+            "@test_user_2:test", ANY, ANY, None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
@@ -648,7 +656,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             store.register_user(user_id=user3.to_string(), password_hash=None)
         )
         userinfo = {"sub": "test3", "username": "test_user_3"}
-        self._make_callback_with_userinfo(userinfo)
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_not_called()
         self.assertRenderedError(
             "mapping_error",
@@ -672,16 +680,16 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "sub": "test",
             "username": "test_user",
         }
-        self._make_callback_with_userinfo(userinfo)
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_called_once_with(
-            user.to_string(), ANY, ANY, {},
+            user.to_string(), ANY, ANY, None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
         # Subsequent calls should map to the same mxid.
-        self._make_callback_with_userinfo(userinfo)
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_called_once_with(
-            user.to_string(), ANY, ANY, {},
+            user.to_string(), ANY, ANY, None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
@@ -694,9 +702,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "sub": "test1",
             "username": "test_user",
         }
-        self._make_callback_with_userinfo(userinfo)
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_called_once_with(
-            user.to_string(), ANY, ANY, {},
+            user.to_string(), ANY, ANY, None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
@@ -715,7 +723,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "sub": "test2",
             "username": "TEST_USER_2",
         }
-        self._make_callback_with_userinfo(userinfo)
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_not_called()
         args = self.assertRenderedError("mapping_error")
         self.assertTrue(
@@ -730,14 +738,16 @@ class OidcHandlerTestCase(HomeserverTestCase):
             store.register_user(user_id=user2.to_string(), password_hash=None)
         )
 
-        self._make_callback_with_userinfo(userinfo)
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_called_once_with(
-            "@TEST_USER_2:test", ANY, ANY, {},
+            "@TEST_USER_2:test", ANY, ANY, None,
         )
 
     def test_map_userinfo_to_invalid_localpart(self):
         """If the mapping provider generates an invalid localpart it should be rejected."""
-        self._make_callback_with_userinfo({"sub": "test2", "username": "föö"})
+        self.get_success(
+            _make_callback_with_userinfo(self.hs, {"sub": "test2", "username": "föö"})
+        )
         self.assertRenderedError("mapping_error", "localpart is invalid: föö")
 
     @override_config(
@@ -762,11 +772,11 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "sub": "test",
             "username": "test_user",
         }
-        self._make_callback_with_userinfo(userinfo)
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
 
         # test_user is already taken, so test_user1 gets registered instead.
         auth_handler.complete_sso_login.assert_called_once_with(
-            "@test_user1:test", ANY, ANY, {},
+            "@test_user1:test", ANY, ANY, None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
@@ -784,70 +794,214 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "sub": "tester",
             "username": "tester",
         }
-        self._make_callback_with_userinfo(userinfo)
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_not_called()
         self.assertRenderedError(
             "mapping_error", "Unable to generate a Matrix ID from the SSO response"
         )
 
-    def _make_callback_with_userinfo(
-        self, userinfo: dict, client_redirect_url: str = "http://client/redirect"
-    ) -> None:
-        self.handler._exchange_code = simple_async_mock(return_value={})
-        self.handler._parse_id_token = simple_async_mock(return_value=userinfo)
-        self.handler._fetch_userinfo = simple_async_mock(return_value=userinfo)
-        auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = simple_async_mock()
+    def test_empty_localpart(self):
+        """Attempts to map onto an empty localpart should be rejected."""
+        userinfo = {
+            "sub": "tester",
+            "username": "",
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+        self.assertRenderedError("mapping_error", "localpart is invalid: ")
 
-        state = "state"
-        session = self.handler._generate_oidc_session_token(
-            state=state,
-            nonce="nonce",
-            client_redirect_url=client_redirect_url,
-            ui_auth_session_id=None,
+    @override_config(
+        {
+            "oidc_config": {
+                "user_mapping_provider": {
+                    "config": {"localpart_template": "{{ user.username }}"}
+                }
+            }
+        }
+    )
+    def test_null_localpart(self):
+        """Mapping onto a null localpart via an empty OIDC attribute should be rejected"""
+        userinfo = {
+            "sub": "tester",
+            "username": None,
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+        self.assertRenderedError("mapping_error", "localpart is invalid: ")
+
+
+class UsernamePickerTestCase(HomeserverTestCase):
+    servlets = [login.register_servlets]
+
+    def default_config(self):
+        config = super().default_config()
+        config["public_baseurl"] = BASE_URL
+        oidc_config = {
+            "enabled": True,
+            "client_id": CLIENT_ID,
+            "client_secret": CLIENT_SECRET,
+            "issuer": ISSUER,
+            "scopes": SCOPES,
+            "user_mapping_provider": {
+                "config": {"display_name_template": "{{ user.displayname }}"}
+            },
+        }
+
+        # Update this config with what's in the default config so that
+        # override_config works as expected.
+        oidc_config.update(config.get("oidc_config", {}))
+        config["oidc_config"] = oidc_config
+
+        # whitelist this client URI so we redirect straight to it rather than
+        # serving a confirmation page
+        config["sso"] = {"client_whitelist": ["https://whitelisted.client"]}
+        return config
+
+    def create_resource_dict(self) -> Dict[str, Resource]:
+        d = super().create_resource_dict()
+        d["/_synapse/client/pick_username"] = pick_username_resource(self.hs)
+        return d
+
+    def test_username_picker(self):
+        """Test the happy path of a username picker flow."""
+        client_redirect_url = "https://whitelisted.client"
+
+        # first of all, mock up an OIDC callback to the OidcHandler, which should
+        # raise a RedirectException
+        userinfo = {"sub": "tester", "displayname": "Jonny"}
+        f = self.get_failure(
+            _make_callback_with_userinfo(
+                self.hs, userinfo, client_redirect_url=client_redirect_url
+            ),
+            RedirectException,
         )
-        request = self._build_callback_request("code", state, session)
 
-        self.get_success(self.handler.handle_oidc_callback(request))
+        # check the Location and cookies returned by the RedirectException
+        self.assertEqual(f.value.location, b"/_synapse/client/pick_username")
+        cookieheader = f.value.cookies[0]
+        regex = re.compile(b"^username_mapping_session=([a-zA-Z]+);")
+        m = regex.search(cookieheader)
+        if not m:
+            self.fail("cookie header %s does not match %s" % (cookieheader, regex))
 
-    def _build_callback_request(
-        self,
-        code: str,
-        state: str,
-        session: str,
-        user_agent: str = "Browser",
-        ip_address: str = "10.0.0.1",
-    ):
-        """Builds a fake SynapseRequest to mock the browser callback
+        # introspect the sso handler a bit to check that the username mapping session
+        # looks ok.
+        session_id = m.group(1).decode("ascii")
+        username_mapping_sessions = self.hs.get_sso_handler()._username_mapping_sessions
+        self.assertIn(
+            session_id, username_mapping_sessions, "session id not found in map"
+        )
+        session = username_mapping_sessions[session_id]
+        self.assertEqual(session.remote_user_id, "tester")
+        self.assertEqual(session.display_name, "Jonny")
+        self.assertEqual(session.client_redirect_url, client_redirect_url)
 
-        Returns a Mock object which looks like the SynapseRequest we get from a browser
-        after SSO (before we return to the client)
+        # the expiry time should be about 15 minutes away
+        expected_expiry = self.clock.time_msec() + (15 * 60 * 1000)
+        self.assertApproximates(session.expiry_time_ms, expected_expiry, tolerance=1000)
 
-        Args:
-            code: the authorization code which would have been returned by the OIDC
-               provider
-            state: the "state" param which would have been passed around in the
-               query param. Should be the same as was embedded in the session in
-               _build_oidc_session.
-            session: the "session" which would have been passed around in the cookie.
-            user_agent: the user-agent to present
-            ip_address: the IP address to pretend the request came from
-        """
-        request = Mock(
-            spec=[
-                "args",
-                "getCookie",
-                "addCookie",
-                "requestHeaders",
-                "getClientIP",
-                "get_user_agent",
-            ]
+        # Now, submit a username to the username picker, which should serve a redirect
+        # back to the client
+        submit_path = f.value.location + b"/submit"
+        content = urlencode({b"username": b"bobby"}).encode("utf8")
+        chan = self.make_request(
+            "POST",
+            path=submit_path,
+            content=content,
+            content_is_form=True,
+            custom_headers=[
+                ("Cookie", cookieheader),
+                # old versions of twisted don't do form-parsing without a valid
+                # content-length header.
+                ("Content-Length", str(len(content))),
+            ],
+        )
+        self.assertEqual(chan.code, 302, chan.result)
+        location_headers = chan.headers.getRawHeaders("Location")
+        # ensure that the returned location starts with the requested redirect URL
+        self.assertEqual(
+            location_headers[0][: len(client_redirect_url)], client_redirect_url
         )
 
-        request.getCookie.return_value = session
-        request.args = {}
-        request.args[b"code"] = [code.encode("utf-8")]
-        request.args[b"state"] = [state.encode("utf-8")]
-        request.getClientIP.return_value = ip_address
-        request.get_user_agent.return_value = user_agent
-        return request
+        # fish the login token out of the returned redirect uri
+        parts = urlparse(location_headers[0])
+        query = parse_qs(parts.query)
+        login_token = query["loginToken"][0]
+
+        # finally, submit the matrix login token to the login API, which gives us our
+        # matrix access token, mxid, and device id.
+        chan = self.make_request(
+            "POST", "/login", content={"type": "m.login.token", "token": login_token},
+        )
+        self.assertEqual(chan.code, 200, chan.result)
+        self.assertEqual(chan.json_body["user_id"], "@bobby:test")
+
+
+async def _make_callback_with_userinfo(
+    hs: HomeServer, userinfo: dict, client_redirect_url: str = "http://client/redirect"
+) -> None:
+    """Mock up an OIDC callback with the given userinfo dict
+
+    We'll pull out the OIDC handler from the homeserver, stub out a couple of methods,
+    and poke in the userinfo dict as if it were the response to an OIDC userinfo call.
+
+    Args:
+        hs: the HomeServer impl to send the callback to.
+        userinfo: the OIDC userinfo dict
+        client_redirect_url: the URL to redirect to on success.
+    """
+    handler = hs.get_oidc_handler()
+    handler._exchange_code = simple_async_mock(return_value={})
+    handler._parse_id_token = simple_async_mock(return_value=userinfo)
+    handler._fetch_userinfo = simple_async_mock(return_value=userinfo)
+
+    state = "state"
+    session = handler._generate_oidc_session_token(
+        state=state,
+        nonce="nonce",
+        client_redirect_url=client_redirect_url,
+        ui_auth_session_id=None,
+    )
+    request = _build_callback_request("code", state, session)
+
+    await handler.handle_oidc_callback(request)
+
+
+def _build_callback_request(
+    code: str,
+    state: str,
+    session: str,
+    user_agent: str = "Browser",
+    ip_address: str = "10.0.0.1",
+):
+    """Builds a fake SynapseRequest to mock the browser callback
+
+    Returns a Mock object which looks like the SynapseRequest we get from a browser
+    after SSO (before we return to the client)
+
+    Args:
+        code: the authorization code which would have been returned by the OIDC
+           provider
+        state: the "state" param which would have been passed around in the
+           query param. Should be the same as was embedded in the session in
+           _build_oidc_session.
+        session: the "session" which would have been passed around in the cookie.
+        user_agent: the user-agent to present
+        ip_address: the IP address to pretend the request came from
+    """
+    request = Mock(
+        spec=[
+            "args",
+            "getCookie",
+            "addCookie",
+            "requestHeaders",
+            "getClientIP",
+            "get_user_agent",
+        ]
+    )
+
+    request.getCookie.return_value = session
+    request.args = {}
+    request.args[b"code"] = [code.encode("utf-8")]
+    request.args[b"state"] = [state.encode("utf-8")]
+    request.getClientIP.return_value = ip_address
+    request.get_user_agent.return_value = user_agent
+    return request

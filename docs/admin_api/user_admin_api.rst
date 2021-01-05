@@ -30,7 +30,12 @@ It returns a JSON body like the following:
         ],
         "avatar_url": "<avatar_url>",
         "admin": false,
-        "deactivated": false
+        "deactivated": false,
+        "password_hash": "$2b$12$p9B4GkqYdRTPGD",
+        "creation_ts": 1560432506,
+        "appservice_id": null,
+        "consent_server_notice_sent": null,
+        "consent_version": null
     }
 
 URL parameters:
@@ -139,7 +144,6 @@ A JSON body is returned with the following shape:
         "users": [
             {
                 "name": "<user_id1>",
-                "password_hash": "<password_hash1>",
                 "is_guest": 0,
                 "admin": 0,
                 "user_type": null,
@@ -148,7 +152,6 @@ A JSON body is returned with the following shape:
                 "avatar_url": null
             }, {
                 "name": "<user_id2>",
-                "password_hash": "<password_hash2>",
                 "is_guest": 0,
                 "admin": 1,
                 "user_type": null,

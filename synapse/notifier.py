@@ -34,7 +34,7 @@ from prometheus_client import Counter
 from twisted.internet import defer
 
 import synapse.server
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.api.errors import AuthError
 from synapse.events import EventBase
 from synapse.handlers.presence import format_user_presence_state
@@ -611,7 +611,9 @@ class Notifier:
             room_id, EventTypes.RoomHistoryVisibility, ""
         )
         if state and "history_visibility" in state.content:
-            return state.content["history_visibility"] == "world_readable"
+            return (
+                state.content["history_visibility"] == HistoryVisibility.WORLD_READABLE
+            )
         else:
             return False
 

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Synapse Login</title>
+    <link rel="stylesheet" href="style.css" type="text/css" />
+  </head>
+  <body>
+    <div class="card">
+      <form method="post" class="form__input" id="form" action="submit">
+        <label for="field-username">Please pick your username:</label>
+        <input type="text" name="username" id="field-username" autofocus="">
+        <input type="submit" class="button button--full-width" id="button-submit" value="Submit">
+      </form>
+      <!-- this is used for feedback -->
+      <div role=alert class="tooltip hidden" id="message"></div>
+      <script src="script.js"></script>
+    </div>
+  </body>
+</html>

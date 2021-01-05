@@ -220,7 +220,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(self.event_source.get_current_key(), 0)
 
-        (request, channel) = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/federation/v1/send/1000000",
             _make_edu_transaction_json(
