@@ -220,12 +220,8 @@ class EmailPusher(Pusher):
             )
 
     async def save_last_stream_ordering_and_success(
-        self, last_stream_ordering: Optional[int]
+        self, last_stream_ordering: int
     ) -> None:
-        if last_stream_ordering is None:
-            # This happens if we haven't yet processed anything
-            return
-
         self.last_stream_ordering = last_stream_ordering
         pusher_still_exists = await self.store.update_pusher_last_stream_ordering_and_success(
             self.app_id,
