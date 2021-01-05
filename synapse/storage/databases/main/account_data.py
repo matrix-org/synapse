@@ -293,7 +293,7 @@ class AccountDataWorkerStore(SQLBaseStore, metaclass=abc.ABCMeta):
         Get users which ignore the given user.
 
         Params:
-            user_id:
+            user_id: The user ID which might be ignored.
 
         Return:
             The user IDs which ignore the given user.
