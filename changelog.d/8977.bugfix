@@ -1,1 +1,0 @@
-Properly return 400 errors on invalid group IDs.
