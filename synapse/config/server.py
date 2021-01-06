@@ -23,6 +23,7 @@ from typing import Any, Dict, Iterable, List, Optional, Set
 
 import attr
 import yaml
+from netaddr import IPSet
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.endpoint import parse_and_validate_server_name
@@ -38,6 +39,34 @@ logger = logging.Logger(__name__)
 # We later check for errors when binding to 0.0.0.0 and ignore them if :: is also in
 # in the list.
 DEFAULT_BIND_ADDRESSES = ["::", "0.0.0.0"]
+
+DEFAULT_IP_RANGE_BLACKLIST = [
+    # Localhost
+    "127.0.0.0/8",
+    # Private networks.
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+    # Carrier grade NAT.
+    "100.64.0.0/10",
+    # Address registry.
+    "192.0.0.0/24",
+    # Link-local networks.
+    "169.254.0.0/16",
+    # Testing networks.
+    "198.18.0.0/15",
+    "192.0.2.0/24",
+    "198.51.100.0/24",
+    "203.0.113.0/24",
+    # Multicast.
+    "224.0.0.0/4",
+    # Localhost
+    "::1/128",
+    # Link-local addresses.
+    "fe80::/10",
+    # Unique local addresses.
+    "fc00::/7",
+]
 
 DEFAULT_ROOM_VERSION = "6"
 
@@ -255,6 +284,38 @@ class ServerConfig(Config):
         # Admin uri to direct users at should their instance become blocked
         # due to resource constraints
         self.admin_contact = config.get("admin_contact", None)
+
+        ip_range_blacklist = config.get(
+            "ip_range_blacklist", DEFAULT_IP_RANGE_BLACKLIST
+        )
+
+        # Attempt to create an IPSet from the given ranges
+        try:
+            self.ip_range_blacklist = IPSet(ip_range_blacklist)
+        except Exception as e:
+            raise ConfigError("Invalid range(s) provided in ip_range_blacklist.") from e
+        # Always blacklist 0.0.0.0, ::
+        self.ip_range_blacklist.update(["0.0.0.0", "::"])
+
+        try:
+            self.ip_range_whitelist = IPSet(config.get("ip_range_whitelist", ()))
+        except Exception as e:
+            raise ConfigError("Invalid range(s) provided in ip_range_whitelist.") from e
+
+        # The federation_ip_range_blacklist is used for backwards-compatibility
+        # and only applies to federation and identity servers. If it is not given,
+        # default to ip_range_blacklist.
+        federation_ip_range_blacklist = config.get(
+            "federation_ip_range_blacklist", ip_range_blacklist
+        )
+        try:
+            self.federation_ip_range_blacklist = IPSet(federation_ip_range_blacklist)
+        except Exception as e:
+            raise ConfigError(
+                "Invalid range(s) provided in federation_ip_range_blacklist."
+            ) from e
+        # Always blacklist 0.0.0.0, ::
+        self.federation_ip_range_blacklist.update(["0.0.0.0", "::"])
 
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != "/":
@@ -561,6 +622,10 @@ class ServerConfig(Config):
     def generate_config_section(
         self, server_name, data_dir_path, open_private_ports, listeners, **kwargs
     ):
+        ip_range_blacklist = "\n".join(
+            "        #  - '%s'" % ip for ip in DEFAULT_IP_RANGE_BLACKLIST
+        )
+
         _, bind_port = parse_and_validate_server_name(server_name)
         if bind_port is not None:
             unsecure_port = bind_port - 400
@@ -751,6 +816,33 @@ class ServerConfig(Config):
         # will receive errors when searching for messages. Defaults to enabled.
         #
         #enable_search: false
+
+        # Prevent outgoing requests from being sent to the following blacklisted IP address
+        # CIDR ranges. If this option is not specified then it defaults to private IP
+        # address ranges (see the example below).
+        #
+        # The blacklist applies to the outbound requests for federation, identity servers,
+        # push servers, and for checking key validity for third-party invite events.
+        #
+        # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
+        # listed here, since they correspond to unroutable addresses.)
+        #
+        # This option replaces federation_ip_range_blacklist in Synapse v1.25.0.
+        #
+        #ip_range_blacklist:
+%(ip_range_blacklist)s
+
+        # List of IP address CIDR ranges that should be allowed for federation,
+        # identity servers, push servers, and for checking key validity for
+        # third-party invite events. This is useful for specifying exceptions to
+        # wide-ranging blacklisted target IP ranges - e.g. for communication with
+        # a push server only visible in your network.
+        #
+        # This whitelist overrides ip_range_blacklist and defaults to an empty
+        # list.
+        #
+        #ip_range_whitelist:
+        #   - '192.168.1.1'
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.
