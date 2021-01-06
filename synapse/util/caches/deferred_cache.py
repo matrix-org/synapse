@@ -105,7 +105,7 @@ class DeferredCache(Generic[KT, VT]):
             keylen=keylen,
             cache_name=name,
             cache_type=cache_type,
-            size_callback=(lambda d: len(d)) if iterable else None,
+            size_callback=(lambda d: len(d) or 1) if iterable else None,
             metrics_collection_callback=metrics_cb,
             apply_cache_factor_from_config=apply_cache_factor_from_config,
         )  # type: LruCache[KT, VT]
