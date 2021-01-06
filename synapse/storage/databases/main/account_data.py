@@ -299,10 +299,11 @@ class AccountDataWorkerStore(SQLBaseStore, metaclass=abc.ABCMeta):
             The user IDs which ignore the given user.
         """
         return set(
-            await self.db_pool.simple_select_one_onecol(
+            await self.db_pool.simple_select_onecol(
                 table="ignored_users",
                 keyvalues={"ignored_user_id": user_id},
                 retcol="ignorer_user_id",
+                desc="ignored_by",
             )
         )
 
