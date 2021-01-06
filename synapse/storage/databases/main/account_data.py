@@ -287,7 +287,7 @@ class AccountDataWorkerStore(SQLBaseStore, metaclass=abc.ABCMeta):
             "get_updated_account_data_for_user", get_updated_account_data_for_user_txn
         )
 
-    @cached(max_entries=5000)
+    @cached(max_entries=5000, iterable=True)
     async def ignored_by(self, user_id: str) -> Set[str]:
         """
         Get users which ignore the given user.
