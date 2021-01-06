@@ -266,12 +266,13 @@ class DeferredCacheTestCase(TestCase):
         cache.prefill(5, ["seven"])
 
         # Now access 4, thus causing 5 to be least-recently used
-        cache.get(5)
+        cache.get(4)
 
         # Add an empty item.
         cache.prefill(6, [])
 
-        # Everything is still available.
+        # 5 gets evicted and replaced since an empty element counts as an item.
+        with self.assertRaises(KeyError):
+            cache.get(5)
         cache.get(4)
-        cache.get(5)
         cache.get(6)
