@@ -47,6 +47,11 @@ def run_upgrade(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwarg
         if isinstance(ignored_users, dict) and ignored_users:
             cur.executemany(insert_sql, [(user_id, u) for u in ignored_users])
 
+    # Add indexes after inserting data for efficiency.
+    logger.info("Adding constraints to ignored_users table")
+    execute_statements_from_stream(cur, StringIO(_constraints_commands))
+
+
 
 def run_create(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwargs):
     logger.info("Creating ignored_users table")
@@ -61,7 +66,14 @@ _create_commands = """
 -- denormalized from account data.
 CREATE TABLE IF NOT EXISTS ignored_users(
     ignorer_user_id TEXT NOT NULL,  -- The user ID of the user who is ignoring another user. (This is a local user.)
-    ignored_user_id TEXT NOT NULL,  -- The user ID of the user who is being ignored. (This is a local or remote user.)
-    UNIQUE (ignorer_user_id, ignored_user_id)
+    ignored_user_id TEXT NOT NULL  -- The user ID of the user who is being ignored. (This is a local or remote user.)
 );
+"""
+
+_constraints_commands = """
+ALTER TABLE ONLY ignored_users
+    ADD CONSTRAINT ignored_users_uniqueness UNIQUE (ignorer_user_id, ignored_user_id);
+
+-- Add an index on ignored_users since look-ups are done to get all ignorers of an ignored user.
+CREATE INDEX ignored_users_ignored_user_id ON ignored_users (ignored_user_id);
 """
