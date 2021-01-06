@@ -387,20 +387,6 @@ class EventChainStoreTestCase(HomeserverTestCase):
             # tables.
             persist_events_store._store_event_txn(txn, [(e, {}) for e in events])
 
-            persist_events_store.db_pool.simple_insert_many_txn(
-                txn,
-                table="state_events",
-                values=[
-                    {
-                        "event_id": event.event_id,
-                        "room_id": event.room_id,
-                        "type": event.type,
-                        "state_key": event.state_key,
-                    }
-                    for event in events
-                ],
-            )
-
             # Actually call the function that calculates the auth chain stuff.
             persist_events_store._persist_event_auth_chain_txn(txn, events)
 
