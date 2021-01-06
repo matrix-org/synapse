@@ -485,9 +485,7 @@ class AccountDataStore(AccountDataWorkerStore):
 
         # Invalidate the cache for any ignored users which were added or removed.
         for ignored_user_id in previously_ignored_users ^ currently_ignored_users:
-            self._invalidate_cache_and_stream(
-                txn, self.ignored_by, (ignored_user_id,)
-            )
+            self._invalidate_cache_and_stream(txn, self.ignored_by, (ignored_user_id,))
 
     async def _update_max_stream_id(self, next_id: int) -> None:
         """Update the max stream_id

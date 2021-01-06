@@ -52,7 +52,6 @@ def run_upgrade(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwarg
     execute_statements_from_stream(cur, StringIO(_constraints_commands))
 
 
-
 def run_create(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwargs):
     logger.info("Creating ignored_users table")
     execute_statements_from_stream(cur, StringIO(_create_commands))
