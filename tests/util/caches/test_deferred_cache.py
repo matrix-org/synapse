@@ -229,3 +229,49 @@ class DeferredCacheTestCase(TestCase):
 
         cache.get(1)
         cache.get(3)
+
+    def test_evication_iterable(self):
+        cache = DeferredCache(
+            "test", max_entries=3, apply_cache_factor_from_config=False, iterable=True,
+        )
+
+        cache.prefill(1, ["one", "two"])
+        cache.prefill(2, ["three"])
+
+        # Now access 1 again, thus causing 2 to be least-recently used
+        cache.get(1)
+
+        # Now add an item to the cache, which evicts 2.
+        cache.prefill(3, ["four"])
+        with self.assertRaises(KeyError):
+            cache.get(2)
+
+        # Ensure 1 & 3 are in the cache.
+        cache.get(1)
+        cache.get(3)
+
+        # Now access 1 again, thus causing 3 to be least-recently used
+        cache.get(1)
+
+        # Now add an item with multiple elements to the cache
+        cache.prefill(4, ["five", "six"])
+
+        # Both 1 and 3 are evicted since there's too many elements.
+        with self.assertRaises(KeyError):
+            cache.get(1)
+        with self.assertRaises(KeyError):
+            cache.get(3)
+
+        # Now add another item to fill the cache again.
+        cache.prefill(5, ["seven"])
+
+        # Now access 4, thus causing 5 to be least-recently used
+        cache.get(5)
+
+        # Add an empty item.
+        cache.prefill(6, [])
+
+        # Everything is still available.
+        cache.get(4)
+        cache.get(5)
+        cache.get(6)
