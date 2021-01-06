@@ -444,48 +444,50 @@ class AccountDataStore(AccountDataWorkerStore):
         )
 
         # Ignored users get denormalized into a separate table as an optimisation.
-        if account_data_type == AccountDataTypes.IGNORED_USER_LIST:
-            # Insert / delete to sync the list of ignored users.
-            previously_ignored_users = set(
-                self.db_pool.simple_select_onecol_txn(
-                    txn,
-                    table="ignored_users",
-                    keyvalues={"ignorer_user_id": user_id},
-                    retcol="ignored_user_id",
-                )
-            )
+        if account_data_type != AccountDataTypes.IGNORED_USER_LIST:
+            return
 
-            # If the data is invalid, no one is ignored.
-            ignored_users_content = content.get("ignored_users", {})
-            if isinstance(ignored_users_content, dict):
-                currently_ignored_users = set(ignored_users_content)
-            else:
-                currently_ignored_users = set()
-
-            # Delete entries which are no longer ignored.
-            self.db_pool.simple_delete_many_txn(
+        # Insert / delete to sync the list of ignored users.
+        previously_ignored_users = set(
+            self.db_pool.simple_select_onecol_txn(
                 txn,
                 table="ignored_users",
-                column="ignored_user_id",
-                iterable=previously_ignored_users - currently_ignored_users,
                 keyvalues={"ignorer_user_id": user_id},
+                retcol="ignored_user_id",
             )
+        )
 
-            # Add entries which are newly ignored.
-            self.db_pool.simple_insert_many_txn(
-                txn,
-                table="ignored_users",
-                values=[
-                    {"ignorer_user_id": user_id, "ignored_user_id": u}
-                    for u in currently_ignored_users - previously_ignored_users
-                ],
+        # If the data is invalid, no one is ignored.
+        ignored_users_content = content.get("ignored_users", {})
+        if isinstance(ignored_users_content, dict):
+            currently_ignored_users = set(ignored_users_content)
+        else:
+            currently_ignored_users = set()
+
+        # Delete entries which are no longer ignored.
+        self.db_pool.simple_delete_many_txn(
+            txn,
+            table="ignored_users",
+            column="ignored_user_id",
+            iterable=previously_ignored_users - currently_ignored_users,
+            keyvalues={"ignorer_user_id": user_id},
+        )
+
+        # Add entries which are newly ignored.
+        self.db_pool.simple_insert_many_txn(
+            txn,
+            table="ignored_users",
+            values=[
+                {"ignorer_user_id": user_id, "ignored_user_id": u}
+                for u in currently_ignored_users - previously_ignored_users
+            ],
+        )
+
+        # Invalidate the cache for any ignored users which were added or removed.
+        for ignored_user_id in previously_ignored_users ^ currently_ignored_users:
+            self._invalidate_cache_and_stream(
+                txn, self.ignored_by, (ignored_user_id,)
             )
-
-            # Invalidate the cache for any ignored users which were added or removed.
-            for ignored_user_id in previously_ignored_users ^ currently_ignored_users:
-                self._invalidate_cache_and_stream(
-                    txn, self.ignored_by, (ignored_user_id,)
-                )
 
     async def _update_max_stream_id(self, next_id: int) -> None:
         """Update the max stream_id
