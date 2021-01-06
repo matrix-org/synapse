@@ -648,7 +648,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
             room_version_obj = KNOWN_ROOM_VERSIONS.get(room_version)
             if not room_version_obj:
-                # We no longer suppport this room version, so we just ignore the
+                # We no longer support this room version, so we just ignore the
                 # events entirely.
                 logger.info(
                     "Ignoring event with unknown room version %r: %r",
