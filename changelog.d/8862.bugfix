@@ -1,1 +1,0 @@
-Fix a longstanding bug where a 500 error would be returned if the `Content-Length` header was not provided to the upload media resource.

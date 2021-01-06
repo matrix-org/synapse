@@ -1,1 +1,0 @@
-Clean up tox.ini file; disable coverage checking for non-test runs.
