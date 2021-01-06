@@ -28,3 +28,5 @@ INSERT INTO access_tokens2(id, user_id, device_id, token)
 
 DROP TABLE access_tokens;
 ALTER TABLE access_tokens2 RENAME TO access_tokens;
+
+CREATE INDEX access_tokens_device_id ON access_tokens (user_id, device_id);
