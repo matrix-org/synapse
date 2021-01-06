@@ -70,8 +70,7 @@ CREATE TABLE IF NOT EXISTS ignored_users(
 """
 
 _constraints_commands = """
-ALTER TABLE ONLY ignored_users
-    ADD CONSTRAINT ignored_users_uniqueness UNIQUE (ignorer_user_id, ignored_user_id);
+CREATE UNIQUE INDEX ignored_users_uniqueness ON ignored_users (ignorer_user_id, ignored_user_id);
 
 -- Add an index on ignored_users since look-ups are done to get all ignorers of an ignored user.
 CREATE INDEX ignored_users_ignored_user_id ON ignored_users (ignored_user_id);
