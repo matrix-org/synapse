@@ -1,1 +1,1 @@
-Fix a longstanding bug where some caches could grow larger than configured.
+Fix a long-standing bug where some caches could grow larger than configured.
