@@ -1,1 +1,0 @@
-Don't publish `latest` docker image until all archs are built.
