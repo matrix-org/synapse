@@ -26,8 +26,15 @@ from twisted.test.proto_helpers import AccumulatingProtocol
 from tests import unittest
 from tests.server import FakeTransport
 
+try:
+    import lxml
+except ImportError:
+    lxml = None
+
 
 class URLPreviewTests(unittest.HomeserverTestCase):
+    if not lxml:
+        skip = "url preview feature requires lxml"
 
     hijack_auth = True
     user_id = "@test:user"

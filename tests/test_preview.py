@@ -20,8 +20,16 @@ from synapse.rest.media.v1.preview_url_resource import (
 
 from . import unittest
 
+try:
+    import lxml
+except ImportError:
+    lxml = None
+
 
 class PreviewTestCase(unittest.TestCase):
+    if not lxml:
+        skip = "url preview feature requires lxml"
+
     def test_long_summarize(self):
         example_paras = [
             """Tromsø (Norwegian pronunciation: [ˈtrʊmsœ] ( listen); Northern Sami:
@@ -137,6 +145,9 @@ class PreviewTestCase(unittest.TestCase):
 
 
 class PreviewUrlTestCase(unittest.TestCase):
+    if not lxml:
+        skip = "url preview feature requires lxml"
+
     def test_simple(self):
         html = """
         <html>
