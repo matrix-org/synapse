@@ -461,7 +461,6 @@ class AccountDataStore(AccountDataWorkerStore):
                 currently_ignored_users = set(ignored_users_content)
             else:
                 currently_ignored_users = set()
-            newly_ignored_users = currently_ignored_users - previously_ignored_users
 
             # Delete entries which are no longer ignored.
             self.db_pool.simple_delete_many_txn(
@@ -478,13 +477,15 @@ class AccountDataStore(AccountDataWorkerStore):
                 table="ignored_users",
                 values=[
                     {"ignorer_user_id": user_id, "ignored_user_id": u}
-                    for u in newly_ignored_users
+                    for u in currently_ignored_users - previously_ignored_users
                 ],
             )
 
-            # Invalidate the cache for newly ignored users.
-            for ignored_user_id in newly_ignored_users:
-                self.ignored_by.invalidate((ignored_user_id,))
+            # Invalidate the cache for any ignored users which were added or removed.
+            for ignored_user_id in previously_ignored_users ^ currently_ignored_users:
+                self._invalidate_cache_and_stream(
+                    txn, self.ignored_by, (ignored_user_id,)
+                )
 
     async def _update_max_stream_id(self, next_id: int) -> None:
         """Update the max stream_id
