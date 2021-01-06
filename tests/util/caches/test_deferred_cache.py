@@ -25,13 +25,8 @@ from tests.unittest import TestCase
 class DeferredCacheTestCase(TestCase):
     def test_empty(self):
         cache = DeferredCache("test")
-        failed = False
-        try:
+        with self.assertRaises(KeyError):
             cache.get("foo")
-        except KeyError:
-            failed = True
-
-        self.assertTrue(failed)
 
     def test_hit(self):
         cache = DeferredCache("test")
@@ -155,13 +150,8 @@ class DeferredCacheTestCase(TestCase):
         cache.prefill(("foo",), 123)
         cache.invalidate(("foo",))
 
-        failed = False
-        try:
+        with self.assertRaises(KeyError):
             cache.get(("foo",))
-        except KeyError:
-            failed = True
-
-        self.assertTrue(failed)
 
     def test_invalidate_all(self):
         cache = DeferredCache("testcache")
@@ -215,13 +205,8 @@ class DeferredCacheTestCase(TestCase):
         cache.prefill(2, "two")
         cache.prefill(3, "three")  # 1 will be evicted
 
-        failed = False
-        try:
+        with self.assertRaises(KeyError):
             cache.get(1)
-        except KeyError:
-            failed = True
-
-        self.assertTrue(failed)
 
         cache.get(2)
         cache.get(3)
@@ -239,13 +224,8 @@ class DeferredCacheTestCase(TestCase):
 
         cache.prefill(3, "three")
 
-        failed = False
-        try:
+        with self.assertRaises(KeyError):
             cache.get(2)
-        except KeyError:
-            failed = True
-
-        self.assertTrue(failed)
 
         cache.get(1)
         cache.get(3)
