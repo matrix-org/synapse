@@ -650,6 +650,11 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             if not room_version_obj:
                 # We no longer suppport this room version, so we just ignore the
                 # events entirely.
+                logger.info(
+                    "Ignoring event with unknown room version %r: %r",
+                    room_version,
+                    event_id,
+                )
                 continue
 
             event = make_event_from_dict(event_json, room_version_obj)
