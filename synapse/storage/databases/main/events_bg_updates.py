@@ -646,7 +646,11 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             if has_state and has_event_auth:
                 continue
 
-            room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+            room_version_obj = KNOWN_ROOM_VERSIONS.get(room_version)
+            if not room_version_obj:
+                # We no longer suppport this room version, so we just ignore the
+                # events entirely.
+                continue
 
             event = make_event_from_dict(event_json, room_version_obj)
 
