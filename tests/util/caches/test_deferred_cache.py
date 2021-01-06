@@ -230,7 +230,7 @@ class DeferredCacheTestCase(TestCase):
         cache.get(1)
         cache.get(3)
 
-    def test_evication_iterable(self):
+    def test_eviction_iterable(self):
         cache = DeferredCache(
             "test", max_entries=3, apply_cache_factor_from_config=False, iterable=True,
         )
