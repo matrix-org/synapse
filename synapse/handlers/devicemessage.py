@@ -47,7 +47,9 @@ class DeviceMessageHandler:
         self.is_mine = hs.is_mine
 
         # We only need to poke the federation sender explicitly if its on the
-        # same instance.
+        # same instance. Other federation sender instances will get notified by
+        # the `generic_worker` when it sees it in the to-device replication
+        # stream.
         self.federation_sender = None
         if hs.should_send_federation():
             self.federation_sender = hs.get_federation_sender()
