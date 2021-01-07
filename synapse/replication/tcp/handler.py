@@ -56,6 +56,7 @@ from synapse.replication.tcp.streams import (
     EventsStream,
     FederationStream,
     Stream,
+    ToDeviceStream,
     TypingStream,
 )
 
@@ -111,6 +112,14 @@ class ReplicationCommandHandler:
                 # Only add EventStream and BackfillStream as a source on the
                 # instance in charge of event persistence.
                 if hs.get_instance_name() in hs.config.worker.writers.events:
+                    self._streams_to_replicate.append(stream)
+
+                continue
+
+            if isinstance(stream, ToDeviceStream):
+                # Only add ToDeviceStream as a source on instances in charge of
+                # sending to device messages.
+                if hs.get_instance_name() in hs.config.worker.writers.to_device:
                     self._streams_to_replicate.append(stream)
 
                 continue
