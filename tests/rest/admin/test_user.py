@@ -167,7 +167,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
                 "mac": want_mac,
             }
         )
-        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
+        channel = self.make_request("POST", self.url, body.encode("utf8"))
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@bob:test", channel.json_body["user_id"])
