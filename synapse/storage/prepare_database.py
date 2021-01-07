@@ -489,11 +489,10 @@ def _upgrade_existing_database(
                 (v, relative_path),
             )
 
-            cur.execute("DELETE FROM schema_version")
-            cur.execute(
-                "INSERT INTO schema_version (version, upgraded) VALUES (?,?)",
-                (v, True),
-            )
+        cur.execute("DELETE FROM schema_version")
+        cur.execute(
+            "INSERT INTO schema_version (version, upgraded) VALUES (?,?)", (v, True),
+        )
 
     logger.info("Schema now up to date")
 
