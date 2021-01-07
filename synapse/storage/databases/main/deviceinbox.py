@@ -45,6 +45,10 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         )
 
         if isinstance(database.engine, PostgresEngine):
+            self._can_write_to_device = (
+                self._instance_name in hs.config.worker.writers.to_device
+            )
+
             self._device_inbox_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
@@ -57,6 +61,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 writers=hs.config.worker.writers.to_device,
             )
         else:
+            self._can_write_to_device = True
             self._device_inbox_id_gen = StreamIdGenerator(
                 db_conn, "device_inbox", "stream_id"
             )
@@ -376,6 +381,8 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             The new stream_id.
         """
 
+        assert self._can_write_to_device
+
         def add_messages_txn(txn, now_ms, stream_id):
             # Add the local messages directly to the local inbox.
             self._add_messages_to_local_device_inbox_txn(
@@ -417,6 +424,8 @@ class DeviceInboxWorkerStore(SQLBaseStore):
     async def add_messages_from_remote_to_device_inbox(
         self, origin: str, message_id: str, local_messages_by_user_then_device: dict
     ) -> int:
+        assert self._can_write_to_device
+
         def add_messages_txn(txn, now_ms, stream_id):
             # Check if we've already inserted a matching message_id for that
             # origin. This can happen if the origin doesn't receive our
@@ -465,6 +474,8 @@ class DeviceInboxWorkerStore(SQLBaseStore):
     def _add_messages_to_local_device_inbox_txn(
         self, txn, stream_id, messages_by_user_then_device
     ):
+        assert self._can_write_to_device
+
         local_by_user_then_device = {}
         for user_id, messages_by_device in messages_by_user_then_device.items():
             messages_json_for_user = {}
