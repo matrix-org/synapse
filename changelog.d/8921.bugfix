@@ -1,1 +1,0 @@
-Fix bug where we ratelimited auto joining of rooms on registration (using `auto_join_rooms` config).
