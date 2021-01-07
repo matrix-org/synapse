@@ -106,6 +106,10 @@ class PusherPool:
 
         time_now_msec = self.clock.time_msec()
 
+        # create the pusher setting last_stream_ordering to the current maximum
+        # stream ordering, so it will process pushes from this point onwards.
+        last_stream_ordering = self.store.get_room_max_stream_ordering()
+
         # we try to create the pusher just to validate the config: it
         # will then get pulled out of the database,
         # recreated, added and started: this means we have only one
@@ -124,15 +128,11 @@ class PusherPool:
                 ts=time_now_msec,
                 lang=lang,
                 data=data,
-                last_stream_ordering=None,
+                last_stream_ordering=last_stream_ordering,
                 last_success=None,
                 failing_since=None,
             )
         )
-
-        # create the pusher setting last_stream_ordering to the current maximum
-        # stream ordering, so it will process pushes from this point onwards.
-        last_stream_ordering = self.store.get_room_max_stream_ordering()
 
         await self.store.add_pusher(
             user_id=user_id,

@@ -4,7 +4,10 @@ import urllib.parse
 
 from mock import Mock
 
-import jwt
+try:
+    import jwt
+except ImportError:
+    jwt = None
 
 import synapse.rest.admin
 from synapse.appservice import ApplicationService
@@ -386,7 +389,7 @@ class CASTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("GET", cas_ticket_url)
 
         # Test that the response is HTML.
-        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.code, 200, channel.result)
         content_type_header_value = ""
         for header in channel.result.get("headers", []):
             if header[0] == b"Content-Type":
@@ -463,6 +466,9 @@ class CASTestCase(unittest.HomeserverTestCase):
 
 
 class JWTTestCase(unittest.HomeserverTestCase):
+    if not jwt:
+        skip = "requires jwt"
+
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
@@ -478,8 +484,12 @@ class JWTTestCase(unittest.HomeserverTestCase):
         self.hs.config.jwt_algorithm = self.jwt_algorithm
         return self.hs
 
-    def jwt_encode(self, token, secret=jwt_secret):
-        return jwt.encode(token, secret, self.jwt_algorithm).decode("ascii")
+    def jwt_encode(self, token: str, secret: str = jwt_secret) -> str:
+        # PyJWT 2.0.0 changed the return type of jwt.encode from bytes to str.
+        result = jwt.encode(token, secret, self.jwt_algorithm)
+        if isinstance(result, bytes):
+            return result.decode("ascii")
+        return result
 
     def jwt_login(self, *args):
         params = json.dumps(
@@ -627,6 +637,9 @@ class JWTTestCase(unittest.HomeserverTestCase):
 # RSS256, with a public key configured in synapse as "jwt_secret", and tokens
 # signed by the private key.
 class JWTPubKeyTestCase(unittest.HomeserverTestCase):
+    if not jwt:
+        skip = "requires jwt"
+
     servlets = [
         login.register_servlets,
     ]
@@ -683,8 +696,12 @@ class JWTPubKeyTestCase(unittest.HomeserverTestCase):
         self.hs.config.jwt_algorithm = "RS256"
         return self.hs
 
-    def jwt_encode(self, token, secret=jwt_privatekey):
-        return jwt.encode(token, secret, "RS256").decode("ascii")
+    def jwt_encode(self, token: str, secret: str = jwt_privatekey) -> str:
+        # PyJWT 2.0.0 changed the return type of jwt.encode from bytes to str.
+        result = jwt.encode(token, secret, "RS256")
+        if isinstance(result, bytes):
+            return result.decode("ascii")
+        return result
 
     def jwt_login(self, *args):
         params = json.dumps(

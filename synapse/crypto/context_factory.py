@@ -227,7 +227,7 @@ class ConnectionVerifier:
 
     # This code is based on twisted.internet.ssl.ClientTLSOptions.
 
-    def __init__(self, hostname: bytes, verify_certs):
+    def __init__(self, hostname: bytes, verify_certs: bool):
         self._verify_certs = verify_certs
 
         _decoded = hostname.decode("ascii")
