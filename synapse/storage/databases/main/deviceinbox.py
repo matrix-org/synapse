@@ -54,7 +54,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 instance_column="instance_name",
                 id_column="stream_id",
                 sequence_name="device_inbox_sequence",
-                writers=["master"],  # FIXME
+                writers=hs.config.worker.writers.to_device,
             )
         else:
             self._device_inbox_id_gen = StreamIdGenerator(
