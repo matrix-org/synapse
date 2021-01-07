@@ -375,7 +375,16 @@ def _upgrade_existing_database(
     specific_engine_extensions = (".sqlite", ".postgres")
 
     for v in range(start_ver, SCHEMA_VERSION + 1):
-        logger.info("Applying schema deltas for v%d", v)
+        if not is_worker:
+            logger.info("Applying schema deltas for v%d", v)
+
+            cur.execute("DELETE FROM schema_version")
+            cur.execute(
+                "INSERT INTO schema_version (version, upgraded) VALUES (?,?)",
+                (v, True),
+            )
+        else:
+            logger.info("Checking schema deltas for v%d", v)
 
         # We need to search both the global and per data store schema
         # directories for schema updates.
@@ -487,12 +496,6 @@ def _upgrade_existing_database(
             cur.execute(
                 "INSERT INTO applied_schema_deltas (version, file) VALUES (?,?)",
                 (v, relative_path),
-            )
-
-            cur.execute("DELETE FROM schema_version")
-            cur.execute(
-                "INSERT INTO schema_version (version, upgraded) VALUES (?,?)",
-                (v, True),
             )
 
     logger.info("Schema now up to date")
