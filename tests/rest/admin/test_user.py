@@ -1235,6 +1235,29 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
+    def test_user_does_not_exist(self):
+        """
+        Tests that a lookup for a user that does not exist returns an empty list
+        """
+        url = "/_synapse/admin/v1/users/@unknown_person:test/joined_rooms"
+        channel = self.make_request("GET", url, access_token=self.admin_user_tok,)
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(0, channel.json_body["total"])
+        self.assertEqual(0, len(channel.json_body["joined_rooms"]))
+
+    def test_user_is_not_local(self):
+        """
+        Tests that a lookup for a user that is not a local and participates in no conversation returns an empty list
+        """
+        url = "/_synapse/admin/v1/users/@unknown_person:unknown_domain/joined_rooms"
+
+        channel = self.make_request("GET", url, access_token=self.admin_user_tok,)
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(0, channel.json_body["total"])
+        self.assertEqual(0, len(channel.json_body["joined_rooms"]))
+
     def test_no_memberships(self):
         """
         Tests that a normal lookup for rooms is successfully
