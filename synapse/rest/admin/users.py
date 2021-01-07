@@ -714,11 +714,6 @@ class UserMembershipRestServlet(RestServlet):
     async def on_GET(self, request, user_id):
         await assert_requester_is_admin(self.auth, request)
 
-        if self.is_mine(UserID.from_string(user_id)):
-            # Let's get rid of unknown local users quickly.
-            if await self.store.get_user_by_id(user_id) is None:
-                raise NotFoundError("Unknown user")
-
         room_ids = await self.store.get_rooms_for_user(user_id)
         ret = {"joined_rooms": list(room_ids), "total": len(room_ids)}
         return 200, ret

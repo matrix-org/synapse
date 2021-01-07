@@ -1235,16 +1235,6 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
-    def test_user_does_not_exist(self):
-        """
-        Tests that a lookup for a user that does not exist returns a 404
-        """
-        url = "/_synapse/admin/v1/users/@unknown_person:test/joined_rooms"
-        channel = self.make_request("GET", url, access_token=self.admin_user_tok,)
-
-        self.assertEqual(404, channel.code, msg=channel.json_body)
-        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
-
     def test_no_memberships(self):
         """
         Tests that a normal lookup for rooms is successfully
