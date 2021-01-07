@@ -63,6 +63,9 @@ class DeviceMessageHandler:
                 "m.direct_to_device", hs.config.worker.writers.to_device,
             )
 
+        # The handler to call when we think a user's device list might be out of
+        # sync. We do all device list resyncing on the master instance, so if
+        # we're on a worker we hit the device resync replication API.
         if hs.config.worker.worker_app is None:
             self._user_device_resync = (
                 hs.get_device_handler().device_list_updater.user_device_resync
