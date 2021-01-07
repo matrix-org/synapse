@@ -134,6 +134,7 @@ def run_generate_config(environ, ownership):
 
     Never returns.
     """
+    print("running generate config")
     for v in ("SYNAPSE_SERVER_NAME", "SYNAPSE_REPORT_STATS"):
         if v not in environ:
             error("Environment variable '%s' is mandatory in `generate` mode." % (v,))
@@ -148,6 +149,8 @@ def run_generate_config(environ, ownership):
     if not os.path.exists(log_config_file):
         log("Creating log config %s" % (log_config_file,))
         convert("/conf/log.config", log_config_file, environ)
+
+    print("Generating config at", config_path, "Config dir:", config_dir)
 
     args = [
         "python",
@@ -178,6 +181,7 @@ def run_generate_config(environ, ownership):
         os.execv("/usr/local/bin/python", args)
 
 def main(args, environ):
+    print("bla")
     mode = args[1] if len(args) > 1 else "run"
     desired_uid = int(environ.get("UID", "991"))
     desired_gid = int(environ.get("GID", "991"))

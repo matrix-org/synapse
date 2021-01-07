@@ -144,7 +144,8 @@ def generate_base_homeserver_config():
     """
     # start.py already does this for us, so just call that.
     # note that this script is copied in in the official, monolith dockerfile
-    subprocess.check_output(["/usr/local/bin/python", "/start.py", "migrate_config"])
+    output = subprocess.check_output(["/usr/local/bin/python", "/start.py", "generate"], shell=True)
+    print("Got output:", output)
 
 
 def generate_worker_files(environ, config_path: str, data_dir: str):
@@ -302,11 +303,12 @@ stderr_logfile_maxbytes=0""".format_map(worker_config)
 
         worker_port += 1
 
-    # Write out the config files
+    # Write out the config files. We use append mode for each in case the
+    # files may have already been written to by others.
 
     # Shared homeserver config
     print(homeserver_config)
-    with open("/conf/workers/shared.yaml", "w") as f:
+    with open("/conf/workers/shared.yaml", "a") as f:
         f.write(homeserver_config)
 
     # Nginx config
@@ -314,7 +316,7 @@ stderr_logfile_maxbytes=0""".format_map(worker_config)
     print(nginx_config_template_header)
     print(nginx_config_body)
     print(nginx_config_template_end)
-    with open("/etc/nginx/conf.d/matrix-synapse.conf", "w") as f:
+    with open("/etc/nginx/conf.d/matrix-synapse.conf", "a") as f:
         f.write(nginx_config_template_header)
         f.write(nginx_config_body)
         f.write(nginx_config_template_end)
@@ -322,7 +324,7 @@ stderr_logfile_maxbytes=0""".format_map(worker_config)
     # Supervisord config
     print()
     print(supervisord_config)
-    with open("/etc/supervisor/conf.d/supervisord.conf", "w") as f:
+    with open("/etc/supervisor/conf.d/supervisord.conf", "a") as f:
         f.write(supervisord_config)
 
     # Ensure the logging directory exists
