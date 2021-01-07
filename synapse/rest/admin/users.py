@@ -244,7 +244,7 @@ class UserRestServletV2(RestServlet):
 
                 if deactivate and not user["deactivated"]:
                     await self.deactivate_account_handler.deactivate_account(
-                        target_user.to_string(), False, requester
+                        target_user.to_string(), False, requester, by_admin=True
                     )
                 elif not deactivate and user["deactivated"]:
                     if "password" not in body:
@@ -512,7 +512,7 @@ class DeactivateAccountRestServlet(RestServlet):
             )
 
         result = await self._deactivate_account_handler.deactivate_account(
-            target_user_id, erase, requester
+            target_user_id, erase, requester, by_admin=True
         )
         if result:
             id_server_unbind_result = "success"

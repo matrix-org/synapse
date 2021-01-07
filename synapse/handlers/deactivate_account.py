@@ -58,6 +58,7 @@ class DeactivateAccountHandler(BaseHandler):
         erase_data: bool,
         requester: Requester,
         id_server: Optional[str] = None,
+        by_admin: bool = False,
     ) -> bool:
         """Deactivate a user's account
 
@@ -68,6 +69,7 @@ class DeactivateAccountHandler(BaseHandler):
             id_server: Use the given identity server when unbinding
                 any threepids. If None then will attempt to unbind using the
                 identity server specified when binding (if known).
+            by_admin: Whether this change was made by an administrator.
 
         Returns:
             True if identity server supports removing threepids, otherwise False.
@@ -129,11 +131,11 @@ class DeactivateAccountHandler(BaseHandler):
         if erase_data:
             # Remove avatar URL from this user
             await self._profile_handler.set_avatar_url(
-                UserID.from_string(user_id), requester, "", by_admin=True
+                UserID.from_string(user_id), requester, "", by_admin
             )
             # Remove displayname from this user
             await self._profile_handler.set_displayname(
-                UserID.from_string(user_id), requester, "", by_admin=True
+                UserID.from_string(user_id), requester, "", by_admin
             )
 
             logger.info("Marking %s as erased", user_id)
