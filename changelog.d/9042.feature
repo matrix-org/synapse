@@ -1,1 +1,1 @@
-Allow handling `/sendToDevice` API endpoints on workers.
+Allow handling `/sendToDevice` API endpoints on worker processes.
