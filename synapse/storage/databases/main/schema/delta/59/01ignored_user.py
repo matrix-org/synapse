@@ -28,6 +28,16 @@ logger = logging.getLogger(__name__)
 
 
 def run_upgrade(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwargs):
+    pass
+
+
+def run_create(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwargs):
+    logger.info("Creating ignored_users table")
+    execute_statements_from_stream(cur, StringIO(_create_commands))
+
+    # We now upgrade existing data, if any. We don't do this in `run_upgrade` as
+    # we a) want to run these before adding constraints and b) `run_upgrade` is
+    # not run on empty databases.
     insert_sql = """
     INSERT INTO ignored_users (ignorer_user_id, ignored_user_id) VALUES (?, ?)
     """
@@ -50,11 +60,6 @@ def run_upgrade(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwarg
     # Add indexes after inserting data for efficiency.
     logger.info("Adding constraints to ignored_users table")
     execute_statements_from_stream(cur, StringIO(_constraints_commands))
-
-
-def run_create(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwargs):
-    logger.info("Creating ignored_users table")
-    execute_statements_from_stream(cur, StringIO(_create_commands))
 
 
 # there might be duplicates, so the easiest way to achieve this is to create a new
