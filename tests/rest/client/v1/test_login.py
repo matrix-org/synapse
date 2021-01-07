@@ -413,8 +413,7 @@ class CASTestCase(unittest.HomeserverTestCase):
         }
     )
     def test_cas_redirect_whitelisted(self):
-        """Tests that the SSO login flow serves a redirect to a whitelisted url
-        """
+        """Tests that the SSO login flow serves a redirect to a whitelisted url"""
         self._test_redirect("https://legit-site.com/")
 
     @override_config({"public_baseurl": "https://example.com"})
@@ -773,8 +772,7 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
         return self.hs
 
     def test_login_appservice_user(self):
-        """Test that an appservice user can use /login
-        """
+        """Test that an appservice user can use /login"""
         self.register_as_user(AS_USER)
 
         params = {
@@ -788,8 +786,7 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
     def test_login_appservice_user_bot(self):
-        """Test that the appservice bot can use /login
-        """
+        """Test that the appservice bot can use /login"""
         self.register_as_user(AS_USER)
 
         params = {
@@ -803,8 +800,7 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
     def test_login_appservice_wrong_user(self):
-        """Test that non-as users cannot login with the as token
-        """
+        """Test that non-as users cannot login with the as token"""
         self.register_as_user(AS_USER)
 
         params = {
@@ -818,8 +814,7 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"403", channel.result)
 
     def test_login_appservice_wrong_as(self):
-        """Test that as users cannot login with wrong as token
-        """
+        """Test that as users cannot login with wrong as token"""
         self.register_as_user(AS_USER)
 
         params = {
@@ -834,7 +829,7 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
 
     def test_login_appservice_no_token(self):
         """Test that users must provide a token when using the appservice
-           login method
+        login method
         """
         self.register_as_user(AS_USER)
 
