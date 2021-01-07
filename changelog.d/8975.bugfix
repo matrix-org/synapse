@@ -1,1 +1,0 @@
-Add validation to the `sendToDevice` API to raise a missing parameters error instead of a 500 error.

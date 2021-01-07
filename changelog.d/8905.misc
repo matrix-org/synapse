@@ -1,1 +1,0 @@
-Skip the SAML tests if the requirements (`pysaml2` and `xmlsec1`) aren't available.

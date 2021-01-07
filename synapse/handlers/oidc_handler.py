@@ -119,9 +119,14 @@ class OidcHandler(BaseHandler):
         self._macaroon_secret_key = hs.config.macaroon_secret_key
 
         # identifier for the external_ids table
-        self._auth_provider_id = "oidc"
+        self.idp_id = "oidc"
+
+        # user-facing name of this auth provider
+        self.idp_name = "OIDC"
 
         self._sso_handler = hs.get_sso_handler()
+
+        self._sso_handler.register_identity_provider(self)
 
     def _validate_metadata(self):
         """Verifies the provider metadata.
@@ -475,7 +480,7 @@ class OidcHandler(BaseHandler):
     async def handle_redirect_request(
         self,
         request: SynapseRequest,
-        client_redirect_url: bytes,
+        client_redirect_url: Optional[bytes],
         ui_auth_session_id: Optional[str] = None,
     ) -> str:
         """Handle an incoming request to /login/sso/redirect
@@ -499,7 +504,7 @@ class OidcHandler(BaseHandler):
             request: the incoming request from the browser.
                 We'll respond to it with a redirect and a cookie.
             client_redirect_url: the URL that we should redirect the client to
-                when everything is done
+                when everything is done (or None for UI Auth)
             ui_auth_session_id: The session ID of the ongoing UI Auth (or
                 None if this is a login).
 
@@ -510,6 +515,9 @@ class OidcHandler(BaseHandler):
 
         state = generate_token()
         nonce = generate_token()
+
+        if not client_redirect_url:
+            client_redirect_url = b""
 
         cookie = self._generate_oidc_session_token(
             state=state,
@@ -682,7 +690,7 @@ class OidcHandler(BaseHandler):
                 return
 
             return await self._sso_handler.complete_sso_ui_auth_request(
-                self._auth_provider_id, remote_user_id, ui_auth_session_id, request
+                self.idp_id, remote_user_id, ui_auth_session_id, request
             )
 
         # otherwise, it's a login
@@ -923,7 +931,7 @@ class OidcHandler(BaseHandler):
             extra_attributes = await get_extra_attributes(userinfo, token)
 
         await self._sso_handler.complete_sso_login_request(
-            self._auth_provider_id,
+            self.idp_id,
             remote_user_id,
             request,
             client_redirect_url,
