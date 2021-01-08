@@ -253,10 +253,10 @@ class OidcProvider:
         self._server_name = hs.config.server_name  # type: str
 
         # identifier for the external_ids table
-        self.idp_id = "oidc"
+        self.idp_id = provider.idp_id
 
         # user-facing name of this auth provider
-        self.idp_name = "OIDC"
+        self.idp_name = provider.idp_name
 
         self._sso_handler = hs.get_sso_handler()
 
