@@ -16,7 +16,7 @@
 """Contains *incomplete* type hints for txredisapi.
 """
 
-from typing import List, Optional, Union, Type
+from typing import List, Optional, Type, Union
 
 class RedisProtocol:
     def publish(self, channel: str, message: bytes): ...

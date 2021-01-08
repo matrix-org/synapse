@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+
 from synapse.storage.engines import create_engine
 
 logger = logging.getLogger("create_postgres_db")
