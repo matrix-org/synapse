@@ -43,6 +43,7 @@ from synapse.config.database import DatabaseConnectionConfig
 from synapse.logging.context import (
     LoggingContext,
     current_context,
+    get_thread_resource_usage,
     make_deferred_yieldable,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -64,6 +65,9 @@ sql_scheduling_timer = Histogram("synapse_storage_schedule_time", "sec")
 
 sql_query_timer = Histogram("synapse_storage_query_time", "sec", ["verb"])
 sql_txn_timer = Histogram("synapse_storage_transaction_time", "sec", ["desc"])
+
+sql_txn_ru_utime = Histogram("synapse_storage_transaction_ru_utime", "sec", ["desc"])
+sql_txn_ru_stime = Histogram("synapse_storage_transaction_ru_stime", "sec", ["desc"])
 
 
 # Unique indexes which have been added in background updates. Maps from table name
@@ -496,6 +500,8 @@ class DatabasePool:
 
         transaction_logger.debug("[TXN START] {%s}", name)
 
+        start_usage = get_thread_resource_usage()
+
         try:
             i = 0
             N = 5
@@ -580,6 +586,17 @@ class DatabasePool:
             duration = end - start
 
             current_context().add_database_transaction(duration)
+
+            end_usage = get_thread_resource_usage()
+
+            # Not all systems support tracking per thread CPU usage.
+            if start_usage and end_usage:
+                sql_txn_ru_utime.labels(desc).observe(
+                    end_usage.ru_utime - start_usage.ru_utime
+                )
+                sql_txn_ru_stime.labels(desc).observe(
+                    end_usage.ru_stime - start_usage.ru_stime
+                )
 
             transaction_logger.debug("[TXN END] {%s} %f sec", name, duration)
 
