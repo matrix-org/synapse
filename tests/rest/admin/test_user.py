@@ -558,20 +558,20 @@ class UsersListTestCase(unittest.HomeserverTestCase):
 
         # Perform search tests
         _search_test(user1, "er1")
-        _search_test(user1, "me 99")
+        _search_test(user1, "me 1")
 
         _search_test(user2, "er2")
-        _search_test(user2, "me 98")
+        _search_test(user2, "me 2")
 
         _search_test(user1, "er1", "user_id")
         _search_test(user2, "er2", "user_id")
 
         # Test case insensitive
         _search_test(user1, "ER1")
-        _search_test(user1, "NAME 99")
+        _search_test(user1, "NAME 1")
 
         _search_test(user2, "ER2")
-        _search_test(user2, "NAME 98")
+        _search_test(user2, "NAME 2")
 
         _search_test(user1, "ER1", "user_id")
         _search_test(user2, "ER2", "user_id")
@@ -755,7 +755,6 @@ class UsersListTestCase(unittest.HomeserverTestCase):
     def _create_users(self, number_users: int):
         """
         Create a number of users
-        Displayname have other numbers for testing sort order.
         Args:
             number_users: Number of users to be created
         """
@@ -764,7 +763,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
                 "user" + str(i),
                 "pass" + str(i),
                 admin=False,
-                displayname="Name " + str(100 - i),
+                displayname="Name " + str(i),
             )
 
 
