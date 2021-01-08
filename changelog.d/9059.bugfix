@@ -1,0 +1,1 @@
+Fix incorrect exit code when there is an error at startup.
