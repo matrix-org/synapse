@@ -1,0 +1,1 @@
+Fix a minor bug which could cause confusing error messages from invalid configurations.
