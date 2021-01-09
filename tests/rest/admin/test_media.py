@@ -35,7 +35,6 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        self.handler = hs.get_device_handler()
         self.media_repo = hs.get_media_repository_resource()
         self.server_name = hs.hostname
 
@@ -181,7 +180,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        self.handler = hs.get_device_handler()
         self.media_repo = hs.get_media_repository_resource()
         self.server_name = hs.hostname
 
