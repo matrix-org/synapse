@@ -9,6 +9,7 @@
   * [Response](#response)
   * [Undoing room shutdowns](#undoing-room-shutdowns)
 - [Make Room Admin API](#make-room-admin-api)
+- [Forward Extremities Admin API](#forward-extremities-admin-api)
 
 # List Room API
 
@@ -511,3 +512,55 @@ optionally be specified, e.g.:
         "user_id": "@foo:example.com"
     }
 ```
+
+# Forward Extremities Admin API
+
+Enables querying and deleting forward extremities from rooms. When a lot of forward
+extremities accumulate in a room, performance can become degraded.
+
+When using this API endpoint to delete any extra forward extremities for a room, 
+the server does not need to be restarted as the relevant caches will be cleared 
+in the API call.
+
+## Check for forward extremities
+
+To check the status of forward extremities for a room:
+
+```
+    GET /_synapse/admin/v1/rooms/<room_id_or_alias>/forward_extremities
+```
+
+A response as follows will be returned:
+
+```json
+{
+  "count": 1,
+  "results": [
+    {
+      "event_id": "$M5SP266vsnxctfwFgFLNceaCo3ujhRtg_NiiHabcdfgh",
+      "state_group": 439
+    }
+  ]
+}    
+```
+
+## Deleting forward extremities
+
+In the event a room has lots of forward extremities, the extra can be
+deleted as follows:
+
+```
+    DELETE /_synapse/admin/v1/rooms/<room_id_or_alias>/forward_extremities
+```
+
+A response as follows will be returned, indicating the amount of forward extremities
+that were deleted.
+
+```json
+{
+  "deleted": 1
+}
+```
+
+The cache `get_latest_event_ids_in_room` will be invalidated, if any forward extremities
+were deleted.
