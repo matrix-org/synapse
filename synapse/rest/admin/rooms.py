@@ -524,18 +524,20 @@ class ForwardExtremitiesRestServlet(RestServlet):
     async def resolve_room_id(self, room_identifier: str) -> str:
         """Resolve to a room ID, if necessary."""
         if RoomID.is_valid(room_identifier):
-            room_id = room_identifier
+            resolved_room_id = room_identifier
         elif RoomAlias.is_valid(room_identifier):
             room_alias = RoomAlias.from_string(room_identifier)
             room_id, _ = await self.room_member_handler.lookup_room_alias(room_alias)
-            room_id = room_id.to_string()
+            resolved_room_id = room_id.to_string()
         else:
             raise SynapseError(
                 400, "%s was not legal room ID or room alias" % (room_identifier,)
             )
-        if not room_id:
-            raise SynapseError(400, "Unknown room ID or room alias %s" % room_identifier)
-        return room_id
+        if not resolved_room_id:
+            raise SynapseError(
+                400, "Unknown room ID or room alias %s" % room_identifier
+            )
+        return resolved_room_id
 
     async def on_DELETE(self, request, room_identifier):
         requester = await self.auth.get_user_by_req(request)
@@ -544,9 +546,7 @@ class ForwardExtremitiesRestServlet(RestServlet):
         room_id = await self.resolve_room_id(room_identifier)
 
         deleted_count = await self.store.delete_forward_extremities_for_room(room_id)
-        return 200, {
-            "deleted": deleted_count,
-        }
+        return 200, {"deleted": deleted_count}
 
     async def on_GET(self, request, room_identifier):
         requester = await self.auth.get_user_by_req(request)
@@ -555,7 +555,4 @@ class ForwardExtremitiesRestServlet(RestServlet):
         room_id = await self.resolve_room_id(room_identifier)
 
         extremities = await self.store.get_forward_extremities_for_room(room_id)
-        return 200, {
-            "count": len(extremities),
-            "results": extremities,
-        }
+        return 200, {"count": len(extremities), "results": extremities}
