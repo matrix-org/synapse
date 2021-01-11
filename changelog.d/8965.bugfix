@@ -1,1 +1,0 @@
-Fix a longstanding bug where a `m.image` event without a `url` would cause errors on push.

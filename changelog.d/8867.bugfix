@@ -1,1 +1,0 @@
-Fix the error code that is returned when a user tries to register on a homeserver on which new-user registration has been disabled.

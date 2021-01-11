@@ -1,1 +1,0 @@
-Fix the "Event persist rate" section of the included grafana dashboard by adding missing prometheus rules.

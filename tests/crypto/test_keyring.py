@@ -75,7 +75,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         return val
 
     def test_verify_json_objects_for_server_awaits_previous_requests(self):
-        mock_fetcher = keyring.KeyFetcher()
+        mock_fetcher = Mock()
         mock_fetcher.get_keys = Mock()
         kr = keyring.Keyring(self.hs, key_fetchers=(mock_fetcher,))
 
@@ -195,7 +195,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         """Tests that we correctly handle key requests for keys we've stored
         with a null `ts_valid_until_ms`
         """
-        mock_fetcher = keyring.KeyFetcher()
+        mock_fetcher = Mock()
         mock_fetcher.get_keys = Mock(return_value=make_awaitable({}))
 
         kr = keyring.Keyring(
@@ -249,7 +249,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
                 }
             }
 
-        mock_fetcher = keyring.KeyFetcher()
+        mock_fetcher = Mock()
         mock_fetcher.get_keys = Mock(side_effect=get_keys)
         kr = keyring.Keyring(self.hs, key_fetchers=(mock_fetcher,))
 
@@ -288,9 +288,9 @@ class KeyringTestCase(unittest.HomeserverTestCase):
                 }
             }
 
-        mock_fetcher1 = keyring.KeyFetcher()
+        mock_fetcher1 = Mock()
         mock_fetcher1.get_keys = Mock(side_effect=get_keys1)
-        mock_fetcher2 = keyring.KeyFetcher()
+        mock_fetcher2 = Mock()
         mock_fetcher2.get_keys = Mock(side_effect=get_keys2)
         kr = keyring.Keyring(self.hs, key_fetchers=(mock_fetcher1, mock_fetcher2))
 

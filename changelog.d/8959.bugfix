@@ -1,1 +1,0 @@
-Fix a bug causing common English words to not be considered for a user directory search.
