@@ -610,10 +610,6 @@ class UsersListTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
-        self.assertEqual(
-            "Boolean query parameter b'guests' must be one of ['true', 'false']",
-            channel.json_body["error"],
-        )
 
         # invalid deactivated
         channel = self.make_request(
@@ -622,10 +618,6 @@ class UsersListTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
-        self.assertEqual(
-            "Boolean query parameter b'deactivated' must be one of ['true', 'false']",
-            channel.json_body["error"],
-        )
 
     def test_limit(self):
         """
@@ -633,7 +625,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         """
 
         number_users = 20
-        # reduction of one admin user
+        # Create one less user (since there's already an admin user).
         self._create_users(number_users - 1)
 
         channel = self.make_request(
@@ -652,7 +644,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         """
 
         number_users = 20
-        # reduction of one admin user
+        # Create one less user (since there's already an admin user).
         self._create_users(number_users - 1)
 
         channel = self.make_request(
@@ -671,7 +663,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         """
 
         number_users = 20
-        # reduction of one admin user
+        # Create one less user (since there's already an admin user).
         self._create_users(number_users - 1)
 
         channel = self.make_request(
@@ -690,7 +682,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         """
 
         number_users = 20
-        # reduction of one admin user
+        # Create one less user (since there's already an admin user).
         self._create_users(number_users - 1)
 
         #  `next_token` does not appear
@@ -739,7 +731,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         self.assertNotIn("next_token", channel.json_body)
 
     def _check_fields(self, content: JsonDict):
-        """Checks that all attributes are present in content
+        """Checks that the expected user attributes are present in content
         Args:
             content: List that is checked for content
         """
@@ -760,10 +752,10 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         """
         for i in range(1, number_users + 1):
             self.register_user(
-                "user" + str(i),
-                "pass" + str(i),
+                "user%d" % i,
+                "pass%d" % i,
                 admin=False,
-                displayname="Name " + str(i),
+                displayname="Name %d" % i,
             )
 
 
