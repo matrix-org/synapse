@@ -158,6 +158,10 @@ oidc_config:
    client_id: "synapse"
    client_secret: "copy secret generated from above"
    scopes: ["openid", "profile"]
+   user_mapping_provider:
+     config:
+       localpart_template: "{{ user.preferred_username }}"
+       display_name_template: "{{ user.name }}"
 ```
 ### [Auth0][auth0]
 

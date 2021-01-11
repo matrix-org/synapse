@@ -15,13 +15,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import gc
 import logging
 import os
 import sys
 from typing import Iterable, Iterator
 
-from twisted.application import service
 from twisted.internet import defer, reactor
 from twisted.python.failure import Failure
 from twisted.web.resource import EncodingResourceWrapper, IResource
@@ -63,6 +61,7 @@ from synapse.rest import ClientRestResource
 from synapse.rest.admin import AdminRestResource
 from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
+from synapse.rest.synapse.client.pick_idp import PickIdpResource
 from synapse.rest.synapse.client.pick_username import pick_username_resource
 from synapse.rest.well_known import WellKnownResource
 from synapse.server import HomeServer
@@ -72,7 +71,6 @@ from synapse.storage.prepare_database import UpgradeDatabaseException
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole
 from synapse.util.module_loader import load_module
-from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger("synapse.app.homeserver")
@@ -194,6 +192,7 @@ class SynapseHomeServer(HomeServer):
                     "/.well-known/matrix/client": WellKnownResource(self),
                     "/_synapse/admin": AdminRestResource(self),
                     "/_synapse/client/pick_username": pick_username_resource(self),
+                    "/_synapse/client/pick_idp": PickIdpResource(self),
                 }
             )
 
@@ -483,25 +482,6 @@ def format_config_error(e: ConfigError) -> Iterator[str]:
         indent += 1
         yield ":\n%s%s" % ("  " * indent, str(e))
         e = e.__cause__
-
-
-class SynapseService(service.Service):
-    """
-    A twisted Service class that will start synapse. Used to run synapse
-    via twistd and a .tac.
-    """
-
-    def __init__(self, config):
-        self.config = config
-
-    def startService(self):
-        hs = setup(self.config)
-        change_resource_limit(hs.config.soft_file_limit)
-        if hs.config.gc_thresholds:
-            gc.set_threshold(*hs.config.gc_thresholds)
-
-    def stopService(self):
-        return self._port.stopListening()
 
 
 def run(hs):
