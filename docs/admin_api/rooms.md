@@ -516,11 +516,8 @@ optionally be specified, e.g.:
 # Forward Extremities Admin API
 
 Enables querying and deleting forward extremities from rooms. When a lot of forward
-extremities accumulate in a room, performance can become degraded.
-
-When using this API endpoint to delete any extra forward extremities for a room, 
-the server does not need to be restarted as the relevant caches will be cleared 
-in the API call.
+extremities accumulate in a room, performance can become degraded. For details, see 
+[#1760](https://github.com/matrix-org/synapse/issues/1760).
 
 ## Check for forward extremities
 
@@ -537,7 +534,7 @@ A response as follows will be returned:
   "count": 1,
   "results": [
     {
-      "event_id": "$M5SP266vsnxctfwFgFLNceaCo3ujhRtg_NiiHabcdfgh",
+      "event_id": "$M5SP266vsnxctfwFgFLNceaCo3ujhRtg_NiiHabcdefgh",
       "state_group": 439
     }
   ]
@@ -561,6 +558,3 @@ that were deleted.
   "deleted": 1
 }
 ```
-
-The cache `get_latest_event_ids_in_room` will be invalidated, if any forward extremities
-were deleted.

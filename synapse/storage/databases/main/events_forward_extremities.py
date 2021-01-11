@@ -1,3 +1,18 @@
+# -*- coding: utf-8 -*-
+# Copyright 2021 The Matrix.org Foundation C.I.C.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import logging
 from typing import Dict, List
 
@@ -19,19 +34,19 @@ class EventForwardExtremitiesStore(SQLBaseStore):
 
         def delete_forward_extremities_for_room_txn(txn):
             # First we need to get the event_id to not delete
-            sql = (
-                "SELECT "
-                "   last_value(event_id) OVER w AS event_id"
-                "   FROM event_forward_extremities"
-                "   NATURAL JOIN events"
-                " where room_id = ?"
-                "   WINDOW w AS ("
-                "   PARTITION BY room_id"
-                "       ORDER BY stream_ordering"
-                "       range between unbounded preceding and unbounded following"
-                "   )"
-                "   ORDER BY stream_ordering"
-            )
+            sql = """
+                SELECT
+                    last_value(event_id) OVER w AS event_id
+                FROM event_forward_extremities
+                    NATURAL JOIN events
+                WHERE room_id = ?
+                    WINDOW w AS (
+                        PARTITION BY room_id
+                        ORDER BY stream_ordering 
+                        range between unbounded preceding and unbounded following
+                    )
+                ORDER BY stream_ordering
+            """
             txn.execute(sql, (room_id,))
             rows = txn.fetchall()
             try:
@@ -47,12 +62,10 @@ class EventForwardExtremitiesStore(SQLBaseStore):
                 raise SynapseError(400, msg)
 
             # Now delete the extra forward extremities
-            sql = (
-                "DELETE FROM event_forward_extremities "
-                "WHERE"
-                "   event_id != ?"
-                "   AND room_id = ?"
-            )
+            sql = """
+                DELETE FROM event_forward_extremities
+                WHERE event_id != ? AND room_id = ?
+            """
 
             txn.execute(sql, (event_id, room_id))
             logger.info(
@@ -78,14 +91,15 @@ class EventForwardExtremitiesStore(SQLBaseStore):
         """Get list of forward extremities for a room."""
 
         def get_forward_extremities_for_room_txn(txn):
-            sql = (
-                "SELECT event_id, state_group FROM event_forward_extremities NATURAL JOIN event_to_state_groups "
-                "WHERE room_id = ?"
-            )
+            sql = """
+                SELECT event_id, state_group 
+                FROM event_forward_extremities 
+                NATURAL JOIN event_to_state_groups
+                WHERE room_id = ?
+            """
 
             txn.execute(sql, (room_id,))
-            rows = txn.fetchall()
-            return [{"event_id": row[0], "state_group": row[1]} for row in rows]
+            return self.db_pool.cursor_to_dict(txn)
 
         return await self.db_pool.runInteraction(
             "get_forward_extremities_for_room", get_forward_extremities_for_room_txn,
