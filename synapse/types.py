@@ -247,6 +247,14 @@ class DomainSpecificString(
 
         domain = parts[1]
 
+        # TODO The checking of a valid domain name should be made stricter.
+        if "," in domain:
+            raise SynapseError(
+                400,
+                "Invalid domain name for %s: %s" % (cls.__name__, domain),
+                Codes.INVALID_PARAM,
+            )
+
         # This code will need changing if we want to support multiple domain
         # names on one HS
         return cls(localpart=parts[0], domain=domain)
