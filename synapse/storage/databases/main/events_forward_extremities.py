@@ -42,7 +42,7 @@ class EventForwardExtremitiesStore(SQLBaseStore):
                     room_id,
                 )
             except KeyError:
-                msg = f"No forward extremity event found for room {room_id}"
+                msg = "No forward extremity event found for room %s" % room_id
                 logger.warning(msg)
                 raise SynapseError(400, msg)
 
