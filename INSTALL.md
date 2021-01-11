@@ -539,13 +539,16 @@ email will be disabled.
 
 The easiest way to create a new user is to do so from a client like [Element](https://element.io/).
 
-Alternatively you can do so from the command line if you have installed via pip.
+Alternatively, you can do so from the command line if you have installed synapse via package.
 
 This can be done as follows:
 
 ```sh
+$ # These steps are needed if installed via pip.
 $ source ~/synapse/env/bin/activate
 $ synctl start # if not already running
+$
+$ # This executable is present when installed via any package.
 $ register_new_matrix_user -c homeserver.yaml http://localhost:8008
 New user localpart: erikj
 Password:
