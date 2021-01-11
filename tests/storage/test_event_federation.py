@@ -261,7 +261,9 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
     def test_auth_difference_partial_cover(self):
         """Test that we correctly handle rooms where not all events have a chain
-        cover calculated. This can happen due to a downgrade/upgrade.
+        cover calculated. This can happen in some obscure edge cases, including
+        during the background update that calculates the chain cover for old
+        rooms.
         """
 
         room_id = "@ROOM:local"
