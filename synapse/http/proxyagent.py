@@ -120,11 +120,11 @@ class ProxyAgent(_AgentBase):
         # Parse credentials from https proxy connection string if present
         self.https_proxy_creds, https_proxy = parse_username_password(https_proxy)
 
-        self.http_proxy_endpoint = _http_proxy_endpoint(
+        self.http_proxy_endpoint = http_proxy_endpoint(
             http_proxy, self.proxy_reactor, **self._endpoint_kwargs
         )
 
-        self.https_proxy_endpoint = _http_proxy_endpoint(
+        self.https_proxy_endpoint = http_proxy_endpoint(
             https_proxy, self.proxy_reactor, **self._endpoint_kwargs
         )
 
@@ -243,7 +243,7 @@ class ProxyAgent(_AgentBase):
         )
 
 
-def _http_proxy_endpoint(proxy: Optional[bytes], reactor, **kwargs):
+def http_proxy_endpoint(proxy: Optional[bytes], reactor, **kwargs):
     """Parses an http proxy setting and returns an endpoint for the proxy
 
     Args:

@@ -279,6 +279,7 @@ class MatrixFederationHttpClient:
             tls_client_options_factory,
             user_agent,
             hs.config.federation_ip_range_blacklist,
+            proxy_reactor=hs.get_reactor(),
         )
 
         # Use a BlacklistingAgentWrapper to prevent circumventing the IP

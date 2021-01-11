@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,8 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Optional
-from unittest.mock import Mock
+import os
+from unittest.mock import patch
+
+from mock import Mock
 
 import treq
 from netaddr import IPSet
@@ -109,7 +112,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
             _well_known_resolver=self.well_known_resolver,
         )
 
-    def _make_connection(self, client_factory, expected_sni):
+    def _make_connection(self, client_factory, expected_sni=None):
         """Builds a test server, and completes the outgoing client connection
 
         Returns:
@@ -146,12 +149,13 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.reactor.pump((0.1,))
 
         # check the SNI
-        server_name = server_tls_connection.get_servername()
-        self.assertEqual(
-            server_name,
-            expected_sni,
-            "Expected SNI %s but got %s" % (expected_sni, server_name),
-        )
+        if expected_sni is not None:
+            server_name = server_tls_connection.get_servername()
+            self.assertEqual(
+                server_name,
+                expected_sni,
+                "Expected SNI %s but got %s" % (expected_sni, server_name),
+            )
 
         return http_protocol
 
@@ -179,11 +183,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
                 _check_logcontext(context)
 
     def _handle_well_known_connection(
-        self,
-        client_factory,
-        expected_sni,
-        content,
-        response_headers: Optional[dict] = None,
+        self, client_factory, expected_sni, content, response_headers={}
     ):
         """Handle an outgoing HTTPs connection: wire it up to a server, check that the
         request is for a .well-known, and send the response.
@@ -205,12 +205,10 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.assertEqual(
             request.requestHeaders.getRawHeaders(b"user-agent"), [b"test-agent"]
         )
-        self._send_well_known_response(request, content, headers=response_headers or {})
+        self._send_well_known_response(request, content, headers=response_headers)
         return well_known_server
 
-    def _send_well_known_response(
-        self, request, content, headers: Optional[dict] = None
-    ):
+    def _send_well_known_response(self, request, content, headers={}):
         """Check that an incoming request looks like a valid .well-known request, and
         send back the response.
         """
@@ -218,7 +216,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.assertEqual(request.path, b"/.well-known/matrix/server")
         self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [b"testserv"])
         # send back a response
-        for k, v in (headers or {}).items():
+        for k, v in headers.items():
             request.setHeader(k, v)
         request.write(content)
         request.finish()
@@ -244,6 +242,76 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
         # make a test server, and wire up the client
         http_server = self._make_connection(client_factory, expected_sni=b"testserv")
+
+        self.assertEqual(len(http_server.requests), 1)
+        request = http_server.requests[0]
+        self.assertEqual(request.method, b"GET")
+        self.assertEqual(request.path, b"/foo/bar")
+        self.assertEqual(
+            request.requestHeaders.getRawHeaders(b"host"), [b"testserv:8448"]
+        )
+        self.assertEqual(
+            request.requestHeaders.getRawHeaders(b"user-agent"), [b"test-agent"]
+        )
+        content = request.content.read()
+        self.assertEqual(content, b"")
+
+        # Deferred is still without a result
+        self.assertNoResult(test_d)
+
+        # send the headers
+        request.responseHeaders.setRawHeaders(b"Content-Type", [b"application/json"])
+        request.write("")
+
+        self.reactor.pump((0.1,))
+
+        response = self.successResultOf(test_d)
+
+        # that should give us a Response object
+        self.assertEqual(response.code, 200)
+
+        # Send the body
+        request.write('{ "a": 1 }'.encode("ascii"))
+        request.finish()
+
+        self.reactor.pump((0.1,))
+
+        # check it can be read
+        json = self.successResultOf(treq.json_content(response))
+        self.assertEqual(json, {"a": 1})
+
+    @patch.dict(os.environ, {"https_proxy": "proxy.com", "no_proxy": "unused.com"})
+    def test_get_via_proxy(self):
+        """
+        test for federation request through proxy
+        """
+        # recreate the agent with patched env
+        self.agent = MatrixFederationAgent(
+            reactor=self.reactor,
+            tls_client_options_factory=self.tls_factory,
+            user_agent="test-agent",  # Note that this is unused since _well_known_resolver is provided.
+            ip_blacklist=IPSet(),
+            _srv_resolver=self.mock_resolver,
+            _well_known_resolver=self.well_known_resolver,
+        )
+
+        self.reactor.lookups["testserv"] = "1.2.3.4"
+        self.reactor.lookups["proxy.com"] = "9.9.9.9"
+        test_d = self._make_get_request(b"matrix://testserv:8448/foo/bar")
+
+        # Nothing happened yet
+        self.assertNoResult(test_d)
+
+        # Make sure treq is trying to connect
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, client_factory, _timeout, _bindAddress) = clients[0]
+        # make sure we are connecting to the proxy
+        self.assertEqual(host, "9.9.9.9")
+        self.assertEqual(port, 1080)
+
+        # make a test server, and wire up the client
+        http_server = self._make_connection(client_factory)
 
         self.assertEqual(len(http_server.requests), 1)
         request = http_server.requests[0]
