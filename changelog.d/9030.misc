@@ -1,0 +1,1 @@
+Add a `-noextras` factor to `tox.ini`, to support running the tests with no optional dependencies.
