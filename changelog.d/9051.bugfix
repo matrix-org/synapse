@@ -1,0 +1,1 @@
+Fix error handling during insertion of client IPs into the database.
