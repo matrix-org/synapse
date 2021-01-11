@@ -35,17 +35,11 @@ class EventForwardExtremitiesStore(SQLBaseStore):
         def delete_forward_extremities_for_room_txn(txn):
             # First we need to get the event_id to not delete
             sql = """
-                SELECT
-                    last_value(event_id) OVER w AS event_id
-                FROM event_forward_extremities
-                    NATURAL JOIN events
+                SELECT event_id FROM event_forward_extremities
+                INNER JOIN events USING (room_id, event_id)
                 WHERE room_id = ?
-                    WINDOW w AS (
-                        PARTITION BY room_id
-                        ORDER BY stream_ordering 
-                        range between unbounded preceding and unbounded following
-                    )
-                ORDER BY stream_ordering
+                ORDER BY stream_ordering DESC
+                LIMIT 1
             """
             txn.execute(sql, (room_id,))
             rows = txn.fetchall()
