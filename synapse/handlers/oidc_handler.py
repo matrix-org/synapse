@@ -14,7 +14,7 @@
 # limitations under the License.
 import inspect
 import logging
-from typing import TYPE_CHECKING, Dict, Generic, List, Optional, Tuple, TypeVar
+from typing import TYPE_CHECKING, Dict, Generic, List, Optional, TypeVar
 from urllib.parse import urlencode
 
 import attr
@@ -522,9 +522,11 @@ class OidcHandler:
 
         cookie = self._generate_oidc_session_token(
             state=state,
-            nonce=nonce,
-            client_redirect_url=client_redirect_url.decode(),
-            ui_auth_session_id=ui_auth_session_id,
+            session_data=OidcSessionData(
+                nonce=nonce,
+                client_redirect_url=client_redirect_url.decode(),
+                ui_auth_session_id=ui_auth_session_id,
+            ),
         )
         request.addCookie(
             SESSION_COOKIE_NAME,
@@ -629,11 +631,7 @@ class OidcHandler:
 
         # Deserialize the session token and verify it.
         try:
-            (
-                nonce,
-                client_redirect_url,
-                ui_auth_session_id,
-            ) = self._verify_oidc_session_token(session, state)
+            session_data = self._verify_oidc_session_token(session, state)
         except MacaroonDeserializationException as e:
             logger.exception("Invalid session")
             self._sso_handler.render_error(request, "invalid_session", str(e))
@@ -675,14 +673,14 @@ class OidcHandler:
         else:
             logger.debug("Extracting userinfo from id_token")
             try:
-                userinfo = await self._parse_id_token(token, nonce=nonce)
+                userinfo = await self._parse_id_token(token, nonce=session_data.nonce)
             except Exception as e:
                 logger.exception("Invalid id_token")
                 self._sso_handler.render_error(request, "invalid_token", str(e))
                 return
 
         # first check if we're doing a UIA
-        if ui_auth_session_id:
+        if session_data.ui_auth_session_id:
             try:
                 remote_user_id = self._remote_id_from_userinfo(userinfo)
             except Exception as e:
@@ -691,7 +689,7 @@ class OidcHandler:
                 return
 
             return await self._sso_handler.complete_sso_ui_auth_request(
-                self.idp_id, remote_user_id, ui_auth_session_id, request
+                self.idp_id, remote_user_id, session_data.ui_auth_session_id, request
             )
 
         # otherwise, it's a login
@@ -699,7 +697,7 @@ class OidcHandler:
         # Call the mapper to register/login the user
         try:
             await self._complete_oidc_login(
-                userinfo, token, request, client_redirect_url
+                userinfo, token, request, session_data.client_redirect_url
             )
         except MappingException as e:
             logger.exception("Could not map user")
@@ -708,9 +706,7 @@ class OidcHandler:
     def _generate_oidc_session_token(
         self,
         state: str,
-        nonce: str,
-        client_redirect_url: str,
-        ui_auth_session_id: Optional[str],
+        session_data: "OidcSessionData",
         duration_in_ms: int = (60 * 60 * 1000),
     ) -> str:
         """Generates a signed token storing data about an OIDC session.
@@ -723,11 +719,7 @@ class OidcHandler:
 
         Args:
             state: The ``state`` parameter passed to the OIDC provider.
-            nonce: The ``nonce`` parameter passed to the OIDC provider.
-            client_redirect_url: The URL the client gave when it initiated the
-                flow.
-            ui_auth_session_id: The session ID of the ongoing UI Auth (or
-                None if this is a login).
+            session_data: data to include in the session token.
             duration_in_ms: An optional duration for the token in milliseconds.
                 Defaults to an hour.
 
@@ -740,13 +732,13 @@ class OidcHandler:
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("type = session")
         macaroon.add_first_party_caveat("state = %s" % (state,))
-        macaroon.add_first_party_caveat("nonce = %s" % (nonce,))
+        macaroon.add_first_party_caveat("nonce = %s" % (session_data.nonce,))
         macaroon.add_first_party_caveat(
-            "client_redirect_url = %s" % (client_redirect_url,)
+            "client_redirect_url = %s" % (session_data.client_redirect_url,)
         )
-        if ui_auth_session_id:
+        if session_data.ui_auth_session_id:
             macaroon.add_first_party_caveat(
-                "ui_auth_session_id = %s" % (ui_auth_session_id,)
+                "ui_auth_session_id = %s" % (session_data.ui_auth_session_id,)
             )
         now = self._clock.time_msec()
         expiry = now + duration_in_ms
@@ -756,7 +748,7 @@ class OidcHandler:
 
     def _verify_oidc_session_token(
         self, session: bytes, state: str
-    ) -> Tuple[str, str, Optional[str]]:
+    ) -> "OidcSessionData":
         """Verifies and extract an OIDC session token.
 
         This verifies that a given session token was issued by this homeserver
@@ -767,7 +759,7 @@ class OidcHandler:
             state: The state the OIDC provider gave back
 
         Returns:
-            The nonce, client_redirect_url, and ui_auth_session_id for this session
+            The data extracted from the session cookie
         """
         macaroon = pymacaroons.Macaroon.deserialize(session)
 
@@ -797,7 +789,11 @@ class OidcHandler:
         except ValueError:
             ui_auth_session_id = None
 
-        return nonce, client_redirect_url, ui_auth_session_id
+        return OidcSessionData(
+            nonce=nonce,
+            client_redirect_url=client_redirect_url,
+            ui_auth_session_id=ui_auth_session_id,
+        )
 
     def _get_value_from_macaroon(self, macaroon: pymacaroons.Macaroon, key: str) -> str:
         """Extracts a caveat value from a macaroon token.
@@ -953,6 +949,20 @@ class OidcHandler:
         # Some OIDC providers use integer IDs, but Synapse expects external IDs
         # to be strings.
         return str(remote_user_id)
+
+
+@attr.s(frozen=True, slots=True)
+class OidcSessionData:
+    """The attributes which are stored in a OIDC session cookie"""
+
+    # The `nonce` parameter passed to the OIDC provider.
+    nonce = attr.ib(type=str)
+
+    # The URL the client gave when it initiated the flow. ("" if this is a UI Auth)
+    client_redirect_url = attr.ib(type=str)
+
+    # The session ID of the ongoing UI Auth (None if this is a login)
+    ui_auth_session_id = attr.ib(type=Optional[str], default=None)
 
 
 UserAttributeDict = TypedDict(
