@@ -175,7 +175,7 @@ class OidcHandler:
             session_data = self._token_generator.verify_oidc_session_token(
                 session, state
             )
-        except MacaroonDeserializationException as e:
+        except (MacaroonDeserializationException, ValueError) as e:
             logger.exception("Invalid session")
             self._sso_handler.render_error(request, "invalid_session", str(e))
             return
@@ -656,6 +656,7 @@ class OidcProvider:
         cookie = self._token_generator.generate_oidc_session_token(
             state=state,
             session_data=OidcSessionData(
+                idp_id=self.idp_id,
                 nonce=nonce,
                 client_redirect_url=client_redirect_url.decode(),
                 ui_auth_session_id=ui_auth_session_id,
@@ -924,6 +925,7 @@ class OidcSessionTokenGenerator:
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("type = session")
         macaroon.add_first_party_caveat("state = %s" % (state,))
+        macaroon.add_first_party_caveat("idp_id = %s" % (session_data.idp_id,))
         macaroon.add_first_party_caveat("nonce = %s" % (session_data.nonce,))
         macaroon.add_first_party_caveat(
             "client_redirect_url = %s" % (session_data.client_redirect_url,)
@@ -952,6 +954,9 @@ class OidcSessionTokenGenerator:
 
         Returns:
             The data extracted from the session cookie
+
+        Raises:
+            ValueError if an expected caveat is missing from the macaroon.
         """
         macaroon = pymacaroons.Macaroon.deserialize(session)
 
@@ -960,6 +965,7 @@ class OidcSessionTokenGenerator:
         v.satisfy_exact("type = session")
         v.satisfy_exact("state = %s" % (state,))
         v.satisfy_general(lambda c: c.startswith("nonce = "))
+        v.satisfy_general(lambda c: c.startswith("idp_id = "))
         v.satisfy_general(lambda c: c.startswith("client_redirect_url = "))
         # Sometimes there's a UI auth session ID, it seems to be OK to attempt
         # to always satisfy this.
@@ -968,9 +974,9 @@ class OidcSessionTokenGenerator:
 
         v.verify(macaroon, self._macaroon_secret_key)
 
-        # Extract the `nonce`, `client_redirect_url`, and maybe the
-        # `ui_auth_session_id` from the token.
+        # Extract the session data from the token.
         nonce = self._get_value_from_macaroon(macaroon, "nonce")
+        idp_id = self._get_value_from_macaroon(macaroon, "idp_id")
         client_redirect_url = self._get_value_from_macaroon(
             macaroon, "client_redirect_url"
         )
@@ -983,6 +989,7 @@ class OidcSessionTokenGenerator:
 
         return OidcSessionData(
             nonce=nonce,
+            idp_id=idp_id,
             client_redirect_url=client_redirect_url,
             ui_auth_session_id=ui_auth_session_id,
         )
@@ -998,7 +1005,7 @@ class OidcSessionTokenGenerator:
             The extracted value
 
         Raises:
-            Exception: if the caveat was not in the macaroon
+            ValueError: if the caveat was not in the macaroon
         """
         prefix = key + " = "
         for caveat in macaroon.caveats:
@@ -1018,6 +1025,9 @@ class OidcSessionTokenGenerator:
 @attr.s(frozen=True, slots=True)
 class OidcSessionData:
     """The attributes which are stored in a OIDC session cookie"""
+
+    # the Identity Provider being used
+    idp_id = attr.ib(type=str)
 
     # The `nonce` parameter passed to the OIDC provider.
     nonce = attr.ib(type=str)

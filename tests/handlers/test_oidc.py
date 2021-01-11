@@ -848,6 +848,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         return self.handler._token_generator.generate_oidc_session_token(
             state=state,
             session_data=OidcSessionData(
+                idp_id="oidc",
                 nonce=nonce,
                 client_redirect_url=client_redirect_url,
                 ui_auth_session_id=ui_auth_session_id,
@@ -990,7 +991,7 @@ async def _make_callback_with_userinfo(
     session = handler._token_generator.generate_oidc_session_token(
         state=state,
         session_data=OidcSessionData(
-            nonce="nonce", client_redirect_url=client_redirect_url,
+            idp_id="oidc", nonce="nonce", client_redirect_url=client_redirect_url,
         ),
     )
     request = _build_callback_request("code", state, session)
