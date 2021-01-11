@@ -546,7 +546,7 @@ A response as follows will be returned:
 
 ## Deleting forward extremities
 
-In the event a room has lots of forward extremities, the extra can be
+If a room has lots of forward extremities, the extra can be
 deleted as follows:
 
 ```
