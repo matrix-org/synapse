@@ -54,13 +54,13 @@ ENV distro ${distro}
 #
 # NB: keep this list in sync with the list of build-deps in debian/control
 # TODO: it would be nice to do that automatically.
+# TODO: Remove the dh-systemd stanza after dropping support for Ubuntu xenial
 RUN apt-get update -qq -o Acquire::Languages=none \
     && env DEBIAN_FRONTEND=noninteractive apt-get install \
         -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
         build-essential \
         debhelper \
         devscripts \
-        dh-systemd \
         libsystemd-dev \
         lsb-release \
         pkg-config \
@@ -70,7 +70,10 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         python3-venv \
         sqlite3 \
         libpq-dev \
-        xmlsec1
+        xmlsec1 \
+    && ( env DEBIAN_FRONTEND=noninteractive apt-get install \
+         -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
+         dh-systemd || true )
 
 COPY --from=builder /dh-virtualenv_1.2~dev-1_all.deb /
 
