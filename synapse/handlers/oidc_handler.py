@@ -566,14 +566,10 @@ class OidcHandler:
           - then we fetch the session cookie, decode and verify it
           - the ``state`` query parameter should match with the one stored in the
             session cookie
-          - once we known this session is legit, exchange the code with the
-            provider using the ``token_endpoint`` (see ``_exchange_code``)
-          - once we have the token, use it to either extract the UserInfo from
-            the ``id_token`` (``_parse_id_token``), or use the ``access_token``
-            to fetch UserInfo from the ``userinfo_endpoint``
-            (``_fetch_userinfo``)
-          - map those UserInfo to a Matrix user (``_map_userinfo_to_user``) and
-            finish the login
+
+        Once we know the session is legit, we then then ddelegate to
+        _handle_oidc_callback_for_provider, which will exchange the code with the
+        provider and complete the login/authentication.
 
         Args:
             request: the incoming request from the browser.
@@ -646,7 +642,6 @@ class OidcHandler:
             self._sso_handler.render_error(request, "mismatching_session", str(e))
             return
 
-        # Exchange the code with the provider
         if b"code" not in request.args:
             logger.info("Code parameter is missing")
             self._sso_handler.render_error(
@@ -654,9 +649,35 @@ class OidcHandler:
             )
             return
 
-        logger.debug("Exchanging code")
         code = request.args[b"code"][0].decode()
+
+        await self._handle_oidc_callback_for_provider(request, session_data, code)
+
+    async def _handle_oidc_callback_for_provider(
+        self, request: SynapseRequest, session_data: "OidcSessionData", code: str
+    ) -> None:
+        """Handle an incoming request to /_synapse/oidc/callback
+
+        By this time we have already validated the session on the synapse side, and
+        now need to do the provider-specific operations. This includes:
+
+          - exchange the code with the provider using the ``token_endpoint`` (see
+            ``_exchange_code``)
+          - once we have the token, use it to either extract the UserInfo from
+            the ``id_token`` (``_parse_id_token``), or use the ``access_token``
+            to fetch UserInfo from the ``userinfo_endpoint``
+            (``_fetch_userinfo``)
+          - map those UserInfo to a Matrix user (``_map_userinfo_to_user``) and
+            finish the login
+
+        Args:
+            request: the incoming request from the browser.
+            session_data: the session data, extracted from our cookie
+            code: The authorization code we got from the callback.
+        """
+        # Exchange the code with the provider
         try:
+            logger.debug("Exchanging code")
             token = await self._exchange_code(code)
         except OidcError as e:
             logger.exception("Could not exchange code")
