@@ -752,10 +752,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         """
         for i in range(1, number_users + 1):
             self.register_user(
-                "user%d" % i,
-                "pass%d" % i,
-                admin=False,
-                displayname="Name %d" % i,
+                "user%d" % i, "pass%d" % i, admin=False, displayname="Name %d" % i,
             )
 
 
