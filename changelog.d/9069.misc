@@ -1,0 +1,1 @@
+Remove `SynapseRequest.get_user_agent`.
