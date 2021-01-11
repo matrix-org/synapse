@@ -313,7 +313,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # easier than constructing events properly.
 
         def insert_event(txn):
-            # First insert the room and mark it has having a chain cover.
+            # First insert the room and mark it as having a chain cover.
             self.store.db_pool.simple_insert_txn(
                 txn,
                 "rooms",
