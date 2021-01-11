@@ -338,8 +338,8 @@ A response body like the following is returned:
     }
 
 The server returns the list of rooms of which the user and the server
-are member. If the user is local, that's all the rooms of which the
-user is member.
+are member. If the user is local, all the rooms of which the user is
+member are returned.
 
 **Parameters**
 
