@@ -349,9 +349,13 @@ class OidcHandlerTestCase(HomeserverTestCase):
         cookie = args[1]
 
         macaroon = pymacaroons.Macaroon.deserialize(cookie)
-        state = self.handler._get_value_from_macaroon(macaroon, "state")
-        nonce = self.handler._get_value_from_macaroon(macaroon, "nonce")
-        redirect = self.handler._get_value_from_macaroon(
+        state = self.handler._token_generator._get_value_from_macaroon(
+            macaroon, "state"
+        )
+        nonce = self.handler._token_generator._get_value_from_macaroon(
+            macaroon, "nonce"
+        )
+        redirect = self.handler._token_generator._get_value_from_macaroon(
             macaroon, "client_redirect_url"
         )
 
@@ -839,7 +843,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
     ) -> str:
         from synapse.handlers.oidc_handler import OidcSessionData
 
-        return self.handler._generate_oidc_session_token(
+        return self.handler._token_generator.generate_oidc_session_token(
             state=state,
             session_data=OidcSessionData(
                 nonce=nonce,
@@ -980,7 +984,7 @@ async def _make_callback_with_userinfo(
     handler._fetch_userinfo = simple_async_mock(return_value=userinfo)
 
     state = "state"
-    session = handler._generate_oidc_session_token(
+    session = handler._token_generator.generate_oidc_session_token(
         state=state,
         session_data=OidcSessionData(
             nonce="nonce", client_redirect_url=client_redirect_url,
