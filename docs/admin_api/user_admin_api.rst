@@ -352,9 +352,9 @@ The following fields are returned in the JSON response body:
 
 
 List media of an user
-================================
+=====================
 Gets a list of all local media that a specific ``user_id`` has created.
-The response is default ordered by creation date ascending and media ID ascending.
+The response is default ordered by creation date descending and media ID ascending.
 The newest media is on top. You can change the order with parameters
 ``order_by`` and ``dir``.
 
@@ -421,17 +421,13 @@ The following parameters should be set in the URL:
   - ``upload_name`` - Media are ordered alphabetically by name the media was uploaded with.
   - ``created_ts`` - Media are ordered by when the content was uploaded in ms.
     Smallest to largest. This is the default.
-
   - ``last_access_ts`` - Media are ordered by when the content was last accessed in ms.
     Smallest to largest.
-
   - ``media_length`` - Media are ordered by length of the media in bytes.
     Smallest to largest.
-
   - ``media_type`` - Media are ordered alphabetically by MIME-type.
   - ``quarantined_by`` - Media are ordered alphabetically by the user ID that
     initiated the quarantine request for this media.
-
   - ``safe_from_quarantine`` - Media are ordered by the status if this media is safe
     from quarantining.
 
@@ -440,6 +436,12 @@ The following parameters should be set in the URL:
 
 If neither ``order_by`` nor ``dir`` is set, the default order is newest media on top
 (corresponds to ``order_by`` = ``created_ts`` and ``dir`` = ``b``).
+
+Caution. The database has only indexes in the following columns ``media_id``,
+``user_id`` and ``created_ts``. This means that if a different sort order is used
+(``upload_name``, ``last_access_ts``, ``media_length``, ``media_type``,
+``quarantined_by`` or ``safe_from_quarantine``), this can cause a large load on the
+database, especially for large environments.
 
 **Response**
 
