@@ -35,7 +35,6 @@ from typing_extensions import TypedDict
 from twisted.web.client import readBody
 
 from synapse.config import ConfigError
-from synapse.handlers._base import BaseHandler
 from synapse.handlers.sso import MappingException, UserAttributes
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
@@ -85,12 +84,14 @@ class OidcError(Exception):
         return self.error
 
 
-class OidcHandler(BaseHandler):
+class OidcHandler:
     """Handles requests related to the OpenID Connect login flow.
     """
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self._clock = hs.get_clock()
+        self._store = hs.get_datastore()
+
         self._callback_url = hs.config.oidc_callback_url  # type: str
         self._scopes = hs.config.oidc_scopes  # type: List[str]
         self._user_profile_method = hs.config.oidc_user_profile_method  # type: str
@@ -747,7 +748,7 @@ class OidcHandler(BaseHandler):
             macaroon.add_first_party_caveat(
                 "ui_auth_session_id = %s" % (ui_auth_session_id,)
             )
-        now = self.clock.time_msec()
+        now = self._clock.time_msec()
         expiry = now + duration_in_ms
         macaroon.add_first_party_caveat("time < %d" % (expiry,))
 
@@ -822,7 +823,7 @@ class OidcHandler(BaseHandler):
         if not caveat.startswith(prefix):
             return False
         expiry = int(caveat[len(prefix) :])
-        now = self.clock.time_msec()
+        now = self._clock.time_msec()
         return now < expiry
 
     async def _complete_oidc_login(
@@ -901,8 +902,8 @@ class OidcHandler(BaseHandler):
                 # and attempt to match it.
                 attributes = await oidc_response_to_user_attributes(failures=0)
 
-                user_id = UserID(attributes.localpart, self.server_name).to_string()
-                users = await self.store.get_users_by_id_case_insensitive(user_id)
+                user_id = UserID(attributes.localpart, self._server_name).to_string()
+                users = await self._store.get_users_by_id_case_insensitive(user_id)
                 if users:
                     # If an existing matrix ID is returned, then use it.
                     if len(users) == 1:
