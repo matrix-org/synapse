@@ -683,7 +683,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("POST", url, access_token=self.admin_user_tok)
 
         self.assertEqual(400, channel.code, msg=channel.json_body)
-        self.assertEqual("Can only lookup local users", channel.json_body["error"])
+        self.assertEqual("Can only deactivate local users", channel.json_body["error"])
 
     def test_deactivate_user_erase_true(self):
         """

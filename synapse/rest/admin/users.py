@@ -493,7 +493,8 @@ class DeactivateAccountRestServlet(RestServlet):
         self.store = hs.get_datastore()
 
     async def on_POST(self, request: str, target_user_id: str) -> Tuple[int, JsonDict]:
-        await assert_requester_is_admin(self.auth, request)
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester)
 
         if not self.is_mine(UserID.from_string(target_user_id)):
             raise SynapseError(400, "Can only deactivate local users")
@@ -501,7 +502,6 @@ class DeactivateAccountRestServlet(RestServlet):
         if not await self.store.get_user_by_id(target_user_id):
             raise NotFoundError("User not found")
 
-        requester = await self.auth.get_user_by_req(request)
         body = parse_json_object_from_request(request, allow_empty_body=True)
         erase = body.get("erase", False)
         if not isinstance(erase, bool):

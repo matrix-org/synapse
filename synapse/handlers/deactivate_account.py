@@ -129,14 +129,11 @@ class DeactivateAccountHandler(BaseHandler):
 
         # Mark the user as erased, if they asked for that
         if erase_data:
+            user = UserID.from_string(user_id)
             # Remove avatar URL from this user
-            await self._profile_handler.set_avatar_url(
-                UserID.from_string(user_id), requester, "", by_admin
-            )
+            await self._profile_handler.set_avatar_url(user, requester, "", by_admin)
             # Remove displayname from this user
-            await self._profile_handler.set_displayname(
-                UserID.from_string(user_id), requester, "", by_admin
-            )
+            await self._profile_handler.set_displayname(user, requester, "", by_admin)
 
             logger.info("Marking %s as erased", user_id)
             await self.store.mark_user_erased(user_id)
