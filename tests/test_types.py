@@ -60,13 +60,7 @@ class RoomAliasTestCase(unittest.HomeserverTestCase):
 
     def test_validate(self):
         id_string = "#test:domain,test"
-
-        try:
-            RoomAlias.from_string(id_string)
-            self.fail("Parsing '%s' should raise exception" % id_string)
-        except SynapseError as exc:
-            self.assertEqual(400, exc.code)
-            self.assertEqual("M_INVALID_PARAM", exc.errcode)
+        self.assertFalse(RoomAlias.is_valid(id_string))
 
 
 class GroupIDTestCase(unittest.TestCase):
