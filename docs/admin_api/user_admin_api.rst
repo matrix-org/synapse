@@ -337,6 +337,10 @@ A response body like the following is returned:
         "total": 2
     }
 
+The server returns the list of rooms of which the user and the server
+are member. If the user is local, all the rooms of which the user is
+member are returned.
+
 **Parameters**
 
 The following parameters should be set in the URL:

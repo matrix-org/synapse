@@ -49,8 +49,10 @@ from synapse.api.errors import (
     UserDeactivatedError,
 )
 from synapse.api.ratelimiting import Ratelimiter
+from synapse.handlers._base import BaseHandler
 from synapse.handlers.ui_auth import INTERACTIVE_AUTH_CHECKERS
 from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
+from synapse.http import get_request_user_agent
 from synapse.http.server import finish_request, respond_with_html
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
@@ -61,8 +63,6 @@ from synapse.util import stringutils as stringutils
 from synapse.util.async_helpers import maybe_awaitable
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.threepids import canonicalise_email
-
-from ._base import BaseHandler
 
 if TYPE_CHECKING:
     from synapse.app.homeserver import HomeServer
@@ -533,7 +533,7 @@ class AuthHandler(BaseHandler):
             # authentication flow.
             await self.store.set_ui_auth_clientdict(sid, clientdict)
 
-        user_agent = request.get_user_agent("")
+        user_agent = get_request_user_agent(request)
         clientip = request.getClientIP()
 
         await self.store.add_user_agent_ip_to_ui_auth_session(

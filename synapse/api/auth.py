@@ -33,6 +33,7 @@ from synapse.api.errors import (
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.appservice import ApplicationService
 from synapse.events import EventBase
+from synapse.http import get_request_user_agent
 from synapse.http.site import SynapseRequest
 from synapse.logging import opentracing as opentracing
 from synapse.storage.databases.main.registration import TokenLookupResult
@@ -187,7 +188,7 @@ class Auth:
         """
         try:
             ip_addr = request.getClientIP()
-            user_agent = request.get_user_agent("")
+            user_agent = get_request_user_agent(request)
 
             access_token = self.get_access_token_from_request(request)
 
