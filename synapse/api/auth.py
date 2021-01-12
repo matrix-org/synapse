@@ -186,7 +186,7 @@ class Auth:
             AuthError if access is denied for the user in the access token
         """
         try:
-            ip_addr = self.hs.get_ip_from_request(request)
+            ip_addr = request.getClientIP()
             user_agent = request.get_user_agent("")
 
             access_token = self.get_access_token_from_request(request)
@@ -275,7 +275,7 @@ class Auth:
             return None, None
 
         if app_service.ip_range_whitelist:
-            ip_address = IPAddress(self.hs.get_ip_from_request(request))
+            ip_address = IPAddress(request.getClientIP())
             if ip_address not in app_service.ip_range_whitelist:
                 return None, None
 
