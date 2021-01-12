@@ -496,7 +496,7 @@ class DeactivateAccountRestServlet(RestServlet):
         await assert_requester_is_admin(self.auth, request)
 
         if not self.is_mine(UserID.from_string(target_user_id)):
-            raise SynapseError(400, "Can only lookup local users")
+            raise SynapseError(400, "Can only deactivate local users")
 
         if not await self.store.get_user_by_id(target_user_id):
             raise NotFoundError("User not found")

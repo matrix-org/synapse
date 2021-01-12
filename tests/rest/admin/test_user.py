@@ -723,8 +723,8 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(True, channel.json_body["deactivated"])
         self.assertEqual(0, len(channel.json_body["threepids"]))
-        self.assertEqual(None, channel.json_body["avatar_url"])
-        self.assertEqual(None, channel.json_body["displayname"])
+        self.assertIsNone(channel.json_body["avatar_url"])
+        self.assertIsNone(channel.json_body["displayname"])
 
         self._is_erased("@user:test", True)
 
@@ -771,7 +771,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
 
         self._is_erased("@user:test", False)
 
-    def _is_erased(self, user_id, expect):
+    def _is_erased(self, user_id: str, expect: bool) -> None:
         """Assert that the user is erased or not
         """
         d = self.store.is_user_erased(user_id)
