@@ -1363,7 +1363,7 @@ class AuthHandler(BaseHandler):
             raise SynapseError(400, "Unknown session ID: %s" % (session_id,))
 
         user_id_to_verify = await self.get_session_data(
-            session_id, UIAuthSessionDataConstants.REGISTERED_USER_ID
+            session_id, UIAuthSessionDataConstants.REQUEST_USER_ID
         )  # type: str
 
         idps = await self.hs.get_sso_handler().get_identity_providers_for_user(
