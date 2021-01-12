@@ -494,7 +494,7 @@ class DeactivateAccountRestServlet(RestServlet):
 
     async def on_POST(self, request: str, target_user_id: str) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester)
+        await assert_user_is_admin(self.auth, requester.user)
 
         if not self.is_mine(UserID.from_string(target_user_id)):
             raise SynapseError(400, "Can only deactivate local users")
