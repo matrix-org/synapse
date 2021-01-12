@@ -284,7 +284,6 @@ class AuthHandler(BaseHandler):
         requester: Requester,
         request: SynapseRequest,
         request_body: Dict[str, Any],
-        clientip: str,
         description: str,
     ) -> Tuple[dict, Optional[str]]:
         """
@@ -300,8 +299,6 @@ class AuthHandler(BaseHandler):
             request: The request sent by the client.
 
             request_body: The body of the request sent by the client
-
-            clientip: The IP address of the client.
 
             description: A human readable string to be displayed to the user that
                          describes the operation happening on their account.
@@ -351,7 +348,7 @@ class AuthHandler(BaseHandler):
 
         try:
             result, params, session_id = await self.check_ui_auth(
-                flows, request, request_body, clientip, description
+                flows, request, request_body, description
             )
         except LoginError:
             # Update the ratelimiter to say we failed (`can_do_action` doesn't raise).
@@ -426,7 +423,6 @@ class AuthHandler(BaseHandler):
         flows: List[List[str]],
         request: SynapseRequest,
         clientdict: Dict[str, Any],
-        clientip: str,
         description: str,
     ) -> Tuple[dict, dict, str]:
         """
@@ -447,8 +443,6 @@ class AuthHandler(BaseHandler):
 
             clientdict: The dictionary from the client root level, not the
                         'auth' key: this method prompts for auth if none is sent.
-
-            clientip: The IP address of the client.
 
             description: A human readable string to be displayed to the user that
                          describes the operation happening on their account.
@@ -540,6 +534,7 @@ class AuthHandler(BaseHandler):
             await self.store.set_ui_auth_clientdict(sid, clientdict)
 
         user_agent = request.get_user_agent("")
+        clientip = request.getClientIP()
 
         await self.store.add_user_agent_ip_to_ui_auth_session(
             session.session_id, user_agent, clientip
