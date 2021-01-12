@@ -408,6 +408,35 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore):
         )
 
 
+    async def get_last_client_ip_by_device(
+        self, user_id: str, device_id: Optional[str]
+    ) -> Dict[Tuple[str, str], dict]:
+        """For each device_id listed, give the user_ip it was last seen on.
+
+        The result might be slightly out of date as client IPs are inserted in batches.
+
+        Args:
+            user_id: The user to fetch devices for.
+            device_id: If None fetches all devices for the user
+
+        Returns:
+            A dictionary mapping a tuple of (user_id, device_id) to dicts, with
+            keys giving the column names from the devices table.
+        """
+
+        keyvalues = {"user_id": user_id}
+        if device_id is not None:
+            keyvalues["device_id"] = device_id
+
+        res = await self.db_pool.simple_select_list(
+            table="devices",
+            keyvalues=keyvalues,
+            retcols=("user_id", "ip", "user_agent", "device_id", "last_seen"),
+        )
+
+        return {(d["user_id"], d["device_id"]): d for d in res}
+
+
 class ClientIpStore(ClientIpWorkerStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
 
@@ -512,18 +541,9 @@ class ClientIpStore(ClientIpWorkerStore):
             A dictionary mapping a tuple of (user_id, device_id) to dicts, with
             keys giving the column names from the devices table.
         """
+        ret = await super().get_last_client_ip_by_device(user_id, device_id)
 
-        keyvalues = {"user_id": user_id}
-        if device_id is not None:
-            keyvalues["device_id"] = device_id
-
-        res = await self.db_pool.simple_select_list(
-            table="devices",
-            keyvalues=keyvalues,
-            retcols=("user_id", "ip", "user_agent", "device_id", "last_seen"),
-        )
-
-        ret = {(d["user_id"], d["device_id"]): d for d in res}
+        # Update what is retrieved from the database with data which is pending insertion.
         for key in self._batch_row_update:
             uid, access_token, ip = key
             if uid == user_id:
