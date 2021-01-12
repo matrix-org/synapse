@@ -1755,10 +1755,14 @@ class DatabasePool:
         Returns:
             The number of deleted rows.
         """
-        sql = "DELETE FROM %s WHERE %s" % (
-            table,
-            " AND ".join("%s = ?" % (k,) for k in keyvalues),
-        )
+
+        if keyvalues:
+            sql = "DELETE FROM %s WHERE %s" % (
+                table,
+                " AND ".join("%s = ?" % (k,) for k in keyvalues),
+            )
+        else:
+            sql = "DELETE FROM %s" % (table,)
 
         txn.execute(sql, list(keyvalues.values()))
         return txn.rowcount
