@@ -1,6 +1,27 @@
 Synapse 1.25.0rc1 (2021-01-06)
 ==============================
 
+Ending Support for Python 3.5 and Postgres 9.5
+----------------------------------------------
+
+With this release, the Synapse team is announcing a formal deprecation policy for our platform dependencies, like Python and PostgreSQL:
+
+All future release of Synapse will follow the upstream end-of-life schedules.
+
+Which means:
+
+* This is the last release which supports Python 3.5.
+* We will end support for PostgreSQL 9.5 early next month.
+* We will end support for Python 3.6 and PostgreSQL 9.6 near the end of the year.
+
+The https://endoflife.date/ website has convenient summaries of the support schedules for projects like [Python](https://endoflife.date/python) and [PostgreSQL](https://endoflife.date/postgresql). 
+
+If you are unable to upgrade your environment to a supported version of Python or Postgres, we encourage you to consider using the [Synapse Docker images](https://registry.hub.docker.com/r/matrixdotorg/synapse) instead.
+
+### Grace Period
+
+As this change may be disruptive, we will make a good faith attempt to avoid breaking compatibility in all releases through the end of March 2021. However, critical security vulnerabilities in dependencies or other unanticipated circumstances may arise which necessitate breaking compatibility earlier.
+
 Removal warning
 ---------------
 
