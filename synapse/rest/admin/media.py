@@ -109,6 +109,28 @@ class QuarantineMediaByID(RestServlet):
         return 200, {}
 
 
+class ProtectMediaByID(RestServlet):
+    """Protect local media from being quarantined.
+    """
+
+    PATTERNS = admin_patterns("/media/protect/(?P<media_id>[^/]+)")
+
+    def __init__(self, hs):
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+
+    async def on_POST(self, request, media_id: str):
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
+
+        logging.info("Protecting local media by ID: %s", media_id)
+
+        # Quarantine this media id
+        await self.store.mark_local_media_as_safe(media_id)
+
+        return 200, {}
+
+
 class ListMediaInRoom(RestServlet):
     """Lists all of the media in a given room.
     """
@@ -230,6 +252,7 @@ def register_servlets_for_media_repo(hs, http_server):
     QuarantineMediaInRoom(hs).register(http_server)
     QuarantineMediaByID(hs).register(http_server)
     QuarantineMediaByUser(hs).register(http_server)
+    ProtectMediaByID(hs).register(http_server)
     ListMediaInRoom(hs).register(http_server)
     DeleteMediaByID(hs).register(http_server)
     DeleteMediaByDateSize(hs).register(http_server)
