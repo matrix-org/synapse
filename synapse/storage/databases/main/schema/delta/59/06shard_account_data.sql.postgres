@@ -15,12 +15,18 @@
 
 CREATE SEQUENCE IF NOT EXISTS account_data_sequence;
 
--- We need to take the max across both device_inbox and device_federation_outbox
--- tables as they share the ID generator
+-- We need to take the max across all the account_data tables as they share the
+-- ID generator
 SELECT setval('account_data_sequence', (
     SELECT GREATEST(
         (SELECT COALESCE(MAX(stream_id), 1) FROM room_account_data),
         (SELECT COALESCE(MAX(stream_id), 1) FROM room_tags_revisions),
         (SELECT COALESCE(MAX(stream_id), 1) FROM account_data)
     )
+));
+
+CREATE SEQUENCE IF NOT EXISTS receipts_sequence;
+
+SELECT setval('receipts_sequence', (
+    SELECT COALESCE(MAX(stream_id), 1) FROM receipts_linearized
 ));
