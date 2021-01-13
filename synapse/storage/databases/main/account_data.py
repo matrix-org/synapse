@@ -43,7 +43,9 @@ class AccountDataWorkerStore(SQLBaseStore):
         self._instance_name = hs.get_instance_name()
 
         if isinstance(database.engine, PostgresEngine):
-            self._can_write_to_account_data = self._instance_name == "master"
+            self._can_write_to_account_data = (
+                self._instance_name in hs.config.worker.writers.account_data
+            )
 
             self._account_data_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
@@ -56,7 +58,7 @@ class AccountDataWorkerStore(SQLBaseStore):
                     ("account_data", "instance_name", "stream_id"),
                 ],
                 sequence_name="account_data_sequence",
-                writers=["master"],
+                writers=hs.config.worker.writers.account_data,
             )
         else:
             self._can_write_to_account_data = True

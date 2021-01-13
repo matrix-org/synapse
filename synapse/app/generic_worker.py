@@ -100,7 +100,14 @@ from synapse.rest.client.v1.profile import (
 )
 from synapse.rest.client.v1.push_rule import PushRuleRestServlet
 from synapse.rest.client.v1.voip import VoipRestServlet
-from synapse.rest.client.v2_alpha import groups, room_keys, sync, user_directory
+from synapse.rest.client.v2_alpha import (
+    groups,
+    room_keys,
+    sync,
+    user_directory,
+    tags,
+    account_data,
+)
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.client.v2_alpha.account import ThreepidRestServlet
 from synapse.rest.client.v2_alpha.account_data import (
@@ -529,6 +536,8 @@ class GenericWorkerServer(HomeServer):
                     room.register_deprecated_servlets(self, resource)
                     InitialSyncRestServlet(self).register(resource)
                     room_keys.register_servlets(self, resource)
+                    tags.register_servlets(self, resource)
+                    account_data.register_servlets(self, resource)
 
                     SendToDeviceRestServlet(self).register(resource)
 

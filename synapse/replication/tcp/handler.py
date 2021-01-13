@@ -58,6 +58,8 @@ from synapse.replication.tcp.streams import (
     Stream,
     ToDeviceStream,
     TypingStream,
+    AccountDataStream,
+    TagAccountDataStream,
 )
 
 logger = logging.getLogger(__name__)
@@ -128,6 +130,14 @@ class ReplicationCommandHandler:
                 # Only add TypingStream as a source on the instance in charge of
                 # typing.
                 if hs.config.worker.writers.typing == hs.get_instance_name():
+                    self._streams_to_replicate.append(stream)
+
+                continue
+
+            if isinstance(stream, (AccountDataStream, TagAccountDataStream)):
+                # Only add AccountDataStream and TagAccountDataStream as a source on the
+                # instance in charge of account_data persistence.
+                if hs.get_instance_name() in hs.config.worker.writers.account_data:
                     self._streams_to_replicate.append(stream)
 
                 continue
