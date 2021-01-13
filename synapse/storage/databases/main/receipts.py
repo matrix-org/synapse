@@ -40,7 +40,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
         self._instance_name = hs.get_instance_name()
 
         if isinstance(database.engine, PostgresEngine):
-            self._can_write_to_receipts = self._instance_name == "master"
+            self._can_write_to_receipts = (
+                self._instance_name in hs.config.worker.writers.receipts
+            )
 
             self._receipts_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
@@ -49,7 +51,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 instance_name=self._instance_name,
                 tables=[("receipts_linearized", "instance_name", "stream_id")],
                 sequence_name="receipts_sequence",
-                writers=["master"],
+                writers=hs.config.worker.writers.receipts,
             )
         else:
             self._can_write_to_receipts = True

@@ -59,6 +59,9 @@ class WriterLocations:
     account_data = attr.ib(
         default=["master"], type=List[str], converter=_instance_to_list_converter,
     )
+    receipts = attr.ib(
+        default=["master"], type=List[str], converter=_instance_to_list_converter,
+    )
 
 
 class WorkerConfig(Config):
@@ -130,7 +133,7 @@ class WorkerConfig(Config):
 
         # Check that the configured writers for events and typing also appears in
         # `instance_map`.
-        for stream in ("events", "typing", "to_device", "account_data"):
+        for stream in ("events", "typing", "to_device", "account_data", "receipts"):
             instances = _instance_to_list_converter(getattr(self.writers, stream))
             for instance in instances:
                 if instance != "master" and instance not in self.instance_map:
@@ -147,6 +150,16 @@ class WorkerConfig(Config):
         if len(self.writers.account_data) != 1:
             raise ConfigError(
                 "Must only specify one instance to handle `account_data` messages."
+            )
+
+        if len(self.writers.receipts) != 1:
+            raise ConfigError(
+                "Must only specify one instance to handle `receipts` messages."
+            )
+
+        if self.writers.receipts != self.writers.account_data:
+            raise ConfigError(
+                "'receipts' and 'account_data' streams must be on the same instance."
             )
 
         self.events_shard_config = ShardedWorkerHandlingConfig(self.writers.events)
