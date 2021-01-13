@@ -157,11 +157,6 @@ class WorkerConfig(Config):
                 "Must only specify one instance to handle `receipts` messages."
             )
 
-        if self.writers.receipts != self.writers.account_data:
-            raise ConfigError(
-                "'receipts' and 'account_data' streams must be on the same instance."
-            )
-
         self.events_shard_config = ShardedWorkerHandlingConfig(self.writers.events)
 
         # Whether this worker should run background tasks or not.
