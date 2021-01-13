@@ -1,15 +1,6 @@
 Synapse 1.25.0 (2021-01-13)
 ===========================
 
-Bugfixes
---------
-
-- Fix HTTP proxy support when using a proxy that is on a blacklisted IP. Introduced in v1.25.0rc1. Contributed by @Bubu. ([\#9084](https://github.com/matrix-org/synapse/issues/9084))
-
-
-Synapse 1.25.0 (2021-01-13)
-==============================
-
 Ending Support for Python 3.5 and Postgres 9.5
 ----------------------------------------------
 
@@ -34,6 +25,12 @@ If you are unable to upgrade your environment to a supported version of Python o
 We will make a good faith attempt to avoid breaking compatibility in all releases through the end of March 2021. However, critical security vulnerabilities in dependencies or other unanticipated circumstances may arise which necessitate breaking compatibility earlier.
 
 We intend to continue producing .deb packages for Debian 9 (Stretch) and Ubuntu 16.04 (Xenial) through the transition period.
+
+Bugfixes
+--------
+
+- Fix HTTP proxy support when using a proxy that is on a blacklisted IP. Introduced in v1.25.0rc1. Contributed by @Bubu. ([\#9084](https://github.com/matrix-org/synapse/issues/9084))
+
 
 Synapse 1.25.0rc1 (2021-01-06)
 ==============================
