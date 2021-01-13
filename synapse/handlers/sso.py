@@ -22,6 +22,7 @@ from typing_extensions import NoReturn, Protocol
 
 from twisted.web.http import Request
 
+from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, RedirectException, SynapseError
 from synapse.handlers.ui_auth import UIAuthSessionDataConstants
 from synapse.http import get_request_user_agent
@@ -147,9 +148,13 @@ class SsoHandler:
         self._store = hs.get_datastore()
         self._server_name = hs.hostname
         self._registration_handler = hs.get_registration_handler()
+        self._auth_handler = hs.get_auth_handler()
         self._error_template = hs.config.sso_error_template
         self._bad_user_template = hs.config.sso_auth_bad_user_template
-        self._auth_handler = hs.get_auth_handler()
+
+        # The following template is shown after a successful user interactive
+        # authentication session. It tells the user they can close the window.
+        self._sso_auth_success_template = hs.config.sso_auth_success_template
 
         # a lock on the mappings
         self._mapping_lock = Linearizer(name="sso_user_mapping", clock=hs.get_clock())
@@ -598,9 +603,14 @@ class SsoHandler:
             )
         else:
             # success!
-            await self._auth_handler.complete_sso_ui_auth(
-                user_id, ui_auth_session_id, request
+            # Mark the stage of the authentication as successful.
+            await self._store.mark_ui_auth_stage_complete(
+                ui_auth_session_id, LoginType.SSO, user_id
             )
+
+            # Render the HTML confirmation page and return.
+            html = self._sso_auth_success_template
+            respond_with_html(request, 200, html)
             return
 
         # the user_id didn't match: mark the stage of the authentication as unsuccessful
