@@ -768,9 +768,15 @@ class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
     def dataReceived(self, data: bytes) -> None:
         self.stream.write(data)
         self.length += len(data)
-        if self.max_size is not None and self.length >= self.max_size:
+        # The first time the maximum size is exceeded, error and cancel the
+        # connection. dataReceived might be called again if data was received
+        # in the meantime.
+        if (
+            self.max_size is not None
+            and self.length >= self.max_size
+            and not self.deferred.called
+        ):
             self.deferred.errback(BodyExceededMaxSize())
-            self.deferred = defer.Deferred()
             self.transport.loseConnection()
 
     def connectionLost(self, reason: Failure) -> None:
