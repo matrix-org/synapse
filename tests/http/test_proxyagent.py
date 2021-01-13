@@ -21,10 +21,12 @@ import treq
 from netaddr import IPSet
 
 from twisted.internet import interfaces  # noqa: F401
+from twisted.internet.endpoints import HostnameEndpoint, _WrapperEndpoint
 from twisted.internet.protocol import Factory
 from twisted.protocols.tls import TLSMemoryBIOFactory
 from twisted.web.http import HTTPChannel
 
+from synapse.http.proxyagent import parse_proxy
 from synapse.http.client import BlacklistingReactorWrapper
 from synapse.http.proxyagent import ProxyAgent
 
@@ -102,6 +104,104 @@ class MatrixFederationAgentTests(TestCase):
             )
 
         return http_protocol
+
+    def test_parse_proxy_host_only(self):
+        url = b"localhost"
+        self.assertEqual((b"http", b"localhost", 1080), parse_proxy(url))
+
+    def test_parse_proxy_host_port(self):
+        url = b"localhost:9988"
+        self.assertEqual((b"http", b"localhost", 9988), parse_proxy(url))
+
+    def test_parse_proxy_scheme_host(self):
+        url = b"https://localhost"
+        self.assertEqual((b"https", b"localhost", 1080), parse_proxy(url))
+
+    def test_parse_proxy_scheme_host_port(self):
+        url = b"https://localhost:1234"
+        self.assertEqual((b"https", b"localhost", 1234), parse_proxy(url))
+
+    def test_parse_proxy_host_only_ipv4(self):
+        url = b"1.2.3.4"
+        self.assertEqual((b"http", b"1.2.3.4", 1080), parse_proxy(url))
+
+    def test_parse_proxy_host_port_ipv4(self):
+        url = b"1.2.3.4:9988"
+        self.assertEqual((b"http", b"1.2.3.4", 9988), parse_proxy(url))
+
+    def test_parse_proxy_scheme_host_ipv4(self):
+        url = b"https://1.2.3.4"
+        self.assertEqual((b"https", b"1.2.3.4", 1080), parse_proxy(url))
+
+    def test_parse_proxy_scheme_host_port_ipv4(self):
+        url = b"https://1.2.3.4:9988"
+        self.assertEqual((b"https", b"1.2.3.4", 9988), parse_proxy(url))
+
+    def test_parse_proxy_host_ipv6(self):
+        url = b"2001:0db8:85a3:0000:0000:8a2e:0370:effe"
+        self.assertEqual(
+            (b"http", b"2001:0db8:85a3:0000:0000:8a2e:0370:effe", 1080),
+            parse_proxy(url),
+        )
+
+        # currently broken
+        url = b"2001:0db8:85a3:0000:0000:8a2e:0370:1234"
+        # self.assertEqual((b"http", b"2001:0db8:85a3:0000:0000:8a2e:0370:1234", 1080), parse_proxy(url))
+
+        # also broken
+        url = b"::1"
+        # self.assertEqual((b"http", b"::1", 1080), parse_proxy(url))
+        url = b"::ffff:0.0.0.0"
+        self.assertEqual((b"http", b"::ffff:0.0.0.0", 1080), parse_proxy(url))
+
+    def test_parse_proxy_host_port_ipv6(self):
+        url = b"2001:0db8:85a3:0000:0000:8a2e:0370:effe:9988"
+        self.assertEqual(
+            (b"http", b"2001:0db8:85a3:0000:0000:8a2e:0370:effe", 9988),
+            parse_proxy(url),
+        )
+
+        # currently broken
+        url = b"2001:0db8:85a3:0000:0000:8a2e:0370:1234:9988"
+        # self.assertEqual((b"http", b"2001:0db8:85a3:0000:0000:8a2e:0370:1234", 9988), parse_proxy(url))
+
+        url = b"::1:9988"
+        self.assertEqual((b"http", b"::1", 9988), parse_proxy(url))
+        url = b"::ffff:0.0.0.0:9988"
+        self.assertEqual((b"http", b"::ffff:0.0.0.0", 9988), parse_proxy(url))
+
+    def test_parse_proxy_scheme_host_ipv6(self):
+        url = b"https://2001:0db8:85a3:0000:0000:8a2e:0370:effe"
+        self.assertEqual(
+            (b"https", b"2001:0db8:85a3:0000:0000:8a2e:0370:effe", 1080),
+            parse_proxy(url),
+        )
+
+        # currently broken
+        url = b"https://2001:0db8:85a3:0000:0000:8a2e:0370:1234"
+        # self.assertEqual((b"https", b"2001:0db8:85a3:0000:0000:8a2e:0370:1234", 1080), parse_proxy(url))
+
+        # also broken
+        url = b"https://::1"
+        # self.assertEqual((b"https", b"::1", 1080), parse_proxy(url))
+        url = b"https://::ffff:0.0.0.0:1080"
+        self.assertEqual((b"https", b"::ffff:0.0.0.0", 1080), parse_proxy(url))
+
+    def test_parse_proxy_scheme_host_port_ipv6(self):
+        url = b"https://2001:0db8:85a3:0000:0000:8a2e:0370:effe:9988"
+        self.assertEqual(
+            (b"https", b"2001:0db8:85a3:0000:0000:8a2e:0370:effe", 9988),
+            parse_proxy(url),
+        )
+
+        # currently broken
+        url = b"https://2001:0db8:85a3:0000:0000:8a2e:0370:1234:9988"
+        # self.assertEqual((b"https", b"2001:0db8:85a3:0000:0000:8a2e:0370:1234", 9988), parse_proxy(url))
+
+        url = b"https://::1:9988"
+        self.assertEqual((b"https", b"::1", 9988), parse_proxy(url))
+        url = b"https://::ffff:0.0.0.0:9988"
+        self.assertEqual((b"https", b"::ffff:0.0.0.0", 9988), parse_proxy(url))
 
     def _test_request_direct_connection(self, agent, scheme, hostname, path):
         """Runs a test case for a direct connection not going through a proxy.
@@ -489,6 +589,36 @@ class MatrixFederationAgentTests(TestCase):
         resp = self.successResultOf(d)
         body = self.successResultOf(treq.content(resp))
         self.assertEqual(body, b"result")
+
+    @patch.dict(os.environ, {"http_proxy": "proxy.com:8888"})
+    def test_proxy_with_no_scheme(self):
+        http_proxy_agent = ProxyAgent(self.reactor, use_proxy=True)
+        self.assertIsInstance(http_proxy_agent.http_proxy_endpoint, HostnameEndpoint)
+        self.assertEqual(http_proxy_agent.http_proxy_endpoint._hostStr, "proxy.com")
+        self.assertEqual(http_proxy_agent.http_proxy_endpoint._port, 8888)
+
+    @patch.dict(os.environ, {"http_proxy": "socks://proxy.com:8888"})
+    def test_proxy_with_unsupported_scheme(self):
+        with self.assertRaises(ValueError):
+            _ = ProxyAgent(self.reactor, use_proxy=True)
+
+    @patch.dict(os.environ, {"http_proxy": "http://proxy.com:8888"})
+    def test_proxy_with_http_scheme(self):
+        http_proxy_agent = ProxyAgent(self.reactor, use_proxy=True)
+        self.assertIsInstance(http_proxy_agent.http_proxy_endpoint, HostnameEndpoint)
+        self.assertEqual(http_proxy_agent.http_proxy_endpoint._hostStr, "proxy.com")
+        self.assertEqual(http_proxy_agent.http_proxy_endpoint._port, 8888)
+
+    @patch.dict(os.environ, {"http_proxy": "https://proxy.com:8888"})
+    def test_proxy_with_https_scheme(self):
+        https_proxy_agent = ProxyAgent(self.reactor, use_proxy=True)
+        self.assertIsInstance(https_proxy_agent.http_proxy_endpoint, _WrapperEndpoint)
+        self.assertEqual(
+            https_proxy_agent.http_proxy_endpoint._wrappedEndpoint._hostStr, "proxy.com"
+        )
+        self.assertEqual(
+            https_proxy_agent.http_proxy_endpoint._wrappedEndpoint._port, 8888
+        )
 
 
 def _wrap_server_factory_for_tls(factory, sanlist=None):

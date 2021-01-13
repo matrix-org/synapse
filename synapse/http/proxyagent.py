@@ -22,6 +22,7 @@ from zope.interface import implementer
 
 from twisted.internet import defer
 from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
+from twisted.internet.interfaces import IReactorCore
 from twisted.python.failure import Failure
 from twisted.web.client import URI, BrowserLikePolicyForHTTPS, _AgentBase
 from twisted.web.error import SchemeNotSupported
@@ -121,11 +122,11 @@ class ProxyAgent(_AgentBase):
         self.https_proxy_creds, https_proxy = parse_username_password(https_proxy)
 
         self.http_proxy_endpoint = _http_proxy_endpoint(
-            http_proxy, self.proxy_reactor, **self._endpoint_kwargs
+            http_proxy, self.proxy_reactor, contextFactory, **self._endpoint_kwargs
         )
 
         self.https_proxy_endpoint = _http_proxy_endpoint(
-            https_proxy, self.proxy_reactor, **self._endpoint_kwargs
+            https_proxy, self.proxy_reactor, contextFactory, **self._endpoint_kwargs
         )
 
         self.no_proxy = no_proxy
@@ -243,7 +244,12 @@ class ProxyAgent(_AgentBase):
         )
 
 
-def _http_proxy_endpoint(proxy: Optional[bytes], reactor, **kwargs):
+def _http_proxy_endpoint(
+    proxy: Optional[bytes],
+    reactor: IReactorCore,
+    tls_options_factory: Optional[IPolicyForHTTPS],
+    **kwargs,
+):
     """Parses an http proxy setting and returns an endpoint for the proxy
 
     Args:
@@ -253,18 +259,31 @@ def _http_proxy_endpoint(proxy: Optional[bytes], reactor, **kwargs):
 
         reactor: reactor to be used to connect to the proxy
 
+        tls_options_factory: the TLS options to use when connecting through a https proxy
         kwargs: other args to be passed to HostnameEndpoint
 
     Returns:
         interfaces.IStreamClientEndpoint|None: endpoint to use to connect to the proxy,
             or None
+
+    Raises: ValueError if given a proxy with a scheme we don't support.
     """
     if proxy is None:
         return None
 
-    # Parse the connection string
-    host, port = parse_host_port(proxy, default_port=1080)
-    return HostnameEndpoint(reactor, host, port, **kwargs)
+    # Note: we can't use urlsplit/urlparse as that is completely broken for things without a scheme://
+    scheme, host, port = parse_proxy(proxy)
+
+    if scheme not in (b"http", b"https"):
+        raise ValueError("Proxy scheme '{}' not supported".format(scheme.decode()))
+
+    proxy_endpoint = HostnameEndpoint(reactor, host, port, **kwargs)
+
+    if scheme == b"https":
+        tls_options = tls_options_factory.creatorForNetloc(host, port)
+        proxy_endpoint = wrapClientTLS(tls_options, proxy_endpoint)
+
+    return proxy_endpoint
 
 
 def parse_username_password(proxy: bytes) -> Tuple[Optional[ProxyCredentials], bytes]:
@@ -288,25 +307,35 @@ def parse_username_password(proxy: bytes) -> Tuple[Optional[ProxyCredentials], b
     return None, proxy
 
 
-def parse_host_port(hostport: bytes, default_port: int = None) -> Tuple[bytes, int]:
+def parse_proxy(
+    proxy: bytes, default_scheme: bytes = b"http", default_port: int = 1080
+) -> Tuple[bytes, bytes, int]:
     """
     Parse the hostname and port from a proxy connection byte string.
 
     Args:
-        hostport: The proxy connection string. Must be in the form 'host[:port]'.
-        default_port: The default port to return if one is not found in `hostport`.
+        proxy: The proxy connection string. Must be in the form 'host[:port]'.
+        default_scheme: The default scheme to return if one is not found in `proxy`.
+        default_port: The default port to return if one is not found in `proxy`.
 
     Returns:
-        A tuple containing the hostname and port. Uses `default_port` if one was not found.
+        A tuple containing the scheme, hostname and port.
     """
-    if b":" in hostport:
-        host, port = hostport.rsplit(b":", 1)
+    # First check if we have a scheme present
+    if b"://" in proxy:
+        scheme, host = proxy.split(b"://", 1)
+    else:
+        scheme, host = default_scheme, proxy
+    # Now check the leftover part for a port
+    if b":" in host:
+        new_host, port = host.rsplit(b":", 1)
         try:
             port = int(port)
-            return host, port
+            return scheme, new_host, port
         except ValueError:
             # the thing after the : wasn't a valid port; presumably this is an
             # IPv6 address.
+            # TODO: this doesn't work when the last part of the IP is also just a number.
+            #  We probably need to require ipv6's being wrapped in square brackets: [2001:db8:0:0:1::1]
             pass
-
-    return hostport, default_port
+    return scheme, host, default_port
