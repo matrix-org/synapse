@@ -1,0 +1,1 @@
+Fix reactor being passsed as ip_whitelist to BlacklistingAgentWrapper from MatrixFederationAgent.
