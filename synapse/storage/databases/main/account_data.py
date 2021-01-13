@@ -40,11 +40,6 @@ class AccountDataWorkerStore(SQLBaseStore):
     """
 
     def __init__(self, database: DatabasePool, db_conn, hs):
-        account_max = self.get_max_account_data_stream_id()
-        self._account_data_stream_cache = StreamChangeCache(
-            "AccountDataAndTagsChangeCache", account_max
-        )
-
         self._instance_name = hs.get_instance_name()
 
         if isinstance(database.engine, PostgresEngine):
@@ -87,6 +82,11 @@ class AccountDataWorkerStore(SQLBaseStore):
                     "stream_id",
                     extra_tables=[("room_tags_revisions", "stream_id")],
                 )
+
+        account_max = self.get_max_account_data_stream_id()
+        self._account_data_stream_cache = StreamChangeCache(
+            "AccountDataAndTagsChangeCache", account_max
+        )
 
         super().__init__(database, db_conn, hs)
 
@@ -372,8 +372,6 @@ class AccountDataWorkerStore(SQLBaseStore):
                 self._account_data_stream_cache.entity_has_changed(row.user_id, token)
         return super().process_replication_rows(stream_name, instance_name, token, rows)
 
-
-class AccountDataStore(AccountDataWorkerStore):
     async def add_account_data_to_room(
         self, user_id: str, room_id: str, account_data_type: str, content: JsonDict
     ) -> int:
@@ -388,6 +386,8 @@ class AccountDataStore(AccountDataWorkerStore):
         Returns:
             The maximum stream ID.
         """
+        assert self._can_write_to_account_data
+
         content_json = json_encoder.encode(content)
 
         async with self._account_data_id_gen.get_next() as next_id:
@@ -428,6 +428,8 @@ class AccountDataStore(AccountDataWorkerStore):
         Returns:
             The maximum stream ID.
         """
+        assert self._can_write_to_account_data
+
         async with self._account_data_id_gen.get_next() as next_id:
             await self.db_pool.runInteraction(
                 "add_user_account_data",
@@ -510,3 +512,7 @@ class AccountDataStore(AccountDataWorkerStore):
         # Invalidate the cache for any ignored users which were added or removed.
         for ignored_user_id in previously_ignored_users ^ currently_ignored_users:
             self._invalidate_cache_and_stream(txn, self.ignored_by, (ignored_user_id,))
+
+
+class AccountDataStore(AccountDataWorkerStore):
+    pass
