@@ -313,7 +313,7 @@ def _parse_oidc_config_dict(oidc_config: JsonDict) -> "OidcProviderConfig":
     )
 
 
-@attr.s
+@attr.s(slots=True, frozen=True)
 class OidcProviderConfig:
     # a unique identifier for this identity provider. Used in the 'user_external_ids'
     # table, as well as the query/path parameter used in the login protocol.
