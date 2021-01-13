@@ -5,6 +5,16 @@ Before upgrading check if any special steps are required to upgrade from the
 version you currently have installed to the current version of Synapse. The extra
 instructions that may be required are listed later in this document.
 
+* Check that your versions of Python and PostgreSQL are still supported.
+
+  Synapse follows upstream lifecycles for `Python`_ and `PostgreSQL`_, and
+  removes support for versions which are no longer maintained.
+
+  The website https://endoflife.date also offers convenient summaries.
+
+  .. _Python: https://devguide.python.org/devcycle/#end-of-life-branches
+  .. _PostgreSQL: https://www.postgresql.org/support/versioning/
+
 * If Synapse was installed using `prebuilt packages
   <INSTALL.md#prebuilt-packages>`_, you will need to follow the normal process
   for upgrading those packages.
@@ -77,6 +87,18 @@ for example:
 
 Upgrading to v1.25.0
 ====================
+
+Last release supporting Python 3.5
+----------------------------------
+
+This is the last release of Synapse which guarantees support with Python 3.5,
+which passed its upstream End of Life date several months ago.
+
+We will attempt to maintain support through March 2021, but without guarantees.
+
+In the future, Synapse will follow upstream schedules for ending support of
+older versions of Python and PostgreSQL. Please upgrade to at least Python 3.6
+and PostgreSQL 9.6 as soon as possible.
 
 Blacklisting IP ranges
 ----------------------

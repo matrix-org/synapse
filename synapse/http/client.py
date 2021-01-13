@@ -341,6 +341,7 @@ class SimpleHttpClient:
 
         self.agent = ProxyAgent(
             self.reactor,
+            hs.get_reactor(),
             connectTimeout=15,
             contextFactory=self.hs.get_http_client_context_factory(),
             pool=pool,

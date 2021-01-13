@@ -3,9 +3,11 @@ Section: contrib/python
 Priority: extra
 Maintainer: Synapse Packaging team <packages@matrix.org>
 # keep this list in sync with the build dependencies in docker/Dockerfile-dhvirtualenv.
+# TODO: Remove the dependency on dh-systemd after dropping support for Ubuntu xenial
+#       On all other supported releases, it's merely a transitional package which
+#       does nothing but depends on debhelper (> 9.20160709)
 Build-Depends:
- debhelper (>= 9),
- dh-systemd,
+ debhelper (>= 9.20160709) | dh-systemd,
  dh-virtualenv (>= 1.1),
  libsystemd-dev,
  libpq-dev,
