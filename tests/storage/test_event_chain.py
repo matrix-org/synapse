@@ -546,12 +546,12 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
         state2 = list(self.get_success(context.get_current_state_ids()).values())
 
         # Delete the chain cover info.
-        self.get_success(
-            store.db_pool.execute("test", None, "DELETE FROM event_auth_chains")
-        )
-        self.get_success(
-            store.db_pool.execute("test", None, "DELETE FROM event_auth_chain_links")
-        )
+
+        def _delete_tables(txn):
+            txn.execute("DELETE FROM event_auth_chains")
+            txn.execute("DELETE FROM event_auth_chain_links")
+
+        self.get_success(store.db_pool.runInteraction("test", _delete_tables))
 
         # Insert and run the background update.
         self.get_success(
