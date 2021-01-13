@@ -26,15 +26,6 @@ We will make a good faith attempt to avoid breaking compatibility in all release
 
 We intend to continue producing .deb packages for Debian 9 (Stretch) and Ubuntu 16.04 (Xenial) through the transition period.
 
-Bugfixes
---------
-
-- Fix HTTP proxy support when using a proxy that is on a blacklisted IP. Introduced in v1.25.0rc1. Contributed by @Bubu. ([\#9084](https://github.com/matrix-org/synapse/issues/9084))
-
-
-Synapse 1.25.0rc1 (2021-01-06)
-==============================
-
 Removal warning
 ---------------
 
@@ -45,6 +36,15 @@ are deprecated and will be removed in a future release. They will be replaced by
 
 `POST /_synapse/admin/v1/rooms/<room_id>/delete` replaces `POST /_synapse/admin/v1/purge_room` and
 `POST /_synapse/admin/v1/shutdown_room/<room_id>`.
+
+Bugfixes
+--------
+
+- Fix HTTP proxy support when using a proxy that is on a blacklisted IP. Introduced in v1.25.0rc1. Contributed by @Bubu. ([\#9084](https://github.com/matrix-org/synapse/issues/9084))
+
+
+Synapse 1.25.0rc1 (2021-01-06)
+==============================
 
 Features
 --------
