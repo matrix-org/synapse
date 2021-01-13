@@ -418,8 +418,9 @@ class RestHelper:
                 of the UI auth.
 
         Returns:
-            the result of calling the OIDC callback endpoint - which may be a 200, 302
-            or 400 depending on how things went.
+            A FakeChannel containing the result of calling the OIDC callback endpoint.
+            Note that the response code may be a 200, 302 or 400 depending on how things
+            went.
         """
 
         cookies = {}
@@ -559,7 +560,7 @@ class RestHelper:
                 raise AssertionError(message)
 
         p = ConfirmationPageParser()
-        p.feed(channel.result["body"].decode("utf-8"))
+        p.feed(channel.text_body)
         p.close()
         assert len(p.links) == 1, "not exactly one link in confirmation page"
         oauth_uri = p.links[0]
