@@ -547,12 +547,10 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
 
         # Delete the chain cover info.
         self.get_success(
-            store.db_pool.simple_delete("event_auth_chains", keyvalues={}, desc="test")
+            store.db_pool.execute("test", None, "DELETE FROM event_auth_chains")
         )
         self.get_success(
-            store.db_pool.simple_delete(
-                "event_auth_chain_links", keyvalues={}, desc="test"
-            )
+            store.db_pool.execute("test", None, "DELETE FROM event_auth_chain_links")
         )
 
         # Insert and run the background update.
