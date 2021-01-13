@@ -512,7 +512,7 @@ class PersistEventsStore:
             table="event_auth_chain_to_calculate",
             keyvalues={},
             column="room_id",
-            iterable=event_to_room_id.values(),
+            iterable=set(event_to_room_id.values()),
             retcols=("event_id", "type", "state_key"),
         )
         for row in rows:
