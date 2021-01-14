@@ -429,7 +429,6 @@ def setup(config_options):
             oidc = hs.get_oidc_handler()
             # Loading the provider metadata also ensures the provider config is valid.
             await oidc.load_metadata()
-            await oidc.load_jwks()
 
         await _base.start(hs, config.listeners)
 
