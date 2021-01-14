@@ -56,6 +56,14 @@ class SortTopologically(TestCase):
         graph = {}  # type: Dict[int, List[int]]
         self.assertEqual(list(sorted_topologically([], graph)), [])
 
+    def test_handle_empty_graph(self):
+        "Test that a graph where a node doesn't have an entry is treated as empty"
+
+        graph = {}  # type: Dict[int, List[int]]
+
+        # For disconnected nodes the output is simply sorted.
+        self.assertEqual(list(sorted_topologically([1, 2], graph)), [1, 2])
+
     def test_disconnected(self):
         "Test that a graph with no edges work"
 
