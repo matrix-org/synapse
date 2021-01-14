@@ -366,7 +366,7 @@ class RestHelper:
         channel = self.auth_via_oidc({"sub": remote_user_id}, client_redirect_url)
 
         # expect a confirmation page
-        assert channel.code == 200
+        assert channel.code == 200, channel.result
 
         # fish the matrix login token out of the body of the confirmation page
         m = re.search(
