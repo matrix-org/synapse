@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
-import re
 from typing import Dict, Optional
 from urllib.parse import parse_qs, urlencode, urlparse
 
@@ -23,15 +22,15 @@ import pymacaroons
 
 from twisted.web.resource import Resource
 
-from synapse.api.errors import RedirectException
 from synapse.handlers.sso import MappingException
 from synapse.rest.client.v1 import login
 from synapse.rest.synapse.client.pick_username import pick_username_resource
 from synapse.server import HomeServer
 from synapse.types import UserID
 
+from tests.rest.client.v1.utils import TEST_OIDC_CONFIG
 from tests.test_utils import FakeResponse, simple_async_mock
-from tests.unittest import HomeserverTestCase, override_config
+from tests.unittest import HomeserverTestCase, override_config, skip_unless
 
 try:
     import authlib  # noqa: F401
@@ -855,30 +854,21 @@ class OidcHandlerTestCase(HomeserverTestCase):
         )
 
 
+@skip_unless(HAS_OIDC, "requires OIDC")
 class UsernamePickerTestCase(HomeserverTestCase):
-    if not HAS_OIDC:
-        skip = "requires OIDC"
+    """Tests for the username picker flow of SSO login"""
 
     servlets = [login.register_servlets]
 
     def default_config(self):
         config = super().default_config()
         config["public_baseurl"] = BASE_URL
-        oidc_config = {
-            "enabled": True,
-            "client_id": CLIENT_ID,
-            "client_secret": CLIENT_SECRET,
-            "issuer": ISSUER,
-            "scopes": SCOPES,
-            "user_mapping_provider": {
-                "config": {"display_name_template": "{{ user.displayname }}"}
-            },
-        }
 
-        # Update this config with what's in the default config so that
-        # override_config works as expected.
-        oidc_config.update(config.get("oidc_config", {}))
-        config["oidc_config"] = oidc_config
+        config["oidc_config"] = {}
+        config["oidc_config"].update(TEST_OIDC_CONFIG)
+        config["oidc_config"]["user_mapping_provider"] = {
+            "config": {"display_name_template": "{{ user.displayname }}"}
+        }
 
         # whitelist this client URI so we redirect straight to it rather than
         # serving a confirmation page
@@ -886,38 +876,38 @@ class UsernamePickerTestCase(HomeserverTestCase):
         return config
 
     def create_resource_dict(self) -> Dict[str, Resource]:
+        from synapse.rest.oidc import OIDCResource
+
         d = super().create_resource_dict()
         d["/_synapse/client/pick_username"] = pick_username_resource(self.hs)
+        d["/_synapse/oidc"] = OIDCResource(self.hs)
         return d
 
     def test_username_picker(self):
         """Test the happy path of a username picker flow."""
         client_redirect_url = "https://whitelisted.client"
 
-        # first of all, mock up an OIDC callback to the OidcHandler, which should
-        # raise a RedirectException
-        userinfo = {"sub": "tester", "displayname": "Jonny"}
-        f = self.get_failure(
-            _make_callback_with_userinfo(
-                self.hs, userinfo, client_redirect_url=client_redirect_url
-            ),
-            RedirectException,
+        # do the start of the login flow
+        channel = self.helper.auth_via_oidc(
+            {"sub": "tester", "displayname": "Jonny"}, client_redirect_url
         )
 
-        # check the Location and cookies returned by the RedirectException
-        self.assertEqual(f.value.location, b"/_synapse/client/pick_username")
-        cookieheader = f.value.cookies[0]
-        regex = re.compile(b"^username_mapping_session=([a-zA-Z]+);")
-        m = regex.search(cookieheader)
-        if not m:
-            self.fail("cookie header %s does not match %s" % (cookieheader, regex))
+        # that should redirect to the username picker
+        self.assertEqual(channel.code, 302, channel.result)
+        picker_url = channel.headers.getRawHeaders("Location")[0]
+        self.assertEqual(picker_url, "/_synapse/client/pick_username")
+
+        # ... with a username_mapping_session cookie
+        cookies = {}  # type: Dict[str,str]
+        channel.extract_cookies(cookies)
+        self.assertIn("username_mapping_session", cookies)
+        session_id = cookies["username_mapping_session"]
 
         # introspect the sso handler a bit to check that the username mapping session
         # looks ok.
-        session_id = m.group(1).decode("ascii")
         username_mapping_sessions = self.hs.get_sso_handler()._username_mapping_sessions
         self.assertIn(
-            session_id, username_mapping_sessions, "session id not found in map"
+            session_id, username_mapping_sessions, "session id not found in map",
         )
         session = username_mapping_sessions[session_id]
         self.assertEqual(session.remote_user_id, "tester")
@@ -930,7 +920,7 @@ class UsernamePickerTestCase(HomeserverTestCase):
 
         # Now, submit a username to the username picker, which should serve a redirect
         # back to the client
-        submit_path = f.value.location + b"/submit"
+        submit_path = picker_url + "/submit"
         content = urlencode({b"username": b"bobby"}).encode("utf8")
         chan = self.make_request(
             "POST",
@@ -938,7 +928,7 @@ class UsernamePickerTestCase(HomeserverTestCase):
             content=content,
             content_is_form=True,
             custom_headers=[
-                ("Cookie", cookieheader),
+                ("Cookie", "username_mapping_session=" + session_id),
                 # old versions of twisted don't do form-parsing without a valid
                 # content-length header.
                 ("Content-Length", str(len(content))),

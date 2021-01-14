@@ -363,7 +363,7 @@ class RestHelper:
         the normal places.
         """
         client_redirect_url = "https://x"
-        channel = self.auth_via_oidc(remote_user_id, client_redirect_url)
+        channel = self.auth_via_oidc({"sub": remote_user_id}, client_redirect_url)
 
         # expect a confirmation page
         assert channel.code == 200
@@ -390,7 +390,7 @@ class RestHelper:
 
     def auth_via_oidc(
         self,
-        remote_user_id: str,
+        user_info_dict: JsonDict,
         client_redirect_url: Optional[str] = None,
         ui_auth_session_id: Optional[str] = None,
     ) -> FakeChannel:
@@ -411,7 +411,8 @@ class RestHelper:
         the normal places.
 
         Args:
-            remote_user_id: the remote id that the OIDC provider should present
+            user_info_dict: the remote userinfo that the OIDC provider should present.
+                Typically this should be '{"sub": "<remote user id>"}'.
             client_redirect_url: for a login flow, the client redirect URL to pass to
                 the login redirect endpoint
             ui_auth_session_id: if set, we will perform a UI Auth flow. The session id
@@ -457,7 +458,7 @@ class RestHelper:
             # a dummy OIDC access token
             ("https://issuer.test/token", {"access_token": "TEST"}),
             # and then one to the user_info endpoint, which returns our remote user id.
-            ("https://issuer.test/userinfo", {"sub": remote_user_id}),
+            ("https://issuer.test/userinfo", user_info_dict),
         ]
 
         async def mock_req(method: str, uri: str, data=None, headers=None):
