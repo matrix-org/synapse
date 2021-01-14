@@ -39,7 +39,7 @@ class OIDCConfig(Config):
 
         oidc_config = config.get("oidc_config")
         if oidc_config and oidc_config.get("enabled", False):
-            validate_config(OIDC_PROVIDER_CONFIG_SCHEMA, oidc_config, "oidc_config")
+            validate_config(OIDC_PROVIDER_CONFIG_SCHEMA, oidc_config, ("oidc_config",))
             self.oidc_provider = _parse_oidc_config_dict(oidc_config)
 
         if not self.oidc_provider:
