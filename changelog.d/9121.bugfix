@@ -1,0 +1,1 @@
+Do not throw spurious errors when deleting a non-existant pusher.
