@@ -32,7 +32,7 @@ from typing import (
 
 import treq
 from canonicaljson import encode_canonical_json
-from netaddr import IPAddress, IPSet
+from netaddr import AddrFormatError, IPAddress, IPSet
 from prometheus_client import Counter
 from zope.interface import implementer, provider
 
@@ -261,16 +261,16 @@ class BlacklistingAgentWrapper(Agent):
 
         try:
             ip_address = IPAddress(h.hostname)
-
+        except AddrFormatError:
+            # Not an IP
+            pass
+        else:
             if check_against_blacklist(
                 ip_address, self._ip_whitelist, self._ip_blacklist
             ):
                 logger.info("Blocking access to %s due to blacklist" % (ip_address,))
                 e = SynapseError(403, "IP address blocked by IP blacklist entry")
                 return defer.fail(Failure(e))
-        except Exception:
-            # Not an IP
-            pass
 
         return self._agent.request(
             method, uri, headers=headers, bodyProducer=bodyProducer
@@ -341,6 +341,7 @@ class SimpleHttpClient:
 
         self.agent = ProxyAgent(
             self.reactor,
+            hs.get_reactor(),
             connectTimeout=15,
             contextFactory=self.hs.get_http_client_context_factory(),
             pool=pool,

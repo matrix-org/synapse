@@ -312,12 +312,9 @@ class AccountDataStore(AccountDataWorkerStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         self._account_data_id_gen = StreamIdGenerator(
             db_conn,
-            "account_data_max_stream_id",
+            "room_account_data",
             "stream_id",
-            extra_tables=[
-                ("room_account_data", "stream_id"),
-                ("room_tags_revisions", "stream_id"),
-            ],
+            extra_tables=[("room_tags_revisions", "stream_id")],
         )
 
         super().__init__(database, db_conn, hs)
@@ -362,14 +359,6 @@ class AccountDataStore(AccountDataWorkerStore):
                 lock=False,
             )
 
-            # it's theoretically possible for the above to succeed and the
-            # below to fail - in which case we might reuse a stream id on
-            # restart, and the above update might not get propagated. That
-            # doesn't sound any worse than the whole update getting lost,
-            # which is what would happen if we combined the two into one
-            # transaction.
-            await self._update_max_stream_id(next_id)
-
             self._account_data_stream_cache.entity_has_changed(user_id, next_id)
             self.get_account_data_for_user.invalidate((user_id,))
             self.get_account_data_for_room.invalidate((user_id, room_id))
@@ -401,18 +390,6 @@ class AccountDataStore(AccountDataWorkerStore):
                 account_data_type,
                 content,
             )
-
-            # it's theoretically possible for the above to succeed and the
-            # below to fail - in which case we might reuse a stream id on
-            # restart, and the above update might not get propagated. That
-            # doesn't sound any worse than the whole update getting lost,
-            # which is what would happen if we combined the two into one
-            # transaction.
-            #
-            # Note: This is only here for backwards compat to allow admins to
-            # roll back to a previous Synapse version. Next time we update the
-            # database version we can remove this table.
-            await self._update_max_stream_id(next_id)
 
             self._account_data_stream_cache.entity_has_changed(user_id, next_id)
             self.get_account_data_for_user.invalidate((user_id,))
@@ -486,24 +463,3 @@ class AccountDataStore(AccountDataWorkerStore):
         # Invalidate the cache for any ignored users which were added or removed.
         for ignored_user_id in previously_ignored_users ^ currently_ignored_users:
             self._invalidate_cache_and_stream(txn, self.ignored_by, (ignored_user_id,))
-
-    async def _update_max_stream_id(self, next_id: int) -> None:
-        """Update the max stream_id
-
-        Args:
-            next_id: The the revision to advance to.
-        """
-
-        # Note: This is only here for backwards compat to allow admins to
-        # roll back to a previous Synapse version. Next time we update the
-        # database version we can remove this table.
-
-        def _update(txn):
-            update_max_id_sql = (
-                "UPDATE account_data_max_stream_id"
-                " SET stream_id = ?"
-                " WHERE stream_id < ?"
-            )
-            txn.execute(update_max_id_sql, (next_id, next_id))
-
-        await self.db_pool.runInteraction("update_account_data_max_stream_id", _update)

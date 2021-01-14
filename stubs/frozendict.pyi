@@ -15,16 +15,7 @@
 
 # Stub for frozendict.
 
-from typing import (
-    Any,
-    Hashable,
-    Iterable,
-    Iterator,
-    Mapping,
-    overload,
-    Tuple,
-    TypeVar,
-)
+from typing import Any, Hashable, Iterable, Iterator, Mapping, Tuple, TypeVar, overload
 
 _KT = TypeVar("_KT", bound=Hashable)  # Key type.
 _VT = TypeVar("_VT")  # Value type.

@@ -262,4 +262,4 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
 def _mock_request():
     """Returns a mock which will stand in as a SynapseRequest"""
-    return Mock(spec=["getClientIP", "get_user_agent"])
+    return Mock(spec=["getClientIP", "getHeader"])

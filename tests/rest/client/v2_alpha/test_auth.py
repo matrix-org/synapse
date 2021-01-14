@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2018 New Vector
+# Copyright 2020-2021 The Matrix.org Foundation C.I.C
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from typing import Union
 
 from twisted.internet.defer import succeed
@@ -383,6 +383,44 @@ class UIAuthTests(unittest.HomeserverTestCase):
         #
         # Note that *no auth* information is provided, not even a session iD!
         self.delete_device(self.user_tok, self.device_id, 200)
+
+    @skip_unless(HAS_OIDC, "requires OIDC")
+    @override_config({"oidc_config": TEST_OIDC_CONFIG})
+    def test_ui_auth_via_sso(self):
+        """Test a successful UI Auth flow via SSO
+
+        This includes:
+          * hitting the UIA SSO redirect endpoint
+          * checking it serves a confirmation page which links to the OIDC provider
+          * calling back to the synapse oidc callback
+          * checking that the original operation succeeds
+        """
+
+        # log the user in
+        remote_user_id = UserID.from_string(self.user).localpart
+        login_resp = self.helper.login_via_oidc(remote_user_id)
+        self.assertEqual(login_resp["user_id"], self.user)
+
+        # initiate a UI Auth process by attempting to delete the device
+        channel = self.delete_device(self.user_tok, self.device_id, 401)
+
+        # check that SSO is offered
+        flows = channel.json_body["flows"]
+        self.assertIn({"stages": ["m.login.sso"]}, flows)
+
+        # run the UIA-via-SSO flow
+        session_id = channel.json_body["session"]
+        channel = self.helper.auth_via_oidc(
+            remote_user_id=remote_user_id, ui_auth_session_id=session_id
+        )
+
+        # that should serve a confirmation page
+        self.assertEqual(channel.code, 200, channel.result)
+
+        # and now the delete request should succeed.
+        self.delete_device(
+            self.user_tok, self.device_id, 200, body={"auth": {"session": session_id}},
+        )
 
     @skip_unless(HAS_OIDC, "requires OIDC")
     @override_config({"oidc_config": TEST_OIDC_CONFIG})

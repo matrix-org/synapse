@@ -319,9 +319,9 @@ class SsoRedirectServlet(RestServlet):
         # register themselves with the main SSOHandler.
         if hs.config.cas_enabled:
             hs.get_cas_handler()
-        elif hs.config.saml2_enabled:
+        if hs.config.saml2_enabled:
             hs.get_saml_handler()
-        elif hs.config.oidc_enabled:
+        if hs.config.oidc_enabled:
             hs.get_oidc_handler()
         self._sso_handler = hs.get_sso_handler()
 

@@ -243,7 +243,7 @@ Then update the ``users`` table in the database::
 Synapse Development
 ===================
 
-Join our developer community on Matrix: [#synapse-dev:matrix.org](https://matrix.to/#/#synapse-dev:matrix.org)
+Join our developer community on Matrix: `#synapse-dev:matrix.org <https://matrix.to/#/#synapse-dev:matrix.org>`_
 
 Before setting up a development environment for synapse, make sure you have the
 system dependencies (such as the python header files) installed - see
