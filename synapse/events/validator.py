@@ -13,20 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Union
+
 from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import EventFormatVersions
+from synapse.config.homeserver import HomeServerConfig
+from synapse.events import EventBase
+from synapse.events.builder import EventBuilder
 from synapse.events.utils import validate_canonicaljson
+from synapse.federation.federation_server import server_matches_acl_event
 from synapse.types import EventID, RoomID, UserID
 
 
 class EventValidator:
-    def validate_new(self, event, config):
+    def validate_new(self, event: EventBase, config: HomeServerConfig):
         """Validates the event has roughly the right format
 
         Args:
-            event (FrozenEvent): The event to validate.
-            config (Config): The homeserver's configuration.
+            event: The event to validate.
+            config: The homeserver's configuration.
         """
         self.validate_builder(event)
 
@@ -76,13 +82,22 @@ class EventValidator:
         if event.type == EventTypes.Retention:
             self._validate_retention(event)
 
-    def _validate_retention(self, event):
+        if event.type == EventTypes.ServerACL:
+            if not server_matches_acl_event(config.server_name, event):
+                raise SynapseError(
+                    400, "Can't create an ACL event that denies the local server"
+                )
+
+    def _validate_retention(self, event: EventBase):
         """Checks that an event that defines the retention policy for a room respects the
         format enforced by the spec.
 
         Args:
-            event (FrozenEvent): The event to validate.
+            event: The event to validate.
         """
+        if not event.is_state():
+            raise SynapseError(code=400, msg="must be a state event")
+
         min_lifetime = event.content.get("min_lifetime")
         max_lifetime = event.content.get("max_lifetime")
 
@@ -113,13 +128,10 @@ class EventValidator:
                 errcode=Codes.BAD_JSON,
             )
 
-    def validate_builder(self, event):
+    def validate_builder(self, event: Union[EventBase, EventBuilder]):
         """Validates that the builder/event has roughly the right format. Only
         checks values that we expect a proto event to have, rather than all the
         fields an event would have
-
-        Args:
-            event (EventBuilder|FrozenEvent)
         """
 
         strings = ["room_id", "sender", "type"]

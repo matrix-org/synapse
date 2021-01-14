@@ -171,6 +171,7 @@ class SyncRestServlet(RestServlet):
         )
         with context:
             sync_result = await self.sync_handler.wait_for_sync_for_user(
+                requester,
                 sync_config,
                 since_token=since_token,
                 timeout=timeout,
@@ -236,6 +237,7 @@ class SyncRestServlet(RestServlet):
                 "leave": sync_result.groups.leave,
             },
             "device_one_time_keys_count": sync_result.device_one_time_keys_count,
+            "org.matrix.msc2732.device_unused_fallback_key_types": sync_result.device_unused_fallback_key_types,
             "next_batch": await sync_result.next_batch.to_string(self.store),
         }
 

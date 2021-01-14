@@ -19,7 +19,7 @@ from typing import Iterable, List, Optional, Tuple
 
 from canonicaljson import encode_canonical_json
 
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
@@ -43,14 +43,32 @@ _UpdateTransactionRow = namedtuple(
 SENTINEL = object()
 
 
-class TransactionStore(SQLBaseStore):
+class TransactionWorkerStore(SQLBaseStore):
+    def __init__(self, database: DatabasePool, db_conn, hs):
+        super().__init__(database, db_conn, hs)
+
+        if hs.config.run_background_tasks:
+            self._clock.looping_call(self._cleanup_transactions, 30 * 60 * 1000)
+
+    @wrap_as_background_process("cleanup_transactions")
+    async def _cleanup_transactions(self) -> None:
+        now = self._clock.time_msec()
+        month_ago = now - 30 * 24 * 60 * 60 * 1000
+
+        def _cleanup_transactions_txn(txn):
+            txn.execute("DELETE FROM received_transactions WHERE ts < ?", (month_ago,))
+
+        await self.db_pool.runInteraction(
+            "_cleanup_transactions", _cleanup_transactions_txn
+        )
+
+
+class TransactionStore(TransactionWorkerStore):
     """A collection of queries for handling PDUs.
     """
 
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
-
-        self._clock.looping_call(self._start_cleanup_transactions, 30 * 60 * 1000)
 
         self._destination_retry_cache = ExpiringCache(
             cache_name="get_destination_retry_timings",
@@ -190,42 +208,56 @@ class TransactionStore(SQLBaseStore):
         """
 
         self._destination_retry_cache.pop(destination, None)
-        return await self.db_pool.runInteraction(
-            "set_destination_retry_timings",
-            self._set_destination_retry_timings,
-            destination,
-            failure_ts,
-            retry_last_ts,
-            retry_interval,
-        )
+        if self.database_engine.can_native_upsert:
+            return await self.db_pool.runInteraction(
+                "set_destination_retry_timings",
+                self._set_destination_retry_timings_native,
+                destination,
+                failure_ts,
+                retry_last_ts,
+                retry_interval,
+                db_autocommit=True,  # Safe as its a single upsert
+            )
+        else:
+            return await self.db_pool.runInteraction(
+                "set_destination_retry_timings",
+                self._set_destination_retry_timings_emulated,
+                destination,
+                failure_ts,
+                retry_last_ts,
+                retry_interval,
+            )
 
-    def _set_destination_retry_timings(
+    def _set_destination_retry_timings_native(
         self, txn, destination, failure_ts, retry_last_ts, retry_interval
     ):
+        assert self.database_engine.can_native_upsert
 
-        if self.database_engine.can_native_upsert:
-            # Upsert retry time interval if retry_interval is zero (i.e. we're
-            # resetting it) or greater than the existing retry interval.
+        # Upsert retry time interval if retry_interval is zero (i.e. we're
+        # resetting it) or greater than the existing retry interval.
+        #
+        # WARNING: This is executed in autocommit, so we shouldn't add any more
+        # SQL calls in here (without being very careful).
+        sql = """
+            INSERT INTO destinations (
+                destination, failure_ts, retry_last_ts, retry_interval
+            )
+                VALUES (?, ?, ?, ?)
+            ON CONFLICT (destination) DO UPDATE SET
+                    failure_ts = EXCLUDED.failure_ts,
+                    retry_last_ts = EXCLUDED.retry_last_ts,
+                    retry_interval = EXCLUDED.retry_interval
+                WHERE
+                    EXCLUDED.retry_interval = 0
+                    OR destinations.retry_interval IS NULL
+                    OR destinations.retry_interval < EXCLUDED.retry_interval
+        """
 
-            sql = """
-                INSERT INTO destinations (
-                    destination, failure_ts, retry_last_ts, retry_interval
-                )
-                    VALUES (?, ?, ?, ?)
-                ON CONFLICT (destination) DO UPDATE SET
-                        failure_ts = EXCLUDED.failure_ts,
-                        retry_last_ts = EXCLUDED.retry_last_ts,
-                        retry_interval = EXCLUDED.retry_interval
-                    WHERE
-                        EXCLUDED.retry_interval = 0
-                        OR destinations.retry_interval IS NULL
-                        OR destinations.retry_interval < EXCLUDED.retry_interval
-            """
+        txn.execute(sql, (destination, failure_ts, retry_last_ts, retry_interval))
 
-            txn.execute(sql, (destination, failure_ts, retry_last_ts, retry_interval))
-
-            return
-
+    def _set_destination_retry_timings_emulated(
+        self, txn, destination, failure_ts, retry_last_ts, retry_interval
+    ):
         self.database_engine.lock_table(txn, "destinations")
 
         # We need to be careful here as the data may have changed from under us
@@ -265,22 +297,6 @@ class TransactionStore(SQLBaseStore):
                     "retry_interval": retry_interval,
                 },
             )
-
-    def _start_cleanup_transactions(self):
-        return run_as_background_process(
-            "cleanup_transactions", self._cleanup_transactions
-        )
-
-    async def _cleanup_transactions(self) -> None:
-        now = self._clock.time_msec()
-        month_ago = now - 30 * 24 * 60 * 60 * 1000
-
-        def _cleanup_transactions_txn(txn):
-            txn.execute("DELETE FROM received_transactions WHERE ts < ?", (month_ago,))
-
-        await self.db_pool.runInteraction(
-            "_cleanup_transactions", _cleanup_transactions_txn
-        )
 
     async def store_destination_rooms_entries(
         self, destinations: Iterable[str], room_id: str, stream_ordering: int,

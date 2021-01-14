@@ -93,11 +93,8 @@ class SSOConfig(Config):
             #  - https://my.custom.client/
 
             # Directory in which Synapse will try to find the template files below.
-            # If not set, default templates from within the Synapse package will be used.
-            #
-            # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
-            # If you *do* uncomment it, you will need to make sure that all the templates
-            # below are in the directory.
+            # If not set, or the files named below are not found within the template
+            # directory, default templates from within the Synapse package will be used.
             #
             # Synapse will look for the following templates in this directory:
             #

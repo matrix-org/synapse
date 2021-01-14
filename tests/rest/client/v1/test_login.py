@@ -63,8 +63,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
                 "identifier": {"type": "m.id.user", "user": "kermit" + str(i)},
                 "password": "monkey",
             }
-            request, channel = self.make_request(b"POST", LOGIN_URL, params)
-            self.render(request)
+            channel = self.make_request(b"POST", LOGIN_URL, params)
 
             if i == 5:
                 self.assertEquals(channel.result["code"], b"429", channel.result)
@@ -83,8 +82,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             "identifier": {"type": "m.id.user", "user": "kermit" + str(i)},
             "password": "monkey",
         }
-        request, channel = self.make_request(b"POST", LOGIN_URL, params)
-        self.render(request)
+        channel = self.make_request(b"POST", LOGIN_URL, params)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
@@ -110,8 +108,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
                 "identifier": {"type": "m.id.user", "user": "kermit"},
                 "password": "monkey",
             }
-            request, channel = self.make_request(b"POST", LOGIN_URL, params)
-            self.render(request)
+            channel = self.make_request(b"POST", LOGIN_URL, params)
 
             if i == 5:
                 self.assertEquals(channel.result["code"], b"429", channel.result)
@@ -130,8 +127,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             "identifier": {"type": "m.id.user", "user": "kermit"},
             "password": "monkey",
         }
-        request, channel = self.make_request(b"POST", LOGIN_URL, params)
-        self.render(request)
+        channel = self.make_request(b"POST", LOGIN_URL, params)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
@@ -157,8 +153,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
                 "identifier": {"type": "m.id.user", "user": "kermit"},
                 "password": "notamonkey",
             }
-            request, channel = self.make_request(b"POST", LOGIN_URL, params)
-            self.render(request)
+            channel = self.make_request(b"POST", LOGIN_URL, params)
 
             if i == 5:
                 self.assertEquals(channel.result["code"], b"429", channel.result)
@@ -177,8 +172,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             "identifier": {"type": "m.id.user", "user": "kermit"},
             "password": "notamonkey",
         }
-        request, channel = self.make_request(b"POST", LOGIN_URL, params)
-        self.render(request)
+        channel = self.make_request(b"POST", LOGIN_URL, params)
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
 
@@ -187,8 +181,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         self.register_user("kermit", "monkey")
 
         # we shouldn't be able to make requests without an access token
-        request, channel = self.make_request(b"GET", TEST_URL)
-        self.render(request)
+        channel = self.make_request(b"GET", TEST_URL)
         self.assertEquals(channel.result["code"], b"401", channel.result)
         self.assertEquals(channel.json_body["errcode"], "M_MISSING_TOKEN")
 
@@ -198,28 +191,21 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             "identifier": {"type": "m.id.user", "user": "kermit"},
             "password": "monkey",
         }
-        request, channel = self.make_request(b"POST", LOGIN_URL, params)
-        self.render(request)
+        channel = self.make_request(b"POST", LOGIN_URL, params)
 
         self.assertEquals(channel.code, 200, channel.result)
         access_token = channel.json_body["access_token"]
         device_id = channel.json_body["device_id"]
 
         # we should now be able to make requests with the access token
-        request, channel = self.make_request(
-            b"GET", TEST_URL, access_token=access_token
-        )
-        self.render(request)
+        channel = self.make_request(b"GET", TEST_URL, access_token=access_token)
         self.assertEquals(channel.code, 200, channel.result)
 
         # time passes
         self.reactor.advance(24 * 3600)
 
         # ... and we should be soft-logouted
-        request, channel = self.make_request(
-            b"GET", TEST_URL, access_token=access_token
-        )
-        self.render(request)
+        channel = self.make_request(b"GET", TEST_URL, access_token=access_token)
         self.assertEquals(channel.code, 401, channel.result)
         self.assertEquals(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
         self.assertEquals(channel.json_body["soft_logout"], True)
@@ -233,10 +219,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
         # more requests with the expired token should still return a soft-logout
         self.reactor.advance(3600)
-        request, channel = self.make_request(
-            b"GET", TEST_URL, access_token=access_token
-        )
-        self.render(request)
+        channel = self.make_request(b"GET", TEST_URL, access_token=access_token)
         self.assertEquals(channel.code, 401, channel.result)
         self.assertEquals(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
         self.assertEquals(channel.json_body["soft_logout"], True)
@@ -244,20 +227,16 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         # ... but if we delete that device, it will be a proper logout
         self._delete_device(access_token_2, "kermit", "monkey", device_id)
 
-        request, channel = self.make_request(
-            b"GET", TEST_URL, access_token=access_token
-        )
-        self.render(request)
+        channel = self.make_request(b"GET", TEST_URL, access_token=access_token)
         self.assertEquals(channel.code, 401, channel.result)
         self.assertEquals(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
         self.assertEquals(channel.json_body["soft_logout"], False)
 
     def _delete_device(self, access_token, user_id, password, device_id):
         """Perform the UI-Auth to delete a device"""
-        request, channel = self.make_request(
+        channel = self.make_request(
             b"DELETE", "devices/" + device_id, access_token=access_token
         )
-        self.render(request)
         self.assertEquals(channel.code, 401, channel.result)
         # check it's a UI-Auth fail
         self.assertEqual(
@@ -275,13 +254,12 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             "session": channel.json_body["session"],
         }
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             b"DELETE",
             "devices/" + device_id,
             access_token=access_token,
             content={"auth": auth},
         )
-        self.render(request)
         self.assertEquals(channel.code, 200, channel.result)
 
     @override_config({"session_lifetime": "24h"})
@@ -292,29 +270,20 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         access_token = self.login("kermit", "monkey")
 
         # we should now be able to make requests with the access token
-        request, channel = self.make_request(
-            b"GET", TEST_URL, access_token=access_token
-        )
-        self.render(request)
+        channel = self.make_request(b"GET", TEST_URL, access_token=access_token)
         self.assertEquals(channel.code, 200, channel.result)
 
         # time passes
         self.reactor.advance(24 * 3600)
 
         # ... and we should be soft-logouted
-        request, channel = self.make_request(
-            b"GET", TEST_URL, access_token=access_token
-        )
-        self.render(request)
+        channel = self.make_request(b"GET", TEST_URL, access_token=access_token)
         self.assertEquals(channel.code, 401, channel.result)
         self.assertEquals(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
         self.assertEquals(channel.json_body["soft_logout"], True)
 
         # Now try to hard logout this session
-        request, channel = self.make_request(
-            b"POST", "/logout", access_token=access_token
-        )
-        self.render(request)
+        channel = self.make_request(b"POST", "/logout", access_token=access_token)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
     @override_config({"session_lifetime": "24h"})
@@ -325,29 +294,20 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         access_token = self.login("kermit", "monkey")
 
         # we should now be able to make requests with the access token
-        request, channel = self.make_request(
-            b"GET", TEST_URL, access_token=access_token
-        )
-        self.render(request)
+        channel = self.make_request(b"GET", TEST_URL, access_token=access_token)
         self.assertEquals(channel.code, 200, channel.result)
 
         # time passes
         self.reactor.advance(24 * 3600)
 
         # ... and we should be soft-logouted
-        request, channel = self.make_request(
-            b"GET", TEST_URL, access_token=access_token
-        )
-        self.render(request)
+        channel = self.make_request(b"GET", TEST_URL, access_token=access_token)
         self.assertEquals(channel.code, 401, channel.result)
         self.assertEquals(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
         self.assertEquals(channel.json_body["soft_logout"], True)
 
         # Now try to hard log out all of the user's sessions
-        request, channel = self.make_request(
-            b"POST", "/logout/all", access_token=access_token
-        )
-        self.render(request)
+        channel = self.make_request(b"POST", "/logout/all", access_token=access_token)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
 
@@ -422,8 +382,7 @@ class CASTestCase(unittest.HomeserverTestCase):
         cas_ticket_url = urllib.parse.urlunparse(url_parts)
 
         # Get Synapse to call the fake CAS and serve the template.
-        request, channel = self.make_request("GET", cas_ticket_url)
-        self.render(request)
+        channel = self.make_request("GET", cas_ticket_url)
 
         # Test that the response is HTML.
         self.assertEqual(channel.code, 200)
@@ -467,8 +426,7 @@ class CASTestCase(unittest.HomeserverTestCase):
         )
 
         # Get Synapse to call the fake CAS and serve the template.
-        request, channel = self.make_request("GET", cas_ticket_url)
-        self.render(request)
+        channel = self.make_request("GET", cas_ticket_url)
 
         self.assertEqual(channel.code, 302)
         location_headers = channel.headers.getRawHeaders("Location")
@@ -494,8 +452,7 @@ class CASTestCase(unittest.HomeserverTestCase):
         )
 
         # Get Synapse to call the fake CAS and serve the template.
-        request, channel = self.make_request("GET", cas_ticket_url)
-        self.render(request)
+        channel = self.make_request("GET", cas_ticket_url)
 
         # Because the user is deactivated they are served an error template.
         self.assertEqual(channel.code, 403)
@@ -518,15 +475,18 @@ class JWTTestCase(unittest.HomeserverTestCase):
         self.hs.config.jwt_algorithm = self.jwt_algorithm
         return self.hs
 
-    def jwt_encode(self, token, secret=jwt_secret):
-        return jwt.encode(token, secret, self.jwt_algorithm).decode("ascii")
+    def jwt_encode(self, token: str, secret: str = jwt_secret) -> str:
+        # PyJWT 2.0.0 changed the return type of jwt.encode from bytes to str.
+        result = jwt.encode(token, secret, self.jwt_algorithm)
+        if isinstance(result, bytes):
+            return result.decode("ascii")
+        return result
 
     def jwt_login(self, *args):
         params = json.dumps(
             {"type": "org.matrix.login.jwt", "token": self.jwt_encode(*args)}
         )
-        request, channel = self.make_request(b"POST", LOGIN_URL, params)
-        self.render(request)
+        channel = self.make_request(b"POST", LOGIN_URL, params)
         return channel
 
     def test_login_jwt_valid_registered(self):
@@ -658,8 +618,7 @@ class JWTTestCase(unittest.HomeserverTestCase):
 
     def test_login_no_token(self):
         params = json.dumps({"type": "org.matrix.login.jwt"})
-        request, channel = self.make_request(b"POST", LOGIN_URL, params)
-        self.render(request)
+        channel = self.make_request(b"POST", LOGIN_URL, params)
         self.assertEqual(channel.result["code"], b"403", channel.result)
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(channel.json_body["error"], "Token field for JWT is missing")
@@ -725,15 +684,18 @@ class JWTPubKeyTestCase(unittest.HomeserverTestCase):
         self.hs.config.jwt_algorithm = "RS256"
         return self.hs
 
-    def jwt_encode(self, token, secret=jwt_privatekey):
-        return jwt.encode(token, secret, "RS256").decode("ascii")
+    def jwt_encode(self, token: str, secret: str = jwt_privatekey) -> str:
+        # PyJWT 2.0.0 changed the return type of jwt.encode from bytes to str.
+        result = jwt.encode(token, secret, "RS256")
+        if isinstance(result, bytes):
+            return result.decode("ascii")
+        return result
 
     def jwt_login(self, *args):
         params = json.dumps(
             {"type": "org.matrix.login.jwt", "token": self.jwt_encode(*args)}
         )
-        request, channel = self.make_request(b"POST", LOGIN_URL, params)
-        self.render(request)
+        channel = self.make_request(b"POST", LOGIN_URL, params)
         return channel
 
     def test_login_jwt_valid(self):
@@ -761,12 +723,11 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
     ]
 
     def register_as_user(self, username):
-        request, channel = self.make_request(
+        self.make_request(
             b"POST",
             "/_matrix/client/r0/register?access_token=%s" % (self.service.token,),
             {"username": username},
         )
-        self.render(request)
 
     def make_homeserver(self, reactor, clock):
         self.hs = self.setup_test_homeserver()
@@ -811,11 +772,10 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
             "type": login.LoginRestServlet.APPSERVICE_TYPE,
             "identifier": {"type": "m.id.user", "user": AS_USER},
         }
-        request, channel = self.make_request(
+        channel = self.make_request(
             b"POST", LOGIN_URL, params, access_token=self.service.token
         )
 
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
     def test_login_appservice_user_bot(self):
@@ -827,11 +787,10 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
             "type": login.LoginRestServlet.APPSERVICE_TYPE,
             "identifier": {"type": "m.id.user", "user": self.service.sender},
         }
-        request, channel = self.make_request(
+        channel = self.make_request(
             b"POST", LOGIN_URL, params, access_token=self.service.token
         )
 
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
     def test_login_appservice_wrong_user(self):
@@ -843,11 +802,10 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
             "type": login.LoginRestServlet.APPSERVICE_TYPE,
             "identifier": {"type": "m.id.user", "user": "fibble_wibble"},
         }
-        request, channel = self.make_request(
+        channel = self.make_request(
             b"POST", LOGIN_URL, params, access_token=self.service.token
         )
 
-        self.render(request)
         self.assertEquals(channel.result["code"], b"403", channel.result)
 
     def test_login_appservice_wrong_as(self):
@@ -859,11 +817,10 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
             "type": login.LoginRestServlet.APPSERVICE_TYPE,
             "identifier": {"type": "m.id.user", "user": AS_USER},
         }
-        request, channel = self.make_request(
+        channel = self.make_request(
             b"POST", LOGIN_URL, params, access_token=self.another_service.token
         )
 
-        self.render(request)
         self.assertEquals(channel.result["code"], b"403", channel.result)
 
     def test_login_appservice_no_token(self):
@@ -876,7 +833,6 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
             "type": login.LoginRestServlet.APPSERVICE_TYPE,
             "identifier": {"type": "m.id.user", "user": AS_USER},
         }
-        request, channel = self.make_request(b"POST", LOGIN_URL, params)
+        channel = self.make_request(b"POST", LOGIN_URL, params)
 
-        self.render(request)
         self.assertEquals(channel.result["code"], b"401", channel.result)

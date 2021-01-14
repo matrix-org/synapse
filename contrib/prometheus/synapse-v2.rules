@@ -58,3 +58,21 @@ groups:
     labels:
       type: "PDU"
     expr: 'synapse_federation_transaction_queue_pending_pdus + 0'
+
+  - record: synapse_storage_events_persisted_by_source_type
+    expr: sum without(type, origin_type, origin_entity) (synapse_storage_events_persisted_events_sep{origin_type="remote"})
+    labels:
+      type: remote
+  - record: synapse_storage_events_persisted_by_source_type
+    expr: sum without(type, origin_type, origin_entity) (synapse_storage_events_persisted_events_sep{origin_entity="*client*",origin_type="local"})
+    labels:
+      type: local
+  - record: synapse_storage_events_persisted_by_source_type
+    expr: sum without(type, origin_type, origin_entity) (synapse_storage_events_persisted_events_sep{origin_entity!="*client*",origin_type="local"})
+    labels:
+      type: bridges
+  - record: synapse_storage_events_persisted_by_event_type
+    expr: sum without(origin_entity, origin_type) (synapse_storage_events_persisted_events_sep)
+  - record: synapse_storage_events_persisted_by_origin
+    expr: sum without(type) (synapse_storage_events_persisted_events_sep)
+

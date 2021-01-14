@@ -63,7 +63,7 @@ class JWTConfig(Config):
         # and issued at ("iat") claims are validated if present.
         #
         # Note that this is a non-standard login type and client support is
-        # expected to be non-existant.
+        # expected to be non-existent.
         #
         # See https://github.com/matrix-org/synapse/blob/master/docs/jwt.md.
         #

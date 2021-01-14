@@ -119,7 +119,7 @@ pid_file: DATADIR/homeserver.pid
 # For example, for room version 1, default_room_version should be set
 # to "1".
 #
-#default_room_version: "5"
+#default_room_version: "6"
 
 # The GC threshold parameters to pass to `gc.set_threshold`, if defined
 #
@@ -143,6 +143,47 @@ pid_file: DATADIR/homeserver.pid
 # will receive errors when searching for messages. Defaults to enabled.
 #
 #enable_search: false
+
+# Prevent outgoing requests from being sent to the following blacklisted IP address
+# CIDR ranges. If this option is not specified then it defaults to private IP
+# address ranges (see the example below).
+#
+# The blacklist applies to the outbound requests for federation, identity servers,
+# push servers, and for checking key validity for third-party invite events.
+#
+# (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
+# listed here, since they correspond to unroutable addresses.)
+#
+# This option replaces federation_ip_range_blacklist in Synapse v1.25.0.
+#
+#ip_range_blacklist:
+#  - '127.0.0.0/8'
+#  - '10.0.0.0/8'
+#  - '172.16.0.0/12'
+#  - '192.168.0.0/16'
+#  - '100.64.0.0/10'
+#  - '192.0.0.0/24'
+#  - '169.254.0.0/16'
+#  - '198.18.0.0/15'
+#  - '192.0.2.0/24'
+#  - '198.51.100.0/24'
+#  - '203.0.113.0/24'
+#  - '224.0.0.0/4'
+#  - '::1/128'
+#  - 'fe80::/10'
+#  - 'fc00::/7'
+
+# List of IP address CIDR ranges that should be allowed for federation,
+# identity servers, push servers, and for checking key validity for
+# third-party invite events. This is useful for specifying exceptions to
+# wide-ranging blacklisted target IP ranges - e.g. for communication with
+# a push server only visible in your network.
+#
+# This whitelist overrides ip_range_blacklist and defaults to an empty
+# list.
+#
+#ip_range_whitelist:
+#   - '192.168.1.1'
 
 # List of ports that Synapse should listen on, their purpose and their
 # configuration.
@@ -642,27 +683,6 @@ acme:
 #  - nyc.example.com
 #  - syd.example.com
 
-# Prevent federation requests from being sent to the following
-# blacklist IP address CIDR ranges. If this option is not specified, or
-# specified with an empty list, no ip range blacklist will be enforced.
-#
-# As of Synapse v1.4.0 this option also affects any outbound requests to identity
-# servers provided by user input.
-#
-# (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
-# listed here, since they correspond to unroutable addresses.)
-#
-federation_ip_range_blacklist:
-  - '127.0.0.0/8'
-  - '10.0.0.0/8'
-  - '172.16.0.0/12'
-  - '192.168.0.0/16'
-  - '100.64.0.0/10'
-  - '169.254.0.0/16'
-  - '::1/128'
-  - 'fe80::/64'
-  - 'fc00::/7'
-
 # Report prometheus metrics on the age of PDUs being sent to and received from
 # the following domains. This can be used to give an idea of "delay" on inbound
 # and outbound federation, though be aware that any delay can be due to problems
@@ -893,7 +913,7 @@ media_store_path: "DATADIR/media_store"
 
 # The largest allowed upload size in bytes
 #
-#max_upload_size: 10M
+#max_upload_size: 50M
 
 # Maximum number of pixels that will be thumbnailed
 #
@@ -953,9 +973,15 @@ media_store_path: "DATADIR/media_store"
 #  - '172.16.0.0/12'
 #  - '192.168.0.0/16'
 #  - '100.64.0.0/10'
+#  - '192.0.0.0/24'
 #  - '169.254.0.0/16'
+#  - '198.18.0.0/15'
+#  - '192.0.2.0/24'
+#  - '198.51.100.0/24'
+#  - '203.0.113.0/24'
+#  - '224.0.0.0/4'
 #  - '::1/128'
-#  - 'fe80::/64'
+#  - 'fe80::/10'
 #  - 'fc00::/7'
 
 # List of IP address CIDR ranges that the URL preview spider is allowed
@@ -1230,8 +1256,9 @@ account_validity:
 # email will be globally disabled.
 #
 # Additionally, if `msisdn` is not set, registration and password resets via msisdn
-# will be disabled regardless. This is due to Synapse currently not supporting any
-# method of sending SMS messages on its own.
+# will be disabled regardless, and users will not be able to associate an msisdn
+# identifier to their account. This is due to Synapse currently not supporting
+# any method of sending SMS messages on its own.
 #
 # To enable using an identity server for operations regarding a particular third-party
 # identifier type, set the value to the URL of that identity server as shown in the
@@ -1505,10 +1532,8 @@ trusted_key_servers:
 
 ## Single sign-on integration ##
 
-# Enable SAML2 for registration and login. Uses pysaml2.
-#
-# At least one of `sp_config` or `config_path` must be set in this section to
-# enable SAML login.
+# The following settings can be used to make Synapse use a single sign-on
+# provider for authentication, instead of its internal password database.
 #
 # You will probably also want to set the following options to `false` to
 # disable the regular login/registration flows:
@@ -1517,6 +1542,11 @@ trusted_key_servers:
 #
 # You will also want to investigate the settings under the "sso" configuration
 # section below.
+
+# Enable SAML2 for registration and login. Uses pysaml2.
+#
+# At least one of `sp_config` or `config_path` must be set in this section to
+# enable SAML login.
 #
 # Once SAML support is enabled, a metadata file will be exposed at
 # https://<server>:<port>/_matrix/saml2/metadata.xml, which you may be able to
@@ -1532,40 +1562,70 @@ saml2_config:
   # so it is not normally necessary to specify them unless you need to
   # override them.
   #
-  #sp_config:
-  #  # point this to the IdP's metadata. You can use either a local file or
-  #  # (preferably) a URL.
-  #  metadata:
-  #    #local: ["saml2/idp.xml"]
-  #    remote:
-  #      - url: https://our_idp/metadata.xml
-  #
-  #  # By default, the user has to go to our login page first. If you'd like
-  #  # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
-  #  # 'service.sp' section:
-  #  #
-  #  #service:
-  #  #  sp:
-  #  #    allow_unsolicited: true
-  #
-  #  # The examples below are just used to generate our metadata xml, and you
-  #  # may well not need them, depending on your setup. Alternatively you
-  #  # may need a whole lot more detail - see the pysaml2 docs!
-  #
-  #  description: ["My awesome SP", "en"]
-  #  name: ["Test SP", "en"]
-  #
-  #  organization:
-  #    name: Example com
-  #    display_name:
-  #      - ["Example co", "en"]
-  #    url: "http://example.com"
-  #
-  #  contact_person:
-  #    - given_name: Bob
-  #      sur_name: "the Sysadmin"
-  #      email_address": ["admin@example.com"]
-  #      contact_type": technical
+  sp_config:
+    # Point this to the IdP's metadata. You must provide either a local
+    # file via the `local` attribute or (preferably) a URL via the
+    # `remote` attribute.
+    #
+    #metadata:
+    #  local: ["saml2/idp.xml"]
+    #  remote:
+    #    - url: https://our_idp/metadata.xml
+
+    # Allowed clock difference in seconds between the homeserver and IdP.
+    #
+    # Uncomment the below to increase the accepted time difference from 0 to 3 seconds.
+    #
+    #accepted_time_diff: 3
+
+    # By default, the user has to go to our login page first. If you'd like
+    # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
+    # 'service.sp' section:
+    #
+    #service:
+    #  sp:
+    #    allow_unsolicited: true
+
+    # The examples below are just used to generate our metadata xml, and you
+    # may well not need them, depending on your setup. Alternatively you
+    # may need a whole lot more detail - see the pysaml2 docs!
+
+    #description: ["My awesome SP", "en"]
+    #name: ["Test SP", "en"]
+
+    #ui_info:
+    #  display_name:
+    #    - lang: en
+    #      text: "Display Name is the descriptive name of your service."
+    #  description:
+    #    - lang: en
+    #      text: "Description should be a short paragraph explaining the purpose of the service."
+    #  information_url:
+    #    - lang: en
+    #      text: "https://example.com/terms-of-service"
+    #  privacy_statement_url:
+    #    - lang: en
+    #      text: "https://example.com/privacy-policy"
+    #  keywords:
+    #    - lang: en
+    #      text: ["Matrix", "Element"]
+    #  logo:
+    #    - lang: en
+    #      text: "https://example.com/logo.svg"
+    #      width: "200"
+    #      height: "80"
+
+    #organization:
+    #  name: Example com
+    #  display_name:
+    #    - ["Example co", "en"]
+    #  url: "http://example.com"
+
+    #contact_person:
+    #  - given_name: Bob
+    #    sur_name: "the Sysadmin"
+    #    email_address": ["admin@example.com"]
+    #    contact_type": technical
 
   # Instead of putting the config inline as above, you can specify a
   # separate pysaml2 configuration file:
@@ -1640,12 +1700,19 @@ saml2_config:
   #  - attribute: department
   #    value: "sales"
 
+  # If the metadata XML contains multiple IdP entities then the `idp_entityid`
+  # option must be set to the entity to redirect users to.
+  #
+  # Most deployments only have a single IdP entity and so should omit this
+  # option.
+  #
+  #idp_entityid: 'https://our_idp/entityid'
 
-# OpenID Connect integration. The following settings can be used to make Synapse
-# use an OpenID Connect Provider for authentication, instead of its internal
-# password database.
+
+# Enable OpenID Connect (OIDC) / OAuth 2.0 for registration and login.
 #
-# See https://github.com/matrix-org/synapse/blob/master/docs/openid.md.
+# See https://github.com/matrix-org/synapse/blob/master/docs/openid.md
+# for some example configurations.
 #
 oidc_config:
   # Uncomment the following to enable authorization against an OpenID Connect
@@ -1714,6 +1781,14 @@ oidc_config:
   #
   #skip_verification: true
 
+  # Whether to fetch the user profile from the userinfo endpoint. Valid
+  # values are: "auto" or "userinfo_endpoint".
+  #
+  # Defaults to "auto", which fetches the userinfo endpoint if "openid" is included
+  # in `scopes`. Uncomment the following to always fetch the userinfo endpoint.
+  #
+  #user_profile_method: "userinfo_endpoint"
+
   # Uncomment to allow a user logging in via OIDC to match a pre-existing account instead
   # of failing. This could be used if switching from password logins to OIDC. Defaults to false.
   #
@@ -1750,9 +1825,10 @@ oidc_config:
       #   * user: The claims returned by the UserInfo Endpoint and/or in the ID
       #     Token
       #
-      # This must be configured if using the default mapping provider.
+      # If this is not set, the user will be prompted to choose their
+      # own username.
       #
-      localpart_template: "{{ user.preferred_username }}"
+      #localpart_template: "{{ user.preferred_username }}"
 
       # Jinja2 template for the display name to set on first login.
       #
@@ -1770,15 +1846,37 @@ oidc_config:
 
 
 
-# Enable CAS for registration and login.
+# Enable Central Authentication Service (CAS) for registration and login.
 #
-#cas_config:
-#   enabled: true
-#   server_url: "https://cas-server.com"
-#   service_url: "https://homeserver.domain.com:8448"
-#   #displayname_attribute: name
-#   #required_attributes:
-#   #    name: value
+cas_config:
+  # Uncomment the following to enable authorization against a CAS server.
+  # Defaults to false.
+  #
+  #enabled: true
+
+  # The URL of the CAS authorization endpoint.
+  #
+  #server_url: "https://cas-server.com"
+
+  # The public URL of the homeserver.
+  #
+  #service_url: "https://homeserver.domain.com:8448"
+
+  # The attribute of the CAS response to use as the display name.
+  #
+  # If unset, no displayname will be set.
+  #
+  #displayname_attribute: name
+
+  # It is possible to configure Synapse to only allow logins if CAS attributes
+  # match particular values. All of the keys in the mapping below must exist
+  # and the values must match the given value. Alternately if the given value
+  # is None then any value is allowed (the attribute just must exist).
+  # All of the listed attributes must match for the login to be permitted.
+  #
+  #required_attributes:
+  #  userGroup: "staff"
+  #  department: None
 
 
 # Additional settings to use with single-sign on systems such as OpenID Connect,
@@ -1806,11 +1904,8 @@ sso:
     #  - https://my.custom.client/
 
     # Directory in which Synapse will try to find the template files below.
-    # If not set, default templates from within the Synapse package will be used.
-    #
-    # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
-    # If you *do* uncomment it, you will need to make sure that all the templates
-    # below are in the directory.
+    # If not set, or the files named below are not found within the template
+    # directory, default templates from within the Synapse package will be used.
     #
     # Synapse will look for the following templates in this directory:
     #
@@ -1878,7 +1973,7 @@ sso:
 # and issued at ("iat") claims are validated if present.
 #
 # Note that this is a non-standard login type and client support is
-# expected to be non-existant.
+# expected to be non-existent.
 #
 # See https://github.com/matrix-org/synapse/blob/master/docs/jwt.md.
 #
@@ -1974,6 +2069,21 @@ password_config:
       #
       #require_uppercase: true
 
+ui_auth:
+    # The number of milliseconds to allow a user-interactive authentication
+    # session to be active.
+    #
+    # This defaults to 0, meaning the user is queried for their credentials
+    # before every action, but this can be overridden to alow a single
+    # validation to be re-used.  This weakens the protections afforded by
+    # the user-interactive authentication process, by allowing for multiple
+    # (and potentially different) operations to use the same validation session.
+    #
+    # Uncomment below to allow for credential validation to last for 15
+    # seconds.
+    #
+    #session_timeout: 15000
+
 
 # Configuration for sending emails from Synapse.
 #
@@ -2039,10 +2149,15 @@ email:
   #
   #validation_token_lifetime: 15m
 
-  # Directory in which Synapse will try to find the template files below.
-  # If not set, default templates from within the Synapse package will be used.
+  # The web client location to direct users to during an invite. This is passed
+  # to the identity server as the org.matrix.web_client_location key. Defaults
+  # to unset, giving no guidance to the identity server.
   #
-  # Do not uncomment this setting unless you want to customise the templates.
+  #invite_client_location: https://app.element.io
+
+  # Directory in which Synapse will try to find the template files below.
+  # If not set, or the files named below are not found within the template
+  # directory, default templates from within the Synapse package will be used.
   #
   # Synapse will look for the following templates in this directory:
   #
@@ -2180,20 +2295,35 @@ password_providers:
 
 
 
-# Clients requesting push notifications can either have the body of
-# the message sent in the notification poke along with other details
-# like the sender, or just the event ID and room ID (`event_id_only`).
-# If clients choose the former, this option controls whether the
-# notification request includes the content of the event (other details
-# like the sender are still included). For `event_id_only` push, it
-# has no effect.
-#
-# For modern android devices the notification content will still appear
-# because it is loaded by the app. iPhone, however will send a
-# notification saying only that a message arrived and who it came from.
-#
-#push:
-#  include_content: true
+## Push ##
+
+push:
+  # Clients requesting push notifications can either have the body of
+  # the message sent in the notification poke along with other details
+  # like the sender, or just the event ID and room ID (`event_id_only`).
+  # If clients choose the former, this option controls whether the
+  # notification request includes the content of the event (other details
+  # like the sender are still included). For `event_id_only` push, it
+  # has no effect.
+  #
+  # For modern android devices the notification content will still appear
+  # because it is loaded by the app. iPhone, however will send a
+  # notification saying only that a message arrived and who it came from.
+  #
+  # The default value is "true" to include message details. Uncomment to only
+  # include the event ID and room ID in push notification payloads.
+  #
+  #include_content: false
+
+  # When a push notification is received, an unread count is also sent.
+  # This number can either be calculated as the number of unread messages
+  # for the user, or the number of *rooms* the user has unread messages in.
+  #
+  # The default value is "true", meaning push clients will see the number of
+  # rooms with unread messages in them. Uncomment to instead send the number
+  # of unread messages.
+  #
+  #group_unread_count_by_room: false
 
 
 # Spam checkers are third-party modules that can block specific actions
@@ -2236,7 +2366,7 @@ spam_checker:
 # If enabled, non server admins can only create groups with local parts
 # starting with this prefix
 #
-#group_creation_prefix: "unofficial/"
+#group_creation_prefix: "unofficial_"
 
 
 
@@ -2394,7 +2524,7 @@ spam_checker:
 #
 # Options for the rules include:
 #
-#   user_id: Matches agaisnt the creator of the alias
+#   user_id: Matches against the creator of the alias
 #   room_id: Matches against the room ID being published
 #   alias: Matches against any current local or canonical aliases
 #            associated with the room
@@ -2440,7 +2570,7 @@ opentracing:
     # This is a list of regexes which are matched against the server_name of the
     # homeserver.
     #
-    # By defult, it is empty, so no servers are matched.
+    # By default, it is empty, so no servers are matched.
     #
     #homeserver_whitelist:
     #  - ".*"
@@ -2495,6 +2625,18 @@ opentracing:
 #stream_writers:
 #  events: worker1
 #  typing: worker1
+
+# The worker that is used to run background tasks (e.g. cleaning up expired
+# data). If not provided this defaults to the main process.
+#
+#run_background_tasks_on: worker1
+
+# A shared secret used by the replication APIs to authenticate HTTP requests
+# from workers.
+#
+# By default this is unused and traffic is not authenticated.
+#
+#worker_replication_secret: ""
 
 
 # Configuration for Redis when using workers. This *must* be enabled when

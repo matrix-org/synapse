@@ -317,7 +317,7 @@ def ensure_active_span(message, ret=None):
 
 
 @contextlib.contextmanager
-def _noop_context_manager(*args, **kwargs):
+def noop_context_manager(*args, **kwargs):
     """Does exactly what it says on the tin"""
     yield
 
@@ -413,7 +413,7 @@ def start_active_span(
     """
 
     if opentracing is None:
-        return _noop_context_manager()
+        return noop_context_manager()
 
     return opentracing.tracer.start_active_span(
         operation_name,
@@ -428,7 +428,7 @@ def start_active_span(
 
 def start_active_span_follows_from(operation_name, contexts):
     if opentracing is None:
-        return _noop_context_manager()
+        return noop_context_manager()
 
     references = [opentracing.follows_from(context) for context in contexts]
     scope = start_active_span(operation_name, references=references)
@@ -459,7 +459,7 @@ def start_active_span_from_request(
     # Also, twisted uses byte arrays while opentracing expects strings.
 
     if opentracing is None:
-        return _noop_context_manager()
+        return noop_context_manager()
 
     header_dict = {
         k.decode(): v[0].decode() for k, v in request.requestHeaders.getAllRawHeaders()
@@ -497,7 +497,7 @@ def start_active_span_from_edu(
     """
 
     if opentracing is None:
-        return _noop_context_manager()
+        return noop_context_manager()
 
     carrier = json_decoder.decode(edu_content.get("context", "{}")).get(
         "opentracing", {}

@@ -63,7 +63,7 @@ class MockHandlerProfileTestCase(unittest.TestCase):
         hs = yield setup_test_homeserver(
             self.addCleanup,
             "test",
-            http_client=None,
+            federation_http_client=None,
             resource_for_client=self.mock_resource,
             federation=Mock(),
             federation_client=Mock(),
@@ -189,13 +189,12 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.owner_tok = self.login("owner", "pass")
 
     def test_set_displayname(self):
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/profile/%s/displayname" % (self.owner,),
             content=json.dumps({"displayname": "test"}),
             access_token=self.owner_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         res = self.get_displayname()
@@ -203,23 +202,19 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
     def test_set_displayname_too_long(self):
         """Attempts to set a stupid displayname should get a 400"""
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/profile/%s/displayname" % (self.owner,),
             content=json.dumps({"displayname": "test" * 100}),
             access_token=self.owner_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 400, channel.result)
 
         res = self.get_displayname()
         self.assertEqual(res, "owner")
 
     def get_displayname(self):
-        request, channel = self.make_request(
-            "GET", "/profile/%s/displayname" % (self.owner,)
-        )
-        self.render(request)
+        channel = self.make_request("GET", "/profile/%s/displayname" % (self.owner,))
         self.assertEqual(channel.code, 200, channel.result)
         return channel.json_body["displayname"]
 
@@ -281,10 +276,9 @@ class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
         )
 
     def request_profile(self, expected_code, url_suffix="", access_token=None):
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", self.profile_url + url_suffix, access_token=access_token
         )
-        self.render(request)
         self.assertEqual(channel.code, expected_code, channel.result)
 
     def ensure_requester_left_room(self):
@@ -324,24 +318,21 @@ class OwnProfileUnrestrictedTestCase(unittest.HomeserverTestCase):
         """Tests that a user can lookup their own profile without having to be in a room
         if 'require_auth_for_profile_requests' is set to true in the server's config.
         """
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/profile/" + self.requester, access_token=self.requester_tok
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/profile/" + self.requester + "/displayname",
             access_token=self.requester_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/profile/" + self.requester + "/avatar_url",
             access_token=self.requester_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)

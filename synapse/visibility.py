@@ -12,11 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 import operator
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import (
+    AccountDataTypes,
+    EventTypes,
+    HistoryVisibility,
+    Membership,
+)
 from synapse.events.utils import prune_event
 from synapse.storage import Storage
 from synapse.storage.state import StateFilter
@@ -25,7 +29,12 @@ from synapse.types import get_domain_from_id
 logger = logging.getLogger(__name__)
 
 
-VISIBILITY_PRIORITY = ("world_readable", "shared", "invited", "joined")
+VISIBILITY_PRIORITY = (
+    HistoryVisibility.WORLD_READABLE,
+    HistoryVisibility.SHARED,
+    HistoryVisibility.INVITED,
+    HistoryVisibility.JOINED,
+)
 
 
 MEMBERSHIP_PRIORITY = (
@@ -77,15 +86,14 @@ async def filter_events_for_client(
     )
 
     ignore_dict_content = await storage.main.get_global_account_data_by_type_for_user(
-        "m.ignored_user_list", user_id
+        AccountDataTypes.IGNORED_USER_LIST, user_id
     )
 
-    # FIXME: This will explode if people upload something incorrect.
-    ignore_list = frozenset(
-        ignore_dict_content.get("ignored_users", {}).keys()
-        if ignore_dict_content
-        else []
-    )
+    ignore_list = frozenset()
+    if ignore_dict_content:
+        ignored_users_dict = ignore_dict_content.get("ignored_users", {})
+        if isinstance(ignored_users_dict, dict):
+            ignore_list = frozenset(ignored_users_dict.keys())
 
     erased_senders = await storage.main.are_users_erased((e.sender for e in events))
 
@@ -117,7 +125,7 @@ async def filter_events_for_client(
         # see events in the room at that point in the DAG, and that shouldn't be decided
         # on those checks.
         if filter_send_to_client:
-            if event.type == "org.matrix.dummy_event":
+            if event.type == EventTypes.Dummy:
                 return None
 
             if not event.is_state() and event.sender in ignore_list:
@@ -151,12 +159,14 @@ async def filter_events_for_client(
         # get the room_visibility at the time of the event.
         visibility_event = state.get((EventTypes.RoomHistoryVisibility, ""), None)
         if visibility_event:
-            visibility = visibility_event.content.get("history_visibility", "shared")
+            visibility = visibility_event.content.get(
+                "history_visibility", HistoryVisibility.SHARED
+            )
         else:
-            visibility = "shared"
+            visibility = HistoryVisibility.SHARED
 
         if visibility not in VISIBILITY_PRIORITY:
-            visibility = "shared"
+            visibility = HistoryVisibility.SHARED
 
         # Always allow history visibility events on boundaries. This is done
         # by setting the effective visibility to the least restrictive
@@ -166,7 +176,7 @@ async def filter_events_for_client(
             prev_visibility = prev_content.get("history_visibility", None)
 
             if prev_visibility not in VISIBILITY_PRIORITY:
-                prev_visibility = "shared"
+                prev_visibility = HistoryVisibility.SHARED
 
             new_priority = VISIBILITY_PRIORITY.index(visibility)
             old_priority = VISIBILITY_PRIORITY.index(prev_visibility)
@@ -211,17 +221,17 @@ async def filter_events_for_client(
 
         # otherwise, it depends on the room visibility.
 
-        if visibility == "joined":
+        if visibility == HistoryVisibility.JOINED:
             # we weren't a member at the time of the event, so we can't
             # see this event.
             return None
 
-        elif visibility == "invited":
+        elif visibility == HistoryVisibility.INVITED:
             # user can also see the event if they were *invited* at the time
             # of the event.
             return event if membership == Membership.INVITE else None
 
-        elif visibility == "shared" and is_peeking:
+        elif visibility == HistoryVisibility.SHARED and is_peeking:
             # if the visibility is shared, users cannot see the event unless
             # they have *subequently* joined the room (or were members at the
             # time, of course)
@@ -285,8 +295,10 @@ async def filter_events_for_server(
     def check_event_is_visible(event, state):
         history = state.get((EventTypes.RoomHistoryVisibility, ""), None)
         if history:
-            visibility = history.content.get("history_visibility", "shared")
-            if visibility in ["invited", "joined"]:
+            visibility = history.content.get(
+                "history_visibility", HistoryVisibility.SHARED
+            )
+            if visibility in [HistoryVisibility.INVITED, HistoryVisibility.JOINED]:
                 # We now loop through all state events looking for
                 # membership states for the requesting server to determine
                 # if the server is either in the room or has been invited
@@ -306,7 +318,7 @@ async def filter_events_for_server(
                     if memtype == Membership.JOIN:
                         return True
                     elif memtype == Membership.INVITE:
-                        if visibility == "invited":
+                        if visibility == HistoryVisibility.INVITED:
                             return True
                 else:
                     # server has no users in the room: redact
@@ -337,7 +349,8 @@ async def filter_events_for_server(
     else:
         event_map = await storage.main.get_events(visibility_ids)
         all_open = all(
-            e.content.get("history_visibility") in (None, "shared", "world_readable")
+            e.content.get("history_visibility")
+            in (None, HistoryVisibility.SHARED, HistoryVisibility.WORLD_READABLE)
             for e in event_map.values()
         )
 

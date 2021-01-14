@@ -272,7 +272,6 @@ class RestServlet:
       on_PUT
       on_POST
       on_DELETE
-      on_OPTIONS
 
     Automatically handles turning CodeMessageExceptions thrown by these methods
     into the appropriate HTTP response.
@@ -283,7 +282,7 @@ class RestServlet:
         if hasattr(self, "PATTERNS"):
             patterns = self.PATTERNS
 
-            for method in ("GET", "PUT", "POST", "OPTIONS", "DELETE"):
+            for method in ("GET", "PUT", "POST", "DELETE"):
                 if hasattr(self, "on_%s" % (method,)):
                     servlet_classname = self.__class__.__name__
                     method_handler = getattr(self, "on_%s" % (method,))

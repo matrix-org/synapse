@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from functools import partial
+from typing import Set
 
 import mock
 
@@ -29,60 +29,50 @@ from synapse.logging.context import (
     make_deferred_yieldable,
 )
 from synapse.util.caches import descriptors
-from synapse.util.caches.descriptors import cached
+from synapse.util.caches.descriptors import cached, lru_cache
 
 from tests import unittest
+from tests.test_utils import get_awaitable_result
 
 logger = logging.getLogger(__name__)
+
+
+class LruCacheDecoratorTestCase(unittest.TestCase):
+    def test_base(self):
+        class Cls:
+            def __init__(self):
+                self.mock = mock.Mock()
+
+            @lru_cache()
+            def fn(self, arg1, arg2):
+                return self.mock(arg1, arg2)
+
+        obj = Cls()
+        obj.mock.return_value = "fish"
+        r = obj.fn(1, 2)
+        self.assertEqual(r, "fish")
+        obj.mock.assert_called_once_with(1, 2)
+        obj.mock.reset_mock()
+
+        # a call with different params should call the mock again
+        obj.mock.return_value = "chips"
+        r = obj.fn(1, 3)
+        self.assertEqual(r, "chips")
+        obj.mock.assert_called_once_with(1, 3)
+        obj.mock.reset_mock()
+
+        # the two values should now be cached
+        r = obj.fn(1, 2)
+        self.assertEqual(r, "fish")
+        r = obj.fn(1, 3)
+        self.assertEqual(r, "chips")
+        obj.mock.assert_not_called()
 
 
 def run_on_reactor():
     d = defer.Deferred()
     reactor.callLater(0, d.callback, 0)
     return make_deferred_yieldable(d)
-
-
-class CacheTestCase(unittest.TestCase):
-    def test_invalidate_all(self):
-        cache = descriptors.Cache("testcache")
-
-        callback_record = [False, False]
-
-        def record_callback(idx):
-            callback_record[idx] = True
-
-        # add a couple of pending entries
-        d1 = defer.Deferred()
-        cache.set("key1", d1, partial(record_callback, 0))
-
-        d2 = defer.Deferred()
-        cache.set("key2", d2, partial(record_callback, 1))
-
-        # lookup should return observable deferreds
-        self.assertFalse(cache.get("key1").has_called())
-        self.assertFalse(cache.get("key2").has_called())
-
-        # let one of the lookups complete
-        d2.callback("result2")
-
-        # for now at least, the cache will return real results rather than an
-        # observabledeferred
-        self.assertEqual(cache.get("key2"), "result2")
-
-        # now do the invalidation
-        cache.invalidate_all()
-
-        # lookup should return none
-        self.assertIsNone(cache.get("key1", None))
-        self.assertIsNone(cache.get("key2", None))
-
-        # both callbacks should have been callbacked
-        self.assertTrue(callback_record[0], "Invalidation callback for key1 not called")
-        self.assertTrue(callback_record[1], "Invalidation callback for key2 not called")
-
-        # letting the other lookup complete should do nothing
-        d1.callback("result1")
-        self.assertIsNone(cache.get("key1", None))
 
 
 class DescriptorTestCase(unittest.TestCase):
@@ -173,6 +163,57 @@ class DescriptorTestCase(unittest.TestCase):
         # and a second call should result in a second exception
         d = obj.fn(1)
         self.failureResultOf(d, SynapseError)
+
+    def test_cache_with_async_exception(self):
+        """The wrapped function returns a failure
+        """
+
+        class Cls:
+            result = None
+            call_count = 0
+
+            @cached()
+            def fn(self, arg1):
+                self.call_count += 1
+                return self.result
+
+        obj = Cls()
+        callbacks = set()  # type: Set[str]
+
+        # set off an asynchronous request
+        obj.result = origin_d = defer.Deferred()
+
+        d1 = obj.fn(1, on_invalidate=lambda: callbacks.add("d1"))
+        self.assertFalse(d1.called)
+
+        # a second request should also return a deferred, but should not call the
+        # function itself.
+        d2 = obj.fn(1, on_invalidate=lambda: callbacks.add("d2"))
+        self.assertFalse(d2.called)
+        self.assertEqual(obj.call_count, 1)
+
+        # no callbacks yet
+        self.assertEqual(callbacks, set())
+
+        # the original request fails
+        e = Exception("bzz")
+        origin_d.errback(e)
+
+        # ... which should cause the lookups to fail similarly
+        self.assertIs(self.failureResultOf(d1, Exception).value, e)
+        self.assertIs(self.failureResultOf(d2, Exception).value, e)
+
+        # ... and the callbacks to have been, uh, called.
+        self.assertEqual(callbacks, {"d1", "d2"})
+
+        # ... leaving the cache empty
+        self.assertEqual(len(obj.fn.cache.cache), 0)
+
+        # and a second call should work as normal
+        obj.result = defer.succeed(100)
+        d3 = obj.fn(1)
+        self.assertEqual(self.successResultOf(d3), 100)
+        self.assertEqual(obj.call_count, 2)
 
     def test_cache_logcontexts(self):
         """Check that logcontexts are set and restored correctly when
@@ -353,6 +394,260 @@ class DescriptorTestCase(unittest.TestCase):
         # and a second call should result in a second exception
         d = obj.fn(1)
         self.failureResultOf(d, SynapseError)
+
+    def test_invalidate_cascade(self):
+        """Invalidations should cascade up through cache contexts"""
+
+        class Cls:
+            @cached(cache_context=True)
+            async def func1(self, key, cache_context):
+                return await self.func2(key, on_invalidate=cache_context.invalidate)
+
+            @cached(cache_context=True)
+            async def func2(self, key, cache_context):
+                return self.func3(key, on_invalidate=cache_context.invalidate)
+
+            @lru_cache(cache_context=True)
+            def func3(self, key, cache_context):
+                self.invalidate = cache_context.invalidate
+                return 42
+
+        obj = Cls()
+
+        top_invalidate = mock.Mock()
+        r = get_awaitable_result(obj.func1("k1", on_invalidate=top_invalidate))
+        self.assertEqual(r, 42)
+        obj.invalidate()
+        top_invalidate.assert_called_once()
+
+
+class CacheDecoratorTestCase(unittest.HomeserverTestCase):
+    """More tests for @cached
+
+    The following is a set of tests that got lost in a different file for a while.
+
+    There are probably duplicates of the tests in DescriptorTestCase. Ideally the
+    duplicates would be removed and the two sets of classes combined.
+    """
+
+    @defer.inlineCallbacks
+    def test_passthrough(self):
+        class A:
+            @cached()
+            def func(self, key):
+                return key
+
+        a = A()
+
+        self.assertEquals((yield a.func("foo")), "foo")
+        self.assertEquals((yield a.func("bar")), "bar")
+
+    @defer.inlineCallbacks
+    def test_hit(self):
+        callcount = [0]
+
+        class A:
+            @cached()
+            def func(self, key):
+                callcount[0] += 1
+                return key
+
+        a = A()
+        yield a.func("foo")
+
+        self.assertEquals(callcount[0], 1)
+
+        self.assertEquals((yield a.func("foo")), "foo")
+        self.assertEquals(callcount[0], 1)
+
+    @defer.inlineCallbacks
+    def test_invalidate(self):
+        callcount = [0]
+
+        class A:
+            @cached()
+            def func(self, key):
+                callcount[0] += 1
+                return key
+
+        a = A()
+        yield a.func("foo")
+
+        self.assertEquals(callcount[0], 1)
+
+        a.func.invalidate(("foo",))
+
+        yield a.func("foo")
+
+        self.assertEquals(callcount[0], 2)
+
+    def test_invalidate_missing(self):
+        class A:
+            @cached()
+            def func(self, key):
+                return key
+
+        A().func.invalidate(("what",))
+
+    @defer.inlineCallbacks
+    def test_max_entries(self):
+        callcount = [0]
+
+        class A:
+            @cached(max_entries=10)
+            def func(self, key):
+                callcount[0] += 1
+                return key
+
+        a = A()
+
+        for k in range(0, 12):
+            yield a.func(k)
+
+        self.assertEquals(callcount[0], 12)
+
+        # There must have been at least 2 evictions, meaning if we calculate
+        # all 12 values again, we must get called at least 2 more times
+        for k in range(0, 12):
+            yield a.func(k)
+
+        self.assertTrue(
+            callcount[0] >= 14, msg="Expected callcount >= 14, got %d" % (callcount[0])
+        )
+
+    def test_prefill(self):
+        callcount = [0]
+
+        d = defer.succeed(123)
+
+        class A:
+            @cached()
+            def func(self, key):
+                callcount[0] += 1
+                return d
+
+        a = A()
+
+        a.func.prefill(("foo",), 456)
+
+        self.assertEquals(a.func("foo").result, 456)
+        self.assertEquals(callcount[0], 0)
+
+    @defer.inlineCallbacks
+    def test_invalidate_context(self):
+        callcount = [0]
+        callcount2 = [0]
+
+        class A:
+            @cached()
+            def func(self, key):
+                callcount[0] += 1
+                return key
+
+            @cached(cache_context=True)
+            def func2(self, key, cache_context):
+                callcount2[0] += 1
+                return self.func(key, on_invalidate=cache_context.invalidate)
+
+        a = A()
+        yield a.func2("foo")
+
+        self.assertEquals(callcount[0], 1)
+        self.assertEquals(callcount2[0], 1)
+
+        a.func.invalidate(("foo",))
+        yield a.func("foo")
+
+        self.assertEquals(callcount[0], 2)
+        self.assertEquals(callcount2[0], 1)
+
+        yield a.func2("foo")
+
+        self.assertEquals(callcount[0], 2)
+        self.assertEquals(callcount2[0], 2)
+
+    @defer.inlineCallbacks
+    def test_eviction_context(self):
+        callcount = [0]
+        callcount2 = [0]
+
+        class A:
+            @cached(max_entries=2)
+            def func(self, key):
+                callcount[0] += 1
+                return key
+
+            @cached(cache_context=True)
+            def func2(self, key, cache_context):
+                callcount2[0] += 1
+                return self.func(key, on_invalidate=cache_context.invalidate)
+
+        a = A()
+        yield a.func2("foo")
+        yield a.func2("foo2")
+
+        self.assertEquals(callcount[0], 2)
+        self.assertEquals(callcount2[0], 2)
+
+        yield a.func2("foo")
+        self.assertEquals(callcount[0], 2)
+        self.assertEquals(callcount2[0], 2)
+
+        yield a.func("foo3")
+
+        self.assertEquals(callcount[0], 3)
+        self.assertEquals(callcount2[0], 2)
+
+        yield a.func2("foo")
+
+        self.assertEquals(callcount[0], 4)
+        self.assertEquals(callcount2[0], 3)
+
+    @defer.inlineCallbacks
+    def test_double_get(self):
+        callcount = [0]
+        callcount2 = [0]
+
+        class A:
+            @cached()
+            def func(self, key):
+                callcount[0] += 1
+                return key
+
+            @cached(cache_context=True)
+            def func2(self, key, cache_context):
+                callcount2[0] += 1
+                return self.func(key, on_invalidate=cache_context.invalidate)
+
+        a = A()
+        a.func2.cache.cache = mock.Mock(wraps=a.func2.cache.cache)
+
+        yield a.func2("foo")
+
+        self.assertEquals(callcount[0], 1)
+        self.assertEquals(callcount2[0], 1)
+
+        a.func2.invalidate(("foo",))
+        self.assertEquals(a.func2.cache.cache.pop.call_count, 1)
+
+        yield a.func2("foo")
+        a.func2.invalidate(("foo",))
+        self.assertEquals(a.func2.cache.cache.pop.call_count, 2)
+
+        self.assertEquals(callcount[0], 1)
+        self.assertEquals(callcount2[0], 2)
+
+        a.func.invalidate(("foo",))
+        self.assertEquals(a.func2.cache.cache.pop.call_count, 3)
+        yield a.func("foo")
+
+        self.assertEquals(callcount[0], 2)
+        self.assertEquals(callcount2[0], 2)
+
+        yield a.func2("foo")
+
+        self.assertEquals(callcount[0], 2)
+        self.assertEquals(callcount2[0], 3)
 
 
 class CachedListDescriptorTestCase(unittest.TestCase):

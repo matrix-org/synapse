@@ -12,19 +12,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import sys
 from argparse import REMAINDER
 from contextlib import redirect_stderr
 from io import StringIO
 
 import pyperf
-from synmark import make_reactor
-from synmark.suites import SUITES
 
 from twisted.internet.defer import Deferred, ensureDeferred
 from twisted.logger import globalLogBeginner, textFileLogObserver
 from twisted.python.failure import Failure
+
+from synmark import make_reactor
+from synmark.suites import SUITES
 
 from tests.utils import setupdb
 

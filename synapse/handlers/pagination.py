@@ -92,7 +92,7 @@ class PaginationHandler:
         self._retention_allowed_lifetime_min = hs.config.retention_allowed_lifetime_min
         self._retention_allowed_lifetime_max = hs.config.retention_allowed_lifetime_max
 
-        if hs.config.retention_enabled:
+        if hs.config.run_background_tasks and hs.config.retention_enabled:
             # Run the purge jobs described in the configuration file.
             for job in hs.config.retention_purge_jobs:
                 logger.info("Setting up purge job with config: %s", job)
@@ -299,17 +299,22 @@ class PaginationHandler:
         """
         return self._purges_by_id.get(purge_id)
 
-    async def purge_room(self, room_id: str) -> None:
-        """Purge the given room from the database"""
+    async def purge_room(self, room_id: str, force: bool = False) -> None:
+        """Purge the given room from the database.
+
+        Args:
+            room_id: room to be purged
+            force: set true to skip checking for joined users.
+        """
         with await self.pagination_lock.write(room_id):
             # check we know about the room
             await self.store.get_room_version_id(room_id)
 
             # first check that we have no users in this room
-            joined = await self.store.is_host_joined(room_id, self._server_name)
-
-            if joined:
-                raise SynapseError(400, "Users are still joined to this room")
+            if not force:
+                joined = await self.store.is_host_joined(room_id, self._server_name)
+                if joined:
+                    raise SynapseError(400, "Users are still joined to this room")
 
             await self.storage.purge_events.purge_room(room_id)
 
@@ -383,7 +388,7 @@ class PaginationHandler:
                             "room_key", leave_token
                         )
 
-                await self.hs.get_handlers().federation_handler.maybe_backfill(
+                await self.hs.get_federation_handler().maybe_backfill(
                     room_id, curr_topo, limit=pagin_config.limit,
                 )
 

@@ -12,12 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Dict
 
+from synapse.events import EventBase
 from synapse.push.presentable_names import calculate_room_name, name_from_member_event
 from synapse.storage import Storage
+from synapse.storage.databases.main import DataStore
 
 
-async def get_badge_count(store, user_id):
+async def get_badge_count(store: DataStore, user_id: str, group_by_room: bool) -> int:
     invites = await store.get_invited_rooms_for_local_user(user_id)
     joins = await store.get_rooms_for_user(user_id)
 
@@ -34,13 +37,21 @@ async def get_badge_count(store, user_id):
                     room_id, user_id, last_unread_event_id
                 )
             )
-            # return one badge count per conversation, as count per
-            # message is so noisy as to be almost useless
-            badge += 1 if notifs["notify_count"] else 0
+            if notifs["notify_count"] == 0:
+                continue
+
+            if group_by_room:
+                # return one badge count per conversation
+                badge += 1
+            else:
+                # increment the badge count by the number of unread messages in the room
+                badge += notifs["notify_count"]
     return badge
 
 
-async def get_context_for_event(storage: Storage, state_handler, ev, user_id):
+async def get_context_for_event(
+    storage: Storage, ev: EventBase, user_id: str
+) -> Dict[str, str]:
     ctx = {}
 
     room_state_ids = await storage.state.get_state_ids_for_event(ev.event_id)

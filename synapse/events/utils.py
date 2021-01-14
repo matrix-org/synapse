@@ -49,6 +49,11 @@ def prune_event(event: EventBase) -> EventBase:
         pruned_event_dict, event.room_version, event.internal_metadata.get_dict()
     )
 
+    # copy the internal fields
+    pruned_event.internal_metadata.stream_ordering = (
+        event.internal_metadata.stream_ordering
+    )
+
     # Mark the event as redacted
     pruned_event.internal_metadata.redacted = True
 
@@ -175,7 +180,7 @@ def only_fields(dictionary, fields):
     in 'fields'.
 
     If there are no event fields specified then all fields are included.
-    The entries may include '.' charaters to indicate sub-fields.
+    The entries may include '.' characters to indicate sub-fields.
     So ['content.body'] will include the 'body' field of the 'content' object.
     A literal '.' character in a field name may be escaped using a '\'.
 

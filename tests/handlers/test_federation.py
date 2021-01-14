@@ -37,8 +37,8 @@ class FederationTestCase(unittest.HomeserverTestCase):
     ]
 
     def make_homeserver(self, reactor, clock):
-        hs = self.setup_test_homeserver(http_client=None)
-        self.handler = hs.get_handlers().federation_handler
+        hs = self.setup_test_homeserver(federation_http_client=None)
+        self.handler = hs.get_federation_handler()
         self.store = hs.get_datastore()
         return hs
 
@@ -59,7 +59,6 @@ class FederationTestCase(unittest.HomeserverTestCase):
         )
 
         d = self.handler.on_exchange_third_party_invite_request(
-            room_id=room_id,
             event_dict={
                 "type": EventTypes.Member,
                 "room_id": room_id,
@@ -127,7 +126,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             room_version,
         )
 
-        with LoggingContext(request="send_rejected"):
+        with LoggingContext("send_rejected"):
             d = run_in_background(self.handler.on_receive_pdu, OTHER_SERVER, ev)
         self.get_success(d)
 
@@ -179,7 +178,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             room_version,
         )
 
-        with LoggingContext(request="send_rejected"):
+        with LoggingContext("send_rejected"):
             d = run_in_background(self.handler.on_receive_pdu, OTHER_SERVER, ev)
         self.get_success(d)
 
@@ -199,7 +198,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
         # the auth code requires that a signature exists, but doesn't check that
         # signature... go figure.
         join_event.signatures[other_server] = {"x": "y"}
-        with LoggingContext(request="send_join"):
+        with LoggingContext("send_join"):
             d = run_in_background(
                 self.handler.on_send_join_request, other_server, join_event
             )

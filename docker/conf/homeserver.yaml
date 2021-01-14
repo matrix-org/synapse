@@ -90,7 +90,7 @@ federation_rc_concurrent: 3
 
 media_store_path: "/data/media"
 uploads_path: "/data/uploads"
-max_upload_size: "{{ SYNAPSE_MAX_UPLOAD_SIZE or "10M" }}"
+max_upload_size: "{{ SYNAPSE_MAX_UPLOAD_SIZE or "50M" }}"
 max_image_pixels: "32M"
 dynamic_thumbnails: false
 

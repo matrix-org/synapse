@@ -1,3 +1,51 @@
+matrix-synapse-py3 (1.25.0) stable; urgency=medium
+
+  [ Dan Callahan ]
+  * Update dependencies to account for the removal of the transitional
+    dh-systemd package from Debian Bullseye.
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.25.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 13 Jan 2021 10:14:55 +0000
+
+matrix-synapse-py3 (1.24.0) stable; urgency=medium
+
+  * New synapse release 1.24.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 09 Dec 2020 10:14:30 +0000
+
+matrix-synapse-py3 (1.23.1) stable; urgency=medium
+
+  * New synapse release 1.23.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 09 Dec 2020 10:40:39 +0000
+
+matrix-synapse-py3 (1.23.0) stable; urgency=medium
+
+  * New synapse release 1.23.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 18 Nov 2020 11:41:28 +0000
+
+matrix-synapse-py3 (1.22.1) stable; urgency=medium
+
+  * New synapse release 1.22.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 30 Oct 2020 15:25:37 +0000
+
+matrix-synapse-py3 (1.22.0) stable; urgency=medium
+
+  * New synapse release 1.22.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 27 Oct 2020 12:07:12 +0000
+
+matrix-synapse-py3 (1.21.2) stable; urgency=medium
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.21.2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 15 Oct 2020 09:23:27 -0400
+
 matrix-synapse-py3 (1.21.1) stable; urgency=medium
 
   [ Synapse Packaging team ]

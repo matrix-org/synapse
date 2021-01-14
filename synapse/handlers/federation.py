@@ -55,6 +55,7 @@ from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
 from synapse.handlers._base import BaseHandler
+from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import (
     make_deferred_yieldable,
     nested_logging_context,
@@ -67,7 +68,7 @@ from synapse.replication.http.devices import ReplicationUserDevicesResyncRestSer
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationFederationSendEventsRestServlet,
-    ReplicationStoreRoomOnInviteRestServlet,
+    ReplicationStoreRoomOnOutlierMembershipRestServlet,
 )
 from synapse.state import StateResolutionStore
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
@@ -112,7 +113,7 @@ class FederationHandler(BaseHandler):
     """Handles events that originated from federation.
         Responsible for:
         a) handling received Pdus before handing them on as Events to the rest
-        of the homeserver (including auth and state conflict resoultion)
+        of the homeserver (including auth and state conflict resolutions)
         b) converting events that were produced by local clients that may need
         to be sent to remote homeservers.
         c) doing the necessary dances to invite remote users and join remote
@@ -139,7 +140,7 @@ class FederationHandler(BaseHandler):
         self._message_handler = hs.get_message_handler()
         self._server_notices_mxid = hs.config.server_notices_mxid
         self.config = hs.config
-        self.http_client = hs.get_simple_http_client()
+        self.http_client = hs.get_proxied_blacklisted_http_client()
         self._instance_name = hs.get_instance_name()
         self._replication = hs.get_replication_data_handler()
 
@@ -152,12 +153,14 @@ class FederationHandler(BaseHandler):
             self._user_device_resync = ReplicationUserDevicesResyncRestServlet.make_client(
                 hs
             )
-            self._maybe_store_room_on_invite = ReplicationStoreRoomOnInviteRestServlet.make_client(
+            self._maybe_store_room_on_outlier_membership = ReplicationStoreRoomOnOutlierMembershipRestServlet.make_client(
                 hs
             )
         else:
             self._device_list_updater = hs.get_device_handler().device_list_updater
-            self._maybe_store_room_on_invite = self.store.maybe_store_room_on_invite
+            self._maybe_store_room_on_outlier_membership = (
+                self.store.maybe_store_room_on_outlier_membership
+            )
 
         # When joining a room we need to queue any events for that room up.
         # For each room, a list of (pdu, origin) tuples.
@@ -477,7 +480,7 @@ class FederationHandler(BaseHandler):
         # ----
         #
         # Update richvdh 2018/09/18: There are a number of problems with timing this
-        # request out agressively on the client side:
+        # request out aggressively on the client side:
         #
         # - it plays badly with the server-side rate-limiter, which starts tarpitting you
         #   if you send too many requests at once, so you end up with the server carefully
@@ -495,13 +498,13 @@ class FederationHandler(BaseHandler):
         #   we'll end up back here for the *next* PDU in the list, which exacerbates the
         #   problem.
         #
-        # - the agressive 10s timeout was introduced to deal with incoming federation
+        # - the aggressive 10s timeout was introduced to deal with incoming federation
         #   requests taking 8 hours to process. It's not entirely clear why that was going
         #   on; certainly there were other issues causing traffic storms which are now
         #   resolved, and I think in any case we may be more sensible about our locking
         #   now. We're *certainly* more sensible about our logging.
         #
-        # All that said: Let's try increasing the timout to 60s and see what happens.
+        # All that said: Let's try increasing the timeout to 60s and see what happens.
 
         try:
             missing_events = await self.federation_client.get_missing_events(
@@ -1120,7 +1123,7 @@ class FederationHandler(BaseHandler):
                     logger.info(str(e))
                     continue
                 except RequestSendFailed as e:
-                    logger.info("Falied to get backfill from %s because %s", dom, e)
+                    logger.info("Failed to get backfill from %s because %s", dom, e)
                     continue
                 except FederationDeniedError as e:
                     logger.info(e)
@@ -1507,18 +1510,9 @@ class FederationHandler(BaseHandler):
             event, context = await self.event_creation_handler.create_new_client_event(
                 builder=builder
             )
-        except AuthError as e:
+        except SynapseError as e:
             logger.warning("Failed to create join to %s because %s", room_id, e)
-            raise e
-
-        event_allowed = await self.third_party_event_rules.check_event_allowed(
-            event, context
-        )
-        if not event_allowed:
-            logger.info("Creation of join %s forbidden by third-party rules", event)
-            raise SynapseError(
-                403, "This event is not allowed in this context", Codes.FORBIDDEN
-            )
+            raise
 
         # The remote hasn't signed it yet, obviously. We'll do the full checks
         # when we get the event back in `on_send_join_request`
@@ -1554,7 +1548,7 @@ class FederationHandler(BaseHandler):
         #
         # The reasons we have the destination server rather than the origin
         # server send it are slightly mysterious: the origin server should have
-        # all the neccessary state once it gets the response to the send_join,
+        # all the necessary state once it gets the response to the send_join,
         # so it could send the event itself if it wanted to. It may be that
         # doing it this way reduces failure modes, or avoids certain attacks
         # where a new server selectively tells a subset of the federation that
@@ -1566,15 +1560,6 @@ class FederationHandler(BaseHandler):
         event.internal_metadata.send_on_behalf_of = origin
 
         context = await self._handle_new_event(origin, event)
-
-        event_allowed = await self.third_party_event_rules.check_event_allowed(
-            event, context
-        )
-        if not event_allowed:
-            logger.info("Sending of join %s forbidden by third-party rules", event)
-            raise SynapseError(
-                403, "This event is not allowed in this context", Codes.FORBIDDEN
-            )
 
         logger.debug(
             "on_send_join_request: After _handle_new_event: %s, sigs: %s",
@@ -1608,7 +1593,7 @@ class FederationHandler(BaseHandler):
         if self.hs.config.block_non_admin_invites:
             raise SynapseError(403, "This server does not accept room invites")
 
-        if not self.spam_checker.user_may_invite(
+        if not await self.spam_checker.user_may_invite(
             event.sender, event.state_key, event.room_id
         ):
             raise SynapseError(
@@ -1635,7 +1620,7 @@ class FederationHandler(BaseHandler):
         # keep a record of the room version, if we don't yet know it.
         # (this may get overwritten if we later get a different room version in a
         # join dance).
-        await self._maybe_store_room_on_invite(
+        await self._maybe_store_room_on_outlier_membership(
             room_id=event.room_id, room_version=room_version
         )
 
@@ -1667,7 +1652,7 @@ class FederationHandler(BaseHandler):
         event.internal_metadata.outlier = True
         event.internal_metadata.out_of_band_membership = True
 
-        # Try the host that we succesfully called /make_leave/ on first for
+        # Try the host that we successfully called /make_leave/ on first for
         # the /send_leave/ request.
         host_list = list(target_hosts)
         try:
@@ -1748,15 +1733,6 @@ class FederationHandler(BaseHandler):
             builder=builder
         )
 
-        event_allowed = await self.third_party_event_rules.check_event_allowed(
-            event, context
-        )
-        if not event_allowed:
-            logger.warning("Creation of leave %s forbidden by third-party rules", event)
-            raise SynapseError(
-                403, "This event is not allowed in this context", Codes.FORBIDDEN
-            )
-
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_leave_request`
@@ -1789,16 +1765,7 @@ class FederationHandler(BaseHandler):
 
         event.internal_metadata.outlier = False
 
-        context = await self._handle_new_event(origin, event)
-
-        event_allowed = await self.third_party_event_rules.check_event_allowed(
-            event, context
-        )
-        if not event_allowed:
-            logger.info("Sending of leave %s forbidden by third-party rules", event)
-            raise SynapseError(
-                403, "This event is not allowed in this context", Codes.FORBIDDEN
-            )
+        await self._handle_new_event(origin, event)
 
         logger.debug(
             "on_send_leave_request: After _handle_new_event: %s, sigs: %s",
@@ -2694,18 +2661,6 @@ class FederationHandler(BaseHandler):
                 builder=builder
             )
 
-            event_allowed = await self.third_party_event_rules.check_event_allowed(
-                event, context
-            )
-            if not event_allowed:
-                logger.info(
-                    "Creation of threepid invite %s forbidden by third-party rules",
-                    event,
-                )
-                raise SynapseError(
-                    403, "This event is not allowed in this context", Codes.FORBIDDEN
-                )
-
             event, context = await self.add_display_name_to_third_party_invite(
                 room_version, event_dict, event, context
             )
@@ -2734,7 +2689,7 @@ class FederationHandler(BaseHandler):
             )
 
     async def on_exchange_third_party_invite_request(
-        self, room_id: str, event_dict: JsonDict
+        self, event_dict: JsonDict
     ) -> None:
         """Handle an exchange_third_party_invite request from a remote server
 
@@ -2742,12 +2697,11 @@ class FederationHandler(BaseHandler):
         into a normal m.room.member invite.
 
         Args:
-            room_id: The ID of the room.
-
-            event_dict (dict[str, Any]): Dictionary containing the event body.
+            event_dict: Dictionary containing the event body.
 
         """
-        room_version = await self.store.get_room_version_id(room_id)
+        assert_params_in_dict(event_dict, ["room_id"])
+        room_version = await self.store.get_room_version_id(event_dict["room_id"])
 
         # NB: event_dict has a particular specced format we might need to fudge
         # if we change event formats too much.
@@ -2756,18 +2710,6 @@ class FederationHandler(BaseHandler):
         event, context = await self.event_creation_handler.create_new_client_event(
             builder=builder
         )
-
-        event_allowed = await self.third_party_event_rules.check_event_allowed(
-            event, context
-        )
-        if not event_allowed:
-            logger.warning(
-                "Exchange of threepid invite %s forbidden by third-party rules", event
-            )
-            raise SynapseError(
-                403, "This event is not allowed in this context", Codes.FORBIDDEN
-            )
-
         event, context = await self.add_display_name_to_third_party_invite(
             room_version, event_dict, event, context
         )
@@ -2966,17 +2908,20 @@ class FederationHandler(BaseHandler):
             return result["max_stream_id"]
         else:
             assert self.storage.persistence
-            max_stream_token = await self.storage.persistence.persist_events(
+
+            # Note that this returns the events that were persisted, which may not be
+            # the same as were passed in if some were deduplicated due to transaction IDs.
+            events, max_stream_token = await self.storage.persistence.persist_events(
                 event_and_contexts, backfilled=backfilled
             )
 
             if self._ephemeral_messages_enabled:
-                for (event, context) in event_and_contexts:
+                for event in events:
                     # If there's an expiry timestamp on the event, schedule its expiry.
                     self._message_handler.maybe_schedule_expiry(event)
 
             if not backfilled:  # Never notify for backfilled events
-                for event, _ in event_and_contexts:
+                for event in events:
                     await self._notify_persisted_event(event, max_stream_token)
 
             return max_stream_token.stream
@@ -3007,6 +2952,9 @@ class FederationHandler(BaseHandler):
             extra_users.append(target_user)
         elif event.internal_metadata.is_outlier():
             return
+
+        # the event has been persisted so it should have a stream ordering.
+        assert event.internal_metadata.stream_ordering
 
         event_pos = PersistedEventPosition(
             self._instance_name, event.internal_metadata.stream_ordering

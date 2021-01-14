@@ -139,7 +139,7 @@ class SearchHandler(BaseHandler):
             # Filter to apply to results
             filter_dict = room_cat.get("filter", {})
 
-            # What to order results by (impacts whether pagination can be doen)
+            # What to order results by (impacts whether pagination can be done)
             order_by = room_cat.get("order_by", "rank")
 
             # Return the current state of the rooms?

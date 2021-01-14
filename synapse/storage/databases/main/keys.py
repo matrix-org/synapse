@@ -22,6 +22,7 @@ from signedjson.key import decode_verify_key_bytes
 
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.keys import FetchKeyResult
+from synapse.storage.types import Cursor
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.iterutils import batch_iter
 
@@ -44,7 +45,7 @@ class KeyStore(SQLBaseStore):
     )
     async def get_server_verify_keys(
         self, server_name_and_key_ids: Iterable[Tuple[str, str]]
-    ) -> Dict[Tuple[str, str], Optional[FetchKeyResult]]:
+    ) -> Dict[Tuple[str, str], FetchKeyResult]:
         """
         Args:
             server_name_and_key_ids:
@@ -56,7 +57,7 @@ class KeyStore(SQLBaseStore):
         """
         keys = {}
 
-        def _get_keys(txn, batch):
+        def _get_keys(txn: Cursor, batch: Tuple[Tuple[str, str]]) -> None:
             """Processes a batch of keys to fetch, and adds the result to `keys`."""
 
             # batch_iter always returns tuples so it's safe to do len(batch)
@@ -77,13 +78,12 @@ class KeyStore(SQLBaseStore):
                     # `ts_valid_until_ms`.
                     ts_valid_until_ms = 0
 
-                res = FetchKeyResult(
+                keys[(server_name, key_id)] = FetchKeyResult(
                     verify_key=decode_verify_key_bytes(key_id, bytes(key_bytes)),
                     valid_until_ts=ts_valid_until_ms,
                 )
-                keys[(server_name, key_id)] = res
 
-        def _txn(txn):
+        def _txn(txn: Cursor) -> Dict[Tuple[str, str], FetchKeyResult]:
             for batch in batch_iter(server_name_and_key_ids, 50):
                 _get_keys(txn, batch)
             return keys
@@ -122,9 +122,7 @@ class KeyStore(SQLBaseStore):
             # param, which is itself the 2-tuple (server_name, key_id).
             invalidations.append((server_name, key_id))
 
-        await self.db_pool.runInteraction(
-            "store_server_verify_keys",
-            self.db_pool.simple_upsert_many_txn,
+        await self.db_pool.simple_upsert_many(
             table="server_signature_keys",
             key_names=("server_name", "key_id"),
             key_values=key_values,
@@ -135,6 +133,7 @@ class KeyStore(SQLBaseStore):
                 "verify_key",
             ),
             value_values=value_values,
+            desc="store_server_verify_keys",
         )
 
         invalidate = self._get_server_verify_key.invalidate

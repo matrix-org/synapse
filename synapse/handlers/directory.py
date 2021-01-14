@@ -46,6 +46,7 @@ class DirectoryHandler(BaseHandler):
         self.config = hs.config
         self.enable_room_list_search = hs.config.enable_room_list_search
         self.require_membership = hs.config.require_membership_for_aliases
+        self.third_party_event_rules = hs.get_third_party_event_rules()
 
         self.federation = hs.get_federation_client()
         hs.get_federation_registry().register_query_handler(
@@ -132,7 +133,9 @@ class DirectoryHandler(BaseHandler):
                         403, "You must be in the room to create an alias for it"
                     )
 
-            if not self.spam_checker.user_may_create_room_alias(user_id, room_alias):
+            if not await self.spam_checker.user_may_create_room_alias(
+                user_id, room_alias
+            ):
                 raise AuthError(403, "This user is not permitted to create this alias")
 
             if not self.config.is_alias_creation_allowed(
@@ -383,7 +386,7 @@ class DirectoryHandler(BaseHandler):
         """
         creator = await self.store.get_room_alias_creator(alias.to_string())
 
-        if creator is not None and creator == user_id:
+        if creator == user_id:
             return True
 
         # Resolve the alias to the corresponding room.
@@ -408,7 +411,7 @@ class DirectoryHandler(BaseHandler):
         """
         user_id = requester.user.to_string()
 
-        if not self.spam_checker.user_may_publish_room(user_id, room_id):
+        if not await self.spam_checker.user_may_publish_room(user_id, room_id):
             raise AuthError(
                 403, "This user is not permitted to publish rooms to the room list"
             )
@@ -452,6 +455,15 @@ class DirectoryHandler(BaseHandler):
                 # Lets just return a generic message, as there may be all sorts of
                 # reasons why we said no. TODO: Allow configurable error messages
                 # per alias creation rule?
+                raise SynapseError(403, "Not allowed to publish room")
+
+            # Check if publishing is blocked by a third party module
+            allowed_by_third_party_rules = await (
+                self.third_party_event_rules.check_visibility_can_be_modified(
+                    room_id, visibility
+                )
+            )
+            if not allowed_by_third_party_rules:
                 raise SynapseError(403, "Not allowed to publish room")
 
         await self.store.set_room_is_public(room_id, making_public)

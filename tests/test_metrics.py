@@ -15,7 +15,7 @@
 # limitations under the License.
 
 from synapse.metrics import REGISTRY, InFlightGauge, generate_latest
-from synapse.util.caches.descriptors import Cache
+from synapse.util.caches.deferred_cache import DeferredCache
 
 from tests import unittest
 
@@ -138,7 +138,7 @@ class CacheMetricsTests(unittest.HomeserverTestCase):
         Caches produce metrics reflecting their state when scraped.
         """
         CACHE_NAME = "cache_metrics_test_fgjkbdfg"
-        cache = Cache(CACHE_NAME, max_entries=777)
+        cache = DeferredCache(CACHE_NAME, max_entries=777)
 
         items = {
             x.split(b"{")[0].decode("ascii"): x.split(b" ")[1].decode("ascii")

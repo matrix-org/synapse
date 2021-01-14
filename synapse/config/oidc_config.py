@@ -56,6 +56,7 @@ class OIDCConfig(Config):
         self.oidc_userinfo_endpoint = oidc_config.get("userinfo_endpoint")
         self.oidc_jwks_uri = oidc_config.get("jwks_uri")
         self.oidc_skip_verification = oidc_config.get("skip_verification", False)
+        self.oidc_user_profile_method = oidc_config.get("user_profile_method", "auto")
         self.oidc_allow_existing_users = oidc_config.get("allow_existing_users", False)
 
         ump_config = oidc_config.get("user_mapping_provider", {})
@@ -65,7 +66,7 @@ class OIDCConfig(Config):
         (
             self.oidc_user_mapping_provider_class,
             self.oidc_user_mapping_provider_config,
-        ) = load_module(ump_config)
+        ) = load_module(ump_config, ("oidc_config", "user_mapping_provider"))
 
         # Ensure loaded user mapping module has defined all necessary methods
         required_methods = [
@@ -86,11 +87,10 @@ class OIDCConfig(Config):
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
-        # OpenID Connect integration. The following settings can be used to make Synapse
-        # use an OpenID Connect Provider for authentication, instead of its internal
-        # password database.
+        # Enable OpenID Connect (OIDC) / OAuth 2.0 for registration and login.
         #
-        # See https://github.com/matrix-org/synapse/blob/master/docs/openid.md.
+        # See https://github.com/matrix-org/synapse/blob/master/docs/openid.md
+        # for some example configurations.
         #
         oidc_config:
           # Uncomment the following to enable authorization against an OpenID Connect
@@ -159,6 +159,14 @@ class OIDCConfig(Config):
           #
           #skip_verification: true
 
+          # Whether to fetch the user profile from the userinfo endpoint. Valid
+          # values are: "auto" or "userinfo_endpoint".
+          #
+          # Defaults to "auto", which fetches the userinfo endpoint if "openid" is included
+          # in `scopes`. Uncomment the following to always fetch the userinfo endpoint.
+          #
+          #user_profile_method: "userinfo_endpoint"
+
           # Uncomment to allow a user logging in via OIDC to match a pre-existing account instead
           # of failing. This could be used if switching from password logins to OIDC. Defaults to false.
           #
@@ -195,9 +203,10 @@ class OIDCConfig(Config):
               #   * user: The claims returned by the UserInfo Endpoint and/or in the ID
               #     Token
               #
-              # This must be configured if using the default mapping provider.
+              # If this is not set, the user will be prompted to choose their
+              # own username.
               #
-              localpart_template: "{{{{ user.preferred_username }}}}"
+              #localpart_template: "{{{{ user.preferred_username }}}}"
 
               # Jinja2 template for the display name to set on first login.
               #

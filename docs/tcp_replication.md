@@ -15,7 +15,7 @@ example flow would be (where '>' indicates master to worker and
 
     > SERVER example.com
     < REPLICATE
-    > POSITION events master 53
+    > POSITION events master 53 53
     > RDATA events master 54 ["$foo1:bar.com", ...]
     > RDATA events master 55 ["$foo4:bar.com", ...]
 
@@ -138,9 +138,9 @@ the wire:
     < NAME synapse.app.appservice
     < PING 1490197665618
     < REPLICATE
-    > POSITION events master 1
-    > POSITION backfill master 1
-    > POSITION caches master 1
+    > POSITION events master 1 1
+    > POSITION backfill master 1 1
+    > POSITION caches master 1 1
     > RDATA caches master 2 ["get_user_by_id",["@01register-user:localhost:8823"],1490197670513]
     > RDATA events master 14 ["$149019767112vOHxz:localhost:8823",
         "!AFDCvgApUmpdfVjIXm:localhost:8823","m.room.guest_access","",null]
@@ -184,6 +184,11 @@ client (C):
    are written by a single process (usually "master"). If fetching missing
    updates via HTTP API, rather than via the DB, then processes should make the
    request to the appropriate process.
+
+   Two positions are included, the "new" position and the last position sent respectively.
+   This allows servers to tell instances that the positions have advanced but no
+   data has been written, without clients needlessly checking to see if they
+   have missed any updates.
 
 #### ERROR (S, C)
 

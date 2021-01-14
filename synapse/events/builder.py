@@ -97,32 +97,37 @@ class EventBuilder:
     def is_state(self):
         return self._state_key is not None
 
-    async def build(self, prev_event_ids: List[str]) -> EventBase:
+    async def build(
+        self, prev_event_ids: List[str], auth_event_ids: Optional[List[str]],
+    ) -> EventBase:
         """Transform into a fully signed and hashed event
 
         Args:
             prev_event_ids: The event IDs to use as the prev events
+            auth_event_ids: The event IDs to use as the auth events.
+                Should normally be set to None, which will cause them to be calculated
+                based on the room state at the prev_events.
 
         Returns:
             The signed and hashed event.
         """
-
-        state_ids = await self._state.get_current_state_ids(
-            self.room_id, prev_event_ids
-        )
-        auth_ids = self._auth.compute_auth_events(self, state_ids)
+        if auth_event_ids is None:
+            state_ids = await self._state.get_current_state_ids(
+                self.room_id, prev_event_ids
+            )
+            auth_event_ids = self._auth.compute_auth_events(self, state_ids)
 
         format_version = self.room_version.event_format
         if format_version == EventFormatVersions.V1:
             # The types of auth/prev events changes between event versions.
             auth_events = await self._store.add_event_hashes(
-                auth_ids
+                auth_event_ids
             )  # type: Union[List[str], List[Tuple[str, Dict[str, str]]]]
             prev_events = await self._store.add_event_hashes(
                 prev_event_ids
             )  # type: Union[List[str], List[Tuple[str, Dict[str, str]]]]
         else:
-            auth_events = auth_ids
+            auth_events = auth_event_ids
             prev_events = prev_event_ids
 
         old_depth = await self._store.get_max_depth_of(prev_event_ids)

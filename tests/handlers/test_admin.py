@@ -35,7 +35,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        self.admin_handler = hs.get_handlers().admin_handler
+        self.admin_handler = hs.get_admin_handler()
 
         self.user1 = self.register_user("user1", "password")
         self.token1 = self.login("user1", "password")

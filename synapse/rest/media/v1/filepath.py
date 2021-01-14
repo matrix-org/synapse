@@ -69,6 +69,23 @@ class MediaFilePaths:
 
     local_media_thumbnail = _wrap_in_base_path(local_media_thumbnail_rel)
 
+    def local_media_thumbnail_dir(self, media_id: str) -> str:
+        """
+        Retrieve the local store path of thumbnails of a given media_id
+
+        Args:
+            media_id: The media ID to query.
+        Returns:
+            Path of local_thumbnails from media_id
+        """
+        return os.path.join(
+            self.base_path,
+            "local_thumbnails",
+            media_id[0:2],
+            media_id[2:4],
+            media_id[4:],
+        )
+
     def remote_media_filepath_rel(self, server_name, file_id):
         return os.path.join(
             "remote_content", server_name, file_id[0:2], file_id[2:4], file_id[4:]

@@ -89,7 +89,7 @@ from synapse.replication.tcp.streams import (
     ToDeviceStream,
 )
 from synapse.rest.admin import register_servlets_for_media_repo
-from synapse.rest.client.v1 import events
+from synapse.rest.client.v1 import events, room
 from synapse.rest.client.v1.initial_sync import InitialSyncRestServlet
 from synapse.rest.client.v1.login import LoginRestServlet
 from synapse.rest.client.v1.profile import (
@@ -98,20 +98,6 @@ from synapse.rest.client.v1.profile import (
     ProfileRestServlet,
 )
 from synapse.rest.client.v1.push_rule import PushRuleRestServlet
-from synapse.rest.client.v1.room import (
-    JoinedRoomMemberListRestServlet,
-    JoinRoomAliasServlet,
-    PublicRoomListRestServlet,
-    RoomEventContextServlet,
-    RoomInitialSyncRestServlet,
-    RoomMemberListRestServlet,
-    RoomMembershipRestServlet,
-    RoomMessageListRestServlet,
-    RoomSendEventRestServlet,
-    RoomStateEventRestServlet,
-    RoomStateRestServlet,
-    RoomTypingRestServlet,
-)
 from synapse.rest.client.v1.voip import VoipRestServlet
 from synapse.rest.client.v2_alpha import groups, sync, user_directory
 from synapse.rest.client.v2_alpha._base import client_patterns
@@ -127,12 +113,16 @@ from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.server import HomeServer, cache_in_self
 from synapse.storage.databases.main.censor_events import CensorEventsStore
+from synapse.storage.databases.main.client_ips import ClientIpWorkerStore
 from synapse.storage.databases.main.media_repository import MediaRepositoryStore
+from synapse.storage.databases.main.metrics import ServerMetricsStore
 from synapse.storage.databases.main.monthly_active_users import (
     MonthlyActiveUsersWorkerStore,
 )
 from synapse.storage.databases.main.presence import UserPresenceState
 from synapse.storage.databases.main.search import SearchWorkerStore
+from synapse.storage.databases.main.stats import StatsStore
+from synapse.storage.databases.main.transactions import TransactionWorkerStore
 from synapse.storage.databases.main.ui_auth import UIAuthWorkerStore
 from synapse.storage.databases.main.user_directory import UserDirectoryStore
 from synapse.types import ReadReceipt
@@ -262,7 +252,6 @@ class GenericWorkerPresence(BasePresenceHandler):
         super().__init__(hs)
         self.hs = hs
         self.is_mine_id = hs.is_mine_id
-        self.http_client = hs.get_simple_http_client()
 
         self._presence_enabled = hs.config.use_presence
 
@@ -454,6 +443,7 @@ class GenericWorkerSlavedStore(
     # FIXME(#3714): We need to add UserDirectoryStore as we write directly
     # rather than going via the correct worker.
     UserDirectoryStore,
+    StatsStore,
     UIAuthWorkerStore,
     SlavedDeviceInboxStore,
     SlavedDeviceStore,
@@ -463,6 +453,7 @@ class GenericWorkerSlavedStore(
     SlavedAccountDataStore,
     SlavedPusherStore,
     CensorEventsStore,
+    ClientIpWorkerStore,
     SlavedEventStore,
     SlavedKeyStore,
     RoomStore,
@@ -476,7 +467,9 @@ class GenericWorkerSlavedStore(
     SlavedFilteringStore,
     MonthlyActiveUsersWorkerStore,
     MediaRepositoryStore,
+    ServerMetricsStore,
     SearchWorkerStore,
+    TransactionWorkerStore,
     BaseSlavedStore,
 ):
     pass
@@ -505,12 +498,6 @@ class GenericWorkerServer(HomeServer):
                 elif name == "client":
                     resource = JsonResource(self, canonical_json=False)
 
-                    PublicRoomListRestServlet(self).register(resource)
-                    RoomMemberListRestServlet(self).register(resource)
-                    JoinedRoomMemberListRestServlet(self).register(resource)
-                    RoomStateRestServlet(self).register(resource)
-                    RoomEventContextServlet(self).register(resource)
-                    RoomMessageListRestServlet(self).register(resource)
                     RegisterRestServlet(self).register(resource)
                     LoginRestServlet(self).register(resource)
                     ThreepidRestServlet(self).register(resource)
@@ -519,22 +506,19 @@ class GenericWorkerServer(HomeServer):
                     VoipRestServlet(self).register(resource)
                     PushRuleRestServlet(self).register(resource)
                     VersionsRestServlet(self).register(resource)
-                    RoomSendEventRestServlet(self).register(resource)
-                    RoomMembershipRestServlet(self).register(resource)
-                    RoomStateEventRestServlet(self).register(resource)
-                    JoinRoomAliasServlet(self).register(resource)
+
                     ProfileAvatarURLRestServlet(self).register(resource)
                     ProfileDisplaynameRestServlet(self).register(resource)
                     ProfileRestServlet(self).register(resource)
                     KeyUploadServlet(self).register(resource)
                     AccountDataServlet(self).register(resource)
                     RoomAccountDataServlet(self).register(resource)
-                    RoomTypingRestServlet(self).register(resource)
 
                     sync.register_servlets(self, resource)
                     events.register_servlets(self, resource)
+                    room.register_servlets(self, resource, True)
+                    room.register_deprecated_servlets(self, resource)
                     InitialSyncRestServlet(self).register(resource)
-                    RoomInitialSyncRestServlet(self).register(resource)
 
                     user_directory.register_servlets(self, resource)
 
@@ -781,10 +765,6 @@ class FederationSenderHandler:
         if stream_name == "federation":
             send_queue.process_rows_for_federation(self.federation_sender, rows)
             await self.update_token(token)
-
-        # We also need to poke the federation sender when new events happen
-        elif stream_name == "events":
-            self.federation_sender.notify_new_events(token)
 
         # ... and when new receipts happen
         elif stream_name == ReceiptsStream.NAME:

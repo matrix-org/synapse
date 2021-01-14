@@ -27,7 +27,8 @@ import logging
 import os
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, TypeVar, cast
 
-import twisted
+import twisted.internet.base
+import twisted.internet.tcp
 from twisted.mail.smtp import sendmail
 from twisted.web.iweb import IPolicyForHTTPS
 
@@ -54,25 +55,28 @@ from synapse.federation.sender import FederationSender
 from synapse.federation.transport.client import TransportLayerClient
 from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
 from synapse.groups.groups_server import GroupsServerHandler, GroupsServerWorkerHandler
-from synapse.handlers import Handlers
 from synapse.handlers.account_validity import AccountValidityHandler
 from synapse.handlers.acme import AcmeHandler
+from synapse.handlers.admin import AdminHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler, MacaroonGenerator
 from synapse.handlers.cas_handler import CasHandler
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
 from synapse.handlers.device import DeviceHandler, DeviceWorkerHandler
 from synapse.handlers.devicemessage import DeviceMessageHandler
+from synapse.handlers.directory import DirectoryHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.e2e_room_keys import E2eRoomKeysHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
+from synapse.handlers.federation import FederationHandler
 from synapse.handlers.groups_local import GroupsLocalHandler, GroupsLocalWorkerHandler
+from synapse.handlers.identity import IdentityHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.message import EventCreationHandler, MessageHandler
 from synapse.handlers.pagination import PaginationHandler
 from synapse.handlers.password_policy import PasswordPolicyHandler
 from synapse.handlers.presence import PresenceHandler
-from synapse.handlers.profile import BaseProfileHandler, MasterProfileHandler
+from synapse.handlers.profile import ProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.receipts import ReceiptsHandler
 from synapse.handlers.register import RegistrationHandler
@@ -84,13 +88,16 @@ from synapse.handlers.room import (
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
+from synapse.handlers.search import SearchHandler
 from synapse.handlers.set_password import SetPasswordHandler
+from synapse.handlers.sso import SsoHandler
 from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import FollowerTypingHandler, TypingWriterHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
 from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpClient
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
+from synapse.module_api import ModuleApi
 from synapse.notifier import Notifier
 from synapse.push.action_generator import ActionGenerator
 from synapse.push.pusherpool import PusherPool
@@ -140,7 +147,8 @@ def cache_in_self(builder: T) -> T:
             "@cache_in_self can only be used on functions starting with `get_`"
         )
 
-    depname = builder.__name__[len("get_") :]
+    # get_attr -> _attr
+    depname = builder.__name__[len("get") :]
 
     building = [False]
 
@@ -185,14 +193,28 @@ class HomeServer(metaclass=abc.ABCMeta):
             we are listening on to provide HTTP services.
     """
 
-    REQUIRED_ON_MASTER_STARTUP = ["user_directory_handler", "stats_handler"]
+    REQUIRED_ON_BACKGROUND_TASK_STARTUP = [
+        "account_validity",
+        "auth",
+        "deactivate_account",
+        "message",
+        "pagination",
+        "profile",
+        "stats",
+    ]
 
     # This is overridden in derived application classes
     # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
     # instantiated during setup() for future return by get_datastore()
     DATASTORE_CLASS = abc.abstractproperty()
 
-    def __init__(self, hostname: str, config: HomeServerConfig, reactor=None, **kwargs):
+    def __init__(
+        self,
+        hostname: str,
+        config: HomeServerConfig,
+        reactor=None,
+        version_string="Synapse",
+    ):
         """
         Args:
             hostname : The hostname for the server.
@@ -214,20 +236,9 @@ class HomeServer(metaclass=abc.ABCMeta):
         self._instance_id = random_string(5)
         self._instance_name = config.worker_name or "master"
 
-        self.clock = Clock(reactor)
-        self.distributor = Distributor()
-
-        self.registration_ratelimiter = Ratelimiter(
-            clock=self.clock,
-            rate_hz=config.rc_registration.per_second,
-            burst_count=config.rc_registration.burst_count,
-        )
+        self.version_string = version_string
 
         self.datastores = None  # type: Optional[Databases]
-
-        # Other kwargs are explicit dependencies
-        for depname in kwargs:
-            setattr(self, depname, kwargs[depname])
 
     def get_instance_id(self) -> str:
         """A unique ID for this synapse process instance.
@@ -251,14 +262,20 @@ class HomeServer(metaclass=abc.ABCMeta):
         self.datastores = Databases(self.DATASTORE_CLASS, self)
         logger.info("Finished setting up.")
 
-    def setup_master(self) -> None:
+        # Register background tasks required by this server. This must be done
+        # somewhat manually due to the background tasks not being registered
+        # unless handlers are instantiated.
+        if self.config.run_background_tasks:
+            self.setup_background_tasks()
+
+    def setup_background_tasks(self) -> None:
         """
         Some handlers have side effects on instantiation (like registering
         background updates). This function causes them to be fetched, and
         therefore instantiated, to run those side effects.
         """
-        for i in self.REQUIRED_ON_MASTER_STARTUP:
-            getattr(self, "get_" + i)()
+        for i in self.REQUIRED_ON_BACKGROUND_TASK_STARTUP:
+            getattr(self, "get_" + i + "_handler")()
 
     def get_reactor(self) -> twisted.internet.base.ReactorBase:
         """
@@ -276,8 +293,9 @@ class HomeServer(metaclass=abc.ABCMeta):
     def is_mine_id(self, string: str) -> bool:
         return string.split(":", 1)[1] == self.hostname
 
+    @cache_in_self
     def get_clock(self) -> Clock:
-        return self.clock
+        return Clock(self._reactor)
 
     def get_datastore(self) -> DataStore:
         if not self.datastores:
@@ -294,11 +312,17 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_config(self) -> HomeServerConfig:
         return self.config
 
+    @cache_in_self
     def get_distributor(self) -> Distributor:
-        return self.distributor
+        return Distributor()
 
+    @cache_in_self
     def get_registration_ratelimiter(self) -> Ratelimiter:
-        return self.registration_ratelimiter
+        return Ratelimiter(
+            clock=self.get_clock(),
+            rate_hz=self.config.rc_registration.per_second,
+            burst_count=self.config.rc_registration.burst_count,
+        )
 
     @cache_in_self
     def get_federation_client(self) -> FederationClient:
@@ -307,10 +331,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_federation_server(self) -> FederationServer:
         return FederationServer(self)
-
-    @cache_in_self
-    def get_handlers(self) -> Handlers:
-        return Handlers(self)
 
     @cache_in_self
     def get_notifier(self) -> Notifier:
@@ -330,15 +350,45 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_simple_http_client(self) -> SimpleHttpClient:
+        """
+        An HTTP client with no special configuration.
+        """
         return SimpleHttpClient(self)
 
     @cache_in_self
     def get_proxied_http_client(self) -> SimpleHttpClient:
+        """
+        An HTTP client that uses configured HTTP(S) proxies.
+        """
         return SimpleHttpClient(
             self,
             http_proxy=os.getenvb(b"http_proxy"),
             https_proxy=os.getenvb(b"HTTPS_PROXY"),
         )
+
+    @cache_in_self
+    def get_proxied_blacklisted_http_client(self) -> SimpleHttpClient:
+        """
+        An HTTP client that uses configured HTTP(S) proxies and blacklists IPs
+        based on the IP range blacklist/whitelist.
+        """
+        return SimpleHttpClient(
+            self,
+            ip_whitelist=self.config.ip_range_whitelist,
+            ip_blacklist=self.config.ip_range_blacklist,
+            http_proxy=os.getenvb(b"http_proxy"),
+            https_proxy=os.getenvb(b"HTTPS_PROXY"),
+        )
+
+    @cache_in_self
+    def get_federation_http_client(self) -> MatrixFederationHttpClient:
+        """
+        An HTTP client for federation.
+        """
+        tls_client_options_factory = context_factory.FederationPolicyForHTTPS(
+            self.config
+        )
+        return MatrixFederationHttpClient(self, tls_client_options_factory)
 
     @cache_in_self
     def get_room_creation_handler(self) -> RoomCreationHandler:
@@ -372,6 +422,10 @@ class HomeServer(metaclass=abc.ABCMeta):
             return FollowerTypingHandler(self)
 
     @cache_in_self
+    def get_sso_handler(self) -> SsoHandler:
+        return SsoHandler(self)
+
+    @cache_in_self
     def get_sync_handler(self) -> SyncHandler:
         return SyncHandler(self)
 
@@ -399,6 +453,10 @@ class HomeServer(metaclass=abc.ABCMeta):
         return DeviceMessageHandler(self)
 
     @cache_in_self
+    def get_directory_handler(self) -> DirectoryHandler:
+        return DirectoryHandler(self)
+
+    @cache_in_self
     def get_e2e_keys_handler(self) -> E2eKeysHandler:
         return E2eKeysHandler(self)
 
@@ -409,6 +467,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_acme_handler(self) -> AcmeHandler:
         return AcmeHandler(self)
+
+    @cache_in_self
+    def get_admin_handler(self) -> AdminHandler:
+        return AdminHandler(self)
 
     @cache_in_self
     def get_application_service_api(self) -> ApplicationServiceApi:
@@ -431,15 +493,20 @@ class HomeServer(metaclass=abc.ABCMeta):
         return EventStreamHandler(self)
 
     @cache_in_self
+    def get_federation_handler(self) -> FederationHandler:
+        return FederationHandler(self)
+
+    @cache_in_self
+    def get_identity_handler(self) -> IdentityHandler:
+        return IdentityHandler(self)
+
+    @cache_in_self
     def get_initial_sync_handler(self) -> InitialSyncHandler:
         return InitialSyncHandler(self)
 
     @cache_in_self
     def get_profile_handler(self):
-        if self.config.worker_app:
-            return BaseProfileHandler(self)
-        else:
-            return MasterProfileHandler(self)
+        return ProfileHandler(self)
 
     @cache_in_self
     def get_event_creation_handler(self) -> EventCreationHandler:
@@ -448,6 +515,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_deactivate_account_handler(self) -> DeactivateAccountHandler:
         return DeactivateAccountHandler(self)
+
+    @cache_in_self
+    def get_search_handler(self) -> SearchHandler:
+        return SearchHandler(self)
 
     @cache_in_self
     def get_set_password_handler(self) -> SetPasswordHandler:
@@ -472,13 +543,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_pusherpool(self) -> PusherPool:
         return PusherPool(self)
-
-    @cache_in_self
-    def get_http_client(self) -> MatrixFederationHttpClient:
-        tls_client_options_factory = context_factory.FederationPolicyForHTTPS(
-            self.config
-        )
-        return MatrixFederationHttpClient(self, tls_client_options_factory)
 
     @cache_in_self
     def get_media_repository_resource(self) -> MediaRepositoryResource:
@@ -554,7 +618,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return StatsHandler(self)
 
     @cache_in_self
-    def get_spam_checker(self):
+    def get_spam_checker(self) -> SpamChecker:
         return SpamChecker(self)
 
     @cache_in_self
@@ -645,7 +709,11 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_federation_ratelimiter(self) -> FederationRateLimiter:
-        return FederationRateLimiter(self.clock, config=self.config.rc_federation)
+        return FederationRateLimiter(self.get_clock(), config=self.config.rc_federation)
+
+    @cache_in_self
+    def get_module_api(self) -> ModuleApi:
+        return ModuleApi(self, self.get_auth_handler())
 
     async def remove_pusher(self, app_id: str, push_key: str, user_id: str):
         return await self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

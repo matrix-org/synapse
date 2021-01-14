@@ -14,12 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from unittest.mock import Mock
-
 from synapse.api.constants import Membership
 from synapse.rest.admin import register_servlets_for_client_rest_resource
 from synapse.rest.client.v1 import login, room
-from synapse.types import Requester, UserID
+from synapse.types import UserID, create_requester
 
 from tests import unittest
 from tests.test_utils import event_injection
@@ -33,12 +31,6 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         register_servlets_for_client_rest_resource,
         room.register_servlets,
     ]
-
-    def make_homeserver(self, reactor, clock):
-        hs = self.setup_test_homeserver(
-            resource_for_federation=Mock(), http_client=None
-        )
-        return hs
 
     def prepare(self, reactor, clock, hs: TestHomeServer):
 
@@ -187,7 +179,7 @@ class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):
 
         # Now let's create a room, which will insert a membership
         user = UserID("alice", "test")
-        requester = Requester(user, None, False, False, None, None)
+        requester = create_requester(user)
         self.get_success(self.room_creator.create_room(requester, {}))
 
         # Register the background update to run again.

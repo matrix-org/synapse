@@ -46,7 +46,7 @@ class Databases:
             db_name = database_config.name
             engine = create_engine(database_config.config)
 
-            with make_conn(database_config, engine) as db_conn:
+            with make_conn(database_config, engine, "startup") as db_conn:
                 logger.info("[database config %r]: Checking database server", db_name)
                 engine.check_database(db_conn)
 
