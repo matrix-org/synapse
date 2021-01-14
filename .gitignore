@@ -17,6 +17,7 @@ _trial_temp*/
 # stuff that is likely to exist when you run a server locally
 /*.db
 /*.log
+/*.log.*
 /*.log.config
 /*.pid
 /.python-version
