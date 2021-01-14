@@ -43,7 +43,6 @@ from synapse.storage._base import db_to_json, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.search import SearchEntry
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
-from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import StateMap, get_domain_from_id
 from synapse.util import json_encoder
 from synapse.util.iterutils import batch_iter, sorted_topologically
@@ -99,14 +98,6 @@ class PersistEventsStore:
         self.database_engine = db.engine
         self._clock = hs.get_clock()
         self._instance_name = hs.get_instance_name()
-
-        def get_chain_id_txn(txn):
-            txn.execute("SELECT COALESCE(max(chain_id), 0) FROM event_auth_chains")
-            return txn.fetchone()[0]
-
-        self._event_chain_id_gen = build_sequence_generator(
-            db.engine, get_chain_id_txn, "event_auth_chain_id"
-        )
 
         self._ephemeral_messages_enabled = hs.config.enable_ephemeral_messages
         self.is_mine_id = hs.is_mine_id
@@ -479,12 +470,13 @@ class PersistEventsStore:
         event_to_room_id = {e.event_id: e.room_id for e in state_events.values()}
 
         self._add_chain_cover_index(
-            txn, event_to_room_id, event_to_types, event_to_auth_chain
+            txn, self.db_pool, event_to_room_id, event_to_types, event_to_auth_chain,
         )
 
+    @staticmethod
     def _add_chain_cover_index(
-        self,
         txn,
+        db_pool: DatabasePool,
         event_to_room_id: Dict[str, str],
         event_to_types: Dict[str, Tuple[str, str]],
         event_to_auth_chain: Dict[str, List[str]],
@@ -507,7 +499,7 @@ class PersistEventsStore:
         # We check if there are any events that need to be handled in the rooms
         # we're looking at. These should just be out of band memberships, where
         # we didn't have the auth chain when we first persisted.
-        rows = self.db_pool.simple_select_many_txn(
+        rows = db_pool.simple_select_many_txn(
             txn,
             table="event_auth_chain_to_calculate",
             keyvalues={},
@@ -523,7 +515,7 @@ class PersistEventsStore:
             # (We could pull out the auth events for all rows at once using
             # simple_select_many, but this case happens rarely and almost always
             # with a single row.)
-            auth_events = self.db_pool.simple_select_onecol_txn(
+            auth_events = db_pool.simple_select_onecol_txn(
                 txn, "event_auth", keyvalues={"event_id": event_id}, retcol="auth_id",
             )
 
@@ -572,9 +564,7 @@ class PersistEventsStore:
 
                     events_to_calc_chain_id_for.add(auth_id)
 
-                    event_to_auth_chain[
-                        auth_id
-                    ] = self.db_pool.simple_select_onecol_txn(
+                    event_to_auth_chain[auth_id] = db_pool.simple_select_onecol_txn(
                         txn,
                         "event_auth",
                         keyvalues={"event_id": auth_id},
@@ -606,7 +596,7 @@ class PersistEventsStore:
                     room_id = event_to_room_id.get(event_id)
                     if room_id:
                         e_type, state_key = event_to_types[event_id]
-                        self.db_pool.simple_insert_txn(
+                        db_pool.simple_insert_txn(
                             txn,
                             table="event_auth_chain_to_calculate",
                             values={
@@ -651,7 +641,7 @@ class PersistEventsStore:
                 proposed_new_id = existing_chain_id[0]
                 proposed_new_seq = existing_chain_id[1] + 1
                 if (proposed_new_id, proposed_new_seq) not in chains_tuples_allocated:
-                    already_allocated = self.db_pool.simple_select_one_onecol_txn(
+                    already_allocated = db_pool.simple_select_one_onecol_txn(
                         txn,
                         table="event_auth_chains",
                         keyvalues={
@@ -672,14 +662,14 @@ class PersistEventsStore:
                         )
 
             if not new_chain_tuple:
-                new_chain_tuple = (self._event_chain_id_gen.get_next_id_txn(txn), 1)
+                new_chain_tuple = (db_pool.event_chain_id_gen.get_next_id_txn(txn), 1)
 
             chains_tuples_allocated.add(new_chain_tuple)
 
             chain_map[event_id] = new_chain_tuple
             new_chain_tuples[event_id] = new_chain_tuple
 
-        self.db_pool.simple_insert_many_txn(
+        db_pool.simple_insert_many_txn(
             txn,
             table="event_auth_chains",
             values=[
@@ -688,7 +678,7 @@ class PersistEventsStore:
             ],
         )
 
-        self.db_pool.simple_delete_many_txn(
+        db_pool.simple_delete_many_txn(
             txn,
             table="event_auth_chain_to_calculate",
             keyvalues={},
@@ -721,7 +711,7 @@ class PersistEventsStore:
         # Step 1, fetch all existing links from all the chains we've seen
         # referenced.
         chain_links = _LinkMap()
-        rows = self.db_pool.simple_select_many_txn(
+        rows = db_pool.simple_select_many_txn(
             txn,
             table="event_auth_chain_links",
             column="origin_chain_id",
@@ -785,7 +775,7 @@ class PersistEventsStore:
                         (chain_id, sequence_number), (target_id, target_seq)
                     )
 
-        self.db_pool.simple_insert_many_txn(
+        db_pool.simple_insert_many_txn(
             txn,
             table="event_auth_chain_links",
             values=[
