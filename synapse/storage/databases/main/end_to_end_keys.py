@@ -514,7 +514,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
 
         for user_chunk in batch_iter(user_ids, 100):
             clause, params = make_in_list_sql_clause(
-                txn.database_engine, "k.user_id", user_chunk
+                txn.database_engine, "user_id", user_chunk
             )
 
             # Fetch the latest key for each type per user.
@@ -523,7 +523,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
                 # encounters, so ordering by stream ID desc will ensure we get
                 # the latest key.
                 sql = """
-                    SELECT DISTINCT ON (user_id, keytype) user_id, keytype, k.keydata, stream_id
+                    SELECT DISTINCT ON (user_id, keytype) user_id, keytype, keydata, stream_id
                         FROM e2e_cross_signing_keys
                         WHERE %(clause)s
                         ORDER BY user_id, keytype, stream_id DESC
@@ -535,7 +535,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
                 # MIN/MAX with a `GROUP BY` clause where it picks the value from
                 # a row that matches the MIN/MAX.
                 sql = """
-                    SELECT user_id, keytype, k.keydata, MAX(stream_id)
+                    SELECT user_id, keytype, keydata, MAX(stream_id)
                         FROM e2e_cross_signing_keys
                         WHERE %(clause)s
                         GROUP BY user_id, keytype
