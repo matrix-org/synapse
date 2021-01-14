@@ -190,11 +190,9 @@ via brew and inform `pip` about it so that `psycopg2` builds:
 
 ```sh
 brew install openssl@1.1
-export LDFLAGS=-L/usr/local/Cellar/openssl\@1.1/1.1.1d/lib/
+export LDFLAGS="-L/usr/local/opt/openssl/lib"
+export CPPFLAGS="-I/usr/local/opt/openssl/include"
 ```
-
-Alternatively, you can try https://stackoverflow.com/a/56228387/796832
-
 
 ##### OpenSUSE
 
