@@ -515,18 +515,15 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
             clause, params = make_in_list_sql_clause(
                 txn.database_engine, "k.user_id", user_chunk
             )
-            sql = (
-                """
-                SELECT k.user_id, k.keytype, k.keydata, k.stream_id
-                  FROM e2e_cross_signing_keys k
-                  INNER JOIN (SELECT user_id, keytype, MAX(stream_id) AS stream_id
-                                FROM e2e_cross_signing_keys
-                               GROUP BY user_id, keytype) s
-                 USING (user_id, stream_id, keytype)
-                 WHERE
-            """
-                + clause
-            )
+
+            sql = """
+                SELECT DISTINCT ON (user_id, keytype) user_id, keytype, k.keydata, stream_id
+                    FROM e2e_cross_signing_keys
+                    WHERE %(clause)s
+                    ORDER BY user_id
+            """ % {
+                "clause": clause
+            }
 
             txn.execute(sql, params)
             rows = self.db_pool.cursor_to_dict(txn)
