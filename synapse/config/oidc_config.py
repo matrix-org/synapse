@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2020 Quentin Gliech
-# Copyright 2020 The Matrix.org Foundation C.I.C.
+# Copyright 2020-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import string
 from typing import Optional, Type
 
 import attr
@@ -38,7 +39,7 @@ class OIDCConfig(Config):
 
         oidc_config = config.get("oidc_config")
         if oidc_config and oidc_config.get("enabled", False):
-            validate_config(OIDC_PROVIDER_CONFIG_SCHEMA, oidc_config, "oidc_config")
+            validate_config(OIDC_PROVIDER_CONFIG_SCHEMA, oidc_config, ("oidc_config",))
             self.oidc_provider = _parse_oidc_config_dict(oidc_config)
 
         if not self.oidc_provider:
@@ -205,6 +206,8 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
     "type": "object",
     "required": ["issuer", "client_id", "client_secret"],
     "properties": {
+        "idp_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "idp_name": {"type": "string"},
         "discover": {"type": "boolean"},
         "issuer": {"type": "string"},
         "client_id": {"type": "string"},
@@ -277,7 +280,17 @@ def _parse_oidc_config_dict(oidc_config: JsonDict) -> "OidcProviderConfig":
             "methods: %s" % (", ".join(missing_methods),)
         )
 
+    # MSC2858 will appy certain limits in what can be used as an IdP id, so let's
+    # enforce those limits now.
+    idp_id = oidc_config.get("idp_id", "oidc")
+    valid_idp_chars = set(string.ascii_letters + string.digits + "-._~")
+
+    if any(c not in valid_idp_chars for c in idp_id):
+        raise ConfigError('idp_id may only contain A-Z, a-z, 0-9, "-", ".", "_", "~"')
+
     return OidcProviderConfig(
+        idp_id=idp_id,
+        idp_name=oidc_config.get("idp_name", "OIDC"),
         discover=oidc_config.get("discover", True),
         issuer=oidc_config["issuer"],
         client_id=oidc_config["client_id"],
@@ -296,8 +309,15 @@ def _parse_oidc_config_dict(oidc_config: JsonDict) -> "OidcProviderConfig":
     )
 
 
-@attr.s
+@attr.s(slots=True, frozen=True)
 class OidcProviderConfig:
+    # a unique identifier for this identity provider. Used in the 'user_external_ids'
+    # table, as well as the query/path parameter used in the login protocol.
+    idp_id = attr.ib(type=str)
+
+    # user-facing name for this identity provider.
+    idp_name = attr.ib(type=str)
+
     # whether the OIDC discovery mechanism is used to discover endpoints
     discover = attr.ib(type=bool)
 
