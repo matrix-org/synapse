@@ -394,8 +394,11 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         return config
 
     def create_resource_dict(self) -> Dict[str, Resource]:
+        from synapse.rest.oidc import OIDCResource
+
         d = super().create_resource_dict()
         d["/_synapse/client/pick_idp"] = PickIdpResource(self.hs)
+        d["/_synapse/oidc"] = OIDCResource(self.hs)
         return d
 
     def test_multi_sso_redirect(self):
@@ -469,14 +472,14 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         relay_state_param = saml_uri_params["RelayState"][0]
         self.assertEqual(relay_state_param, client_redirect_url)
 
-    def test_multi_sso_redirect_to_oidc(self):
+    def test_login_via_oidc(self):
         """If OIDC is chosen, should redirect to the OIDC auth endpoint"""
-        client_redirect_url = "https://x?<abc>"
+        client_redirect_url = 'https://x?"q"="foo"'
 
         channel = self.make_request(
             "GET",
             "/_synapse/client/pick_idp?redirectUrl="
-            + client_redirect_url
+            + urllib.parse.quote_plus(client_redirect_url)
             + "&idp=oidc",
         )
         self.assertEqual(channel.code, 302, channel.result)
@@ -498,6 +501,38 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
             self._get_value_from_macaroon(macaroon, "client_redirect_url"),
             client_redirect_url,
         )
+
+        channel = self.helper.complete_oidc_auth(oidc_uri, cookies, {"sub": "user1"})
+
+        # that should serve a confirmation page
+        self.assertEqual(channel.code, 200, channel.result)
+        self.assertTrue(
+            channel.headers.getRawHeaders("Content-Type")[-1].startswith("text/html")
+        )
+        p = TestHtmlParser()
+        p.feed(channel.text_body)
+        p.close()
+
+        # ... which should contain our redirect link
+        self.assertEqual(len(p.links), 1)
+        path, query = p.links[0].split("?", 1)
+        self.assertEqual(path, "https://x")
+
+        # it will have url-encoded the params properly, so we'll have to parse them
+        params = urllib.parse.parse_qsl(
+            query, keep_blank_values=True, strict_parsing=True, errors="strict"
+        )
+        self.assertEqual(params[0:1], [('"q"', '"foo"')])
+        self.assertEqual(params[1][0], "loginToken")
+
+        # finally, submit the matrix login token to the login API, which gives us our
+        # matrix access token, mxid, and device id.
+        login_token = params[1][1]
+        chan = self.make_request(
+            "POST", "/login", content={"type": "m.login.token", "token": login_token},
+        )
+        self.assertEqual(chan.code, 200, chan.result)
+        self.assertEqual(chan.json_body["user_id"], "@user1:test")
 
     def test_multi_sso_redirect_to_unknown(self):
         """An unknown IdP should cause a 400"""
