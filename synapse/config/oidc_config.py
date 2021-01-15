@@ -207,7 +207,7 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
     "type": "object",
     "required": ["issuer", "client_id", "client_secret"],
     "properties": {
-        "idp_id": {"type": "string"},
+        "idp_id": {"type": "string", "minLength": 1, "maxLength": 128},
         "idp_name": {"type": "string"},
         "discover": {"type": "boolean"},
         "issuer": {"type": "string"},
@@ -325,10 +325,6 @@ def _parse_oidc_config_dict(oidc_config: JsonDict) -> "OidcProviderConfig":
 
     if any(c not in valid_idp_chars for c in idp_id):
         raise ConfigError('idp_id may only contain A-Z, a-z, 0-9, "-", ".", "_", "~"')
-    if len(idp_id) < 0:
-        raise ConfigError("idp_id must have at least one character")
-    if len(idp_id) > 128:
-        raise ConfigError("idp_id may not be more than 128 characters")
 
     return OidcProviderConfig(
         idp_id=idp_id,
