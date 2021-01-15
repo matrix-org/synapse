@@ -30,7 +30,7 @@ from synapse.types import JsonDict
 logger = logging.getLogger(__name__)
 
 
-@attr.s
+@attr.s(slots=True, frozen=True)
 class _CalculateChainCover:
     """Return value for _calculate_chain_cover_txn.
     """
