@@ -389,8 +389,27 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
             },
         }
 
+        # default OIDC provider
         config["oidc_config"] = TEST_OIDC_CONFIG
 
+        # additional OIDC providers
+        config["oidc_providers"] = [
+            {
+                "idp_id": "idp1",
+                "idp_name": "IDP1",
+                "discover": False,
+                "issuer": "https://issuer1",
+                "client_id": "test-client-id",
+                "client_secret": "test-client-secret",
+                "scopes": ["profile"],
+                "authorization_endpoint": "https://issuer1/auth",
+                "token_endpoint": "https://issuer1/token",
+                "userinfo_endpoint": "https://issuer1/userinfo",
+                "user_mapping_provider": {
+                    "config": {"localpart_template": "{{ user.sub }}"}
+                },
+            }
+        ]
         return config
 
     def create_resource_dict(self) -> Dict[str, Resource]:
@@ -422,7 +441,7 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         p.feed(channel.result["body"].decode("utf-8"))
         p.close()
 
-        self.assertCountEqual(p.radios["idp"], ["cas", "oidc", "saml"])
+        self.assertCountEqual(p.radios["idp"], ["cas", "oidc", "idp1", "saml"])
 
         self.assertEqual(p.hiddens["redirectUrl"], client_redirect_url)
 
@@ -476,6 +495,7 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         """If OIDC is chosen, should redirect to the OIDC auth endpoint"""
         client_redirect_url = 'https://x?"q"="foo"'
 
+        # pick the default OIDC provider
         channel = self.make_request(
             "GET",
             "/_synapse/client/pick_idp?redirectUrl="

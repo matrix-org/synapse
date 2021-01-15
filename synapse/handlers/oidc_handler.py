@@ -85,7 +85,7 @@ class OidcHandler:
         self._token_generator = OidcSessionTokenGenerator(hs)
         self._providers = {
             p.idp_id: OidcProvider(hs, self._token_generator, p) for p in provider_confs
-        }
+        }  # type: Dict[str, OidcProvider]
 
     async def load_metadata(self) -> None:
         """Validate the config and load the metadata from the remote endpoint.
