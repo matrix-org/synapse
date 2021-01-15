@@ -40,7 +40,7 @@ class CasConfig(Config):
             self.cas_required_attributes = {}
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
-        return """
+        return """\
         # Enable Central Authentication Service (CAS) for registration and login.
         #
         cas_config:

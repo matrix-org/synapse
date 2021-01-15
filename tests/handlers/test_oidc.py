@@ -145,7 +145,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         hs = self.setup_test_homeserver(proxied_http_client=self.http_client)
 
         self.handler = hs.get_oidc_handler()
-        self.provider = self.handler._provider
+        self.provider = self.handler._providers["oidc"]
         sso_handler = hs.get_sso_handler()
         # Mock the render error method.
         self.render_error = Mock(return_value=None)
@@ -866,7 +866,7 @@ async def _make_callback_with_userinfo(
     from synapse.handlers.oidc_handler import OidcSessionData
 
     handler = hs.get_oidc_handler()
-    provider = handler._provider
+    provider = handler._providers["oidc"]
     provider._exchange_code = simple_async_mock(return_value={})
     provider._parse_id_token = simple_async_mock(return_value=userinfo)
     provider._fetch_userinfo = simple_async_mock(return_value=userinfo)
