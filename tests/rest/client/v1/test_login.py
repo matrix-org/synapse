@@ -16,7 +16,7 @@
 import time
 import urllib.parse
 from typing import Any, Dict, Union
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import urlencode
 
 from mock import Mock
 
@@ -68,6 +68,12 @@ TEST_SAML_METADATA = """
 
 LOGIN_URL = b"/_matrix/client/r0/login"
 TEST_URL = b"/_matrix/client/r0/account/whoami"
+
+# a (valid) url with some annoying characters in.  %3D is =, %26 is &, %2B is +
+TEST_CLIENT_REDIRECT_URL = 'https://x?<ab c>&q"+%3D%2B"="fö%26=o"'
+
+# the query params in TEST_CLIENT_REDIRECT_URL
+EXPECTED_CLIENT_REDIRECT_URL_PARAMS = [("<ab c>", ""), ('q" =+"', '"fö&=o"')]
 
 
 class LoginRestServletTestCase(unittest.HomeserverTestCase):
@@ -422,12 +428,11 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
 
     def test_multi_sso_redirect(self):
         """/login/sso/redirect should redirect to an identity picker"""
-        client_redirect_url = "https://x?<abc>"
-
         # first hit the redirect url, which should redirect to our idp picker
         channel = self.make_request(
             "GET",
-            "/_matrix/client/r0/login/sso/redirect?redirectUrl=" + client_redirect_url,
+            "/_matrix/client/r0/login/sso/redirect?redirectUrl="
+            + urllib.parse.quote_plus(TEST_CLIENT_REDIRECT_URL),
         )
         self.assertEqual(channel.code, 302, channel.result)
         uri = channel.headers.getRawHeaders("Location")[0]
@@ -443,15 +448,16 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
 
         self.assertCountEqual(p.radios["idp"], ["cas", "oidc", "idp1", "saml"])
 
-        self.assertEqual(p.hiddens["redirectUrl"], client_redirect_url)
+        self.assertEqual(p.hiddens["redirectUrl"], TEST_CLIENT_REDIRECT_URL)
 
     def test_multi_sso_redirect_to_cas(self):
         """If CAS is chosen, should redirect to the CAS server"""
-        client_redirect_url = "https://x?<abc>"
 
         channel = self.make_request(
             "GET",
-            "/_synapse/client/pick_idp?redirectUrl=" + client_redirect_url + "&idp=cas",
+            "/_synapse/client/pick_idp?redirectUrl="
+            + urllib.parse.quote_plus(TEST_CLIENT_REDIRECT_URL)
+            + "&idp=cas",
             shorthand=False,
         )
         self.assertEqual(channel.code, 302, channel.result)
@@ -467,16 +473,14 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         service_uri = cas_uri_params["service"][0]
         _, service_uri_query = service_uri.split("?", 1)
         service_uri_params = urllib.parse.parse_qs(service_uri_query)
-        self.assertEqual(service_uri_params["redirectUrl"][0], client_redirect_url)
+        self.assertEqual(service_uri_params["redirectUrl"][0], TEST_CLIENT_REDIRECT_URL)
 
     def test_multi_sso_redirect_to_saml(self):
         """If SAML is chosen, should redirect to the SAML server"""
-        client_redirect_url = "https://x?<abc>"
-
         channel = self.make_request(
             "GET",
             "/_synapse/client/pick_idp?redirectUrl="
-            + client_redirect_url
+            + urllib.parse.quote_plus(TEST_CLIENT_REDIRECT_URL)
             + "&idp=saml",
         )
         self.assertEqual(channel.code, 302, channel.result)
@@ -489,17 +493,16 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         # the RelayState is used to carry the client redirect url
         saml_uri_params = urllib.parse.parse_qs(saml_uri_query)
         relay_state_param = saml_uri_params["RelayState"][0]
-        self.assertEqual(relay_state_param, client_redirect_url)
+        self.assertEqual(relay_state_param, TEST_CLIENT_REDIRECT_URL)
 
     def test_login_via_oidc(self):
         """If OIDC is chosen, should redirect to the OIDC auth endpoint"""
-        client_redirect_url = 'https://x?"q"="foo"'
 
         # pick the default OIDC provider
         channel = self.make_request(
             "GET",
             "/_synapse/client/pick_idp?redirectUrl="
-            + urllib.parse.quote_plus(client_redirect_url)
+            + urllib.parse.quote_plus(TEST_CLIENT_REDIRECT_URL)
             + "&idp=oidc",
         )
         self.assertEqual(channel.code, 302, channel.result)
@@ -519,7 +522,7 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         macaroon = pymacaroons.Macaroon.deserialize(oidc_session_cookie)
         self.assertEqual(
             self._get_value_from_macaroon(macaroon, "client_redirect_url"),
-            client_redirect_url,
+            TEST_CLIENT_REDIRECT_URL,
         )
 
         channel = self.helper.complete_oidc_auth(oidc_uri, cookies, {"sub": "user1"})
@@ -542,12 +545,12 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         params = urllib.parse.parse_qsl(
             query, keep_blank_values=True, strict_parsing=True, errors="strict"
         )
-        self.assertEqual(params[0:1], [('"q"', '"foo"')])
-        self.assertEqual(params[1][0], "loginToken")
+        self.assertEqual(params[0:2], EXPECTED_CLIENT_REDIRECT_URL_PARAMS)
+        self.assertEqual(params[2][0], "loginToken")
 
         # finally, submit the matrix login token to the login API, which gives us our
         # matrix access token, mxid, and device id.
-        login_token = params[1][1]
+        login_token = params[2][1]
         chan = self.make_request(
             "POST", "/login", content={"type": "m.login.token", "token": login_token},
         )
@@ -1112,7 +1115,7 @@ class UsernamePickerTestCase(HomeserverTestCase):
 
         # whitelist this client URI so we redirect straight to it rather than
         # serving a confirmation page
-        config["sso"] = {"client_whitelist": ["https://whitelisted.client"]}
+        config["sso"] = {"client_whitelist": ["https://x"]}
         return config
 
     def create_resource_dict(self) -> Dict[str, Resource]:
@@ -1125,11 +1128,10 @@ class UsernamePickerTestCase(HomeserverTestCase):
 
     def test_username_picker(self):
         """Test the happy path of a username picker flow."""
-        client_redirect_url = "https://whitelisted.client"
 
         # do the start of the login flow
         channel = self.helper.auth_via_oidc(
-            {"sub": "tester", "displayname": "Jonny"}, client_redirect_url
+            {"sub": "tester", "displayname": "Jonny"}, TEST_CLIENT_REDIRECT_URL
         )
 
         # that should redirect to the username picker
@@ -1152,7 +1154,7 @@ class UsernamePickerTestCase(HomeserverTestCase):
         session = username_mapping_sessions[session_id]
         self.assertEqual(session.remote_user_id, "tester")
         self.assertEqual(session.display_name, "Jonny")
-        self.assertEqual(session.client_redirect_url, client_redirect_url)
+        self.assertEqual(session.client_redirect_url, TEST_CLIENT_REDIRECT_URL)
 
         # the expiry time should be about 15 minutes away
         expected_expiry = self.clock.time_msec() + (15 * 60 * 1000)
@@ -1176,15 +1178,19 @@ class UsernamePickerTestCase(HomeserverTestCase):
         )
         self.assertEqual(chan.code, 302, chan.result)
         location_headers = chan.headers.getRawHeaders("Location")
-        # ensure that the returned location starts with the requested redirect URL
-        self.assertEqual(
-            location_headers[0][: len(client_redirect_url)], client_redirect_url
+        # ensure that the returned location matches the requested redirect URL
+        path, query = location_headers[0].split("?", 1)
+        self.assertEqual(path, "https://x")
+
+        # it will have url-encoded the params properly, so we'll have to parse them
+        params = urllib.parse.parse_qsl(
+            query, keep_blank_values=True, strict_parsing=True, errors="strict"
         )
+        self.assertEqual(params[0:2], EXPECTED_CLIENT_REDIRECT_URL_PARAMS)
+        self.assertEqual(params[2][0], "loginToken")
 
         # fish the login token out of the returned redirect uri
-        parts = urlparse(location_headers[0])
-        query = parse_qs(parts.query)
-        login_token = query["loginToken"][0]
+        login_token = params[2][1]
 
         # finally, submit the matrix login token to the login API, which gives us our
         # matrix access token, mxid, and device id.
