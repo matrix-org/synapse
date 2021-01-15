@@ -269,8 +269,12 @@ MAIN_CONFIG_SCHEMA = {
 }
 
 
-def _parse_oidc_provider_configs(config: JsonDict,) -> Iterable["OidcProviderConfig"]:
+def _parse_oidc_provider_configs(config: JsonDict) -> Iterable["OidcProviderConfig"]:
     """extract and parse the OIDC provider configs from the config dict
+
+    The configuration may contain either a single `oidc_config` object with an
+    `enabled: True` property, or a list of provider configurations under
+    `oidc_providers`, *or both*.
 
     Returns a generator which yields the OidcProviderConfig objects
     """
@@ -283,6 +287,9 @@ def _parse_oidc_provider_configs(config: JsonDict,) -> Iterable["OidcProviderCon
     # object with an "enabled: True" property.
     oidc_config = config.get("oidc_config")
     if oidc_config and oidc_config.get("enabled", False):
+        # MAIN_CONFIG_SCHEMA checks that `oidc_config` is an object, but not that
+        # it matches OIDC_PROVIDER_CONFIG_SCHEMA (see the comments on OIDC_CONFIG_SCHEMA
+        # above), so now we need to validate it.
         validate_config(OIDC_PROVIDER_CONFIG_SCHEMA, oidc_config, ("oidc_config",))
         yield _parse_oidc_config_dict(oidc_config)
 
