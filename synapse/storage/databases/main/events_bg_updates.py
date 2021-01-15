@@ -736,10 +736,6 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
     async def _chain_cover_index(self, progress: dict, batch_size: int) -> int:
         """A background updates that iterates over all rooms and generates the
         chain cover index for them.
-
-        Returns:
-            tuple of rows processed, if the background update has finished and
-            the new progress dict.
         """
 
         current_room_id = progress.get("current_room_id", "")
@@ -824,9 +820,8 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
         Args:
             txn,
-            last_room_id,
-            last_depth,
-            last_stream,
+            last_room_id, last_depth, last_stream: The `(room_id, depth, stream)`
+                tuple to fetch results after.
             batch_size: The maximum number of events to process. If None then
                 no limit.
             single_room: Whether to calculate the index for just the given
