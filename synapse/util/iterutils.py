@@ -92,7 +92,7 @@ def sorted_topologically(
         node = heapq.heappop(zero_degree)
         yield node
 
-        for edge in reverse_graph[node]:
+        for edge in reverse_graph.get(node, []):
             if edge in degree_map:
                 degree_map[edge] -= 1
                 if degree_map[edge] == 0:
