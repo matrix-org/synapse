@@ -20,8 +20,7 @@ import json
 import re
 import time
 import urllib.parse
-from html.parser import HTMLParser
-from typing import Any, Dict, Iterable, List, MutableMapping, Optional, Tuple
+from typing import Any, Dict, Mapping, MutableMapping, Optional
 
 from mock import patch
 
@@ -35,6 +34,7 @@ from synapse.types import JsonDict
 
 from tests.server import FakeChannel, FakeSite, make_request
 from tests.test_utils import FakeResponse
+from tests.test_utils.html_parsers import TestHtmlParser
 
 
 @attr.s
@@ -542,25 +542,7 @@ class RestHelper:
         channel.extract_cookies(cookies)
 
         # parse the confirmation page to fish out the link.
-        class ConfirmationPageParser(HTMLParser):
-            def __init__(self):
-                super().__init__()
-
-                self.links = []  # type: List[str]
-
-            def handle_starttag(
-                self, tag: str, attrs: Iterable[Tuple[str, Optional[str]]]
-            ) -> None:
-                attr_dict = dict(attrs)
-                if tag == "a":
-                    href = attr_dict["href"]
-                    if href:
-                        self.links.append(href)
-
-            def error(_, message):
-                raise AssertionError(message)
-
-        p = ConfirmationPageParser()
+        p = TestHtmlParser()
         p.feed(channel.text_body)
         p.close()
         assert len(p.links) == 1, "not exactly one link in confirmation page"

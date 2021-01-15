@@ -15,8 +15,7 @@
 
 import time
 import urllib.parse
-from html.parser import HTMLParser
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Dict, Union
 from urllib.parse import parse_qs, urlencode, urlparse
 
 from mock import Mock
@@ -38,6 +37,7 @@ from tests import unittest
 from tests.handlers.test_oidc import HAS_OIDC
 from tests.handlers.test_saml import has_saml2
 from tests.rest.client.v1.utils import TEST_OIDC_AUTH_ENDPOINT, TEST_OIDC_CONFIG
+from tests.test_utils.html_parsers import TestHtmlParser
 from tests.unittest import HomeserverTestCase, override_config, skip_unless
 
 try:
@@ -415,36 +415,11 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.result)
 
         # parse the form to check it has fields assumed elsewhere in this class
-        class FormPageParser(HTMLParser):
-            def __init__(self):
-                super().__init__()
-
-                # the values of the hidden inputs: map from name to value
-                self.hiddens = {}  # type: Dict[str, Optional[str]]
-
-                # the values of the radio buttons
-                self.radios = []  # type: List[Optional[str]]
-
-            def handle_starttag(
-                self, tag: str, attrs: Iterable[Tuple[str, Optional[str]]]
-            ) -> None:
-                attr_dict = dict(attrs)
-                if tag == "input":
-                    if attr_dict["type"] == "radio" and attr_dict["name"] == "idp":
-                        self.radios.append(attr_dict["value"])
-                    elif attr_dict["type"] == "hidden":
-                        input_name = attr_dict["name"]
-                        assert input_name
-                        self.hiddens[input_name] = attr_dict["value"]
-
-            def error(_, message):
-                self.fail(message)
-
-        p = FormPageParser()
+        p = TestHtmlParser()
         p.feed(channel.result["body"].decode("utf-8"))
         p.close()
 
-        self.assertCountEqual(p.radios, ["cas", "oidc", "saml"])
+        self.assertCountEqual(p.radios["idp"], ["cas", "oidc", "saml"])
 
         self.assertEqual(p.hiddens["redirectUrl"], client_redirect_url)
 
