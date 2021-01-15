@@ -31,7 +31,6 @@ Pre-Depends: dpkg (>= 1.16.1)
 Depends:
  adduser,
  debconf,
- python3-distutils|libpython3-stdlib (<< 3.6),
  ${misc:Depends},
  ${shlibs:Depends},
  ${synapse:pydepends},
