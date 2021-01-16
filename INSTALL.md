@@ -156,7 +156,7 @@ Installing prerequisites on CentOS 8 or Fedora>26:
 ```sh
 sudo dnf install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
                  libwebp-devel tk-devel redhat-rpm-config \
-                 python3-virtualenv libffi-devel openssl-devel
+                 python3-virtualenv libffi-devel openssl-devel python3-devel phycopg2 
 sudo dnf groupinstall "Development Tools"
 ```
 
