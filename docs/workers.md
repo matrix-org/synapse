@@ -59,7 +59,7 @@ The appropriate dependencies must also be installed for Synapse. If using a
 virtualenv, these can be installed with:
 
 ```sh
-pip install matrix-synapse[redis]
+pip install "matrix-synapse[redis]"
 ```
 
 Note that these dependencies are included when synapse is installed with `pip
