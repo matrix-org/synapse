@@ -1008,6 +1008,7 @@ class RoomContextHandler:
         event_id: str,
         limit: int,
         event_filter: Optional[Filter],
+        use_admin_priviledge: bool = False,
     ) -> Optional[JsonDict]:
         """Retrieves events, pagination tokens and state around a given event
         in a room.
@@ -1020,7 +1021,9 @@ class RoomContextHandler:
                 (excluding state).
             event_filter: the filter to apply to the events returned
                 (excluding the target event_id)
-
+            use_admin_priviledge: if `True`, return all events, regardless
+                of whether `user` has access to them. To be used **ONLY**
+                from the admin API.
         Returns:
             dict, or None if the event isn't found
         """
@@ -1032,7 +1035,11 @@ class RoomContextHandler:
 
         def filter_evts(events):
             return filter_events_for_client(
-                self.storage, user.to_string(), events, is_peeking=is_peeking
+                self.storage,
+                user.to_string(),
+                events,
+                is_peeking=is_peeking,
+                use_admin_priviledge=use_admin_priviledge,
             )
 
         event = await self.store.get_event(

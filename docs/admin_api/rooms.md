@@ -511,3 +511,20 @@ optionally be specified, e.g.:
         "user_id": "@foo:example.com"
     }
 ```
+
+# Event context API
+
+Fetch context around an event for a room.
+
+```
+  POST /_synapse/admin/rooms/<room_id>/context/<event_id>
+  {
+    "event": // details about `event_id`
+    "events_before": [] // details about the events just before `event_id` in this room
+    "events_after": [] // detailsa bout the events just after `event_id` in this room
+  }
+```
+
+This API replicates the behavior of `/_matrix/client/r0/rooms/{roomId}/context/{eventId}`, including filtering, paginating, etc.
+
+See https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-rooms-roomid-context-eventid for more details about this API.
