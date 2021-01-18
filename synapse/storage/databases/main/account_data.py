@@ -92,7 +92,7 @@ class AccountDataWorkerStore(SQLBaseStore):
 
         super().__init__(database, db_conn, hs)
 
-    def get_max_account_data_stream_id(self):
+    def get_max_account_data_stream_id(self) -> int:
         """Get the current max stream ID for account data stream
 
         Returns:

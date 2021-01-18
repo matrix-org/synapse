@@ -629,7 +629,7 @@ class MultiTableMultiWriterIdGeneratorTestCase(HomeserverTestCase):
         return self.get_success_or_raise(self.db_pool.runWithConnection(_create))
 
     def _insert_rows(
-        self, table: str, instance_name: str, number: int, update_stream_table=True
+        self, table: str, instance_name: str, number: int, update_stream_table: bool = True
     ):
         """Insert N rows as the given instance, inserting with stream IDs pulled
         from the postgres sequence.
