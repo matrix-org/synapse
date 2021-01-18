@@ -1,3 +1,9 @@
+matrix-synapse-py3 (1.25.0ubuntu1) UNRELEASED; urgency=medium
+
+  * Remove dependency on `python3-distutils`.
+
+ -- Richard van der Hoff <richard@matrix.org>  Fri, 15 Jan 2021 12:44:19 +0000
+
 matrix-synapse-py3 (1.25.0) stable; urgency=medium
 
   [ Dan Callahan ]

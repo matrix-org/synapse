@@ -1,0 +1,1 @@
+Fix corruption of `pushers` data when a postgres bouncer is used.

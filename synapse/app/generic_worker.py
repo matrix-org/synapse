@@ -116,6 +116,7 @@ from synapse.rest.client.v2_alpha.account_data import (
     AccountDataServlet,
     RoomAccountDataServlet,
 )
+from synapse.rest.client.v2_alpha.devices import DevicesRestServlet
 from synapse.rest.client.v2_alpha.keys import (
     KeyChangesServlet,
     KeyQueryServlet,
@@ -518,6 +519,7 @@ class GenericWorkerServer(HomeServer):
                     RegisterRestServlet(self).register(resource)
                     LoginRestServlet(self).register(resource)
                     ThreepidRestServlet(self).register(resource)
+                    DevicesRestServlet(self).register(resource)
                     KeyQueryServlet(self).register(resource)
                     OneTimeKeyServlet(self).register(resource)
                     KeyChangesServlet(self).register(resource)
