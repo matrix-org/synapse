@@ -102,7 +102,6 @@ class MatrixFederationAgent:
                         pool=self._pool,
                         contextFactory=tls_client_options_factory,
                     ),
-                    self._reactor,
                     ip_blacklist=ip_blacklist,
                 ),
                 user_agent=self.user_agent,

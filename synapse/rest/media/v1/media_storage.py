@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2018 New Vecotr Ltd
+# Copyright 2018-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ import os
 import shutil
 from typing import IO, TYPE_CHECKING, Any, Optional, Sequence
 
+from twisted.internet.defer import Deferred
+from twisted.internet.interfaces import IConsumer
 from twisted.protocols.basic import FileSender
 
 from synapse.logging.context import defer_to_thread, make_deferred_yieldable
@@ -270,7 +272,7 @@ class MediaStorage:
         return self.filepaths.local_media_filepath_rel(file_info.file_id)
 
 
-def _write_file_synchronously(source, dest):
+def _write_file_synchronously(source: IO, dest: IO) -> None:
     """Write `source` to the file like `dest` synchronously. Should be called
     from a thread.
 
@@ -286,14 +288,14 @@ class FileResponder(Responder):
     """Wraps an open file that can be sent to a request.
 
     Args:
-        open_file (file): A file like object to be streamed ot the client,
+        open_file: A file like object to be streamed ot the client,
             is closed when finished streaming.
     """
 
-    def __init__(self, open_file):
+    def __init__(self, open_file: IO):
         self.open_file = open_file
 
-    def write_to_consumer(self, consumer):
+    def write_to_consumer(self, consumer: IConsumer) -> Deferred:
         return make_deferred_yieldable(
             FileSender().beginFileTransfer(self.open_file, consumer)
         )

@@ -1095,7 +1095,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # Expire both caches and repeat the request
         self.reactor.pump((10000.0,))
 
-        # Repated the request, this time it should fail if the lookup fails.
+        # Repeat the request, this time it should fail if the lookup fails.
         fetch_d = defer.ensureDeferred(
             self.well_known_resolver.get_well_known(b"testserv")
         )
@@ -1130,7 +1130,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
             content=b'{ "m.server": "' + (b"a" * WELL_KNOWN_MAX_SIZE) + b'" }',
         )
 
-        # The result is sucessful, but disabled delegation.
+        # The result is successful, but disabled delegation.
         r = self.successResultOf(fetch_d)
         self.assertIsNone(r.delegated_server)
 

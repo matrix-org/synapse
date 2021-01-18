@@ -51,11 +51,11 @@ class RoomDisposition:
 class RoomVersion:
     """An object which describes the unique attributes of a room version."""
 
-    identifier = attr.ib()  # str; the identifier for this version
-    disposition = attr.ib()  # str; one of the RoomDispositions
-    event_format = attr.ib()  # int; one of the EventFormatVersions
-    state_res = attr.ib()  # int; one of the StateResolutionVersions
-    enforce_key_validity = attr.ib()  # bool
+    identifier = attr.ib(type=str)  # the identifier for this version
+    disposition = attr.ib(type=str)  # one of the RoomDispositions
+    event_format = attr.ib(type=int)  # one of the EventFormatVersions
+    state_res = attr.ib(type=int)  # one of the StateResolutionVersions
+    enforce_key_validity = attr.ib(type=bool)
 
     # Before MSC2432, m.room.aliases had special auth rules and redaction rules
     special_case_aliases_auth = attr.ib(type=bool)
@@ -67,6 +67,8 @@ class RoomVersion:
     # MSC2209: Check 'notifications' key while verifying
     # m.room.power_levels auth rules.
     limit_notifications_power_levels = attr.ib(type=bool)
+    # MSC2174/MSC2176: Apply updated redaction rules algorithm.
+    msc2176_redaction_rules = attr.ib(type=bool)
     # MSC2403: Allows join_rules to be set to 'knock', changes auth rules to allow sending
     # m.room.membership event with membership 'knock'.
     allow_knocking = attr.ib(type=bool)
@@ -82,6 +84,7 @@ class RoomVersions:
         special_case_aliases_auth=True,
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
+        msc2176_redaction_rules=False,
         allow_knocking=False,
     )
     V2 = RoomVersion(
@@ -93,6 +96,7 @@ class RoomVersions:
         special_case_aliases_auth=True,
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
+        msc2176_redaction_rules=False,
         allow_knocking=False,
     )
     V3 = RoomVersion(
@@ -104,6 +108,7 @@ class RoomVersions:
         special_case_aliases_auth=True,
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
+        msc2176_redaction_rules=False,
         allow_knocking=False,
     )
     V4 = RoomVersion(
@@ -115,6 +120,7 @@ class RoomVersions:
         special_case_aliases_auth=True,
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
+        msc2176_redaction_rules=False,
         allow_knocking=False,
     )
     V5 = RoomVersion(
@@ -126,6 +132,7 @@ class RoomVersions:
         special_case_aliases_auth=True,
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
+        msc2176_redaction_rules=False,
         allow_knocking=False,
     )
     V6 = RoomVersion(
@@ -137,6 +144,19 @@ class RoomVersions:
         special_case_aliases_auth=False,
         strict_canonicaljson=True,
         limit_notifications_power_levels=True,
+        msc2176_redaction_rules=False,
+        allow_knocking=False,
+    )
+    MSC2176 = RoomVersion(
+        "org.matrix.msc2176",
+        RoomDisposition.UNSTABLE,
+        EventFormatVersions.V3,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=False,
+        strict_canonicaljson=True,
+        limit_notifications_power_levels=True,
+        msc2176_redaction_rules=True,
         allow_knocking=False,
     )
     MSC2403_DEV = RoomVersion(
@@ -148,6 +168,7 @@ class RoomVersions:
         special_case_aliases_auth=False,
         strict_canonicaljson=True,
         limit_notifications_power_levels=True,
+        msc2176_redaction_rules=False,
         allow_knocking=True,
     )
 
@@ -161,5 +182,6 @@ KNOWN_ROOM_VERSIONS = {
         RoomVersions.V4,
         RoomVersions.V5,
         RoomVersions.V6,
+        RoomVersions.MSC2176,
     )
 }  # type: Dict[str, RoomVersion]

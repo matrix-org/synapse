@@ -190,7 +190,8 @@ via brew and inform `pip` about it so that `psycopg2` builds:
 
 ```sh
 brew install openssl@1.1
-export LDFLAGS=-L/usr/local/Cellar/openssl\@1.1/1.1.1d/lib/
+export LDFLAGS="-L/usr/local/opt/openssl/lib"
+export CPPFLAGS="-I/usr/local/opt/openssl/include"
 ```
 
 ##### OpenSUSE
@@ -257,7 +258,7 @@ for a number of platforms.
 
 #### Docker images and Ansible playbooks
 
-There is an offical synapse image available at
+There is an official synapse image available at
 <https://hub.docker.com/r/matrixdotorg/synapse> which can be used with
 the docker-compose file available at [contrib/docker](contrib/docker). Further
 information on this including configuration options is available in the README

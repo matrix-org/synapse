@@ -58,8 +58,6 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
-
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
@@ -155,9 +153,6 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
-        self.hs = hs
-
         # Allow for uploading and downloading to/from the media repo
         self.media_repo = hs.get_media_repository_resource()
         self.download_resource = self.media_repo.children[b"download"]
@@ -431,7 +426,11 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         # Mark the second item as safe from quarantine.
         _, media_id_2 = server_and_media_id_2.split("/")
-        self.get_success(self.store.mark_local_media_as_safe(media_id_2))
+        # Quarantine the media
+        url = "/_synapse/admin/v1/media/protect/%s" % (urllib.parse.quote(media_id_2),)
+        channel = self.make_request("POST", url, access_token=admin_user_tok)
+        self.pump(1.0)
+        self.assertEqual(200, int(channel.code), msg=channel.result["body"])
 
         # Quarantine all media by this user
         url = "/_synapse/admin/v1/user/%s/media/quarantine" % urllib.parse.quote(
