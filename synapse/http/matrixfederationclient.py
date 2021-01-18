@@ -996,7 +996,7 @@ class MatrixFederationHttpClient:
             logger.warning(
                 "{%s} [%s] %s", request.txn_id, request.destination, msg,
             )
-            SynapseError(502, msg, Codes.TOO_LARGE)
+            raise SynapseError(502, msg, Codes.TOO_LARGE)
         except Exception as e:
             logger.warning(
                 "{%s} [%s] Error reading response: %s",
