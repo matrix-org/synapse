@@ -16,13 +16,10 @@
 import logging
 import re
 
-from twisted.internet import defer
-
 logger = logging.getLogger(__name__)
 
 
-@defer.inlineCallbacks
-def check_3pid_allowed(hs, medium, address):
+async def check_3pid_allowed(hs, medium, address):
     """Checks whether a given 3PID is allowed to be used on this HS
 
     Args:
@@ -31,11 +28,11 @@ def check_3pid_allowed(hs, medium, address):
         address (str): address within that medium (e.g. "wotan@matrix.org")
             msisdns need to first have been canonicalised
     Returns:
-        defered bool: whether the 3PID medium/address is allowed to be added to this HS
+        bool: whether the 3PID medium/address is allowed to be added to this HS
     """
 
     if hs.config.check_is_for_allowed_local_3pids:
-        data = yield hs.get_simple_http_client().get_json(
+        data = await hs.get_simple_http_client().get_json(
             "https://%s%s"
             % (
                 hs.config.check_is_for_allowed_local_3pids,
@@ -46,20 +43,20 @@ def check_3pid_allowed(hs, medium, address):
 
         # Check for invalid response
         if "hs" not in data and "shadow_hs" not in data:
-            defer.returnValue(False)
+            return False
 
         # Check if this user is intended to register for this homeserver
         if (
             data.get("hs") != hs.config.server_name
             and data.get("shadow_hs") != hs.config.server_name
         ):
-            defer.returnValue(False)
+            return False
 
         if data.get("requires_invite", False) and not data.get("invited", False):
             # Requires an invite but hasn't been invited
-            defer.returnValue(False)
+            return False
 
-        defer.returnValue(True)
+        return True
 
     if hs.config.allowed_local_3pids:
         for constraint in hs.config.allowed_local_3pids:
@@ -73,11 +70,11 @@ def check_3pid_allowed(hs, medium, address):
             if medium == constraint["medium"] and re.match(
                 constraint["pattern"], address
             ):
-                defer.returnValue(True)
+                return True
     else:
-        defer.returnValue(True)
+        return True
 
-    defer.returnValue(False)
+    return False
 
 
 def canonicalise_email(address: str) -> str:
