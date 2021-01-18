@@ -18,6 +18,7 @@ import random
 import re
 import string
 from collections.abc import Iterable
+from typing import Optional, Tuple
 
 from synapse.api.errors import Codes, SynapseError
 
@@ -59,14 +60,14 @@ def assert_valid_client_secret(client_secret):
         )
 
 
-def parse_server_name(server_name):
+def parse_server_name(server_name: str) -> Tuple[str, Optional[int]]:
     """Split a server name into host/port parts.
 
     Args:
-        server_name (str): server name to parse
+        server_name: server name to parse
 
     Returns:
-        Tuple[str, int|None]: host/port parts.
+        host/port parts.
 
     Raises:
         ValueError if the server name could not be parsed.
@@ -87,14 +88,14 @@ def parse_server_name(server_name):
 VALID_HOST_REGEX = re.compile("\\A[0-9a-zA-Z.-]+\\Z")
 
 
-def parse_and_validate_server_name(server_name):
+def parse_and_validate_server_name(server_name: str) -> Tuple[str, Optional[int]]:
     """Split a server name into host/port parts and do some basic validation.
 
     Args:
-        server_name (str): server name to parse
+        server_name: server name to parse
 
     Returns:
-        Tuple[str, int|None]: host/port parts.
+        host/port parts.
 
     Raises:
         ValueError if the server name could not be parsed.
