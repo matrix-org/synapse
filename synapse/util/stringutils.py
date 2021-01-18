@@ -130,6 +130,27 @@ def parse_and_validate_server_name(server_name: str) -> Tuple[str, Optional[int]
     return host, port
 
 
+def parse_and_validate_mxc_uri(mxc: str) -> Tuple[str, Optional[int], str]:
+    """Parse the given string as an MXC URI
+
+    Checks that the "server name" part is a valid server name
+
+    Args:
+        mxc: the (alleged) MXC URI to be checked
+    Returns:
+        hostname, port, media id
+    Raises:
+        ValueError if the URI cannot be parsed
+    """
+    m = mxc_re.match(mxc)
+    if not m:
+        raise ValueError("mxc URI %r did not match expected format" % (mxc,))
+    server_name = m.group(1)
+    media_id = m.group(2)
+    host, port = parse_and_validate_server_name(server_name)
+    return host, port, media_id
+
+
 def shortstr(iterable: Iterable, maxitems: int = 5) -> str:
     """If iterable has maxitems or fewer, return the stringification of a list
     containing those items.
