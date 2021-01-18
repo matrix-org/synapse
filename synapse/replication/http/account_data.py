@@ -29,7 +29,6 @@ class ReplicationUserAccountDataRestServlet(ReplicationEndpoint):
         POST /_synapse/replication/add_user_account_data/:user_id/:type
 
         {
-            "account_data_type": "m.direct",
             "content": { ... },
         }
 
@@ -71,7 +70,6 @@ class ReplicationRoomAccountDataRestServlet(ReplicationEndpoint):
         POST /_synapse/replication/add_room_account_data/:user_id/:room_id/:account_data_type
 
         {
-            "account_data_type": "m.read_marker",
             "content": { ... },
         }
 
