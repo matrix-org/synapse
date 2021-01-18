@@ -53,6 +53,7 @@ async def filter_events_for_client(
     is_peeking=False,
     always_include_ids=frozenset(),
     filter_send_to_client=True,
+    use_admin_priviledge=False,
 ):
     """
     Check which events a user is allowed to see. If the user can see the event but its
@@ -71,6 +72,9 @@ async def filter_events_for_client(
         filter_send_to_client (bool): Whether we're checking an event that's going to be
             sent to a client. This might not always be the case since this function can
             also be called to check whether a user can see the state at a given point.
+        use_admin_priviledge: if `True`, return all events, regardless
+            of whether `user` has access to them. To be used **ONLY**
+            from the admin API.
 
     Returns:
         list[synapse.events.EventBase]
@@ -79,15 +83,23 @@ async def filter_events_for_client(
     # to clients.
     events = [e for e in events if not e.internal_metadata.is_soft_failed()]
 
-    types = ((EventTypes.RoomHistoryVisibility, ""), (EventTypes.Member, user_id))
+    types = None
+    if use_admin_priviledge:
+        # Administrators can access all events.
+        types = ((EventTypes.RoomHistoryVisibility, ""), (EventTypes.Member, None))
+    else:
+        types = ((EventTypes.RoomHistoryVisibility, ""), (EventTypes.Member, user_id))
+
     event_id_to_state = await storage.state.get_state_for_events(
         frozenset(e.event_id for e in events),
         state_filter=StateFilter.from_types(types),
     )
 
-    ignore_dict_content = await storage.main.get_global_account_data_by_type_for_user(
-        AccountDataTypes.IGNORED_USER_LIST, user_id
-    )
+    ignore_dict_content = None
+    if not use_admin_priviledge:
+        ignore_dict_content = await storage.main.get_global_account_data_by_type_for_user(
+            AccountDataTypes.IGNORED_USER_LIST, user_id
+        )
 
     ignore_list = frozenset()
     if ignore_dict_content:
@@ -183,10 +195,12 @@ async def filter_events_for_client(
             if old_priority < new_priority:
                 visibility = prev_visibility
 
+        membership = None
+        if use_admin_priviledge:
+            membership = Membership.JOIN
         # likewise, if the event is the user's own membership event, use
         # the 'most joined' membership
-        membership = None
-        if event.type == EventTypes.Member and event.state_key == user_id:
+        elif event.type == EventTypes.Member and event.state_key == user_id:
             membership = event.content.get("membership", None)
             if membership not in MEMBERSHIP_PRIORITY:
                 membership = "leave"
