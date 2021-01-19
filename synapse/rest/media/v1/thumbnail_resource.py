@@ -16,7 +16,7 @@
 
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List
 
 from twisted.web.http import Request
 
@@ -306,13 +306,29 @@ class ThumbnailResource(DirectServeJsonResource):
         desired_height: int,
         desired_method: str,
         desired_type: str,
-        thumbnail_infos,
+        thumbnail_infos: List[Dict[str, Any]],
     ) -> dict:
+        """
+        Choose an appropriate thumbnail from the previously generated thumbnails.
+
+        Params:
+            desired_width: The desired width, the returned thumbnail may be larger than this.
+            desired_height: The desired height, the returned thumbnail may be larger than this.
+            desired_method: The desired method used to generate the thumbnail.
+            desired_type: The desired content-type of the thumbnail.
+            thumbnail_infos: A list of dictionaries of candidate thumbnails.
+
+        Returns:
+             The thumbnail which best matches the desired parameters.
+        """
+
         d_w = desired_width
         d_h = desired_height
 
         if desired_method.lower() == "crop":
+            # Thumbnails that match equal or larger sizes of desired width/height.
             crop_info_list = []
+            # Other thumbnails.
             crop_info_list2 = []
             for info in thumbnail_infos:
                 t_w = info["thumbnail_width"]
@@ -351,7 +367,9 @@ class ThumbnailResource(DirectServeJsonResource):
             else:
                 return min(crop_info_list2)[-1]
         else:
+            # Thumbnails that match equal or larger sizes of desired width/height.
             info_list = []
+            # Other thumbnails.
             info_list2 = []
             for info in thumbnail_infos:
                 t_w = info["thumbnail_width"]
