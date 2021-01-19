@@ -1,0 +1,1 @@
+Fix a longstanding bug where invalid data could cause errors when calculating the presentable room name for push.
