@@ -1,0 +1,31 @@
+# Inherit from the workers Synapse docker image
+FROM matrixdotorg/synapse:workers
+
+RUN apt-get update
+RUN apt-get install -y postgresql
+
+RUN pg_ctlcluster 11 main start &&  su postgres -c "echo \
+ \"ALTER USER postgres PASSWORD 'somesecret'; \
+ CREATE DATABASE synapse \
+  ENCODING 'UTF8' \
+  LC_COLLATE='C' \
+  LC_CTYPE='C' \
+  template=template0;\" | psql" && pg_ctlcluster 11 main stop
+
+WORKDIR /root
+
+RUN curl -OL "https://github.com/caddyserver/caddy/releases/download/v2.3.0/caddy_2.3.0_linux_amd64.tar.gz" && \
+  tar xzf caddy_2.3.0_linux_amd64.tar.gz && rm caddy_2.3.0_linux_amd64.tar.gz
+
+COPY ./docker/caddy.complement.json /root/caddy.json
+
+EXPOSE 8008 8448
+
+ENTRYPOINT sed -i "s/{{ server_name }}/${SERVER_NAME}/g" /root/caddy.json && \
+  pg_ctlcluster 11 main start > /dev/null && \
+  /root/caddy start --config /root/caddy.json > /dev/null && \
+  SYNAPSE_SERVER_NAME=${SERVER_NAME} \
+  SYNAPSE_REPORT_STATS=no \
+  POSTGRES_PASSWORD=somesecret POSTGRES_USER=postgres POSTGRES_HOST=localhost \
+  SYNAPSE_WORKERS=synchrotron \
+  /configure_workers_and_start.py

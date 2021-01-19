@@ -5,11 +5,13 @@ FROM matrixdotorg/synapse
 RUN apt-get update
 RUN apt-get install -y supervisor redis nginx
 
+RUN rm /etc/nginx/sites-enabled/default
+
 # Copy the worker process and log configuration files
 COPY ./docker/worker.yaml.j2 /conf/worker.yaml.j2
 
 # Expose nginx listener port
-EXPOSE 80/tcp
+EXPOSE 8080/tcp
 
 # Volume for user-editable config files, logs etc.
 VOLUME ["/data"]

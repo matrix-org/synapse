@@ -144,8 +144,7 @@ def generate_base_homeserver_config():
     """
     # start.py already does this for us, so just call that.
     # note that this script is copied in in the official, monolith dockerfile
-    output = subprocess.check_output(["/usr/local/bin/python", "/start.py", "generate"], shell=True)
-    print("Got output:", output)
+    subprocess.check_output(["/usr/local/bin/python", "/start.py", "migrate_config"])
 
 
 def generate_worker_files(environ, config_path: str, data_dir: str):
@@ -226,8 +225,8 @@ exitcodes=0
     nginx_config_template_header = """
 server {
     # Listen on Synapse's default HTTP port number
-    listen 80;
-    listen [::]:80;
+    listen 8080;
+    listen [::]:8080;
 
     server_name localhost;
 
