@@ -43,8 +43,6 @@ class OIDCConfig(Config):
             raise ConfigError(e.message) from e
 
         public_baseurl = self.public_baseurl
-        if public_baseurl is None:
-            raise ConfigError("oidc_config requires a public_baseurl to be set")
         self.oidc_callback_url = public_baseurl + "_synapse/oidc/callback"
 
     @property
