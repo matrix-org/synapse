@@ -1,0 +1,1 @@
+Fix a longstanding bug where an internal server error was raised when attempting to preview an HTML document in an unknown character encoding.
