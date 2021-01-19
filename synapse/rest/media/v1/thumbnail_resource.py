@@ -125,13 +125,13 @@ class ThumbnailResource(DirectServeJsonResource):
                 thumbnail_height=thumbnail_info["thumbnail_height"],
                 thumbnail_type=thumbnail_info["thumbnail_type"],
                 thumbnail_method=thumbnail_info["thumbnail_method"],
+                thumbnail_length=thumbnail_info["thumbnail_length"],
             )
 
-            t_type = file_info.thumbnail_type
-            t_length = thumbnail_info["thumbnail_length"]
-
             responder = await self.media_storage.fetch_media(file_info)
-            await respond_with_responder(request, responder, t_type, t_length)
+            await respond_with_responder(
+                request, responder, file_info.thumbnail_type, file_info.thumbnail_length
+            )
         else:
             logger.info("Couldn't find any generated thumbnails")
             respond_404(request)
@@ -298,13 +298,13 @@ class ThumbnailResource(DirectServeJsonResource):
                 thumbnail_height=thumbnail_info["thumbnail_height"],
                 thumbnail_type=thumbnail_info["thumbnail_type"],
                 thumbnail_method=thumbnail_info["thumbnail_method"],
+                thumbnail_length=thumbnail_info["thumbnail_length"],
             )
 
-            t_type = file_info.thumbnail_type
-            t_length = thumbnail_info["thumbnail_length"]
-
             responder = await self.media_storage.fetch_media(file_info)
-            await respond_with_responder(request, responder, t_type, t_length)
+            await respond_with_responder(
+                request, responder, file_info.thumbnail_type, file_info.thumbnail_length
+            )
         else:
             logger.info("Failed to find any generated thumbnails")
             respond_404(request)
