@@ -292,6 +292,38 @@ class RoomMembersRestServlet(RestServlet):
         return 200, ret
 
 
+class RoomStateRestServlet(RestServlet):
+    """
+    Get full state within a room.
+    """
+
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)/state")
+
+    def __init__(self, hs: "HomeServer"):
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+        self.message_handler = hs.get_message_handler()
+
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self.auth, request)
+
+        ret = await self.store.get_room(room_id)
+        if not ret:
+            raise NotFoundError("Room not found")
+
+        room_state = await self.message_handler.get_state_events(
+            user_id=request.requester.user.to_string(),
+            room_id=room_id,
+            is_admin=True,  # already verified above
+        )
+        ret = {"state": room_state}
+
+        return 200, ret
+
+
 class JoinRoomAliasServlet(RestServlet):
 
     PATTERNS = admin_patterns("/join/(?P<room_identifier>[^/]*)")
