@@ -1,0 +1,1 @@
+Replace the old `perspectives` option in the Synapse docker config file template with `trusted_key_servers`.
