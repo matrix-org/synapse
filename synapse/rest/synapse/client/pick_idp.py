@@ -45,7 +45,9 @@ class PickIdpResource(DirectServeHtmlResource):
         self._server_name = hs.hostname
 
     async def _async_render_GET(self, request: SynapseRequest) -> None:
-        client_redirect_url = parse_string(request, "redirectUrl", required=True)
+        client_redirect_url = parse_string(
+            request, "redirectUrl", required=True, encoding="utf-8"
+        )
         idp = parse_string(request, "idp", required=False)
 
         # if we need to pick an IdP, do so
