@@ -198,12 +198,10 @@ old_signing_keys: {}
 key_refresh_interval: "1d" # 1 Day.
 
 # The trusted servers to download signing keys from.
-perspectives:
-  servers:
-    "matrix.org":
-      verify_keys:
-        "ed25519:auto":
-          key: "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw"
+trusted_key_servers:
+  - server_name: matrix.org
+    verify_keys:
+      "ed25519:auto": "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw"
 
 password_config:
    enabled: true
