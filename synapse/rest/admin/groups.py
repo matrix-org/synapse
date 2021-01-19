@@ -15,7 +15,11 @@
 import logging
 
 from synapse.api.errors import SynapseError
-from synapse.http.servlet import assert_params_in_dict, parse_json_object_from_request, RestServlet
+from synapse.http.servlet import (
+    RestServlet,
+    assert_params_in_dict,
+    parse_json_object_from_request,
+)
 from synapse.rest.admin._base import admin_patterns, assert_user_is_admin
 
 logger = logging.getLogger(__name__)
