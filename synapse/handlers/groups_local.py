@@ -365,6 +365,32 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
 
         return {}
 
+    async def force_join_user_to_group(self, group_id, user_id):
+        """Forces a user to join a group.
+        """
+        if not self.is_mine_id(group_id):
+            raise SynapseError(400, "Can only affect local groups")
+
+        if not self.is_mine_id(user_id):
+            raise SynapseError(400, "Can only affect local users")
+
+        # Bypass the group server to avoid business logic regarding whether or not
+        # the user can actually join.
+        await self.store.add_user_to_group(group_id, user_id)
+
+        token = await self.store.register_user_group_membership(
+            group_id,
+            user_id,
+            membership="join",
+            is_admin=False,
+            local_attestation=None,
+            remote_attestation=None,
+            is_publicised=False,
+        )
+        self.notifier.on_new_event("groups_key", token, users=[user_id])
+
+        return {}
+
     async def accept_invite(self, group_id, user_id, content):
         """Accept an invite to a group
         """
