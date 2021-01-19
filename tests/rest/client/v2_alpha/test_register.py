@@ -18,6 +18,8 @@
 import datetime
 import json
 import os
+import os.path
+import tempfile
 
 from mock import Mock
 
@@ -324,6 +326,55 @@ class RegisterHideProfileTestCase(unittest.HomeserverTestCase):
         self.assertEqual(split_uri[len(split_uri) - 1], "replicate_profiles", args[0])
         # Make sure the last profile update was overriding the user's profile to None.
         self.assertEqual(args[1]["batch"][user_id], None, args[1])
+
+
+class AccountValidityTemplateDirectoryTestCase(unittest.HomeserverTestCase):
+    def make_homeserver(self, reactor, clock):
+        config = self.default_config()
+
+        # Create a custom template directory and a template inside to read
+        temp_dir = tempfile.mkdtemp()
+        self.account_renewed_fd, account_renewed_path = tempfile.mkstemp(dir=temp_dir)
+        self.invalid_token_fd, invalid_token_path = tempfile.mkstemp(dir=temp_dir)
+
+        self.account_renewed_template_contents = "Yay, your account has been renewed"
+        self.invalid_token_template_contents = "Boo, you used an invalid token. Booo"
+
+        # Add some content to the custom templates
+        with open(account_renewed_path, "w") as f:
+            f.write(self.account_renewed_template_contents)
+
+        with open(invalid_token_path, "w") as f:
+            f.write(self.invalid_token_template_contents)
+
+        # Write the config, specifying the custom template directory and name of the custom
+        # template files. They must be different than those that exist in the default
+        # template directory in order to properly test everything.
+        config["enable_registration"] = True
+        config["account_validity"] = {
+            "enabled": True,
+            "period": 604800000,  # Time in ms for 1 week
+            "template_dir": temp_dir,
+            "account_renewed_html_path": os.path.basename(account_renewed_path),
+            "invalid_token_html_path": os.path.basename(invalid_token_path),
+        }
+        self.hs = self.setup_test_homeserver(config=config)
+
+        return self.hs
+
+    def test_template_contents(self):
+        """Tests that the contents of the custom templates as specified in the config are
+        correct.
+        """
+        self.assertEquals(
+            self.hs.config.account_validity.account_validity_account_renewed_template.render(),
+            self.account_renewed_template_contents,
+        )
+
+        self.assertEquals(
+            self.hs.config.account_validity.account_validity_invalid_token_template.render(),
+            self.invalid_token_template_contents,
+        )
 
 
 class AccountValidityTestCase(unittest.HomeserverTestCase):
