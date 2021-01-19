@@ -701,20 +701,17 @@ def decode_and_calc_og(
     try:
         parser = etree.HTMLParser(recover=True, encoding=request_encoding)
         tree = etree.fromstring(body, parser)
-        og = _calc_og(tree, media_uri)
     except UnicodeDecodeError:
         # blindly try decoding the body as utf-8, which seems to fix
         # the charset mismatches on https://google.com
         parser = etree.HTMLParser(recover=True, encoding=request_encoding)
         tree = etree.fromstring(body.decode("utf-8", "ignore"), parser)
-        og = _calc_og(tree, media_uri)
     except LookupError:
         # blindly try decoding the body as utf-8.
         parser = etree.HTMLParser(recover=True, encoding="utf-8")
         tree = etree.fromstring(body, parser)
-        og = _calc_og(tree, media_uri)
 
-    return og
+    return _calc_og(tree, media_uri)
 
 
 def _calc_og(tree, media_uri: str) -> Dict[str, Optional[str]]:
