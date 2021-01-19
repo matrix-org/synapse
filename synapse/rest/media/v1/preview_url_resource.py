@@ -708,6 +708,11 @@ def decode_and_calc_og(
         parser = etree.HTMLParser(recover=True, encoding=request_encoding)
         tree = etree.fromstring(body.decode("utf-8", "ignore"), parser)
         og = _calc_og(tree, media_uri)
+    except LookupError:
+        # blindly try decoding the body as utf-8.
+        parser = etree.HTMLParser(recover=True, encoding="utf-8")
+        tree = etree.fromstring(body, parser)
+        og = _calc_og(tree, media_uri)
 
     return og
 
