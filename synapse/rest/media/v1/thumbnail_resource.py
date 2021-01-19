@@ -16,7 +16,7 @@
 
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from twisted.web.http import Request
 
@@ -111,6 +111,10 @@ class ThumbnailResource(DirectServeJsonResource):
             thumbnail_info = self._select_thumbnail(
                 width, height, method, m_type, thumbnail_infos
             )
+            if not thumbnail_info:
+                logger.info("Couldn't find a thumbnail matching the desired inputs")
+                respond_404(request)
+                return
 
             file_info = FileInfo(
                 server_name=None,
@@ -281,6 +285,11 @@ class ThumbnailResource(DirectServeJsonResource):
             thumbnail_info = self._select_thumbnail(
                 width, height, method, m_type, thumbnail_infos
             )
+            if not thumbnail_info:
+                logger.info("Couldn't find a thumbnail matching the desired inputs")
+                respond_404(request)
+                return
+
             file_info = FileInfo(
                 server_name=server_name,
                 file_id=media_info["filesystem_id"],
@@ -307,7 +316,7 @@ class ThumbnailResource(DirectServeJsonResource):
         desired_method: str,
         desired_type: str,
         thumbnail_infos: List[Dict[str, Any]],
-    ) -> dict:
+    ) -> Optional[Dict[str, Any]]:
         """
         Choose an appropriate thumbnail from the previously generated thumbnails.
 
@@ -367,8 +376,9 @@ class ThumbnailResource(DirectServeJsonResource):
                     )
             if crop_info_list:
                 return min(crop_info_list)[-1]
-            else:
+            elif crop_info_list2:
                 return min(crop_info_list2)[-1]
+            return None
         elif desired_method == "scale":
             # Thumbnails that match equal or larger sizes of desired width/height.
             info_list = []
@@ -393,7 +403,10 @@ class ThumbnailResource(DirectServeJsonResource):
                     )
             if info_list:
                 return min(info_list)[-1]
-            else:
+            elif info_list2:
                 return min(info_list2)[-1]
 
-        raise ValueError("No matching thumbnail")
+            return None
+
+        # No matching thumbnail was found.
+        return None
