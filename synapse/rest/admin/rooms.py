@@ -308,14 +308,15 @@ class RoomStateRestServlet(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
-        await assert_requester_is_admin(self.auth, request)
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
 
         ret = await self.store.get_room(room_id)
         if not ret:
             raise NotFoundError("Room not found")
 
         room_state = await self.message_handler.get_state_events(
-            user_id=request.requester.user.to_string(),
+            user_id=requester.user.to_string(),
             room_id=room_id,
             is_admin=True,  # already verified above
         )
