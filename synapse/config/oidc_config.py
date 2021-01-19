@@ -280,7 +280,7 @@ def _parse_oidc_provider_configs(config: JsonDict) -> Iterable["OidcProviderConf
     """
     validate_config(MAIN_CONFIG_SCHEMA, config, ())
 
-    for i, p in enumerate(config.get("oidc_providers")) or []:
+    for i, p in enumerate(config.get("oidc_providers") or []):
         yield _parse_oidc_config_dict(p, ("oidc_providers", "<item %i>" % (i,)))
 
     # for backwards-compatibility, it is also possible to provide a single "oidc_config"
