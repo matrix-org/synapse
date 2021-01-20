@@ -1,1 +1,0 @@
-Fix running unit tests when optional dependencies are not installed.

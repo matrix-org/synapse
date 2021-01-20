@@ -1,1 +1,0 @@
-Fix "Failed to send request" errors when a client provides an invalid room alias.

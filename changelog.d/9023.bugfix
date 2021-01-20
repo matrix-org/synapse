@@ -1,1 +1,0 @@
-Fix a longstanding issue where an internal server error would occur when requesting a profile over federation that did not include a display name / avatar URL.
