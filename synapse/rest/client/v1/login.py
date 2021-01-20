@@ -20,7 +20,7 @@ from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.appservice import ApplicationService
 from synapse.handlers.sso import SsoIdentityProvider
-from synapse.http.server import finish_request
+from synapse.http.server import HttpServer, finish_request
 from synapse.http.servlet import (
     RestServlet,
     parse_json_object_from_request,
@@ -337,7 +337,7 @@ def _get_auth_flow_dict_for_idp(idp: SsoIdentityProvider) -> JsonDict:
 
 
 class SsoRedirectServlet(RestServlet):
-    PATTERNS = client_patterns("/login/(cas|sso)/redirect", v1=True)
+    PATTERNS = client_patterns("/login/(cas|sso)/redirect$", v1=True)
 
     def __init__(self, hs: "HomeServer"):
         # make sure that the relevant handlers are instantiated, so that they
@@ -349,13 +349,31 @@ class SsoRedirectServlet(RestServlet):
         if hs.config.oidc_enabled:
             hs.get_oidc_handler()
         self._sso_handler = hs.get_sso_handler()
+        self._msc2858_enabled = hs.config.sso.experimental_msc2858_support_enabled
 
-    async def on_GET(self, request: SynapseRequest):
+    def register(self, http_server: HttpServer) -> None:
+        super().register(http_server)
+        if self._msc2858_enabled:
+            # expose additional endpoint for MSC2858 support
+            http_server.register_paths(
+                "GET",
+                client_patterns(
+                    "/org.matrix.msc2858/login/sso/redirect/(?P<idp_id>[A-Za-z0-9_.~-]+)$",
+                    releases=(),
+                    unstable=True,
+                ),
+                self.on_GET,
+                self.__class__.__name__,
+            )
+
+    async def on_GET(
+        self, request: SynapseRequest, idp_id: Optional[str] = None
+    ) -> None:
         client_redirect_url = parse_string(
             request, "redirectUrl", required=True, encoding=None
         )
         sso_url = await self._sso_handler.handle_redirect_request(
-            request, client_redirect_url
+            request, client_redirect_url, idp_id,
         )
         logger.info("Redirecting to %s", sso_url)
         request.redirect(sso_url)
