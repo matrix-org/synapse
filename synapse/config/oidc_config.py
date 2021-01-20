@@ -23,6 +23,7 @@ from synapse.config._util import validate_config
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.types import Collection, JsonDict
 from synapse.util.module_loader import load_module
+from synapse.util.stringutils import parse_and_validate_mxc_uri
 
 from ._base import Config, ConfigError
 
@@ -65,6 +66,10 @@ class OIDCConfig(Config):
         #
         #   idp_name: A user-facing name for this identity provider, which is used to
         #       offer the user a choice of login mechanisms.
+        #
+        #   idp_icon: An optional icon for this identity provider, which is presented
+        #       by identity picker pages. If given, must be an MXC URI of the format
+        #       mxc://<server-name>/<media-id>
         #
         #   discover: set to 'false' to disable the use of the OIDC discovery mechanism
         #       to discover endpoints. Defaults to true.
@@ -207,6 +212,7 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
     "properties": {
         "idp_id": {"type": "string", "minLength": 1, "maxLength": 128},
         "idp_name": {"type": "string"},
+        "idp_icon": {"type": "string"},
         "discover": {"type": "boolean"},
         "issuer": {"type": "string"},
         "client_id": {"type": "string"},
@@ -342,9 +348,20 @@ def _parse_oidc_config_dict(
             "idp_id must start with a-z", config_path + ("idp_id",),
         )
 
+    # MSC2858 also specifies that the idp_icon must be a valid MXC uri
+    idp_icon = oidc_config.get("idp_icon")
+    if idp_icon is not None:
+        try:
+            parse_and_validate_mxc_uri(idp_icon)
+        except ValueError as e:
+            raise ConfigError(
+                "idp_icon must be a valid MXC URI", config_path + ("idp_icon",)
+            ) from e
+
     return OidcProviderConfig(
         idp_id=idp_id,
         idp_name=oidc_config.get("idp_name", "OIDC"),
+        idp_icon=idp_icon,
         discover=oidc_config.get("discover", True),
         issuer=oidc_config["issuer"],
         client_id=oidc_config["client_id"],
@@ -371,6 +388,9 @@ class OidcProviderConfig:
 
     # user-facing name for this identity provider.
     idp_name = attr.ib(type=str)
+
+    # Optional MXC URI for icon for this IdP.
+    idp_icon = attr.ib(type=Optional[str])
 
     # whether the OIDC discovery mechanism is used to discover endpoints
     discover = attr.ib(type=bool)

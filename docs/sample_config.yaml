@@ -1726,6 +1726,10 @@ saml2_config:
 #   idp_name: A user-facing name for this identity provider, which is used to
 #       offer the user a choice of login mechanisms.
 #
+#   idp_icon: An optional icon for this identity provider, which is presented
+#       by identity picker pages. If given, must be an MXC URI of the format
+#       mxc://<server-name>/<media-id>
+#
 #   discover: set to 'false' to disable the use of the OIDC discovery mechanism
 #       to discover endpoints. Defaults to true.
 #
