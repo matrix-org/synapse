@@ -152,8 +152,8 @@ class PresentableNamesTestCase(unittest.HomeserverTestCase):
 
         # Note that events with invalid (or missing) membership are ignored.
         events = {
-            (EventTypes.Member, self.USER_ID): {},
-            (EventTypes.Member, self.OTHER_USER_ID): {"membership": "foo"},
+            (EventTypes.Member, self.OTHER_USER_ID): {"foo": 1},
+            (EventTypes.Member, "@foo:test"): {"membership": "foo"},
         }
         self.assertEqual("Empty Room", self._calculate_room_name(events))
 
