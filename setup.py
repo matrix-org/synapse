@@ -121,6 +121,7 @@ setup(
     include_package_data=True,
     zip_safe=False,
     long_description=long_description,
+    long_description_content_type="text/x-rst",
     python_requires="~=3.5",
     classifiers=[
         "Development Status :: 5 - Production/Stable",
