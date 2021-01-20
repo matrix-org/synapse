@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Tuple
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import RoomVersions
@@ -29,42 +29,37 @@ class MockDataStore:
     (I.e. the state key is used as the event ID.)
     """
 
-    def __init__(self, events: StateMap[dict]):
+    def __init__(self, events: Iterable[Tuple[StateKey, dict]]):
         """
         Params:
             events: A state map to event contents.
         """
-        self._events = events
+        self._events = {}
+
+        for i, (event_id, content) in enumerate(events):
+            self._events[event_id] = FrozenEvent(
+                {
+                    "event_id": "$event_id",
+                    "type": event_id[0],
+                    "sender": "@user:test",
+                    "state_key": event_id[1],
+                    "room_id": "#room:test",
+                    "content": content,
+                    "origin_server_ts": i,
+                },
+                RoomVersions.V1,
+            )
 
     async def get_event(
         self, event_id: StateKey, allow_none: bool = False
     ) -> Optional[FrozenEvent]:
         assert allow_none, "Mock not configured for allow_none = False"
 
-        content = self._events.get(event_id)
-        if not content:
-            return None
-
-        return FrozenEvent(
-            {
-                "event_id": "$event_id",
-                "type": event_id[0],
-                "sender": "@user:test",
-                "state_key": event_id[1],
-                "room_id": "#room:test",
-                "content": content,
-                "origin_server_ts": 1,
-            },
-            RoomVersions.V1,
-        )
+        return self._events.get(event_id)
 
     async def get_events(self, event_ids: Iterable[StateKey]):
-        results = {}
-        for event_id in event_ids:
-            event = await self.get_event(event_id, allow_none=True)
-            if event:
-                results[event_id] = event
-        return results
+        # This is cheating since it just returns all events.
+        return self._events
 
 
 class PresentableNamesTestCase(unittest.HomeserverTestCase):
@@ -79,7 +74,7 @@ class PresentableNamesTestCase(unittest.HomeserverTestCase):
         fallback_to_single_member: bool = True,
     ):
         # This isn't 100% accurate, but works with MockDataStore.
-        room_state_ids = {k: k for k in events}
+        room_state_ids = {k[0]: k[0] for k in events}
 
         return self.get_success(
             calculate_room_name(
@@ -93,38 +88,38 @@ class PresentableNamesTestCase(unittest.HomeserverTestCase):
 
     def test_name(self):
         """A room name event should be used."""
-        events = {
-            (EventTypes.Name, ""): {"name": "test-name"},
-        }
+        events = [
+            ((EventTypes.Name, ""), {"name": "test-name"}),
+        ]
         self.assertEqual("test-name", self._calculate_room_name(events))
 
         # Check if the event content has garbage.
-        events = {(EventTypes.Name, ""): {"foo": 1}}
+        events = [((EventTypes.Name, ""), {"foo": 1})]
         self.assertEqual("Empty Room", self._calculate_room_name(events))
 
-        events = {(EventTypes.Name, ""): {"name": 1}}
+        events = [((EventTypes.Name, ""), {"name": 1})]
         self.assertEqual(1, self._calculate_room_name(events))
 
     def test_canonical_alias(self):
         """An canonical alias should be used."""
-        events = {
-            (EventTypes.CanonicalAlias, ""): {"alias": "#test-name:test"},
-        }
+        events = [
+            ((EventTypes.CanonicalAlias, ""), {"alias": "#test-name:test"}),
+        ]
         self.assertEqual("#test-name:test", self._calculate_room_name(events))
 
         # Check if the event content has garbage.
-        events = {(EventTypes.CanonicalAlias, ""): {"foo": 1}}
+        events = [((EventTypes.CanonicalAlias, ""), {"foo": 1})]
         self.assertEqual("Empty Room", self._calculate_room_name(events))
 
-        events = {(EventTypes.CanonicalAlias, ""): {"alias": "test-name"}}
+        events = [((EventTypes.CanonicalAlias, ""), {"alias": "test-name"})]
         self.assertEqual("Empty Room", self._calculate_room_name(events))
 
     def test_invite(self):
         """An invite has special behaviour."""
-        events = {
-            (EventTypes.Member, self.USER_ID): {"membership": Membership.INVITE},
-            (EventTypes.Member, self.OTHER_USER_ID): {"displayname": "Other User"},
-        }
+        events = [
+            ((EventTypes.Member, self.USER_ID), {"membership": Membership.INVITE}),
+            ((EventTypes.Member, self.OTHER_USER_ID), {"displayname": "Other User"}),
+        ]
         self.assertEqual("Invite from Other User", self._calculate_room_name(events))
         self.assertIsNone(
             self._calculate_room_name(events, fallback_to_single_member=False)
@@ -133,58 +128,58 @@ class PresentableNamesTestCase(unittest.HomeserverTestCase):
         self.assertIsNone(self._calculate_room_name(events, fallback_to_members=False))
 
         # Check if the event content has garbage.
-        events = {
-            (EventTypes.Member, self.USER_ID): {"membership": Membership.INVITE},
-            (EventTypes.Member, self.OTHER_USER_ID): {"foo": 1},
-        }
+        events = [
+            ((EventTypes.Member, self.USER_ID), {"membership": Membership.INVITE}),
+            ((EventTypes.Member, self.OTHER_USER_ID), {"foo": 1}),
+        ]
         self.assertEqual("Invite from @user:test", self._calculate_room_name(events))
 
         # No member event for sender.
-        events = {
-            (EventTypes.Member, self.USER_ID): {"membership": Membership.INVITE},
-        }
+        events = [
+            ((EventTypes.Member, self.USER_ID), {"membership": Membership.INVITE}),
+        ]
         self.assertEqual("Room Invite", self._calculate_room_name(events))
 
     def test_no_members(self):
         """Behaviour of an empty room."""
-        events = {}
+        events = []
         self.assertEqual("Empty Room", self._calculate_room_name(events))
 
         # Note that events with invalid (or missing) membership are ignored.
-        events = {
-            (EventTypes.Member, self.OTHER_USER_ID): {"foo": 1},
-            (EventTypes.Member, "@foo:test"): {"membership": "foo"},
-        }
+        events = [
+            ((EventTypes.Member, self.OTHER_USER_ID), {"foo": 1}),
+            ((EventTypes.Member, "@foo:test"), {"membership": "foo"}),
+        ]
         self.assertEqual("Empty Room", self._calculate_room_name(events))
 
     def test_no_other_members(self):
         """Behaviour of a room with no other members in it."""
-        events = {
-            (EventTypes.Member, self.USER_ID): {
-                "membership": Membership.JOIN,
-                "displayname": "Me",
-            },
-        }
+        events = [
+            (
+                (EventTypes.Member, self.USER_ID),
+                {"membership": Membership.JOIN, "displayname": "Me"},
+            ),
+        ]
         self.assertEqual("Me", self._calculate_room_name(events))
 
         # Check if the event content has no displayname.
-        events = {
-            (EventTypes.Member, self.USER_ID): {"membership": Membership.JOIN},
-        }
+        events = [
+            ((EventTypes.Member, self.USER_ID), {"membership": Membership.JOIN}),
+        ]
         self.assertEqual("@test:test", self._calculate_room_name(events))
 
         # 3pid invite, use the other user (who is set as the sender).
-        events = {
-            (EventTypes.Member, self.OTHER_USER_ID): {"membership": Membership.JOIN},
-        }
+        events = [
+            ((EventTypes.Member, self.OTHER_USER_ID), {"membership": Membership.JOIN}),
+        ]
         self.assertEqual(
             "nobody", self._calculate_room_name(events, user_id=self.OTHER_USER_ID)
         )
 
-        events = {
-            (EventTypes.Member, self.OTHER_USER_ID): {"membership": Membership.JOIN},
-            (EventTypes.ThirdPartyInvite, self.OTHER_USER_ID): {},
-        }
+        events = [
+            ((EventTypes.Member, self.OTHER_USER_ID), {"membership": Membership.JOIN}),
+            ((EventTypes.ThirdPartyInvite, self.OTHER_USER_ID), {}),
+        ]
         self.assertEqual(
             "Inviting email address",
             self._calculate_room_name(events, user_id=self.OTHER_USER_ID),
@@ -192,40 +187,43 @@ class PresentableNamesTestCase(unittest.HomeserverTestCase):
 
     def test_one_other_member(self):
         """Behaviour of a room with a single other member."""
-        events = {
-            (EventTypes.Member, self.USER_ID): {"membership": Membership.JOIN},
-            (EventTypes.Member, self.OTHER_USER_ID): {
-                "membership": Membership.JOIN,
-                "displayname": "Other User",
-            },
-        }
+        events = [
+            ((EventTypes.Member, self.USER_ID), {"membership": Membership.JOIN}),
+            (
+                (EventTypes.Member, self.OTHER_USER_ID),
+                {"membership": Membership.JOIN, "displayname": "Other User"},
+            ),
+        ]
         self.assertEqual("Other User", self._calculate_room_name(events))
         self.assertIsNone(
             self._calculate_room_name(events, fallback_to_single_member=False)
         )
 
         # Check if the event content has no displayname and is an invite.
-        events = {
-            (EventTypes.Member, self.USER_ID): {"membership": Membership.JOIN},
-            (EventTypes.Member, self.OTHER_USER_ID): {"membership": Membership.INVITE},
-        }
+        events = [
+            ((EventTypes.Member, self.USER_ID), {"membership": Membership.JOIN}),
+            (
+                (EventTypes.Member, self.OTHER_USER_ID),
+                {"membership": Membership.INVITE},
+            ),
+        ]
         self.assertEqual("@user:test", self._calculate_room_name(events))
 
     def test_other_members(self):
         """Behaviour of a room with multiple other members."""
         # Two other members.
-        events = {
-            (EventTypes.Member, self.USER_ID): {"membership": Membership.JOIN},
-            (EventTypes.Member, self.OTHER_USER_ID): {
-                "membership": Membership.JOIN,
-                "displayname": "Other User",
-            },
-            (EventTypes.Member, "@foo:test"): {"membership": Membership.JOIN},
-        }
+        events = [
+            ((EventTypes.Member, self.USER_ID), {"membership": Membership.JOIN}),
+            (
+                (EventTypes.Member, self.OTHER_USER_ID),
+                {"membership": Membership.JOIN, "displayname": "Other User"},
+            ),
+            ((EventTypes.Member, "@foo:test"), {"membership": Membership.JOIN}),
+        ]
         self.assertEqual("Other User and @foo:test", self._calculate_room_name(events))
 
         # Three or more other members.
-        events[(EventTypes.Member, "@fourth:test")] = {
-            "membership": Membership.INVITE,
-        }
+        events.append(
+            ((EventTypes.Member, "@fourth:test"), {"membership": Membership.INVITE})
+        )
         self.assertEqual("Other User and 2 others", self._calculate_room_name(events))
