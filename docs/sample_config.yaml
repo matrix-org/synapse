@@ -67,11 +67,16 @@ pid_file: DATADIR/homeserver.pid
 #
 #web_client_location: https://riot.example.com/
 
-# The public-facing base URL that clients use to access this HS
-# (not including _matrix/...). This is the same URL a user would
-# enter into the 'custom HS URL' field on their client. If you
-# use synapse with a reverse proxy, this should be the URL to reach
-# synapse via the proxy.
+# The public-facing base URL that clients use to access this Homeserver (not
+# including _matrix/...). This is the same URL a user might enter into the
+# 'Custom Homeserver URL' field on their client. If you use Synapse with a
+# reverse proxy, this should be the URL to reach Synapse via the proxy.
+# Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
+# 'listeners' below).
+#
+# If this is left unset, it defaults to 'https://<server_name>/'. (Note that
+# that will not work unless you configure Synapse or a reverse-proxy to listen
+# on port 443.)
 #
 #public_baseurl: https://example.com/
 
@@ -1150,8 +1155,9 @@ account_validity:
   # send an email to the account's email address with a renewal link. By
   # default, no such emails are sent.
   #
-  # If you enable this setting, you will also need to fill out the 'email' and
-  # 'public_baseurl' configuration sections.
+  # If you enable this setting, you will also need to fill out the 'email'
+  # configuration section. You should also check that 'public_baseurl' is set
+  # correctly.
   #
   #renew_at: 1w
 
@@ -1242,8 +1248,7 @@ account_validity:
 # The identity server which we suggest that clients should use when users log
 # in on this server.
 #
-# (By default, no suggestion is made, so it is left up to the client.
-# This setting is ignored unless public_baseurl is also set.)
+# (By default, no suggestion is made, so it is left up to the client.)
 #
 #default_identity_server: https://matrix.org
 
@@ -1267,8 +1272,6 @@ account_validity:
 # Servers handling the these requests must answer the `/requestToken` endpoints defined
 # by the Matrix Identity Service API specification:
 # https://matrix.org/docs/spec/identity_service/latest
-#
-# If a delegate is specified, the config option public_baseurl must also be filled out.
 #
 account_threepid_delegates:
     #email: https://example.com     # Delegate email sending to example.com
@@ -1901,9 +1904,9 @@ sso:
     # phishing attacks from evil.site. To avoid this, include a slash after the
     # hostname: "https://my.client/".
     #
-    # If public_baseurl is set, then the login fallback page (used by clients
-    # that don't natively support the required login flows) is whitelisted in
-    # addition to any URLs in this list.
+    # The login fallback page (used by clients that don't natively support the
+    # required login flows) is automatically whitelisted in addition to any URLs
+    # in this list.
     #
     # By default, this list is empty.
     #
