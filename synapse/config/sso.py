@@ -67,6 +67,11 @@ class SSOConfig(Config):
         login_fallback_url = self.public_baseurl + "_matrix/static/client/login"
         self.sso_client_whitelist.append(login_fallback_url)
 
+        # experimental support for MSC2858 (multiple SSO identity providers)
+        self.experimental_msc2858_support_enabled = config.get(
+            "experimental_msc2858_support_enabled", False
+        )
+
     def generate_config_section(self, **kwargs):
         return """\
         # Additional settings to use with single-sign on systems such as OpenID Connect,
