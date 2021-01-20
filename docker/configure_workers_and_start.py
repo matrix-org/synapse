@@ -271,7 +271,7 @@ server {
         worker_types = []
     elif worker_types == "*":
         # Use all known worker types
-        worker_types = WORKERS_CONFIG.keys()
+        worker_types = list(WORKERS_CONFIG.keys())
     else:
         # Split type names by comma
         worker_types = worker_types.split(",")

@@ -13,8 +13,10 @@ worker_replication_http_port: 9093
 worker_listeners:
   - type: http
     port: {{ port }}
+{% if listener_resources %}
     resources:
       - names:
 {%- for resource in listener_resources %}
         - {{ resource }}
 {%- endfor %}
+{% endif %}
