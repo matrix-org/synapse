@@ -85,6 +85,48 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+Upgrading to v1.26.0
+====================
+
+Rolling back to v1.25.0 after a failed upgrade
+----------------------------------------------
+
+v1.26.0 includes a lot of large changes. If something problematic occurs, you
+may want to roll-back to a previous version of Synapse. Because v1.26.0 also
+includes a new database schema version, reverting that version is also required
+alongside the generic rollback instructions mentioned above. In short, to roll
+back to v1.25.0 you need to:
+
+1. Stop the server
+2. Decrease the schema version in the database:
+
+   .. code:: sql
+
+      UPDATE schema_version SET version = 58;
+
+3. Delete the ignored users data:
+
+  If using PostgreSQL:
+
+  .. code:: sql
+
+      TRUNCATE TABLE ignored_users;
+
+  If using SQLite:
+
+  .. code:: sql
+
+      DELETE FROM ignored_users;
+
+4. Mark the ignored user delta as not run (so it will re-run on upgrade).
+
+  .. code:: sql
+
+      DELETE FROM applied_schema_deltas WHERE version = 59 AND file = "59/01ignored_user.py";
+
+5. Downgrade Synapse by following the instructions for your installation method
+   in the "Rolling back to older versions" section above.
+
 Upgrading to v1.25.0
 ====================
 
