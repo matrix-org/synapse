@@ -331,7 +331,7 @@ def _parse_oidc_config_dict(
             config_path + ("user_mapping_provider", "module"),
         )
 
-    # MSC2858 will appy certain limits in what can be used as an IdP id, so let's
+    # MSC2858 will apply certain limits in what can be used as an IdP id, so let's
     # enforce those limits now.
     # TODO: factor out this stuff to a generic function
     idp_id = oidc_config.get("idp_id", "oidc")
