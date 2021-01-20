@@ -34,7 +34,7 @@ client_secret_regex = re.compile(r"^[0-9a-zA-Z\.\=\_\-]+$")
 # The server_name part of this is purposely lax: use parse_and_validate_mxc for
 # additional validation.
 #
-mxc_re = re.compile("^mxc://([^/]+)/([^/#?]+)$")
+MXC_REGEX = re.compile("^mxc://([^/]+)/([^/#?]+)$")
 
 # random_string and random_string_with_symbols are used for a range of things,
 # some cryptographically important, some less so. We use SystemRandom to make sure
@@ -142,7 +142,7 @@ def parse_and_validate_mxc_uri(mxc: str) -> Tuple[str, Optional[int], str]:
     Raises:
         ValueError if the URI cannot be parsed
     """
-    m = mxc_re.match(mxc)
+    m = MXC_REGEX.match(mxc)
     if not m:
         raise ValueError("mxc URI %r did not match expected format" % (mxc,))
     server_name = m.group(1)
