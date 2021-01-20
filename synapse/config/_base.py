@@ -252,11 +252,12 @@ class Config:
         env = jinja2.Environment(loader=loader, autoescape=autoescape)
 
         # Update the environment with our custom filters
-        env.filters.update({"format_ts": _format_ts_filter})
-        if self.public_baseurl:
-            env.filters.update(
-                {"mxc_to_http": _create_mxc_to_http_filter(self.public_baseurl)}
-            )
+        env.filters.update(
+            {
+                "format_ts": _format_ts_filter,
+                "mxc_to_http": _create_mxc_to_http_filter(self.public_baseurl),
+            }
+        )
 
         for filename in filenames:
             # Load the template
