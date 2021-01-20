@@ -327,13 +327,19 @@ def _parse_oidc_config_dict(
 
     # MSC2858 will appy certain limits in what can be used as an IdP id, so let's
     # enforce those limits now.
+    # TODO: factor out this stuff to a generic function
     idp_id = oidc_config.get("idp_id", "oidc")
-    valid_idp_chars = set(string.ascii_letters + string.digits + "-._~")
+    valid_idp_chars = set(string.ascii_lowercase + string.digits + "-._")
 
     if any(c not in valid_idp_chars for c in idp_id):
         raise ConfigError(
-            'idp_id may only contain A-Z, a-z, 0-9, "-", ".", "_", "~"',
+            'idp_id may only contain a-z, 0-9, "-", ".", "_"',
             config_path + ("idp_id",),
+        )
+
+    if idp_id[0] not in string.ascii_lowercase:
+        raise ConfigError(
+            "idp_id must start with a-z", config_path + ("idp_id",),
         )
 
     return OidcProviderConfig(
