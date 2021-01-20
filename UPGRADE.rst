@@ -104,25 +104,29 @@ back to v1.25.0 you need to:
 
       UPDATE schema_version SET version = 58;
 
-3. Delete the ignored users data:
+3. Delete the ignored users & chain cover data:
 
-  If using PostgreSQL:
+   .. code:: sql
 
-  .. code:: sql
+      DROP TABLE IF EXISTS ignored_users;
+      UPDATE rooms SET has_auth_chain_index = false;
 
-      TRUNCATE TABLE ignored_users;
+   For PostgreSQL run:
 
-  If using SQLite:
+      TRUNCATE event_auth_chain_links;
+      TRUNCATE event_auth_chains;
 
-  .. code:: sql
+   For SQLite run:
 
-      DELETE FROM ignored_users;
+      DELETE FROM event_auth_chain_links;
+      DELETE FROM event_auth_chains;
 
-4. Mark the ignored user delta as not run (so it will re-run on upgrade).
+4. Mark the deltas as not run (so they will re-run on upgrade).
 
   .. code:: sql
 
       DELETE FROM applied_schema_deltas WHERE version = 59 AND file = "59/01ignored_user.py";
+      DELETE FROM applied_schema_deltas WHERE version = 59 AND file = "59/06chain_cover_index.sql";
 
 5. Downgrade Synapse by following the instructions for your installation method
    in the "Rolling back to older versions" section above.
