@@ -20,6 +20,7 @@ FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 
 # install the OS build deps
 RUN apt-get update && apt-get install -y \
+    git \
     build-essential \
     libffi-dev \
     libjpeg-dev \
@@ -52,7 +53,7 @@ COPY scripts /synapse/scripts/
 COPY MANIFEST.in README.rst setup.py synctl /synapse/
 
 RUN pip install --prefix="/install" --no-warn-script-location \
-        /synapse[all]
+        /synapse[all] 'git+https://github.com/devture/matrix-synapse-shared-secret-auth#egg=shared_secret_authenticator'
 
 ###
 ### Stage 1: runtime
