@@ -114,7 +114,7 @@ class RelationsWorkerStore(SQLBaseStore):
             last_stream_id = None
             events = []
             for row in txn:
-                events.append({"event_id": row[0]})
+                events.append({"type": event_type, "event_id": row[0]})
                 last_topo_id = row[1]
                 last_stream_id = row[2]
 
@@ -186,7 +186,7 @@ class RelationsWorkerStore(SQLBaseStore):
             having_clause = ""
 
         sql = """
-            SELECT type, aggregation_key, COUNT(DISTINCT sender), MAX(stream_ordering)
+            SELECT type, aggregation_key, COUNT(DISTINCT sender), MAX(stream_ordering), origin_server_ts
             FROM event_relations
             INNER JOIN events USING (event_id)
             WHERE {where_clause}
@@ -206,7 +206,7 @@ class RelationsWorkerStore(SQLBaseStore):
             next_batch = None
             events = []
             for row in txn:
-                events.append({"type": row[0], "key": row[1], "count": row[2]})
+                events.append({"type": row[0], "key": row[1], "count": row[2], "origin_server_ts": row[4]})
                 next_batch = AggregationPaginationToken(row[2], row[3])
 
             if len(events) <= limit:
