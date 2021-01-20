@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import string
-from typing import Iterable, Optional, Type
+from typing import Iterable, Optional, Tuple, Type
 
 import attr
 
@@ -280,8 +280,8 @@ def _parse_oidc_provider_configs(config: JsonDict) -> Iterable["OidcProviderConf
     """
     validate_config(MAIN_CONFIG_SCHEMA, config, ())
 
-    for p in config.get("oidc_providers") or []:
-        yield _parse_oidc_config_dict(p)
+    for i, p in enumerate(config.get("oidc_providers") or []):
+        yield _parse_oidc_config_dict(p, ("oidc_providers", "<item %i>" % (i,)))
 
     # for backwards-compatibility, it is also possible to provide a single "oidc_config"
     # object with an "enabled: True" property.
@@ -291,10 +291,12 @@ def _parse_oidc_provider_configs(config: JsonDict) -> Iterable["OidcProviderConf
         # it matches OIDC_PROVIDER_CONFIG_SCHEMA (see the comments on OIDC_CONFIG_SCHEMA
         # above), so now we need to validate it.
         validate_config(OIDC_PROVIDER_CONFIG_SCHEMA, oidc_config, ("oidc_config",))
-        yield _parse_oidc_config_dict(oidc_config)
+        yield _parse_oidc_config_dict(oidc_config, ("oidc_config",))
 
 
-def _parse_oidc_config_dict(oidc_config: JsonDict) -> "OidcProviderConfig":
+def _parse_oidc_config_dict(
+    oidc_config: JsonDict, config_path: Tuple[str, ...]
+) -> "OidcProviderConfig":
     """Take the configuration dict and parse it into an OidcProviderConfig
 
     Raises:
@@ -305,7 +307,7 @@ def _parse_oidc_config_dict(oidc_config: JsonDict) -> "OidcProviderConfig":
     ump_config.setdefault("config", {})
 
     (user_mapping_provider_class, user_mapping_provider_config,) = load_module(
-        ump_config, ("oidc_config", "user_mapping_provider")
+        ump_config, config_path + ("user_mapping_provider",)
     )
 
     # Ensure loaded user mapping module has defined all necessary methods
@@ -320,9 +322,9 @@ def _parse_oidc_config_dict(oidc_config: JsonDict) -> "OidcProviderConfig":
     ]
     if missing_methods:
         raise ConfigError(
-            "Class specified by oidc_config."
-            "user_mapping_provider.module is missing required "
-            "methods: %s" % (", ".join(missing_methods),)
+            "Class %s is missing required "
+            "methods: %s" % (user_mapping_provider_class, ", ".join(missing_methods),),
+            config_path + ("user_mapping_provider", "module"),
         )
 
     # MSC2858 will appy certain limits in what can be used as an IdP id, so let's
@@ -331,7 +333,10 @@ def _parse_oidc_config_dict(oidc_config: JsonDict) -> "OidcProviderConfig":
     valid_idp_chars = set(string.ascii_letters + string.digits + "-._~")
 
     if any(c not in valid_idp_chars for c in idp_id):
-        raise ConfigError('idp_id may only contain A-Z, a-z, 0-9, "-", ".", "_", "~"')
+        raise ConfigError(
+            'idp_id may only contain A-Z, a-z, 0-9, "-", ".", "_", "~"',
+            config_path + ("idp_id",),
+        )
 
     return OidcProviderConfig(
         idp_id=idp_id,
