@@ -625,6 +625,7 @@ class PersistEventsStore:
             events_to_calc_chain_id_for,
             chain_map,
         )
+        chain_map.update(new_chain_tuples)
 
         db_pool.simple_insert_many_txn(
             txn,
@@ -792,8 +793,6 @@ class PersistEventsStore:
         #      new chain if the sequence number has already been allocated.
         #
 
-        new_chain_tuples = {}  # type: Dict[str, Tuple[int, int]]
-
         existing_chains = set()  # type: Set[int]
         tree = []  # type: List[Tuple[str, Optional[str]]]
 
@@ -826,14 +825,28 @@ class PersistEventsStore:
         )
         txn.execute(sql % (clause,), args)
 
-        chain_to_max_seq_no = {row[0]: row[1] for row in txn}  # type: Dict[int, int]
+        chain_to_max_seq_no = {row[0]: row[1] for row in txn}  # type: Dict[Any, int]
 
         # Allocate the new events chain ID/sequence numbers.
-        for event_id, prev_event_id in tree:
-            if prev_event_id:
-                existing_chain_id = chain_map[prev_event_id]
+        #
+        # To reduce the number of calls to the database we don't allocate a
+        # chain ID number in the loop, instead we use a temporary `object()` for
+        # each new chain ID. Once we've done the loop we generate the necessary
+        # number of new chain IDs in one call, replacing all temporary
+        # objects with real allocated chain IDs.
 
-            new_chain_tuple = None
+        unallocated_chain_ids = set()  # type: Set[object]
+        new_chain_tuples = {}  # type: Dict[str, Tuple[Any, int]]
+        for event_id, auth_event_id in tree:
+            # If we reference an auth_event_id we fetch the allocated chain ID,
+            # either from the existing `chain_map` or the newly generated
+            # `new_chain_tuples` map.
+            if auth_event_id:
+                existing_chain_id = new_chain_tuples.get(auth_event_id)
+                if not existing_chain_id:
+                    existing_chain_id = chain_map[auth_event_id]
+
+            new_chain_tuple = None  # type: Optional[Tuple[Any, int]]
             if existing_chain_id:
                 # We found a chain ID/sequence number candidate, check its
                 # not already taken.
@@ -846,14 +859,29 @@ class PersistEventsStore:
                         proposed_new_seq,
                     )
 
+            # If we need to start a new chain we allocate a temporary chain ID.
             if not new_chain_tuple:
-                new_chain_tuple = (db_pool.event_chain_id_gen.get_next_id_txn(txn), 1)
+                new_chain_tuple = (object(), 1)
+                unallocated_chain_ids.add(new_chain_tuple[0])
 
-            chain_map[event_id] = new_chain_tuple
             new_chain_tuples[event_id] = new_chain_tuple
             chain_to_max_seq_no[new_chain_tuple[0]] = new_chain_tuple[1]
 
-        return new_chain_tuples
+        # Generate new chain IDs for all unallocated chain IDs.
+        newly_allocated_chain_ids = db_pool.event_chain_id_gen.get_next_mult_txn(
+            txn, len(unallocated_chain_ids)
+        )
+
+        # Map from potentially temporary chain ID to real chain ID
+        chain_id_to_allocated_map = dict(
+            zip(unallocated_chain_ids, newly_allocated_chain_ids)
+        )  # type: Dict[Any, int]
+        chain_id_to_allocated_map.update((c, c) for c in existing_chains)
+
+        return {
+            event_id: (chain_id_to_allocated_map[chain_id], seq)
+            for event_id, (chain_id, seq) in new_chain_tuples.items()
+        }
 
     def _persist_transaction_ids_txn(
         self,
