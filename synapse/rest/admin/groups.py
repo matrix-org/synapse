@@ -16,10 +16,7 @@ import logging
 
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import RestServlet
-from synapse.rest.admin._base import (
-    assert_user_is_admin,
-    historical_admin_path_patterns,
-)
+from synapse.rest.admin._base import admin_patterns, assert_user_is_admin
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +25,7 @@ class DeleteGroupAdminRestServlet(RestServlet):
     """Allows deleting of local groups
     """
 
-    PATTERNS = historical_admin_path_patterns("/delete_group/(?P<group_id>[^/]*)")
+    PATTERNS = admin_patterns("/delete_group/(?P<group_id>[^/]*)")
 
     def __init__(self, hs):
         self.group_server = hs.get_groups_server_handler()

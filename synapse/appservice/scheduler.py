@@ -49,12 +49,22 @@ This is all tied together by the AppServiceScheduler which DIs the required
 components.
 """
 import logging
+from typing import List
 
-from synapse.appservice import ApplicationServiceState
+from synapse.appservice import ApplicationService, ApplicationServiceState
+from synapse.events import EventBase
 from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
+
+
+# Maximum number of events to provide in an AS transaction.
+MAX_PERSISTENT_EVENTS_PER_TRANSACTION = 100
+
+# Maximum number of ephemeral events to provide in an AS transaction.
+MAX_EPHEMERAL_EVENTS_PER_TRANSACTION = 100
 
 
 class ApplicationServiceScheduler:
@@ -82,8 +92,13 @@ class ApplicationServiceScheduler:
         for service in services:
             self.txn_ctrl.start_recoverer(service)
 
-    def submit_event_for_as(self, service, event):
-        self.queuer.enqueue(service, event)
+    def submit_event_for_as(self, service: ApplicationService, event: EventBase):
+        self.queuer.enqueue_event(service, event)
+
+    def submit_ephemeral_events_for_as(
+        self, service: ApplicationService, events: List[JsonDict]
+    ):
+        self.queuer.enqueue_ephemeral(service, events)
 
 
 class _ServiceQueuer:
@@ -96,17 +111,15 @@ class _ServiceQueuer:
 
     def __init__(self, txn_ctrl, clock):
         self.queued_events = {}  # dict of {service_id: [events]}
+        self.queued_ephemeral = {}  # dict of {service_id: [events]}
 
         # the appservices which currently have a transaction in flight
         self.requests_in_flight = set()
         self.txn_ctrl = txn_ctrl
         self.clock = clock
 
-    def enqueue(self, service, event):
-        self.queued_events.setdefault(service.id, []).append(event)
-
+    def _start_background_request(self, service):
         # start a sender for this appservice if we don't already have one
-
         if service.id in self.requests_in_flight:
             return
 
@@ -114,7 +127,15 @@ class _ServiceQueuer:
             "as-sender-%s" % (service.id,), self._send_request, service
         )
 
-    async def _send_request(self, service):
+    def enqueue_event(self, service: ApplicationService, event: EventBase):
+        self.queued_events.setdefault(service.id, []).append(event)
+        self._start_background_request(service)
+
+    def enqueue_ephemeral(self, service: ApplicationService, events: List[JsonDict]):
+        self.queued_ephemeral.setdefault(service.id, []).extend(events)
+        self._start_background_request(service)
+
+    async def _send_request(self, service: ApplicationService):
         # sanity-check: we shouldn't get here if this service already has a sender
         # running.
         assert service.id not in self.requests_in_flight
@@ -122,11 +143,19 @@ class _ServiceQueuer:
         self.requests_in_flight.add(service.id)
         try:
             while True:
-                events = self.queued_events.pop(service.id, [])
-                if not events:
+                all_events = self.queued_events.get(service.id, [])
+                events = all_events[:MAX_PERSISTENT_EVENTS_PER_TRANSACTION]
+                del all_events[:MAX_PERSISTENT_EVENTS_PER_TRANSACTION]
+
+                all_events_ephemeral = self.queued_ephemeral.get(service.id, [])
+                ephemeral = all_events_ephemeral[:MAX_EPHEMERAL_EVENTS_PER_TRANSACTION]
+                del all_events_ephemeral[:MAX_EPHEMERAL_EVENTS_PER_TRANSACTION]
+
+                if not events and not ephemeral:
                     return
+
                 try:
-                    await self.txn_ctrl.send(service, events)
+                    await self.txn_ctrl.send(service, events, ephemeral)
                 except Exception:
                     logger.exception("AS request failed")
         finally:
@@ -158,9 +187,16 @@ class _TransactionController:
         # for UTs
         self.RECOVERER_CLASS = _Recoverer
 
-    async def send(self, service, events):
+    async def send(
+        self,
+        service: ApplicationService,
+        events: List[EventBase],
+        ephemeral: List[JsonDict] = [],
+    ):
         try:
-            txn = await self.store.create_appservice_txn(service=service, events=events)
+            txn = await self.store.create_appservice_txn(
+                service=service, events=events, ephemeral=ephemeral
+            )
             service_is_up = await self._is_service_up(service)
             if service_is_up:
                 sent = await txn.send(self.as_api)
@@ -204,7 +240,7 @@ class _TransactionController:
         recoverer.recover()
         logger.info("Now %i active recoverers", len(self.recoverers))
 
-    async def _is_service_up(self, service):
+    async def _is_service_up(self, service: ApplicationService) -> bool:
         state = await self.store.get_appservice_state(service)
         return state == ApplicationServiceState.UP or state is None
 

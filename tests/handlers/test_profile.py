@@ -20,17 +20,11 @@ from twisted.internet import defer
 
 import synapse.types
 from synapse.api.errors import AuthError, SynapseError
-from synapse.handlers.profile import MasterProfileHandler
 from synapse.types import UserID
 
 from tests import unittest
 from tests.test_utils import make_awaitable
 from tests.utils import setup_test_homeserver
-
-
-class ProfileHandlers:
-    def __init__(self, hs):
-        self.profile_handler = MasterProfileHandler(hs)
 
 
 class ProfileTestCase(unittest.TestCase):
@@ -50,9 +44,6 @@ class ProfileTestCase(unittest.TestCase):
 
         hs = yield setup_test_homeserver(
             self.addCleanup,
-            http_client=None,
-            handlers=None,
-            resource_for_federation=Mock(),
             federation_client=self.mock_federation,
             federation_server=Mock(),
             federation_registry=self.mock_registry,

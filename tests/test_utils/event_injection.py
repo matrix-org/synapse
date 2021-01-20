@@ -50,7 +50,7 @@ async def inject_member_event(
         sender=sender,
         state_key=target,
         content=content,
-        **kwargs
+        **kwargs,
     )
 
 

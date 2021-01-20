@@ -22,28 +22,6 @@ from synapse.api.errors import AuthError
 from synapse.types import UserID
 
 
-def historical_admin_path_patterns(path_regex):
-    """Returns the list of patterns for an admin endpoint, including historical ones
-
-    This is a backwards-compatibility hack. Previously, the Admin API was exposed at
-    various paths under /_matrix/client. This function returns a list of patterns
-    matching those paths (as well as the new one), so that existing scripts which rely
-    on the endpoints being available there are not broken.
-
-    Note that this should only be used for existing endpoints: new ones should just
-    register for the /_synapse/admin path.
-    """
-    return [
-        re.compile(prefix + path_regex)
-        for prefix in (
-            "^/_synapse/admin/v1",
-            "^/_matrix/client/api/v1/admin",
-            "^/_matrix/client/unstable/admin",
-            "^/_matrix/client/r0/admin",
-        )
-    ]
-
-
 def admin_patterns(path_regex: str, version: str = "v1"):
     """Returns the list of patterns for an admin endpoint
 

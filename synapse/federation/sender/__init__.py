@@ -40,7 +40,7 @@ from synapse.metrics import (
     events_processed_counter,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import ReadReceipt
+from synapse.types import ReadReceipt, RoomStreamToken
 from synapse.util.metrics import Measure, measure_func
 
 logger = logging.getLogger(__name__)
@@ -154,10 +154,15 @@ class FederationSender:
             self._per_destination_queues[destination] = queue
         return queue
 
-    def notify_new_events(self, current_id: int) -> None:
+    def notify_new_events(self, max_token: RoomStreamToken) -> None:
         """This gets called when we have some new events we might want to
         send out to other servers.
         """
+        # We just use the minimum stream ordering and ignore the vector clock
+        # component. This is safe to do as long as we *always* ignore the vector
+        # clock components.
+        current_id = max_token.stream
+
         self._last_poked_id = max(current_id, self._last_poked_id)
 
         if self._is_processing:
@@ -296,6 +301,8 @@ class FederationSender:
 
         sent_pdus_destination_dist_total.inc(len(destinations))
         sent_pdus_destination_dist_count.inc()
+
+        assert pdu.internal_metadata.stream_ordering
 
         # track the fact that we have a PDU for these destinations,
         # to allow us to perform catch-up later on if the remote is unreachable

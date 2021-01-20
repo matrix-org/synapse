@@ -28,5 +28,5 @@
 -- functionality as the old one. This effectively restarts the background job
 -- from the beginning, without running it twice in a row, supporting both
 -- upgrade usecases.
-INSERT INTO background_updates (update_name, progress_json) VALUES
-    ('populate_stats_process_rooms_2', '{}');
+INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
+    (5812, 'populate_stats_process_rooms_2', '{}');

@@ -50,17 +50,22 @@ FROM ${distro}
 ARG distro=""
 ENV distro ${distro}
 
+# Python < 3.7 assumes LANG="C" means ASCII-only and throws on printing unicode
+# http://bugs.python.org/issue19846
+ENV LANG C.UTF-8
+
 # Install the build dependencies
 #
 # NB: keep this list in sync with the list of build-deps in debian/control
 # TODO: it would be nice to do that automatically.
+# TODO: Remove the dh-systemd stanza after dropping support for Ubuntu xenial
+#       it's a transitional package on all other, more recent releases
 RUN apt-get update -qq -o Acquire::Languages=none \
     && env DEBIAN_FRONTEND=noninteractive apt-get install \
         -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
         build-essential \
         debhelper \
         devscripts \
-        dh-systemd \
         libsystemd-dev \
         lsb-release \
         pkg-config \
@@ -69,7 +74,11 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         python3-setuptools \
         python3-venv \
         sqlite3 \
-        libpq-dev
+        libpq-dev \
+        xmlsec1 \
+    && ( env DEBIAN_FRONTEND=noninteractive apt-get install \
+         -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
+         dh-systemd || true )
 
 COPY --from=builder /dh-virtualenv_1.2~dev-1_all.deb /
 

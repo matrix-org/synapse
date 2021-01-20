@@ -15,16 +15,19 @@
 # limitations under the License.
 
 import copy
+from typing import Any, Dict, List
 
 from synapse.push.rulekinds import PRIORITY_CLASS_INVERSE_MAP, PRIORITY_CLASS_MAP
 
 
-def list_with_base_rules(rawrules, use_new_defaults=False):
+def list_with_base_rules(
+    rawrules: List[Dict[str, Any]], use_new_defaults: bool = False
+) -> List[Dict[str, Any]]:
     """Combine the list of rules set by the user with the default push rules
 
     Args:
-        rawrules(list): The rules the user has modified or set.
-        use_new_defaults(bool): Whether to use the new experimental default rules when
+        rawrules: The rules the user has modified or set.
+        use_new_defaults: Whether to use the new experimental default rules when
             appending or prepending default rules.
 
     Returns:
@@ -37,7 +40,7 @@ def list_with_base_rules(rawrules, use_new_defaults=False):
     modified_base_rules = {r["rule_id"]: r for r in rawrules if r["priority_class"] < 0}
 
     # Remove the modified base rules from the list, They'll be added back
-    # in the default postions in the list.
+    # in the default positions in the list.
     rawrules = [r for r in rawrules if r["priority_class"] >= 0]
 
     # shove the server default rules for each kind onto the end of each
@@ -94,7 +97,11 @@ def list_with_base_rules(rawrules, use_new_defaults=False):
     return ruleslist
 
 
-def make_base_append_rules(kind, modified_base_rules, use_new_defaults=False):
+def make_base_append_rules(
+    kind: str,
+    modified_base_rules: Dict[str, Dict[str, Any]],
+    use_new_defaults: bool = False,
+) -> List[Dict[str, Any]]:
     rules = []
 
     if kind == "override":
@@ -116,6 +123,7 @@ def make_base_append_rules(kind, modified_base_rules, use_new_defaults=False):
     rules = copy.deepcopy(rules)
     for r in rules:
         # Only modify the actions, keep the conditions the same.
+        assert isinstance(r["rule_id"], str)
         modified = modified_base_rules.get(r["rule_id"])
         if modified:
             r["actions"] = modified["actions"]
@@ -123,7 +131,11 @@ def make_base_append_rules(kind, modified_base_rules, use_new_defaults=False):
     return rules
 
 
-def make_base_prepend_rules(kind, modified_base_rules, use_new_defaults=False):
+def make_base_prepend_rules(
+    kind: str,
+    modified_base_rules: Dict[str, Dict[str, Any]],
+    use_new_defaults: bool = False,
+) -> List[Dict[str, Any]]:
     rules = []
 
     if kind == "override":
@@ -133,6 +145,7 @@ def make_base_prepend_rules(kind, modified_base_rules, use_new_defaults=False):
     rules = copy.deepcopy(rules)
     for r in rules:
         # Only modify the actions, keep the conditions the same.
+        assert isinstance(r["rule_id"], str)
         modified = modified_base_rules.get(r["rule_id"])
         if modified:
             r["actions"] = modified["actions"]
@@ -495,6 +508,30 @@ BASE_APPEND_UNDERRIDE_RULES = [
                 "pattern": "m.room.encrypted",
                 "_id": "_encrypted",
             }
+        ],
+        "actions": ["notify", {"set_tweak": "highlight", "value": False}],
+    },
+    {
+        "rule_id": "global/underride/.im.vector.jitsi",
+        "conditions": [
+            {
+                "kind": "event_match",
+                "key": "type",
+                "pattern": "im.vector.modular.widgets",
+                "_id": "_type_modular_widgets",
+            },
+            {
+                "kind": "event_match",
+                "key": "content.type",
+                "pattern": "jitsi",
+                "_id": "_content_type_jitsi",
+            },
+            {
+                "kind": "event_match",
+                "key": "state_key",
+                "pattern": "*",
+                "_id": "_is_state_event",
+            },
         ],
         "actions": ["notify", {"set_tweak": "highlight", "value": False}],
     },

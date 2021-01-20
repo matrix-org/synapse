@@ -28,9 +28,11 @@ from twisted.protocols.tls import TLSMemoryBIOFactory
 
 import synapse
 from synapse.app import check_bind_error
+from synapse.app.phone_stats_home import start_phone_stats_home
 from synapse.config.server import ListenerConfig
 from synapse.crypto import context_factory
 from synapse.logging.context import PreserveLoggingContext
+from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.util.async_helpers import Linearizer
 from synapse.util.daemonize import daemonize_process
 from synapse.util.rlimit import change_resource_limit
@@ -48,7 +50,6 @@ def register_sighup(func, *args, **kwargs):
 
     Args:
         func (function): Function to be called when sent a SIGHUP signal.
-            Will be called with a single default argument, the homeserver.
         *args, **kwargs: args and kwargs to be passed to the target function.
     """
     _sighup_callbacks.append((func, args, kwargs))
@@ -244,19 +245,30 @@ def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerConfig]):
         # Set up the SIGHUP machinery.
         if hasattr(signal, "SIGHUP"):
 
+            reactor = hs.get_reactor()
+
+            @wrap_as_background_process("sighup")
             def handle_sighup(*args, **kwargs):
                 # Tell systemd our state, if we're using it. This will silently fail if
                 # we're not using systemd.
                 sdnotify(b"RELOADING=1")
 
                 for i, args, kwargs in _sighup_callbacks:
-                    i(hs, *args, **kwargs)
+                    i(*args, **kwargs)
 
                 sdnotify(b"READY=1")
 
-            signal.signal(signal.SIGHUP, handle_sighup)
+            # We defer running the sighup handlers until next reactor tick. This
+            # is so that we're in a sane state, e.g. flushing the logs may fail
+            # if the sighup happens in the middle of writing a log entry.
+            def run_sighup(*args, **kwargs):
+                # `callFromThread` should be "signal safe" as well as thread
+                # safe.
+                reactor.callFromThread(handle_sighup, *args, **kwargs)
 
-            register_sighup(refresh_certificate)
+            signal.signal(signal.SIGHUP, run_sighup)
+
+            register_sighup(refresh_certificate, hs)
 
         # Load the certificate from disk.
         refresh_certificate(hs)
@@ -271,8 +283,18 @@ def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerConfig]):
         hs.get_datastore().db_pool.start_profiling()
         hs.get_pusherpool().start()
 
+        # Log when we start the shut down process.
+        hs.get_reactor().addSystemEventTrigger(
+            "before", "shutdown", logger.info, "Shutting down..."
+        )
+
         setup_sentry(hs)
         setup_sdnotify(hs)
+
+        # If background tasks are running on the main process, start collecting the
+        # phone home stats.
+        if hs.config.run_background_tasks:
+            start_phone_stats_home(hs)
 
         # We now freeze all allocated objects in the hopes that (almost)
         # everything currently allocated are things that will be used for the

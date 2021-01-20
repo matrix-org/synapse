@@ -21,6 +21,7 @@ _trial_temp*/
 /.python-version
 /*.signing.key
 /env/
+/.venv*/
 /homeserver*.yaml
 /logs
 /media_store/

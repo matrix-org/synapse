@@ -38,14 +38,27 @@ def validate_config(
     try:
         jsonschema.validate(config, json_schema)
     except jsonschema.ValidationError as e:
-        # copy `config_path` before modifying it.
-        path = list(config_path)
-        for p in list(e.path):
-            if isinstance(p, int):
-                path.append("<item %i>" % p)
-            else:
-                path.append(str(p))
+        raise json_error_to_config_error(e, config_path)
 
-        raise ConfigError(
-            "Unable to parse configuration: %s at %s" % (e.message, ".".join(path))
-        )
+
+def json_error_to_config_error(
+    e: jsonschema.ValidationError, config_path: Iterable[str]
+) -> ConfigError:
+    """Converts a json validation error to a user-readable ConfigError
+
+    Args:
+        e: the exception to be converted
+        config_path: the path within the config file. This will be used as a basis
+           for the error message.
+
+    Returns:
+        a ConfigError
+    """
+    # copy `config_path` before modifying it.
+    path = list(config_path)
+    for p in list(e.path):
+        if isinstance(p, int):
+            path.append("<item %i>" % p)
+        else:
+            path.append(str(p))
+    return ConfigError(e.message, path)

@@ -31,7 +31,14 @@ from synapse.logging.context import PreserveLoggingContext, make_deferred_yielda
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.databases import Databases
 from synapse.storage.databases.main.events import DeltaState
-from synapse.types import Collection, PersistedEventPosition, RoomStreamToken, StateMap
+from synapse.storage.databases.main.events_worker import EventRedactBehaviour
+from synapse.types import (
+    Collection,
+    PersistedEventPosition,
+    RoomStreamToken,
+    StateMap,
+    get_domain_from_id,
+)
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.metrics import Measure
 
@@ -68,6 +75,21 @@ stale_forward_extremities_counter = Histogram(
     buckets=(0, 1, 2, 3, 5, 7, 10, 15, 20, 50, 100, 200, 500, "+Inf"),
 )
 
+state_resolutions_during_persistence = Counter(
+    "synapse_storage_events_state_resolutions_during_persistence",
+    "Number of times we had to do state res to calculate new current state",
+)
+
+potential_times_prune_extremities = Counter(
+    "synapse_storage_events_potential_times_prune_extremities",
+    "Number of times we might be able to prune extremities",
+)
+
+times_pruned_extremities = Counter(
+    "synapse_storage_events_times_pruned_extremities",
+    "Number of times we were actually be able to prune extremities",
+)
+
 
 class _EventPeristenceQueue:
     """Queues up events so that they can be persisted in bulk with only one
@@ -96,7 +118,9 @@ class _EventPeristenceQueue:
 
         Returns:
             defer.Deferred: a deferred which will resolve once the events are
-                persisted. Runs its callbacks *without* a logcontext.
+            persisted. Runs its callbacks *without* a logcontext. The result
+            is the same as that returned by the callback passed to
+            `handle_queue`.
         """
         queue = self._event_persist_queues.setdefault(room_id, deque())
         if queue:
@@ -199,7 +223,7 @@ class EventsPersistenceStorage:
         self,
         events_and_contexts: Iterable[Tuple[EventBase, EventContext]],
         backfilled: bool = False,
-    ) -> RoomStreamToken:
+    ) -> Tuple[List[EventBase], RoomStreamToken]:
         """
         Write events to the database
         Args:
@@ -209,7 +233,11 @@ class EventsPersistenceStorage:
                 which might update the current state etc.
 
         Returns:
-            the stream ordering of the latest persisted event
+            List of events persisted, the current position room stream position.
+            The list of events persisted may not be the same as those passed in
+            if they were deduplicated due to an event already existing that
+            matched the transcation ID; the existing event is returned in such
+            a case.
         """
         partitioned = {}  # type: Dict[str, List[Tuple[EventBase, EventContext]]]
         for event, ctx in events_and_contexts:
@@ -225,19 +253,41 @@ class EventsPersistenceStorage:
         for room_id in partitioned:
             self._maybe_start_persisting(room_id)
 
-        await make_deferred_yieldable(
+        # Each deferred returns a map from event ID to existing event ID if the
+        # event was deduplicated. (The dict may also include other entries if
+        # the event was persisted in a batch with other events).
+        #
+        # Since we use `defer.gatherResults` we need to merge the returned list
+        # of dicts into one.
+        ret_vals = await make_deferred_yieldable(
             defer.gatherResults(deferreds, consumeErrors=True)
         )
+        replaced_events = {}
+        for d in ret_vals:
+            replaced_events.update(d)
 
-        return self.main_store.get_room_max_token()
+        events = []
+        for event, _ in events_and_contexts:
+            existing_event_id = replaced_events.get(event.event_id)
+            if existing_event_id:
+                events.append(await self.main_store.get_event(existing_event_id))
+            else:
+                events.append(event)
+
+        return (
+            events,
+            self.main_store.get_room_max_token(),
+        )
 
     async def persist_event(
         self, event: EventBase, context: EventContext, backfilled: bool = False
-    ) -> Tuple[PersistedEventPosition, RoomStreamToken]:
+    ) -> Tuple[EventBase, PersistedEventPosition, RoomStreamToken]:
         """
         Returns:
-            The stream ordering of `event`, and the stream ordering of the
-            latest persisted event
+            The event, stream ordering of `event`, and the stream ordering of the
+            latest persisted event. The returned event may not match the given
+            event if it was deduplicated due to an existing event matching the
+            transaction ID.
         """
         deferred = self._event_persist_queue.add_to_queue(
             event.room_id, [(event, context)], backfilled=backfilled
@@ -245,17 +295,33 @@ class EventsPersistenceStorage:
 
         self._maybe_start_persisting(event.room_id)
 
-        await make_deferred_yieldable(deferred)
+        # The deferred returns a map from event ID to existing event ID if the
+        # event was deduplicated. (The dict may also include other entries if
+        # the event was persisted in a batch with other events.)
+        replaced_events = await make_deferred_yieldable(deferred)
+        replaced_event = replaced_events.get(event.event_id)
+        if replaced_event:
+            event = await self.main_store.get_event(replaced_event)
 
         event_stream_id = event.internal_metadata.stream_ordering
+        # stream ordering should have been assigned by now
+        assert event_stream_id
 
         pos = PersistedEventPosition(self._instance_name, event_stream_id)
-        return pos, self.main_store.get_room_max_token()
+        return event, pos, self.main_store.get_room_max_token()
 
     def _maybe_start_persisting(self, room_id: str):
+        """Pokes the `_event_persist_queue` to start handling new items in the
+        queue, if not already in progress.
+
+        Causes the deferreds returned by `add_to_queue` to resolve with: a
+        dictionary of event ID to event ID we didn't persist as we already had
+        another event persisted with the same TXN ID.
+        """
+
         async def persisting_queue(item):
             with Measure(self._clock, "persist_events"):
-                await self._persist_events(
+                return await self._persist_events(
                     item.events_and_contexts, backfilled=item.backfilled
                 )
 
@@ -265,12 +331,38 @@ class EventsPersistenceStorage:
         self,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
         backfilled: bool = False,
-    ):
+    ) -> Dict[str, str]:
         """Calculates the change to current state and forward extremities, and
         persists the given events and with those updates.
+
+        Returns:
+            A dictionary of event ID to event ID we didn't persist as we already
+            had another event persisted with the same TXN ID.
         """
+        replaced_events = {}  # type: Dict[str, str]
         if not events_and_contexts:
-            return
+            return replaced_events
+
+        # Check if any of the events have a transaction ID that has already been
+        # persisted, and if so we don't persist it again.
+        #
+        # We should have checked this a long time before we get here, but it's
+        # possible that different send event requests race in such a way that
+        # they both pass the earlier checks. Checking here isn't racey as we can
+        # have only one `_persist_events` per room being called at a time.
+        replaced_events = await self.main_store.get_already_persisted_events(
+            (event for event, _ in events_and_contexts)
+        )
+
+        if replaced_events:
+            events_and_contexts = [
+                (e, ctx)
+                for e, ctx in events_and_contexts
+                if e.event_id not in replaced_events
+            ]
+
+            if not events_and_contexts:
+                return replaced_events
 
         chunks = [
             events_and_contexts[x : x + 100]
@@ -384,7 +476,15 @@ class EventsPersistenceStorage:
                                 latest_event_ids,
                                 new_latest_event_ids,
                             )
-                            current_state, delta_ids = res
+                            current_state, delta_ids, new_latest_event_ids = res
+
+                            # there should always be at least one forward extremity.
+                            # (except during the initial persistence of the send_join
+                            # results, in which case there will be no existing
+                            # extremities, so we'll `continue` above and skip this bit.)
+                            assert new_latest_event_ids, "No forward extremities left!"
+
+                            new_forward_extremeties[room_id] = new_latest_event_ids
 
                         # If either are not None then there has been a change,
                         # and we need to work out the delta (or use that
@@ -438,6 +538,8 @@ class EventsPersistenceStorage:
             )
 
             await self._handle_potentially_left_users(potentially_left_users)
+
+        return replaced_events
 
     async def _calculate_new_extremities(
         self,
@@ -501,29 +603,35 @@ class EventsPersistenceStorage:
         self,
         room_id: str,
         events_context: List[Tuple[EventBase, EventContext]],
-        old_latest_event_ids: Iterable[str],
-        new_latest_event_ids: Iterable[str],
-    ) -> Tuple[Optional[StateMap[str]], Optional[StateMap[str]]]:
+        old_latest_event_ids: Set[str],
+        new_latest_event_ids: Set[str],
+    ) -> Tuple[Optional[StateMap[str]], Optional[StateMap[str]], Set[str]]:
         """Calculate the current state dict after adding some new events to
         a room
 
         Args:
-            room_id (str):
+            room_id:
                 room to which the events are being added. Used for logging etc
 
-            events_context (list[(EventBase, EventContext)]):
+            events_context:
                 events and contexts which are being added to the room
 
-            old_latest_event_ids (iterable[str]):
+            old_latest_event_ids:
                 the old forward extremities for the room.
 
-            new_latest_event_ids (iterable[str]):
+            new_latest_event_ids :
                 the new forward extremities for the room.
 
         Returns:
-            Returns a tuple of two state maps, the first being the full new current
-            state and the second being the delta to the existing current state.
-            If both are None then there has been no change.
+            Returns a tuple of two state maps and a set of new forward
+            extremities.
+
+            The first state map is the full new current state and the second
+            is the delta to the existing current state. If both are None then
+            there has been no change.
+
+            The function may prune some old entries from the set of new
+            forward extremities if it's safe to do so.
 
             If there has been a change then we only return the delta if its
             already been calculated. Conversely if we do know the delta then
@@ -600,7 +708,7 @@ class EventsPersistenceStorage:
         # If they old and new groups are the same then we don't need to do
         # anything.
         if old_state_groups == new_state_groups:
-            return None, None
+            return None, None, new_latest_event_ids
 
         if len(new_state_groups) == 1 and len(old_state_groups) == 1:
             # If we're going from one state group to another, lets check if
@@ -617,7 +725,7 @@ class EventsPersistenceStorage:
                 # the current state in memory then lets also return that,
                 # but it doesn't matter if we don't.
                 new_state = state_groups_map.get(new_state_group)
-                return new_state, delta_ids
+                return new_state, delta_ids, new_latest_event_ids
 
         # Now that we have calculated new_state_groups we need to get
         # their state IDs so we can resolve to a single state set.
@@ -629,7 +737,7 @@ class EventsPersistenceStorage:
         if len(new_state_groups) == 1:
             # If there is only one state group, then we know what the current
             # state is.
-            return state_groups_map[new_state_groups.pop()], None
+            return state_groups_map[new_state_groups.pop()], None, new_latest_event_ids
 
         # Ok, we need to defer to the state handler to resolve our state sets.
 
@@ -662,7 +770,139 @@ class EventsPersistenceStorage:
             state_res_store=StateResolutionStore(self.main_store),
         )
 
-        return res.state, None
+        state_resolutions_during_persistence.inc()
+
+        # If the returned state matches the state group of one of the new
+        # forward extremities then we check if we are able to prune some state
+        # extremities.
+        if res.state_group and res.state_group in new_state_groups:
+            new_latest_event_ids = await self._prune_extremities(
+                room_id,
+                new_latest_event_ids,
+                res.state_group,
+                event_id_to_state_group,
+                events_context,
+            )
+
+        return res.state, None, new_latest_event_ids
+
+    async def _prune_extremities(
+        self,
+        room_id: str,
+        new_latest_event_ids: Set[str],
+        resolved_state_group: int,
+        event_id_to_state_group: Dict[str, int],
+        events_context: List[Tuple[EventBase, EventContext]],
+    ) -> Set[str]:
+        """See if we can prune any of the extremities after calculating the
+        resolved state.
+        """
+        potential_times_prune_extremities.inc()
+
+        # We keep all the extremities that have the same state group, and
+        # see if we can drop the others.
+        new_new_extrems = {
+            e
+            for e in new_latest_event_ids
+            if event_id_to_state_group[e] == resolved_state_group
+        }
+
+        dropped_extrems = set(new_latest_event_ids) - new_new_extrems
+
+        logger.debug("Might drop extremities: %s", dropped_extrems)
+
+        # We only drop events from the extremities list if:
+        #   1. we're not currently persisting them;
+        #   2. they're not our own events (or are dummy events); and
+        #   3. they're either:
+        #       1. over N hours old and more than N events ago (we use depth to
+        #          calculate); or
+        #       2. we are persisting an event from the same domain and more than
+        #          M events ago.
+        #
+        # The idea is that we don't want to drop events that are "legitimate"
+        # extremities (that we would want to include as prev events), only
+        # "stuck" extremities that are e.g. due to a gap in the graph.
+        #
+        # Note that we either drop all of them or none of them. If we only drop
+        # some of the events we don't know if state res would come to the same
+        # conclusion.
+
+        for ev, _ in events_context:
+            if ev.event_id in dropped_extrems:
+                logger.debug(
+                    "Not dropping extremities: %s is being persisted", ev.event_id
+                )
+                return new_latest_event_ids
+
+        dropped_events = await self.main_store.get_events(
+            dropped_extrems,
+            allow_rejected=True,
+            redact_behaviour=EventRedactBehaviour.AS_IS,
+        )
+
+        new_senders = {get_domain_from_id(e.sender) for e, _ in events_context}
+
+        one_day_ago = self._clock.time_msec() - 24 * 60 * 60 * 1000
+        current_depth = max(e.depth for e, _ in events_context)
+        for event in dropped_events.values():
+            # If the event is a local dummy event then we should check it
+            # doesn't reference any local events, as we want to reference those
+            # if we send any new events.
+            #
+            # Note we do this recursively to handle the case where a dummy event
+            # references a dummy event that only references remote events.
+            #
+            # Ideally we'd figure out a way of still being able to drop old
+            # dummy events that reference local events, but this is good enough
+            # as a first cut.
+            events_to_check = [event]
+            while events_to_check:
+                new_events = set()
+                for event_to_check in events_to_check:
+                    if self.is_mine_id(event_to_check.sender):
+                        if event_to_check.type != EventTypes.Dummy:
+                            logger.debug("Not dropping own event")
+                            return new_latest_event_ids
+                        new_events.update(event_to_check.prev_event_ids())
+
+                prev_events = await self.main_store.get_events(
+                    new_events,
+                    allow_rejected=True,
+                    redact_behaviour=EventRedactBehaviour.AS_IS,
+                )
+                events_to_check = prev_events.values()
+
+            if (
+                event.origin_server_ts < one_day_ago
+                and event.depth < current_depth - 100
+            ):
+                continue
+
+            # We can be less conservative about dropping extremities from the
+            # same domain, though we do want to wait a little bit (otherwise
+            # we'll immediately remove all extremities from a given server).
+            if (
+                get_domain_from_id(event.sender) in new_senders
+                and event.depth < current_depth - 20
+            ):
+                continue
+
+            logger.debug(
+                "Not dropping as too new and not in new_senders: %s", new_senders,
+            )
+
+            return new_latest_event_ids
+
+        times_pruned_extremities.inc()
+
+        logger.info(
+            "Pruning forward extremities in room %s: from %s -> %s",
+            room_id,
+            new_latest_event_ids,
+            new_new_extrems,
+        )
+        return new_new_extrems
 
     async def _calculate_state_delta(
         self, room_id: str, current_state: StateMap[str]

@@ -25,7 +25,7 @@ from io import BytesIO
 from typing import Any, Callable, Dict, Iterator, List, Tuple, Union
 
 import jinja2
-from canonicaljson import iterencode_canonical_json, iterencode_pretty_printed_json
+from canonicaljson import iterencode_canonical_json
 from zope.interface import implementer
 
 from twisted.internet import defer, interfaces
@@ -35,8 +35,6 @@ from twisted.web.server import NOT_DONE_YET, Request
 from twisted.web.static import File, NoRangeStaticProducer
 from twisted.web.util import redirectTo
 
-import synapse.events
-import synapse.metrics
 from synapse.api.errors import (
     CodeMessageException,
     Codes,
@@ -96,11 +94,7 @@ def return_json_error(f: failure.Failure, request: SynapseRequest) -> None:
                 pass
     else:
         respond_with_json(
-            request,
-            error_code,
-            error_dict,
-            send_cors=True,
-            pretty_print=_request_user_agent_is_curl(request),
+            request, error_code, error_dict, send_cors=True,
         )
 
 
@@ -182,7 +176,7 @@ class HttpServer:
         """ Register a callback that gets fired if we receive a http request
         with the given method for a path that matches the given regex.
 
-        If the regex contains groups these gets passed to the calback via
+        If the regex contains groups these gets passed to the callback via
         an unpacked tuple.
 
         Args:
@@ -241,7 +235,7 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
 
     async def _async_render(self, request: Request):
         """Delegates to `_async_render_<METHOD>` methods, or returns a 400 if
-        no appropriate method exists. Can be overriden in sub classes for
+        no appropriate method exists. Can be overridden in sub classes for
         different routing.
         """
         # Treat HEAD requests as GET requests.
@@ -257,7 +251,7 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
             if isinstance(raw_callback_return, (defer.Deferred, types.CoroutineType)):
                 callback_return = await raw_callback_return
             else:
-                callback_return = raw_callback_return
+                callback_return = raw_callback_return  # type: ignore
 
             return callback_return
 
@@ -281,6 +275,10 @@ class DirectServeJsonResource(_AsyncResource):
     formatting responses and errors as JSON.
     """
 
+    def __init__(self, canonical_json=False, extract_context=False):
+        super().__init__(extract_context)
+        self.canonical_json = canonical_json
+
     def _send_response(
         self, request: Request, code: int, response_object: Any,
     ):
@@ -292,7 +290,6 @@ class DirectServeJsonResource(_AsyncResource):
             code,
             response_object,
             send_cors=True,
-            pretty_print=_request_user_agent_is_curl(request),
             canonical_json=self.canonical_json,
         )
 
@@ -325,9 +322,7 @@ class JsonResource(DirectServeJsonResource):
     )
 
     def __init__(self, hs, canonical_json=True, extract_context=False):
-        super().__init__(extract_context)
-
-        self.canonical_json = canonical_json
+        super().__init__(canonical_json, extract_context)
         self.clock = hs.get_clock()
         self.path_regexs = {}
         self.hs = hs
@@ -386,7 +381,7 @@ class JsonResource(DirectServeJsonResource):
     async def _async_render(self, request):
         callback, servlet_classname, group_dict = self._get_handler_for_request(request)
 
-        # Make sure we have an appopriate name for this handler in prometheus
+        # Make sure we have an appropriate name for this handler in prometheus
         # (rather than the default of JsonResource).
         request.request_metrics.name = servlet_classname
 
@@ -406,7 +401,7 @@ class JsonResource(DirectServeJsonResource):
         if isinstance(raw_callback_return, (defer.Deferred, types.CoroutineType)):
             callback_return = await raw_callback_return
         else:
-            callback_return = raw_callback_return
+            callback_return = raw_callback_return  # type: ignore
 
         return callback_return
 
@@ -589,7 +584,6 @@ def respond_with_json(
     code: int,
     json_object: Any,
     send_cors: bool = False,
-    pretty_print: bool = False,
     canonical_json: bool = True,
 ):
     """Sends encoded JSON in response to the given request.
@@ -600,8 +594,6 @@ def respond_with_json(
         json_object: The object to serialize to JSON.
         send_cors: Whether to send Cross-Origin Resource Sharing headers
             https://fetch.spec.whatwg.org/#http-cors-protocol
-        pretty_print: Whether to include indentation and line-breaks in the
-            resulting JSON bytes.
         canonical_json: Whether to use the canonicaljson algorithm when encoding
             the JSON bytes.
 
@@ -617,13 +609,10 @@ def respond_with_json(
         )
         return None
 
-    if pretty_print:
-        encoder = iterencode_pretty_printed_json
+    if canonical_json:
+        encoder = iterencode_canonical_json
     else:
-        if canonical_json or synapse.events.USE_FROZEN_DICTS:
-            encoder = iterencode_canonical_json
-        else:
-            encoder = _encode_json_bytes
+        encoder = _encode_json_bytes
 
     request.setResponseCode(code)
     request.setHeader(b"Content-Type", b"application/json")
@@ -651,6 +640,11 @@ def respond_with_json_bytes(
     Returns:
         twisted.web.server.NOT_DONE_YET if the request is still active.
     """
+    if request._disconnected:
+        logger.warning(
+            "Not sending response to request %s, already disconnected.", request
+        )
+        return
 
     request.setResponseCode(code)
     request.setHeader(b"Content-Type", b"application/json")
@@ -682,7 +676,7 @@ def set_cors_headers(request: Request):
     )
     request.setHeader(
         b"Access-Control-Allow-Headers",
-        b"Origin, X-Requested-With, Content-Type, Accept, Authorization",
+        b"Origin, X-Requested-With, Content-Type, Accept, Authorization, Date",
     )
 
 
@@ -756,11 +750,3 @@ def finish_request(request: Request):
         request.finish()
     except RuntimeError as e:
         logger.info("Connection disconnected before response was written: %r", e)
-
-
-def _request_user_agent_is_curl(request: Request) -> bool:
-    user_agents = request.requestHeaders.getRawHeaders(b"User-Agent", default=[])
-    for user_agent in user_agents:
-        if b"curl" in user_agent:
-            return True
-    return False

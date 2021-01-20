@@ -1,41 +1,10 @@
 # This file serves as a blacklist for SyTest tests that we expect will fail in
 # Synapse when run under worker mode. For more details, see sytest-blacklist.
 
-Message history can be paginated
-
 Can re-join room if re-invited
-
-The only membership state included in an initial sync is for all the senders in the timeline
-
-Local device key changes get to remote servers
-
-If remote user leaves room we no longer receive device updates
-
-Forgotten room messages cannot be paginated
-
-Inbound federation can get public room list
-
-Members from the gap are included in gappy incr LL sync
-
-Leaves are present in non-gapped incremental syncs
-
-Old leaves are present in gapped incremental syncs
-
-User sees updates to presence from other users in the incremental sync.
-
-Gapped incremental syncs include all state changes
-
-Old members are included in gappy incr LL sync if they start speaking
 
 # new failures as of https://github.com/matrix-org/sytest/pull/732
 Device list doesn't change if remote server is down
-Remote servers cannot set power levels in rooms without existing powerlevels
-Remote servers should reject attempts by non-creators to set the power levels
 
 # https://buildkite.com/matrix-dot-org/synapse/builds/6134#6f67bf47-e234-474d-80e8-c6e1868b15c5
 Server correctly handles incoming m.device_list_update
-
-# this fails reliably with a torture level of 100 due to https://github.com/matrix-org/synapse/issues/6536
-Outbound federation requests missing prev_events and then asks for /state_ids and resolves the state
-
-Can get rooms/{roomId}/members at a given point

@@ -45,6 +45,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.metrics import threepid_send_requests
 from synapse.push.mailer import Mailer
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
@@ -78,7 +79,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         """
         super().__init__()
         self.hs = hs
-        self.identity_handler = hs.get_handlers().identity_handler
+        self.identity_handler = hs.get_identity_handler()
         self.config = hs.config
 
         if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
@@ -134,7 +135,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
                 # comments for request_token_inhibit_3pid_errors.
                 # Also wait for some random amount of time between 100ms and 1s to make it
                 # look like we did something.
-                await self.hs.clock.sleep(random.randint(1, 10) / 10)
+                await self.hs.get_clock().sleep(random.randint(1, 10) / 10)
                 return 200, {"sid": random_string(16)}
 
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
@@ -163,6 +164,10 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             # Wrap the session id in a JSON object
             ret = {"sid": sid}
 
+        threepid_send_requests.labels(type="email", reason="register").observe(
+            send_attempt
+        )
+
         return 200, ret
 
 
@@ -176,7 +181,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         """
         super().__init__()
         self.hs = hs
-        self.identity_handler = hs.get_handlers().identity_handler
+        self.identity_handler = hs.get_identity_handler()
 
     async def on_POST(self, request):
         body = parse_json_object_from_request(request)
@@ -209,7 +214,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
                 # comments for request_token_inhibit_3pid_errors.
                 # Also wait for some random amount of time between 100ms and 1s to make it
                 # look like we did something.
-                await self.hs.clock.sleep(random.randint(1, 10) / 10)
+                await self.hs.get_clock().sleep(random.randint(1, 10) / 10)
                 return 200, {"sid": random_string(16)}
 
             raise SynapseError(
@@ -232,6 +237,10 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
             client_secret,
             send_attempt,
             next_link,
+        )
+
+        threepid_send_requests.labels(type="msisdn", reason="register").observe(
+            send_attempt
         )
 
         return 200, ret
@@ -370,7 +379,7 @@ class RegisterRestServlet(RestServlet):
         self.store = hs.get_datastore()
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
-        self.identity_handler = hs.get_handlers().identity_handler
+        self.identity_handler = hs.get_identity_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.macaroon_gen = hs.get_macaroon_generator()
         self.ratelimiter = hs.get_registration_ratelimiter()
@@ -442,7 +451,7 @@ class RegisterRestServlet(RestServlet):
 
         # == Normal User Registration == (everyone else)
         if not self._registration_enabled:
-            raise SynapseError(403, "Registration has been disabled")
+            raise SynapseError(403, "Registration has been disabled", Codes.FORBIDDEN)
 
         # For regular registration, convert the provided username to lowercase
         # before attempting to register it. This should mean that people who try
@@ -642,16 +651,17 @@ class RegisterRestServlet(RestServlet):
 
         return 200, return_dict
 
-    def on_OPTIONS(self, _):
-        return 200, {}
-
     async def _do_appservice_registration(self, username, as_token, body):
         user_id = await self.registration_handler.appservice_register(
             username, as_token
         )
-        return await self._create_registration_details(user_id, body)
+        return await self._create_registration_details(
+            user_id, body, is_appservice_ghost=True,
+        )
 
-    async def _create_registration_details(self, user_id, params):
+    async def _create_registration_details(
+        self, user_id, params, is_appservice_ghost=False
+    ):
         """Complete registration of newly-registered user
 
         Allocates device_id if one was not given; also creates access_token.
@@ -668,7 +678,11 @@ class RegisterRestServlet(RestServlet):
             device_id = params.get("device_id")
             initial_display_name = params.get("initial_device_display_name")
             device_id, access_token = await self.registration_handler.register_device(
-                user_id, device_id, initial_display_name, is_guest=False
+                user_id,
+                device_id,
+                initial_display_name,
+                is_guest=False,
+                is_appservice_ghost=is_appservice_ghost,
             )
 
             result.update({"access_token": access_token, "device_id": device_id})

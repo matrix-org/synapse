@@ -314,6 +314,7 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
         for table in (
             "event_auth",
             "event_edges",
+            "event_json",
             "event_push_actions_staging",
             "event_reference_hashes",
             "event_relations",
@@ -340,7 +341,6 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
             "destination_rooms",
             "event_backward_extremities",
             "event_forward_extremities",
-            "event_json",
             "event_push_actions",
             "event_search",
             "events",

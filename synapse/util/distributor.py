@@ -12,13 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import inspect
 import logging
 
 from twisted.internet import defer
 
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.util.async_helpers import maybe_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -105,10 +105,7 @@ class Signal:
 
         async def do(observer):
             try:
-                result = observer(*args, **kwargs)
-                if inspect.isawaitable(result):
-                    result = await result
-                return result
+                return await maybe_awaitable(observer(*args, **kwargs))
             except Exception as e:
                 logger.warning(
                     "%s signal observer %s failed: %r", self.name, observer, e,

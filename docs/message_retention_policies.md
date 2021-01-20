@@ -136,24 +136,34 @@ the server's database.
 
 ### Lifetime limits
 
-**Note: this feature is mainly useful within a closed federation or on
-servers that don't federate, because there currently is no way to
-enforce these limits in an open federation.**
-
-Server admins can restrict the values their local users are allowed to
-use for both `min_lifetime` and `max_lifetime`. These limits can be
-defined as such in the `retention` section of the configuration file:
+Server admins can set limits on the values of `max_lifetime` to use when
+purging old events in a room. These limits can be defined as such in the
+`retention` section of the configuration file:
 
 ```yaml
   allowed_lifetime_min: 1d
   allowed_lifetime_max: 1y
 ```
 
-Here, `allowed_lifetime_min` is the lowest value a local user can set
-for both `min_lifetime` and `max_lifetime`, and `allowed_lifetime_max`
-is the highest value. Both parameters are optional (e.g. setting
-`allowed_lifetime_min` but not `allowed_lifetime_max` only enforces a
-minimum and no maximum).
+The limits are considered when running purge jobs. If necessary, the
+effective value of `max_lifetime` will be brought between
+`allowed_lifetime_min` and `allowed_lifetime_max` (inclusive).
+This means that, if the value of `max_lifetime` defined in the room's state
+is lower than `allowed_lifetime_min`, the value of `allowed_lifetime_min`
+will be used instead. Likewise, if the value of `max_lifetime` is higher
+than `allowed_lifetime_max`, the value of `allowed_lifetime_max` will be
+used instead.
+
+In the example above, we ensure Synapse never deletes events that are less
+than one day old, and that it always deletes events that are over a year
+old.
+
+If a default policy is set, and its `max_lifetime` value is lower than
+`allowed_lifetime_min` or higher than `allowed_lifetime_max`, the same
+process applies.
+
+Both parameters are optional; if one is omitted Synapse won't use it to
+adjust the effective value of `max_lifetime`.
 
 Like other settings in this section, these parameters can be expressed
 either as a duration or as a number of milliseconds.

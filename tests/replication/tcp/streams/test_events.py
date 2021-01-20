@@ -449,7 +449,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
                 sender=sender,
                 type="test_event",
                 content={"body": body},
-                **kwargs
+                **kwargs,
             )
         )
 

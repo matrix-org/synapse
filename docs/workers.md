@@ -89,7 +89,8 @@ shared configuration file.
 Normally, only a couple of changes are needed to make an existing configuration
 file suitable for use with workers. First, you need to enable an "HTTP replication
 listener" for the main process; and secondly, you need to enable redis-based
-replication. For example:
+replication. Optionally, a shared secret can be used to authenticate HTTP
+traffic between workers. For example:
 
 
 ```yaml
@@ -102,6 +103,9 @@ listeners:
     type: http
     resources:
      - names: [replication]
+
+# Add a random shared secret to authenticate traffic.
+worker_replication_secret: ""
 
 redis:
     enabled: true
@@ -116,7 +120,7 @@ public internet; it has no authentication and is unencrypted.
 ### Worker configuration
 
 In the config file for each worker, you must specify the type of worker
-application (`worker_app`), and you should specify a unqiue name for the worker
+application (`worker_app`), and you should specify a unique name for the worker
 (`worker_name`). The currently available worker applications are listed below.
 You must also specify the HTTP replication endpoint that it should talk to on
 the main synapse process.  `worker_replication_host` should specify the host of
@@ -225,6 +229,7 @@ expressions:
     ^/_matrix/client/(r0|unstable)/auth/.*/fallback/web$
 
     # Event sending requests
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/redact
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/send
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/state/
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$
@@ -262,6 +267,9 @@ using):
 Note that a HTTP listener with `client` and `federation` resources must be
 configured in the `worker_listeners` option in the worker config.
 
+Ensure that all SSO logins go to a single process (usually the main process). 
+For multiple workers not handling the SSO endpoints properly, see
+[#7530](https://github.com/matrix-org/synapse/issues/7530).
 
 #### Load balancing
 
@@ -302,7 +310,7 @@ Additionally, there is *experimental* support for moving writing of specific
 streams (such as events) off of the main process to a particular worker. (This
 is only supported with Redis-based replication.)
 
-Currently support streams are `events` and `typing`.
+Currently supported streams are `events` and `typing`.
 
 To enable this, the worker must have a HTTP replication listener configured,
 have a `worker_name` and be listed in the `instance_map` config. For example to
@@ -319,6 +327,35 @@ stream_writers:
     events: event_persister1
 ```
 
+The `events` stream also experimentally supports having multiple writers, where
+work is sharded between them by room ID. Note that you *must* restart all worker
+instances when adding or removing event persisters. An example `stream_writers`
+configuration with multiple writers:
+
+```yaml
+stream_writers:
+    events:
+        - event_persister1
+        - event_persister2
+```
+
+#### Background tasks
+
+There is also *experimental* support for moving background tasks to a separate
+worker. Background tasks are run periodically or started via replication. Exactly
+which tasks are configured to run depends on your Synapse configuration (e.g. if
+stats is enabled).
+
+To enable this, the worker must have a `worker_name` and can be configured to run
+background tasks. For example, to move background tasks to a dedicated worker,
+the shared configuration would include:
+
+```yaml
+run_background_tasks_on: background_worker
+```
+
+You might also wish to investigate the `update_user_directory` and
+`media_instance_running_background_jobs` settings.
 
 ### `synapse.app.pusher`
 
@@ -390,6 +427,8 @@ and you must configure a single instance to run the background tasks, e.g.:
 ```yaml
     media_instance_running_background_jobs: "media-repository-1"
 ```
+
+Note that if a reverse proxy is used , then `/_matrix/media/` must be routed for both inbound client and federation requests (if they are handled separately).
 
 ### `synapse.app.user_dir`
 

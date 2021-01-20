@@ -18,39 +18,13 @@ import re
 
 from mock import patch
 
-import attr
-
 from twisted.internet._resolver import HostResolution
 from twisted.internet.address import IPv4Address, IPv6Address
 from twisted.internet.error import DNSLookupError
-from twisted.python.failure import Failure
 from twisted.test.proto_helpers import AccumulatingProtocol
-from twisted.web._newclient import ResponseDone
 
 from tests import unittest
 from tests.server import FakeTransport
-
-
-@attr.s
-class FakeResponse:
-    version = attr.ib()
-    code = attr.ib()
-    phrase = attr.ib()
-    headers = attr.ib()
-    body = attr.ib()
-    absoluteURI = attr.ib()
-
-    @property
-    def request(self):
-        @attr.s
-        class FakeTransport:
-            absoluteURI = self.absoluteURI
-
-        return FakeTransport()
-
-    def deliverBody(self, protocol):
-        protocol.dataReceived(self.body)
-        protocol.connectionLost(Failure(ResponseDone()))
 
 
 class URLPreviewTests(unittest.HomeserverTestCase):
@@ -133,13 +107,18 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         self.reactor.nameResolver = Resolver()
 
+    def create_test_resource(self):
+        return self.hs.get_media_repository_resource()
+
     def test_cache_returns_correct_type(self):
         self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
 
-        request, channel = self.make_request(
-            "GET", "url_preview?url=http://matrix.org", shorthand=False
+        channel = self.make_request(
+            "GET",
+            "preview_url?url=http://matrix.org",
+            shorthand=False,
+            await_result=False,
         )
-        request.render(self.preview_url)
         self.pump()
 
         client = self.reactor.tcpClients[0][2].buildProtocol(None)
@@ -159,11 +138,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
 
         # Check the cache returns the correct response
-        request, channel = self.make_request(
-            "GET", "url_preview?url=http://matrix.org", shorthand=False
+        channel = self.make_request(
+            "GET", "preview_url?url=http://matrix.org", shorthand=False
         )
-        request.render(self.preview_url)
-        self.pump()
 
         # Check the cache response has the same content
         self.assertEqual(channel.code, 200)
@@ -177,11 +154,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertNotIn("http://matrix.org", self.preview_url._cache)
 
         # Check the database cache returns the correct response
-        request, channel = self.make_request(
-            "GET", "url_preview?url=http://matrix.org", shorthand=False
+        channel = self.make_request(
+            "GET", "preview_url?url=http://matrix.org", shorthand=False
         )
-        request.render(self.preview_url)
-        self.pump()
 
         # Check the cache response has the same content
         self.assertEqual(channel.code, 200)
@@ -200,10 +175,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             b"</head></html>"
         )
 
-        request, channel = self.make_request(
-            "GET", "url_preview?url=http://matrix.org", shorthand=False
+        channel = self.make_request(
+            "GET",
+            "preview_url?url=http://matrix.org",
+            shorthand=False,
+            await_result=False,
         )
-        request.render(self.preview_url)
         self.pump()
 
         client = self.reactor.tcpClients[0][2].buildProtocol(None)
@@ -233,10 +210,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             b"</head></html>"
         )
 
-        request, channel = self.make_request(
-            "GET", "url_preview?url=http://matrix.org", shorthand=False
+        channel = self.make_request(
+            "GET",
+            "preview_url?url=http://matrix.org",
+            shorthand=False,
+            await_result=False,
         )
-        request.render(self.preview_url)
         self.pump()
 
         client = self.reactor.tcpClients[0][2].buildProtocol(None)
@@ -266,10 +245,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             b"</head></html>"
         )
 
-        request, channel = self.make_request(
-            "GET", "url_preview?url=http://matrix.org", shorthand=False
+        channel = self.make_request(
+            "GET",
+            "preview_url?url=http://matrix.org",
+            shorthand=False,
+            await_result=False,
         )
-        request.render(self.preview_url)
         self.pump()
 
         client = self.reactor.tcpClients[0][2].buildProtocol(None)
@@ -297,10 +278,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """
         self.lookups["example.com"] = [(IPv4Address, "10.1.2.3")]
 
-        request, channel = self.make_request(
-            "GET", "url_preview?url=http://example.com", shorthand=False
+        channel = self.make_request(
+            "GET",
+            "preview_url?url=http://example.com",
+            shorthand=False,
+            await_result=False,
         )
-        request.render(self.preview_url)
         self.pump()
 
         client = self.reactor.tcpClients[0][2].buildProtocol(None)
@@ -325,11 +308,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """
         self.lookups["example.com"] = [(IPv4Address, "192.168.1.1")]
 
-        request, channel = self.make_request(
-            "GET", "url_preview?url=http://example.com", shorthand=False
+        channel = self.make_request(
+            "GET", "preview_url?url=http://example.com", shorthand=False
         )
-        request.render(self.preview_url)
-        self.pump()
 
         # No requests made.
         self.assertEqual(len(self.reactor.tcpClients), 0)
@@ -348,11 +329,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """
         self.lookups["example.com"] = [(IPv4Address, "1.1.1.2")]
 
-        request, channel = self.make_request(
-            "GET", "url_preview?url=http://example.com", shorthand=False
+        channel = self.make_request(
+            "GET", "preview_url?url=http://example.com", shorthand=False
         )
-        request.render(self.preview_url)
-        self.pump()
 
         self.assertEqual(channel.code, 502)
         self.assertEqual(
@@ -367,11 +346,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """
         Blacklisted IP addresses, accessed directly, are not spidered.
         """
-        request, channel = self.make_request(
-            "GET", "url_preview?url=http://192.168.1.1", shorthand=False
+        channel = self.make_request(
+            "GET", "preview_url?url=http://192.168.1.1", shorthand=False
         )
-        request.render(self.preview_url)
-        self.pump()
 
         # No requests made.
         self.assertEqual(len(self.reactor.tcpClients), 0)
@@ -388,11 +365,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """
         Blacklisted IP ranges, accessed directly, are not spidered.
         """
-        request, channel = self.make_request(
-            "GET", "url_preview?url=http://1.1.1.2", shorthand=False
+        channel = self.make_request(
+            "GET", "preview_url?url=http://1.1.1.2", shorthand=False
         )
-        request.render(self.preview_url)
-        self.pump()
 
         self.assertEqual(channel.code, 403)
         self.assertEqual(
@@ -410,10 +385,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """
         self.lookups["example.com"] = [(IPv4Address, "1.1.1.1")]
 
-        request, channel = self.make_request(
-            "GET", "url_preview?url=http://example.com", shorthand=False
+        channel = self.make_request(
+            "GET",
+            "preview_url?url=http://example.com",
+            shorthand=False,
+            await_result=False,
         )
-        request.render(self.preview_url)
         self.pump()
 
         client = self.reactor.tcpClients[0][2].buildProtocol(None)
@@ -445,11 +422,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             (IPv4Address, "10.1.2.3"),
         ]
 
-        request, channel = self.make_request(
-            "GET", "url_preview?url=http://example.com", shorthand=False
+        channel = self.make_request(
+            "GET", "preview_url?url=http://example.com", shorthand=False
         )
-        request.render(self.preview_url)
-        self.pump()
         self.assertEqual(channel.code, 502)
         self.assertEqual(
             channel.json_body,
@@ -467,11 +442,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             (IPv6Address, "3fff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
         ]
 
-        request, channel = self.make_request(
-            "GET", "url_preview?url=http://example.com", shorthand=False
+        channel = self.make_request(
+            "GET", "preview_url?url=http://example.com", shorthand=False
         )
-        request.render(self.preview_url)
-        self.pump()
 
         # No requests made.
         self.assertEqual(len(self.reactor.tcpClients), 0)
@@ -490,11 +463,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """
         self.lookups["example.com"] = [(IPv6Address, "2001:800::1")]
 
-        request, channel = self.make_request(
-            "GET", "url_preview?url=http://example.com", shorthand=False
+        channel = self.make_request(
+            "GET", "preview_url?url=http://example.com", shorthand=False
         )
-        request.render(self.preview_url)
-        self.pump()
 
         self.assertEqual(channel.code, 502)
         self.assertEqual(
@@ -509,11 +480,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """
         OPTIONS returns the OPTIONS.
         """
-        request, channel = self.make_request(
-            "OPTIONS", "url_preview?url=http://example.com", shorthand=False
+        channel = self.make_request(
+            "OPTIONS", "preview_url?url=http://example.com", shorthand=False
         )
-        request.render(self.preview_url)
-        self.pump()
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body, {})
 
@@ -524,10 +493,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.lookups["example.com"] = [(IPv4Address, "10.1.2.3")]
 
         # Build and make a request to the server
-        request, channel = self.make_request(
-            "GET", "url_preview?url=http://example.com", shorthand=False
+        channel = self.make_request(
+            "GET",
+            "preview_url?url=http://example.com",
+            shorthand=False,
+            await_result=False,
         )
-        request.render(self.preview_url)
         self.pump()
 
         # Extract Synapse's tcp client
@@ -596,12 +567,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                 b"</head></html>"
             )
 
-            request, channel = self.make_request(
+            channel = self.make_request(
                 "GET",
-                "url_preview?url=http://twitter.com/matrixdotorg/status/12345",
+                "preview_url?url=http://twitter.com/matrixdotorg/status/12345",
                 shorthand=False,
+                await_result=False,
             )
-            request.render(self.preview_url)
             self.pump()
 
             client = self.reactor.tcpClients[0][2].buildProtocol(None)
@@ -661,12 +632,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             }
             end_content = json.dumps(result).encode("utf-8")
 
-            request, channel = self.make_request(
+            channel = self.make_request(
                 "GET",
-                "url_preview?url=http://twitter.com/matrixdotorg/status/12345",
+                "preview_url?url=http://twitter.com/matrixdotorg/status/12345",
                 shorthand=False,
+                await_result=False,
             )
-            request.render(self.preview_url)
             self.pump()
 
             client = self.reactor.tcpClients[0][2].buildProtocol(None)

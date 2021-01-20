@@ -43,7 +43,7 @@ class TestRatelimiter(unittest.TestCase):
 
     def test_allowed_appservice_ratelimited_via_can_requester_do_action(self):
         appservice = ApplicationService(
-            None, "example.com", id="foo", rate_limited=True,
+            None, "example.com", id="foo", rate_limited=True, sender="@as:example.com",
         )
         as_requester = create_requester("@user:example.com", app_service=appservice)
 
@@ -68,7 +68,7 @@ class TestRatelimiter(unittest.TestCase):
 
     def test_allowed_appservice_via_can_requester_do_action(self):
         appservice = ApplicationService(
-            None, "example.com", id="foo", rate_limited=False,
+            None, "example.com", id="foo", rate_limited=False, sender="@as:example.com",
         )
         as_requester = create_requester("@user:example.com", app_service=appservice)
 

@@ -42,13 +42,11 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         self.mock_registry.register_query_handler = register_query_handler
 
         hs = self.setup_test_homeserver(
-            http_client=None,
-            resource_for_federation=Mock(),
             federation_client=self.mock_federation,
             federation_registry=self.mock_registry,
         )
 
-        self.handler = hs.get_handlers().directory_handler
+        self.handler = hs.get_directory_handler()
 
         self.store = hs.get_datastore()
 
@@ -110,7 +108,7 @@ class TestCreateAlias(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        self.handler = hs.get_handlers().directory_handler
+        self.handler = hs.get_directory_handler()
 
         # Create user
         self.admin_user = self.register_user("admin", "pass", admin=True)
@@ -173,7 +171,7 @@ class TestDeleteAlias(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
-        self.handler = hs.get_handlers().directory_handler
+        self.handler = hs.get_directory_handler()
         self.state_handler = hs.get_state_handler()
 
         # Create user
@@ -289,7 +287,7 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
-        self.handler = hs.get_handlers().directory_handler
+        self.handler = hs.get_directory_handler()
         self.state_handler = hs.get_state_handler()
 
         # Create user
@@ -407,23 +405,21 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
     def test_denied(self):
         room_id = self.helper.create_room_as(self.user_id)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             b"directory/room/%23test%3Atest",
             ('{"room_id":"%s"}' % (room_id,)).encode("ascii"),
         )
-        self.render(request)
         self.assertEquals(403, channel.code, channel.result)
 
     def test_allowed(self):
         room_id = self.helper.create_room_as(self.user_id)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             b"directory/room/%23unofficial_test%3Atest",
             ('{"room_id":"%s"}' % (room_id,)).encode("ascii"),
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
 
 
@@ -435,14 +431,13 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         room_id = self.helper.create_room_as(self.user_id)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT", b"directory/list/room/%s" % (room_id.encode("ascii"),), b"{}"
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
 
         self.room_list_handler = hs.get_room_list_handler()
-        self.directory_handler = hs.get_handlers().directory_handler
+        self.directory_handler = hs.get_directory_handler()
 
         return hs
 
@@ -451,8 +446,7 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
         self.directory_handler.enable_room_list_search = True
 
         # Room list is enabled so we should get some results
-        request, channel = self.make_request("GET", b"publicRooms")
-        self.render(request)
+        channel = self.make_request("GET", b"publicRooms")
         self.assertEquals(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["chunk"]) > 0)
 
@@ -460,15 +454,13 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
         self.directory_handler.enable_room_list_search = False
 
         # Room list disabled so we should get no results
-        request, channel = self.make_request("GET", b"publicRooms")
-        self.render(request)
+        channel = self.make_request("GET", b"publicRooms")
         self.assertEquals(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["chunk"]) == 0)
 
         # Room list disabled so we shouldn't be allowed to publish rooms
         room_id = self.helper.create_room_as(self.user_id)
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT", b"directory/list/room/%s" % (room_id.encode("ascii"),), b"{}"
         )
-        self.render(request)
         self.assertEquals(403, channel.code, channel.result)

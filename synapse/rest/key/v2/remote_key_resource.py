@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, Set
+from typing import Dict
 
 from signedjson.sign import sign_json
 
@@ -142,12 +142,13 @@ class RemoteKey(DirectServeJsonResource):
 
         time_now_ms = self.clock.time_msec()
 
-        cache_misses = {}  # type: Dict[str, Set[str]]
+        # Note that the value is unused.
+        cache_misses = {}  # type: Dict[str, Dict[str, int]]
         for (server_name, key_id, from_server), results in cached.items():
             results = [(result["ts_added_ms"], result) for result in results]
 
             if not results and key_id is not None:
-                cache_misses.setdefault(server_name, set()).add(key_id)
+                cache_misses.setdefault(server_name, {})[key_id] = 0
                 continue
 
             if key_id is not None:
@@ -201,7 +202,7 @@ class RemoteKey(DirectServeJsonResource):
                     )
 
                 if miss:
-                    cache_misses.setdefault(server_name, set()).add(key_id)
+                    cache_misses.setdefault(server_name, {})[key_id] = 0
                 # Cast to bytes since postgresql returns a memoryview.
                 json_results.add(bytes(most_recent_result["key_json"]))
             else:

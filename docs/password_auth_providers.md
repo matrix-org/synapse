@@ -26,6 +26,7 @@ Password auth provider classes must provide the following methods:
 
   It should perform any appropriate sanity checks on the provided
   configuration, and return an object which is then passed into
+  `__init__`.
 
   This method should have the `@staticmethod` decoration.
 

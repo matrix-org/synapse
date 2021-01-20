@@ -46,6 +46,12 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             "ratelimit": true,
             "extra_users": [],
         }
+
+        200 OK
+
+        { "stream_id": 12345, "event_id": "$abcdef..." }
+
+    The returned event ID may not match the sent event if it was deduplicated.
     """
 
     NAME = "send_event"
@@ -109,18 +115,23 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             ratelimit = content["ratelimit"]
             extra_users = [UserID.from_string(u) for u in content["extra_users"]]
 
-        if requester.user:
-            request.authenticated_entity = requester.user.to_string()
+        request.requester = requester
 
         logger.info(
             "Got event to send with ID: %s into room: %s", event.event_id, event.room_id
         )
 
-        stream_id = await self.event_creation_handler.persist_and_notify_client_event(
+        event = await self.event_creation_handler.persist_and_notify_client_event(
             requester, event, context, ratelimit=ratelimit, extra_users=extra_users
         )
 
-        return 200, {"stream_id": stream_id}
+        return (
+            200,
+            {
+                "stream_id": event.internal_metadata.stream_ordering,
+                "event_id": event.event_id,
+            },
+        )
 
 
 def register_servlets(hs, http_server):

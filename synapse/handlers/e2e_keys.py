@@ -129,6 +129,11 @@ class E2eKeysHandler:
                 if user_id in local_query:
                     results[user_id] = keys
 
+        # Get cached cross-signing keys
+        cross_signing_keys = await self.get_cross_signing_keys_from_cache(
+            device_keys_query, from_user_id
+        )
+
         # Now attempt to get any remote devices from our local cache.
         remote_queries_not_in_cache = {}
         if remote_queries:
@@ -155,15 +160,27 @@ class E2eKeysHandler:
                             unsigned["device_display_name"] = device_display_name
                         user_devices[device_id] = result
 
+            # check for missing cross-signing keys.
+            for user_id in remote_queries.keys():
+                cached_cross_master = user_id in cross_signing_keys["master_keys"]
+                cached_cross_selfsigning = (
+                    user_id in cross_signing_keys["self_signing_keys"]
+                )
+
+                # check if we are missing only one of cross-signing master or
+                # self-signing key, but the other one is cached.
+                # as we need both, this will issue a federation request.
+                # if we don't have any of the keys, either the user doesn't have
+                # cross-signing set up, or the cached device list
+                # is not (yet) updated.
+                if cached_cross_master ^ cached_cross_selfsigning:
+                    user_ids_not_in_cache.add(user_id)
+
+            # add those users to the list to fetch over federation.
             for user_id in user_ids_not_in_cache:
                 domain = get_domain_from_id(user_id)
                 r = remote_queries_not_in_cache.setdefault(domain, {})
                 r[user_id] = remote_queries[user_id]
-
-        # Get cached cross-signing keys
-        cross_signing_keys = await self.get_cross_signing_keys_from_cache(
-            device_keys_query, from_user_id
-        )
 
         # Now fetch any devices that we don't have in our cache
         @trace
@@ -495,6 +512,22 @@ class E2eKeysHandler:
         else:
             log_kv(
                 {"message": "Did not update one_time_keys", "reason": "no keys given"}
+            )
+        fallback_keys = keys.get("org.matrix.msc2732.fallback_keys", None)
+        if fallback_keys and isinstance(fallback_keys, dict):
+            log_kv(
+                {
+                    "message": "Updating fallback_keys for device.",
+                    "user_id": user_id,
+                    "device_id": device_id,
+                }
+            )
+            await self.store.set_e2e_fallback_keys(user_id, device_id, fallback_keys)
+        elif fallback_keys:
+            log_kv({"message": "Did not update fallback_keys", "reason": "not a dict"})
+        else:
+            log_kv(
+                {"message": "Did not update fallback_keys", "reason": "no keys given"}
             )
 
         # the device should have been registered already, but it may have been
