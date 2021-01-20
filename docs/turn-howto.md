@@ -232,6 +232,12 @@ Here are a few things to try:
 
    (Understanding the output is beyond the scope of this document!)
 
+ * You can test your Matrix homeserver TURN setup with https://test.voip.librepush.net/.
+   Note that this test is not fully reliable yet, so don't be discouraged if
+   the test fails.
+   [Here](https://github.com/matrix-org/voip-tester) is the github repo of the
+   source of the tester, where you can file bug reports.
+
  * There is a WebRTC test tool at
    https://webrtc.github.io/samples/src/content/peerconnection/trickle-ice/. To
    use it, you will need a username/password for your TURN server. You can
