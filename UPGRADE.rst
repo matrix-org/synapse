@@ -113,10 +113,14 @@ back to v1.25.0 you need to:
 
    For PostgreSQL run:
 
+   .. code:: sql
+
       TRUNCATE event_auth_chain_links;
       TRUNCATE event_auth_chains;
 
    For SQLite run:
+
+   .. code:: sql
 
       DELETE FROM event_auth_chain_links;
       DELETE FROM event_auth_chains;
