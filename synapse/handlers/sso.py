@@ -75,6 +75,11 @@ class SsoIdentityProvider(Protocol):
     def idp_name(self) -> str:
         """User-facing name for this provider"""
 
+    @property
+    def idp_icon(self) -> Optional[str]:
+        """Optional MXC URI for user-facing icon"""
+        return None
+
     @abc.abstractmethod
     async def handle_redirect_request(
         self,
