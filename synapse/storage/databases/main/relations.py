@@ -206,7 +206,14 @@ class RelationsWorkerStore(SQLBaseStore):
             next_batch = None
             events = []
             for row in txn:
-                events.append({"type": row[0], "key": row[1], "count": row[2], "origin_server_ts": row[4]})
+                events.append(
+                    {
+                        "type": row[0],
+                        "key": row[1],
+                        "count": row[2],
+                        "origin_server_ts": row[4],
+                    }
+                )
                 next_batch = AggregationPaginationToken(row[2], row[3])
 
             if len(events) <= limit:
