@@ -267,8 +267,7 @@ class LoggingTransaction:
 
             self._do_execute(lambda *x: execute_batch(self.txn, *x), sql, args)
         else:
-            for val in args:
-                self.execute(sql, val)
+            self.executemany(sql, args)
 
     def execute_values(self, sql: str, *args: Any) -> List[Tuple]:
         """Corresponds to psycopg2.extras.execute_values. Only available when
