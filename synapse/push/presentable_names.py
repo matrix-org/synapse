@@ -79,10 +79,6 @@ async def calculate_room_name(
         ):
             return canon_alias.content["alias"]
 
-    # at this point we're going to need to search the state by all state keys
-    # for an event type, so rearrange the data structure
-    room_state_bytype_ids = _state_as_two_level_dict(room_state_ids)
-
     if not fallback_to_members:
         return None
 
@@ -110,6 +106,10 @@ async def calculate_room_name(
                     return None
         else:
             return "Room Invite"
+
+    # at this point we're going to need to search the state by all state keys
+    # for an event type, so rearrange the data structure
+    room_state_bytype_ids = _state_as_two_level_dict(room_state_ids)
 
     # we're going to have to generate a name based on who's in the room,
     # so find out who is in the room that isn't the user.
