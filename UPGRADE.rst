@@ -127,7 +127,7 @@ back to v1.25.0 you need to:
 
 4. Mark the deltas as not run (so they will re-run on upgrade).
 
-  .. code:: sql
+   .. code:: sql
 
       DELETE FROM applied_schema_deltas WHERE version = 59 AND file = "59/01ignored_user.py";
       DELETE FROM applied_schema_deltas WHERE version = 59 AND file = "59/06chain_cover_index.sql";
