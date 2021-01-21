@@ -328,9 +328,18 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         self._test_thumbnail("invalid", None, False)
 
     @unittest.override_config(
+        {"thumbnail_sizes": [{"width": 32, "height": 32, "method": "scale"}]}
+    )
+    def test_no_thumbnail_crop(self):
+        """
+        Override the config to generate only scaled thumbnails, but request a cropped one.
+        """
+        self._test_thumbnail("crop", None, False)
+
+    @unittest.override_config(
         {"thumbnail_sizes": [{"width": 32, "height": 32, "method": "crop"}]}
     )
-    def test_no_thumbnail(self):
+    def test_no_thumbnail_scale(self):
         """
         Override the config to generate only cropped thumbnails, but request a scaled one.
         """
