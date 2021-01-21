@@ -52,6 +52,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             "config": {
                 "domains_forbidden_when_restricted": ["forbidden_domain"],
                 "id_server": "testis",
+                "freeze_room_with_no_admin": "true",
             },
         }
         config["trusted_third_party_id_servers"] = ["testis"]
