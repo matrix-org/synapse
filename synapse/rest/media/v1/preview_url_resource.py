@@ -717,11 +717,7 @@ def decode_and_calc_og(
         parser = etree.HTMLParser(recover=True, encoding=request_encoding)
     except LookupError:
         # blindly consider the encoding as utf-8.
-        try:
-            parser = etree.HTMLParser(recover=True, encoding="utf-8")
-        except Exception as e:
-            logger.warning("Unable to create fallback HTML parser: %s" % (e,))
-            return {}
+        parser = etree.HTMLParser(recover=True, encoding="utf-8")
     except Exception as e:
         logger.warning("Unable to create HTML parser: %s" % (e,))
         return {}
@@ -729,19 +725,19 @@ def decode_and_calc_og(
     # Attempt to parse the body. If this fails, log and return no metadata.
     try:
         tree = etree.fromstring(body, parser)
+        return _calc_og(tree, media_uri)
     except UnicodeDecodeError:
         # blindly try decoding the body as utf-8, which seems to fix
         # the charset mismatches on https://google.com
         try:
             tree = etree.fromstring(body.decode("utf-8", "ignore"), parser)
+            return _calc_og(tree, media_uri)
         except Exception as e:
             logger.warning("Failed to parse HTML body as UTF-8: %s" % (e,))
             return {}
     except Exception as e:
         logger.warning("Failed to parse HTML body: %s" % (e,))
         return {}
-
-    return _calc_og(tree, media_uri)
 
 
 def _calc_og(tree, media_uri: str) -> Dict[str, Optional[str]]:
