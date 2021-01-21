@@ -303,9 +303,9 @@ class CasHandler:
 
         # Ensure that the attributes of the logged in user meet the required
         # attributes.
-        for required_attribute, required_value in self._cas_required_attributes.items():
+        for requirement in self._cas_required_attributes:
             # If required attribute was not in CAS Response - Forbidden
-            if required_attribute not in cas_response.attributes:
+            if requirement.attribute not in cas_response.attributes:
                 self._sso_handler.render_error(
                     request,
                     "unauthorised",
@@ -315,10 +315,10 @@ class CasHandler:
                 return
 
             # Also need to check value
-            if required_value is not None:
-                actual_value = cas_response.attributes[required_attribute]
+            if requirement.value is not None:
+                actual_value = cas_response.attributes[requirement.attribute]
                 # If required attribute value does not match expected - Forbidden
-                if required_value != actual_value:
+                if requirement.value != actual_value:
                     self._sso_handler.render_error(
                         request,
                         "unauthorised",

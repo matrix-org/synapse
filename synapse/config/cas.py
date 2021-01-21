@@ -13,7 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any, List
+
+from synapse.config.sso import SsoAttributeRequirement
+
 from ._base import Config
+from ._util import validate_config
 
 
 class CasConfig(Config):
@@ -38,12 +43,16 @@ class CasConfig(Config):
                 public_base_url + "_matrix/client/r0/login/cas/ticket"
             )
             self.cas_displayname_attribute = cas_config.get("displayname_attribute")
-            self.cas_required_attributes = cas_config.get("required_attributes") or {}
+            required_attributes = cas_config.get("required_attributes") or {}
+            self.cas_required_attributes = _parsed_required_attributes_def(
+                required_attributes
+            )
+
         else:
             self.cas_server_url = None
             self.cas_service_url = None
             self.cas_displayname_attribute = None
-            self.cas_required_attributes = {}
+            self.cas_required_attributes = []
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
@@ -75,3 +84,22 @@ class CasConfig(Config):
           #  userGroup: "staff"
           #  department: None
         """
+
+
+# CAS uses a legacy required attributes mapping, not the one provided by
+# SsoAttributeRequirement.
+REQUIRED_ATTRIBUTES_SCHEMA = {
+    "type": "object",
+    "additionalProperties": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+}
+
+
+def _parsed_required_attributes_def(
+    required_attributes: Any,
+) -> List[SsoAttributeRequirement]:
+    validate_config(
+        REQUIRED_ATTRIBUTES_SCHEMA,
+        required_attributes,
+        config_path=("cas_config", "required_attributes"),
+    )
+    return [SsoAttributeRequirement(k, v) for k, v in required_attributes.items()]

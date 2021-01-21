@@ -12,9 +12,26 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+
+import attr
 
 from ._base import Config
+
+
+@attr.s(frozen=True)
+class SsoAttributeRequirement:
+    """Object describing a single requirement for SSO attributes."""
+
+    attribute = attr.ib(type=str)
+    # If a value is not given, than the attribute must simply exist.
+    value = attr.ib(type=Optional[str])
+
+    JSON_SCHEMA = {
+        "type": "object",
+        "properties": {"attribute": {"type": "string"}, "value": {"type": "string"}},
+        "required": ["attribute", "value"],
+    }
 
 
 class SSOConfig(Config):
