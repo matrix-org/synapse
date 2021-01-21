@@ -802,7 +802,6 @@ class PersistEventsStore:
         for event_id in sorted_topologically(
             events_to_calc_chain_id_for, event_to_auth_chain
         ):
-            existing_chain_id = None
             for auth_id in event_to_auth_chain.get(event_id, []):
                 if event_to_types.get(event_id) == event_to_types.get(auth_id):
                     existing_chain_id = chain_map.get(auth_id)
