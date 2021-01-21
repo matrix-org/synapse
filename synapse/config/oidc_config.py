@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import string
+from collections import Counter
 from typing import Iterable, Optional, Tuple, Type
 
 import attr
@@ -42,6 +43,16 @@ class OIDCConfig(Config):
             check_requirements("oidc")
         except DependencyException as e:
             raise ConfigError(e.message) from e
+
+        # check we don't have any duplicate idp_ids now. (The SSO handler will also
+        # check for duplicates when the REST listeners get registered, but that happens
+        # after synapse has forked so doesn't give nice errors.)
+        c = Counter([i.idp_id for i in self.oidc_providers])
+        for idp_id, count in c.items():
+            if count > 1:
+                raise ConfigError(
+                    "Multiple OIDC providers have the idp_id %r." % idp_id
+                )
 
         public_baseurl = self.public_baseurl
         self.oidc_callback_url = public_baseurl + "_synapse/oidc/callback"
