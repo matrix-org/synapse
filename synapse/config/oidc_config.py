@@ -69,7 +69,9 @@ class OIDCConfig(Config):
         #
         #   idp_icon: An optional icon for this identity provider, which is presented
         #       by identity picker pages. If given, must be an MXC URI of the format
-        #       mxc://<server-name>/<media-id>
+        #       mxc://<server-name>/<media-id>. (An easy way to obtain such an MXC URI
+        #       is to upload an image to an (unencrypted) room and then copy the "url"
+        #       from the source of the event.)
         #
         #   discover: set to 'false' to disable the use of the OIDC discovery mechanism
         #       to discover endpoints. Defaults to true.
@@ -164,6 +166,7 @@ class OIDCConfig(Config):
           #
           #- idp_id: my_idp
           #  idp_name: "My OpenID provider"
+          #  idp_icon: "mxc://example.com/mediaid"
           #  discover: false
           #  issuer: "https://accounts.example.com/"
           #  client_id: "provided-by-your-issuer"
@@ -187,8 +190,8 @@ class OIDCConfig(Config):
 
           # For use with Github
           #
-          #- idp_id: google
-          #  idp_name: Google
+          #- idp_id: github
+          #  idp_name: Github
           #  discover: false
           #  issuer: "https://github.com/"
           #  client_id: "your-client-id" # TO BE FILLED
