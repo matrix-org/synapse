@@ -49,7 +49,6 @@ class SSOConfig(Config):
                 "sso_auth_bad_user.html",
             ],
             template_dir,
-            autoescape=True,
         )
 
         # These templates have no placeholders, so render them here
