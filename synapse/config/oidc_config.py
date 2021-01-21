@@ -44,10 +44,9 @@ class OIDCConfig(Config):
         except DependencyException as e:
             raise ConfigError(e.message) from e
 
-        # check we don't have any duplicate idp_ids
-        # XXX: this won't detect clashes with other IdP providers using other SSO
-        # mechanisms (such as SAML or CAS); that will be detected when we set up the
-        # listeners but by then synapse will have forked, so it's not ideal.
+        # check we don't have any duplicate idp_ids now. (The SSO handler will also
+        # check for duplicates when the REST listeners get registered, but that happens
+        # after synapse has forked so doesn't give nice errors.)
         c = Counter([i.idp_id for i in self.oidc_providers])
         for idp_id, count in c.items():
             if count > 1:
