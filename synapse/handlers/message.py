@@ -432,6 +432,9 @@ class EventCreationHandler:
 
         self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
 
+        self._external_cache = hs.get_external_cache()
+        self._use_external_cache = hs.config.redis.redis_enabled
+
     async def create_event(
         self,
         requester: Requester,
@@ -938,6 +941,43 @@ class EventCreationHandler:
             raise
 
         await self.action_generator.handle_push_actions_for_event(event, context)
+
+        if self._use_external_cache:
+            # We precalculate the joined hosts at the event, when using Redis,
+            # so that external federation senders don't have to recalculate it
+            # themselves.
+            #
+            # We actually store two mappings, event ID -> prev state group,
+            # state group -> joined hosts, which is much more space efficient
+            # than event ID -> joined hosts.
+            #
+            # Note: We have to cache event ID -> prev state group, as we don't
+            # store that in the DB.
+            #
+            # Note: We always set the state group -> joined hosts cache, even if
+            # we already set it, so that the expiry time is reset.
+
+            state_entry = await self.state.resolve_state_groups_for_events(
+                event.room_id, event_ids=event.prev_event_ids()
+            )
+
+            if state_entry.state_group:
+                joined_hosts = await self.store.get_joined_hosts(
+                    event.room_id, state_entry
+                )
+
+                await self._external_cache.set_cache(
+                    "event_to_prev_state_group",
+                    event.event_id,
+                    state_entry.state_group,
+                    expire_seconds=60 * 60,
+                )
+                await self._external_cache.set_cache(
+                    "get_joined_hosts",
+                    str(state_entry.state_group),
+                    list(joined_hosts),
+                    expire_seconds=60 * 60,
+                )
 
         try:
             # If we're a worker we need to hit out to the master.
