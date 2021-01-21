@@ -61,7 +61,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             # `StreamIdGenerator`, otherwise we use `SlavedIdTracker` which gets
             # updated over replication. (Multiple writers are not supported for
             # SQLite).
-            if hs.get_instance_name() in hs.config.worker.writers.events:
+            if hs.get_instance_name() in hs.config.worker.writers.receipts:
                 self._receipts_id_gen = StreamIdGenerator(
                     db_conn, "receipts_linearized", "stream_id"
                 )
