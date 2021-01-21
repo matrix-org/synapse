@@ -1814,7 +1814,9 @@ saml2_config:
 #
 # For backwards compatibility, it is also possible to configure a single OIDC
 # provider via an 'oidc_config' setting. This is now deprecated and admins are
-# advised to migrate to the 'oidc_providers' format.
+# advised to migrate to the 'oidc_providers' format. (When doing that migration,
+# use 'oidc' for the idp_id to ensure that existing users continue to be
+# recognised.)
 #
 oidc_providers:
   # Generic example
