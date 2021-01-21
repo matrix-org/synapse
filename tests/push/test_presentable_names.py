@@ -31,7 +31,7 @@ class MockDataStore:
 
     def __init__(self, events: Iterable[Tuple[StateKey, dict]]):
         """
-        Params:
+        Args:
             events: A state map to event contents.
         """
         self._events = {}
