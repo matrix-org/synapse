@@ -841,6 +841,7 @@ class PersistEventsStore:
             # If we reference an auth_event_id we fetch the allocated chain ID,
             # either from the existing `chain_map` or the newly generated
             # `new_chain_tuples` map.
+            existing_chain_id = None
             if auth_event_id:
                 existing_chain_id = new_chain_tuples.get(auth_event_id)
                 if not existing_chain_id:
