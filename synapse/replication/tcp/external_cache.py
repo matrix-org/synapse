@@ -16,10 +16,24 @@
 import logging
 from typing import TYPE_CHECKING, Any, Optional
 
+from prometheus_client import Counter
+
 from synapse.util import json_decoder, json_encoder
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+
+set_counter = Counter(
+    "synapse_external_cache_set",
+    "Number of times we set a cache",
+    labelnames=["cache_name"],
+)
+
+get_counter = Counter(
+    "synapse_external_cache_get",
+    "Number of times we get a cache",
+    labelnames=["cache_name", "hit"],
+)
 
 
 logger = logging.getLogger(__name__)
@@ -63,6 +77,8 @@ class ExternalCache:
         if self._redis_connection is None:
             return
 
+        set_counter.labels(cache_name).inc()
+
         # txredisapi requires the value to be string, bytes or numbers, so we
         # encode stuff in JSON.
         encoded_value = json_encoder.encode(value)
@@ -83,6 +99,8 @@ class ExternalCache:
         result = await self._redis_connection.get(self._get_redis_key(cache_name, key))
 
         logger.debug("Got cache result %s %s: %r", cache_name, key, result)
+
+        get_counter.labels(cache_name, result is not None).inc()
 
         if not result:
             return None
