@@ -247,7 +247,6 @@ class Config:
         Returns:
             A list of jinja2 templates.
         """
-        templates = []
         search_directories = [self.default_template_dir]
 
         # The loader will first look in the custom template directory (if specified) for the
@@ -274,12 +273,8 @@ class Config:
             }
         )
 
-        for filename in filenames:
-            # Load the template
-            template = env.get_template(filename)
-            templates.append(template)
-
-        return templates
+        # Load the templates
+        return [env.get_template(filename) for filename in filenames]
 
 
 def _format_ts_filter(value: int, format: str):
