@@ -386,7 +386,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         """
         Check whether the URL should be downloaded as oEmbed content instead.
 
-        Params:
+        Args:
             url: The URL to check.
 
         Returns:
@@ -403,7 +403,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         """
         Request content from an oEmbed endpoint.
 
-        Params:
+        Args:
             endpoint: The oEmbed API endpoint.
             url: The URL to pass to the API.
 
@@ -698,7 +698,7 @@ def decode_and_calc_og(
     This uses lxml to parse the HTML document into the OG response. If errors
     occur during processing of the document, an empty response is returned.
 
-    Params:
+    Args:
         body: The HTML document, as bytes.
         media_url: The URI used to download the body.
         request_encoding: The character encoding of the body, as a string.
