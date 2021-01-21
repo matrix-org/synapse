@@ -272,7 +272,9 @@ class PreviewUrlTestCase(unittest.TestCase):
         </body>
         </html>
         """
-        og = decode_and_calc_og(html, "http://example.com/test.html", "invalid-encoding")
+        og = decode_and_calc_og(
+            html, "http://example.com/test.html", "invalid-encoding"
+        )
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
 
     def test_invalid_encoding2(self):
