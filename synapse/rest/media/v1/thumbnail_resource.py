@@ -289,7 +289,7 @@ class ThumbnailResource(DirectServeJsonResource):
         """
         Respond to a request with an appropriate thumbnail from the previously generated thumbnails.
 
-        Params:
+        Args:
             request: The incoming request.
             desired_width: The desired width, the returned thumbnail may be larger than this.
             desired_height: The desired height, the returned thumbnail may be larger than this.
@@ -338,7 +338,7 @@ class ThumbnailResource(DirectServeJsonResource):
         """
         Choose an appropriate thumbnail from the previously generated thumbnails.
 
-        Params:
+        Args:
             desired_width: The desired width, the returned thumbnail may be larger than this.
             desired_height: The desired height, the returned thumbnail may be larger than this.
             desired_method: The desired method used to generate the thumbnail.
