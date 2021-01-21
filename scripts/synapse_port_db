@@ -70,7 +70,7 @@ logger = logging.getLogger("synapse_port_db")
 
 BOOLEAN_COLUMNS = {
     "events": ["processed", "outlier", "contains_url"],
-    "rooms": ["is_public"],
+    "rooms": ["is_public", "has_auth_chain_index"],
     "event_edges": ["is_state"],
     "presence_list": ["accepted"],
     "presence_stream": ["currently_active"],
@@ -629,6 +629,7 @@ class Porter(object):
             await self._setup_state_group_id_seq()
             await self._setup_user_id_seq()
             await self._setup_events_stream_seqs()
+            await self._setup_device_inbox_seq()
 
             # Step 3. Get tables.
             self.progress.set_state("Fetching tables")
@@ -910,6 +911,32 @@ class Porter(object):
         return await self.postgres_store.db_pool.runInteraction(
             "_setup_events_stream_seqs", _setup_events_stream_seqs_set_pos,
         )
+
+    async def _setup_device_inbox_seq(self):
+        """Set the device inbox sequence to the correct value.
+        """
+        curr_local_id = await self.sqlite_store.db_pool.simple_select_one_onecol(
+            table="device_inbox",
+            keyvalues={},
+            retcol="COALESCE(MAX(stream_id), 1)",
+            allow_none=True,
+        )
+
+        curr_federation_id = await self.sqlite_store.db_pool.simple_select_one_onecol(
+            table="device_federation_outbox",
+            keyvalues={},
+            retcol="COALESCE(MAX(stream_id), 1)",
+            allow_none=True,
+        )
+
+        next_id = max(curr_local_id, curr_federation_id) + 1
+
+        def r(txn):
+            txn.execute(
+                "ALTER SEQUENCE device_inbox_sequence RESTART WITH %s", (next_id,)
+            )
+
+        return self.postgres_store.db_pool.runInteraction("_setup_device_inbox_seq", r)
 
 
 ##############################################

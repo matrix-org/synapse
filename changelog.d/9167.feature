@@ -1,0 +1,1 @@
+Add server admin endpoints to join users to legacy groups and manage their flair.

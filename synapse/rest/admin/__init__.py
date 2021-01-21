@@ -31,7 +31,11 @@ from synapse.rest.admin.event_reports import (
     EventReportDetailRestServlet,
     EventReportsRestServlet,
 )
-from synapse.rest.admin.groups import DeleteGroupAdminRestServlet
+from synapse.rest.admin.groups import (
+    DeleteGroupAdminRestServlet,
+    ForceJoinGroupAdminRestServlet,
+    UpdatePublicityGroupAdminRestServlet,
+)
 from synapse.rest.admin.media import ListMediaInRoom, register_servlets_for_media_repo
 from synapse.rest.admin.purge_room_servlet import PurgeRoomServlet
 from synapse.rest.admin.rooms import (
@@ -244,6 +248,8 @@ def register_servlets_for_client_rest_resource(hs, http_server):
     ShutdownRoomRestServlet(hs).register(http_server)
     UserRegisterServlet(hs).register(http_server)
     DeleteGroupAdminRestServlet(hs).register(http_server)
+    ForceJoinGroupAdminRestServlet(hs).register(http_server)
+    UpdatePublicityGroupAdminRestServlet(hs).register(http_server)
     AccountValidityRenewServlet(hs).register(http_server)
 
     # Load the media repo ones if we're using them. Otherwise load the servlets which

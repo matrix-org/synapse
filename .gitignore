@@ -12,10 +12,12 @@
 _trial_temp/
 _trial_temp*/
 /out
+.DS_Store
 
 # stuff that is likely to exist when you run a server locally
 /*.db
 /*.log
+/*.log.*
 /*.log.config
 /*.pid
 /.python-version

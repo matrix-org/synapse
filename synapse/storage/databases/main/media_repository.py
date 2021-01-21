@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2020-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -169,7 +170,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
 
     async def get_local_media_before(
         self, before_ts: int, size_gt: int, keep_profiles: bool,
-    ) -> Optional[List[str]]:
+    ) -> List[str]:
 
         # to find files that have never been accessed (last_access_ts IS NULL)
         # compare with `created_ts`

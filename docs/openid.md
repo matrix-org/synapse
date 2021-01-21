@@ -42,11 +42,10 @@ as follows:
  * For other installation mechanisms, see the documentation provided by the
    maintainer.
 
-To enable the OpenID integration, you should then add an `oidc_config` section
-to your configuration file (or uncomment the `enabled: true` line in the
-existing section). See [sample_config.yaml](./sample_config.yaml) for some
-sample settings, as well as the text below for example configurations for
-specific providers.
+To enable the OpenID integration, you should then add a section to the `oidc_providers`
+setting in your configuration file (or uncomment one of the existing examples).
+See [sample_config.yaml](./sample_config.yaml) for some sample settings, as well as 
+the text below for example configurations for specific providers.
 
 ## Sample configs
 
@@ -62,20 +61,21 @@ Directory (tenant) ID as it will be used in the Azure links.
 Edit your Synapse config file and change the `oidc_config` section:
 
 ```yaml
-oidc_config:
-   enabled: true
-   issuer: "https://login.microsoftonline.com/<tenant id>/v2.0"
-   client_id: "<client id>"
-   client_secret: "<client secret>"
-   scopes: ["openid", "profile"]
-   authorization_endpoint: "https://login.microsoftonline.com/<tenant id>/oauth2/v2.0/authorize"
-   token_endpoint: "https://login.microsoftonline.com/<tenant id>/oauth2/v2.0/token"
-   userinfo_endpoint: "https://graph.microsoft.com/oidc/userinfo"
+oidc_providers:
+  - idp_id: microsoft
+    idp_name: Microsoft
+    issuer: "https://login.microsoftonline.com/<tenant id>/v2.0"
+    client_id: "<client id>"
+    client_secret: "<client secret>"
+    scopes: ["openid", "profile"]
+    authorization_endpoint: "https://login.microsoftonline.com/<tenant id>/oauth2/v2.0/authorize"
+    token_endpoint: "https://login.microsoftonline.com/<tenant id>/oauth2/v2.0/token"
+    userinfo_endpoint: "https://graph.microsoft.com/oidc/userinfo"
 
-   user_mapping_provider:
-     config:
-       localpart_template: "{{ user.preferred_username.split('@')[0] }}"
-       display_name_template: "{{ user.name }}"
+    user_mapping_provider:
+      config:
+        localpart_template: "{{ user.preferred_username.split('@')[0] }}"
+        display_name_template: "{{ user.name }}"
 ```
 
 ### [Dex][dex-idp]
@@ -103,17 +103,18 @@ Run with `dex serve examples/config-dev.yaml`.
 Synapse config:
 
 ```yaml
-oidc_config:
-   enabled: true
-   skip_verification: true # This is needed as Dex is served on an insecure endpoint
-   issuer: "http://127.0.0.1:5556/dex"
-   client_id: "synapse"
-   client_secret: "secret"
-   scopes: ["openid", "profile"]
-   user_mapping_provider:
-     config:
-       localpart_template: "{{ user.name }}"
-       display_name_template: "{{ user.name|capitalize }}"
+oidc_providers:
+  - idp_id: dex
+    idp_name: "My Dex server"
+    skip_verification: true # This is needed as Dex is served on an insecure endpoint
+    issuer: "http://127.0.0.1:5556/dex"
+    client_id: "synapse"
+    client_secret: "secret"
+    scopes: ["openid", "profile"]
+    user_mapping_provider:
+      config:
+        localpart_template: "{{ user.name }}"
+        display_name_template: "{{ user.name|capitalize }}"
 ```
 ### [Keycloak][keycloak-idp]
 
@@ -152,12 +153,17 @@ Follow the [Getting Started Guide](https://www.keycloak.org/getting-started) to 
 8. Copy Secret
 
 ```yaml
-oidc_config:
-   enabled: true
-   issuer: "https://127.0.0.1:8443/auth/realms/{realm_name}"
-   client_id: "synapse"
-   client_secret: "copy secret generated from above"
-   scopes: ["openid", "profile"]
+oidc_providers:
+  - idp_id: keycloak
+    idp_name: "My KeyCloak server"
+    issuer: "https://127.0.0.1:8443/auth/realms/{realm_name}"
+    client_id: "synapse"
+    client_secret: "copy secret generated from above"
+    scopes: ["openid", "profile"]
+    user_mapping_provider:
+      config:
+        localpart_template: "{{ user.preferred_username }}"
+        display_name_template: "{{ user.name }}"
 ```
 ### [Auth0][auth0]
 
@@ -187,16 +193,17 @@ oidc_config:
 Synapse config:
 
 ```yaml
-oidc_config:
-   enabled: true
-   issuer: "https://your-tier.eu.auth0.com/" # TO BE FILLED
-   client_id: "your-client-id" # TO BE FILLED
-   client_secret: "your-client-secret" # TO BE FILLED
-   scopes: ["openid", "profile"]
-   user_mapping_provider:
-     config:
-       localpart_template: "{{ user.preferred_username }}"
-       display_name_template: "{{ user.name }}"
+oidc_providers:
+  - idp_id: auth0 
+    idp_name: Auth0
+    issuer: "https://your-tier.eu.auth0.com/" # TO BE FILLED
+    client_id: "your-client-id" # TO BE FILLED
+    client_secret: "your-client-secret" # TO BE FILLED
+    scopes: ["openid", "profile"]
+    user_mapping_provider:
+      config:
+        localpart_template: "{{ user.preferred_username }}"
+        display_name_template: "{{ user.name }}"
 ```
 
 ### GitHub
@@ -215,21 +222,22 @@ does not return a `sub` property, an alternative `subject_claim` has to be set.
 Synapse config:
 
 ```yaml
-oidc_config:
-   enabled: true
-   discover: false
-   issuer: "https://github.com/"
-   client_id: "your-client-id" # TO BE FILLED
-   client_secret: "your-client-secret" # TO BE FILLED
-   authorization_endpoint: "https://github.com/login/oauth/authorize"
-   token_endpoint: "https://github.com/login/oauth/access_token"
-   userinfo_endpoint: "https://api.github.com/user"
-   scopes: ["read:user"]
-   user_mapping_provider:
-     config:
-       subject_claim: "id"
-       localpart_template: "{{ user.login }}"
-       display_name_template: "{{ user.name }}"
+oidc_providers:
+  - idp_id: github
+    idp_name: Github
+    discover: false
+    issuer: "https://github.com/"
+    client_id: "your-client-id" # TO BE FILLED
+    client_secret: "your-client-secret" # TO BE FILLED
+    authorization_endpoint: "https://github.com/login/oauth/authorize"
+    token_endpoint: "https://github.com/login/oauth/access_token"
+    userinfo_endpoint: "https://api.github.com/user"
+    scopes: ["read:user"]
+    user_mapping_provider:
+      config:
+        subject_claim: "id"
+        localpart_template: "{{ user.login }}"
+        display_name_template: "{{ user.name }}"
 ```
 
 ### [Google][google-idp]
@@ -239,16 +247,17 @@ oidc_config:
 2. add an "OAuth Client ID" for a Web Application under "Credentials".
 3. Copy the Client ID and Client Secret, and add the following to your synapse config:
    ```yaml
-   oidc_config:
-     enabled: true
-     issuer: "https://accounts.google.com/"
-     client_id: "your-client-id" # TO BE FILLED
-     client_secret: "your-client-secret" # TO BE FILLED
-     scopes: ["openid", "profile"]
-     user_mapping_provider:
-       config:
-         localpart_template: "{{ user.given_name|lower }}"
-         display_name_template: "{{ user.name }}"
+   oidc_providers:
+     - idp_id: google
+       idp_name: Google
+       issuer: "https://accounts.google.com/"
+       client_id: "your-client-id" # TO BE FILLED
+       client_secret: "your-client-secret" # TO BE FILLED
+       scopes: ["openid", "profile"]
+       user_mapping_provider:
+         config:
+           localpart_template: "{{ user.given_name|lower }}"
+           display_name_template: "{{ user.name }}"
    ```
 4. Back in the Google console, add this Authorized redirect URI: `[synapse
    public baseurl]/_synapse/oidc/callback`.
@@ -262,16 +271,17 @@ oidc_config:
 Synapse config:
 
 ```yaml
-oidc_config:
-  enabled: true
-  issuer: "https://id.twitch.tv/oauth2/"
-  client_id: "your-client-id" # TO BE FILLED
-  client_secret: "your-client-secret" # TO BE FILLED
-  client_auth_method: "client_secret_post"
-  user_mapping_provider:
-    config:
-      localpart_template: "{{ user.preferred_username }}"
-      display_name_template: "{{ user.name }}"
+oidc_providers:
+  - idp_id: twitch
+    idp_name: Twitch
+    issuer: "https://id.twitch.tv/oauth2/"
+    client_id: "your-client-id" # TO BE FILLED
+    client_secret: "your-client-secret" # TO BE FILLED
+    client_auth_method: "client_secret_post"
+    user_mapping_provider:
+      config:
+        localpart_template: "{{ user.preferred_username }}"
+        display_name_template: "{{ user.name }}"
 ```
 
 ### GitLab
@@ -283,16 +293,17 @@ oidc_config:
 Synapse config:
 
 ```yaml
-oidc_config:
-  enabled: true
-  issuer: "https://gitlab.com/"
-  client_id: "your-client-id" # TO BE FILLED
-  client_secret: "your-client-secret" # TO BE FILLED
-  client_auth_method: "client_secret_post"
-  scopes: ["openid", "read_user"]
-  user_profile_method: "userinfo_endpoint"
-  user_mapping_provider:
-    config:
-      localpart_template: '{{ user.nickname }}'
-      display_name_template: '{{ user.name }}'
+oidc_providers:
+  - idp_id: gitlab
+    idp_name: Gitlab
+    issuer: "https://gitlab.com/"
+    client_id: "your-client-id" # TO BE FILLED
+    client_secret: "your-client-secret" # TO BE FILLED
+    client_auth_method: "client_secret_post"
+    scopes: ["openid", "read_user"]
+    user_profile_method: "userinfo_endpoint"
+    user_mapping_provider:
+      config:
+        localpart_template: '{{ user.nickname }}'
+        display_name_template: '{{ user.name }}'
 ```
