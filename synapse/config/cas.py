@@ -30,7 +30,7 @@ class CasConfig(Config):
 
         if self.cas_enabled:
             self.cas_server_url = cas_config["server_url"]
-            self.cas_service_url = cas_config["service_url"]
+            self.cas_service_url = cas_config.get("service_url") or self.public_baseurl
             self.cas_displayname_attribute = cas_config.get("displayname_attribute")
             self.cas_required_attributes = cas_config.get("required_attributes") or {}
         else:
@@ -52,10 +52,6 @@ class CasConfig(Config):
           # The URL of the CAS authorization endpoint.
           #
           #server_url: "https://cas-server.com"
-
-          # The public URL of the homeserver.
-          #
-          #service_url: "https://homeserver.domain.com:8448"
 
           # The attribute of the CAS response to use as the display name.
           #
