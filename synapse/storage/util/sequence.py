@@ -148,11 +148,11 @@ class PostgresSequenceGenerator(SequenceGenerator):
         max_in_stream_positions = None
         if stream_name:
             txn.execute(
-                "SELECT MAX(stream_id) FROM stream_positions WHERE stream_name",
+                "SELECT MAX(stream_id) FROM stream_positions WHERE stream_name = ?",
                 (stream_name,),
             )
-            rows = txn.fetchall()
-            if rows and row[0][0] is not None:
+            row = txn.fetchone()
+            if row and row[0] is not None:
                 max_in_stream_positions = row[0][0]
 
         txn.close()
