@@ -249,7 +249,10 @@ class Config:
             search_directories.insert(0, custom_template_directory)
 
         loader = jinja2.FileSystemLoader(search_directories)
-        env = jinja2.Environment(loader=loader, autoescape=autoescape)
+        env = jinja2.Environment(
+            loader=loader,
+            autoescape=jinja2.select_autoescape() if autoescape else False,
+        )
 
         # Update the environment with our custom filters
         env.filters.update(
