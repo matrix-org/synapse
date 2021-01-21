@@ -42,8 +42,6 @@ class ConsentURIBuilder:
         """
         if hs_config.form_secret is None:
             raise ConfigError("form_secret not set in config")
-        if hs_config.public_baseurl is None:
-            raise ConfigError("public_baseurl not set in config")
 
         self._hmac_secret = hs_config.form_secret.encode("utf-8")
         self._public_baseurl = hs_config.public_baseurl
