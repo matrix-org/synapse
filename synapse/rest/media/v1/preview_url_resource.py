@@ -692,24 +692,54 @@ class PreviewUrlResource(DirectServeJsonResource):
 def decode_and_calc_og(
     body: bytes, media_uri: str, request_encoding: Optional[str] = None
 ) -> Dict[str, Optional[str]]:
+    """
+    Calculate metadata for an HTML document.
+
+    This uses lxml to parse the HTML document into the OG response. If errors
+    occur during processing of the document, an empty response is returned.
+
+    Params:
+        body: The HTML document, as bytes.
+        media_url: The URI used to download the body.
+        request_encoding: The character encoding of the body, as a string.
+
+    Returns:
+        The OG response as a dictionary.
+    """
     # If there's no body, nothing useful is going to be found.
     if not body:
         return {}
 
     from lxml import etree
 
+    # Create an HTML parser. If this fails, log and return no metadata.
     try:
         parser = etree.HTMLParser(recover=True, encoding=request_encoding)
+    except LookupError:
+        # blindly consider the encoding as utf-8.
+        try:
+            parser = etree.HTMLParser(recover=True, encoding="utf-8")
+        except Exception as e:
+            logger.warning("Unable to create fallback HTML parser: %s" % (e,))
+            return {}
+    except Exception as e:
+        logger.warning("Unable to create HTML parser: %s" % (e,))
+        return {}
+
+    # Attempt to parse the body. If this fails, log and return no metadata.
+    try:
         tree = etree.fromstring(body, parser)
     except UnicodeDecodeError:
         # blindly try decoding the body as utf-8, which seems to fix
         # the charset mismatches on https://google.com
-        parser = etree.HTMLParser(recover=True, encoding=request_encoding)
-        tree = etree.fromstring(body.decode("utf-8", "ignore"), parser)
-    except LookupError:
-        # blindly try decoding the body as utf-8.
-        parser = etree.HTMLParser(recover=True, encoding="utf-8")
-        tree = etree.fromstring(body, parser)
+        try:
+            tree = etree.fromstring(body.decode("utf-8", "ignore"), parser)
+        except Exception as e:
+            logger.warning("Failed to parse HTML body as UTF-8: %s" % (e,))
+            return {}
+    except Exception as e:
+        logger.warning("Failed to parse HTML body: %s" % (e,))
+        return {}
 
     return _calc_og(tree, media_uri)
 
