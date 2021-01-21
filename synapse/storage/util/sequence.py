@@ -152,8 +152,8 @@ class PostgresSequenceGenerator(SequenceGenerator):
                 (stream_name,),
             )
             row = txn.fetchone()
-            if row and row[0] is not None:
-                max_in_stream_positions = row[0][0]
+            if row:
+                max_in_stream_positions = row[0]
 
         txn.close()
 
