@@ -16,10 +16,20 @@
 """Contains *incomplete* type hints for txredisapi.
 """
 
-from typing import List, Optional, Type, Union
+from typing import Any, Awaitable, List, Optional, Type, Union
 
 class RedisProtocol:
     def publish(self, channel: str, message: bytes): ...
+    def set(
+        self,
+        key: str,
+        value: Any,
+        expire: Optional[int] = None,
+        pexpire: Optional[int] = None,
+        only_if_not_exists: bool = False,
+        only_if_exists: bool = False,
+    ) -> Awaitable[None]: ...
+    def get(self, key: str) -> Awaitable[Any]: ...
 
 class SubscriberProtocol:
     def __init__(self, *args, **kwargs): ...
