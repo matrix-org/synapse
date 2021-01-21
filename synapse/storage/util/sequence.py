@@ -180,7 +180,7 @@ class PostgresSequenceGenerator(SequenceGenerator):
         if max_in_stream_positions and max_in_stream_positions > last_value:
             raise IncorrectDatabaseSetup(
                 _INCONSISTENT_STREAM_ERROR
-                % {"seq": self._sequence_name, "stream": stream_name}
+                % {"seq": self._sequence_name, "stream_name": stream_name}
             )
 
 
