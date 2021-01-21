@@ -1,0 +1,1 @@
+Fix receipts or account data not being sent down sync. Introduced in v1.26.0rc1.
