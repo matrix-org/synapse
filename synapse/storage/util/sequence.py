@@ -85,7 +85,7 @@ class SequenceGenerator(metaclass=abc.ABCMeta):
         sync with the table, e.g. if Synapse gets rolled back to a previous
         version and the rolled forwards again.
 
-        If a stream name is given then will check that any value in the
+        If a stream name is given then this will check that any value in the
         `stream_positions` table is less than or equal to the current sequence
         value. If it isn't then it's likely that streams have been crossed
         somewhere (e.g. two ID generators have the same stream name).
