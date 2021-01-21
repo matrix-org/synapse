@@ -30,7 +30,13 @@ class CasConfig(Config):
 
         if self.cas_enabled:
             self.cas_server_url = cas_config["server_url"]
-            self.cas_service_url = cas_config.get("service_url") or self.public_baseurl
+            public_base_url = cas_config.get("service_url") or self.public_baseurl
+            if public_base_url[-1] != "/":
+                public_base_url += "/"
+            # TODO Update this to a _synapse URL.
+            self.cas_service_url = (
+                public_base_url + "_matrix/client/r0/login/cas/ticket"
+            )
             self.cas_displayname_attribute = cas_config.get("displayname_attribute")
             self.cas_required_attributes = cas_config.get("required_attributes") or {}
         else:
