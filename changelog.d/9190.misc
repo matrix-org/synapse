@@ -1,0 +1,1 @@
+Increase perf of handling concurrent use of `StreamIDGenerators`.
