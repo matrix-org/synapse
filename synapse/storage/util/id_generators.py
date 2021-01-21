@@ -102,7 +102,10 @@ class StreamIdGenerator:
             )
 
         # We use this as an ordered set, as we want to efficiently append items,
-        # remove items and get the first item.
+        # remove items and get the first item. Since we insert IDs in order, the
+        # insertion ordering will ensure its in the correct ordering.
+        #
+        # The key and values are the same, but we never look at the values.
         self._unfinished_ids = OrderedDict()  # type: OrderedDict[int, int]
 
     def get_next(self):
