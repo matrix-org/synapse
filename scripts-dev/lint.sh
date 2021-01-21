@@ -80,7 +80,7 @@ else
   # then lint everything!
   if [[ -z ${files+x} ]]; then
     # Lint all source code files and directories
-    files=("synapse" "tests" "scripts-dev" "scripts" "contrib" "synctl" "setup.py" "synmark")
+    files=("synapse" "docker" "tests" "scripts-dev" "scripts" "contrib" "synctl" "setup.py" "synmark" "stubs" ".buildkite")
   fi
 fi
 
