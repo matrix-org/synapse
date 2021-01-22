@@ -9,5 +9,3 @@ apt-get update
 apt-get install -y python3.5 python3.5-dev python3-pip libxml2-dev libxslt-dev xmlsec1 zlib1g-dev tox
 
 export LANG="C.UTF-8"
-
-exec tox -e py35-old,combine
