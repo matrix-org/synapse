@@ -223,11 +223,21 @@ stderr_logfile_maxbytes=0
 username=www-data
 autorestart=true
 
+[program:redis]
+command=/usr/bin/redis-server /etc/redis/redis.conf
+priority=1
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
+username=redis
+autorestart=true
+
 [program:synapse_main]
 command=/usr/local/bin/python -m synapse.app.homeserver \
     --config-path="%s" \
     --config-path=/conf/workers/shared.yaml
-priority=1
+priority=10
 # Log startup failures to supervisord's stdout/err
 # Regular synapse logs will still go in the configured data directory
 stdout_logfile=/dev/stdout
