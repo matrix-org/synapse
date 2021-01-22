@@ -50,7 +50,18 @@ WELL_KNOWN = ISSUER + ".well-known/openid-configuration"
 JWKS_URI = ISSUER + ".well-known/jwks.json"
 
 # config for common cases
-COMMON_CONFIG = {
+DEFAULT_CONFIG = {
+    "enabled": True,
+    "client_id": CLIENT_ID,
+    "client_secret": CLIENT_SECRET,
+    "issuer": ISSUER,
+    "scopes": SCOPES,
+    "user_mapping_provider": {"module": __name__ + ".TestMappingProvider"},
+}
+
+# extends the default config with explicit OAuth2 endpoints instead of using discovery
+EXPLICIT_ENDPOINT_CONFIG = {
+    **DEFAULT_CONFIG,
     "discover": False,
     "authorization_endpoint": AUTHORIZATION_ENDPOINT,
     "token_endpoint": TOKEN_ENDPOINT,
@@ -114,20 +125,6 @@ class OidcHandlerTestCase(HomeserverTestCase):
     def default_config(self):
         config = super().default_config()
         config["public_baseurl"] = BASE_URL
-        oidc_config = {
-            "enabled": True,
-            "client_id": CLIENT_ID,
-            "client_secret": CLIENT_SECRET,
-            "issuer": ISSUER,
-            "scopes": SCOPES,
-            "user_mapping_provider": {"module": __name__ + ".TestMappingProvider"},
-        }
-
-        # Update this config with what's in the default config so that
-        # override_config works as expected.
-        oidc_config.update(config.get("oidc_config", {}))
-        config["oidc_config"] = oidc_config
-
         return config
 
     def make_homeserver(self, reactor, clock):
@@ -170,13 +167,14 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.render_error.reset_mock()
         return args
 
+    @override_config({"oidc_config": DEFAULT_CONFIG})
     def test_config(self):
         """Basic config correctly sets up the callback URL and client auth correctly."""
         self.assertEqual(self.provider._callback_url, CALLBACK_URL)
         self.assertEqual(self.provider._client_auth.client_id, CLIENT_ID)
         self.assertEqual(self.provider._client_auth.client_secret, CLIENT_SECRET)
 
-    @override_config({"oidc_config": {"discover": True}})
+    @override_config({"oidc_config": {**DEFAULT_CONFIG, "discover": True}})
     def test_discovery(self):
         """The handler should discover the endpoints from OIDC discovery document."""
         # This would throw if some metadata were invalid
@@ -195,13 +193,13 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.get_success(self.provider.load_metadata())
         self.http_client.get_json.assert_not_called()
 
-    @override_config({"oidc_config": COMMON_CONFIG})
+    @override_config({"oidc_config": EXPLICIT_ENDPOINT_CONFIG})
     def test_no_discovery(self):
         """When discovery is disabled, it should not try to load from discovery document."""
         self.get_success(self.provider.load_metadata())
         self.http_client.get_json.assert_not_called()
 
-    @override_config({"oidc_config": COMMON_CONFIG})
+    @override_config({"oidc_config": EXPLICIT_ENDPOINT_CONFIG})
     def test_load_jwks(self):
         """JWKS loading is done once (then cached) if used."""
         jwks = self.get_success(self.provider.load_jwks())
@@ -236,6 +234,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.http_client.get_json.assert_not_called()
         self.assertEqual(jwks, {"keys": []})
 
+    @override_config({"oidc_config": DEFAULT_CONFIG})
     def test_validate_config(self):
         """Provider metadatas are extensively validated."""
         h = self.provider
@@ -318,13 +317,14 @@ class OidcHandlerTestCase(HomeserverTestCase):
             # Shouldn't raise with a valid userinfo, even without jwks
             force_load_metadata()
 
-    @override_config({"oidc_config": {"skip_verification": True}})
+    @override_config({"oidc_config": {**DEFAULT_CONFIG, "skip_verification": True}})
     def test_skip_verification(self):
         """Provider metadata validation can be disabled by config."""
         with self.metadata_edit({"issuer": "http://insecure"}):
             # This should not throw
             get_awaitable_result(self.provider.load_metadata())
 
+    @override_config({"oidc_config": DEFAULT_CONFIG})
     def test_redirect_request(self):
         """The redirect request has the right arguments & generates a valid session cookie."""
         req = Mock(spec=["cookies"])
@@ -368,6 +368,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(params["nonce"], [nonce])
         self.assertEqual(redirect, "http://client/redirect")
 
+    @override_config({"oidc_config": DEFAULT_CONFIG})
     def test_callback_error(self):
         """Errors from the provider returned in the callback are displayed."""
         request = Mock(args={})
@@ -379,6 +380,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.get_success(self.handler.handle_oidc_callback(request))
         self.assertRenderedError("invalid_client", "some description")
 
+    @override_config({"oidc_config": DEFAULT_CONFIG})
     def test_callback(self):
         """Code callback works and display errors if something went wrong.
 
@@ -480,6 +482,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.get_success(self.handler.handle_oidc_callback(request))
         self.assertRenderedError("invalid_request")
 
+    @override_config({"oidc_config": DEFAULT_CONFIG})
     def test_callback_session(self):
         """The callback verifies the session presence and validity"""
         request = Mock(spec=["args", "getCookie", "cookies"])
@@ -522,7 +525,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.get_success(self.handler.handle_oidc_callback(request))
         self.assertRenderedError("invalid_request")
 
-    @override_config({"oidc_config": {"client_auth_method": "client_secret_post"}})
+    @override_config(
+        {"oidc_config": {**DEFAULT_CONFIG, "client_auth_method": "client_secret_post"}}
+    )
     def test_exchange_code(self):
         """Code exchange behaves correctly and handles various error scenarios."""
         token = {"type": "bearer"}
@@ -607,9 +612,10 @@ class OidcHandlerTestCase(HomeserverTestCase):
     @override_config(
         {
             "oidc_config": {
+                **DEFAULT_CONFIG,
                 "user_mapping_provider": {
                     "module": __name__ + ".TestMappingProviderExtra"
-                }
+                },
             }
         }
     )
@@ -652,6 +658,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             new_user=True,
         )
 
+    @override_config({"oidc_config": DEFAULT_CONFIG})
     def test_map_userinfo_to_user(self):
         """Ensure that mapping the userinfo returned from a provider to an MXID works properly."""
         auth_handler = self.hs.get_auth_handler()
@@ -692,7 +699,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "Mapping provider does not support de-duplicating Matrix IDs",
         )
 
-    @override_config({"oidc_config": {"allow_existing_users": True}})
+    @override_config({"oidc_config": {**DEFAULT_CONFIG, "allow_existing_users": True}})
     def test_map_userinfo_to_existing_user(self):
         """Existing users can log in with OpenID Connect when allow_existing_users is True."""
         store = self.hs.get_datastore()
@@ -772,6 +779,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "@TEST_USER_2:test", "oidc", ANY, ANY, None, new_user=False
         )
 
+    @override_config({"oidc_config": DEFAULT_CONFIG})
     def test_map_userinfo_to_invalid_localpart(self):
         """If the mapping provider generates an invalid localpart it should be rejected."""
         self.get_success(
@@ -782,9 +790,10 @@ class OidcHandlerTestCase(HomeserverTestCase):
     @override_config(
         {
             "oidc_config": {
+                **DEFAULT_CONFIG,
                 "user_mapping_provider": {
                     "module": __name__ + ".TestMappingProviderFailures"
-                }
+                },
             }
         }
     )
@@ -829,6 +838,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "mapping_error", "Unable to generate a Matrix ID from the SSO response"
         )
 
+    @override_config({"oidc_config": DEFAULT_CONFIG})
     def test_empty_localpart(self):
         """Attempts to map onto an empty localpart should be rejected."""
         userinfo = {
@@ -841,9 +851,10 @@ class OidcHandlerTestCase(HomeserverTestCase):
     @override_config(
         {
             "oidc_config": {
+                **DEFAULT_CONFIG,
                 "user_mapping_provider": {
                     "config": {"localpart_template": "{{ user.username }}"}
-                }
+                },
             }
         }
     )
