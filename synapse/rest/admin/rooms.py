@@ -303,7 +303,8 @@ class RoomStateRestServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
-        self.message_handler = hs.get_message_handler()
+        self.clock = hs.get_clock()
+        self._event_serializer = hs.get_event_client_serializer()
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str
@@ -315,10 +316,15 @@ class RoomStateRestServlet(RestServlet):
         if not ret:
             raise NotFoundError("Room not found")
 
-        room_state = await self.message_handler.get_state_events(
-            user_id=requester.user.to_string(),
-            room_id=room_id,
-            is_admin=True,  # already verified above
+        event_ids = await self.store.get_current_state_ids(room_id)
+        events = await self.store.get_events(event_ids.values())
+        now = self.clock.time_msec()
+        room_state = await self._event_serializer.serialize_events(
+            events.values(),
+            now,
+            # We don't bother bundling aggregations in when asked for state
+            # events, as clients won't use them.
+            bundle_aggregations=False,
         )
         ret = {"state": room_state}
 
