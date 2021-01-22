@@ -202,11 +202,11 @@ class FederationSender:
                     # We check the external cache for the destinations, which is
                     # stored per state group.
                     destinations = None
-                    sg = await self._external_cache.get_cache(
+                    sg = await self._external_cache.get(
                         "event_to_prev_state_group", event.event_id
                     )
                     if sg:
-                        destinations = await self._external_cache.get_cache(
+                        destinations = await self._external_cache.get(
                             "get_joined_hosts", str(sg)
                         )
 
