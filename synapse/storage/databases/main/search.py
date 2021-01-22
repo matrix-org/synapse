@@ -16,7 +16,7 @@
 import logging
 import re
 from collections import namedtuple
-from typing import List, Optional, Set
+from typing import Collection, List, Optional, Set
 
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
@@ -460,7 +460,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 
     async def search_rooms(
         self,
-        room_ids: List[str],
+        room_ids: Collection[str],
         search_term: str,
         keys: List[str],
         limit,
