@@ -137,7 +137,6 @@ class MessageHandler:
         state_filter: StateFilter = StateFilter.all(),
         at_token: Optional[StreamToken] = None,
         is_guest: bool = False,
-        is_admin: bool = False,
     ) -> List[dict]:
         """Retrieve all state events for a given room. If the user is
         joined to the room then return the current state. If the user has
@@ -154,7 +153,6 @@ class MessageHandler:
                 stream token, we raise a 403 SynapseError. If None, returns the current
                 state based on the current_state_events table.
             is_guest: whether this user is a guest
-            is_admin: whether this user is making the request as a server admin.
         Returns:
             A list of dicts representing state events. [{}, {}, {}]
         Raises:
@@ -175,12 +173,9 @@ class MessageHandler:
             if not last_events:
                 raise NotFoundError("Can't find event for token %s" % (at_token,))
 
-            if is_admin:
-                visible_events = last_events
-            else:
-                visible_events = await filter_events_for_client(
-                    self.storage, user_id, last_events, filter_send_to_client=False,
-                )
+            visible_events = await filter_events_for_client(
+                self.storage, user_id, last_events, filter_send_to_client=False,
+            )
 
             event = last_events[0]
             if visible_events:
@@ -202,7 +197,7 @@ class MessageHandler:
                 room_id, user_id, allow_departed_users=True
             )
 
-            if membership == Membership.JOIN or is_admin:
+            if membership == Membership.JOIN:
                 state_ids = await self.store.get_filtered_current_state_ids(
                     room_id, state_filter=state_filter
                 )
