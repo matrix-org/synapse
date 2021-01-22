@@ -433,7 +433,6 @@ class EventCreationHandler:
         self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
 
         self._external_cache = hs.get_external_cache()
-        self._use_external_cache = hs.config.redis.redis_enabled
 
     async def create_event(
         self,
@@ -942,7 +941,7 @@ class EventCreationHandler:
 
         await self.action_generator.handle_push_actions_for_event(event, context)
 
-        if self._use_external_cache:
+        if self._external_cache.is_enabled():
             # We precalculate the joined hosts at the event, when using Redis,
             # so that external federation senders don't have to recalculate it
             # themselves.

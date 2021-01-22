@@ -68,6 +68,14 @@ class ExternalCache:
     def _get_redis_key(self, cache_name: str, key: str) -> str:
         return "cache_v1:%s:%s" % (cache_name, key)
 
+    def is_enabled(self) -> bool:
+        """Whether the external cache is used or not.
+
+        It's safe to use the cache when this returns false, the methods will
+        just no-op, but the function is useful to avoid doing unnecessary work.
+        """
+        return self._redis_connection is not None
+
     async def set_cache(
         self, cache_name: str, key: str, value: Any, expire_seconds: int
     ) -> None:
