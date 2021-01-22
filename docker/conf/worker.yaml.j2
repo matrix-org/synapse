@@ -20,3 +20,5 @@ worker_listeners:
         - {{ resource }}
 {%- endfor %}
 {% endif %}
+
+{{ worker_extra_conf }}

@@ -39,6 +39,7 @@ WORKERS_CONFIG = {
         "listener_resources": [],
         "endpoint_patterns": [],
         "shared_extra_conf": "start_pushers: false",
+        "worker_extra_conf": "",
     },
     "user_dir": {
         "app": "synapse.app.user_dir",
@@ -47,6 +48,7 @@ WORKERS_CONFIG = {
             "^/_matrix/client/(api/v1|r0|unstable)/user_directory/search$"
         ],
         "shared_extra_conf": "update_user_directory: false",
+        "worker_extra_conf": "",
     },
     "media_repository": {
         "app": "synapse.app.media_repository",
@@ -60,18 +62,21 @@ WORKERS_CONFIG = {
             "^/_synapse/admin/v1/quarantine_media/.*$",
         ],
         "shared_extra_conf": "enable_media_repo: false",
+        "worker_extra_conf": "enable_media_repo: true",
     },
     "appservice": {
         "app": "synapse.app.appservice",
         "listener_resources": [],
         "endpoint_patterns": [],
         "shared_extra_conf": "notify_appservices: false",
+        "worker_extra_conf": "",
     },
     "federation_sender": {
         "app": "synapse.app.federation_sender",
         "listener_resources": [],
         "endpoint_patterns": [],
         "shared_extra_conf": "send_federation: false",
+        "worker_extra_conf": "",
     },
     "synchrotron": {
         "app": "synapse.app.generic_worker",
@@ -83,6 +88,7 @@ WORKERS_CONFIG = {
             "^/_matrix/client/(api/v1|r0)/rooms/[^/]+/initialSync$",
         ],
         "shared_extra_conf": "",
+        "worker_extra_conf": "",
     },
     "federation_reader": {
         "app": "synapse.app.generic_worker",
@@ -108,12 +114,14 @@ WORKERS_CONFIG = {
             "^/_matrix/key/v2/query",
         ],
         "shared_extra_conf": "",
+        "worker_extra_conf": "",
     },
     "federation_inbound": {
         "app": "synapse.app.generic_worker",
         "listener_resources": DEFAULT_LISTENER_RESOURCES,
         "endpoint_patterns": ["/_matrix/federation/(v1|v2)/send/"],
         "shared_extra_conf": "",
+        "worker_extra_conf": "",
     },
 }
 
@@ -307,10 +315,11 @@ server {
         # This is not hardcoded as we want to be able to have several workers
         # of each type ultimately (though not supported for now)
         worker_name = worker_type
-        worker_config.update({"name": worker_name})
-
-        worker_config.update({"port": worker_port})
-        worker_config.update({"config_path": config_path})
+        worker_config.update({
+            "name": worker_name,
+            "port": worker_port,
+            "config_path": config_path,
+        })
 
         shared_config += worker_config["shared_extra_conf"] + "\n"
 
