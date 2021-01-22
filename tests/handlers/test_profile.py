@@ -184,7 +184,11 @@ class ProfileTestCase(unittest.TestCase):
 
         response = yield defer.ensureDeferred(
             self.query_handlers["profile"](
-                {"user_id": "@caroline:test", "field": "displayname"}
+                {
+                    "user_id": "@caroline:test",
+                    "field": "displayname",
+                    "origin": "servername.tld",
+                }
             )
         )
 
