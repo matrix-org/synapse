@@ -71,7 +71,6 @@ class FederationSender:
         self.server_name = hs.hostname
 
         self.store = hs.get_datastore()
-        self.state_store = hs.get_datastores().state
         self.state = hs.get_state_handler()
 
         self.clock = hs.get_clock()
