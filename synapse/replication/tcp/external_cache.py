@@ -77,7 +77,7 @@ class ExternalCache:
         return self._redis_connection is not None
 
     async def set_cache(
-        self, cache_name: str, key: str, value: Any, expire_seconds: int
+        self, cache_name: str, key: str, value: Any, expire_ms: int
     ) -> None:
         """Add the key/value to the named cache, with the expiry time given.
         """
@@ -94,7 +94,7 @@ class ExternalCache:
         logger.debug("Caching %s %s: %r", cache_name, key, encoded_value)
 
         return await self._redis_connection.set(
-            self._get_redis_key(cache_name, key), encoded_value, expire=expire_seconds,
+            self._get_redis_key(cache_name, key), encoded_value, pexpire=expire_ms,
         )
 
     async def get_cache(self, cache_name: str, key: str) -> Optional[Any]:

@@ -969,13 +969,13 @@ class EventCreationHandler:
                     "event_to_prev_state_group",
                     event.event_id,
                     state_entry.state_group,
-                    expire_seconds=60 * 60,
+                    expire_ms=60 * 60 * 1000,
                 )
                 await self._external_cache.set_cache(
                     "get_joined_hosts",
                     str(state_entry.state_group),
                     list(joined_hosts),
-                    expire_seconds=60 * 60,
+                    expire_ms=60 * 60 * 1000,
                 )
 
         try:
