@@ -1,1 +1,0 @@
-Fix bug where we didn't correctly record CPU time spent in 'on_new_event' block.

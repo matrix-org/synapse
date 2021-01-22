@@ -64,11 +64,8 @@ class SSOConfig(Config):
         # gracefully to the client). This would make it pointless to ask the user for
         # confirmation, since the URL the confirmation page would be showing wouldn't be
         # the client's.
-        # public_baseurl is an optional setting, so we only add the fallback's URL to the
-        # list if it's provided (because we can't figure out what that URL is otherwise).
-        if self.public_baseurl:
-            login_fallback_url = self.public_baseurl + "_matrix/static/client/login"
-            self.sso_client_whitelist.append(login_fallback_url)
+        login_fallback_url = self.public_baseurl + "_matrix/static/client/login"
+        self.sso_client_whitelist.append(login_fallback_url)
 
     def generate_config_section(self, **kwargs):
         return """\
@@ -86,9 +83,9 @@ class SSOConfig(Config):
             # phishing attacks from evil.site. To avoid this, include a slash after the
             # hostname: "https://my.client/".
             #
-            # If public_baseurl is set, then the login fallback page (used by clients
-            # that don't natively support the required login flows) is whitelisted in
-            # addition to any URLs in this list.
+            # The login fallback page (used by clients that don't natively support the
+            # required login flows) is automatically whitelisted in addition to any URLs
+            # in this list.
             #
             # By default, this list is empty.
             #

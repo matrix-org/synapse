@@ -1,1 +1,0 @@
-Fix `JSONDecodeError` spamming the logs when sending transactions to remote servers.
