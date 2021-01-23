@@ -394,7 +394,7 @@ def start_supervisord():
 
     Raises: CalledProcessError if calling start.py return a non-zero exit code.
     """
-    subprocess.check_output(["/usr/bin/supervisord"])
+    subprocess.run(["/usr/bin/supervisord"], stdin=subprocess.PIPE)
 
 
 def main(args, environ):
