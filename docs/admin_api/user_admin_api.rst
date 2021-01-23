@@ -98,6 +98,8 @@ Body parameters:
 
 - ``deactivated``, optional. If unspecified, deactivation state will be left
   unchanged on existing accounts and set to ``false`` for new accounts.
+  A user cannot be erased by deactivating with this API. For details on deactivating users see
+  `Deactivate Account <#deactivate-account>`_.
 
 If the user already exists then optional parameters default to the current value.
 
@@ -248,6 +250,25 @@ server admin: see `README.rst <README.rst>`_.
 The erase parameter is optional and defaults to ``false``.
 An empty body may be passed for backwards compatibility.
 
+The following actions are performed when deactivating an user:
+
+- Try to unpind 3PIDs from the identity server
+- Remove all 3PIDs from the homeserver
+- Delete all devices and E2EE keys
+- Delete all access tokens
+- Delete the password hash
+- Removal from all rooms the user is a member of
+- Remove the user from the user directory
+- Reject all pending invites
+- Remove all account validity information related to the user
+
+The following additional actions are performed during deactivation if``erase``
+is set to ``true``:
+
+- Remove the user's display name
+- Remove the user's avatar URL
+- Mark the user as erased
+
 
 Reset password
 ==============
@@ -336,6 +357,10 @@ A response body like the following is returned:
         ],
         "total": 2
     }
+
+The server returns the list of rooms of which the user and the server
+are member. If the user is local, all the rooms of which the user is
+member are returned.
 
 **Parameters**
 

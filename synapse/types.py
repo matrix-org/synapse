@@ -37,6 +37,7 @@ from signedjson.key import decode_verify_key_bytes
 from unpaddedbase64 import decode_base64
 
 from synapse.api.errors import Codes, SynapseError
+from synapse.util.stringutils import parse_and_validate_server_name
 
 if TYPE_CHECKING:
     from synapse.appservice.api import ApplicationService
@@ -257,8 +258,13 @@ class DomainSpecificString(
 
     @classmethod
     def is_valid(cls: Type[DS], s: str) -> bool:
+        """Parses the input string and attempts to ensure it is valid."""
         try:
-            cls.from_string(s)
+            obj = cls.from_string(s)
+            # Apply additional validation to the domain. This is only done
+            # during  is_valid (and not part of from_string) since it is
+            # possible for invalid data to exist in room-state, etc.
+            parse_and_validate_server_name(obj.domain)
             return True
         except Exception:
             return False

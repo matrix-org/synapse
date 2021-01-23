@@ -5,6 +5,16 @@ Before upgrading check if any special steps are required to upgrade from the
 version you currently have installed to the current version of Synapse. The extra
 instructions that may be required are listed later in this document.
 
+* Check that your versions of Python and PostgreSQL are still supported.
+
+  Synapse follows upstream lifecycles for `Python`_ and `PostgreSQL`_, and
+  removes support for versions which are no longer maintained.
+
+  The website https://endoflife.date also offers convenient summaries.
+
+  .. _Python: https://devguide.python.org/devcycle/#end-of-life-branches
+  .. _PostgreSQL: https://www.postgresql.org/support/versioning/
+
 * If Synapse was installed using `prebuilt packages
   <INSTALL.md#prebuilt-packages>`_, you will need to follow the normal process
   for upgrading those packages.
@@ -75,8 +85,70 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+Upgrading to v1.26.0
+====================
+
+Rolling back to v1.25.0 after a failed upgrade
+----------------------------------------------
+
+v1.26.0 includes a lot of large changes. If something problematic occurs, you
+may want to roll-back to a previous version of Synapse. Because v1.26.0 also
+includes a new database schema version, reverting that version is also required
+alongside the generic rollback instructions mentioned above. In short, to roll
+back to v1.25.0 you need to:
+
+1. Stop the server
+2. Decrease the schema version in the database:
+
+   .. code:: sql
+
+      UPDATE schema_version SET version = 58;
+
+3. Delete the ignored users & chain cover data:
+
+   .. code:: sql
+
+      DROP TABLE IF EXISTS ignored_users;
+      UPDATE rooms SET has_auth_chain_index = false;
+
+   For PostgreSQL run:
+
+   .. code:: sql
+
+      TRUNCATE event_auth_chain_links;
+      TRUNCATE event_auth_chains;
+
+   For SQLite run:
+
+   .. code:: sql
+
+      DELETE FROM event_auth_chain_links;
+      DELETE FROM event_auth_chains;
+
+4. Mark the deltas as not run (so they will re-run on upgrade).
+
+   .. code:: sql
+
+      DELETE FROM applied_schema_deltas WHERE version = 59 AND file = "59/01ignored_user.py";
+      DELETE FROM applied_schema_deltas WHERE version = 59 AND file = "59/06chain_cover_index.sql";
+
+5. Downgrade Synapse by following the instructions for your installation method
+   in the "Rolling back to older versions" section above.
+
 Upgrading to v1.25.0
 ====================
+
+Last release supporting Python 3.5
+----------------------------------
+
+This is the last release of Synapse which guarantees support with Python 3.5,
+which passed its upstream End of Life date several months ago.
+
+We will attempt to maintain support through March 2021, but without guarantees.
+
+In the future, Synapse will follow upstream schedules for ending support of
+older versions of Python and PostgreSQL. Please upgrade to at least Python 3.6
+and PostgreSQL 9.6 as soon as possible.
 
 Blacklisting IP ranges
 ----------------------

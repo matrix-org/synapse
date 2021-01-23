@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2020-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,11 +17,12 @@
 import functools
 import os
 import re
+from typing import Callable, List
 
 NEW_FORMAT_ID_RE = re.compile(r"^\d\d\d\d-\d\d-\d\d")
 
 
-def _wrap_in_base_path(func):
+def _wrap_in_base_path(func: "Callable[..., str]") -> "Callable[..., str]":
     """Takes a function that returns a relative path and turns it into an
     absolute path based on the location of the primary media store
     """
@@ -41,12 +43,18 @@ class MediaFilePaths:
     to write to the backup media store (when one is configured)
     """
 
-    def __init__(self, primary_base_path):
+    def __init__(self, primary_base_path: str):
         self.base_path = primary_base_path
 
     def default_thumbnail_rel(
-        self, default_top_level, default_sub_type, width, height, content_type, method
-    ):
+        self,
+        default_top_level: str,
+        default_sub_type: str,
+        width: int,
+        height: int,
+        content_type: str,
+        method: str,
+    ) -> str:
         top_level_type, sub_type = content_type.split("/")
         file_name = "%i-%i-%s-%s-%s" % (width, height, top_level_type, sub_type, method)
         return os.path.join(
@@ -55,12 +63,14 @@ class MediaFilePaths:
 
     default_thumbnail = _wrap_in_base_path(default_thumbnail_rel)
 
-    def local_media_filepath_rel(self, media_id):
+    def local_media_filepath_rel(self, media_id: str) -> str:
         return os.path.join("local_content", media_id[0:2], media_id[2:4], media_id[4:])
 
     local_media_filepath = _wrap_in_base_path(local_media_filepath_rel)
 
-    def local_media_thumbnail_rel(self, media_id, width, height, content_type, method):
+    def local_media_thumbnail_rel(
+        self, media_id: str, width: int, height: int, content_type: str, method: str
+    ) -> str:
         top_level_type, sub_type = content_type.split("/")
         file_name = "%i-%i-%s-%s-%s" % (width, height, top_level_type, sub_type, method)
         return os.path.join(
@@ -86,7 +96,7 @@ class MediaFilePaths:
             media_id[4:],
         )
 
-    def remote_media_filepath_rel(self, server_name, file_id):
+    def remote_media_filepath_rel(self, server_name: str, file_id: str) -> str:
         return os.path.join(
             "remote_content", server_name, file_id[0:2], file_id[2:4], file_id[4:]
         )
@@ -94,8 +104,14 @@ class MediaFilePaths:
     remote_media_filepath = _wrap_in_base_path(remote_media_filepath_rel)
 
     def remote_media_thumbnail_rel(
-        self, server_name, file_id, width, height, content_type, method
-    ):
+        self,
+        server_name: str,
+        file_id: str,
+        width: int,
+        height: int,
+        content_type: str,
+        method: str,
+    ) -> str:
         top_level_type, sub_type = content_type.split("/")
         file_name = "%i-%i-%s-%s-%s" % (width, height, top_level_type, sub_type, method)
         return os.path.join(
@@ -113,7 +129,7 @@ class MediaFilePaths:
     # Should be removed after some time, when most of the thumbnails are stored
     # using the new path.
     def remote_media_thumbnail_rel_legacy(
-        self, server_name, file_id, width, height, content_type
+        self, server_name: str, file_id: str, width: int, height: int, content_type: str
     ):
         top_level_type, sub_type = content_type.split("/")
         file_name = "%i-%i-%s-%s" % (width, height, top_level_type, sub_type)
@@ -126,7 +142,7 @@ class MediaFilePaths:
             file_name,
         )
 
-    def remote_media_thumbnail_dir(self, server_name, file_id):
+    def remote_media_thumbnail_dir(self, server_name: str, file_id: str) -> str:
         return os.path.join(
             self.base_path,
             "remote_thumbnail",
@@ -136,7 +152,7 @@ class MediaFilePaths:
             file_id[4:],
         )
 
-    def url_cache_filepath_rel(self, media_id):
+    def url_cache_filepath_rel(self, media_id: str) -> str:
         if NEW_FORMAT_ID_RE.match(media_id):
             # Media id is of the form <DATE><RANDOM_STRING>
             # E.g.: 2017-09-28-fsdRDt24DS234dsf
@@ -146,7 +162,7 @@ class MediaFilePaths:
 
     url_cache_filepath = _wrap_in_base_path(url_cache_filepath_rel)
 
-    def url_cache_filepath_dirs_to_delete(self, media_id):
+    def url_cache_filepath_dirs_to_delete(self, media_id: str) -> List[str]:
         "The dirs to try and remove if we delete the media_id file"
         if NEW_FORMAT_ID_RE.match(media_id):
             return [os.path.join(self.base_path, "url_cache", media_id[:10])]
@@ -156,7 +172,9 @@ class MediaFilePaths:
                 os.path.join(self.base_path, "url_cache", media_id[0:2]),
             ]
 
-    def url_cache_thumbnail_rel(self, media_id, width, height, content_type, method):
+    def url_cache_thumbnail_rel(
+        self, media_id: str, width: int, height: int, content_type: str, method: str
+    ) -> str:
         # Media id is of the form <DATE><RANDOM_STRING>
         # E.g.: 2017-09-28-fsdRDt24DS234dsf
 
@@ -178,7 +196,7 @@ class MediaFilePaths:
 
     url_cache_thumbnail = _wrap_in_base_path(url_cache_thumbnail_rel)
 
-    def url_cache_thumbnail_directory(self, media_id):
+    def url_cache_thumbnail_directory(self, media_id: str) -> str:
         # Media id is of the form <DATE><RANDOM_STRING>
         # E.g.: 2017-09-28-fsdRDt24DS234dsf
 
@@ -195,7 +213,7 @@ class MediaFilePaths:
                 media_id[4:],
             )
 
-    def url_cache_thumbnail_dirs_to_delete(self, media_id):
+    def url_cache_thumbnail_dirs_to_delete(self, media_id: str) -> List[str]:
         "The dirs to try and remove if we delete the media_id thumbnails"
         # Media id is of the form <DATE><RANDOM_STRING>
         # E.g.: 2017-09-28-fsdRDt24DS234dsf

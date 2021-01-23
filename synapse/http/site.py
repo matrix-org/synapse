@@ -20,7 +20,7 @@ from twisted.python.failure import Failure
 from twisted.web.server import Request, Site
 
 from synapse.config.server import ListenerConfig
-from synapse.http import redact_uri
+from synapse.http import get_request_user_agent, redact_uri
 from synapse.http.request_metrics import RequestMetrics, requests_counter
 from synapse.logging.context import LoggingContext, PreserveLoggingContext
 from synapse.types import Requester
@@ -112,15 +112,6 @@ class SynapseRequest(Request):
         if isinstance(method, bytes):
             method = self.method.decode("ascii")
         return method
-
-    def get_user_agent(self, default: str) -> str:
-        """Return the last User-Agent header, or the given default.
-        """
-        user_agent = self.requestHeaders.getRawHeaders(b"User-Agent", [None])[-1]
-        if user_agent is None:
-            return default
-
-        return user_agent.decode("ascii", "replace")
 
     def render(self, resrc):
         # this is called once a Resource has been found to serve the request; in our
@@ -292,12 +283,7 @@ class SynapseRequest(Request):
             # and can see that we're doing something wrong.
             authenticated_entity = repr(self.requester)  # type: ignore[unreachable]
 
-        # ...or could be raw utf-8 bytes in the User-Agent header.
-        # N.B. if you don't do this, the logger explodes cryptically
-        # with maximum recursion trying to log errors about
-        # the charset problem.
-        # c.f. https://github.com/matrix-org/synapse/issues/3471
-        user_agent = self.get_user_agent("-")
+        user_agent = get_request_user_agent(self, "-")
 
         code = str(self.code)
         if not self.finished:

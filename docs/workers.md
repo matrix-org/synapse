@@ -16,6 +16,9 @@ workers only work with PostgreSQL-based Synapse deployments. SQLite should only
 be used for demo purposes and any admin considering workers should already be
 running PostgreSQL.
 
+See also https://matrix.org/blog/2020/11/03/how-we-fixed-synapses-scalability
+for a higher level overview.
+
 ## Main process/worker communication
 
 The processes communicate with each other via a Synapse-specific protocol called
@@ -56,7 +59,7 @@ The appropriate dependencies must also be installed for Synapse. If using a
 virtualenv, these can be installed with:
 
 ```sh
-pip install matrix-synapse[redis]
+pip install "matrix-synapse[redis]"
 ```
 
 Note that these dependencies are included when synapse is installed with `pip
@@ -214,6 +217,7 @@ expressions:
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/members$
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/state$
     ^/_matrix/client/(api/v1|r0|unstable)/account/3pid$
+    ^/_matrix/client/(api/v1|r0|unstable)/devices$
     ^/_matrix/client/(api/v1|r0|unstable)/keys/query$
     ^/_matrix/client/(api/v1|r0|unstable)/keys/changes$
     ^/_matrix/client/versions$
