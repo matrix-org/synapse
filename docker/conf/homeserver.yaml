@@ -40,7 +40,7 @@ listeners:
         compress: false
   {% endif %}
 
-  - port: 8008
+  - port: {{ SYNAPSE_PORT or 8008 }}
     tls: false
     bind_addresses: ['::']
     type: http
