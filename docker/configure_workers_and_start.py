@@ -316,11 +316,9 @@ server {
         # This is not hardcoded as we want to be able to have several workers
         # of each type ultimately (though not supported for now)
         worker_name = worker_type
-        worker_config.update({
-            "name": worker_name,
-            "port": worker_port,
-            "config_path": config_path,
-        })
+        worker_config.update(
+            {"name": worker_name, "port": worker_port, "config_path": config_path}
+        )
 
         shared_config += worker_config["shared_extra_conf"] + "\n"
 
