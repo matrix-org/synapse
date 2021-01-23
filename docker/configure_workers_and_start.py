@@ -232,7 +232,7 @@ username=www-data
 autorestart=true
 
 [program:redis]
-command=/usr/bin/redis-server /etc/redis/redis.conf
+command=/usr/bin/redis-server /etc/redis/redis.conf --daemonize no
 priority=1
 stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0
