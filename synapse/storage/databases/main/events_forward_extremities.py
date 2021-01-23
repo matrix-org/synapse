@@ -86,9 +86,10 @@ class EventForwardExtremitiesStore(SQLBaseStore):
 
         def get_forward_extremities_for_room_txn(txn):
             sql = """
-                SELECT event_id, state_group
+                SELECT event_id, state_group, depth, received_ts
                 FROM event_forward_extremities
                 NATURAL JOIN event_to_state_groups
+                NATURAL JOIN events
                 WHERE room_id = ?
             """
 

@@ -535,13 +535,19 @@ A response as follows will be returned:
   "results": [
     {
       "event_id": "$M5SP266vsnxctfwFgFLNceaCo3ujhRtg_NiiHabcdefgh",
-      "state_group": 439
+      "state_group": 439,
+      "depth": 123,
+      "received_ts": 1611263016761
     }
   ]
 }    
 ```
 
 ## Deleting forward extremities
+
+**WARNING**: Please ensure you know what you're doing and have read 
+the related issue [#1760](https://github.com/matrix-org/synapse/issues/1760).
+Under no situations should this API be executed as an automated maintenance task!
 
 If a room has lots of forward extremities, the extra can be
 deleted as follows:
