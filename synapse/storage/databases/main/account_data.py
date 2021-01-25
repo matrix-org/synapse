@@ -68,7 +68,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             # `StreamIdGenerator`, otherwise we use `SlavedIdTracker` which gets
             # updated over replication. (Multiple writers are not supported for
             # SQLite).
-            if hs.get_instance_name() in hs.config.worker.writers.events:
+            if hs.get_instance_name() in hs.config.worker.writers.account_data:
                 self._account_data_id_gen = StreamIdGenerator(
                     db_conn,
                     "room_account_data",
