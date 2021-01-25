@@ -56,7 +56,6 @@ class ExternalCache:
                 hs.config.redis_port,
             )
 
-            # First create the connection for sending commands.
             self._redis_connection = lazyConnection(
                 reactor=hs.get_reactor(),
                 host=hs.config.redis_host,
