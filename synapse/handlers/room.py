@@ -52,7 +52,7 @@ from synapse.types import (
     create_requester,
 )
 from synapse.util import stringutils
-from synapse.util.async_helpers import Linearizer
+from synapse.util.async_helpers import Linearizer, maybe_awaitable
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import parse_and_validate_server_name
 from synapse.visibility import filter_events_for_client
@@ -1034,12 +1034,10 @@ class RoomContextHandler:
         is_peeking = user.to_string() not in users
 
         def filter_evts(events):
+            if use_admin_priviledge:
+                return maybe_awaitable(events)
             return filter_events_for_client(
-                self.storage,
-                user.to_string(),
-                events,
-                is_peeking=is_peeking,
-                use_admin_priviledge=use_admin_priviledge,
+                self.storage, user.to_string(), events, is_peeking=is_peeking
             )
 
         event = await self.store.get_event(
