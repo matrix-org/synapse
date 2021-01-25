@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from prometheus_client import Counter
 
+from synapse.logging.context import make_deferred_yieldable
 from synapse.util import json_decoder, json_encoder
 
 if TYPE_CHECKING:
@@ -90,8 +91,10 @@ class ExternalCache:
 
         logger.debug("Caching %s %s: %r", cache_name, key, encoded_value)
 
-        return await self._redis_connection.set(
-            self._get_redis_key(cache_name, key), encoded_value, pexpire=expire_ms,
+        return await make_deferred_yieldable(
+            self._redis_connection.set(
+                self._get_redis_key(cache_name, key), encoded_value, pexpire=expire_ms,
+            )
         )
 
     async def get(self, cache_name: str, key: str) -> Optional[Any]:
@@ -101,7 +104,9 @@ class ExternalCache:
         if self._redis_connection is None:
             return None
 
-        result = await self._redis_connection.get(self._get_redis_key(cache_name, key))
+        result = await make_deferred_yieldable(
+            self._redis_connection.get(self._get_redis_key(cache_name, key))
+        )
 
         logger.debug("Got cache result %s %s: %r", cache_name, key, result)
 
