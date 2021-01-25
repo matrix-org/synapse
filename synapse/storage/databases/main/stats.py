@@ -17,7 +17,9 @@
 import logging
 from enum import Enum
 from itertools import chain
-from typing import Any, Counter, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
+from typing_extensions import Counter
 
 from twisted.internet.defer import DeferredLock
 
