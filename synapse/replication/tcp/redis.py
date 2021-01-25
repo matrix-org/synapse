@@ -191,8 +191,8 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
 
 
 class SynapseRedisFactory(txredisapi.RedisFactory):
-    """A subclass of RedisFactory that periodically sends pings
-    to ensure that we detect dead connections.
+    """A subclass of RedisFactory that periodically sends pings to ensure that
+    we detect dead connections.
     """
 
     def __init__(
