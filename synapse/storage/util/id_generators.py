@@ -261,7 +261,11 @@ class MultiWriterIdGenerator:
         # We check that the table and sequence haven't diverged.
         for table, _, id_column in tables:
             self._sequence_gen.check_consistency(
-                db_conn, table=table, id_column=id_column, positive=positive
+                db_conn,
+                table=table,
+                id_column=id_column,
+                stream_name=stream_name,
+                positive=positive,
             )
 
         # This goes and fills out the above state from the database.
