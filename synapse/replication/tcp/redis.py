@@ -205,24 +205,19 @@ class SynapseRedisFactory(txredisapi.RedisFactory):
         handler: Type = txredisapi.ConnectionHandler,
         charset: str = "utf-8",
         password: Optional[str] = None,
-        replyTimeout: Optional[int] = None,
+        replyTimeout: int = 30,
         convertNumbers: Optional[int] = True,
     ):
-        # We want to ensure that we timeout when sending pings on dead
-        # connections, rather than just hanging.
-        if replyTimeout is None:
-            replyTimeout = 30
-
         super().__init__(
-            uuid,
-            dbid,
-            poolsize,
-            isLazy,
-            handler,
-            charset,
-            password,
-            replyTimeout,
-            convertNumbers,
+            uuid=uuid,
+            dbid=dbid,
+            poolsize=poolsize,
+            isLazy=isLazy,
+            handler=handler,
+            charset=charset,
+            password=password,
+            replyTimeout=replyTimeout,
+            convertNumbers=convertNumbers,
         )
 
         hs.get_clock().looping_call(self._send_ping, 30 * 1000)
@@ -257,9 +252,9 @@ class RedisDirectTcpReplicationClientFactory(SynapseRedisFactory):
 
         super().__init__(
             hs,
-            "subscriber",
-            None,
-            1,
+            uuid="subscriber",
+            dbid=None,
+            poolsize=1,
             replyTimeout=30,
             password=hs.config.redis.redis_password,
         )
@@ -290,36 +285,27 @@ def lazyConnection(
     port: int = 6379,
     dbid: Optional[int] = None,
     reconnect: bool = True,
-    charset: str = "utf-8",
     password: Optional[str] = None,
-    connectTimeout: Optional[int] = None,
-    replyTimeout: Optional[int] = None,
-    convertNumbers: bool = True,
+    replyTimeout: int = 30,
 ) -> txredisapi.RedisProtocol:
-    """Equivalent to `txredisapi.lazyConnection`, except allows specifying a
-    reactor.
+    """Creates a connection to Redis that is lazily set up and reconnects if the
+    connections is lost.
     """
-
-    isLazy = True
-    poolsize = 1
 
     uuid = "%s:%d" % (host, port)
     factory = SynapseRedisFactory(
         hs,
-        uuid,
-        dbid,
-        poolsize,
-        isLazy,
-        txredisapi.ConnectionHandler,
-        charset,
-        password,
-        replyTimeout,
-        convertNumbers,
+        uuid=uuid,
+        dbid=dbid,
+        poolsize=1,
+        isLazy=True,
+        handler=txredisapi.ConnectionHandler,
+        password=password,
+        replyTimeout=replyTimeout,
     )
     factory.continueTrying = reconnect
 
     reactor = hs.get_reactor()
-    for x in range(poolsize):
-        reactor.connectTCP(host, port, factory, connectTimeout)
+    reactor.connectTCP(host, port, factory, 30)
 
     return factory.handler
