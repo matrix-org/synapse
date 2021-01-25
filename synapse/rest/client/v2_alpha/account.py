@@ -692,6 +692,7 @@ class ThreepidAddRestServlet(RestServlet):
         assert_params_in_dict(body, ["client_secret", "sid"])
         sid = body["sid"]
         client_secret = body["client_secret"]
+        logger.info("GOT CLIENT_SECRET: %s, FULL BODY: %s", client_secret, body)
         assert_valid_client_secret(client_secret)
 
         await self.auth_handler.validate_user_via_ui_auth(
