@@ -149,21 +149,24 @@ For details on having Synapse manage your federation TLS certificates
 automatically, please see `<docs/ACME.md>`_.
 
 
-Security Note
+Security note
 =============
 
-Matrix serves raw user generated data in some APIs - specifically the `content
-repository endpoints <https://matrix.org/docs/spec/client_server/latest.html#get-matrix-media-r0-download-servername-mediaid>`_.
+Matrix serves raw, user-supplied data in some APIs -- specifically the `content
+repository endpoints`_.
 
-Whilst we have tried to mitigate against possible XSS attacks (e.g.
-https://github.com/matrix-org/synapse/pull/1021) we recommend running
-matrix homeservers on a dedicated domain name, to limit any malicious user generated
-content served to web browsers a matrix API from being able to attack webapps hosted
-on the same domain.  This is particularly true of sharing a matrix webclient and
-server on the same domain.
+.. _content repository endpoints: https://matrix.org/docs/spec/client_server/latest.html#get-matrix-media-r0-download-servername-mediaid
 
-See https://github.com/vector-im/riot-web/issues/1977 and
-https://developer.github.com/changes/2014-04-25-user-content-security for more details.
+Whilst we make a reasonable effort to mitigate against XSS attacks (such as
+using `CSP`_), ideally a Matrix homeserver should be hosted on a dedicated
+domain name not shared by other web applications. This particularly applies to
+sharing the domain with Matrix web clients and other sensitive applications
+like webmail.
+
+.. _CSP: https://github.com/matrix-org/synapse/pull/1021
+
+Using a separate domain ensures that even if an XSS is found in Synapse, the
+impact to other applications will be minimal.
 
 
 Upgrading an existing Synapse
