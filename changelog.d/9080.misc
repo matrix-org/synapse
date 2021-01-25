@@ -1,1 +1,0 @@
-Remove redundant `Homeserver.get_ip_from_request` method.

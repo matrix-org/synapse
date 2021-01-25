@@ -286,7 +286,7 @@ We recommend using the demo which starts 3 federated instances running on ports 
 
 (to stop, you can use `./demo/stop.sh`)
 
-If you just want to start a single instance of the app and run it directly:
+If you just want to start a single instance of the app and run it directly::
 
     # Create the homeserver.yaml config once
     python -m synapse.app.homeserver \

@@ -1,1 +1,0 @@
-Fix "Unhandled error in Deferred: BodyExceededMaxSize" errors when .well-known files that are too large.

@@ -1,1 +1,0 @@
-Reduce the scope of caught exceptions in `BlacklistingAgentWrapper`.

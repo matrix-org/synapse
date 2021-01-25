@@ -446,7 +446,7 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         p.feed(channel.result["body"].decode("utf-8"))
         p.close()
 
-        self.assertCountEqual(p.radios["idp"], ["cas", "oidc", "idp1", "saml"])
+        self.assertCountEqual(p.radios["idp"], ["cas", "oidc", "oidc-idp1", "saml"])
 
         self.assertEqual(p.hiddens["redirectUrl"], TEST_CLIENT_REDIRECT_URL)
 
