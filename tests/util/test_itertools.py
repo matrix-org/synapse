@@ -92,3 +92,15 @@ class SortTopologically(TestCase):
         # Valid orderings are `[1, 3, 2, 4]` or `[1, 2, 3, 4]`, but we should
         # always get the same one.
         self.assertEqual(list(sorted_topologically([4, 3, 2, 1], graph)), [1, 2, 3, 4])
+
+    def test_duplicates(self):
+        "Test that a graph with duplicate edges work"
+        graph = {1: [], 2: [1, 1], 3: [2, 2], 4: [3]}  # type: Dict[int, List[int]]
+
+        self.assertEqual(list(sorted_topologically([4, 3, 2, 1], graph)), [1, 2, 3, 4])
+
+    def test_multiple_paths(self):
+        "Test that a graph with multiple paths between two nodes work"
+        graph = {1: [], 2: [1], 3: [2], 4: [3, 2, 1]}  # type: Dict[int, List[int]]
+
+        self.assertEqual(list(sorted_topologically([4, 3, 2, 1], graph)), [1, 2, 3, 4])

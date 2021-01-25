@@ -1,1 +1,0 @@
-Add an `oidc-` prefix to any `idp_id`s which are given in the `oidc_providers` configuration.
