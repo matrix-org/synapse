@@ -1,1 +1,1 @@
-Do not throw spurious errors when deleting a non-existant pusher.
+Fix spurious errors in logs when deleting a non-existant pusher.
