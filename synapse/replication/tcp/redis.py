@@ -15,7 +15,7 @@
 
 import logging
 from inspect import isawaitable
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Type, cast
 
 import txredisapi
 
@@ -23,6 +23,7 @@ from synapse.logging.context import PreserveLoggingContext, make_deferred_yielda
 from synapse.metrics.background_process_metrics import (
     BackgroundProcessLoggingContext,
     run_as_background_process,
+    wrap_as_background_process,
 )
 from synapse.replication.tcp.commands import (
     Command,
@@ -187,7 +188,53 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
         )
 
 
-class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
+class SynapseRedisFactory(txredisapi.RedisFactory):
+    """A subclass of RedisFactory that ensures that periodically sends pings
+    to ensure that we detect dead connections.
+    """
+
+    def __init__(
+        self,
+        hs: "HomeServer",
+        uuid: str,
+        dbid: Optional[int],
+        poolsize: int,
+        isLazy: bool = False,
+        handler: Type = txredisapi.ConnectionHandler,
+        charset: str = "utf-8",
+        password: Optional[str] = None,
+        replyTimeout: Optional[int] = None,
+        convertNumbers: Optional[int] = True,
+    ):
+        # We want to ensure that we timeout when sending pings on dead
+        # connections, rather than just hanging.
+        if replyTimeout is None:
+            replyTimeout = 30
+
+        super().__init__(
+            uuid,
+            dbid,
+            poolsize,
+            isLazy,
+            handler,
+            charset,
+            password,
+            replyTimeout,
+            convertNumbers,
+        )
+
+        hs.get_clock().looping_call(self._send_ping, 30 * 1000)
+
+    @wrap_as_background_process("redis_ping")
+    async def _send_ping(self):
+        for connection in self.pool:
+            try:
+                await make_deferred_yieldable(connection.ping())
+            except Exception:
+                logger.warning("Failed to send ping to a redis connection")
+
+
+class RedisDirectTcpReplicationClientFactory(SynapseRedisFactory):
     """This is a reconnecting factory that connects to redis and immediately
     subscribes to a stream.
 
@@ -206,11 +253,14 @@ class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
         self, hs: "HomeServer", outbound_redis_connection: txredisapi.RedisProtocol
     ):
 
-        super().__init__()
-
-        # This sets the password on the RedisFactory base class (as
-        # SubscriberFactory constructor doesn't pass it through).
-        self.password = hs.config.redis.redis_password
+        super().__init__(
+            hs,
+            "subscriber",
+            None,
+            1,
+            replyTimeout=30,
+            password=hs.config.redis.redis_password,
+        )
 
         self.handler = hs.get_tcp_replication()
         self.stream_name = hs.hostname
@@ -218,7 +268,8 @@ class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
         self.outbound_redis_connection = outbound_redis_connection
 
     def buildProtocol(self, addr):
-        p = super().buildProtocol(addr)  # type: RedisSubscriber
+        p = super().buildProtocol(addr)
+        p = cast(RedisSubscriber, p)
 
         # We do this here rather than add to the constructor of `RedisSubcriber`
         # as to do so would involve overriding `buildProtocol` entirely, however
@@ -227,13 +278,12 @@ class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
         p.handler = self.handler
         p.outbound_redis_connection = self.outbound_redis_connection
         p.stream_name = self.stream_name
-        p.password = self.password
 
         return p
 
 
 def lazyConnection(
-    reactor,
+    hs: "HomeServer",
     host: str = "localhost",
     port: int = 6379,
     dbid: Optional[int] = None,
@@ -252,7 +302,8 @@ def lazyConnection(
     poolsize = 1
 
     uuid = "%s:%d" % (host, port)
-    factory = txredisapi.RedisFactory(
+    factory = SynapseRedisFactory(
+        hs,
         uuid,
         dbid,
         poolsize,
@@ -264,6 +315,8 @@ def lazyConnection(
         convertNumbers,
     )
     factory.continueTrying = reconnect
+
+    reactor = hs.get_reactor()
     for x in range(poolsize):
         reactor.connectTCP(host, port, factory, connectTimeout)
 
