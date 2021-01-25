@@ -375,7 +375,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 keyvalues={"name": user.to_string()},
                 updatevalues={"shadow_banned": shadow_banned},
             )
-            # In order for this to apply immediately, reset all access tokens of this user.
+            # In order for this to apply immediately, clear the cache for this user.
             tokens = self.db_pool.simple_select_onecol_txn(
                 txn,
                 table="access_tokens",
