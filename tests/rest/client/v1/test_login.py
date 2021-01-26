@@ -451,7 +451,7 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.result)
 
         # stick the flows results in a dict by type
-        flow_results = {}
+        flow_results = {}  # type: Dict[str, Any]
         for f in channel.json_body["flows"]:
             flow_type = f["type"]
             self.assertNotIn(
