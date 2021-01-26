@@ -941,42 +941,7 @@ class EventCreationHandler:
 
         await self.action_generator.handle_push_actions_for_event(event, context)
 
-        if self._external_cache.is_enabled():
-            # We precalculate the joined hosts at the event, when using Redis,
-            # so that external federation senders don't have to recalculate it
-            # themselves.
-            #
-            # We actually store two mappings, event ID -> prev state group,
-            # state group -> joined hosts, which is much more space efficient
-            # than event ID -> joined hosts.
-            #
-            # Note: We have to cache event ID -> prev state group, as we don't
-            # store that in the DB.
-            #
-            # Note: We always set the state group -> joined hosts cache, even if
-            # we already set it, so that the expiry time is reset.
-
-            state_entry = await self.state.resolve_state_groups_for_events(
-                event.room_id, event_ids=event.prev_event_ids()
-            )
-
-            if state_entry.state_group:
-                joined_hosts = await self.store.get_joined_hosts(
-                    event.room_id, state_entry
-                )
-
-                await self._external_cache.set(
-                    "event_to_prev_state_group",
-                    event.event_id,
-                    state_entry.state_group,
-                    expire_ms=60 * 60 * 1000,
-                )
-                await self._external_cache.set(
-                    "get_joined_hosts",
-                    str(state_entry.state_group),
-                    list(joined_hosts),
-                    expire_ms=60 * 60 * 1000,
-                )
+        await self._cache_joined_hosts_for_event(event)
 
         try:
             # If we're a worker we need to hit out to the master.
@@ -1016,6 +981,44 @@ class EventCreationHandler:
             # staging area, if we calculated them.
             await self.store.remove_push_actions_from_staging(event.event_id)
             raise
+
+    async def _cache_joined_hosts_for_event(self, event: EventBase):
+        """Precalculate the joined hosts at the event, when using Redis, so that
+        external federation senders don't have to recalculate it themselves.
+        """
+
+        if not self._external_cache.is_enabled():
+            return
+
+        # We actually store two mappings, event ID -> prev state group,
+        # state group -> joined hosts, which is much more space efficient
+        # than event ID -> joined hosts.
+        #
+        # Note: We have to cache event ID -> prev state group, as we don't
+        # store that in the DB.
+        #
+        # Note: We always set the state group -> joined hosts cache, even if
+        # we already set it, so that the expiry time is reset.
+
+        state_entry = await self.state.resolve_state_groups_for_events(
+            event.room_id, event_ids=event.prev_event_ids()
+        )
+
+        if state_entry.state_group:
+            joined_hosts = await self.store.get_joined_hosts(event.room_id, state_entry)
+
+            await self._external_cache.set(
+                "event_to_prev_state_group",
+                event.event_id,
+                state_entry.state_group,
+                expire_ms=60 * 60 * 1000,
+            )
+            await self._external_cache.set(
+                "get_joined_hosts",
+                str(state_entry.state_group),
+                list(joined_hosts),
+                expire_ms=60 * 60 * 1000,
+            )
 
     async def _validate_canonical_alias(
         self, directory_handler, room_alias_str: str, expected_room_id: str
