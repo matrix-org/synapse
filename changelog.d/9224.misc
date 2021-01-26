@@ -1,0 +1,1 @@
+Add stable `/rooms/:roomId/aliases` endpoint from r0.6.0 (MSC2432 historically).
