@@ -199,16 +199,22 @@ class FederationSender:
                     if not event.internal_metadata.should_proactively_send():
                         return
 
-                    # We check the external cache for the destinations, which is
-                    # stored per state group.
-                    destinations = None
-                    sg = await self._external_cache.get(
-                        "event_to_prev_state_group", event.event_id
-                    )
-                    if sg:
-                        destinations = await self._external_cache.get(
-                            "get_joined_hosts", str(sg)
+                    destinations = None  # type: Optional[Set[str]]
+                    if not event.prev_event_ids():
+                        # If there are no prev event IDs then the state is empty
+                        # and so no remote servers in the room
+                        destinations = set()
+                    else:
+                        # We check the external cache for the destinations, which is
+                        # stored per state group.
+
+                        sg = await self._external_cache.get(
+                            "event_to_prev_state_group", event.event_id
                         )
+                        if sg:
+                            destinations = await self._external_cache.get(
+                                "get_joined_hosts", str(sg)
+                            )
 
                     if destinations is None:
                         try:
