@@ -1011,13 +1011,13 @@ class EventCreationHandler:
                 "event_to_prev_state_group",
                 event.event_id,
                 state_entry.state_group,
-                expire_ms=60 * 60 * 1000,
+                expiry_ms=60 * 60 * 1000,
             )
             await self._external_cache.set(
                 "get_joined_hosts",
                 str(state_entry.state_group),
                 list(joined_hosts),
-                expire_ms=60 * 60 * 1000,
+                expiry_ms=60 * 60 * 1000,
             )
 
     async def _validate_canonical_alias(
