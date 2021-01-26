@@ -1,0 +1,1 @@
+Skip the newsfile check in CI when not testing a pull request.

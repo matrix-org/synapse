@@ -7,6 +7,11 @@ echo -e "+++ \033[32mChecking newsfragment\033[m"
 
 set -e
 
+if [ "$BUILDKITE_PULL_REQUEST" = "false" ]; then
+    echo "Not a pull request; skipping newsfile check."
+    exit 0
+fi
+
 # make sure that origin/develop is up to date
 git remote set-branches --add origin develop
 git fetch -q origin develop
