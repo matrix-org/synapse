@@ -19,8 +19,9 @@ from typing import List, Optional, Type, Union
 
 class RedisProtocol:
     def publish(self, channel: str, message: bytes): ...
+    async def ping(self) -> None: ...
 
-class SubscriberProtocol:
+class SubscriberProtocol(RedisProtocol):
     def __init__(self, *args, **kwargs): ...
     password: Optional[str]
     def subscribe(self, channels: Union[str, List[str]]): ...
@@ -39,14 +40,13 @@ def lazyConnection(
     convertNumbers: bool = ...,
 ) -> RedisProtocol: ...
 
-class SubscriberFactory:
-    def buildProtocol(self, addr): ...
-
 class ConnectionHandler: ...
 
 class RedisFactory:
     continueTrying: bool
     handler: RedisProtocol
+    pool: List[RedisProtocol]
+    replyTimeout: Optional[int]
     def __init__(
         self,
         uuid: str,
@@ -59,3 +59,7 @@ class RedisFactory:
         replyTimeout: Optional[int] = None,
         convertNumbers: Optional[int] = True,
     ): ...
+    def buildProtocol(self, addr) -> RedisProtocol: ...
+
+class SubscriberFactory(RedisFactory):
+    def __init__(self): ...
