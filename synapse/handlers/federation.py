@@ -2096,7 +2096,7 @@ class FederationHandler(BaseHandler):
         # If we are going to send this event over federation we precaclculate
         # the joined hosts.
         if event.internal_metadata.get_send_on_behalf_of():
-            await self.event_creation_handler._cache_joined_hosts_for_event(event)
+            await self.event_creation_handler.cache_joined_hosts_for_event(event)
 
         return context
 

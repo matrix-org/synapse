@@ -941,7 +941,7 @@ class EventCreationHandler:
 
         await self.action_generator.handle_push_actions_for_event(event, context)
 
-        await self._cache_joined_hosts_for_event(event)
+        await self.cache_joined_hosts_for_event(event)
 
         try:
             # If we're a worker we need to hit out to the master.
@@ -982,7 +982,7 @@ class EventCreationHandler:
             await self.store.remove_push_actions_from_staging(event.event_id)
             raise
 
-    async def _cache_joined_hosts_for_event(self, event: EventBase):
+    async def cache_joined_hosts_for_event(self, event: EventBase) -> None:
         """Precalculate the joined hosts at the event, when using Redis, so that
         external federation senders don't have to recalculate it themselves.
         """
