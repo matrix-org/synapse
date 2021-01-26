@@ -78,7 +78,7 @@ def sorted_topologically(
         if node not in degree_map:
             continue
 
-        for edge in edges:
+        for edge in set(edges):
             if edge in degree_map:
                 degree_map[node] += 1
 

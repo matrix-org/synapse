@@ -15,12 +15,12 @@
 
 """Contains *incomplete* type hints for txredisapi.
 """
-
-from typing import Any, Awaitable, List, Optional, Type, Union
+from typing import Any, List, Optional, Type, Union
 
 class RedisProtocol:
     def publish(self, channel: str, message: bytes): ...
-    def set(
+    async def ping(self) -> None: ...
+    async def set(
         self,
         key: str,
         value: Any,
@@ -28,10 +28,10 @@ class RedisProtocol:
         pexpire: Optional[int] = None,
         only_if_not_exists: bool = False,
         only_if_exists: bool = False,
-    ) -> Awaitable[None]: ...
-    def get(self, key: str) -> Awaitable[Any]: ...
+    ) -> None: ...
+    async def get(self, key: str) -> Any: ...
 
-class SubscriberProtocol:
+class SubscriberProtocol(RedisProtocol):
     def __init__(self, *args, **kwargs): ...
     password: Optional[str]
     def subscribe(self, channels: Union[str, List[str]]): ...
@@ -50,14 +50,13 @@ def lazyConnection(
     convertNumbers: bool = ...,
 ) -> RedisProtocol: ...
 
-class SubscriberFactory:
-    def buildProtocol(self, addr): ...
-
 class ConnectionHandler: ...
 
 class RedisFactory:
     continueTrying: bool
     handler: RedisProtocol
+    pool: List[RedisProtocol]
+    replyTimeout: Optional[int]
     def __init__(
         self,
         uuid: str,
@@ -70,3 +69,7 @@ class RedisFactory:
         replyTimeout: Optional[int] = None,
         convertNumbers: Optional[int] = True,
     ): ...
+    def buildProtocol(self, addr) -> RedisProtocol: ...
+
+class SubscriberFactory(RedisFactory):
+    def __init__(self): ...
