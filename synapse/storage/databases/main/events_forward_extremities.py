@@ -89,7 +89,7 @@ class EventForwardExtremitiesStore(SQLBaseStore):
                 SELECT event_id, state_group, depth, received_ts
                 FROM event_forward_extremities
                 INNER JOIN event_to_state_groups USING (event_id)
-                INNER JOIN events INNER JOIN USING (event_id)
+                INNER JOIN events USING (room_id, event_id)
                 WHERE room_id = ?
             """
 
