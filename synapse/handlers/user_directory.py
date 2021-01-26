@@ -228,7 +228,12 @@ class UserDirectoryHandler(StateDeltasHandler):
                         continue
 
                     if change:  # The user joined
-                        event = await self.store.get_event(event_id)
+                        event = await self.store.get_event(event_id, allow_none=True)
+                        # It isn't expected for this event to not exist, but we
+                        # don't want the entire background process to break.
+                        if event is None:
+                            continue
+
                         profile = ProfileInfo(
                             avatar_url=event.content.get("avatar_url"),
                             display_name=event.content.get("displayname"),
