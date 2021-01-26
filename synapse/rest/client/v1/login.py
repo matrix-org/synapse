@@ -61,7 +61,7 @@ class LoginRestServlet(RestServlet):
         self.saml2_enabled = hs.config.saml2_enabled
         self.cas_enabled = hs.config.cas_enabled
         self.oidc_enabled = hs.config.oidc_enabled
-        self._msc2858_enabled = hs.config.sso.experimental_msc2858_support_enabled
+        self._msc2858_enabled = hs.config.experimental.msc2858_enabled
 
         self.auth = hs.get_auth()
 
@@ -349,7 +349,7 @@ class SsoRedirectServlet(RestServlet):
         if hs.config.oidc_enabled:
             hs.get_oidc_handler()
         self._sso_handler = hs.get_sso_handler()
-        self._msc2858_enabled = hs.config.sso.experimental_msc2858_support_enabled
+        self._msc2858_enabled = hs.config.experimental.msc2858_enabled
 
     def register(self, http_server: HttpServer) -> None:
         super().register(http_server)

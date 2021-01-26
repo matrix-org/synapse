@@ -444,7 +444,7 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
 
         self.assertCountEqual(channel.json_body["flows"], expected_flows)
 
-    @override_config({"experimental_msc2858_support_enabled": True})
+    @override_config({"experimental_features": {"msc2858_enabled": True}})
     def test_get_msc2858_login_flows(self):
         """The SSO flow should include IdP info if MSC2858 is enabled"""
         channel = self.make_request("GET", "/_matrix/client/r0/login")
@@ -629,7 +629,7 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 400, channel.result)
         self.assertEqual(channel.json_body["errcode"], "M_UNRECOGNIZED")
 
-    @override_config({"experimental_msc2858_support_enabled": True})
+    @override_config({"experimental_features": {"msc2858_enabled": True}})
     def test_client_idp_redirect_to_unknown(self):
         """If the client tries to pick an unknown IdP, return a 404"""
         channel = self.make_request(
@@ -640,7 +640,7 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 404, channel.result)
         self.assertEqual(channel.json_body["errcode"], "M_NOT_FOUND")
 
-    @override_config({"experimental_msc2858_support_enabled": True})
+    @override_config({"experimental_features": {"msc2858_enabled": True}})
     def test_client_idp_redirect_to_oidc(self):
         """If the client pick a known IdP, redirect to it"""
         channel = self.make_request(
