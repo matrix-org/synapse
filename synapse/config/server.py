@@ -23,7 +23,7 @@ from typing import Any, Dict, Iterable, List, Optional, Set
 
 import attr
 import yaml
-from netaddr import IPSet
+from netaddr import IPNetwork, IPSet
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.util.stringutils import parse_and_validate_server_name
@@ -40,7 +40,24 @@ logger = logging.Logger(__name__)
 # in the list.
 DEFAULT_BIND_ADDRESSES = ["::", "0.0.0.0"]
 
-DEFAULT_IP_RANGE_BLACKLIST = [
+
+def _6to4(network_str: str) -> str:
+    """Convert an IPv4 network into a 6to4 IPv6 network per RFC 3056."""
+    network = IPNetwork(network_str)
+    # 6to4 networks have a prefix of 2002, the first IPv4 address in the network
+    # needs to be hex-encoded as the next 32 bits. Calculate the new prefix by
+    # adding 16 (the additional bits from the 2002: prefix).
+    hex_network = hex(network.first)[2:]
+    hex_network = ("0" * (8 - len(hex_network))) + hex_network
+    return "2002:%s:%s::/%d" % (
+        hex_network[:4],
+        hex_network[4:],
+        16 + network.prefixlen,
+    )
+
+
+# Start with IPv4 ranges that are considered private / unroutable / don't make sense.
+DEFAULT_IPV4_RANGE_BLACKLIST = [
     # Localhost
     "127.0.0.0/8",
     # Private networks.
@@ -60,6 +77,24 @@ DEFAULT_IP_RANGE_BLACKLIST = [
     "203.0.113.0/24",
     # Multicast.
     "224.0.0.0/4",
+]
+
+# IPv6 contains all of the IPv4 address space, see RFC 4291, section 2.5.5.
+# IPv6 also has a deprecated transition mechanism (6to4) which is not supposed
+# to be used for private IPv4 space, see RFC 3056, section 2.
+DEFAULT_IPV6_RANGE_BLACKLIST = (
+    [
+        str(IPNetwork(ip).ipv6(ipv4_compatible=True))
+        for ip in DEFAULT_IPV4_RANGE_BLACKLIST
+    ]
+    + [
+        str(IPNetwork(ip).ipv6(ipv4_compatible=False))
+        for ip in DEFAULT_IPV4_RANGE_BLACKLIST
+    ]
+    + [_6to4(ip) for ip in DEFAULT_IPV4_RANGE_BLACKLIST]
+)
+# Add IPv6 ranges that are considered private / unroutable / don't make sense.
+DEFAULT_IPV6_RANGE_BLACKLIST += [
     # Localhost
     "::1/128",
     # Link-local addresses.
@@ -67,6 +102,7 @@ DEFAULT_IP_RANGE_BLACKLIST = [
     # Unique local addresses.
     "fc00::/7",
 ]
+DEFAULT_IP_RANGE_BLACKLIST = DEFAULT_IPV4_RANGE_BLACKLIST + DEFAULT_IPV6_RANGE_BLACKLIST
 
 DEFAULT_ROOM_VERSION = "6"
 
