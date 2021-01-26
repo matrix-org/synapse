@@ -15,7 +15,6 @@
 
 """Contains *incomplete* type hints for txredisapi.
 """
-
 from typing import List, Optional, Type, Union
 
 class RedisProtocol:
