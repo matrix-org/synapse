@@ -46,24 +46,7 @@ class ExternalCache:
     """
 
     def __init__(self, hs: "HomeServer"):
-        self._redis_connection = None
-
-        if hs.config.redis.redis_enabled:
-            from synapse.replication.tcp.redis import lazyConnection
-
-            logger.info(
-                "Connecting to redis (host=%r port=%r) for external cache",
-                hs.config.redis_host,
-                hs.config.redis_port,
-            )
-
-            self._redis_connection = lazyConnection(
-                reactor=hs.get_reactor(),
-                host=hs.config.redis_host,
-                port=hs.config.redis_port,
-                password=hs.config.redis.redis_password,
-                reconnect=True,
-            )
+        self._redis_connection = hs.get_outbound_redis_connection()
 
     def _get_redis_key(self, cache_name: str, key: str) -> str:
         return "cache_v1:%s:%s" % (cache_name, key)
