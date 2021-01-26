@@ -23,6 +23,7 @@ from synapse.config._util import validate_config
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.types import Collection, JsonDict
 from synapse.util.module_loader import load_module
+from synapse.util.stringutils import parse_and_validate_mxc_uri
 
 from ._base import Config, ConfigError
 
@@ -43,8 +44,6 @@ class OIDCConfig(Config):
             raise ConfigError(e.message) from e
 
         public_baseurl = self.public_baseurl
-        if public_baseurl is None:
-            raise ConfigError("oidc_config requires a public_baseurl to be set")
         self.oidc_callback_url = public_baseurl + "_synapse/oidc/callback"
 
     @property
@@ -67,6 +66,12 @@ class OIDCConfig(Config):
         #
         #   idp_name: A user-facing name for this identity provider, which is used to
         #       offer the user a choice of login mechanisms.
+        #
+        #   idp_icon: An optional icon for this identity provider, which is presented
+        #       by identity picker pages. If given, must be an MXC URI of the format
+        #       mxc://<server-name>/<media-id>. (An easy way to obtain such an MXC URI
+        #       is to upload an image to an (unencrypted) room and then copy the "url"
+        #       from the source of the event.)
         #
         #   discover: set to 'false' to disable the use of the OIDC discovery mechanism
         #       to discover endpoints. Defaults to true.
@@ -152,13 +157,16 @@ class OIDCConfig(Config):
         #
         # For backwards compatibility, it is also possible to configure a single OIDC
         # provider via an 'oidc_config' setting. This is now deprecated and admins are
-        # advised to migrate to the 'oidc_providers' format.
+        # advised to migrate to the 'oidc_providers' format. (When doing that migration,
+        # use 'oidc' for the idp_id to ensure that existing users continue to be
+        # recognised.)
         #
         oidc_providers:
           # Generic example
           #
           #- idp_id: my_idp
           #  idp_name: "My OpenID provider"
+          #  idp_icon: "mxc://example.com/mediaid"
           #  discover: false
           #  issuer: "https://accounts.example.com/"
           #  client_id: "provided-by-your-issuer"
@@ -182,8 +190,8 @@ class OIDCConfig(Config):
 
           # For use with Github
           #
-          #- idp_id: google
-          #  idp_name: Google
+          #- idp_id: github
+          #  idp_name: Github
           #  discover: false
           #  issuer: "https://github.com/"
           #  client_id: "your-client-id" # TO BE FILLED
@@ -207,8 +215,11 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
     "type": "object",
     "required": ["issuer", "client_id", "client_secret"],
     "properties": {
+        # TODO: fix the maxLength here depending on what MSC2528 decides
+        #   remember that we prefix the ID given here with `oidc-`
         "idp_id": {"type": "string", "minLength": 1, "maxLength": 128},
         "idp_name": {"type": "string"},
+        "idp_icon": {"type": "string"},
         "discover": {"type": "boolean"},
         "issuer": {"type": "string"},
         "client_id": {"type": "string"},
@@ -327,20 +338,50 @@ def _parse_oidc_config_dict(
             config_path + ("user_mapping_provider", "module"),
         )
 
-    # MSC2858 will appy certain limits in what can be used as an IdP id, so let's
+    # MSC2858 will apply certain limits in what can be used as an IdP id, so let's
     # enforce those limits now.
+    # TODO: factor out this stuff to a generic function
     idp_id = oidc_config.get("idp_id", "oidc")
-    valid_idp_chars = set(string.ascii_letters + string.digits + "-._~")
+
+    # TODO: update this validity check based on what MSC2858 decides.
+    valid_idp_chars = set(string.ascii_lowercase + string.digits + "-._")
 
     if any(c not in valid_idp_chars for c in idp_id):
         raise ConfigError(
-            'idp_id may only contain A-Z, a-z, 0-9, "-", ".", "_", "~"',
+            'idp_id may only contain a-z, 0-9, "-", ".", "_"',
             config_path + ("idp_id",),
         )
+
+    if idp_id[0] not in string.ascii_lowercase:
+        raise ConfigError(
+            "idp_id must start with a-z", config_path + ("idp_id",),
+        )
+
+    # prefix the given IDP with a prefix specific to the SSO mechanism, to avoid
+    # clashes with other mechs (such as SAML, CAS).
+    #
+    # We allow "oidc" as an exception so that people migrating from old-style
+    # "oidc_config" format (which has long used "oidc" as its idp_id) can migrate to
+    # a new-style "oidc_providers" entry without changing the idp_id for their provider
+    # (and thereby invalidating their user_external_ids data).
+
+    if idp_id != "oidc":
+        idp_id = "oidc-" + idp_id
+
+    # MSC2858 also specifies that the idp_icon must be a valid MXC uri
+    idp_icon = oidc_config.get("idp_icon")
+    if idp_icon is not None:
+        try:
+            parse_and_validate_mxc_uri(idp_icon)
+        except ValueError as e:
+            raise ConfigError(
+                "idp_icon must be a valid MXC URI", config_path + ("idp_icon",)
+            ) from e
 
     return OidcProviderConfig(
         idp_id=idp_id,
         idp_name=oidc_config.get("idp_name", "OIDC"),
+        idp_icon=idp_icon,
         discover=oidc_config.get("discover", True),
         issuer=oidc_config["issuer"],
         client_id=oidc_config["client_id"],
@@ -367,6 +408,9 @@ class OidcProviderConfig:
 
     # user-facing name for this identity provider.
     idp_name = attr.ib(type=str)
+
+    # Optional MXC URI for icon for this IdP.
+    idp_icon = attr.ib(type=Optional[str])
 
     # whether the OIDC discovery mechanism is used to discover endpoints
     discover = attr.ib(type=bool)

@@ -17,6 +17,9 @@
                     <li>
                         <input type="radio" name="idp" id="prov{{loop.index}}" value="{{p.idp_id}}">
                         <label for="prov{{loop.index}}">{{p.idp_name | e}}</label>
+{% if p.idp_icon %}
+                        <img src="{{p.idp_icon | mxc_to_http(32, 32)}}"/>
+{% endif %}
                     </li>
 {% endfor %}
                 </ul>
