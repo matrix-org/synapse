@@ -330,7 +330,6 @@ Synapse config:
 ```yaml
   - idp_id: facebook
     idp_name: Facebook
-    idp_icon: "mxc://sw1v.org/SDfenVPwXAwVcHXOGkinoPkb"
     idp_brand: "org.matrix.facebook"  # optional: styling hint for clients
     discover: false
     issuer: "https://facebook.com"
