@@ -1,0 +1,1 @@
+The make_room_admin admin API now checks if a user is in the room before sending a PL event on their behalf. Contributed by Pankaj Yadav.
