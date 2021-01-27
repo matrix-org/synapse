@@ -1,1 +1,1 @@
-Restore PyPy compatibility by using psycopg2cffi consistently.
+Restore PyPy compatibility by using psycopg2cffi consistently and not calling CPython GC methods.
