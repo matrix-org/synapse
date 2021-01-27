@@ -234,7 +234,7 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
             "type": "string",
             "minLength": 1,
             # MSC2858 allows a maxlen of 255, but we prefix with "oidc-"
-            "maxLength": 251,
+            "maxLength": 250,
             "pattern": "^[A-Za-z0-9._~-]+$",
         },
         "idp_name": {"type": "string"},
