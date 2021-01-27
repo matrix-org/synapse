@@ -22,12 +22,8 @@ class ExperimentalConfig(Config):
 
     section = "experimental"
 
-    # MSC2858 (multiple SSO identity providers)
-    msc2858_enabled = False
-
     def read_config(self, config: JsonDict, **kwargs):
-        experimental = config.get("experimental_features")
-        if not experimental:
-            return
+        experimental = config.get("experimental_features") or {}
 
-        self.msc2858_enabled = experimental.get("msc2858_enabled", False)
+        # MSC2858 (multiple SSO identity providers)
+        self.msc2858_enabled = experimental.get("msc2858_enabled", False)  # type: bool
