@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import itertools
 import logging
 import os.path
 import re
@@ -41,23 +42,58 @@ logger = logging.Logger(__name__)
 DEFAULT_BIND_ADDRESSES = ["::", "0.0.0.0"]
 
 
-def _6to4(network_str: str) -> str:
+def _6to4(network: IPNetwork) -> IPNetwork:
     """Convert an IPv4 network into a 6to4 IPv6 network per RFC 3056."""
-    network = IPNetwork(network_str)
-    # 6to4 networks have a prefix of 2002, the first IPv4 address in the network
-    # needs to be hex-encoded as the next 32 bits. Calculate the new prefix by
-    # adding 16 (the additional bits from the 2002: prefix).
+
+    # 6to4 networks consist of:
+    # * 2002 as the first 16 bits
+    # * The first IPv4 address in the network hex-encoded as the next 32 bits
+    # * The new prefix length needs to include the bits from the 2002 prefix.
     hex_network = hex(network.first)[2:]
     hex_network = ("0" * (8 - len(hex_network))) + hex_network
-    return "2002:%s:%s::/%d" % (
-        hex_network[:4],
-        hex_network[4:],
-        16 + network.prefixlen,
+    return IPNetwork(
+        "2002:%s:%s::/%d" % (hex_network[:4], hex_network[4:], 16 + network.prefixlen,)
     )
 
 
-# Start with IPv4 ranges that are considered private / unroutable / don't make sense.
-DEFAULT_IPV4_RANGE_BLACKLIST = [
+def generate_ip_set(
+    ip_addresses: Iterable[str], extra_addresses: Optional[Iterable[str]] = None
+) -> IPSet:
+    """
+    Generate an IPSet from a list of IP addresses or CIDRs.
+
+    Additionally, for each IPv4 network in the list of IP addresses, also
+    includes the corresponding IPv6 networks.
+
+    This includes:
+
+    * IPv4-Compatible IPv6 Address (see RFC 4291, section 2.5.5.1)
+    * IPv4-Mapped IPv6 Address (see RFC 4291, section 2.5.5.1)
+    * 6to4 Address (see RFC 3056, section 2)
+
+    Args:
+        ip_addresses: An iterable of IP addresses or CIDRs.
+        extra_addresses: An iterable of IP addresses or CIDRs.
+
+    Returns:
+        A new IP set.
+    """
+    result = IPSet()
+    for ip in itertools.chain(ip_addresses, extra_addresses or ()):
+        network = IPNetwork(ip)
+        result.add(network)
+
+        # It is possible that these already exist in the set, but that's OK.
+        if ":" not in str(network):
+            result.add(IPNetwork(network).ipv6(ipv4_compatible=True))
+            result.add(IPNetwork(network).ipv6(ipv4_compatible=False))
+            result.add(_6to4(network))
+
+    return result
+
+
+# IP ranges that are considered private / unroutable / don't make sense.
+DEFAULT_IP_RANGE_BLACKLIST = [
     # Localhost
     "127.0.0.0/8",
     # Private networks.
@@ -77,24 +113,6 @@ DEFAULT_IPV4_RANGE_BLACKLIST = [
     "203.0.113.0/24",
     # Multicast.
     "224.0.0.0/4",
-]
-
-# IPv6 contains all of the IPv4 address space, see RFC 4291, section 2.5.5.
-# IPv6 also has a deprecated transition mechanism (6to4) which is not supposed
-# to be used for private IPv4 space, see RFC 3056, section 2.
-DEFAULT_IPV6_RANGE_BLACKLIST = (
-    [
-        str(IPNetwork(ip).ipv6(ipv4_compatible=True))
-        for ip in DEFAULT_IPV4_RANGE_BLACKLIST
-    ]
-    + [
-        str(IPNetwork(ip).ipv6(ipv4_compatible=False))
-        for ip in DEFAULT_IPV4_RANGE_BLACKLIST
-    ]
-    + [_6to4(ip) for ip in DEFAULT_IPV4_RANGE_BLACKLIST]
-)
-# Add IPv6 ranges that are considered private / unroutable / don't make sense.
-DEFAULT_IPV6_RANGE_BLACKLIST += [
     # Localhost
     "::1/128",
     # Link-local addresses.
@@ -102,7 +120,6 @@ DEFAULT_IPV6_RANGE_BLACKLIST += [
     # Unique local addresses.
     "fc00::/7",
 ]
-DEFAULT_IP_RANGE_BLACKLIST = DEFAULT_IPV4_RANGE_BLACKLIST + DEFAULT_IPV6_RANGE_BLACKLIST
 
 DEFAULT_ROOM_VERSION = "6"
 
@@ -331,14 +348,17 @@ class ServerConfig(Config):
 
         # Attempt to create an IPSet from the given ranges
         try:
-            self.ip_range_blacklist = IPSet(ip_range_blacklist)
+            # Always blacklist 0.0.0.0, ::
+            self.ip_range_blacklist = generate_ip_set(
+                ip_range_blacklist, ["0.0.0.0", "::"]
+            )
         except Exception as e:
             raise ConfigError("Invalid range(s) provided in ip_range_blacklist.") from e
-        # Always blacklist 0.0.0.0, ::
-        self.ip_range_blacklist.update(["0.0.0.0", "::"])
 
         try:
-            self.ip_range_whitelist = IPSet(config.get("ip_range_whitelist", ()))
+            self.ip_range_whitelist = generate_ip_set(
+                config.get("ip_range_whitelist", ())
+            )
         except Exception as e:
             raise ConfigError("Invalid range(s) provided in ip_range_whitelist.") from e
 
@@ -349,13 +369,14 @@ class ServerConfig(Config):
             "federation_ip_range_blacklist", ip_range_blacklist
         )
         try:
-            self.federation_ip_range_blacklist = IPSet(federation_ip_range_blacklist)
+            # Always blacklist 0.0.0.0, ::
+            self.federation_ip_range_blacklist = generate_ip_set(
+                federation_ip_range_blacklist, ["0.0.0.0", "::"]
+            )
         except Exception as e:
             raise ConfigError(
                 "Invalid range(s) provided in federation_ip_range_blacklist."
             ) from e
-        # Always blacklist 0.0.0.0, ::
-        self.federation_ip_range_blacklist.update(["0.0.0.0", "::"])
 
         self.start_pushers = config.get("start_pushers", True)
 

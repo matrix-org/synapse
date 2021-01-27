@@ -17,9 +17,7 @@ import os
 from collections import namedtuple
 from typing import Dict, List
 
-from netaddr import IPSet
-
-from synapse.config.server import DEFAULT_IP_RANGE_BLACKLIST
+from synapse.config.server import DEFAULT_IP_RANGE_BLACKLIST, generate_ip_set
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module
 
@@ -187,15 +185,13 @@ class ContentRepositoryConfig(Config):
                     "to work"
                 )
 
-            self.url_preview_ip_range_blacklist = IPSet(
-                config["url_preview_ip_range_blacklist"]
-            )
-
             # we always blacklist '0.0.0.0' and '::', which are supposed to be
             # unroutable addresses.
-            self.url_preview_ip_range_blacklist.update(["0.0.0.0", "::"])
+            self.url_preview_ip_range_blacklist = generate_ip_set(
+                config["url_preview_ip_range_blacklist"], ["0.0.0.0", "::"]
+            )
 
-            self.url_preview_ip_range_whitelist = IPSet(
+            self.url_preview_ip_range_whitelist = generate_ip_set(
                 config.get("url_preview_ip_range_whitelist", ())
             )
 
