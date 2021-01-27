@@ -848,7 +848,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request("POST", b"account/3pid/email/requestToken", body,)
 
-        if channel.code != 200:
+        if channel.code != expect_code:
             raise HttpResponseException(
                 channel.code, channel.result["reason"], channel.result["body"],
             )
