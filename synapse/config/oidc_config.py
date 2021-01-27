@@ -78,10 +78,14 @@ class OIDCConfig(Config):
         #       offer the user a choice of login mechanisms.
         #
         #   idp_icon: An optional icon for this identity provider, which is presented
-        #       by identity picker pages. If given, must be an MXC URI of the format
-        #       mxc://<server-name>/<media-id>. (An easy way to obtain such an MXC URI
-        #       is to upload an image to an (unencrypted) room and then copy the "url"
-        #       from the source of the event.)
+        #       by clients and Synapse's own IdP picker page. If given, must be an
+        #       MXC URI of the format mxc://<server-name>/<media-id>. (An easy way to
+        #       obtain such an MXC URI is to upload an image to an (unencrypted) room
+        #       and then copy the "url" from the source of the event.)
+        #
+        #   idp_brand: An optional brand for this identity provider, allowing clients
+        #       to style the login flow according to the identity provider in question.
+        #       See the spec for possible options here.
         #
         #   discover: set to 'false' to disable the use of the OIDC discovery mechanism
         #       to discover endpoints. Defaults to true.
@@ -202,6 +206,7 @@ class OIDCConfig(Config):
           #
           #- idp_id: github
           #  idp_name: Github
+          #  idp_brand: org.matrix.github
           #  discover: false
           #  issuer: "https://github.com/"
           #  client_id: "your-client-id" # TO BE FILLED
@@ -234,6 +239,13 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
         },
         "idp_name": {"type": "string"},
         "idp_icon": {"type": "string"},
+        "idp_brand": {
+            "type": "string",
+            # MSC2758-style namespaced identifier
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[a-z][a-z0-9_.-]*$",
+        },
         "discover": {"type": "boolean"},
         "issuer": {"type": "string"},
         "client_id": {"type": "string"},
@@ -379,6 +391,7 @@ def _parse_oidc_config_dict(
         idp_id=idp_id,
         idp_name=oidc_config.get("idp_name", "OIDC"),
         idp_icon=idp_icon,
+        idp_brand=oidc_config.get("idp_brand"),
         discover=oidc_config.get("discover", True),
         issuer=oidc_config["issuer"],
         client_id=oidc_config["client_id"],
@@ -408,6 +421,9 @@ class OidcProviderConfig:
 
     # Optional MXC URI for icon for this IdP.
     idp_icon = attr.ib(type=Optional[str])
+
+    # Optional brand identifier for this IdP.
+    idp_brand = attr.ib(type=Optional[str])
 
     # whether the OIDC discovery mechanism is used to discover endpoints
     discover = attr.ib(type=bool)
