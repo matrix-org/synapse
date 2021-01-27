@@ -24,7 +24,7 @@ from typing import Any, Dict, Iterable, List, Optional, Set
 
 import attr
 import yaml
-from netaddr import IPNetwork, IPSet
+from netaddr import AddrFormatError, IPNetwork, IPSet
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.util.stringutils import parse_and_validate_server_name
@@ -57,7 +57,9 @@ def _6to4(network: IPNetwork) -> IPNetwork:
 
 
 def generate_ip_set(
-    ip_addresses: Iterable[str], extra_addresses: Optional[Iterable[str]] = None
+    ip_addresses: Optional[Iterable[str]],
+    extra_addresses: Optional[Iterable[str]] = None,
+    config_path: Optional[Iterable[str]] = None,
 ) -> IPSet:
     """
     Generate an IPSet from a list of IP addresses or CIDRs.
@@ -74,13 +76,19 @@ def generate_ip_set(
     Args:
         ip_addresses: An iterable of IP addresses or CIDRs.
         extra_addresses: An iterable of IP addresses or CIDRs.
+        config_path: The path in the configuration for error messages.
 
     Returns:
         A new IP set.
     """
     result = IPSet()
-    for ip in itertools.chain(ip_addresses, extra_addresses or ()):
-        network = IPNetwork(ip)
+    for ip in itertools.chain(ip_addresses or (), extra_addresses or ()):
+        try:
+            network = IPNetwork(ip)
+        except AddrFormatError as e:
+            raise ConfigError(
+                "Invalid IP range provided: %s." % (ip,), config_path
+            ) from e
         result.add(network)
 
         # It is possible that these already exist in the set, but that's OK.
@@ -347,20 +355,15 @@ class ServerConfig(Config):
         )
 
         # Attempt to create an IPSet from the given ranges
-        try:
-            # Always blacklist 0.0.0.0, ::
-            self.ip_range_blacklist = generate_ip_set(
-                ip_range_blacklist, ["0.0.0.0", "::"]
-            )
-        except Exception as e:
-            raise ConfigError("Invalid range(s) provided in ip_range_blacklist.") from e
 
-        try:
-            self.ip_range_whitelist = generate_ip_set(
-                config.get("ip_range_whitelist", ())
-            )
-        except Exception as e:
-            raise ConfigError("Invalid range(s) provided in ip_range_whitelist.") from e
+        # Always blacklist 0.0.0.0, ::
+        self.ip_range_blacklist = generate_ip_set(
+            ip_range_blacklist, ["0.0.0.0", "::"], config_path=("ip_range_blacklist",)
+        )
+
+        self.ip_range_whitelist = generate_ip_set(
+            config.get("ip_range_whitelist", ()), config_path=("ip_range_whitelist",)
+        )
 
         # The federation_ip_range_blacklist is used for backwards-compatibility
         # and only applies to federation and identity servers. If it is not given,
@@ -368,15 +371,12 @@ class ServerConfig(Config):
         federation_ip_range_blacklist = config.get(
             "federation_ip_range_blacklist", ip_range_blacklist
         )
-        try:
-            # Always blacklist 0.0.0.0, ::
-            self.federation_ip_range_blacklist = generate_ip_set(
-                federation_ip_range_blacklist, ["0.0.0.0", "::"]
-            )
-        except Exception as e:
-            raise ConfigError(
-                "Invalid range(s) provided in federation_ip_range_blacklist."
-            ) from e
+        # Always blacklist 0.0.0.0, ::
+        self.federation_ip_range_blacklist = generate_ip_set(
+            federation_ip_range_blacklist,
+            ["0.0.0.0", "::"],
+            config_path=("federation_ip_range_blacklist",),
+        )
 
         self.start_pushers = config.get("start_pushers", True)
 

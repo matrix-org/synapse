@@ -15,6 +15,7 @@
 
 import yaml
 
+from synapse.config._base import ConfigError
 from synapse.config.server import ServerConfig, generate_ip_set, is_threepid_reserved
 
 from tests import unittest
@@ -171,3 +172,18 @@ class GenerateIpSetTestCase(unittest.TestCase):
         # They can duplicate without error.
         ip_set = generate_ip_set(("1.2.3.4",), ("1.2.3.4",))
         self.assertEqual(len(ip_set.iter_cidrs()), 4)
+
+    def test_bad_value(self):
+        """An error should be raised if a bad value is passed in."""
+        with self.assertRaises(ConfigError):
+            generate_ip_set(("not-an-ip",))
+
+        with self.assertRaises(ConfigError):
+            generate_ip_set(("1.2.3.4/128",))
+
+        with self.assertRaises(ConfigError):
+            generate_ip_set((":::",))
+
+        # The following get treated as empty data.
+        self.assertFalse(generate_ip_set(None))
+        self.assertFalse(generate_ip_set({}))
