@@ -23,7 +23,7 @@ from typing_extensions import NoReturn, Protocol
 from twisted.web.http import Request
 
 from synapse.api.constants import LoginType
-from synapse.api.errors import Codes, RedirectException, SynapseError
+from synapse.api.errors import Codes, NotFoundError, RedirectException, SynapseError
 from synapse.handlers.ui_auth import UIAuthSessionDataConstants
 from synapse.http import get_request_user_agent
 from synapse.http.server import respond_with_html
@@ -235,7 +235,10 @@ class SsoHandler:
         respond_with_html(request, code, html)
 
     async def handle_redirect_request(
-        self, request: SynapseRequest, client_redirect_url: bytes,
+        self,
+        request: SynapseRequest,
+        client_redirect_url: bytes,
+        idp_id: Optional[str],
     ) -> str:
         """Handle a request to /login/sso/redirect
 
@@ -243,6 +246,7 @@ class SsoHandler:
             request: incoming HTTP request
             client_redirect_url: the URL that we should redirect the
                 client to after login.
+            idp_id: optional identity provider chosen by the client
 
         Returns:
              the URI to redirect to
@@ -252,10 +256,19 @@ class SsoHandler:
                 400, "Homeserver not configured for SSO.", errcode=Codes.UNRECOGNIZED
             )
 
+        # if the client chose an IdP, use that
+        idp = None  # type: Optional[SsoIdentityProvider]
+        if idp_id:
+            idp = self._identity_providers.get(idp_id)
+            if not idp:
+                raise NotFoundError("Unknown identity provider")
+
         # if we only have one auth provider, redirect to it directly
-        if len(self._identity_providers) == 1:
-            ap = next(iter(self._identity_providers.values()))
-            return await ap.handle_redirect_request(request, client_redirect_url)
+        elif len(self._identity_providers) == 1:
+            idp = next(iter(self._identity_providers.values()))
+
+        if idp:
+            return await idp.handle_redirect_request(request, client_redirect_url)
 
         # otherwise, redirect to the IDP picker
         return "/_synapse/client/pick_idp?" + urlencode(
