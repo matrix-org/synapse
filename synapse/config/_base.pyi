@@ -9,6 +9,7 @@ from synapse.config import (
     consent_config,
     database,
     emailconfig,
+    experimental,
     groups,
     jwt_config,
     key,
@@ -49,6 +50,7 @@ def path_exists(file_path: str): ...
 
 class RootConfig:
     server: server.ServerConfig
+    experimental: experimental.ExperimentalConfig
     tls: tls.TlsConfig
     database: database.DatabaseConfig
     logging: logger.LoggingConfig
