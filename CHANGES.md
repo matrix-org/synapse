@@ -1,11 +1,11 @@
 Synapse 1.26.0 (2021-01-27)
 ===========================
 
-No significant changes since 1.26.0rc2.
-
 This release brings a new schema version for Synapse and rolling back to a previous
 version is not trivial. Please review [UPGRADE.rst](UPGRADE.rst) for more details
 on these changes and for general upgrade guidance.
+
+No significant changes since 1.26.0rc2.
 
 
 Synapse 1.26.0rc2 (2021-01-25)
