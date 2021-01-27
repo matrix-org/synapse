@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import string
 from collections import Counter
 from typing import Iterable, Optional, Tuple, Type
 
@@ -226,9 +225,13 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
     "type": "object",
     "required": ["issuer", "client_id", "client_secret"],
     "properties": {
-        # TODO: fix the maxLength here depending on what MSC2528 decides
-        #   remember that we prefix the ID given here with `oidc-`
-        "idp_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "idp_id": {
+            "type": "string",
+            "minLength": 1,
+            # MSC2858 allows a maxlen of 255, but we prefix with "oidc-"
+            "maxLength": 251,
+            "pattern": "^[A-Za-z0-9._~-]+$",
+        },
         "idp_name": {"type": "string"},
         "idp_icon": {"type": "string"},
         "discover": {"type": "boolean"},
@@ -349,24 +352,7 @@ def _parse_oidc_config_dict(
             config_path + ("user_mapping_provider", "module"),
         )
 
-    # MSC2858 will apply certain limits in what can be used as an IdP id, so let's
-    # enforce those limits now.
-    # TODO: factor out this stuff to a generic function
     idp_id = oidc_config.get("idp_id", "oidc")
-
-    # TODO: update this validity check based on what MSC2858 decides.
-    valid_idp_chars = set(string.ascii_lowercase + string.digits + "-._")
-
-    if any(c not in valid_idp_chars for c in idp_id):
-        raise ConfigError(
-            'idp_id may only contain a-z, 0-9, "-", ".", "_"',
-            config_path + ("idp_id",),
-        )
-
-    if idp_id[0] not in string.ascii_lowercase:
-        raise ConfigError(
-            "idp_id must start with a-z", config_path + ("idp_id",),
-        )
 
     # prefix the given IDP with a prefix specific to the SSO mechanism, to avoid
     # clashes with other mechs (such as SAML, CAS).
