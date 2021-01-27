@@ -40,6 +40,9 @@ which relays replication commands between processes. This can give a significant
 cpu saving on the main process and will be a prerequisite for upcoming
 performance improvements.
 
+If Redis support is enabled Synapse will use it as a shared cache, as well as a
+pub/sub mechanism.
+
 See the [Architectural diagram](#architectural-diagram) section at the end for
 a visualisation of what this looks like.
 
@@ -271,7 +274,7 @@ using):
 Note that a HTTP listener with `client` and `federation` resources must be
 configured in the `worker_listeners` option in the worker config.
 
-Ensure that all SSO logins go to a single process (usually the main process). 
+Ensure that all SSO logins go to a single process (usually the main process).
 For multiple workers not handling the SSO endpoints properly, see
 [#7530](https://github.com/matrix-org/synapse/issues/7530).
 
