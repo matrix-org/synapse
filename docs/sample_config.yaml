@@ -1727,10 +1727,14 @@ saml2_config:
 #       offer the user a choice of login mechanisms.
 #
 #   idp_icon: An optional icon for this identity provider, which is presented
-#       by identity picker pages. If given, must be an MXC URI of the format
-#       mxc://<server-name>/<media-id>. (An easy way to obtain such an MXC URI
-#       is to upload an image to an (unencrypted) room and then copy the "url"
-#       from the source of the event.)
+#       by clients and Synapse's own IdP picker page. If given, must be an
+#       MXC URI of the format mxc://<server-name>/<media-id>. (An easy way to
+#       obtain such an MXC URI is to upload an image to an (unencrypted) room
+#       and then copy the "url" from the source of the event.)
+#
+#   idp_brand: An optional brand for this identity provider, allowing clients
+#       to style the login flow according to the identity provider in question.
+#       See the spec for possible options here.
 #
 #   discover: set to 'false' to disable the use of the OIDC discovery mechanism
 #       to discover endpoints. Defaults to true.
@@ -1860,6 +1864,7 @@ oidc_providers:
   #
   #- idp_id: github
   #  idp_name: Github
+  #  idp_brand: org.matrix.github
   #  discover: false
   #  issuer: "https://github.com/"
   #  client_id: "your-client-id" # TO BE FILLED

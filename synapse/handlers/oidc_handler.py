@@ -274,6 +274,9 @@ class OidcProvider:
         # MXC URI for icon for this auth provider
         self.idp_icon = provider.idp_icon
 
+        # optional brand identifier for this auth provider
+        self.idp_brand = provider.idp_brand
+
         self._sso_handler = hs.get_sso_handler()
 
         self._sso_handler.register_identity_provider(self)
