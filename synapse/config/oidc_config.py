@@ -198,7 +198,7 @@ class OIDCConfig(Config):
           #      localpart_template: "{{ user.login }}"
           #      display_name_template: "{{ user.name }}"
           #      email_template: "{{ user.email }}"
-          
+
           # For use with Keycloak
           #
           #- idp_id: keycloak
