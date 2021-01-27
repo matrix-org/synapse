@@ -1,0 +1,1 @@
+Restore PyPy compatibility by using psycopg2cffi consistently.
