@@ -634,7 +634,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
 
     async def get_e2e_cross_signing_keys_bulk(
         self, user_ids: List[str], from_user_id: Optional[str] = None
-    ) -> Dict[str, Dict[str, dict]]:
+    ) -> Dict[str, Optional[Dict[str, dict]]]:
         """Returns the cross-signing keys for a set of users.
 
         Args:
@@ -644,7 +644,8 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
 
         Returns:
             A map of user ID to key type to key data.  If a user's cross-signing
-            keys were not found, their user ID will not be in the dict.
+            keys were not found, either their user ID will not be in the dict,
+            or their user ID will map to None.
         """
 
         result = await self._get_bare_e2e_cross_signing_keys_bulk(user_ids)
