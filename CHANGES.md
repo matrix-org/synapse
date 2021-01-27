@@ -1,3 +1,9 @@
+Unreleased
+==========
+
+Note that this release includes a change in Synapse to use Redis as a cache ─ as well as a pub/sub mechanism ─ if Redis support is enabled. No action is needed by server administrators, and we do not expect resource usage of the Redis instance to change dramatically.
+
+
 Synapse 1.26.0rc2 (2021-01-25)
 ==============================
 
