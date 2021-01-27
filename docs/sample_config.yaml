@@ -824,6 +824,7 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #     users are joining rooms the server is already in (this is cheap) vs
 #     "remote" for when users are trying to join rooms not on the server (which
 #     can be more expensive)
+#   - one for ratelimiting how often a user or IP can attempt to validate a 3PID.
 #
 # The defaults are as shown below.
 #
@@ -857,7 +858,10 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #  remote:
 #    per_second: 0.01
 #    burst_count: 3
-
+#
+#rc_3pid_validation:
+#  per_second: 0.003
+#  burst_count: 5
 
 # Ratelimiting settings for incoming federation
 #

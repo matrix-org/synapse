@@ -27,10 +27,12 @@ from synapse.api.errors import (
     HttpResponseException,
     SynapseError,
 )
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http import RequestTimedOutError
 from synapse.http.client import SimpleHttpClient
-from synapse.types import JsonDict, Requester
+from synapse.http.site import SynapseRequest
+from synapse.types import JsonDict, Requester, UserID
 from synapse.util import json_decoder
 from synapse.util.hash import sha256_and_url_safe_base64
 from synapse.util.stringutils import assert_valid_client_secret, random_string
@@ -56,6 +58,31 @@ class IdentityHandler(BaseHandler):
         self.hs = hs
 
         self._web_client_location = hs.config.invite_client_location
+
+        # Ratelimiters for `/requestToken` endpoints.
+        self._3pid_validation_ratelimiter_ip = Ratelimiter(
+            clock=hs.get_clock(),
+            rate_hz=hs.config.ratelimiting.rc_3pid_validation.per_second,
+            burst_count=hs.config.ratelimiting.rc_3pid_validation.burst_count,
+        )
+        self._3pid_validation_ratelimiter_address = Ratelimiter(
+            clock=hs.get_clock(),
+            rate_hz=hs.config.ratelimiting.rc_3pid_validation.per_second,
+            burst_count=hs.config.ratelimiting.rc_3pid_validation.burst_count,
+        )
+
+    def ratelimit_request_token_requests(
+        self,
+        request: SynapseRequest,
+        medium: str,
+        address: str,
+        user_id: Optional[UserID] = None,
+    ):
+        """Used to ratelimit requests to `/requestToken` by IP and address.
+        """
+
+        self._3pid_validation_ratelimiter_ip.ratelimit((medium, request.getClientIP()))
+        self._3pid_validation_ratelimiter_address.ratelimit((medium, address))
 
     async def threepid_from_creds(
         self, id_server: str, creds: Dict[str, str]
