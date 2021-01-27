@@ -143,9 +143,9 @@ class OIDCConfig(Config):
         #
         #           For the default provider, the following settings are available:
         #
-        #             sub: name of the claim containing a unique identifier for the
-        #                 user. Defaults to 'sub', which OpenID Connect compliant
-        #                 providers should provide.
+        #             subject_claim: name of the claim containing a unique identifier
+        #                 for the user. Defaults to 'sub', which OpenID Connect
+        #                 compliant providers should provide.
         #
         #             localpart_template: Jinja2 template for the localpart of the MXID.
         #                 If this is not set, the user will be prompted to choose their
@@ -153,6 +153,9 @@ class OIDCConfig(Config):
         #
         #             display_name_template: Jinja2 template for the display name to set
         #                 on first login. If unset, no displayname will be set.
+        #
+        #             email_template: Jinja2 template for the email address of the user.
+        #                 If unset, no email address will be added to the account.
         #
         #             extra_attributes: a map of Jinja2 templates for extra attributes
         #                 to send back to the client during login.
@@ -189,6 +192,12 @@ class OIDCConfig(Config):
           #  userinfo_endpoint: "https://accounts.example.com/userinfo"
           #  jwks_uri: "https://accounts.example.com/.well-known/jwks.json"
           #  skip_verification: true
+          #  user_mapping_provider:
+          #    config:
+          #      subject_claim: "id"
+          #      localpart_template: "{{ user.login }}"
+          #      display_name_template: "{{ user.name }}"
+          #      email_template: "{{ user.email }}"
 
           # For use with Keycloak
           #
