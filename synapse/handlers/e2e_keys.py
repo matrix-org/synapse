@@ -693,9 +693,8 @@ class E2eKeysHandler:
 
         Args:
             user_id: the user uploading the signatures
-            signatures: map of users to
-                devices to signed keys. This is the submission from the user; an
-                exception will be raised if it is malformed.
+            signatures: map of users to devices to signed keys. This is the submission
+            from the user; an exception will be raised if it is malformed.
         Returns:
             The response to be sent back to the client.  The response will have
                 a "failures" key, which will be a dict mapping users to devices
@@ -1172,8 +1171,8 @@ def _check_cross_signing_key(
         key: the key data to verify
         user_id: the user whose key is being checked
         key_type: the type of key that the key should be
-        signing_key: (optional) the signing key that the key should
-            be signed with.  If omitted, signatures will not be checked.
+        signing_key: the signing key that the key should be signed with.  If
+            omitted, signatures will not be checked.
     """
     if (
         key.get("user_id") != user_id
