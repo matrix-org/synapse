@@ -1430,7 +1430,41 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(private_room_id, channel.json_body["joined_rooms"][0])
 
-    def test_context(self):
+    def test_context_as_non_admin(self):
+        """
+        Test that, without being admin, one cannot use the context admin API
+        """
+        # Create a room.
+        user_id = self.register_user("test", "test")
+        user_tok = self.login("test", "test")
+
+        self.register_user("test_2", "test")
+        user_tok_2 = self.login("test_2", "test")
+
+        room_id = self.helper.create_room_as(user_id, tok=user_tok)
+
+        # Populate the room with events.
+        events = []
+        for i in range(30):
+            events.append(
+                self.helper.send_event(
+                    room_id, "com.example.test", content={"index": i}, tok=user_tok
+                )
+            )
+
+        # Now attempt to find the context using the admin API without being admin.
+        midway = (len(events) - 1) // 2
+        for tok in [user_tok, user_tok_2]:
+            channel = self.make_request(
+                "GET",
+                "/_synapse/admin/v1/rooms/%s/context/%s"
+                % (room_id, events[midway]["event_id"]),
+                access_token=tok,
+            )
+            self.assertEquals(403, int(channel.result["code"]), msg=channel.result["body"])
+            self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
+    def test_context_as_admin(self):
         """
         Test that, as admin, we can find the context of an event without having joined the room.
         """

@@ -578,7 +578,8 @@ class RoomEventContextServlet(RestServlet):
         self.auth = hs.get_auth()
 
     async def on_GET(self, request, room_id, event_id):
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        requester = await self.auth.get_user_by_req(request, allow_guest=False)
+        await assert_user_is_admin(self.auth, requester.user)
 
         limit = parse_integer(request, "limit", default=10)
 
