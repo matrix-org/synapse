@@ -76,9 +76,13 @@ class IdentityHandler(BaseHandler):
         request: SynapseRequest,
         medium: str,
         address: str,
-        user_id: Optional[UserID] = None,
     ):
         """Used to ratelimit requests to `/requestToken` by IP and address.
+
+        Args:
+            request: The associated request
+            medium: The type of threepid, e.g. "msisdn" or "email"
+            address: The actual threepid ID, e.g. the phone number or email address
         """
 
         self._3pid_validation_ratelimiter_ip.ratelimit((medium, request.getClientIP()))
