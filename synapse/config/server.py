@@ -168,7 +168,8 @@ class ServerConfig(Config):
             self.public_baseurl += "/"
 
         # Whether to enable user presence.
-        self.use_presence = config.get("use_presence", True)
+        # TODO https://github.com/matrix-org/synapse/issues/3971
+        self.use_presence = config.get("use_presence", False)
 
         # Whether to update the user directory or not. This should be set to
         # false only if we are updating the user directory in a worker

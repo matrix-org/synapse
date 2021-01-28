@@ -1,0 +1,2 @@
+use_presence: Default to False.
+Wait until https://github.com/matrix-org/synapse/issues/3971 is fixed.

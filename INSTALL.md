@@ -581,6 +581,12 @@ This also requires the optional `lxml` python dependency to be  installed. This
 in turn requires the `libxml2` library to be available - on  Debian/Ubuntu this
 means `apt-get install libxml2-dev`, or equivalent for your OS.
 
+### Presence
+
+By default, presence is disabled because because it consumes a lot CPU. If you
+want to turn it on anyway, you can set `use_presence: true`. The tracking issue
+is https://github.com/matrix-org/synapse/issues/3971.
+
 ### Troubleshooting Installation
 
 `pip` seems to leak *lots* of memory during installation. For instance, a Linux
