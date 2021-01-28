@@ -600,7 +600,7 @@ class RoomEventContextServlet(RestServlet):
             event_filter = None
 
         results = await self.room_context_handler.get_event_context(
-            requester.user,
+            requester,
             room_id,
             event_id,
             limit,
