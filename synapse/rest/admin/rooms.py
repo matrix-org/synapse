@@ -568,6 +568,12 @@ class ForwardExtremitiesRestServlet(RestServlet):
         return 200, {"count": len(extremities), "results": extremities}
 
 class RoomEventContextServlet(RestServlet):
+    """
+    Provide the context for an event.
+    This API is designed to be used when system administrators wish to look at
+    an abuse report and understand what happened during and immediately prior
+    to this event.
+    """
     PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]*)/context/(?P<event_id>[^/]*)$")
 
     def __init__(self, hs):
