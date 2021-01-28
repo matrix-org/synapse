@@ -1033,10 +1033,10 @@ class RoomContextHandler:
         users = await self.store.get_users_in_room(room_id)
         is_peeking = user.to_string() not in users
 
-        def filter_evts(events):
+        async def filter_evts(events):
             if use_admin_priviledge:
-                return maybe_awaitable(events)
-            return filter_events_for_client(
+                return events
+            return await filter_events_for_client(
                 self.storage, user.to_string(), events, is_peeking=is_peeking
             )
 
