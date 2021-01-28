@@ -664,9 +664,25 @@ class Mailer:
         # are from explicitly to avoid, "messages in the Bob room"
         sender_ids = {notif_events[n["event_id"]].sender for n in notifs}
 
-        member_events = await self.store.get_events(
-            [room_state_ids[("m.room.member", s)] for s in sender_ids]
-        )
+        # Attempt to get some names of the senders.
+        member_event_ids = [
+            room_state_ids[("m.room.member", s)]
+            for s in sender_ids
+            if ("m.room.member", s) in room_state_ids
+        ]
+
+        if not member_event_ids:
+            # No member events were found! Maybe the room is empty?
+            # Fallback to the room ID (note that if there was a room name this
+            # would already have been used previously).
+            return self.email_subjects.messages_in_room % {
+                "room": room_id,
+                "app": self.app_name,
+            }
+
+        # Get the actual member events (in order to calculate a pretty name for
+        # the room).
+        member_events = await self.store.get_events(member_event_ids)
 
         # There was a single sender.
         if len(sender_ids) == 1:
