@@ -272,7 +272,11 @@ class Mailer:
             room_id = list(notifs_by_room.keys())[0]
 
             summary_text = await self.make_summary_text_single_room(
-                notifs_by_room[room_id], state_by_room[room_id], notif_events, user_id
+                room_id,
+                notifs_by_room[room_id],
+                state_by_room[room_id],
+                notif_events,
+                user_id,
             )
         else:
             summary_text = await self.make_summary_text(
@@ -502,15 +506,17 @@ class Mailer:
 
     async def make_summary_text_single_room(
         self,
+        room_id: str,
         notifs: List[Dict[str, Any]],
         room_state_ids: StateMap[str],
         notif_events: Dict[str, EventBase],
         user_id: str,
-    ):
+    ) -> str:
         """
         Make a summary text for the email when only a single room has notifications.
 
         Args:
+            room_id: The ID of the room.
             notifs: The notifications for this room.
             room_state_ids: The state map for the room.
             notif_events: A map of event ID -> notification event.
@@ -559,9 +565,9 @@ class Mailer:
                     "app": self.app_name,
                 }
 
-        sender_name = None
         if len(notifs) == 1:
             # There is just the one notification, so give some detail
+            sender_name = None
             event = notif_events[notifs[0]["event_id"]]
             if ("m.room.member", event.sender) in room_state_ids:
                 state_event_id = room_state_ids[("m.room.member", event.sender)]
@@ -577,6 +583,12 @@ class Mailer:
             elif sender_name is not None:
                 return self.email_subjects.message_from_person % {
                     "person": sender_name,
+                    "app": self.app_name,
+                }
+            else:
+                # The sender is unknown, just use the room name (or ID).
+                return self.email_subjects.messages_in_room % {
+                    "room": room_name or room_id,
                     "app": self.app_name,
                 }
         else:
@@ -607,7 +619,7 @@ class Mailer:
         room_state_ids: Dict[str, StateMap[str]],
         notif_events: Dict[str, EventBase],
         reason: Dict[str, Any],
-    ):
+    ) -> str:
         """
         Make a summary text for the email when multiple rooms have notifications.
 
