@@ -32,7 +32,7 @@ from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http import RequestTimedOutError
 from synapse.http.client import SimpleHttpClient
 from synapse.http.site import SynapseRequest
-from synapse.types import JsonDict, Requester, UserID
+from synapse.types import JsonDict, Requester
 from synapse.util import json_decoder
 from synapse.util.hash import sha256_and_url_safe_base64
 from synapse.util.stringutils import assert_valid_client_secret, random_string
@@ -72,10 +72,7 @@ class IdentityHandler(BaseHandler):
         )
 
     def ratelimit_request_token_requests(
-        self,
-        request: SynapseRequest,
-        medium: str,
-        address: str,
+        self, request: SynapseRequest, medium: str, address: str,
     ):
         """Used to ratelimit requests to `/requestToken` by IP and address.
 
