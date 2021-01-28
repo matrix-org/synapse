@@ -188,8 +188,8 @@ class EmailPusherTests(HomeserverTestCase):
         self._check_for_mail()
 
     def test_multiple_rooms(self):
-        # We want to test multiple notifications from multiple rooms., so we pause processing of push
-        # while we send messages.
+        # We want to test multiple notifications from multiple rooms, so we pause
+        # processing of push while we send messages.
         self.pusher._pause_processing()
 
         # Create a simple room with multiple other users
