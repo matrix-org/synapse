@@ -15,9 +15,11 @@
 import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, List, Optional, Tuple
+from urllib import parse as urlparse
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
+from synapse.api.filtering import Filter
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -33,6 +35,7 @@ from synapse.rest.admin._base import (
 )
 from synapse.storage.databases.main.room import RoomSortOrder
 from synapse.types import JsonDict, RoomAlias, RoomID, UserID, create_requester
+from synapse.util import json_decoder
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -567,6 +570,7 @@ class ForwardExtremitiesRestServlet(RestServlet):
         extremities = await self.store.get_forward_extremities_for_room(room_id)
         return 200, {"count": len(extremities), "results": extremities}
 
+
 class RoomEventContextServlet(RestServlet):
     """
     Provide the context for an event.
@@ -574,6 +578,7 @@ class RoomEventContextServlet(RestServlet):
     an abuse report and understand what happened during and immediately prior
     to this event.
     """
+
     PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]*)/context/(?P<event_id>[^/]*)$")
 
     def __init__(self, hs):

@@ -53,7 +53,7 @@ from synapse.types import (
     create_requester,
 )
 from synapse.util import stringutils
-from synapse.util.async_helpers import Linearizer, maybe_awaitable
+from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import parse_and_validate_server_name
 from synapse.visibility import filter_events_for_client

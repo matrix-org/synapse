@@ -1461,7 +1461,9 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
                 % (room_id, events[midway]["event_id"]),
                 access_token=tok,
             )
-            self.assertEquals(403, int(channel.result["code"]), msg=channel.result["body"])
+            self.assertEquals(
+                403, int(channel.result["code"]), msg=channel.result["body"]
+            )
             self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_context_as_admin(self):
