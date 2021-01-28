@@ -126,6 +126,8 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
+        self.identity_handler.ratelimit_request_token_requests(request, "email", email)
+
         existing_user_id = await self.hs.get_datastore().get_user_id_by_threepid(
             "email", email
         )
@@ -204,6 +206,10 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
                 "Phone numbers are not authorized to register on this server",
                 Codes.THREEPID_DENIED,
             )
+
+        self.identity_handler.ratelimit_request_token_requests(
+            request, "msisdn", msisdn
+        )
 
         existing_user_id = await self.hs.get_datastore().get_user_id_by_threepid(
             "msisdn", msisdn
