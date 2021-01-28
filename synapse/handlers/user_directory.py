@@ -14,13 +14,18 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import synapse.metrics
 from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules, Membership
 from synapse.handlers.state_deltas import StateDeltasHandler
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.roommember import ProfileInfo
+from synapse.types import JsonDict
 from synapse.util.metrics import Measure
+
+if TYPE_CHECKING:
+    from synapse.app.homeserver import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +41,7 @@ class UserDirectoryHandler(StateDeltasHandler):
     be in the directory or not when necessary.
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
         self.store = hs.get_datastore()
@@ -49,7 +54,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         self.search_all_users = hs.config.user_directory_search_all_users
         self.spam_checker = hs.get_spam_checker()
         # The current position in the current_state_delta stream
-        self.pos = None
+        self.pos = None  # type: Optional[int]
 
         # Guard to ensure we only process deltas one at a time
         self._is_processing = False
@@ -61,7 +66,9 @@ class UserDirectoryHandler(StateDeltasHandler):
             # we start populating the user directory
             self.clock.call_later(0, self.notify_new_event)
 
-    async def search_users(self, user_id, search_term, limit):
+    async def search_users(
+        self, user_id: str, search_term: str, limit: int
+    ) -> JsonDict:
         """Searches for users in directory
 
         Returns:
@@ -89,7 +96,7 @@ class UserDirectoryHandler(StateDeltasHandler):
 
         return results
 
-    def notify_new_event(self):
+    def notify_new_event(self) -> None:
         """Called when there may be more deltas to process
         """
         if not self.update_user_directory:
@@ -107,34 +114,36 @@ class UserDirectoryHandler(StateDeltasHandler):
         self._is_processing = True
         run_as_background_process("user_directory.notify_new_event", process)
 
-    async def handle_local_profile_change(self, user_id, profile):
+    async def handle_local_profile_change(
+        self, user_id: str, profile: ProfileInfo
+    ) -> None:
         """Called to update index of our local user profiles when they change
         irrespective of any rooms the user may be in.
         """
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
-        is_support = await self.store.is_support_user(user_id)
+
         # Support users are for diagnostics and should not appear in the user directory.
-        if not is_support:
+        is_support = await self.store.is_support_user(user_id)
+        # When change profile information of deactivated user it should not appear in the user directory.
+        is_deactivated = await self.store.get_user_deactivated_status(user_id)
+
+        if not (is_support or is_deactivated):
             await self.store.update_profile_in_user_dir(
                 user_id, profile.display_name, profile.avatar_url
             )
 
-    async def handle_user_deactivated(self, user_id):
+    async def handle_user_deactivated(self, user_id: str) -> None:
         """Called when a user ID is deactivated
         """
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
         await self.store.remove_from_user_dir(user_id)
 
-    async def _unsafe_process(self):
+    async def _unsafe_process(self) -> None:
         # If self.pos is None then means we haven't fetched it from DB
         if self.pos is None:
             self.pos = await self.store.get_user_directory_stream_pos()
-
-        # If still None then the initial background update hasn't happened yet
-        if self.pos is None:
-            return None
 
         # Loop round handling deltas until we're up to date
         while True:
@@ -162,7 +171,7 @@ class UserDirectoryHandler(StateDeltasHandler):
 
                 await self.store.update_user_directory_stream_pos(max_pos)
 
-    async def _handle_deltas(self, deltas):
+    async def _handle_deltas(self, deltas: List[Dict[str, Any]]) -> None:
         """Called with the state deltas to process
         """
         for delta in deltas:
@@ -220,6 +229,11 @@ class UserDirectoryHandler(StateDeltasHandler):
 
                     if change:  # The user joined
                         event = await self.store.get_event(event_id, allow_none=True)
+                        # It isn't expected for this event to not exist, but we
+                        # don't want the entire background process to break.
+                        if event is None:
+                            continue
+
                         profile = ProfileInfo(
                             avatar_url=event.content.get("avatar_url"),
                             display_name=event.content.get("displayname"),
@@ -232,16 +246,20 @@ class UserDirectoryHandler(StateDeltasHandler):
                 logger.debug("Ignoring irrelevant type: %r", typ)
 
     async def _handle_room_publicity_change(
-        self, room_id, prev_event_id, event_id, typ
-    ):
+        self,
+        room_id: str,
+        prev_event_id: Optional[str],
+        event_id: Optional[str],
+        typ: str,
+    ) -> None:
         """Handle a room having potentially changed from/to world_readable/publicly
         joinable.
 
         Args:
-            room_id (str)
-            prev_event_id (str|None): The previous event before the state change
-            event_id (str|None): The new event after the state change
-            typ (str): Type of the event
+            room_id: The ID of the room which changed.
+            prev_event_id: The previous event before the state change
+            event_id: The new event after the state change
+            typ: Type of the event
         """
         logger.debug("Handling change for %s: %s", typ, room_id)
 
@@ -299,12 +317,14 @@ class UserDirectoryHandler(StateDeltasHandler):
         for user_id, profile in users_with_profile.items():
             await self._handle_new_user(room_id, user_id, profile)
 
-    async def _handle_new_user(self, room_id, user_id, profile):
+    async def _handle_new_user(
+        self, room_id: str, user_id: str, profile: ProfileInfo
+    ) -> None:
         """Called when we might need to add user to directory
 
         Args:
-            room_id (str): room_id that user joined or started being public
-            user_id (str)
+            room_id: The room ID that user joined or started being public
+            user_id
         """
         logger.debug("Adding new user to dir, %r", user_id)
 
@@ -352,12 +372,12 @@ class UserDirectoryHandler(StateDeltasHandler):
             if to_insert:
                 await self.store.add_users_who_share_private_room(room_id, to_insert)
 
-    async def _handle_remove_user(self, room_id, user_id):
+    async def _handle_remove_user(self, room_id: str, user_id: str) -> None:
         """Called when we might need to remove user from directory
 
         Args:
-            room_id (str): room_id that user left or stopped being public that
-            user_id (str)
+            room_id: The room ID that user left or stopped being public that
+            user_id
         """
         logger.debug("Removing user %r", user_id)
 
@@ -370,7 +390,13 @@ class UserDirectoryHandler(StateDeltasHandler):
         if len(rooms_user_is_in) == 0:
             await self.store.remove_from_user_dir(user_id)
 
-    async def _handle_profile_change(self, user_id, room_id, prev_event_id, event_id):
+    async def _handle_profile_change(
+        self,
+        user_id: str,
+        room_id: str,
+        prev_event_id: Optional[str],
+        event_id: Optional[str],
+    ) -> None:
         """Check member event changes for any profile changes and update the
         database if there are.
         """

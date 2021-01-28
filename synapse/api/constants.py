@@ -98,6 +98,8 @@ class EduTypes:
     Presence = "m.presence"
     RoomKeyRequest = "m.room_key_request"
 
+    Dummy = "org.matrix.dummy_event"
+
 
 class RejectedReason:
     AUTH_ERROR = "auth_error"

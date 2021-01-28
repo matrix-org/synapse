@@ -125,7 +125,7 @@ async def filter_events_for_client(
         # see events in the room at that point in the DAG, and that shouldn't be decided
         # on those checks.
         if filter_send_to_client:
-            if event.type == "org.matrix.dummy_event":
+            if event.type == EventTypes.Dummy:
                 return None
 
             if not event.is_state() and event.sender in ignore_list:

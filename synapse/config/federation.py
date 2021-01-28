@@ -56,18 +56,6 @@ class FederationConfig(Config):
         #  - nyc.example.com
         #  - syd.example.com
 
-        # List of IP address CIDR ranges that should be allowed for federation,
-        # identity servers, push servers, and for checking key validity for
-        # third-party invite events. This is useful for specifying exceptions to
-        # wide-ranging blacklisted target IP ranges - e.g. for communication with
-        # a push server only visible in your network.
-        #
-        # This whitelist overrides ip_range_blacklist and defaults to an empty
-        # list.
-        #
-        #ip_range_whitelist:
-        #   - '192.168.1.1'
-
         # Report prometheus metrics on the age of PDUs being sent to and received from
         # the following domains. This can be used to give an idea of "delay" on inbound
         # and outbound federation, though be aware that any delay can be due to problems

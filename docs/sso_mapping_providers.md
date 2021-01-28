@@ -15,12 +15,18 @@ where SAML mapping providers come into play.
 SSO mapping providers are currently supported for OpenID and SAML SSO
 configurations. Please see the details below for how to implement your own.
 
-It is the responsibility of the mapping provider to normalise the SSO attributes
-and map them to a valid Matrix ID. The
-[specification for Matrix IDs](https://matrix.org/docs/spec/appendices#user-identifiers)
-has some information about what is considered valid. Alternately an easy way to
-ensure it is valid is to use a Synapse utility function:
-`synapse.types.map_username_to_mxid_localpart`.
+It is up to the mapping provider whether the user should be assigned a predefined
+Matrix ID based on the SSO attributes, or if the user should be allowed to
+choose their own username.
+
+In the first case - where users are automatically allocated a Matrix ID - it is
+the responsibility of the mapping provider to normalise the SSO attributes and
+map them to a valid Matrix ID. The [specification for Matrix
+IDs](https://matrix.org/docs/spec/appendices#user-identifiers) has some
+information about what is considered valid.
+
+If the mapping provider does not assign a Matrix ID, then Synapse will
+automatically serve an HTML page allowing the user to pick their own username.
 
 External mapping providers are provided to Synapse in the form of an external
 Python module. You can retrieve this module from [PyPI](https://pypi.org) or elsewhere,
@@ -80,8 +86,9 @@ A custom mapping provider must specify the following methods:
                      with failures=1. The method should then return a different
                      `localpart` value, such as `john.doe1`.
     - Returns a dictionary with two keys:
-      - localpart: A required string, used to generate the Matrix ID.
-      - displayname: An optional string, the display name for the user.
+      - `localpart`: A string, used to generate the Matrix ID. If this is
+        `None`, the user is prompted to pick their own username.
+      - `displayname`: An optional string, the display name for the user.
 * `get_extra_attributes(self, userinfo, token)`
     - This method must be async.
     - Arguments:
@@ -165,12 +172,13 @@ A custom mapping provider must specify the following methods:
                                 redirected to.
     - This method must return a dictionary, which will then be used by Synapse
       to build a new user. The following keys are allowed:
-       * `mxid_localpart` - Required. The mxid localpart of the new user.
+       * `mxid_localpart` - The mxid localpart of the new user.  If this is
+         `None`, the user is prompted to pick their own username.
        * `displayname` - The displayname of the new user. If not provided, will default to
                          the value of `mxid_localpart`.
        * `emails` - A list of emails for the new user. If not provided, will
                     default to an empty list.
-       
+
        Alternatively it can raise a `synapse.api.errors.RedirectException` to
        redirect the user to another page. This is useful to prompt the user for
        additional information, e.g. if you want them to provide their own username.

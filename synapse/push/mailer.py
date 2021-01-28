@@ -486,7 +486,11 @@ class Mailer:
     def add_image_message_vars(
         self, messagevars: Dict[str, Any], event: EventBase
     ) -> None:
-        messagevars["image_url"] = event.content["url"]
+        """
+        Potentially add an image URL to the message variables.
+        """
+        if "url" in event.content:
+            messagevars["image_url"] = event.content["url"]
 
     async def make_summary_text(
         self,
@@ -664,6 +668,15 @@ class Mailer:
 
 
 def safe_markup(raw_html: str) -> jinja2.Markup:
+    """
+    Sanitise a raw HTML string to a set of allowed tags and attributes, and linkify any bare URLs.
+
+    Args
+        raw_html: Unsafe HTML.
+
+    Returns:
+        A Markup object ready to safely use in a Jinja template.
+    """
     return jinja2.Markup(
         bleach.linkify(
             bleach.clean(
@@ -680,8 +693,13 @@ def safe_markup(raw_html: str) -> jinja2.Markup:
 
 def safe_text(raw_text: str) -> jinja2.Markup:
     """
-    Process text: treat it as HTML but escape any tags (ie. just escape the
-    HTML) then linkify it.
+    Sanitise text (escape any HTML tags), and then linkify any bare URLs.
+
+    Args
+        raw_text: Unsafe text which might include HTML markup.
+
+    Returns:
+        A Markup object ready to safely use in a Jinja template.
     """
     return jinja2.Markup(
         bleach.linkify(bleach.clean(raw_text, tags=[], attributes={}, strip=False))
