@@ -1,0 +1,1 @@
+Fix long-standing KeyError in synapse.push.mailer in get_message_vars.

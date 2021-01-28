@@ -443,10 +443,15 @@ class Mailer:
         if event.type != EventTypes.Message and event.type != EventTypes.Encrypted:
             return None
 
-        sender_state_event_id = room_state_ids[("m.room.member", event.sender)]
-        sender_state_event = await self.store.get_event(sender_state_event_id)
-        sender_name = name_from_member_event(sender_state_event)
-        sender_avatar_url = sender_state_event.content.get("avatar_url")
+        sender_state_event_id = room_state_ids.get(("m.room.member", event.sender))
+        if sender_state_event_id:
+            sender_state_event = await self.store.get_event(sender_state_event_id)
+            sender_name = name_from_member_event(sender_state_event)
+            sender_avatar_url = sender_state_event.content.get("avatar_url")
+        else:
+            # The sender is no longer in the room for some reason.
+            sender_name = event.sender
+            sender_avatar_url = None
 
         # 'hash' for deterministically picking default images: use
         # sender_hash % the number of default images to choose from
