@@ -22,7 +22,7 @@ from synapse.logging.context import (
     PreserveLoggingContext,
     current_context,
 )
-from synapse.util.async_helpers import timeout_deferred
+from synapse.util.async_helpers import timeout_deferred, Smoother
 
 from tests.unittest import TestCase
 
@@ -105,3 +105,44 @@ class TimeoutDeferredTest(TestCase):
             )
             self.failureResultOf(timing_out_d, defer.TimeoutError)
             self.assertIs(current_context(), context_one)
+
+
+class TestSmoother(TestCase):
+    def setUp(self):
+        self.clock = Clock()
+
+        self.smoother = Smoother(self.clock, 10 * 1000)
+
+    def test_first(self):
+        self.clock.advance(100)
+
+        d = self.smoother.smooth()
+        self.successResultOf(d)
+
+    def test_multiple_at_same_time(self):
+        self.clock.advance(100)
+
+        d = self.smoother.smooth()
+        self.successResultOf(d)
+
+        d = self.smoother.smooth()
+        self.assertNoResult(d)
+        self.assertAlmostEqual(
+            self.smoother._queue[0].scheduled_for_ms,
+            self.clock.seconds() * 1000 + self.smoother._target_ms / 2,
+        )
+
+        d = self.smoother.smooth()
+        self.assertNoResult(d)
+        self.assertAlmostEqual(
+            self.smoother._queue[0].scheduled_for_ms,
+            self.clock.seconds() * 1000 + self.smoother._target_ms / 3,
+        )
+        self.assertAlmostEqual(
+            self.smoother._queue[1].scheduled_for_ms,
+            self.clock.seconds() * 1000 + 2 * self.smoother._target_ms / 3,
+        )
+
+        self.clock.advance(100)
+
+        self.assertNot(self.smoother._queue)
