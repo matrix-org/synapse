@@ -122,18 +122,18 @@ class TestSmoother(TestCase):
     def test_multiple_at_same_time(self):
         self.clock.advance(100)
 
-        d = self.smoother.smooth()
-        self.successResultOf(d)
+        d1 = defer.ensureDeferred(self.smoother.smooth())
+        self.successResultOf(d1)
 
-        d = self.smoother.smooth()
-        self.assertNoResult(d)
+        d2 = defer.ensureDeferred(self.smoother.smooth())
+        self.assertNoResult(d2)
         self.assertAlmostEqual(
             self.smoother._queue[0].scheduled_for_ms,
             self.clock.seconds() * 1000 + self.smoother._target_ms / 2,
         )
 
-        d = self.smoother.smooth()
-        self.assertNoResult(d)
+        d3 = defer.ensureDeferred(self.smoother.smooth())
+        self.assertNoResult(d3)
         self.assertAlmostEqual(
             self.smoother._queue[0].scheduled_for_ms,
             self.clock.seconds() * 1000 + self.smoother._target_ms / 3,
@@ -142,6 +142,16 @@ class TestSmoother(TestCase):
             self.smoother._queue[1].scheduled_for_ms,
             self.clock.seconds() * 1000 + 2 * self.smoother._target_ms / 3,
         )
+
+        self.clock.advance(4)
+        self.successResultOf(d2)
+        self.assertNoResult(d3)
+
+        self.clock.advance(0)
+        self.assertNoResult(d3)
+
+        self.clock.advance(4)
+        self.successResultOf(d3)
 
         self.clock.advance(100)
 

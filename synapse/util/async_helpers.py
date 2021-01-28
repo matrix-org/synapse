@@ -576,6 +576,8 @@ class Smoother:
         if not self._queue:
             return
 
+        self._next_call = None
+
         entry = self._queue.popleft()
         entry.defer.callback(None)
 
@@ -584,7 +586,6 @@ class Smoother:
 
         if not self._queue:
             scheduled_for_ms = (now + self._target_ms + self._last_run) / 2
-            print(scheduled_for_ms, now)
             if scheduled_for_ms <= now:
                 self._last_run = now
                 return
@@ -611,25 +612,26 @@ class Smoother:
             step = self._target_ms / (len(self._queue) + 1)
             for idx, entry in enumerate(self._queue):
                 new_time = now + (idx + 1) * step
-                print("Moving?", entry.scheduled_for_ms, new_time)
                 if new_time < entry.scheduled_for_ms:
                     entry.scheduled_for_ms = new_time
 
-        if self._next_call:
+        if self._next_call and not self._next_call.active:
             self._next_call.reset(
                 max(self._queue[0].scheduled_for_ms - now, 0) / 1000.0
             )
         else:
-            self._reactor.callLater(
+            self._next_call = self._reactor.callLater(
                 max(self._queue[0].scheduled_for_ms - now, 0) / 1000.0, self._fire_next
             )
 
         await make_deferred_yieldable(entry.defer)
+        now = self._reactor.seconds() * 1000.0
 
         self._last_run = now
 
-        self._reactor.callLater(
-            (self._queue[0].scheduled_for_ms - now) / 1000.0, self._fire_next,
-        )
+        if self._queue:
+            self._next_call = self._reactor.callLater(
+                (self._queue[0].scheduled_for_ms - now) / 1000.0, self._fire_next,
+            )
 
         return
