@@ -109,7 +109,7 @@ class RatelimitConfig(Config):
         # Note that this isn't exposed in the configuration as it is obscure.
         self.rc_key_requests = RateLimitConfig(
             config.get("rc_key_requests", {}),
-            defaults={"per_second": 0.1, "burst_count": 3},
+            defaults={"per_second": 250, "burst_count": 500},
         )
 
     def generate_config_section(self, **kwargs):
