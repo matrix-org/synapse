@@ -80,6 +80,11 @@ class SsoIdentityProvider(Protocol):
         """Optional MXC URI for user-facing icon"""
         return None
 
+    @property
+    def idp_brand(self) -> Optional[str]:
+        """Optional branding identifier"""
+        return None
+
     @abc.abstractmethod
     async def handle_redirect_request(
         self,

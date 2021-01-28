@@ -333,6 +333,8 @@ def _get_auth_flow_dict_for_idp(idp: SsoIdentityProvider) -> JsonDict:
     e = {"id": idp.idp_id, "name": idp.idp_name}  # type: JsonDict
     if idp.idp_icon:
         e["icon"] = idp.idp_icon
+    if idp.idp_brand:
+        e["brand"] = idp.idp_brand
     return e
 
 
