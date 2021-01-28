@@ -631,7 +631,7 @@ class Smoother:
 
         if self._queue:
             self._next_call = self._reactor.callLater(
-                (self._queue[0].scheduled_for_ms - now) / 1000.0, self._fire_next,
+                max(self._queue[0].scheduled_for_ms - now, 0) / 1000.0, self._fire_next,
             )
 
         return
