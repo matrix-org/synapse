@@ -600,18 +600,9 @@ class Mailer:
                     "app": self.app_name,
                 }
             else:
-                # If the room doesn't have a name, say who the messages
-                # are from explicitly to avoid, "messages in the Bob room"
-                sender_ids = list({notif_events[n["event_id"]].sender for n in notifs})
-
-                member_events = await self.store.get_events(
-                    [room_state_ids[("m.room.member", s)] for s in sender_ids]
+                return await self.make_summary_text_from_member_events(
+                    room_id, notifs, room_state_ids, notif_events
                 )
-
-                return self.email_subjects.messages_from_person % {
-                    "person": descriptor_from_member_events(member_events.values()),
-                    "app": self.app_name,
-                }
 
     async def make_summary_text(
         self,
@@ -640,20 +631,50 @@ class Mailer:
                 "app": self.app_name,
             }
         else:
-            # If the reason room doesn't have a name, say who the messages
-            # are from explicitly to avoid, "messages in the Bob room"
             room_id = reason["room_id"]
 
-            sender_ids = list(
-                {notif_events[n["event_id"]].sender for n in notifs_by_room[room_id]}
+            return await self.make_summary_text_from_member_events(
+                room_id, notifs_by_room[room_id], room_state_ids[room_id], notif_events
             )
 
-            member_events = await self.store.get_events(
-                [room_state_ids[room_id][("m.room.member", s)] for s in sender_ids]
-            )
+    async def make_summary_text_from_member_events(
+        self,
+        room_id: str,
+        notifs: List[Dict[str, Any]],
+        room_state_ids: StateMap[str],
+        notif_events: Dict[str, EventBase],
+    ) -> str:
+        """
+        Make a summary text for the email when only a single room has notifications.
 
-            return self.email_subjects.messages_from_person_and_others % {
+        Args:
+            room_id: The ID of the room.
+            notifs: The notifications for this room.
+            room_state_ids: The state map for the room.
+            notif_events: A map of event ID -> notification event.
+
+        Returns:
+            The summary text.
+        """
+        # If the room doesn't have a name, say who the messages
+        # are from explicitly to avoid, "messages in the Bob room"
+        sender_ids = {notif_events[n["event_id"]].sender for n in notifs}
+
+        member_events = await self.store.get_events(
+            [room_state_ids[("m.room.member", s)] for s in sender_ids]
+        )
+
+        # There was a single sender.
+        if len(sender_ids) == 1:
+            return self.email_subjects.messages_from_person % {
                 "person": descriptor_from_member_events(member_events.values()),
+                "app": self.app_name,
+            }
+
+        # There was more than one sender, use the first one and a tweaked template.
+        else:
+            return self.email_subjects.messages_from_person_and_others % {
+                "person": descriptor_from_member_events(list(member_events.values())[:1]),
                 "app": self.app_name,
             }
 
