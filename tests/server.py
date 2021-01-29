@@ -2,7 +2,7 @@ import json
 import logging
 from collections import deque
 from io import SEEK_END, BytesIO
-from typing import Callable, Iterable, Optional, Tuple, Union
+from typing import Callable, Iterable, MutableMapping, Optional, Tuple, Union
 
 import attr
 from typing_extensions import Deque
@@ -51,9 +51,21 @@ class FakeChannel:
 
     @property
     def json_body(self):
-        if not self.result:
-            raise Exception("No result yet.")
-        return json.loads(self.result["body"].decode("utf8"))
+        return json.loads(self.text_body)
+
+    @property
+    def text_body(self) -> str:
+        """The body of the result, utf-8-decoded.
+
+        Raises an exception if the request has not yet completed.
+        """
+        if not self.is_finished:
+            raise Exception("Request not yet completed")
+        return self.result["body"].decode("utf8")
+
+    def is_finished(self) -> bool:
+        """check if the response has been completely received"""
+        return self.result.get("done", False)
 
     @property
     def code(self):
@@ -62,7 +74,7 @@ class FakeChannel:
         return int(self.result["code"])
 
     @property
-    def headers(self):
+    def headers(self) -> Headers:
         if not self.result:
             raise Exception("No result yet.")
         h = Headers()
@@ -124,7 +136,7 @@ class FakeChannel:
         self._reactor.run()
         x = 0
 
-        while not self.result.get("done"):
+        while not self.is_finished():
             # If there's a producer, tell it to resume producing so we get content
             if self._producer:
                 self._producer.resumeProducing()
@@ -135,6 +147,16 @@ class FakeChannel:
                 raise TimedOutException("Timed out waiting for request to finish.")
 
             self._reactor.advance(0.1)
+
+    def extract_cookies(self, cookies: MutableMapping[str, str]) -> None:
+        """Process the contents of any Set-Cookie headers in the response
+
+        Any cookines found are added to the given dict
+        """
+        for h in self.headers.getRawHeaders("Set-Cookie"):
+            parts = h.split(";")
+            k, v = parts[0].split("=", maxsplit=1)
+            cookies[k] = v
 
 
 class FakeSite:

@@ -14,14 +14,13 @@
 # limitations under the License.
 
 import os
-from distutils.util import strtobool
 
 import pkg_resources
 
 from synapse.api.constants import RoomCreationPreset
 from synapse.config._base import Config, ConfigError
 from synapse.types import RoomAlias, UserID
-from synapse.util.stringutils import random_string_with_symbols
+from synapse.util.stringutils import random_string_with_symbols, strtobool
 
 
 class AccountValidityConfig(Config):
@@ -49,10 +48,6 @@ class AccountValidityConfig(Config):
                 self.renew_email_subject = "Renew your %(app)s account"
 
             self.startup_job_max_delta = self.period * 10.0 / 100.0
-
-        if self.renew_by_email_enabled:
-            if "public_baseurl" not in synapse_config:
-                raise ConfigError("Can't send renewal emails without 'public_baseurl'")
 
         template_dir = config.get("template_dir")
 
@@ -86,12 +81,12 @@ class RegistrationConfig(Config):
     section = "registration"
 
     def read_config(self, config, **kwargs):
-        self.enable_registration = bool(
-            strtobool(str(config.get("enable_registration", False)))
+        self.enable_registration = strtobool(
+            str(config.get("enable_registration", False))
         )
         if "disable_registration" in config:
-            self.enable_registration = not bool(
-                strtobool(str(config["disable_registration"]))
+            self.enable_registration = not strtobool(
+                str(config["disable_registration"])
             )
 
         self.account_validity = AccountValidityConfig(
@@ -110,13 +105,6 @@ class RegistrationConfig(Config):
         account_threepid_delegates = config.get("account_threepid_delegates") or {}
         self.account_threepid_delegate_email = account_threepid_delegates.get("email")
         self.account_threepid_delegate_msisdn = account_threepid_delegates.get("msisdn")
-        if self.account_threepid_delegate_msisdn and not self.public_baseurl:
-            raise ConfigError(
-                "The configuration option `public_baseurl` is required if "
-                "`account_threepid_delegate.msisdn` is set, such that "
-                "clients know where to submit validation tokens to. Please "
-                "configure `public_baseurl`."
-            )
 
         self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
@@ -241,8 +229,9 @@ class RegistrationConfig(Config):
           # send an email to the account's email address with a renewal link. By
           # default, no such emails are sent.
           #
-          # If you enable this setting, you will also need to fill out the 'email' and
-          # 'public_baseurl' configuration sections.
+          # If you enable this setting, you will also need to fill out the 'email'
+          # configuration section. You should also check that 'public_baseurl' is set
+          # correctly.
           #
           #renew_at: 1w
 
@@ -333,8 +322,7 @@ class RegistrationConfig(Config):
         # The identity server which we suggest that clients should use when users log
         # in on this server.
         #
-        # (By default, no suggestion is made, so it is left up to the client.
-        # This setting is ignored unless public_baseurl is also set.)
+        # (By default, no suggestion is made, so it is left up to the client.)
         #
         #default_identity_server: https://matrix.org
 
@@ -358,8 +346,6 @@ class RegistrationConfig(Config):
         # Servers handling the these requests must answer the `/requestToken` endpoints defined
         # by the Matrix Identity Service API specification:
         # https://matrix.org/docs/spec/identity_service/latest
-        #
-        # If a delegate is specified, the config option public_baseurl must also be filled out.
         #
         account_threepid_delegates:
             #email: https://example.com     # Delegate email sending to example.com

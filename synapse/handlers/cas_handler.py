@@ -75,9 +75,18 @@ class CasHandler:
         self._http_client = hs.get_proxied_http_client()
 
         # identifier for the external_ids table
-        self._auth_provider_id = "cas"
+        self.idp_id = "cas"
+
+        # user-facing name of this auth provider
+        self.idp_name = "CAS"
+
+        # we do not currently support icons for CAS auth, but this is required by
+        # the SsoIdentityProvider protocol type.
+        self.idp_icon = None
 
         self._sso_handler = hs.get_sso_handler()
+
+        self._sso_handler.register_identity_provider(self)
 
     def _build_service_param(self, args: Dict[str, str]) -> str:
         """
@@ -105,7 +114,7 @@ class CasHandler:
         Args:
             ticket: The CAS ticket from the client.
             service_args: Additional arguments to include in the service URL.
-                Should be the same as those passed to `get_redirect_url`.
+                Should be the same as those passed to `handle_redirect_request`.
 
         Raises:
             CasError: If there's an error parsing the CAS response.
@@ -184,16 +193,31 @@ class CasHandler:
 
         return CasResponse(user, attributes)
 
-    def get_redirect_url(self, service_args: Dict[str, str]) -> str:
-        """
-        Generates a URL for the CAS server where the client should be redirected.
+    async def handle_redirect_request(
+        self,
+        request: SynapseRequest,
+        client_redirect_url: Optional[bytes],
+        ui_auth_session_id: Optional[str] = None,
+    ) -> str:
+        """Generates a URL for the CAS server where the client should be redirected.
 
         Args:
-            service_args: Additional arguments to include in the final redirect URL.
+            request: the incoming HTTP request
+            client_redirect_url: the URL that we should redirect the
+                client to after login (or None for UI Auth).
+            ui_auth_session_id: The session ID of the ongoing UI Auth (or
+                None if this is a login).
 
         Returns:
-            The URL to redirect the client to.
+            URL to redirect to
         """
+
+        if ui_auth_session_id:
+            service_args = {"session": ui_auth_session_id}
+        else:
+            assert client_redirect_url
+            service_args = {"redirectUrl": client_redirect_url.decode("utf8")}
+
         args = urllib.parse.urlencode(
             {"service": self._build_service_param(service_args)}
         )
@@ -275,7 +299,7 @@ class CasHandler:
         # first check if we're doing a UIA
         if session:
             return await self._sso_handler.complete_sso_ui_auth_request(
-                self._auth_provider_id, cas_response.username, session, request,
+                self.idp_id, cas_response.username, session, request,
             )
 
         # otherwise, we're handling a login request.
@@ -375,7 +399,7 @@ class CasHandler:
             return None
 
         await self._sso_handler.complete_sso_login_request(
-            self._auth_provider_id,
+            self.idp_id,
             cas_response.username,
             request,
             client_redirect_url,

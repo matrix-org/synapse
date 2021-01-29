@@ -28,7 +28,6 @@ from synapse.api.urls import (
     FEDERATION_V1_PREFIX,
     FEDERATION_V2_PREFIX,
 )
-from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.http.server import JsonResource
 from synapse.http.servlet import (
     parse_boolean_from_args,
@@ -45,6 +44,7 @@ from synapse.logging.opentracing import (
 )
 from synapse.server import HomeServer
 from synapse.types import ThirdPartyInstanceID, get_domain_from_id
+from synapse.util.stringutils import parse_and_validate_server_name
 from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger(__name__)

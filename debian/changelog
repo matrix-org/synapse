@@ -1,3 +1,13 @@
+matrix-synapse-py3 (1.26.0) stable; urgency=medium
+
+  [ Richard van der Hoff ]
+  * Remove dependency on `python3-distutils`.
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.26.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 27 Jan 2021 12:43:35 -0500
+
 matrix-synapse-py3 (1.25.0) stable; urgency=medium
 
   [ Dan Callahan ]
