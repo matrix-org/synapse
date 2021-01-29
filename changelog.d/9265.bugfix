@@ -1,0 +1,1 @@
+Prevent password hashes from getting dropped if a client failed threepid validation during a User Interactive Auth stage.
