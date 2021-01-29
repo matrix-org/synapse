@@ -191,7 +191,7 @@ class RatelimitConfig(Config):
         #    per_second: 0.3
         #    burst_count: 10
         #  per_user:
-        #    per_second: 0.03
+        #    per_second: 0.003
         #    burst_count: 5
 
         # Ratelimiting settings for incoming federation
