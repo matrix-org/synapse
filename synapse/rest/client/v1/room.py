@@ -37,6 +37,7 @@ from synapse.http.servlet import (
     assert_params_in_dict,
     parse_integer,
     parse_json_object_from_request,
+    parse_strings_from_args,
     parse_string,
 )
 from synapse.logging.opentracing import set_tag
@@ -222,12 +223,16 @@ class RoomSendEventRestServlet(TransactionRestServlet):
     async def on_POST(self, request, room_id, event_type, txn_id=None):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         content = parse_json_object_from_request(request)
+        prev_events = parse_strings_from_args(request.args, "prev_event")
+
+        logger.info("prev_events %s", prev_events)
 
         event_dict = {
             "type": event_type,
             "content": content,
             "room_id": room_id,
             "sender": requester.user.to_string(),
+            "prev_events": prev_events
         }
 
         if b"ts" in request.args and requester.app_service:

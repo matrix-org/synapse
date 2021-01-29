@@ -16,6 +16,7 @@
 """ This module contains base REST classes for constructing REST servlets. """
 
 import logging
+from typing import List
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.util import json_decoder
@@ -147,7 +148,29 @@ def parse_string(
     )
 
 
-def parse_string_from_args(
+def parse_string_value(
+    value,
+    allowed_values,
+    encoding="ascii"
+) -> str:
+    if encoding:
+        try:
+            value = value.decode(encoding)
+        except ValueError:
+            raise SynapseError(
+                400, "Query parameter %r must be %s" % (name, encoding)
+            )
+
+    if allowed_values is not None and value not in allowed_values:
+        message = "Query parameter %r must be one of [%s]" % (
+            name,
+            ", ".join(repr(v) for v in allowed_values),
+        )
+        raise SynapseError(400, message)
+    else:
+        return value
+
+def parse_strings_from_args(
     args,
     name,
     default=None,
@@ -155,30 +178,15 @@ def parse_string_from_args(
     allowed_values=None,
     param_type="string",
     encoding="ascii",
-):
+) -> List[str]:
 
     if not isinstance(name, bytes):
         name = name.encode("ascii")
 
     if name in args:
-        value = args[name][0]
+        values = args[name]
 
-        if encoding:
-            try:
-                value = value.decode(encoding)
-            except ValueError:
-                raise SynapseError(
-                    400, "Query parameter %r must be %s" % (name, encoding)
-                )
-
-        if allowed_values is not None and value not in allowed_values:
-            message = "Query parameter %r must be one of [%s]" % (
-                name,
-                ", ".join(repr(v) for v in allowed_values),
-            )
-            raise SynapseError(400, message)
-        else:
-            return value
+        return [parse_string_value(value, allowed_values, encoding=encoding) for value in values]
     else:
         if required:
             message = "Missing %s query parameter %r" % (param_type, name)
@@ -190,6 +198,31 @@ def parse_string_from_args(
 
             return default
 
+
+def parse_string_from_args(
+    args,
+    name,
+    default=None,
+    required=False,
+    allowed_values=None,
+    param_type="string",
+    encoding="ascii",
+):
+    strings = parse_strings_from_args(
+        args,
+        name,
+        default=default,
+        required=required,
+        allowed_values=allowed_values,
+        param_type=param_type,
+        encoding=encoding,
+    )
+    
+    if isinstance(strings, list) and len(strings):
+        return strings[0]
+
+    # Return the default
+    return strings
 
 def parse_json_value_from_request(request, allow_empty_body=False):
     """Parse a JSON value from the body of a twisted HTTP request.
@@ -244,7 +277,6 @@ def parse_json_object_from_request(request, allow_empty_body=False):
         raise SynapseError(400, message, errcode=Codes.BAD_JSON)
 
     return content
-
 
 def assert_params_in_dict(body, required):
     absent = []

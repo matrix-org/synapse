@@ -17,4 +17,4 @@ cd ../complement
 docker build -t complement-synapse -f dockerfiles/Synapse.Dockerfile ./dockerfiles
 
 # Run the tests on the resulting image!
-COMPLEMENT_BASE_IMAGE=complement-synapse go test -tags msc2716 -v -count=1 ./tests/main_test.go ./tests/msc2716_test.go
+COMPLEMENT_DEBUG=1 COMPLEMENT_BASE_IMAGE=complement-synapse go test -tags msc2716 -v -count=1 ./tests/main_test.go ./tests/msc2716_test.go
