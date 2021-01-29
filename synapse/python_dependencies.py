@@ -87,7 +87,7 @@ REQUIREMENTS = [
 CONDITIONAL_REQUIREMENTS = {
     "matrix-synapse-ldap3": ["matrix-synapse-ldap3>=0.1"],
     "postgres": [
-         # we use execute_values with the fetch param, which arrived in psycopg 2.8.
+        # we use execute_values with the fetch param, which arrived in psycopg 2.8.
         "psycopg2>=2.8 ; platform_python_implementation != 'PyPy'",
         "psycopg2cffi>=2.7 ; platform_python_implementation == 'PyPy'",
         "psycopg2cffi-compat==1.1 ; platform_python_implementation == 'PyPy'",
