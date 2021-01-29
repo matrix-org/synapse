@@ -107,6 +107,15 @@ class RatelimitConfig(Config):
             defaults={"per_second": 0.003, "burst_count": 5},
         )
 
+        self.rc_invites_per_room = RateLimitConfig(
+            config.get("rc_invites", {}).get("per_room", {}),
+            defaults={"per_second": 0.3, "burst_count": 10},
+        )
+        self.rc_invites_per_user = RateLimitConfig(
+            config.get("rc_invites", {}).get("per_user", {}),
+            defaults={"per_second": 0.003, "burst_count": 5},
+        )
+
     def generate_config_section(self, **kwargs):
         return """\
         ## Ratelimiting ##
@@ -137,6 +146,8 @@ class RatelimitConfig(Config):
         #     "remote" for when users are trying to join rooms not on the server (which
         #     can be more expensive)
         #   - one for ratelimiting how often a user or IP can attempt to validate a 3PID.
+        #   - two for ratelimiting how often invites can be sent in a room or to a
+        #     specific user.
         #
         # The defaults are as shown below.
         #
@@ -174,6 +185,14 @@ class RatelimitConfig(Config):
         #rc_3pid_validation:
         #  per_second: 0.003
         #  burst_count: 5
+        #
+        #rc_invites:
+        #  per_room:
+        #    per_second: 0.3
+        #    burst_count: 10
+        #  per_user:
+        #    per_second: 0.003
+        #    burst_count: 5
 
         # Ratelimiting settings for incoming federation
         #
