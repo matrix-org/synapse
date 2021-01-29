@@ -109,7 +109,7 @@ class RatelimitConfig(Config):
 
         self.rc_invites_per_room = RateLimitConfig(
             config.get("rc_invites", {}).get("per_room", {}),
-            defaults={"per_second": 0.003, "burst_count": 10},
+            defaults={"per_second": 0.3, "burst_count": 10},
         )
         self.rc_invites_per_user = RateLimitConfig(
             config.get("rc_invites", {}).get("per_user", {}),
@@ -188,7 +188,7 @@ class RatelimitConfig(Config):
         #
         #rc_invites:
         #  per_room:
-        #    per_second: 0.03
+        #    per_second: 0.3
         #    burst_count: 10
         #  per_user:
         #    per_second: 0.03
