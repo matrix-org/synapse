@@ -156,7 +156,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     def ratelimit_invite(self, room_id: str, invitee_user_id: str):
-        """Ratelimit invites py room and by target user.
+        """Ratelimit invites by room and by target user.
         """
         self._invites_per_room_limiter.ratelimit(room_id)
         self._invites_per_user_limiter.ratelimit(invitee_user_id)
