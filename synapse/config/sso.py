@@ -31,18 +31,22 @@ class SSOConfig(Config):
 
         # Read templates from disk
         (
+            self.sso_login_idp_picker_template,
             self.sso_redirect_confirm_template,
             self.sso_auth_confirm_template,
             self.sso_error_template,
             sso_account_deactivated_template,
             sso_auth_success_template,
+            self.sso_auth_bad_user_template,
         ) = self.read_templates(
             [
+                "sso_login_idp_picker.html",
                 "sso_redirect_confirm.html",
                 "sso_auth_confirm.html",
                 "sso_error.html",
                 "sso_account_deactivated.html",
                 "sso_auth_success.html",
+                "sso_auth_bad_user.html",
             ],
             template_dir,
         )
@@ -60,11 +64,8 @@ class SSOConfig(Config):
         # gracefully to the client). This would make it pointless to ask the user for
         # confirmation, since the URL the confirmation page would be showing wouldn't be
         # the client's.
-        # public_baseurl is an optional setting, so we only add the fallback's URL to the
-        # list if it's provided (because we can't figure out what that URL is otherwise).
-        if self.public_baseurl:
-            login_fallback_url = self.public_baseurl + "_matrix/static/client/login"
-            self.sso_client_whitelist.append(login_fallback_url)
+        login_fallback_url = self.public_baseurl + "_matrix/static/client/login"
+        self.sso_client_whitelist.append(login_fallback_url)
 
     def generate_config_section(self, **kwargs):
         return """\
@@ -82,9 +83,9 @@ class SSOConfig(Config):
             # phishing attacks from evil.site. To avoid this, include a slash after the
             # hostname: "https://my.client/".
             #
-            # If public_baseurl is set, then the login fallback page (used by clients
-            # that don't natively support the required login flows) is whitelisted in
-            # addition to any URLs in this list.
+            # The login fallback page (used by clients that don't natively support the
+            # required login flows) is automatically whitelisted in addition to any URLs
+            # in this list.
             #
             # By default, this list is empty.
             #
@@ -97,6 +98,31 @@ class SSOConfig(Config):
             # directory, default templates from within the Synapse package will be used.
             #
             # Synapse will look for the following templates in this directory:
+            #
+            # * HTML page to prompt the user to choose an Identity Provider during
+            #   login: 'sso_login_idp_picker.html'.
+            #
+            #   This is only used if multiple SSO Identity Providers are configured.
+            #
+            #   When rendering, this template is given the following variables:
+            #     * redirect_url: the URL that the user will be redirected to after
+            #       login. Needs manual escaping (see
+            #       https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+            #
+            #     * server_name: the homeserver's name.
+            #
+            #     * providers: a list of available Identity Providers. Each element is
+            #       an object with the following attributes:
+            #         * idp_id: unique identifier for the IdP
+            #         * idp_name: user-facing name for the IdP
+            #
+            #   The rendered HTML page should contain a form which submits its results
+            #   back as a GET request, with the following query parameters:
+            #
+            #     * redirectUrl: the client redirect URI (ie, the `redirect_url` passed
+            #       to the template)
+            #
+            #     * idp: the 'idp_id' of the chosen IDP.
             #
             # * HTML page for a confirmation step before redirecting back to the client
             #   with the login token: 'sso_redirect_confirm.html'.
@@ -132,6 +158,14 @@ class SSOConfig(Config):
             #   (see https://matrix.org/docs/spec/client_server/r0.6.0#fallback).
             #
             #   This template has no additional variables.
+            #
+            # * HTML page shown after a user-interactive authentication session which
+            #   does not map correctly onto the expected user: 'sso_auth_bad_user.html'.
+            #
+            #   When rendering, this template is given the following variables:
+            #     * server_name: the homeserver's name.
+            #     * user_id_to_verify: the MXID of the user that we are trying to
+            #       validate.
             #
             # * HTML page shown during single sign-on if a deactivated user (according to Synapse's database)
             #   attempts to login: 'sso_account_deactivated.html'.
