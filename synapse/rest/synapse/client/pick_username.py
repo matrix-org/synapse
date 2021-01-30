@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from typing import TYPE_CHECKING
 
 import pkg_resources
@@ -21,6 +22,7 @@ from twisted.web.http import Request
 from twisted.web.resource import Resource
 from twisted.web.static import File
 
+from synapse.api.errors import SynapseError
 from synapse.handlers.sso import get_username_mapping_session_cookie_from_request
 from synapse.http.server import DirectServeHtmlResource, DirectServeJsonResource
 from synapse.http.servlet import parse_string
@@ -28,6 +30,8 @@ from synapse.http.site import SynapseRequest
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+
+logger = logging.getLogger(__name__)
 
 
 def pick_username_resource(hs: "HomeServer") -> Resource:
@@ -75,9 +79,19 @@ class SubmitResource(DirectServeHtmlResource):
         self._sso_handler = hs.get_sso_handler()
 
     async def _async_render_POST(self, request: SynapseRequest):
-        localpart = parse_string(request, "username", required=True)
+        try:
+            session_id = get_username_mapping_session_cookie_from_request(request)
+        except SynapseError as e:
+            logger.warning("Error fetching session cookie: %s", e)
+            self._sso_handler.render_error(request, "bad_session", e.msg, code=e.code)
+            return
 
-        session_id = get_username_mapping_session_cookie_from_request(request)
+        try:
+            localpart = parse_string(request, "username", required=True)
+        except SynapseError as e:
+            logger.warning("[session %s] bad param: %s", session_id, e)
+            self._sso_handler.render_error(request, "bad_param", e.msg, code=e.code)
+            return
 
         await self._sso_handler.handle_submit_username_request(
             request, localpart, session_id
