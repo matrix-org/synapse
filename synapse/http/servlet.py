@@ -151,6 +151,7 @@ def parse_string(
 def parse_string_value(
     value,
     allowed_values,
+    name="",
     encoding="ascii"
 ) -> str:
     if encoding:
@@ -186,7 +187,7 @@ def parse_strings_from_args(
     if name in args:
         values = args[name]
 
-        return [parse_string_value(value, allowed_values, encoding=encoding) for value in values]
+        return [parse_string_value(value, allowed_values, name=name, encoding=encoding) for value in values]
     else:
         if required:
             message = "Missing %s query parameter %r" % (param_type, name)

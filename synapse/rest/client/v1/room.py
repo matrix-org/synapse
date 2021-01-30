@@ -38,6 +38,7 @@ from synapse.http.servlet import (
     parse_integer,
     parse_json_object_from_request,
     parse_strings_from_args,
+    parse_integer_from_args,
     parse_string,
 )
 from synapse.logging.opentracing import set_tag
@@ -224,17 +225,25 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         content = parse_json_object_from_request(request)
         prev_events = parse_strings_from_args(request.args, "prev_event")
-
-        logger.info("prev_events %s", prev_events)
+        origin_server_ts = parse_integer(request, "origin_server_ts")
 
         event_dict = {
             "type": event_type,
             "content": content,
             "room_id": room_id,
-            "sender": requester.user.to_string(),
-            "prev_events": prev_events
+            "sender": requester.user.to_string()
         }
 
+        if prev_events:
+            event_dict["prev_events"] = prev_events
+
+        # TODO: Add `and requester.app_service`
+        if origin_server_ts:
+            event_dict["origin_server_ts"] = origin_server_ts
+
+        # TODO: I noticed in the Synapse code that we already accept a `ts` query parameter to override
+        # the `origin_server_ts` if the request is coming from an app service.
+        # Do we want to remove in favor of the spec'ed code above
         if b"ts" in request.args and requester.app_service:
             event_dict["origin_server_ts"] = parse_integer(request, "ts", 0)
 
