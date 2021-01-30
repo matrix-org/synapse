@@ -256,24 +256,27 @@ Additionally, the following endpoints should be included if Synapse is configure
 to use SSO (you only need to include the ones for whichever SSO provider you're
 using):
 
+    # for all SSO providers
+    ^/_matrix/client/(api/v1|r0|unstable)/login/sso/redirect
+    ^/_synapse/client/pick_idp$
+    ^/_synapse/client/pick_username
+    ^/_synapse/client/sso_register$
+
     # OpenID Connect requests.
-    ^/_matrix/client/(api/v1|r0|unstable)/login/sso/redirect$
     ^/_synapse/oidc/callback$
 
     # SAML requests.
-    ^/_matrix/client/(api/v1|r0|unstable)/login/sso/redirect$
     ^/_matrix/saml2/authn_response$
 
     # CAS requests.
-    ^/_matrix/client/(api/v1|r0|unstable)/login/(cas|sso)/redirect$
     ^/_matrix/client/(api/v1|r0|unstable)/login/cas/ticket$
+
+Ensure that all SSO logins go to a single process.
+For multiple workers not handling the SSO endpoints properly, see
+[#7530](https://github.com/matrix-org/synapse/issues/7530).
 
 Note that a HTTP listener with `client` and `federation` resources must be
 configured in the `worker_listeners` option in the worker config.
-
-Ensure that all SSO logins go to a single process (usually the main process). 
-For multiple workers not handling the SSO endpoints properly, see
-[#7530](https://github.com/matrix-org/synapse/issues/7530).
 
 #### Load balancing
 
