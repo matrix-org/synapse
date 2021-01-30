@@ -1971,7 +1971,8 @@ sso:
     # * HTML page for a confirmation step before redirecting back to the client
     #   with the login token: 'sso_redirect_confirm.html'.
     #
-    #   When rendering, this template is given three variables:
+    #   When rendering, this template is given the following variables:
+    #
     #     * redirect_url: the URL the user is about to be redirected to. Needs
     #                     manual escaping (see
     #                     https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
@@ -1983,6 +1984,17 @@ sso:
     #                    (see https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
     #
     #     * server_name: the homeserver's name.
+    #
+    #     * new_user: a boolean indicating whether this is the user's first time
+    #          logging in.
+    #
+    #     * user_id: the user's matrix ID.
+    #
+    #     * user_profile.avatar_url: an MXC URI for the user's avatar, if any.
+    #           None if the user has not set an avatar.
+    #
+    #     * user_profile.display_name: the user's display name. None if the user
+    #           has not set a display name.
     #
     # * HTML page which notifies the user that they are authenticating to confirm
     #   an operation on their account during the user interactive authentication
