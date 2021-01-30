@@ -29,9 +29,7 @@ from synapse.appservice import ApplicationService
 from synapse.rest.client.v1 import login, logout
 from synapse.rest.client.v2_alpha import devices, register
 from synapse.rest.client.v2_alpha.account import WhoamiRestServlet
-from synapse.rest.synapse.client.pick_idp import PickIdpResource
-from synapse.rest.synapse.client.pick_username import pick_username_resource
-from synapse.rest.synapse.client.sso_register import SsoRegisterResource
+from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.types import create_requester
 
 from tests import unittest
@@ -427,7 +425,7 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         from synapse.rest.oidc import OIDCResource
 
         d = super().create_resource_dict()
-        d["/_synapse/client/pick_idp"] = PickIdpResource(self.hs)
+        d.update(build_synapse_client_resource_tree(self.hs))
         d["/_synapse/oidc"] = OIDCResource(self.hs)
         return d
 
@@ -1215,8 +1213,7 @@ class UsernamePickerTestCase(HomeserverTestCase):
         from synapse.rest.oidc import OIDCResource
 
         d = super().create_resource_dict()
-        d["/_synapse/client/pick_username"] = pick_username_resource(self.hs)
-        d["/_synapse/client/sso_register"] = SsoRegisterResource(self.hs)
+        d.update(build_synapse_client_resource_tree(self.hs))
         d["/_synapse/oidc"] = OIDCResource(self.hs)
         return d
 
