@@ -422,11 +422,8 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         return config
 
     def create_resource_dict(self) -> Dict[str, Resource]:
-        from synapse.rest.oidc import OIDCResource
-
         d = super().create_resource_dict()
         d.update(build_synapse_client_resource_tree(self.hs))
-        d["/_synapse/oidc"] = OIDCResource(self.hs)
         return d
 
     def test_get_login_flows(self):
@@ -1210,11 +1207,8 @@ class UsernamePickerTestCase(HomeserverTestCase):
         return config
 
     def create_resource_dict(self) -> Dict[str, Resource]:
-        from synapse.rest.oidc import OIDCResource
-
         d = super().create_resource_dict()
         d.update(build_synapse_client_resource_tree(self.hs))
-        d["/_synapse/oidc"] = OIDCResource(self.hs)
         return d
 
     def test_username_picker(self):
