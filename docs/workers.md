@@ -225,7 +225,6 @@ expressions:
     ^/_matrix/client/(api/v1|r0|unstable)/joined_groups$
     ^/_matrix/client/(api/v1|r0|unstable)/publicised_groups$
     ^/_matrix/client/(api/v1|r0|unstable)/publicised_groups/
-    ^/_synapse/client/password_reset/email/submit_token$
 
     # Registration/login requests
     ^/_matrix/client/(api/v1|r0|unstable)/login$
