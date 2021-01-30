@@ -30,11 +30,9 @@ def create_engine(database_config) -> BaseDatabaseEngine:
     if name == "psycopg2":
         # pypy requires psycopg2cffi rather than psycopg2
         if platform.python_implementation() == "PyPy":
-            from psycopg2cffi import compat  # type: ignore
-
-            compat.register()
-
-        import psycopg2  # type: ignore
+            import psycopg2cffi as psycopg2  # type: ignore
+        else:
+            import psycopg2  # type: ignore
 
         return PostgresEngine(psycopg2, database_config)
 
