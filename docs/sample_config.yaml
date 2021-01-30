@@ -1998,6 +1998,28 @@ sso:
     #
     #     * username: the localpart of the user's chosen user id
     #
+    # * HTML page allowing the user to consent to the server's terms and
+    #   conditions. This is only shown for new users, and only if
+    #   `user_consent.require_at_registration` is set.
+    #
+    #   When rendering, this template is given the following variables:
+    #
+    #     * server_name: the homeserver's name.
+    #
+    #     * user_id: the user's matrix proposed ID.
+    #
+    #     * user_profile.display_name: the user's proposed display name, if any.
+    #
+    #     * consent_version: the version of the terms that the user will be
+    #       shown
+    #
+    #     * terms_url: a link to the page showing the terms.
+    #
+    #   The template should render a form which submits the following fields:
+    #
+    #     * accepted_version: the version of the terms accepted by the user
+    #       (ie, 'consent_version' from the input variables).
+    #
     # * HTML page for a confirmation step before redirecting back to the client
     #   with the login token: 'sso_redirect_confirm.html'.
     #

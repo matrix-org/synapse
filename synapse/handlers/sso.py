@@ -144,6 +144,7 @@ class UsernameMappingSession:
 
     # choices made by the user
     chosen_localpart = attr.ib(type=Optional[str], default=None)
+    terms_accepted_version = attr.ib(type=Optional[str], default=None)
 
 
 # the HTTP cookie used to track the mapping session id
@@ -178,6 +179,8 @@ class SsoHandler:
 
         # map from idp_id to SsoIdentityProvider
         self._identity_providers = {}  # type: Dict[str, SsoIdentityProvider]
+
+        self._consent_at_registration = hs.config.consent.user_consent_at_registration
 
     def register_identity_provider(self, p: SsoIdentityProvider):
         p_id = p.idp_id
@@ -726,6 +729,38 @@ class SsoHandler:
         # update the session with the user's choices
         session.chosen_localpart = localpart
 
+        # we may now need to collect consent from the user, in which case, redirect
+        # to the consent-extraction-unit
+        if self._consent_at_registration:
+            redirect_url = b"/_synapse/client/new_user_consent"
+
+        # otherwise, redirect to the completion page
+        else:
+            redirect_url = b"/_synapse/client/sso_register"
+
+        respond_with_redirect(request, redirect_url)
+
+    async def handle_terms_accepted(
+        self, request: Request, session_id: str, terms_version: str
+    ):
+        """Handle a request to the new-user 'consent' endpoint
+
+        Will serve an HTTP response to the request.
+
+        Args:
+            request: HTTP request
+            session_id: ID of the username mapping session, extracted from a cookie
+            terms_version: the version of the terms which the user viewed and consented
+                to
+        """
+        logger.info(
+            "[session %s] User consented to terms version %s",
+            session_id,
+            terms_version,
+        )
+        session = self.get_mapping_session(session_id)
+        session.terms_accepted_version = terms_version
+
         # we're done; now we can register the user
         respond_with_redirect(request, b"/_synapse/client/sso_register")
 
@@ -778,6 +813,15 @@ class SsoHandler:
             b"",
             expires=b"Thu, 01 Jan 1970 00:00:00 GMT",
             path=b"/",
+        )
+
+        auth_result = {}
+        if session.terms_accepted_version:
+            # TODO: make this less awful.
+            auth_result[LoginType.TERMS] = True
+
+        await self._registration_handler.post_registration_actions(
+            user_id, auth_result, access_token=None
         )
 
         await self._auth_handler.complete_sso_login(
