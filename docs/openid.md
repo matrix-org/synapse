@@ -369,21 +369,23 @@ does not return a `sub` property, an alternative `subject_claim` has to be set.
 Synapse config:
 
 ```yaml
-oidc_config:
-  enabled: true
-  discover: false
-  issuer: "https://your-gitea.com/"
-  client_id: "your-client-id" # TO BE FILLED
-  client_secret: "your-client-secret" # TO BE FILLED
-  client_auth_method: client_secret_post
-  scopes: [] # Gitea doesn't support Scopes
-  authorization_endpoint: "https://your-gitea.com/login/oauth/authorize"
-  token_endpoint: "https://your-gitea.com/login/oauth/access_token"
-  userinfo_endpoint: "https://your-gitea.com/api/v1/user"
-  user_mapping_provider:
-    config:
-      subject_claim: "id"
-      localpart_template: "{{ user.login }}"
-      display_name_template: "{{ user.full_name }}" 
+oidc_providers:
+  - idp_id: gitea
+    idp_name: Gitea
+    idp_brand: "org.matrix.gitea"  # optional: styling hint for clients
+    discover: false
+    issuer: "https://your-gitea.com/"
+    client_id: "your-client-id" # TO BE FILLED
+    client_secret: "your-client-secret" # TO BE FILLED
+    client_auth_method: client_secret_post
+    scopes: [] # Gitea doesn't support Scopes
+    authorization_endpoint: "https://your-gitea.com/login/oauth/authorize"
+    token_endpoint: "https://your-gitea.com/login/oauth/access_token"
+    userinfo_endpoint: "https://your-gitea.com/api/v1/user"
+    user_mapping_provider:
+      config:
+        subject_claim: "id"
+        localpart_template: "{{ user.login }}"
+        display_name_template: "{{ user.full_name }}" 
 ```
 
