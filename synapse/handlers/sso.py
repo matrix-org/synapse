@@ -20,9 +20,9 @@ from typing import (
     Callable,
     Dict,
     Iterable,
-    List,
     Mapping,
     Optional,
+    Set,
 )
 from urllib.parse import urlencode
 
@@ -38,7 +38,7 @@ from synapse.handlers.ui_auth import UIAuthSessionDataConstants
 from synapse.http import get_request_user_agent
 from synapse.http.server import respond_with_html, respond_with_redirect
 from synapse.http.site import SynapseRequest
-from synapse.types import JsonDict, UserID, contains_invalid_mxid_characters
+from synapse.types import Collection, JsonDict, UserID, contains_invalid_mxid_characters
 from synapse.util.async_helpers import Linearizer
 from synapse.util.stringutils import random_string
 
@@ -124,7 +124,7 @@ class UserAttributes:
     # enter one.
     localpart = attr.ib(type=Optional[str])
     display_name = attr.ib(type=Optional[str], default=None)
-    emails = attr.ib(type=List[str], default=attr.Factory(list))
+    emails = attr.ib(type=Collection[str], default=attr.Factory(list))
 
 
 @attr.s(slots=True)
@@ -139,7 +139,7 @@ class UsernameMappingSession:
 
     # attributes returned by the ID mapper
     display_name = attr.ib(type=Optional[str])
-    emails = attr.ib(type=List[str])
+    emails = attr.ib(type=Collection[str])
 
     # An optional dictionary of extra attributes to be provided to the client in the
     # login response.
@@ -154,7 +154,7 @@ class UsernameMappingSession:
     # choices made by the user
     chosen_localpart = attr.ib(type=Optional[str], default=None)
     use_display_name = attr.ib(type=bool, default=True)
-    emails_to_use = attr.ib(type=List[str], factory=list)
+    emails_to_use = attr.ib(type=Collection[str], default=())
 
 
 # the HTTP cookie used to track the mapping session id
@@ -745,17 +745,21 @@ class SsoHandler:
         session.chosen_localpart = localpart
         session.use_display_name = use_display_name
 
-        session.emails_to_use = []
+        emails_from_idp = set(session.emails)
+        filtered_emails = set()  # type: Set[str]
+
+        # we iterate through the list rather than just building a set conjunction, so
+        # that we can log attempts to use unknown addresses
         for email in emails_to_use:
-            # this is O(N^2), but N is small...
-            if email in session.emails:
-                session.emails_to_use.append(email)
+            if email in emails_from_idp:
+                filtered_emails.add(email)
             else:
                 logger.warning(
                     "[session %s] ignoring user request to use unknown email address %r",
                     session_id,
                     email,
                 )
+        session.emails_to_use = filtered_emails
 
         # we're done; now we can register the user
         respond_with_redirect(request, b"/_synapse/client/sso_register")
