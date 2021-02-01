@@ -88,10 +88,10 @@
         <input type="submit" value="Continue" class="primary-button">
         <!-- {% if user_attributes %} -->
         <section class="idp-pick-details">
-          <h2><img src="{{idp.idp_icon | mxc_to_http(24, 24)}}"/>Information from {{ idp.idp_name }}</h2>
+          <h2><img src="{{ idp.idp_icon | mxc_to_http(24, 24) }}"/>Information from {{ idp.idp_name }}</h2>
           <!-- {% if user_attributes.avatar_url %} -->
           <div class="idp-detail idp-avatar">
-            <img src="{{user_attributes.avatar_url}}" class="avatar" />
+            <img src="{{ user_attributes.avatar_url }}" class="avatar" />
           </div>
           <!-- {% endif %} -->
           <!-- {% if user_attributes.display_name %} -->
