@@ -86,26 +86,26 @@
           <div class="postfix">:{{ server_name }}</div>
         </div>
         <input type="submit" value="Continue" class="primary-button">
-        <!-- {% if user_attributes %} -->
+        {% if user_attributes %}
         <section class="idp-pick-details">
           <h2><img src="{{ idp.idp_icon | mxc_to_http(24, 24) }}"/>Information from {{ idp.idp_name }}</h2>
-          <!-- {% if user_attributes.avatar_url %} -->
+          {% if user_attributes.avatar_url %}
           <div class="idp-detail idp-avatar">
             <img src="{{ user_attributes.avatar_url }}" class="avatar" />
           </div>
-          <!-- {% endif %} -->
-          <!-- {% if user_attributes.display_name %} -->
+          {% endif %}
+          {% if user_attributes.display_name %}
           <div class="idp-detail">
             <p class="idp-value">{{ user_attributes.display_name }}</p>
           </div>
-          <!-- {% endif %} -->
-          <!-- {% for email in user_attributes.emails %} -->
+          {% endif %}
+          {% for email in user_attributes.emails %}
           <div class="idp-detail">
             <p class="idp-value">{{ email }}</p>
           </div>
-          <!-- {% endfor %} -->
+          {% endfor %}
         </section>
-        <!-- {% endif %} -->
+        {% endif %}
       </form>
     </main>
     <script type="text/javascript">
