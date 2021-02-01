@@ -114,6 +114,8 @@ DEFAULT_IP_RANGE_BLACKLIST = [
     "192.0.0.0/24",
     # Link-local networks.
     "169.254.0.0/16",
+    # Formerly used for 6to4 relay.
+    "192.88.99.0/24",
     # Testing networks.
     "198.18.0.0/15",
     "192.0.2.0/24",
@@ -127,6 +129,10 @@ DEFAULT_IP_RANGE_BLACKLIST = [
     "fe80::/10",
     # Unique local addresses.
     "fc00::/7",
+    # Testing networks.
+    "2001:db8::/32",
+    # Multicast.
+    "ff00::/8",
 ]
 
 DEFAULT_ROOM_VERSION = "6"
