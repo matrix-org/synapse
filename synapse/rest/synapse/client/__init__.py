@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Mapping
 
 from twisted.web.resource import Resource
 
+from synapse.rest.synapse.client.new_user_consent import NewUserConsentResource
 from synapse.rest.synapse.client.pick_idp import PickIdpResource
 from synapse.rest.synapse.client.pick_username import pick_username_resource
 from synapse.rest.synapse.client.sso_register import SsoRegisterResource
@@ -39,6 +40,7 @@ def build_synapse_client_resource_tree(hs: "HomeServer") -> Mapping[str, Resourc
         # enabled (they just won't work very well if it's not)
         "/_synapse/client/pick_idp": PickIdpResource(hs),
         "/_synapse/client/pick_username": pick_username_resource(hs),
+        "/_synapse/client/new_user_consent": NewUserConsentResource(hs),
         "/_synapse/client/sso_register": SsoRegisterResource(hs),
     }
 
