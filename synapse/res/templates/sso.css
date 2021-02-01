@@ -20,6 +20,10 @@ h1 {
   font-size: 24px;
 }
 
+.error_page h1 {
+  color: #FE2928;
+}
+
 h2 {
   font-size: 14px;
 }
