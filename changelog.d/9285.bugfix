@@ -1,0 +1,1 @@
+Fix bug where we deleted correctly delete all pushers for a user when they deactivated their account.
