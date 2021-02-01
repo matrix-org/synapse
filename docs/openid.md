@@ -372,7 +372,6 @@ Synapse config:
 oidc_providers:
   - idp_id: gitea
     idp_name: Gitea
-    idp_brand: "org.matrix.gitea"  # optional: styling hint for clients
     discover: false
     issuer: "https://your-gitea.com/"
     client_id: "your-client-id" # TO BE FILLED
@@ -388,4 +387,3 @@ oidc_providers:
         localpart_template: "{{ user.login }}"
         display_name_template: "{{ user.full_name }}" 
 ```
-
