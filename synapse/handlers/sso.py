@@ -530,7 +530,7 @@ class SsoHandler:
         logger.info("Recorded registration session id %s", session_id)
 
         # Set the cookie and redirect to the username picker
-        e = RedirectException(b"/_synapse/client/pick_username")
+        e = RedirectException(b"/_synapse/client/pick_username/account_details")
         e.cookies.append(
             b"%s=%s; path=/"
             % (USERNAME_MAPPING_SESSION_COOKIE_NAME, session_id.encode("ascii"))

@@ -27,7 +27,7 @@ class SSOConfig(Config):
         sso_config = config.get("sso") or {}  # type: Dict[str, Any]
 
         # The sso-specific template_dir
-        template_dir = sso_config.get("template_dir")
+        self.sso_template_dir = sso_config.get("template_dir")
 
         # Read templates from disk
         (
@@ -48,7 +48,7 @@ class SSOConfig(Config):
                 "sso_auth_success.html",
                 "sso_auth_bad_user.html",
             ],
-            template_dir,
+            self.sso_template_dir,
         )
 
         # These templates have no placeholders, so render them here
@@ -123,6 +123,35 @@ class SSOConfig(Config):
             #       to the template)
             #
             #     * idp: the 'idp_id' of the chosen IDP.
+            #
+            # * HTML page to prompt new users to enter a userid and confirm other
+            #   details: 'sso_auth_account_details.html'. This is only shown if the
+            #   SSO implementation (with any user_mapping_provider) does not return
+            #   a localpart.
+            #
+            #   When rendering, this template is given the following variables:
+            #
+            #     * server_name: the homeserver's name.
+            #
+            #     * idp: details of the SSO Identity Provider that the user logged in
+            #       with: an object with the following attributes:
+            #
+            #         * idp_id: unique identifier for the IdP
+            #         * idp_name: user-facing name for the IdP
+            #         * idp_icon: if specified in the IdP config, an MXC URI for an icon
+            #              for the IdP
+            #         * idp_brand: if specified in the IdP config, a textual identifier
+            #              for the brand of the IdP
+            #
+            #     * user_attributes: an object containing details about the user that
+            #       we received from the IdP. May have the following attributes:
+            #
+            #         * display_name: the user's display_name
+            #         * emails: a list of email addresses
+            #
+            #   The template should render a form which submits the following fields:
+            #
+            #     * username: the localpart of the user's chosen user id
             #
             # * HTML page for a confirmation step before redirecting back to the client
             #   with the login token: 'sso_redirect_confirm.html'.
