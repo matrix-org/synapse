@@ -1,0 +1,1 @@
+Fix single-sign-on when the endpoints are routed to synapse workers.

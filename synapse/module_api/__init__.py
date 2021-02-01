@@ -279,7 +279,11 @@ class ModuleApi:
         )
 
     async def complete_sso_login_async(
-        self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str
+        self,
+        registered_user_id: str,
+        request: SynapseRequest,
+        client_redirect_url: str,
+        new_user: bool = False,
     ):
         """Complete a SSO login by redirecting the user to a page to confirm whether they
         want their access token sent to `client_redirect_url`, or redirect them to that
@@ -291,9 +295,11 @@ class ModuleApi:
             request: The request to respond to.
             client_redirect_url: The URL to which to offer to redirect the user (or to
                 redirect them directly if whitelisted).
+            new_user: set to true to use wording for the consent appropriate to a user
+                who has just registered.
         """
         await self._auth_handler.complete_sso_login(
-            registered_user_id, request, client_redirect_url,
+            registered_user_id, request, client_redirect_url, new_user=new_user
         )
 
     @defer.inlineCallbacks

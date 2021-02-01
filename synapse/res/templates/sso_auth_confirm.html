@@ -1,14 +1,28 @@
-<html>
-<head>
-    <title>Authentication</title>
-</head>
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Authentication</title>
+        <meta name="viewport" content="width=device-width, user-scalable=no">
+        <style type="text/css">
+            {% include "sso.css" without context %}
+        </style>
+    </head>
     <body>
-        <div>
+        <header>
+            <h1>Confirm it's you to continue</h1>
             <p>
-                A client is trying to {{ description | e }}. To confirm this action,
-                <a href="{{ redirect_url | e }}">re-authenticate with single sign-on</a>.
-                If you did not expect this, your account may be compromised!
+                A client is trying to {{ description }}. To confirm this action
+                re-authorize your account with single sign-on.
             </p>
-        </div>
+            <p><strong>
+                If you did not expect this, your account may be compromised.
+            </strong></p>
+        </header>
+        <main>
+            <a href="{{ redirect_url }}" class="primary-button">
+                Continue with {{ idp.idp_name }}
+            </a>
+        </main>
     </body>
 </html>

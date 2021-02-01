@@ -1,0 +1,1 @@
+Restore PyPy compatibility by not calling CPython-specific GC methods when under PyPy.

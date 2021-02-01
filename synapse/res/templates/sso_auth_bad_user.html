@@ -1,18 +1,25 @@
-<html>
-<head>
-    <title>Authentication Failed</title>
-</head>
-    <body>
-        <div>
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Authentication failed</title>
+        <meta name="viewport" content="width=device-width, user-scalable=no">
+        <style type="text/css">
+            {% include "sso.css" without context %}
+        </style>
+    </head>
+    <body class="error_page">
+        <header>
+            <h1>That doesn't look right</h1>
             <p>
-                We were unable to validate your <tt>{{server_name | e}}</tt> account via
-                single-sign-on (SSO), because the SSO Identity Provider returned
-                different details than when you logged in.
+                <strong>We were unable to validate your {{ server_name }} account</strong>
+                via single&nbsp;sign&#8209;on&nbsp;(SSO), because the SSO Identity
+                Provider returned different details than when you logged in.
             </p>
             <p>
                 Try the operation again, and ensure that you use the same details on
                 the Identity Provider as when you log into your account.
             </p>
-        </div>
+        </header>
     </body>
 </html>

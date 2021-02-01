@@ -126,6 +126,10 @@ class RoomCreationHandler(BaseHandler):
 
         self.third_party_event_rules = hs.get_third_party_event_rules()
 
+        self._invite_burst_count = (
+            hs.config.ratelimiting.rc_invites_per_room.burst_count
+        )
+
     async def upgrade_room(
         self, requester: Requester, old_room_id: str, new_version: RoomVersion
     ) -> str:
@@ -661,6 +665,9 @@ class RoomCreationHandler(BaseHandler):
             # Allow the request to go through, but remove any associated invites.
             invite_3pid_list = []
             invite_list = []
+
+        if len(invite_list) + len(invite_3pid_list) > self._invite_burst_count:
+            raise SynapseError(400, "Cannot invite so many users at once")
 
         await self.event_creation_handler.assert_accepted_privacy_policy(requester)
 
