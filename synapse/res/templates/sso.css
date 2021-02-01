@@ -55,6 +55,7 @@ main {
   display: block;
   border-radius: 12px;
   width: 100%;
+  box-sizing: border-box;
   margin: 16px 0;
   cursor: pointer;
   text-align: center;
