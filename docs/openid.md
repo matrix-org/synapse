@@ -353,3 +353,37 @@ Relevant documents:
  * https://developers.facebook.com/docs/facebook-login/manually-build-a-login-flow
  * Using Facebook's Graph API: https://developers.facebook.com/docs/graph-api/using-graph-api/
  * Reference to the User endpoint: https://developers.facebook.com/docs/graph-api/reference/user
+
+### Gitea
+
+Gitea is, like Github, not an OpenID provider, but just an OAuth2 provider.
+
+The [`/user` API endpoint](https://try.gitea.io/api/swagger#/user/userGetCurrent)
+can be used to retrieve information on the authenticated user. As the Synapse
+login mechanism needs an attribute to uniquely identify users, and that endpoint
+does not return a `sub` property, an alternative `subject_claim` has to be set.
+
+1. Create a new application.
+2. Add this Callback URL: `[synapse public baseurl]/_synapse/oidc/callback`
+
+Synapse config:
+
+```yaml
+oidc_providers:
+  - idp_id: gitea
+    idp_name: Gitea
+    discover: false
+    issuer: "https://your-gitea.com/"
+    client_id: "your-client-id" # TO BE FILLED
+    client_secret: "your-client-secret" # TO BE FILLED
+    client_auth_method: client_secret_post
+    scopes: [] # Gitea doesn't support Scopes
+    authorization_endpoint: "https://your-gitea.com/login/oauth/authorize"
+    token_endpoint: "https://your-gitea.com/login/oauth/access_token"
+    userinfo_endpoint: "https://your-gitea.com/api/v1/user"
+    user_mapping_provider:
+      config:
+        subject_claim: "id"
+        localpart_template: "{{ user.login }}"
+        display_name_template: "{{ user.full_name }}" 
+```
