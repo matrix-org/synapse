@@ -53,7 +53,7 @@ class OIDCConfig(Config):
                     "Multiple OIDC providers have the idp_id %r." % idp_id
                 )
 
-        self.oidc_callback_url = self.public_baseurl + "_synapse/oidc/callback"
+        self.oidc_callback_url = self.public_baseurl + "_synapse/client/oidc/callback"
 
     @property
     def oidc_enabled(self) -> bool:
