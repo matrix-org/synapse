@@ -102,7 +102,7 @@ class OidcHandler:
                 ) from e
 
     async def handle_oidc_callback(self, request: SynapseRequest) -> None:
-        """Handle an incoming request to /_synapse/oidc/callback
+        """Handle an incoming request to /_synapse/client/oidc/callback
 
         Since we might want to display OIDC-related errors in a user-friendly
         way, we don't raise SynapseError from here. Instead, we call
@@ -643,7 +643,7 @@ class OidcProvider:
 
           - ``client_id``: the client ID set in ``oidc_config.client_id``
           - ``response_type``: ``code``
-          - ``redirect_uri``: the callback URL ; ``{base url}/_synapse/oidc/callback``
+          - ``redirect_uri``: the callback URL ; ``{base url}/_synapse/client/oidc/callback``
           - ``scope``: the list of scopes set in ``oidc_config.scopes``
           - ``state``: a random string
           - ``nonce``: a random string
@@ -684,7 +684,7 @@ class OidcProvider:
         request.addCookie(
             SESSION_COOKIE_NAME,
             cookie,
-            path="/_synapse/oidc",
+            path="/_synapse/client/oidc",
             max_age="3600",
             httpOnly=True,
             sameSite="lax",
@@ -705,7 +705,7 @@ class OidcProvider:
     async def handle_oidc_callback(
         self, request: SynapseRequest, session_data: "OidcSessionData", code: str
     ) -> None:
-        """Handle an incoming request to /_synapse/oidc/callback
+        """Handle an incoming request to /_synapse/client/oidc/callback
 
         By this time we have already validated the session on the synapse side, and
         now need to do the provider-specific operations. This includes:

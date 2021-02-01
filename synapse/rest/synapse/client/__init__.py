@@ -47,7 +47,7 @@ def build_synapse_client_resource_tree(hs: "HomeServer") -> Mapping[str, Resourc
     if hs.config.oidc_enabled:
         from synapse.rest.oidc import OIDCResource
 
-        resources["/_synapse/oidc"] = OIDCResource(hs)
+        resources["/_synapse/client/oidc"] = OIDCResource(hs)
 
     if hs.config.saml2_enabled:
         from synapse.rest.saml2 import SAML2Resource
