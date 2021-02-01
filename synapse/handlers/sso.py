@@ -14,7 +14,16 @@
 # limitations under the License.
 import abc
 import logging
-from typing import TYPE_CHECKING, Awaitable, Callable, Dict, List, Mapping, Optional
+from typing import (
+    TYPE_CHECKING,
+    Awaitable,
+    Callable,
+    Dict,
+    Iterable,
+    Mapping,
+    Optional,
+    Set,
+)
 from urllib.parse import urlencode
 
 import attr
@@ -29,7 +38,7 @@ from synapse.handlers.ui_auth import UIAuthSessionDataConstants
 from synapse.http import get_request_user_agent
 from synapse.http.server import respond_with_html, respond_with_redirect
 from synapse.http.site import SynapseRequest
-from synapse.types import JsonDict, UserID, contains_invalid_mxid_characters
+from synapse.types import Collection, JsonDict, UserID, contains_invalid_mxid_characters
 from synapse.util.async_helpers import Linearizer
 from synapse.util.stringutils import random_string
 
@@ -115,7 +124,7 @@ class UserAttributes:
     # enter one.
     localpart = attr.ib(type=Optional[str])
     display_name = attr.ib(type=Optional[str], default=None)
-    emails = attr.ib(type=List[str], default=attr.Factory(list))
+    emails = attr.ib(type=Collection[str], default=attr.Factory(list))
 
 
 @attr.s(slots=True)
@@ -130,7 +139,7 @@ class UsernameMappingSession:
 
     # attributes returned by the ID mapper
     display_name = attr.ib(type=Optional[str])
-    emails = attr.ib(type=List[str])
+    emails = attr.ib(type=Collection[str])
 
     # An optional dictionary of extra attributes to be provided to the client in the
     # login response.
@@ -144,6 +153,8 @@ class UsernameMappingSession:
 
     # choices made by the user
     chosen_localpart = attr.ib(type=Optional[str], default=None)
+    use_display_name = attr.ib(type=bool, default=True)
+    emails_to_use = attr.ib(type=Collection[str], default=())
 
 
 # the HTTP cookie used to track the mapping session id
@@ -710,7 +721,12 @@ class SsoHandler:
         return not user_infos
 
     async def handle_submit_username_request(
-        self, request: SynapseRequest, localpart: str, session_id: str
+        self,
+        request: SynapseRequest,
+        session_id: str,
+        localpart: str,
+        use_display_name: bool,
+        emails_to_use: Iterable[str],
     ) -> None:
         """Handle a request to the username-picker 'submit' endpoint
 
@@ -720,11 +736,30 @@ class SsoHandler:
             request: HTTP request
             localpart: localpart requested by the user
             session_id: ID of the username mapping session, extracted from a cookie
+            use_display_name: whether the user wants to use the suggested display name
+            emails_to_use: emails that the user would like to use
         """
         session = self.get_mapping_session(session_id)
 
         # update the session with the user's choices
         session.chosen_localpart = localpart
+        session.use_display_name = use_display_name
+
+        emails_from_idp = set(session.emails)
+        filtered_emails = set()  # type: Set[str]
+
+        # we iterate through the list rather than just building a set conjunction, so
+        # that we can log attempts to use unknown addresses
+        for email in emails_to_use:
+            if email in emails_from_idp:
+                filtered_emails.add(email)
+            else:
+                logger.warning(
+                    "[session %s] ignoring user request to use unknown email address %r",
+                    session_id,
+                    email,
+                )
+        session.emails_to_use = filtered_emails
 
         # we're done; now we can register the user
         respond_with_redirect(request, b"/_synapse/client/sso_register")
@@ -747,10 +782,11 @@ class SsoHandler:
         )
 
         attributes = UserAttributes(
-            localpart=session.chosen_localpart,
-            display_name=session.display_name,
-            emails=session.emails,
+            localpart=session.chosen_localpart, emails=session.emails_to_use,
         )
+
+        if session.use_display_name:
+            attributes.display_name = session.display_name
 
         # the following will raise a 400 error if the username has been taken in the
         # meantime.
