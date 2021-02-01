@@ -58,12 +58,6 @@ COMMON_CONFIG = {
 }
 
 
-# The cookie name and path don't really matter, just that it has to be coherent
-# between the callback & redirect handlers.
-COOKIE_NAME = b"oidc_session"
-COOKIE_PATH = "/_synapse/oidc"
-
-
 class TestMappingProvider:
     @staticmethod
     def parse_config(config):
@@ -340,8 +334,11 @@ class OidcHandlerTestCase(HomeserverTestCase):
         # For some reason, call.args does not work with python3.5
         args = calls[0][0]
         kwargs = calls[0][1]
-        self.assertEqual(args[0], COOKIE_NAME)
-        self.assertEqual(kwargs["path"], COOKIE_PATH)
+
+        # The cookie name and path don't really matter, just that it has to be coherent
+        # between the callback & redirect handlers.
+        self.assertEqual(args[0], b"oidc_session")
+        self.assertEqual(kwargs["path"], "/_synapse/client/oidc")
         cookie = args[1]
 
         macaroon = pymacaroons.Macaroon.deserialize(cookie)
