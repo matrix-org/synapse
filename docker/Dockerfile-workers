@@ -21,5 +21,3 @@ VOLUME ["/data"]
 # files to run the desired worker configuration. Will start supervisord.
 COPY ./docker/configure_workers_and_start.py /configure_workers_and_start.py
 ENTRYPOINT ["/configure_workers_and_start.py"]
-
-# TODO: Healthcheck? Which worker to ask? Can we ask supervisord?
