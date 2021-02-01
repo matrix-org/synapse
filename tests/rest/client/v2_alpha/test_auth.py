@@ -22,7 +22,7 @@ from synapse.api.constants import LoginType
 from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
 from synapse.rest.client.v1 import login
 from synapse.rest.client.v2_alpha import auth, devices, register
-from synapse.rest.oidc import OIDCResource
+from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.types import JsonDict, UserID
 
 from tests import unittest
@@ -173,9 +173,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
 
     def create_resource_dict(self):
         resource_dict = super().create_resource_dict()
-        if HAS_OIDC:
-            # mount the OIDC resource at /_synapse/oidc
-            resource_dict["/_synapse/oidc"] = OIDCResource(self.hs)
+        resource_dict.update(build_synapse_client_resource_tree(self.hs))
         return resource_dict
 
     def prepare(self, reactor, clock, hs):
