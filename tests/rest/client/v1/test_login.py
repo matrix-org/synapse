@@ -31,6 +31,7 @@ from synapse.rest.client.v2_alpha import devices, register
 from synapse.rest.client.v2_alpha.account import WhoamiRestServlet
 from synapse.rest.synapse.client.pick_idp import PickIdpResource
 from synapse.rest.synapse.client.pick_username import pick_username_resource
+from synapse.rest.synapse.client.sso_register import SsoRegisterResource
 from synapse.types import create_requester
 
 from tests import unittest
@@ -1215,6 +1216,7 @@ class UsernamePickerTestCase(HomeserverTestCase):
 
         d = super().create_resource_dict()
         d["/_synapse/client/pick_username"] = pick_username_resource(self.hs)
+        d["/_synapse/client/sso_register"] = SsoRegisterResource(self.hs)
         d["/_synapse/oidc"] = OIDCResource(self.hs)
         return d
 
@@ -1253,7 +1255,7 @@ class UsernamePickerTestCase(HomeserverTestCase):
         self.assertApproximates(session.expiry_time_ms, expected_expiry, tolerance=1000)
 
         # Now, submit a username to the username picker, which should serve a redirect
-        # back to the client
+        # to the completion page
         submit_path = picker_url + "/submit"
         content = urlencode({b"username": b"bobby"}).encode("utf8")
         chan = self.make_request(
@@ -1270,6 +1272,16 @@ class UsernamePickerTestCase(HomeserverTestCase):
         )
         self.assertEqual(chan.code, 302, chan.result)
         location_headers = chan.headers.getRawHeaders("Location")
+
+        # send a request to the completion page, which should 302 to the client redirectUrl
+        chan = self.make_request(
+            "GET",
+            path=location_headers[0],
+            custom_headers=[("Cookie", "username_mapping_session=" + session_id)],
+        )
+        self.assertEqual(chan.code, 302, chan.result)
+        location_headers = chan.headers.getRawHeaders("Location")
+
         # ensure that the returned location matches the requested redirect URL
         path, query = location_headers[0].split("?", 1)
         self.assertEqual(path, "https://x")
