@@ -1,1 +1,1 @@
-Prevent password hashes from getting dropped if a client failed threepid validation during a User Interactive Auth stage.
+Prevent password hashes from getting dropped if a client failed threepid validation during a User Interactive Auth stage. Removes a workaround for an ancient bug in Riot Web <v0.7.4.
