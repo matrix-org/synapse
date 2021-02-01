@@ -113,8 +113,13 @@ class SSOConfig(Config):
             #
             #     * providers: a list of available Identity Providers. Each element is
             #       an object with the following attributes:
+            #
             #         * idp_id: unique identifier for the IdP
             #         * idp_name: user-facing name for the IdP
+            #         * idp_icon: if specified in the IdP config, an MXC URI for an icon
+            #              for the IdP
+            #         * idp_brand: if specified in the IdP config, a textual identifier
+            #              for the brand of the IdP
             #
             #   The rendered HTML page should contain a form which submits its results
             #   back as a GET request, with the following query parameters:
@@ -191,6 +196,16 @@ class SSOConfig(Config):
             #                     https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
             #
             #     * description: the operation which the user is being asked to confirm
+            #
+            #     * idp: details of the Identity Provider that we will use to confirm
+            #       the user's identity: an object with the following attributes:
+            #
+            #         * idp_id: unique identifier for the IdP
+            #         * idp_name: user-facing name for the IdP
+            #         * idp_icon: if specified in the IdP config, an MXC URI for an icon
+            #              for the IdP
+            #         * idp_brand: if specified in the IdP config, a textual identifier
+            #              for the brand of the IdP
             #
             # * HTML page shown after a successful user interactive authentication session:
             #   'sso_auth_success.html'.
