@@ -1388,7 +1388,9 @@ class AuthHandler(BaseHandler):
         )
 
         return self._sso_auth_confirm_template.render(
-            description=session.description, redirect_url=redirect_url,
+            description=session.description,
+            redirect_url=redirect_url,
+            idp=sso_auth_provider,
         )
 
     async def complete_sso_login(
