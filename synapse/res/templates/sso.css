@@ -47,6 +47,9 @@ main {
 
 .primary-button {
   border: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
   text-decoration: none;
   padding: 12px;
   color: white;
