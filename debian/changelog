@@ -1,8 +1,18 @@
-matrix-synapse-py3 (1.25.0ubuntu1) UNRELEASED; urgency=medium
+matrix-synapse-py3 (1.26.0+nmu1) UNRELEASED; urgency=medium
 
+  * Fix build on Ubuntu 16.04 LTS (Xenial).
+
+ -- Dan Callahan <danc@element.io>  Thu, 28 Jan 2021 16:21:03 +0000
+
+matrix-synapse-py3 (1.26.0) stable; urgency=medium
+
+  [ Richard van der Hoff ]
   * Remove dependency on `python3-distutils`.
 
- -- Richard van der Hoff <richard@matrix.org>  Fri, 15 Jan 2021 12:44:19 +0000
+  [ Synapse Packaging team ]
+  * New synapse release 1.26.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 27 Jan 2021 12:43:35 -0500
 
 matrix-synapse-py3 (1.25.0) stable; urgency=medium
 

@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 class EmailPasswordRequestTokenRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/password/email/requestToken$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.datastore = hs.get_datastore()
@@ -102,6 +102,8 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         if next_link:
             # Raise if the provided next_link value isn't valid
             assert_valid_next_link(self.hs, next_link)
+
+        self.identity_handler.ratelimit_request_token_requests(request, "email", email)
 
         # The email will be sent to the stored address.
         # This avoids a potential account hijack by requesting a password reset to
@@ -379,6 +381,8 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
+        self.identity_handler.ratelimit_request_token_requests(request, "email", email)
+
         if next_link:
             # Raise if the provided next_link value isn't valid
             assert_valid_next_link(self.hs, next_link)
@@ -430,7 +434,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
 class MsisdnThreepidRequestTokenRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid/msisdn/requestToken$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         super().__init__()
         self.store = self.hs.get_datastore()
@@ -457,6 +461,10 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
                 "Account phone numbers are not authorized on this server",
                 Codes.THREEPID_DENIED,
             )
+
+        self.identity_handler.ratelimit_request_token_requests(
+            request, "msisdn", msisdn
+        )
 
         if next_link:
             # Raise if the provided next_link value isn't valid

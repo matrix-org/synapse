@@ -174,7 +174,7 @@ class MessageHandler:
                 raise NotFoundError("Can't find event for token %s" % (at_token,))
 
             visible_events = await filter_events_for_client(
-                self.storage, user_id, last_events, filter_send_to_client=False
+                self.storage, user_id, last_events, filter_send_to_client=False,
             )
 
             event = last_events[0]

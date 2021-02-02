@@ -1,1 +1,0 @@
-Update `isort` to v5.7.0 to bypass a bug where it would disagree with `black` about formatting.
