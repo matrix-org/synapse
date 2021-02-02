@@ -19,6 +19,7 @@ import hashlib
 import hmac
 import inspect
 import logging
+import platform
 import time
 from typing import Callable, Dict, Iterable, Optional, Tuple, Type, TypeVar, Union
 
@@ -126,7 +127,8 @@ class TestCase(unittest.TestCase):
             ret = orig()
             # force a GC to workaround problems with deferreds leaking logcontexts when
             # they are GCed (see the logcontext docs)
-            gc.collect()
+            if platform.python_implementation() != "PyPy":
+                gc.collect()
             set_current_context(SENTINEL_CONTEXT)
 
             return ret
