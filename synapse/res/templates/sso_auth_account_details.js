@@ -64,6 +64,9 @@ function validateUsername(username) {
     if (!username) {
         return reportError("Please provide a username");
     }
+    if (username.length > 255) {
+        return reportError("Too long, please choose something shorter");
+    }
     if (!allowedUsernameCharacters.test(username)) {
         return reportError("Invalid username, please only use " + allowedCharactersString);
     }
