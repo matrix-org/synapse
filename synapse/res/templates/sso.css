@@ -1,0 +1,88 @@
+body {
+  font-family: "Inter", "Helvetica", "Arial", sans-serif;
+  font-size: 14px;
+  color: #17191C;
+}
+
+header {
+  max-width: 480px;
+  width: 100%;
+  margin: 24px auto;
+  text-align: center;
+}
+
+header p {
+  color: #737D8C;
+  line-height: 24px;
+}
+
+h1 {
+  font-size: 24px;
+}
+
+.error_page h1 {
+  color: #FE2928;
+}
+
+h2 {
+  font-size: 14px;
+}
+
+h2 img {
+  vertical-align: middle;
+  margin-right: 8px;
+  width: 24px;
+  height: 24px;
+}
+
+label {
+  cursor: pointer;
+}
+
+main {
+  max-width: 360px;
+  width: 100%;
+  margin: 24px auto;
+}
+
+.primary-button {
+  border: none;
+  text-decoration: none;
+  padding: 12px;
+  color: white;
+  background-color: #418DED;
+  font-weight: bold;
+  display: block;
+  border-radius: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 16px 0;
+  cursor: pointer;
+  text-align: center;
+}
+
+.profile {
+  display: flex;
+  justify-content: center;
+  margin: 24px 0;
+}
+
+.profile .avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 100%;
+  display: block;
+  margin-right: 8px;
+}
+
+.profile .display-name {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+.profile .user-id {
+  color: #737D8C;
+}
+
+.profile .display-name, .profile .user-id {
+  line-height: 18px;
+}

@@ -96,7 +96,7 @@ CONDITIONAL_REQUIREMENTS["all"] = list(ALL_OPTIONAL_REQUIREMENTS)
 #
 # We pin black so that our tests don't start failing on new releases.
 CONDITIONAL_REQUIREMENTS["lint"] = [
-    "isort==5.0.3",
+    "isort==5.7.0",
     "black==19.10b0",
     "flake8-comprehensions",
     "flake8",
@@ -121,6 +121,7 @@ setup(
     include_package_data=True,
     zip_safe=False,
     long_description=long_description,
+    long_description_content_type="text/x-rst",
     python_requires="~=3.5",
     classifiers=[
         "Development Status :: 5 - Production/Stable",

@@ -3,12 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <title>SSO redirect confirmation</title>
+    <meta name="viewport" content="width=device-width, user-scalable=no">
+    <style type="text/css">
+      {% include "sso.css" without context %}
+    </style>
 </head>
     <body>
-        <p>The application at <span style="font-weight:bold">{{ display_url | e }}</span> is requesting full access to your <span style="font-weight:bold">{{ server_name }}</span> Matrix account.</p>
-        <p>If you don't recognise this address, you should ignore this and close this tab.</p>
-        <p>
-            <a href="{{ redirect_url | e }}">I trust this address</a>
-        </p>
+        <header>
+            {% if new_user %}
+            <h1>Your account is now ready</h1>
+            <p>You've made your account on {{ server_name }}.</p>
+            {% else %}
+            <h1>Log in</h1>
+            {% endif %}
+            <p>Continue to confirm you trust <strong>{{ display_url }}</strong>.</p>
+        </header>
+        <main>
+            {% if user_profile.avatar_url %}
+            <div class="profile">
+                <img src="{{ user_profile.avatar_url | mxc_to_http(64, 64) }}" class="avatar" />
+                <div class="profile-details">
+                    {% if user_profile.display_name %}
+                    <div class="display-name">{{ user_profile.display_name }}</div>
+                    {% endif %}
+                    <div class="user-id">{{ user_id }}</div>
+                </div>
+            </div>
+            {% endif %}
+            <a href="{{ redirect_url }}" class="primary-button">Continue</a>
+        </main>
     </body>
 </html>

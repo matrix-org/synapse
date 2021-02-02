@@ -26,7 +26,7 @@ import yaml
 from netaddr import IPSet
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
-from synapse.http.endpoint import parse_and_validate_server_name
+from synapse.util.stringutils import parse_and_validate_server_name
 
 from ._base import Config, ConfigError
 
@@ -161,7 +161,11 @@ class ServerConfig(Config):
         self.print_pidfile = config.get("print_pidfile")
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
-        self.public_baseurl = config.get("public_baseurl")
+        self.public_baseurl = config.get("public_baseurl") or "https://%s/" % (
+            self.server_name,
+        )
+        if self.public_baseurl[-1] != "/":
+            self.public_baseurl += "/"
 
         # Whether to enable user presence.
         self.use_presence = config.get("use_presence", True)
@@ -317,9 +321,6 @@ class ServerConfig(Config):
         # Always blacklist 0.0.0.0, ::
         self.federation_ip_range_blacklist.update(["0.0.0.0", "::"])
 
-        if self.public_baseurl is not None:
-            if self.public_baseurl[-1] != "/":
-                self.public_baseurl += "/"
         self.start_pushers = config.get("start_pushers", True)
 
         # (undocumented) option for torturing the worker-mode replication a bit,
@@ -740,11 +741,16 @@ class ServerConfig(Config):
         #
         #web_client_location: https://riot.example.com/
 
-        # The public-facing base URL that clients use to access this HS
-        # (not including _matrix/...). This is the same URL a user would
-        # enter into the 'custom HS URL' field on their client. If you
-        # use synapse with a reverse proxy, this should be the URL to reach
-        # synapse via the proxy.
+        # The public-facing base URL that clients use to access this Homeserver (not
+        # including _matrix/...). This is the same URL a user might enter into the
+        # 'Custom Homeserver URL' field on their client. If you use Synapse with a
+        # reverse proxy, this should be the URL to reach Synapse via the proxy.
+        # Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
+        # 'listeners' below).
+        #
+        # If this is left unset, it defaults to 'https://<server_name>/'. (Note that
+        # that will not work unless you configure Synapse or a reverse-proxy to listen
+        # on port 443.)
         #
         #public_baseurl: https://example.com/
 
