@@ -225,7 +225,6 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         content = parse_json_object_from_request(request)
         prev_events = parse_strings_from_args(request.args, "prev_event")
-        origin_server_ts = parse_integer(request, "origin_server_ts")
 
         event_dict = {
             "type": event_type,
@@ -237,14 +236,7 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         if prev_events:
             event_dict["prev_events"] = prev_events
 
-        # TODO: Add `and requester.app_service`
-        if origin_server_ts:
-            event_dict["origin_server_ts"] = origin_server_ts
-
-        # TODO: I noticed in the Synapse code that we already accept a `ts` query parameter to override
-        # the `origin_server_ts` if the request is coming from an app service.
-        # Do we want to remove in favor of the spec'ed code above
-        if b"ts" in request.args and requester.app_service:
+        if b"ts" in request.args: # and requester.app_service:
             event_dict["origin_server_ts"] = parse_integer(request, "ts", 0)
 
         try:
