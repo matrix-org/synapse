@@ -192,53 +192,6 @@ class FederationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(sg, sg2)
 
     @unittest.override_config(
-        {"rc_invites": {"per_room": {"per_second": 0.5, "burst_count": 3}}}
-    )
-    def test_invite_by_room_ratelimit(self):
-        """Tests that invites from federation in a room are actually rate-limited.
-        """
-        other_server = "otherserver"
-        other_user = "@otheruser:" + other_server
-
-        # create the room
-        user_id = self.register_user("kermit", "test")
-        tok = self.login("kermit", "test")
-        room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
-        room_version = self.get_success(self.store.get_room_version(room_id))
-
-        def create_invite_for(local_user):
-            return event_from_pdu_json(
-                {
-                    "type": EventTypes.Member,
-                    "content": {"membership": "invite"},
-                    "room_id": room_id,
-                    "sender": other_user,
-                    "state_key": local_user,
-                    "depth": 32,
-                    "prev_events": [],
-                    "auth_events": [],
-                    "origin_server_ts": self.clock.time_msec(),
-                },
-                room_version,
-            )
-
-        for i in range(3):
-            self.get_success(
-                self.handler.on_invite_request(
-                    other_server,
-                    create_invite_for("@user-%d:test" % (i,)),
-                    room_version,
-                )
-            )
-
-        self.get_failure(
-            self.handler.on_invite_request(
-                other_server, create_invite_for("@user-4:test"), room_version,
-            ),
-            exc=LimitExceededError,
-        )
-
-    @unittest.override_config(
         {"rc_invites": {"per_user": {"per_second": 0.5, "burst_count": 3}}}
     )
     def test_invite_by_user_ratelimit(self):
