@@ -4,8 +4,25 @@
     <title>Synapse Login</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no">
+    <script type="text/javascript">
+      let wasKeyboard = false;
+      document.addEventListener("mousedown", function() { wasKeyboard = false; });
+      document.addEventListener("keydown", function() { wasKeyboard = true; });
+      document.addEventListener("focusin", function() {
+        if (wasKeyboard) {
+          document.body.classList.add("keyboard-focus");
+        } else {
+          document.body.classList.remove("keyboard-focus");
+        }
+      });
+    </script>
     <style type="text/css">
       {% include "sso.css" without context %}
+
+      body.keyboard-focus :focus, body.keyboard-focus .username_input:focus-within {
+        outline: 3px solid #17191C;
+        outline-offset: 4px;
+      }
 
       .username_input {
         display: flex;
@@ -20,11 +37,12 @@
 
       .username_input label {
         position: absolute;
-        top: -8px;
+        top: -5px;
         left: 14px;
-        font-size: 80%;
+        font-size: 10px;
+        line-height: 10px;
         background: white;
-        padding: 2px;
+        padding: 0 2px;
       }
 
       .username_input input {
@@ -32,6 +50,13 @@
         display: block;
         min-width: 0;
         border: none;
+      }
+
+      /* only clear the outline if we know it will be shown on the parent div using :focus-within */
+      @supports selector(:focus-within) {
+        .username_input input {
+          outline: none !important;
+        }
       }
 
       .username_input div {
