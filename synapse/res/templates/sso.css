@@ -4,7 +4,7 @@ body, input, select, textarea {
   color: #17191C;
 }
 
-header {
+header, footer {
   max-width: 480px;
   width: 100%;
   margin: 24px auto;
@@ -85,4 +85,18 @@ main {
 
 .profile .display-name, .profile .user-id {
   line-height: 18px;
+}
+
+footer {
+  margin-top: 80px;
+}
+
+footer svg {
+  display: block;
+  width: 46px;
+  margin: 0px auto 12px auto;
+}
+
+footer p {
+  color: #737D8C;
 }
