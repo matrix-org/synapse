@@ -378,6 +378,9 @@ class RegistrationConfig(Config):
         # By default, any room aliases included in this list will be created
         # as a publicly joinable room when the first user registers for the
         # homeserver. This behaviour can be customised with the settings below.
+        # If the room already exists, make certain it is a publicly joinable
+        # room, i.e. 'Security & Privacy' settings for the room allow 'Anyone
+        # who knows the room's link, including guests' to access the room.
         #
         #auto_join_rooms:
         #  - "#example:example.com"
