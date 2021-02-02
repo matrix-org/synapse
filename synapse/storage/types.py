@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Iterable, Iterator, List, Optional, Tuple
+from typing import Any, Iterator, List, Mapping, Optional, Sequence, Tuple, Union
 
 from typing_extensions import Protocol
 
@@ -20,22 +20,41 @@ from typing_extensions import Protocol
 Some very basic protocol definitions for the DB-API2 classes specified in PEP-249
 """
 
+_Parameters = Union[Sequence[Any], Mapping[str, Any]]
+
 
 class Cursor(Protocol):
-    def execute(self, sql: str, parameters: Iterable[Any] = ...) -> Any:
+    def execute(self, sql: str, parameters: _Parameters = ...) -> Any:
         ...
 
-    def executemany(self, sql: str, parameters: Iterable[Iterable[Any]]) -> Any:
+    def executemany(self, sql: str, parameters: Sequence[_Parameters]) -> Any:
+        ...
+
+    def fetchone(self) -> Optional[Tuple]:
+        ...
+
+    def fetchmany(self, size: Optional[int] = ...) -> List[Tuple]:
         ...
 
     def fetchall(self) -> List[Tuple]:
         ...
 
-    def fetchone(self) -> Tuple:
-        ...
-
     @property
-    def description(self) -> Any:
+    def description(
+        self,
+    ) -> Optional[
+        Sequence[
+            Tuple[
+                Any,
+                Any,
+                Optional[Any],
+                Optional[Any],
+                Optional[Any],
+                Optional[Any],
+                Optional[Any],
+            ]
+        ]
+    ]:
         return None
 
     @property
@@ -59,7 +78,7 @@ class Connection(Protocol):
     def commit(self) -> None:
         ...
 
-    def rollback(self, *args, **kwargs) -> None:
+    def rollback(self) -> None:
         ...
 
     def __enter__(self) -> "Connection":
