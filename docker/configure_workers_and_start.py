@@ -146,18 +146,30 @@ def error(txt: str):
     sys.exit(2)
 
 
-def convert(src: str, dst: str, environ: dict):
+def convert(src: str, dst: str, **template_vars):
     """Generate a file from a template
 
     Args:
-        src: path to input file
-        dst: path to file to write
-        environ: environment dictionary, for replacement mappings.
+        src: Path to the input file.
+        dst: Path to write to.
+        template_vars: The arguments to replace placeholder variables in the template with.
     """
+    # Read the template file
     with open(src) as infile:
         template = infile.read()
-    rendered = jinja2.Template(template, autoescape=True).render(**environ)
-    with open(dst, "w") as outfile:
+
+    # Generate a string from the template. We disable autoescape to prevent template
+    # variables from being escaped.
+    rendered = jinja2.Template(template, autoescape=False).render(**template_vars)
+
+    # Write the generated contents to a file
+    #
+    # We use append mode in case the files have already been written to by something else
+    # (for instance, as part of the instructions in a dockerfile).
+    with open(dst, "a") as outfile:
+        # In case the existing file doesn't end with a newline
+        outfile.write("\n")
+
         outfile.write(rendered)
 
 
@@ -207,82 +219,26 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
         if original_listeners:
             listeners += original_listeners
 
+    # The shared homeserver config. The contents of which will be inserted into the
+    # base shared worker jinja2 template.
+    #
+    # This config file will be passed to all workers, included Synapse's main process.
     shared_config = yaml.dump({"listeners": listeners})
 
-    # Don't forget to enable redis support!
-    shared_config += """
-redis:
-    enabled: true
-"""
-
-    # The supervisord config
+    # The supervisord config. The contents of which will be inserted into the
+    # base supervisord jinja2 template.
+    #
     # Supervisord will be in charge of running everything, from redis to nginx to Synapse
-    # and all of its worker processes. We define a few services we'll know will run now.
-    supervisord_config = """
-[supervisord]
-nodaemon=true
+    # and all of its worker processes. Load the config template, which defines a few
+    # services that are necessary to run.
+    supervisord_config = ""
 
-[program:nginx]
-command=/usr/sbin/nginx -g "daemon off;"
-priority=500
-stdout_logfile=/dev/stdout
-stdout_logfile_maxbytes=0
-stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0
-username=www-data
-autorestart=true
-
-[program:redis]
-command=/usr/bin/redis-server /etc/redis/redis.conf --daemonize no
-priority=1
-stdout_logfile=/dev/stdout
-stdout_logfile_maxbytes=0
-stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0
-username=redis
-autorestart=true
-
-[program:synapse_main]
-command=/usr/local/bin/python -m synapse.app.homeserver \
-    --config-path="%s" \
-    --config-path=/conf/workers/shared.yaml
-priority=10
-# Log startup failures to supervisord's stdout/err
-# Regular synapse logs will still go in the configured data directory
-stdout_logfile=/dev/stdout
-stdout_logfile_maxbytes=0
-stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0
-autorestart=unexpected
-exitcodes=0
-
-""" % (
-        config_path,
-    )
-
+    # The nginx config. The contents of which will be inserted into the base nginx
+    # jinja2 template.
+    #
     # An nginx site config that will be amended to depending on the workers that are
     # spun up. To be placed in /etc/nginx/conf.d
-    nginx_config_template_header = """
-server {
-    # Listen on an unoccupied port number
-    listen 8008;
-    listen [::]:8008;
-
-    server_name localhost;
-
-    # Nginx by default only allows file uploads up to 1M in size
-    # Increase client_max_body_size to match max_upload_size defined in homeserver.yaml
-    client_max_body_size 100M;
-    """
-    nginx_config_body = ""  # to modify below
-    nginx_config_template_end = """
-    # Send all other traffic to the main process
-    location ~* ^(\\/_matrix|\\/_synapse) {
-        proxy_pass http://localhost:8080;
-        proxy_set_header X-Forwarded-For $remote_addr;
-    }
-}
-"""
+    nginx_config = ""
 
     # Read the desired worker configuration from the environment
     worker_types = environ.get("SYNAPSE_WORKERS")
@@ -341,7 +297,7 @@ stderr_logfile_maxbytes=0""".format_map(
 
         # Add nginx rules for this worker's endpoints (if any)
         for pattern in worker_config["endpoint_patterns"]:
-            nginx_config_body += """
+            nginx_config += """
     location ~* %s {
         proxy_pass http://localhost:%s;
         proxy_set_header X-Forwarded-For $remote_addr;
@@ -355,32 +311,34 @@ stderr_logfile_maxbytes=0""".format_map(
         convert(
             "/conf/worker.yaml.j2",
             "/conf/workers/{name}.yaml".format(name=worker_name),
-            worker_config,
+            **worker_config,
         )
 
         worker_port += 1
 
-    # Finally, we'll write out the config file.. We use append mode for each in case the
-    # files have already been written to by something else (for instance, as
-    # part of the instructions in a dockerfile).
+    # Finally, we'll write out the config files.
 
     # Shared homeserver config
-    with open("/conf/workers/shared.yaml", "a") as f:
-        # Add a newline in front in case the file already has some contents
-        # This is only necessary for the homeserver config as the others already
-        # start with a newline
-        f.write("\n")
-        f.write(shared_config)
+    convert(
+        "/conf/shared.yaml.j2",
+        "/conf/workers/shared.yaml",
+        shared_worker_config=shared_config,
+    )
 
     # Nginx config
-    with open("/etc/nginx/conf.d/matrix-synapse.conf", "a") as f:
-        f.write(nginx_config_template_header)
-        f.write(nginx_config_body)
-        f.write(nginx_config_template_end)
+    convert(
+        "/conf/nginx.conf.j2",
+        "/etc/nginx/conf.d/matrix-synapse.conf",
+        worker_locations=nginx_config,
+    )
 
     # Supervisord config
-    with open("/etc/supervisor/conf.d/supervisord.conf", "a") as f:
-        f.write(supervisord_config)
+    convert(
+        "/conf/supervisord.conf.j2",
+        "/etc/supervisor/conf.d/supervisord.conf",
+        main_config_path=config_path,
+        worker_config=supervisord_config,
+    )
 
     # Ensure the logging directory exists
     log_dir = data_dir + "/logs"
