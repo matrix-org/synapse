@@ -77,6 +77,7 @@
       .idp-pick-details .idp-detail {
         border-top: 1px solid #E9ECF1;
         padding: 12px;
+        display: block;
       }
       .idp-pick-details .check-row {
         display: flex;
@@ -123,34 +124,34 @@
         <section class="idp-pick-details">
           <h2><img src="{{ idp.idp_icon | mxc_to_http(24, 24) }}"/>Information from {{ idp.idp_name }}</h2>
           {% if user_attributes.avatar_url %}
-          <div class="idp-detail idp-avatar">
+          <label class="idp-detail idp-avatar" for="idp-avatar">
             <div class="check-row">
-              <label for="idp-avatar" class="name">Avatar</label>
-              <label for="idp-avatar" class="use">Use</label>
+              <span class="name">Avatar</span>
+              <span class="use">Use</span>
               <input type="checkbox" name="use_avatar" id="idp-avatar" value="true" checked>
             </div>
             <img src="{{ user_attributes.avatar_url }}" class="avatar" />
-          </div>
+          </label>
           {% endif %}
           {% if user_attributes.display_name %}
-          <div class="idp-detail">
+          <label class="idp-detail" for="idp-displayname">
             <div class="check-row">
-              <label for="idp-displayname" class="name">Display name</label>
-              <label for="idp-displayname" class="use">Use</label>
+              <span class="name">Display name</span>
+              <span class="use">Use</span>
               <input type="checkbox" name="use_display_name" id="idp-displayname" value="true" checked>
             </div>
             <p class="idp-value">{{ user_attributes.display_name }}</p>
-          </div>
+          </label>
           {% endif %}
           {% for email in user_attributes.emails %}
-          <div class="idp-detail">
+          <label class="idp-detail" for="idp-email{{ loop.index }}">
             <div class="check-row">
-              <label for="idp-email{{ loop.index }}" class="name">E-mail</label>
-              <label for="idp-email{{ loop.index }}" class="use">Use</label>
+              <span class="name">E-mail</span>
+              <span class="use">Use</span>
               <input type="checkbox" name="use_email" id="idp-email{{ loop.index }}" value="{{ email }}" checked>
             </div>
             <p class="idp-value">{{ email }}</p>
-          </div>
+          </label>
           {% endfor %}
         </section>
         {% endif %}
