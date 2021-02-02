@@ -34,6 +34,7 @@ from synapse.push.presentable_names import (
     descriptor_from_member_events,
     name_from_member_event,
 )
+from synapse.storage.state import StateFilter
 from synapse.types import StateMap, UserID
 from synapse.util.async_helpers import concurrently_execute
 from synapse.visibility import filter_events_for_client
@@ -110,6 +111,7 @@ class Mailer:
 
         self.sendmail = self.hs.get_sendmail()
         self.store = self.hs.get_datastore()
+        self.state_store = self.hs.get_storage().state
         self.macaroon_gen = self.hs.get_macaroon_generator()
         self.state_handler = self.hs.get_state_handler()
         self.storage = hs.get_storage()
@@ -443,13 +445,25 @@ class Mailer:
         if event.type != EventTypes.Message and event.type != EventTypes.Encrypted:
             return None
 
-        sender_state_event_id = room_state_ids.get(("m.room.member", event.sender))
+        # Get the sender's name and avatar from the room state.
+        state_key = ("m.room.member", event.sender)
+        sender_state_event_id = room_state_ids.get(state_key)
         if sender_state_event_id:
-            sender_state_event = await self.store.get_event(sender_state_event_id)
+            sender_state_event = await self.store.get_event(
+                sender_state_event_id
+            )  # type: Optional[EventBase]
+        else:
+            # Attempt to check the historical state for the room.
+            historical_state = await self.state_store.get_state_for_event(
+                event.event_id, StateFilter.from_types((state_key,))
+            )
+            sender_state_event = historical_state.get(state_key)
+
+        if sender_state_event:
             sender_name = name_from_member_event(sender_state_event)
             sender_avatar_url = sender_state_event.content.get("avatar_url")
         else:
-            # The sender is no longer in the room for some reason.
+            # No state could be found, fallback to the MXID.
             sender_name = event.sender
             sender_avatar_url = None
 
