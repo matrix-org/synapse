@@ -189,7 +189,7 @@ class ContentRepositoryConfig(Config):
             # unroutable addresses.
             self.url_preview_ip_range_blacklist = generate_ip_set(
                 config["url_preview_ip_range_blacklist"],
-                ["0.0.0.0/8", "::"],
+                ["0.0.0.0", "::"],
                 config_path=("url_preview_ip_range_blacklist",),
             )
 

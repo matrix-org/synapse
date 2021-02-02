@@ -366,7 +366,7 @@ class ServerConfig(Config):
 
         # Always blacklist 0.0.0.0, ::
         self.ip_range_blacklist = generate_ip_set(
-            ip_range_blacklist, ["0.0.0.0/8", "::"], config_path=("ip_range_blacklist",)
+            ip_range_blacklist, ["0.0.0.0", "::"], config_path=("ip_range_blacklist",)
         )
 
         self.ip_range_whitelist = generate_ip_set(
@@ -382,7 +382,7 @@ class ServerConfig(Config):
         # Always blacklist 0.0.0.0, ::
         self.federation_ip_range_blacklist = generate_ip_set(
             federation_ip_range_blacklist,
-            ["0.0.0.0/8", "::"],
+            ["0.0.0.0", "::"],
             config_path=("federation_ip_range_blacklist",),
         )
 
