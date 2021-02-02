@@ -109,7 +109,11 @@ class PostgresSequenceGenerator(SequenceGenerator):
         fetch_res = txn.fetchone()
         if fetch_res is None:
             # this should technically not happen, unless the connection/cursor/transaction has been corrupted
-            raise RuntimeError("nextval for self._sequence_name {} returned empty".format(repr(self._sequence_name)))
+            raise RuntimeError(
+                "nextval for self._sequence_name {} returned empty".format(
+                    repr(self._sequence_name)
+                )
+            )
         return fetch_res[0]
 
     def get_next_mult_txn(self, txn: Cursor, n: int) -> List[int]:
