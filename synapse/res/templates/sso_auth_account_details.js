@@ -1,14 +1,24 @@
 const usernameField = document.getElementById("field-username");
+const usernameOutput = document.getElementById("field-username-output");
+const form = document.getElementById("form");
+
+// needed to validate on change event when no input was changed
+let needsValidation = true;
+let isValid = false;
 
 function throttle(fn, wait) {
     let timeout;
-    return function() {
+    const throttleFn = function() {
         const args = Array.from(arguments);
         if (timeout) {
             clearTimeout(timeout);
         }
         timeout = setTimeout(fn.bind.apply(fn, [null].concat(args)), wait);
-    }
+    };
+    throttleFn.cancelQueued = function() {
+        clearTimeout(timeout);
+    };
+    return throttleFn;
 }
 
 function checkUsernameAvailable(username) {
@@ -16,14 +26,14 @@ function checkUsernameAvailable(username) {
     return fetch(check_uri, {
         // include the cookie
         "credentials": "same-origin",
-    }).then((response) => {
+    }).then(function(response) {
         if(!response.ok) {
             // for non-200 responses, raise the body of the response as an exception
             return response.text().then((text) => { throw new Error(text); });
         } else {
             return response.json();
         }
-    }).then((json) => {
+    }).then(function(json) {
         if(json.error) {
             return {message: json.error};
         } else if(json.available) {
@@ -34,33 +44,46 @@ function checkUsernameAvailable(username) {
     });
 }
 
+const allowedUsernameCharacters = new RegExp("^[a-z0-9\\.\\_\\-\\/\\=]+$");
+const allowedCharactersString = "lowercase letters, digits, ., _, -, /, =";
+
+function reportError(error) {
+    throttledCheckUsernameAvailable.cancelQueued();
+    usernameOutput.innerText = error;
+    usernameOutput.classList.add("error");
+    usernameField.parentElement.classList.add("invalid");
+    usernameField.focus();
+}
+
 function validateUsername(username) {
-    usernameField.setCustomValidity("");
-    if (usernameField.validity.valueMissing) {
-        usernameField.setCustomValidity("Please provide a username");
-        return;
+    isValid = false;
+    needsValidation = false;
+    usernameOutput.innerText = "";
+    usernameField.parentElement.classList.remove("invalid");
+    usernameOutput.classList.remove("error");
+    if (!username) {
+        return reportError("Please provide a username");
     }
-    if (usernameField.validity.patternMismatch) {
-        usernameField.setCustomValidity("Invalid username, please only use " + allowedCharactersString);
-        return;
+    if (!allowedUsernameCharacters.test(username)) {
+        return reportError("Invalid username, please only use " + allowedCharactersString);
     }
-    usernameField.setCustomValidity("Checking if username is available …");
+    usernameOutput.innerText = "Checking if username is available …";
     throttledCheckUsernameAvailable(username);
 }
 
 const throttledCheckUsernameAvailable = throttle(function(username) {
-    const handleError =  function(err) {
+    const handleError = function(err) {
         // don't prevent form submission on error
-        usernameField.setCustomValidity("");
-        console.log(err.message);
+        usernameOutput.innerText = "";
+        isValid = true;
     };
     try {
         checkUsernameAvailable(username).then(function(result) {
             if (!result.available) {
-                usernameField.setCustomValidity(result.message);
-                usernameField.reportValidity();
+                reportError(result.message);
             } else {
-                usernameField.setCustomValidity("");
+                isValid = true;
+                usernameOutput.innerText = "";
             }
         }, handleError);
     } catch (err) {
@@ -68,9 +91,23 @@ const throttledCheckUsernameAvailable = throttle(function(username) {
     }
 }, 500);
 
+form.addEventListener("submit", function(evt) {
+    if (needsValidation) {
+        validateUsername(usernameField.value);
+        evt.preventDefault();
+        return;
+    }
+    if (!isValid) {
+        evt.preventDefault();
+        usernameField.focus();
+        return;
+    }
+});
 usernameField.addEventListener("input", function(evt) {
     validateUsername(usernameField.value);
 });
 usernameField.addEventListener("change", function(evt) {
-    validateUsername(usernameField.value);
+    if (needsValidation) {
+        validateUsername(usernameField.value);
+    }
 });
