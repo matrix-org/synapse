@@ -195,7 +195,7 @@ class ContentRepositoryConfig(Config):
 
             self.url_preview_ip_range_whitelist = generate_ip_set(
                 config.get("url_preview_ip_range_whitelist", ()),
-                config_path=("url_preview_ip_range_blacklist",),
+                config_path=("url_preview_ip_range_whitelist",),
             )
 
             self.url_preview_url_blacklist = config.get("url_preview_url_blacklist", ())

@@ -70,7 +70,7 @@ def generate_ip_set(
     This includes:
 
     * IPv4-Compatible IPv6 Address (see RFC 4291, section 2.5.5.1)
-    * IPv4-Mapped IPv6 Address (see RFC 4291, section 2.5.5.1)
+    * IPv4-Mapped IPv6 Address (see RFC 4291, section 2.5.5.2)
     * 6to4 Address (see RFC 3056, section 2)
 
     Args:
