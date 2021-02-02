@@ -14,7 +14,7 @@
 # limitations under the License.
 import platform
 
-from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
+from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup, SQLType
 from .postgres import PostgresEngine
 from .sqlite import Sqlite3Engine
 
@@ -39,4 +39,4 @@ def create_engine(database_config) -> BaseDatabaseEngine:
     raise RuntimeError("Unsupported database engine '%s'" % (name,))
 
 
-__all__ = ["create_engine", "BaseDatabaseEngine", "IncorrectDatabaseSetup"]
+__all__ = ["create_engine", "BaseDatabaseEngine", "IncorrectDatabaseSetup", "SQLType"]

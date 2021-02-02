@@ -23,7 +23,8 @@ from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
+from synapse.storage.types import Connection
 from synapse.types import Collection
 
 logger = logging.getLogger(__name__)
@@ -45,7 +46,7 @@ class SearchWorkerStore(SQLBaseStore):
         """
         if not self.hs.config.enable_search:
             return
-        if isinstance(self.database_engine, PostgresEngine):
+        if self.database_engine.sql_type.is_postgres():
             sql = (
                 "INSERT INTO event_search"
                 " (event_id, room_id, key, vector, stream_ordering, origin_server_ts)"
@@ -66,7 +67,7 @@ class SearchWorkerStore(SQLBaseStore):
 
             txn.execute_batch(sql, args)
 
-        elif isinstance(self.database_engine, Sqlite3Engine):
+        elif self.database_engine.sql_type.is_sqlite():
             sql = (
                 "INSERT INTO event_search (event_id, room_id, key, value)"
                 " VALUES (?,?,?,?)"
@@ -222,12 +223,12 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
         converting them back to be GIN as per the actual schema.
         """
 
-        def create_index(conn):
+        def create_index(conn: Connection):
             conn.rollback()
 
             # we have to set autocommit, because postgres refuses to
             # CREATE INDEX CONCURRENTLY without it.
-            conn.set_session(autocommit=True)
+            self.database_engine.attempt_to_set_autocommit(conn, True)
 
             try:
                 c = conn.cursor()
@@ -251,9 +252,11 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
                 # we should now be able to delete the GIST index.
                 c.execute("DROP INDEX IF EXISTS event_search_fts_idx_gist")
             finally:
-                conn.set_session(autocommit=False)
+                self.database_engine.attempt_to_set_autocommit(conn, False)
 
-        if isinstance(self.database_engine, PostgresEngine):
+        if isinstance(
+            self.database_engine, PostgresEngine
+        ):  # todo see if generalizable to is_postgres
             await self.db_pool.runWithConnection(create_index)
 
         await self.db_pool.updates._end_background_update(
@@ -269,9 +272,9 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
 
         if not have_added_index:
 
-            def create_index(conn):
+            def create_index(conn: Connection):
                 conn.rollback()
-                conn.set_session(autocommit=True)
+                self.db_pool.engine.attempt_to_set_autocommit(conn, True)
                 c = conn.cursor()
 
                 # We create with NULLS FIRST so that when we search *backwards*
@@ -284,7 +287,7 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
                     "CREATE INDEX CONCURRENTLY event_search_order ON event_search("
                     "origin_server_ts NULLS FIRST, stream_ordering NULLS FIRST)"
                 )
-                conn.set_session(autocommit=False)
+                self.db_pool.engine.attempt_to_set_autocommit(conn, False)
 
             await self.db_pool.runWithConnection(create_index)
 
@@ -381,7 +384,7 @@ class SearchStore(SearchBackgroundUpdateStore):
         count_args = args
         count_clauses = clauses
 
-        if isinstance(self.database_engine, PostgresEngine):
+        if self.database_engine.sql_type.is_postgres():
             sql = (
                 "SELECT ts_rank_cd(vector, to_tsquery('english', ?)) AS rank,"
                 " room_id, event_id"
@@ -395,7 +398,7 @@ class SearchStore(SearchBackgroundUpdateStore):
                 " WHERE vector @@ to_tsquery('english', ?)"
             )
             count_args = [search_query] + count_args
-        elif isinstance(self.database_engine, Sqlite3Engine):
+        elif self.database_engine.sql_type.is_sqlite():
             sql = (
                 "SELECT rank(matchinfo(event_search)) as rank, room_id, event_id"
                 " FROM event_search"
@@ -438,7 +441,9 @@ class SearchStore(SearchBackgroundUpdateStore):
         event_map = {ev.event_id: ev for ev in events}
 
         highlights = None
-        if isinstance(self.database_engine, PostgresEngine):
+        if isinstance(
+            self.database_engine, PostgresEngine
+        ):  # todo see if generalizable to is_postgres
             highlights = await self._find_highlights_in_postgres(search_query, events)
 
         count_sql += " GROUP BY room_id"
@@ -519,7 +524,7 @@ class SearchStore(SearchBackgroundUpdateStore):
             )
             args.extend([origin_server_ts, origin_server_ts, stream])
 
-        if isinstance(self.database_engine, PostgresEngine):
+        if self.database_engine.sql_type.is_postgres():
             sql = (
                 "SELECT ts_rank_cd(vector, to_tsquery('english', ?)) as rank,"
                 " origin_server_ts, stream_ordering, room_id, event_id"
@@ -533,7 +538,7 @@ class SearchStore(SearchBackgroundUpdateStore):
                 " WHERE vector @@ to_tsquery('english', ?) AND "
             )
             count_args = [search_query] + count_args
-        elif isinstance(self.database_engine, Sqlite3Engine):
+        elif self.database_engine.sql_type.is_sqlite():
             # We use CROSS JOIN here to ensure we use the right indexes.
             # https://sqlite.org/optoverview.html#crossjoin
             #
@@ -568,12 +573,12 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         # We add an arbitrary limit here to ensure we don't try to pull the
         # entire table from the database.
-        if isinstance(self.database_engine, PostgresEngine):
+        if self.database_engine.sql_type.is_postgres():
             sql += (
                 " ORDER BY origin_server_ts DESC NULLS LAST,"
                 " stream_ordering DESC NULLS LAST LIMIT ?"
             )
-        elif isinstance(self.database_engine, Sqlite3Engine):
+        elif self.database_engine.sql_type.is_sqlite():
             sql += " ORDER BY origin_server_ts DESC, stream_ordering DESC LIMIT ?"
         else:
             raise Exception("Unrecognized database engine")
@@ -596,7 +601,9 @@ class SearchStore(SearchBackgroundUpdateStore):
         event_map = {ev.event_id: ev for ev in events}
 
         highlights = None
-        if isinstance(self.database_engine, PostgresEngine):
+        if isinstance(
+            self.database_engine, PostgresEngine
+        ):  # todo see if generalizable to is_postgres
             highlights = await self._find_highlights_in_postgres(search_query, events)
 
         count_sql += " GROUP BY room_id"
@@ -696,7 +703,7 @@ def _to_postgres_options(options_dict):
     return "'%s'" % (",".join("%s=%s" % (k, v) for k, v in options_dict.items()),)
 
 
-def _parse_query(database_engine, search_term):
+def _parse_query(database_engine: BaseDatabaseEngine, search_term):
     """Takes a plain unicode string from the user and converts it into a form
     that can be passed to database.
     We use this so that we can add prefix matching, which isn't something
@@ -706,9 +713,9 @@ def _parse_query(database_engine, search_term):
     # Pull out the individual words, discarding any non-word characters.
     results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
 
-    if isinstance(database_engine, PostgresEngine):
+    if database_engine.sql_type.is_postgres():
         return " & ".join(result + ":*" for result in results)
-    elif isinstance(database_engine, Sqlite3Engine):
+    elif database_engine.sql_type.is_sqlite():
         return " & ".join(result + "*" for result in results)
     else:
         # This should be unreachable.

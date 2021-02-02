@@ -16,7 +16,7 @@ import struct
 import threading
 import typing
 
-from synapse.storage.engines import BaseDatabaseEngine
+from synapse.storage.engines import BaseDatabaseEngine, SQLType
 from synapse.storage.types import Connection
 
 if typing.TYPE_CHECKING:
@@ -34,6 +34,10 @@ class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
         # in the DB yet.
         self._current_state_group_id = None
         self._current_state_group_id_lock = threading.Lock()
+
+    @property
+    def sql_type(self) -> SQLType:
+        return SQLType.SQLITE
 
     @property
     def single_threaded(self) -> bool:

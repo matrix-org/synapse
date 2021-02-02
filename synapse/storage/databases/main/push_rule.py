@@ -27,7 +27,6 @@ from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.pusher import PusherWorkerStore
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
 from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.util import json_encoder
@@ -542,13 +541,13 @@ class PushRuleStore(PushRulesWorkerStore):
 
         # ensure we have a push_rules_enable row
         # enabledness defaults to true
-        if isinstance(self.database_engine, PostgresEngine):
+        if self.database_engine.sql_type.is_postgres():
             sql = """
                 INSERT INTO push_rules_enable (id, user_name, rule_id, enabled)
                 VALUES (?, ?, ?, ?)
                 ON CONFLICT DO NOTHING
             """
-        elif isinstance(self.database_engine, Sqlite3Engine):
+        elif self.database_engine.sql_type.is_sqlite():
             sql = """
                 INSERT OR IGNORE INTO push_rules_enable (id, user_name, rule_id, enabled)
                 VALUES (?, ?, ?, ?)
@@ -651,7 +650,7 @@ class PushRuleStore(PushRulesWorkerStore):
             # ensure we always have a push_rule_enable row for every push_rule
             # row. We chose the latter.
             for_key_share = "FOR KEY SHARE"
-            if not isinstance(self.database_engine, PostgresEngine):
+            if not self.database_engine.sql_type.is_postgres():
                 # For key share is not applicable/available on SQLite
                 for_key_share = ""
             sql = (

@@ -20,7 +20,7 @@ entries, and with a UNIQUE index.
 import logging
 from io import StringIO
 
-from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
+from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.prepare_database import execute_statements_from_stream
 from synapse.storage.types import Cursor
 
@@ -33,7 +33,7 @@ def run_upgrade(*args, **kwargs):
 
 def run_create(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwargs):
     # some instances might already have this index, in which case we can skip this
-    if isinstance(database_engine, PostgresEngine):
+    if database_engine.sql_type.is_postgres():
         cur.execute(
             """
             SELECT 1 FROM pg_class WHERE relkind = 'i'

@@ -16,7 +16,9 @@ from synapse.storage.engines import PostgresEngine
 
 
 def run_create(cur, database_engine, *args, **kwargs):
-    if isinstance(database_engine, PostgresEngine):
+    if isinstance(
+        database_engine, PostgresEngine
+    ):  # todo see if generalizable to is_postgres
         # if we already have some state groups, we want to start making new
         # ones with a higher id.
         cur.execute("SELECT max(id) FROM state_groups")

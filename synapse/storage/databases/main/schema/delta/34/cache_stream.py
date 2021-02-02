@@ -14,7 +14,7 @@
 
 import logging
 
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.prepare_database import get_statements
 
 logger = logging.getLogger(__name__)
@@ -34,8 +34,8 @@ CREATE INDEX cache_invalidation_stream_id ON cache_invalidation_stream(stream_id
 """
 
 
-def run_create(cur, database_engine, *args, **kwargs):
-    if not isinstance(database_engine, PostgresEngine):
+def run_create(cur, database_engine: BaseDatabaseEngine, *args, **kwargs):
+    if not database_engine.sql_type.is_postgres():
         return
 
     for statement in get_statements(CREATE_TABLE.splitlines()):

@@ -88,7 +88,9 @@ class EventsWorkerStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
 
-        if isinstance(database.engine, PostgresEngine):
+        if isinstance(
+            database.engine, PostgresEngine
+        ):  # todo see if generalizable to is_postgres
             # If we're using Postgres than we can use `MultiWriterIdGenerator`
             # regardless of whether this process writes to the streams or not.
             self._stream_id_gen = MultiWriterIdGenerator(

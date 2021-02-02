@@ -22,7 +22,6 @@ from canonicaljson import encode_canonical_json
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool, LoggingTransaction
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import JsonDict
 from synapse.util.caches.expiringcache import ExpiringCache
 
@@ -328,13 +327,13 @@ class TransactionStore(TransactionWorkerStore):
 
         # ensure we have a `destinations` row for this destination, as there is
         # a foreign key constraint.
-        if isinstance(self.database_engine, PostgresEngine):
+        if self.database_engine.sql_type.is_postgres():
             q = """
                 INSERT INTO destinations (destination)
                     VALUES (?)
                     ON CONFLICT DO NOTHING;
             """
-        elif isinstance(self.database_engine, Sqlite3Engine):
+        elif self.database_engine.sql_type.is_sqlite():
             q = """
                 INSERT OR IGNORE INTO destinations (destination)
                     VALUES (?);

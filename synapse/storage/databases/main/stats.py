@@ -27,7 +27,6 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import StoreError
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.state_deltas import StateDeltasStore
-from synapse.storage.engines import PostgresEngine
 from synapse.types import JsonDict
 from synapse.util.caches.descriptors import cached
 
@@ -706,10 +705,13 @@ class StatsStore(StateDeltasStore):
             # nothing to do here.
             return {}, {}
 
-        if isinstance(self.database_engine, PostgresEngine):
+        if self.database_engine.sql_type.is_postgres():
             new_bytes_expression = "OCTET_LENGTH(json)"
-        else:
+        elif self.database_engine.sql_type.is_sqlite():
             new_bytes_expression = "LENGTH(CAST(json AS BLOB))"
+        else:
+            # SHOULD be unreachable
+            raise Exception("Unrecognized database engine")
 
         sql = """
             SELECT events.room_id, COUNT(*) AS new_events, SUM(%s) AS new_bytes

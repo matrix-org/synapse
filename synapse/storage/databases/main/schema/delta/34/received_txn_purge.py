@@ -14,13 +14,13 @@
 
 import logging
 
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines import BaseDatabaseEngine
 
 logger = logging.getLogger(__name__)
 
 
-def run_create(cur, database_engine, *args, **kwargs):
-    if isinstance(database_engine, PostgresEngine):
+def run_create(cur, database_engine: BaseDatabaseEngine, *args, **kwargs):
+    if database_engine.sql_type.is_postgres():
         cur.execute("TRUNCATE received_transactions")
     else:
         cur.execute("DELETE FROM received_transactions")

@@ -14,7 +14,7 @@
 
 import logging
 
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.prepare_database import get_statements
 
 logger = logging.getLogger(__name__)
@@ -66,14 +66,14 @@ CREATE VIRTUAL TABLE user_directory_search
 """
 
 
-def run_create(cur, database_engine, *args, **kwargs):
+def run_create(cur, database_engine: BaseDatabaseEngine, *args, **kwargs):
     for statement in get_statements(BOTH_TABLES.splitlines()):
         cur.execute(statement)
 
-    if isinstance(database_engine, PostgresEngine):
+    if database_engine.sql_type.is_postgres():
         for statement in get_statements(POSTGRES_TABLE.splitlines()):
             cur.execute(statement)
-    elif isinstance(database_engine, Sqlite3Engine):
+    elif database_engine.sql_type.is_sqlite():
         for statement in get_statements(SQLITE_TABLE.splitlines()):
             cur.execute(statement)
     else:

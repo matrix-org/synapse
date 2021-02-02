@@ -37,7 +37,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         self._instance_name = hs.get_instance_name()
 
-        if isinstance(database.engine, PostgresEngine):
+        if isinstance(
+            database.engine, PostgresEngine
+        ):  # todo see if generalizable to is_postgres
             self._can_write_to_receipts = (
                 self._instance_name in hs.config.worker.writers.receipts
             )

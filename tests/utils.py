@@ -67,7 +67,7 @@ def setupdb():
             user=POSTGRES_USER,
             host=POSTGRES_HOST,
             password=POSTGRES_PASSWORD,
-            dbname=POSTGRES_DBNAME_FOR_INITIAL_CREATE,
+            database=POSTGRES_DBNAME_FOR_INITIAL_CREATE,
         )
         db_conn.autocommit = True
         cur = db_conn.cursor()
@@ -95,7 +95,7 @@ def setupdb():
                 user=POSTGRES_USER,
                 host=POSTGRES_HOST,
                 password=POSTGRES_PASSWORD,
-                dbname=POSTGRES_DBNAME_FOR_INITIAL_CREATE,
+                database=POSTGRES_DBNAME_FOR_INITIAL_CREATE,
             )
             db_conn.autocommit = True
             cur = db_conn.cursor()
@@ -245,7 +245,7 @@ def setup_test_homeserver(
 
     # Create the database before we actually try and connect to it, based off
     # the template database we generate in setupdb()
-    if isinstance(db_engine, PostgresEngine):
+    if db_engine.sql_type.is_postgres():
         db_conn = db_engine.module.connect(
             database=POSTGRES_BASE_DB,
             user=POSTGRES_USER,
@@ -277,6 +277,7 @@ def setup_test_homeserver(
     if homeserver_to_use == TestHomeServer:
         hs.setup_background_tasks()
 
+    # todo find a way to generalize this (has psycopg2 import below, not safe to just do is_postgres)
     if isinstance(db_engine, PostgresEngine):
         database = hs.get_datastores().databases[0]
 

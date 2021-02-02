@@ -47,7 +47,7 @@ from synapse.logging.context import (
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
-from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
+from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
 from synapse.storage.types import Connection, Cursor
 from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import Collection
@@ -268,7 +268,9 @@ class LoggingTransaction:
         More efficient than `executemany` on PostgreSQL
         """
 
-        if isinstance(self.database_engine, PostgresEngine):
+        if isinstance(
+            self.database_engine, PostgresEngine
+        ):  # isinstance because psycopg2.extras is imported below
             from psycopg2.extras import execute_batch  # type: ignore
 
             self._do_execute(lambda *x: execute_batch(self.txn, *x), sql, args)
@@ -405,7 +407,7 @@ class DatabasePool:
         # We add the user_directory_search table to the blacklist on SQLite
         # because the existing search table does not have an index, making it
         # unsafe to use native upserts.
-        if isinstance(self.engine, Sqlite3Engine):
+        if self.engine.sql_type.is_sqlite():
             self._unsafe_to_upsert_tables.add("user_directory_search")
 
         if self.engine.can_native_upsert:

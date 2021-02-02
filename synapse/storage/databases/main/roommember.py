@@ -27,7 +27,6 @@ from synapse.metrics.background_process_metrics import (
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
-from synapse.storage.engines import Sqlite3Engine
 from synapse.storage.roommember import (
     GetRoomsForUserWithStreamOrdering,
     MemberSummary,
@@ -92,7 +91,13 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         """
 
         def _transact(txn):
-            if isinstance(self.database_engine, Sqlite3Engine):
+            if self.database_engine.sql_type.is_postgres():
+                query = """
+                    SELECT COUNT(DISTINCT split_part(state_key, ':', 2))
+                    FROM current_state_events
+                    WHERE type = 'm.room.member' AND membership = 'join';
+                """
+            elif self.database_engine.sql_type.is_sqlite():
                 query = """
                     SELECT COUNT(DISTINCT substr(out.user_id, pos+1))
                     FROM (
@@ -103,11 +108,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                     ) as out
                 """
             else:
-                query = """
-                    SELECT COUNT(DISTINCT split_part(state_key, ':', 2))
-                    FROM current_state_events
-                    WHERE type = 'm.room.member' AND membership = 'join';
-                """
+                raise RuntimeError("database type not supported")
+
             txn.execute(query)
             return list(txn)[0][0]
 

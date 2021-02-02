@@ -15,6 +15,7 @@
 
 import logging
 
+from synapse.storage.engines import SQLType
 from synapse.storage.engines._base import BaseDatabaseEngine, IncorrectDatabaseSetup
 from synapse.storage.types import Connection
 
@@ -34,6 +35,10 @@ class PostgresEngine(BaseDatabaseEngine):
         self.module.extensions.register_adapter(bytes, _disable_bytes_adapter)
         self.synchronous_commit = database_config.get("synchronous_commit", True)
         self._version = None  # unknown as yet
+
+    @property
+    def sql_type(self) -> SQLType:
+        return SQLType.POSTGRES
 
     @property
     def single_threaded(self) -> bool:

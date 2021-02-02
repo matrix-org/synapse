@@ -19,11 +19,11 @@ Adds a postgres SEQUENCE for generating guest user IDs.
 from synapse.storage.databases.main.registration import (
     find_max_generated_user_id_localpart,
 )
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines import BaseDatabaseEngine
 
 
-def run_create(cur, database_engine, *args, **kwargs):
-    if not isinstance(database_engine, PostgresEngine):
+def run_create(cur, database_engine: BaseDatabaseEngine, *args, **kwargs):
+    if not database_engine.sql_type.is_postgres():
         return
 
     next_id = find_max_generated_user_id_localpart(cur) + 1

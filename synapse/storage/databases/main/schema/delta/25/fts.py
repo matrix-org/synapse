@@ -14,7 +14,7 @@
 import json
 import logging
 
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.prepare_database import get_statements
 
 logger = logging.getLogger(__name__)
@@ -41,11 +41,11 @@ SQLITE_TABLE = (
 )
 
 
-def run_create(cur, database_engine, *args, **kwargs):
-    if isinstance(database_engine, PostgresEngine):
+def run_create(cur, database_engine: BaseDatabaseEngine, *args, **kwargs):
+    if database_engine.sql_type.is_postgres():
         for statement in get_statements(POSTGRES_TABLE.splitlines()):
             cur.execute(statement)
-    elif isinstance(database_engine, Sqlite3Engine):
+    elif database_engine.sql_type.is_sqlite():
         cur.execute(SQLITE_TABLE)
     else:
         raise Exception("Unrecognized database engine")

@@ -152,7 +152,9 @@ class DataStore(
             db_conn, "local_group_updates", "stream_id"
         )
 
-        if isinstance(self.database_engine, PostgresEngine):
+        if isinstance(
+            self.database_engine, PostgresEngine
+        ):  # todo see if generalizable to is_postgres
             # We set the `writers` to an empty list here as we don't care about
             # missing updates over restarts, as we'll not have anything in our
             # caches to invalidate. (This reduces the amount of writes to the DB

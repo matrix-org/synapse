@@ -21,7 +21,6 @@ from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.state import StateFilter
 from synapse.storage.databases.main.state_deltas import StateDeltasStore
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id, get_localpart_from_id
 from synapse.util.caches.descriptors import cached
 
@@ -389,7 +388,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 lock=False,  # We're only inserter
             )
 
-            if isinstance(self.database_engine, PostgresEngine):
+            if self.database_engine.sql_type.is_postgres():
                 # We weight the localpart most highly, then display name and finally
                 # server name
                 if self.database_engine.can_native_upsert:
@@ -453,7 +452,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                         raise RuntimeError(
                             "upsert returned None when 'can_native_upsert' is False"
                         )
-            elif isinstance(self.database_engine, Sqlite3Engine):
+            elif self.database_engine.sql_type.is_sqlite():
                 value = "%s %s" % (user_id, display_name) if display_name else user_id
                 self.db_pool.simple_upsert_txn(
                     txn,
@@ -750,7 +749,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 )
             """
 
-        if isinstance(self.database_engine, PostgresEngine):
+        if self.database_engine.sql_type.is_postgres():
             full_query, exact_query, prefix_query = _parse_query_postgres(search_term)
 
             # We order by rank and then if they have profile info
@@ -791,7 +790,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 where_clause,
             )
             args = join_args + (full_query, exact_query, prefix_query, limit + 1)
-        elif isinstance(self.database_engine, Sqlite3Engine):
+        elif self.database_engine.sql_type.is_sqlite():
             search_query = _parse_query_sqlite(search_term)
 
             sql = """

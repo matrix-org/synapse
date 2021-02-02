@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import abc
+from enum import Enum
 from typing import Generic, TypeVar
 
 from synapse.storage.types import Connection
@@ -22,12 +23,29 @@ class IncorrectDatabaseSetup(RuntimeError):
     pass
 
 
+class SQLType(Enum):
+    POSTGRES = "postgres"
+    SQLITE = "sqlite"
+
+    # sugar functions
+    def is_postgres(self) -> bool:
+        return self == SQLType.POSTGRES
+
+    def is_sqlite(self) -> bool:
+        return self == SQLType.SQLITE
+
+
 ConnectionType = TypeVar("ConnectionType", bound=Connection)
 
 
 class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
     def __init__(self, module, database_config: dict):
         self.module = module
+
+    @property
+    @abc.abstractmethod
+    def sql_type(self) -> SQLType:
+        ...
 
     @property
     @abc.abstractmethod

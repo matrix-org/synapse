@@ -14,7 +14,7 @@
 
 import logging
 
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.prepare_database import get_statements
 
 logger = logging.getLogger(__name__)
@@ -68,11 +68,11 @@ CREATE INDEX evauth_edges_id ON event_auth(event_id);
 """
 
 
-def run_create(cur, database_engine, *args, **kwargs):
+def run_create(cur, database_engine: BaseDatabaseEngine, *args, **kwargs):
     for statement in get_statements(DROP_INDICES.splitlines()):
         cur.execute(statement)
 
-    if isinstance(database_engine, PostgresEngine):
+    if database_engine.sql_type.is_postgres():
         drop_constraint = POSTGRES_DROP_CONSTRAINT
     else:
         drop_constraint = SQLITE_DROP_CONSTRAINT

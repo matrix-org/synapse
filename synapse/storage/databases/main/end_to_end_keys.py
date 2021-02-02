@@ -25,7 +25,6 @@ from twisted.enterprise.adbapi import Connection
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool, make_in_list_sql_clause
-from synapse.storage.engines import PostgresEngine
 from synapse.storage.types import Cursor
 from synapse.types import JsonDict
 from synapse.util import json_encoder
@@ -518,7 +517,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
             )
 
             # Fetch the latest key for each type per user.
-            if isinstance(self.database_engine, PostgresEngine):
+            if self.database_engine.sql_type.is_postgres():
                 # The `DISTINCT ON` clause will pick the *first* row it
                 # encounters, so ordering by stream ID desc will ensure we get
                 # the latest key.

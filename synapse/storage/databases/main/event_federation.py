@@ -308,6 +308,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             # If there are no gaps to fetch, we're done!
             return result
 
+        # todo find way to generalize this (execute_values used below, which works with psycopg2.extras)
         if isinstance(self.database_engine, PostgresEngine):
             # We can use `execute_values` to efficiently fetch the gaps when
             # using postgres.

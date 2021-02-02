@@ -52,7 +52,7 @@ from synapse.storage.database import (
     make_in_list_sql_clause,
 )
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
-from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
+from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
 from synapse.types import Collection, PersistedEventPosition, RoomStreamToken
 from synapse.util.caches.descriptors import cached
@@ -185,7 +185,7 @@ def _make_generic_sql_bound(
     val1 = int(val1)
     val2 = int(val2)
 
-    if isinstance(engine, PostgresEngine):
+    if engine.sql_type.is_postgres():
         # Postgres doesn't optimise ``(x < a) OR (x=a AND y<b)`` as well
         # as it optimises ``(x,y) < (a,b)`` on multicolumn indexes. So we
         # use the later form when running against postgres.

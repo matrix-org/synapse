@@ -44,7 +44,9 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             expiry_ms=30 * 60 * 1000,
         )
 
-        if isinstance(database.engine, PostgresEngine):
+        if isinstance(
+            database.engine, PostgresEngine
+        ):  # todo see if generalizable to is_postgres
             self._can_write_to_device = (
                 self._instance_name in hs.config.worker.writers.to_device
             )

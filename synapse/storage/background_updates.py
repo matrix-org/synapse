@@ -357,7 +357,7 @@ class BackgroundUpdater:
         def create_index_psql(conn: Connection) -> None:
             conn.rollback()
             # postgres insists on autocommit for the index
-            conn.set_session(autocommit=True)  # type: ignore
+            self.db_pool.engine.attempt_to_set_autocommit(conn, True)
 
             try:
                 c = conn.cursor()
@@ -384,7 +384,7 @@ class BackgroundUpdater:
                 logger.debug("[SQL] %s", sql)
                 c.execute(sql)
             finally:
-                conn.set_session(autocommit=False)  # type: ignore
+                self.db_pool.engine.attempt_to_set_autocommit(conn, False)
 
         def create_index_sqlite(conn: Connection) -> None:
             # Sqlite doesn't support concurrent creation of indexes.

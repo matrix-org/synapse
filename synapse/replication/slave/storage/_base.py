@@ -27,7 +27,9 @@ logger = logging.getLogger(__name__)
 class BaseSlavedStore(CacheInvalidationWorkerStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
-        if isinstance(self.database_engine, PostgresEngine):
+        if isinstance(
+            self.database_engine, PostgresEngine
+        ):  # todo see if generalizable to is_postgres
             self._cache_id_gen = MultiWriterIdGenerator(
                 db_conn,
                 database,

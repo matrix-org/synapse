@@ -19,6 +19,7 @@ from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.state import StateFilter
+from synapse.storage.types import Connection
 
 logger = logging.getLogger(__name__)
 
@@ -339,11 +340,11 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
         return result * BATCH_SIZE_SCALE_FACTOR
 
     async def _background_index_state(self, progress, batch_size):
-        def reindex_txn(conn):
+        def reindex_txn(conn: Connection):
             conn.rollback()
-            if isinstance(self.database_engine, PostgresEngine):
+            if self.database_engine.sql_type.is_postgres():
                 # postgres insists on autocommit for the index
-                conn.set_session(autocommit=True)
+                self.database_engine.attempt_to_set_autocommit(conn, True)
                 try:
                     txn = conn.cursor()
                     txn.execute(
@@ -352,14 +353,17 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
                     )
                     txn.execute("DROP INDEX IF EXISTS state_groups_state_id")
                 finally:
-                    conn.set_session(autocommit=False)
-            else:
+                    self.database_engine.attempt_to_set_autocommit(conn, False)
+            elif self.database_engine.sql_type.is_sqlite():
                 txn = conn.cursor()
                 txn.execute(
                     "CREATE INDEX state_groups_state_type_idx"
                     " ON state_groups_state(state_group, type, state_key)"
                 )
                 txn.execute("DROP INDEX IF EXISTS state_groups_state_id")
+            else:
+                # SHOULD not be reachable
+                raise RuntimeError("Unsupported database type")
 
         await self.db_pool.runWithConnection(reindex_txn)
 

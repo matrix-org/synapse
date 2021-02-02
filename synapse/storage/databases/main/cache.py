@@ -276,7 +276,9 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                 "Can't stream invalidate all with magic current state cache"
             )
 
-        if isinstance(self.database_engine, PostgresEngine):
+        if isinstance(
+            self.database_engine, PostgresEngine
+        ):  # todo see if generalizable to is_postgres
             # get_next() returns a context manager which is designed to wrap
             # the transaction. However, we want to only get an ID when we want
             # to use it, here, so we need to call __enter__ manually, and have
