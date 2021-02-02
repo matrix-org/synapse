@@ -1,1 +1,0 @@
-Add an admin API for retrieving the current room state of a room.
