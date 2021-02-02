@@ -327,7 +327,9 @@ class MatrixHostnameEndpoint:
         server_list = await self._srv_resolver.resolve_service(b"_matrix._tcp." + host)
 
         if server_list:
-            logger.debug("Got %s from SRV lookup for %s", ', '.join(map(str, server_list)), host)
+            logger.debug(
+                "Got %s from SRV lookup for %s", ", ".join(map(str, server_list)), host
+            )
             return server_list
 
         # No SRV records, so we fallback to host and 8448
