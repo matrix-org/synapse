@@ -368,6 +368,36 @@ Response:
 }
 ```
 
+# Room State API
+
+The Room State admin API allows server admins to get a list of all state events in a room.
+
+The response includes the following fields:
+
+* `state` - The current state of the room at the time of request.
+
+## Usage
+
+A standard request:
+
+```
+GET /_synapse/admin/v1/rooms/<room_id>/state
+
+{}
+```
+
+Response:
+
+```json
+{
+  "state": [
+    {"type": "m.room.create", "state_key": "", "etc": true},
+    {"type": "m.room.power_levels", "state_key": "", "etc": true},
+    {"type": "m.room.name", "state_key": "", "etc": true}
+  ]
+}
+```
+
 # Delete Room API
 
 The Delete Room admin API allows server admins to remove rooms from server
