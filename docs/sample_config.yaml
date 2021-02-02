@@ -180,6 +180,7 @@ pid_file: DATADIR/homeserver.pid
 #  - 'fc00::/7'
 #  - '2001:db8::/32'
 #  - 'ff00::/8'
+#  - 'fec0::/10'
 
 # List of IP address CIDR ranges that should be allowed for federation,
 # identity servers, push servers, and for checking key validity for
@@ -1008,6 +1009,7 @@ media_store_path: "DATADIR/media_store"
 #  - 'fc00::/7'
 #  - '2001:db8::/32'
 #  - 'ff00::/8'
+#  - 'fec0::/10'
 
 # List of IP address CIDR ranges that the URL preview spider is allowed
 # to access even if they are specified in url_preview_ip_range_blacklist.

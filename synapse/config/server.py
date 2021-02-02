@@ -133,6 +133,8 @@ DEFAULT_IP_RANGE_BLACKLIST = [
     "2001:db8::/32",
     # Multicast.
     "ff00::/8",
+    # Site-local addresses
+    "fec0::/10",
 ]
 
 DEFAULT_ROOM_VERSION = "6"
