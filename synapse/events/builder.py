@@ -98,7 +98,7 @@ class EventBuilder:
         return self._state_key is not None
 
     async def build(
-        self, prev_event_ids: List[str], auth_event_ids: Optional[List[str]],
+        self, prev_event_ids: List[str], overriding_prev_events: False, auth_event_ids: Optional[List[str]],
     ) -> EventBase:
         """Transform into a fully signed and hashed event
 
@@ -131,7 +131,13 @@ class EventBuilder:
             prev_events = prev_event_ids
 
         old_depth = await self._store.get_max_depth_of(prev_event_ids)
-        depth = old_depth + 1
+        # awfewafeafew depth stuff
+        # If backfilling old message, let's just use the same depth of what we're inserting next to
+        if overriding_prev_events:
+            depth = old_depth
+        # Otherwise, progress the depth as normal
+        else:
+            depth = old_depth + 1
 
         # we cap depth of generated events, to ensure that they are not
         # rejected by other servers (and so that they can be persisted in
