@@ -672,10 +672,12 @@ class CASTestCase(unittest.HomeserverTestCase):
         self.redirect_path = "_synapse/client/login/sso/redirect/confirm"
 
         config = self.default_config()
+        config["public_baseurl"] = (
+            config.get("public_baseurl") or "https://matrix.goodserver.com:8448"
+        )
         config["cas_config"] = {
             "enabled": True,
             "server_url": CAS_SERVER,
-            "service_url": "https://matrix.goodserver.com:8448",
         }
 
         cas_user_id = "username"
