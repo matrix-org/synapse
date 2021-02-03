@@ -17,10 +17,7 @@ import logging
 import os
 import warnings
 from datetime import datetime
-from hashlib import sha256
 from typing import List, Optional
-
-from unpaddedbase64 import encode_base64
 
 from OpenSSL import SSL, crypto
 from twisted.internet._sslverify import Certificate, trustRootFromCertificates
