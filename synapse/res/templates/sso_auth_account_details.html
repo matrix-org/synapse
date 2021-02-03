@@ -18,6 +18,19 @@
         font-size: 12px;
       }
 
+      .username_input.invalid {
+        border-color: #FE2928;
+      }
+
+      .username_input.invalid input, .username_input.invalid label {
+        color: #FE2928;
+      }
+
+      .username_input div, .username_input input {
+        line-height: 18px;
+        font-size: 14px;
+      }
+
       .username_input label {
         position: absolute;
         top: -8px;
@@ -78,6 +91,15 @@
         display: block;
         margin-top: 8px;
       }
+
+      output {
+        padding: 0 14px;
+        display: block;
+      }
+
+      output.error {
+        color: #FE2928;
+      }
     </style>
   </head>
   <body>
@@ -87,12 +109,13 @@
     </header>
     <main>
       <form method="post" class="form__input" id="form">
-        <div class="username_input">
+        <div class="username_input" id="username_input">
           <label for="field-username">Username</label>
           <div class="prefix">@</div>
-          <input type="text" name="username" id="field-username" autofocus required pattern="[a-z0-9\-=_\/\.]+">
+          <input type="text" name="username" id="field-username" autofocus>
           <div class="postfix">:{{ server_name }}</div>
         </div>
+        <output for="username_input" id="field-username-output"></output>
         <input type="submit" value="Continue" class="primary-button">
         {% if user_attributes %}
         <section class="idp-pick-details">
