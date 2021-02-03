@@ -32,17 +32,7 @@
             <h1>Continue to your account</h1>
         </header>
         <main>
-            <div class="profile{% if user_profile.avatar_url %} with-avatar{% endif %}">
-                {% if user_profile.avatar_url %}
-                <img src="{{ user_profile.avatar_url | mxc_to_http(64, 64) }}" class="avatar" />
-                {% endif %}
-                {% if user_profile.display_name %}
-                    <div class="display-name">{{ user_profile.display_name }}</div>
-                {% else %}
-                    <div class="display-name">{{ user_id.split(":")[1:] }}</div>
-                {% endif %}
-                <div class="user-id">{{ user_id }}</div>
-            </div>
+            {% include "sso_partial_profile.html" %}
             <p class="confirm-trust">Continuing will grant <strong>{{ display_url }}</strong> access to your account.</p>
             <a href="{{ redirect_url }}" class="primary-button">Continue</a>
         </main>
