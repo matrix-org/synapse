@@ -11,6 +11,16 @@ header, footer {
   text-align: center;
 }
 
+@media screen and (min-width: 800px) {
+  header {
+    margin-top: 90px;
+  }
+}
+
+header {
+  min-height: 60px;
+}
+
 header p {
   color: #737D8C;
   line-height: 24px;
