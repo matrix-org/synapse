@@ -328,7 +328,9 @@ class MatrixHostnameEndpoint:
 
         if server_list:
             logger.debug(
-                "Got %s from SRV lookup for %s", ", ".join(map(str, server_list)), host.decode()
+                "Got %s from SRV lookup for %s",
+                ", ".join(map(str, server_list)),
+                host.decode(),
             )
             return server_list
 
