@@ -127,8 +127,7 @@ class TestCase(unittest.TestCase):
             ret = orig()
             # force a GC to workaround problems with deferreds leaking logcontexts when
             # they are GCed (see the logcontext docs)
-            if platform.python_implementation() != "PyPy":
-                gc.collect()
+            gc.collect()
             set_current_context(SENTINEL_CONTEXT)
 
             return ret
