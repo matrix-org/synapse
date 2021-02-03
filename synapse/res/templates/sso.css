@@ -70,8 +70,17 @@ main {
 
 .profile {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  margin: 24px 0;
+  margin: 24px;
+  padding: 13px;
+  border: 1px solid #E9ECF1;
+  border-radius: 4px;
+}
+
+.profile.with-avatar {
+  margin-top: 42px; /* (36px / 2) + 24px*/
 }
 
 .profile .avatar {
@@ -79,19 +88,20 @@ main {
   height: 36px;
   border-radius: 100%;
   display: block;
-  margin-right: 8px;
+  margin-top: -32px;
+  margin-bottom: 8px;
 }
 
 .profile .display-name {
   font-weight: bold;
   margin-bottom: 4px;
+  font-size: 15px;
+  line-height: 18px;
 }
 .profile .user-id {
   color: #737D8C;
-}
-
-.profile .display-name, .profile .user-id {
-  line-height: 18px;
+  font-size: 12px;
+  line-height: 12px;
 }
 
 footer {
