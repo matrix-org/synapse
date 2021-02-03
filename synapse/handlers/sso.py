@@ -742,7 +742,11 @@ class SsoHandler:
             use_display_name: whether the user wants to use the suggested display name
             emails_to_use: emails that the user would like to use
         """
-        session = self.get_mapping_session(session_id)
+        try:
+            session = self.get_mapping_session(session_id)
+        except SynapseError as e:
+            self.render_error(request, "bad_session", e.msg, code=e.code)
+            return
 
         # update the session with the user's choices
         session.chosen_localpart = localpart
@@ -793,7 +797,12 @@ class SsoHandler:
             session_id,
             terms_version,
         )
-        session = self.get_mapping_session(session_id)
+        try:
+            session = self.get_mapping_session(session_id)
+        except SynapseError as e:
+            self.render_error(request, "bad_session", e.msg, code=e.code)
+            return
+
         session.terms_accepted_version = terms_version
 
         # we're done; now we can register the user
@@ -808,7 +817,11 @@ class SsoHandler:
             request: HTTP request
             session_id: ID of the username mapping session, extracted from a cookie
         """
-        session = self.get_mapping_session(session_id)
+        try:
+            session = self.get_mapping_session(session_id)
+        except SynapseError as e:
+            self.render_error(request, "bad_session", e.msg, code=e.code)
+            return
 
         logger.info(
             "[session %s] Registering localpart %s",
