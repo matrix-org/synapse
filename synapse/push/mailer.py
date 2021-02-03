@@ -257,7 +257,7 @@ class Mailer:
         rooms = []
 
         for r in rooms_in_order:
-            roomvars = await self.get_room_vars(
+            roomvars = await self._get_room_vars(
                 r, user_id, notifs_by_room[r], notif_events, state_by_room[r]
             )
             rooms.append(roomvars)
@@ -273,7 +273,7 @@ class Mailer:
             # Only one room has new stuff
             room_id = list(notifs_by_room.keys())[0]
 
-            summary_text = await self.make_summary_text_single_room(
+            summary_text = await self._make_summary_text_single_room(
                 room_id,
                 notifs_by_room[room_id],
                 state_by_room[room_id],
@@ -281,13 +281,13 @@ class Mailer:
                 user_id,
             )
         else:
-            summary_text = await self.make_summary_text(
+            summary_text = await self._make_summary_text(
                 notifs_by_room, state_by_room, notif_events, reason
             )
 
         template_vars = {
             "user_display_name": user_display_name,
-            "unsubscribe_link": self.make_unsubscribe_link(
+            "unsubscribe_link": self._make_unsubscribe_link(
                 user_id, app_id, email_address
             ),
             "summary_text": summary_text,
@@ -351,7 +351,7 @@ class Mailer:
             )
         )
 
-    async def get_room_vars(
+    async def _get_room_vars(
         self,
         room_id: str,
         user_id: str,
@@ -375,12 +375,12 @@ class Mailer:
             "hash": string_ordinal_total(room_id),  # See sender avatar hash
             "notifs": [],
             "invite": is_invite,
-            "link": self.make_room_link(room_id),
+            "link": self._make_room_link(room_id),
         }  # type: Dict[str, Any]
 
         if not is_invite:
             for n in notifs:
-                notifvars = await self.get_notif_vars(
+                notifvars = await self._get_notif_vars(
                     n, user_id, notif_events[n["event_id"]], room_state_ids
                 )
 
@@ -407,7 +407,7 @@ class Mailer:
 
         return room_vars
 
-    async def get_notif_vars(
+    async def _get_notif_vars(
         self,
         notif: Dict[str, Any],
         user_id: str,
@@ -422,7 +422,7 @@ class Mailer:
         )
 
         ret = {
-            "link": self.make_notif_link(notif),
+            "link": self._make_notif_link(notif),
             "ts": notif["received_ts"],
             "messages": [],
         }
@@ -433,13 +433,13 @@ class Mailer:
         the_events.append(notif_event)
 
         for event in the_events:
-            messagevars = await self.get_message_vars(notif, event, room_state_ids)
+            messagevars = await self._get_message_vars(notif, event, room_state_ids)
             if messagevars is not None:
                 ret["messages"].append(messagevars)
 
         return ret
 
-    async def get_message_vars(
+    async def _get_message_vars(
         self, notif: Dict[str, Any], event: EventBase, room_state_ids: StateMap[str]
     ) -> Optional[Dict[str, Any]]:
         if event.type != EventTypes.Message and event.type != EventTypes.Encrypted:
@@ -490,16 +490,16 @@ class Mailer:
         ret["msgtype"] = msgtype
 
         if msgtype == "m.text":
-            self.add_text_message_vars(ret, event)
+            self._add_text_message_vars(ret, event)
         elif msgtype == "m.image":
-            self.add_image_message_vars(ret, event)
+            self._add_image_message_vars(ret, event)
 
         if "body" in event.content:
             ret["body_text_plain"] = event.content["body"]
 
         return ret
 
-    def add_text_message_vars(
+    def _add_text_message_vars(
         self, messagevars: Dict[str, Any], event: EventBase
     ) -> None:
         msgformat = event.content.get("format")
@@ -514,7 +514,7 @@ class Mailer:
         elif body:
             messagevars["body_text_html"] = safe_text(body)
 
-    def add_image_message_vars(
+    def _add_image_message_vars(
         self, messagevars: Dict[str, Any], event: EventBase
     ) -> None:
         """
@@ -523,7 +523,7 @@ class Mailer:
         if "url" in event.content:
             messagevars["image_url"] = event.content["url"]
 
-    async def make_summary_text_single_room(
+    async def _make_summary_text_single_room(
         self,
         room_id: str,
         notifs: List[Dict[str, Any]],
@@ -619,11 +619,11 @@ class Mailer:
                     "app": self.app_name,
                 }
 
-            return await self.make_summary_text_from_member_events(
+            return await self._make_summary_text_from_member_events(
                 room_id, notifs, room_state_ids, notif_events
             )
 
-    async def make_summary_text(
+    async def _make_summary_text(
         self,
         notifs_by_room: Dict[str, List[Dict[str, Any]]],
         room_state_ids: Dict[str, StateMap[str]],
@@ -651,11 +651,11 @@ class Mailer:
             }
 
         room_id = reason["room_id"]
-        return await self.make_summary_text_from_member_events(
+        return await self._make_summary_text_from_member_events(
             room_id, notifs_by_room[room_id], room_state_ids[room_id], notif_events
         )
 
-    async def make_summary_text_from_member_events(
+    async def _make_summary_text_from_member_events(
         self,
         room_id: str,
         notifs: List[Dict[str, Any]],
@@ -711,7 +711,7 @@ class Mailer:
             "app": self.app_name,
         }
 
-    def make_room_link(self, room_id: str) -> str:
+    def _make_room_link(self, room_id: str) -> str:
         if self.hs.config.email_riot_base_url:
             base_url = "%s/#/room" % (self.hs.config.email_riot_base_url)
         elif self.app_name == "Vector":
@@ -721,7 +721,7 @@ class Mailer:
             base_url = "https://matrix.to/#"
         return "%s/%s" % (base_url, room_id)
 
-    def make_notif_link(self, notif: Dict[str, str]) -> str:
+    def _make_notif_link(self, notif: Dict[str, str]) -> str:
         if self.hs.config.email_riot_base_url:
             return "%s/#/room/%s/%s" % (
                 self.hs.config.email_riot_base_url,
@@ -737,7 +737,7 @@ class Mailer:
         else:
             return "https://matrix.to/#/%s/%s" % (notif["room_id"], notif["event_id"])
 
-    def make_unsubscribe_link(
+    def _make_unsubscribe_link(
         self, user_id: str, app_id: str, email_address: str
     ) -> str:
         params = {
