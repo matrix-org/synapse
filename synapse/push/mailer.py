@@ -375,7 +375,7 @@ class Mailer:
         Args:
             room_id: The room ID
             user_id: The user receiving the notification.
-            notifs: The outstanding notifications for this room.
+            notifs: The outstanding push actions for this room.
             notif_events: The events related to the above notifications.
             room_state_ids: The event IDs of the current room state.
 
@@ -596,7 +596,7 @@ class Mailer:
 
         Args:
             room_id: The ID of the room.
-            notifs: The notifications for this room.
+            notifs: The push actions for this room.
             room_state_ids: The state map for the room.
             notif_events: A map of event ID -> notification event.
             user_id: The user receiving the notification.
@@ -694,7 +694,7 @@ class Mailer:
         Make a summary text for the email when multiple rooms have notifications.
 
         Args:
-            notifs_by_room: A map of room ID to the notifications for that room.
+            notifs_by_room: A map of room ID to the push actions for that room.
             room_state_ids: A map of room ID to the state map for that room.
             notif_events: A map of event ID -> notification event.
             reason: The reason this notification is being sent.
@@ -727,7 +727,7 @@ class Mailer:
 
         Args:
             room_id: The ID of the room.
-            notifs: The notifications for this room.
+            notifs: The push actions for this room.
             room_state_ids: The state map for the room.
             notif_events: A map of event ID -> notification event.
 
@@ -736,16 +736,35 @@ class Mailer:
         """
         # If the room doesn't have a name, say who the messages
         # are from explicitly to avoid, "messages in the Bob room"
-        sender_ids = {notif_events[n["event_id"]].sender for n in notifs}
 
-        # Attempt to get some names of the senders.
-        member_event_ids = [
-            room_state_ids[("m.room.member", s)]
-            for s in sender_ids
-            if ("m.room.member", s) in room_state_ids
-        ]
+        # Find the latest event ID for each sender, note that the notifications
+        # are already in descending received_ts.
+        sender_ids = {}
+        for n in notifs:
+            sender = notif_events[n["event_id"]].sender
+            if sender not in sender_ids:
+                sender_ids[sender] = n["event_id"]
 
-        if not member_event_ids:
+        # Get the actual member events (in order to calculate a pretty name for
+        # the room).
+        member_event_ids = []
+        member_events = {}
+        for sender_id, event_id in sender_ids.items():
+            state_key = ("m.room.member", sender_id)
+            sender_state_event_id = room_state_ids.get(state_key)
+            if sender_state_event_id:
+                member_event_ids.append(sender_state_event_id)
+            else:
+                # Attempt to check the historical state for the room.
+                historical_state = await self.state_store.get_state_for_event(
+                    event_id, StateFilter.from_types((state_key,))
+                )
+                sender_state_event = historical_state.get(state_key)
+                if sender_state_event:
+                    member_events[event_id] = sender_state_event
+        member_events.update(await self.store.get_events(member_event_ids))
+
+        if not member_events:
             # No member events were found! Maybe the room is empty?
             # Fallback to the room ID (note that if there was a room name this
             # would already have been used previously).
@@ -754,12 +773,8 @@ class Mailer:
                 "app": self.app_name,
             }
 
-        # Get the actual member events (in order to calculate a pretty name for
-        # the room).
-        member_events = await self.store.get_events(member_event_ids)
-
         # There was a single sender.
-        if len(sender_ids) == 1:
+        if len(member_events) == 1:
             return self.email_subjects.messages_from_person % {
                 "person": descriptor_from_member_events(member_events.values()),
                 "app": self.app_name,
