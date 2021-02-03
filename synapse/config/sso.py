@@ -106,8 +106,7 @@ class SSOConfig(Config):
             #
             #   When rendering, this template is given the following variables:
             #     * redirect_url: the URL that the user will be redirected to after
-            #       login. Needs manual escaping (see
-            #       https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+            #       login.
             #
             #     * server_name: the homeserver's name.
             #
@@ -185,15 +184,12 @@ class SSOConfig(Config):
             #
             #   When rendering, this template is given the following variables:
             #
-            #     * redirect_url: the URL the user is about to be redirected to. Needs
-            #                     manual escaping (see
-            #                     https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+            #     * redirect_url: the URL the user is about to be redirected to.
             #
             #     * display_url: the same as `redirect_url`, but with the query
             #                    parameters stripped. The intention is to have a
             #                    human-readable URL to show to users, not to use it as
-            #                    the final address to redirect to. Needs manual escaping
-            #                    (see https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+            #                    the final address to redirect to.
             #
             #     * server_name: the homeserver's name.
             #
@@ -213,9 +209,7 @@ class SSOConfig(Config):
             #   process: 'sso_auth_confirm.html'.
             #
             #   When rendering, this template is given the following variables:
-            #     * redirect_url: the URL the user is about to be redirected to. Needs
-            #                     manual escaping (see
-            #                     https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+            #     * redirect_url: the URL the user is about to be redirected to.
             #
             #     * description: the operation which the user is being asked to confirm
             #
