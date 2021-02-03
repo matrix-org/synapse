@@ -67,11 +67,12 @@ pid_file: DATADIR/homeserver.pid
 #
 #web_client_location: https://riot.example.com/
 
-# The public-facing base URL that clients use to access this HS
-# (not including _matrix/...). This is the same URL a user would
-# enter into the 'custom HS URL' field on their client. If you
-# use synapse with a reverse proxy, this should be the URL to reach
-# synapse via the proxy.
+# The public-facing base URL that clients use to access this Homeserver (not
+# including _matrix/...). This is the same URL a user might enter into the
+# 'Custom Homeserver URL' field on their client. If you use Synapse with a
+# reverse proxy, this should be the URL to reach Synapse via the proxy.
+# Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
+# 'listeners' below).
 #
 #public_baseurl: https://example.com/
 
