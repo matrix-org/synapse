@@ -219,7 +219,17 @@ class Mailer:
         push_actions: Iterable[Dict[str, Any]],
         reason: Dict[str, Any],
     ) -> None:
-        """Send email regarding a user's room notifications"""
+        """
+        Send email regarding a user's room notifications
+
+        Params:
+            app_id: The application receiving the notification.
+            user_id: The user receiving the notification.
+            email_address: The email address receiving the notification.
+            push_actions: All outstanding notifications.
+            reason: The notification that was ready and is the cause of an email
+                being sent.
+        """
         rooms_in_order = deduped_ordered_list([pa["room_id"] for pa in push_actions])
 
         notif_events = await self.store.get_events(
@@ -243,7 +253,7 @@ class Mailer:
         except StoreError:
             user_display_name = user_id
 
-        async def _fetch_room_state(room_id):
+        async def _fetch_room_state(room_id: str) -> None:
             room_state = await self.store.get_current_state_ids(room_id)
             state_by_room[room_id] = room_state
 
@@ -359,6 +369,20 @@ class Mailer:
         notif_events: Dict[str, EventBase],
         room_state_ids: StateMap[str],
     ) -> Dict[str, Any]:
+        """
+        Generate the variables for notifications on a per-room basis.
+
+        Args:
+            room_id: The room ID
+            user_id: The user receiving the notification.
+            notifs: The outstanding notifications for this room.
+            notif_events: The events related to the above notifications.
+            room_state_ids: The event IDs of the current room state.
+
+        Returns:
+             A dictionary to be added to the template context.
+        """
+
         # Check if one of the notifs is an invite event for the user.
         is_invite = False
         for n in notifs:
@@ -414,6 +438,19 @@ class Mailer:
         notif_event: EventBase,
         room_state_ids: StateMap[str],
     ) -> Dict[str, Any]:
+        """
+        Generate the variables for a single notification.
+
+        Args:
+            notif: The outstanding notification for this room.
+            user_id: The user receiving the notification.
+            notif_event: The event related to the above notification.
+            room_state_ids: The event IDs of the current room state.
+
+        Returns:
+             A dictionary to be added to the template context.
+        """
+
         results = await self.store.get_events_around(
             notif["room_id"],
             notif["event_id"],
@@ -442,6 +479,18 @@ class Mailer:
     async def _get_message_vars(
         self, notif: Dict[str, Any], event: EventBase, room_state_ids: StateMap[str]
     ) -> Optional[Dict[str, Any]]:
+        """
+        Generate the variables for a single event, if possible.
+
+        Args:
+            notif: The outstanding notification for this room.
+            event: The event under consideration.
+            room_state_ids: The event IDs of the current room state.
+
+        Returns:
+             A dictionary to be added to the template context, or None if the
+             event cannot be processed.
+        """
         if event.type != EventTypes.Message and event.type != EventTypes.Encrypted:
             return None
 
@@ -502,6 +551,13 @@ class Mailer:
     def _add_text_message_vars(
         self, messagevars: Dict[str, Any], event: EventBase
     ) -> None:
+        """
+        Potentially add a sanitised message body to the message variables.
+
+        Args:
+            messagevars: The template context to be modified.
+            event: The event under consideration.
+        """
         msgformat = event.content.get("format")
 
         messagevars["format"] = msgformat
@@ -519,6 +575,10 @@ class Mailer:
     ) -> None:
         """
         Potentially add an image URL to the message variables.
+
+        Args:
+            messagevars: The template context to be modified.
+            event: The event under consideration.
         """
         if "url" in event.content:
             messagevars["image_url"] = event.content["url"]
@@ -712,6 +772,15 @@ class Mailer:
         }
 
     def _make_room_link(self, room_id: str) -> str:
+        """
+        Generate a link to open a room in the web client.
+
+        Args:
+            room_id: The room ID to generate a link to.
+
+        Returns:
+             A link to open a room in the web client.
+        """
         if self.hs.config.email_riot_base_url:
             base_url = "%s/#/room" % (self.hs.config.email_riot_base_url)
         elif self.app_name == "Vector":
@@ -722,6 +791,15 @@ class Mailer:
         return "%s/%s" % (base_url, room_id)
 
     def _make_notif_link(self, notif: Dict[str, str]) -> str:
+        """
+        Generate a link to open an event in the web client.
+
+        Args:
+            notif: The notification to generate a link for.
+
+        Returns:
+             A link to open the notification in the web client.
+        """
         if self.hs.config.email_riot_base_url:
             return "%s/#/room/%s/%s" % (
                 self.hs.config.email_riot_base_url,
@@ -740,6 +818,17 @@ class Mailer:
     def _make_unsubscribe_link(
         self, user_id: str, app_id: str, email_address: str
     ) -> str:
+        """
+        Generate a link to unsubscribe from email notifications.
+
+        Args:
+            user_id: The user receiving the notification.
+            app_id: The application receiving the notification.
+            email_address: The email address receiving the notification.
+
+        Returns:
+             A link to unsubscribe from email notifications.
+        """
         params = {
             "access_token": self.macaroon_gen.generate_delete_pusher_token(user_id),
             "app_id": app_id,
