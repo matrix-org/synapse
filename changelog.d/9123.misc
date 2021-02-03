@@ -1,1 +1,1 @@
-Add in preliminary PyPy support.
+Add experimental support for running Synapse with PyPy.
