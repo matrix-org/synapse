@@ -19,7 +19,6 @@ import hashlib
 import hmac
 import inspect
 import logging
-import platform
 import time
 from typing import Callable, Dict, Iterable, Optional, Tuple, Type, TypeVar, Union
 
