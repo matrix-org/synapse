@@ -27,7 +27,7 @@ def create_engine(database_config) -> BaseDatabaseEngine:
         return Sqlite3Engine(sqlite3, database_config)
 
     if name == "psycopg2":
-        # note: pypy is still supported by using psycopg2cffi-compat to monkey-patch imports to psycopg2
+        # Note that psycopg2cffi-compat provides the psycopg2 module on mypy.
         import psycopg2  # type: ignore
 
         return PostgresEngine(psycopg2, database_config)
