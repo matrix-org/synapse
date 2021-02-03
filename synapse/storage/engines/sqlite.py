@@ -32,8 +32,8 @@ class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
         self._is_in_memory = database in (None, ":memory:",)
 
         if platform.python_implementation() == "PyPy":
-            # related to #6186, pypy's sqlite3 module doesn't like bytearrays,
-            # so here we're converting them back
+            # pypy's sqlite3 module doesn't handle bytearrays, convert them
+            # back to bytes.
             database_module.register_adapter(bytearray, lambda array: bytes(array))
 
         # The current max state_group, or None if we haven't looked
