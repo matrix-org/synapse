@@ -55,7 +55,7 @@ class Cursor(Protocol):
             ]
         ]
     ]:
-        return None
+        ...
 
     @property
     def rowcount(self) -> int:
