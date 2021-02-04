@@ -220,10 +220,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         Returns:
             Dict of state group to state map.
         """
+        state_filter = state_filter or StateFilter.all()
 
-        member_filter, non_member_filter = (
-            state_filter or StateFilter.all()
-        ).get_member_split()
+        member_filter, non_member_filter = state_filter.get_member_split()
 
         # Now we look them up in the member and non-member caches
         (

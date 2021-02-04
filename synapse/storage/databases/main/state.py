@@ -205,10 +205,9 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         Returns:
             Map from type/state_key to event ID.
         """
+        state_filter = state_filter or StateFilter.all()
 
-        where_clause, where_args = (
-            state_filter or StateFilter.all()
-        ).make_sql_filter_clause()
+        where_clause, where_args = state_filter.make_sql_filter_clause()
 
         if not where_clause:
             # We delegate to the cached version
