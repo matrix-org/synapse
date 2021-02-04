@@ -79,6 +79,9 @@ class GroupServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
+        assert_params_in_dict(
+            content, ("name", "avatar_url", "short_description", "long_description")
+        )
         await self.groups_handler.update_group_profile(
             group_id, requester_user_id, content
         )
