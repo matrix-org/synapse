@@ -12,14 +12,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Dict, Tuple
+
 from mock import Mock
 
 from twisted.internet import defer
 
 import synapse.rest.admin
 from synapse.api.constants import EventTypes, RoomEncryptionAlgorithms, UserTypes
+from synapse.config import ConfigError
+from synapse.module_api import ModuleApi
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import user_directory
+from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.roommember import ProfileInfo
 
 from tests import unittest
@@ -585,3 +590,153 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         )
         self.assertEquals(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["results"]) == 0)
+
+
+class UserDirectorySearchTestModule:
+    def __init__(self, config: Dict, module_api: ModuleApi):
+        self.config = config
+        self.user_displayname_to_show_first = self.config[
+            "user_displayname_to_show_first"
+        ]
+
+        # Ensure an initialised ModuleApi has been passed
+        if module_api is None or not isinstance(module_api, ModuleApi):
+            raise Exception("Passed module_api is invalid")
+
+    @staticmethod
+    def parse_config(config: Dict) -> Dict:
+        """Parse the dict provided by the homeserver's config
+        Args:
+            config: A dictionary containing configuration options for this provider.
+
+        Returns:
+            A custom config object for this module.
+        """
+        if "user_displayname_to_show_first" not in config:
+            raise ConfigError("user_displayname_to_show_first is a required field")
+
+        return config
+
+    def get_search_query_ordering(
+        self, database_engine_type: BaseDatabaseEngine
+    ) -> Tuple[str, Tuple]:
+        """Returns the contents of the ORDER BY section of the user directory search
+        query.
+
+        Args:
+            database_engine_type: The type of database engine that is in use. One of
+                those in synapse/storage/engines/*.
+                Ex. synapse.storage.engines.PostgresEngine
+
+        Returns:
+            A tuple containing:
+
+            * A string that can be placed after ORDER BY in order to influence the
+              ordering of results from a user directory search.
+            * A tuple containing any extra arguments to provide to the query.
+        """
+        # Users with a specific display name should get the highest overall rank.
+        # Otherwise, we simply order users by their display name lexicographically.
+        return (
+            """
+            display_name = ? DESC,
+            display_name ASC
+        """,
+            (self.user_displayname_to_show_first,),
+        )
+
+
+# A displayname for a user that we expect our custom module to present first in results
+test_displayname = "3 Super Special Displayname"
+
+
+class UserDirectorySearchModuleTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        user_directory.register_servlets,
+    ]
+
+    @override_config(
+        {
+            "user_directory": {
+                "enabled": True,
+                "search_all_users": True,
+                "user_directory_search_module": {
+                    "module": (
+                        "tests.handlers.test_user_directory.UserDirectorySearchTestModule"
+                    ),
+                    "config": {
+                        "user_displayname_to_show_first": test_displayname,
+                        "test_option": True,
+                    },
+                },
+            }
+        }
+    )
+    def test_parse_config(self):
+        """Test that parsing a config produces the expected ModuleConfig object."""
+        # Check that our custom module was loaded
+        user_dir_search_module = self.hs.get_user_directory_search_module()
+        self.assertIsNotNone(user_dir_search_module.custom_module)
+        self.assertTrue(
+            isinstance(
+                user_dir_search_module.custom_module, UserDirectorySearchTestModule
+            ),
+        )
+
+        # Check that the custom module was configured as expected
+        self.assertTrue(user_dir_search_module.custom_module.config["test_option"],)
+        self.assertEqual(
+            user_dir_search_module.custom_module.user_displayname_to_show_first,
+            test_displayname,
+        )
+
+    @override_config(
+        {
+            "user_directory": {
+                "enabled": True,
+                "search_all_users": True,
+                "user_directory_search_module": {
+                    "module": (
+                        "tests.handlers.test_user_directory.UserDirectorySearchTestModule"
+                    ),
+                    # Fill the config with options that will influence user dir search results
+                    "config": {"user_displayname_to_show_first": test_displayname},
+                },
+            }
+        }
+    )
+    def test_get_search_query_ordering(self):
+        """Tests that implementing UserDirectorySearchModule.get_search_query_ordering
+        modifies the ordering of user directory search results
+        """
+        handler = self.hs.get_user_directory_handler()
+
+        # Create a few users to test the directory with
+        user1 = self.register_user(
+            "user1", "password", displayname="1 Ordinary Displayname"
+        )
+        user2 = self.register_user(
+            "user2", "password", displayname="2 Normal Displayname"
+        )
+        user3 = self.register_user("user3", "password", displayname=test_displayname)
+
+        searcher = self.register_user("searcher", "password")
+
+        # Search for the term "user"
+        results = self.get_success(handler.search_users(searcher, "user", 20))[
+            "results"
+        ]
+
+        # Typically we'd expect Synapse to return users in lexicographical order, assuming
+        # they have similar User IDs/display names, and profile information.
+
+        # We purposefully don't include a test for ordering without this module as Synapse
+        # could change its default user directory ordering at any time.
+
+        # Check that the order of returned results using our module is as we expect,
+        # i.e our user with a special display name shows up first (and results after that
+        # are simply ordered lexicographically ascending).
+        received_user_id_ordering = [result["user_id"] for result in results]
+        expected_user_id_ordering = [user3, user1, user2]
+        self.assertEqual(received_user_id_ordering, expected_user_id_ordering)
