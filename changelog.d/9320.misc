@@ -1,0 +1,1 @@
+Add flake8-bugbear to test suite, to enrich lint errors with probable subtle bugs.
