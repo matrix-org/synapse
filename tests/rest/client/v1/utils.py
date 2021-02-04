@@ -187,7 +187,7 @@ class RestHelper:
         self,
         room_id,
         type,
-        content: Optional[dict] = None,
+        content: dict = None,
         txn_id=None,
         tok=None,
         expect_code=200,
