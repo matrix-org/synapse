@@ -629,7 +629,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         relation_type,
         event_type,
         key=None,
-        content: Optional[dict] = None,
+        content: dict = None,
         access_token=None,
         parent_id=None,
     ):
@@ -648,6 +648,8 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         Returns:
             FakeChannel
         """
+        content = content or {}
+
         if not access_token:
             access_token = self.user_token
 
