@@ -2545,6 +2545,21 @@ spam_checker:
 #user_directory:
 #  enabled: true
 #  search_all_users: false
+#
+#  # Server admins can define a Python module that implements extra rules for
+#  # user directory search. In order to work, this module needs to override
+#  # the methods defined in
+#  # synapse/storage/database/main/user_directory_search_module.py.
+#  #
+#  user_directory_search_module:
+#    # Your custom user directory search module's class name
+#    #
+#    module: "my_custom_module.UserDirectorySearchModule"
+#
+#    # Custom configuration options passed to the module
+#    #
+#    config:
+#      example_option: 'things'
 
 
 # User Consent configuration
