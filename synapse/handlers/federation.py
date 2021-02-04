@@ -1682,7 +1682,7 @@ class FederationHandler(BaseHandler):
         room_id: str,
         user_id: str,
         membership: str,
-        content: JsonDict = {},
+        content: JsonDict = None,
         params: Optional[Dict[str, Union[str, Iterable[str]]]] = None,
     ) -> Tuple[str, EventBase, RoomVersion]:
         (
@@ -1690,7 +1690,7 @@ class FederationHandler(BaseHandler):
             event,
             room_version,
         ) = await self.federation_client.make_membership_event(
-            target_hosts, room_id, user_id, membership, content, params=params
+            target_hosts, room_id, user_id, membership, content or {}, params=params
         )
 
         logger.debug("Got response to make_%s: %s", membership, event)
@@ -2814,7 +2814,7 @@ class FederationHandler(BaseHandler):
             try:
                 # for each sig on the third_party_invite block of the actual invite
                 for server, signature_block in signed["signatures"].items():
-                    for key_name, encoded_signature in signature_block.items():
+                    for key_name, _ in signature_block.items():
                         if not key_name.startswith("ed25519:"):
                             continue
 

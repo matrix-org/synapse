@@ -37,9 +37,10 @@ def create_event(
     state_key=None,
     depth=2,
     event_id=None,
-    prev_events=[],
+    prev_events: list = None,
     **kwargs
 ):
+    prev_events = prev_events or []
     global _next_event_id
 
     if not event_id:

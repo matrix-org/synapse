@@ -329,15 +329,20 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         room_id=ROOM_ID,
         type="m.room.message",
         key=None,
-        internal={},
+        internal: dict = None,
         depth=None,
-        prev_events=[],
-        auth_events=[],
-        prev_state=[],
+        prev_events: list = None,
+        auth_events: list = None,
+        prev_state: list = None,
         redacts=None,
-        push_actions=[],
+        push_actions: list = None,
         **content
     ):
+        internal = internal or {}
+        prev_events = prev_events or []
+        auth_events = auth_events or []
+        prev_state = prev_state or []
+        push_actions = push_actions or []
 
         if depth is None:
             depth = self.event_id

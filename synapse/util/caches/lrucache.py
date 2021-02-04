@@ -57,12 +57,12 @@ def enumerate_leaves(node, depth):
 class _Node:
     __slots__ = ["prev_node", "next_node", "key", "value", "callbacks"]
 
-    def __init__(self, prev_node, next_node, key, value, callbacks=set()):
+    def __init__(self, prev_node, next_node, key, value, callbacks: set = None):
         self.prev_node = prev_node
         self.next_node = next_node
         self.key = key
         self.value = value
-        self.callbacks = callbacks
+        self.callbacks = callbacks or set()
 
 
 class LruCache(Generic[KT, VT]):
@@ -176,10 +176,10 @@ class LruCache(Generic[KT, VT]):
 
         self.len = synchronized(cache_len)
 
-        def add_node(key, value, callbacks=set()):
+        def add_node(key, value, callbacks: set = None):
             prev_node = list_root
             next_node = prev_node.next_node
-            node = _Node(prev_node, next_node, key, value, callbacks)
+            node = _Node(prev_node, next_node, key, value, callbacks or set())
             prev_node.next_node = node
             next_node.prev_node = node
             cache[key] = node
@@ -237,13 +237,13 @@ class LruCache(Generic[KT, VT]):
         def cache_get(
             key: KT,
             default: Optional[T] = None,
-            callbacks: Iterable[Callable[[], None]] = [],
+            callbacks: Iterable[Callable[[], None]] = None,
             update_metrics: bool = True,
         ):
             node = cache.get(key, None)
             if node is not None:
                 move_node_to_front(node)
-                node.callbacks.update(callbacks)
+                node.callbacks.update(callbacks or [])
                 if update_metrics and metrics:
                     metrics.inc_hits()
                 return node.value
@@ -253,7 +253,11 @@ class LruCache(Generic[KT, VT]):
                 return default
 
         @synchronized
-        def cache_set(key: KT, value: VT, callbacks: Iterable[Callable[[], None]] = []):
+        def cache_set(
+            key: KT, value: VT, callbacks: Iterable[Callable[[], None]] = None
+        ):
+            callbacks = callbacks or []
+
             node = cache.get(key, None)
             if node is not None:
                 # We sometimes store large objects, e.g. dicts, which cause

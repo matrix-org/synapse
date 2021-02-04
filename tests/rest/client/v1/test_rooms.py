@@ -205,8 +205,8 @@ class RoomPermissionsTestCase(RoomBase):
         )
         self.assertEquals(403, channel.code, msg=channel.result["body"])
 
-    def _test_get_membership(self, room=None, members=[], expect_code=None):
-        for member in members:
+    def _test_get_membership(self, room=None, members: list = None, expect_code=None):
+        for member in members or []:
             path = "/rooms/%s/state/m.room.member/%s" % (room, member)
             channel = self.make_request("GET", path)
             self.assertEquals(expect_code, channel.code)
@@ -643,7 +643,7 @@ class RoomInviteRatelimitTestCase(RoomBase):
     def test_invites_by_users_ratelimit(self):
         """Tests that invites to a specific user are actually rate-limited."""
 
-        for i in range(3):
+        for _ in range(3):
             room_id = self.helper.create_room_as(self.user_id)
             self.helper.invite(room_id, self.user_id, "@other-users:red")
 
@@ -665,7 +665,7 @@ class RoomJoinRatelimitTestCase(RoomBase):
     )
     def test_join_local_ratelimit(self):
         """Tests that local joins are actually rate-limited."""
-        for i in range(3):
+        for _ in range(3):
             self.helper.create_room_as(self.user_id)
 
         self.helper.create_room_as(self.user_id, expect_code=429)
@@ -730,7 +730,7 @@ class RoomJoinRatelimitTestCase(RoomBase):
         for path in paths_to_test:
             # Make sure we send more requests than the rate-limiting config would allow
             # if all of these requests ended up joining the user to a room.
-            for i in range(4):
+            for _ in range(4):
                 channel = self.make_request("POST", path % room_id, {})
                 self.assertEquals(channel.code, 200)
 

@@ -588,7 +588,7 @@ class FakeTransport:
         if self.disconnected:
             return
 
-        if getattr(self.other, "transport") is None:
+        if getattr(self.other, "transport", None) is None:
             # the other has no transport yet; reschedule
             if self.autoflush:
                 self._reactor.callLater(0.0, self.flush)

@@ -351,7 +351,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
         """
         # Create devices
         number_devices = 5
-        for n in range(number_devices):
+        for _ in range(number_devices):
             self.login("user", "pass")
 
         # Get devices
@@ -452,7 +452,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
 
         # Create devices
         number_devices = 5
-        for n in range(number_devices):
+        for _ in range(number_devices):
             self.login("user", "pass")
 
         # Get devices

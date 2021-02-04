@@ -216,11 +216,11 @@ class RemoteHandler(logging.Handler):
         old_buffer = self._buffer
         self._buffer = deque()
 
-        for i in range(buffer_split):
+        for _ in range(buffer_split):
             self._buffer.append(old_buffer.popleft())
 
         end_buffer = []
-        for i in range(buffer_split):
+        for _ in range(buffer_split):
             end_buffer.append(old_buffer.pop())
 
         self._buffer.extend(reversed(end_buffer))

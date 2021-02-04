@@ -56,7 +56,7 @@ class MetricsConfig(Config):
             try:
                 check_requirements("sentry")
             except DependencyException as e:
-                raise ConfigError(e.message)
+                raise ConfigError(e.message) from e  # noqa: B306
 
             self.sentry_dsn = config["sentry"].get("dsn")
             if not self.sentry_dsn:

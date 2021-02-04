@@ -43,8 +43,10 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         )
 
     def _create_id_generator(
-        self, instance_name="master", writers=["master"]
+        self, instance_name="master", writers: list = None
     ) -> MultiWriterIdGenerator:
+        writers = writers or ["master"]
+
         def _create(conn):
             return MultiWriterIdGenerator(
                 conn,
@@ -477,8 +479,10 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
         )
 
     def _create_id_generator(
-        self, instance_name="master", writers=["master"]
+        self, instance_name="master", writers: list = None
     ) -> MultiWriterIdGenerator:
+        writers = writers or ["master"]
+
         def _create(conn):
             return MultiWriterIdGenerator(
                 conn,
@@ -610,8 +614,10 @@ class MultiTableMultiWriterIdGeneratorTestCase(HomeserverTestCase):
         )
 
     def _create_id_generator(
-        self, instance_name="master", writers=["master"]
+        self, instance_name="master", writers: list = None
     ) -> MultiWriterIdGenerator:
+        writers = writers or ["master"]
+
         def _create(conn):
             return MultiWriterIdGenerator(
                 conn,

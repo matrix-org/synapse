@@ -91,12 +91,12 @@ class StreamIdGenerator:
             # ... persist event ...
     """
 
-    def __init__(self, db_conn, table, column, extra_tables=[], step=1):
+    def __init__(self, db_conn, table, column, extra_tables: list = None, step=1):
         assert step != 0
         self._lock = threading.Lock()
         self._step = step
         self._current = _load_current_id(db_conn, table, column, step)
-        for table, column in extra_tables:
+        for table, column in extra_tables or []:
             self._current = (max if step > 0 else min)(
                 self._current, _load_current_id(db_conn, table, column, step)
             )

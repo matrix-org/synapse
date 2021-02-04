@@ -115,8 +115,7 @@ def register_cache(
         CacheMetric: an object which provides inc_{hits,misses,evictions} methods
     """
     if resizable:
-        if not resize_callback:
-            resize_callback = getattr(cache, "set_cache_factor")
+        resize_callback = resize_callback or cache.set_cache_factor  # type: ignore
         add_resizable_cache(cache_name, resize_callback)
 
     metric = CacheMetric(cache, cache_type, cache_name, collect_callback)

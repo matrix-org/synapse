@@ -64,7 +64,7 @@ class ProxyAgent(_AgentBase):
         self,
         reactor,
         proxy_reactor=None,
-        contextFactory=BrowserLikePolicyForHTTPS(),
+        contextFactory: BrowserLikePolicyForHTTPS = None,
         connectTimeout=None,
         bindAddress=None,
         pool=None,
@@ -72,6 +72,8 @@ class ProxyAgent(_AgentBase):
         https_proxy=None,
     ):
         _AgentBase.__init__(self, reactor, pool)
+
+        contextFactory = contextFactory or BrowserLikePolicyForHTTPS()
 
         if proxy_reactor is None:
             self.proxy_reactor = reactor

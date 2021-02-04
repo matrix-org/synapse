@@ -614,7 +614,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # Create 3 test rooms
         total_rooms = 3
         room_ids = []
-        for x in range(total_rooms):
+        for _ in range(total_rooms):
             room_id = self.helper.create_room_as(
                 self.admin_user, tok=self.admin_user_tok
             )
@@ -676,7 +676,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # Create 5 test rooms
         total_rooms = 5
         room_ids = []
-        for x in range(total_rooms):
+        for _ in range(total_rooms):
             room_id = self.helper.create_room_as(
                 self.admin_user, tok=self.admin_user_tok
             )

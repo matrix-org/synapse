@@ -260,7 +260,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         return resource
 
     def make_worker_hs(
-        self, worker_app: str, extra_config: dict = {}, **kwargs
+        self, worker_app: str, extra_config: dict = None, **kwargs
     ) -> HomeServer:
         """Make a new worker HS instance, correctly connecting replcation
         stream to the master HS.
@@ -277,7 +277,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
 
         config = self._get_worker_hs_config()
         config["worker_app"] = worker_app
-        config.update(extra_config)
+        config.update(extra_config or {})
 
         worker_hs = self.setup_test_homeserver(
             homeserver_to_use=GenericWorkerServer,

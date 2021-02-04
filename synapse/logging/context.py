@@ -33,6 +33,7 @@ from typing import TYPE_CHECKING, Optional, Tuple, TypeVar, Union
 from typing_extensions import Literal
 
 from twisted.internet import defer, threads
+from twisted.python.failure import Failure
 
 if TYPE_CHECKING:
     from synapse.logging.scopecontextmanager import _LogContextScope
@@ -683,10 +684,10 @@ def run_in_background(f, *args, **kwargs):
     current = current_context()
     try:
         res = f(*args, **kwargs)
-    except:  # noqa: E722
+    except BaseException as e:
         # the assumption here is that the caller doesn't want to be disturbed
         # by synchronous exceptions, so let's turn them into Failures.
-        return defer.fail()
+        return defer.fail(Failure(e))
 
     if isinstance(res, types.CoroutineType):
         res = defer.ensureDeferred(res)

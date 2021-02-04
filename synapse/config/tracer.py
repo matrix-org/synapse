@@ -39,7 +39,7 @@ class TracerConfig(Config):
         try:
             check_requirements("opentracing")
         except DependencyException as e:
-            raise ConfigError(e.message)
+            raise ConfigError(e.message) from e  # noqa: B306
 
         # The tracer is enabled so sanitize the config
 

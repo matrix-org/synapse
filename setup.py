@@ -98,6 +98,7 @@ CONDITIONAL_REQUIREMENTS["all"] = list(ALL_OPTIONAL_REQUIREMENTS)
 CONDITIONAL_REQUIREMENTS["lint"] = [
     "isort==5.7.0",
     "black==19.10b0",
+    "flake8-bugbear",
     "flake8-comprehensions",
     "flake8",
 ]

@@ -180,7 +180,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
                 _check_logcontext(context)
 
     def _handle_well_known_connection(
-        self, client_factory, expected_sni, content, response_headers={}
+        self, client_factory, expected_sni, content, response_headers: dict = None
     ):
         """Handle an outgoing HTTPs connection: wire it up to a server, check that the
         request is for a .well-known, and send the response.
@@ -192,6 +192,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
         Returns:
             HTTPChannel: server impl
         """
+        response_headers = response_headers or {}
+
         # make the connection for .well-known
         well_known_server = self._make_connection(
             client_factory, expected_sni=expected_sni
@@ -205,10 +207,12 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self._send_well_known_response(request, content, headers=response_headers)
         return well_known_server
 
-    def _send_well_known_response(self, request, content, headers={}):
+    def _send_well_known_response(self, request, content, headers: dict = None):
         """Check that an incoming request looks like a valid .well-known request, and
         send back the response.
         """
+        headers = headers or {}
+
         self.assertEqual(request.method, b"GET")
         self.assertEqual(request.path, b"/.well-known/matrix/server")
         self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [b"testserv"])

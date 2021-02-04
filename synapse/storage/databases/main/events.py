@@ -165,7 +165,7 @@ class PersistEventsStore:
             )
 
         async with stream_ordering_manager as stream_orderings:
-            for (event, context), stream in zip(events_and_contexts, stream_orderings):
+            for (event, _), stream in zip(events_and_contexts, stream_orderings):
                 event.internal_metadata.stream_ordering = stream
 
             await self.db_pool.runInteraction(
@@ -292,7 +292,7 @@ class PersistEventsStore:
                 txn.execute(sql + clause, args)
                 to_recursively_check = []
 
-                for event_id, prev_event_id, metadata, rejected in txn:
+                for _, prev_event_id, metadata, rejected in txn:
                     if prev_event_id in existing_prevs:
                         continue
 
@@ -314,8 +314,8 @@ class PersistEventsStore:
         txn: LoggingTransaction,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
         backfilled: bool,
-        state_delta_for_room: Dict[str, DeltaState] = {},
-        new_forward_extremeties: Dict[str, List[str]] = {},
+        state_delta_for_room: Dict[str, DeltaState] = None,
+        new_forward_extremeties: Dict[str, List[str]] = None,
     ):
         """Insert some number of room events into the necessary database tables.
 
@@ -336,6 +336,9 @@ class PersistEventsStore:
                 extremities.
 
         """
+        state_delta_for_room = state_delta_for_room or {}
+        new_forward_extremeties = new_forward_extremeties or {}
+
         all_events_and_contexts = events_and_contexts
 
         min_stream_order = events_and_contexts[0][0].internal_metadata.stream_ordering
@@ -1100,7 +1103,7 @@ class PersistEventsStore:
     def _update_forward_extremities_txn(
         self, txn, new_forward_extremities, max_stream_order
     ):
-        for room_id, new_extrem in new_forward_extremities.items():
+        for room_id in new_forward_extremities.keys():
             self.db_pool.simple_delete_txn(
                 txn, table="event_forward_extremities", keyvalues={"room_id": room_id}
             )
@@ -1353,7 +1356,7 @@ class PersistEventsStore:
         ]
 
         state_values = []
-        for event, context in state_events_and_contexts:
+        for event, _ in state_events_and_contexts:
             vals = {
                 "event_id": event.event_id,
                 "room_id": event.room_id,
@@ -1396,7 +1399,11 @@ class PersistEventsStore:
         return [ec for ec in events_and_contexts if ec[0] not in to_remove]
 
     def _update_metadata_tables_txn(
-        self, txn, events_and_contexts, all_events_and_contexts, backfilled
+        self,
+        txn,
+        events_and_contexts: List[Tuple[EventBase, EventContext]],
+        all_events_and_contexts,
+        backfilled,
     ):
         """Update all the miscellaneous tables for new events
 
@@ -1422,7 +1429,7 @@ class PersistEventsStore:
             # nothing to do here
             return
 
-        for event, context in events_and_contexts:
+        for event, _ in events_and_contexts:
             if event.type == EventTypes.Redaction and event.redacts is not None:
                 # Remove the entries in the event_push_actions table for the
                 # redacted event.

@@ -207,7 +207,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         return state_filter.filter_state(state_dict_ids), not missing_types
 
     async def _get_state_for_groups(
-        self, groups: Iterable[int], state_filter: StateFilter = StateFilter.all()
+        self, groups: Iterable[int], state_filter: StateFilter = None
     ) -> Dict[int, MutableStateMap[str]]:
         """Gets the state at each of a list of state groups, optionally
         filtering by type/state_key
@@ -221,7 +221,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             Dict of state group to state map.
         """
 
-        member_filter, non_member_filter = state_filter.get_member_split()
+        member_filter, non_member_filter = (
+            state_filter or StateFilter.all()
+        ).get_member_split()
 
         # Now we look them up in the member and non-member caches
         (

@@ -1171,7 +1171,7 @@ class GroupServerStore(GroupServerWorkerStore):
         user_id: str,
         membership: str,
         is_admin: bool = False,
-        content: JsonDict = {},
+        content: JsonDict = None,
         local_attestation: Optional[dict] = None,
         remote_attestation: Optional[dict] = None,
         is_publicised: bool = False,
@@ -1191,6 +1191,7 @@ class GroupServerStore(GroupServerWorkerStore):
                 attestation from the group, else None.
             is_publicised: Whether this should be publicised.
         """
+        content = content or []
 
         def _register_user_group_membership_txn(txn, next_id):
             # TODO: Upsert?

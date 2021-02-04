@@ -50,10 +50,10 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         self.depth = 1
 
     def inject_room_member(
-        self, room, user, membership, replaces_state=None, extra_content={}
+        self, room, user, membership, replaces_state=None, extra_content: dict = None
     ):
         content = {"membership": membership}
-        content.update(extra_content)
+        content.update(extra_content or {})
         builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {

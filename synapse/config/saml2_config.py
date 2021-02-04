@@ -77,7 +77,7 @@ class SAML2Config(Config):
         try:
             check_requirements("saml2")
         except DependencyException as e:
-            raise ConfigError(e.message)
+            raise ConfigError(e.message) from e  # noqa: B306
 
         self.saml2_enabled = True
 

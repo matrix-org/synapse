@@ -73,11 +73,13 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
             return count
 
     def _get_state_groups_from_groups_txn(
-        self, txn, groups, state_filter=StateFilter.all()
+        self, txn, groups, state_filter: StateFilter = None
     ):
         results = {group: {} for group in groups}
 
-        where_clause, where_args = state_filter.make_sql_filter_clause()
+        where_clause, where_args = (
+            state_filter or StateFilter.all()
+        ).make_sql_filter_clause()
 
         # Unless the filter clause is empty, we're going to append it after an
         # existing where clause
