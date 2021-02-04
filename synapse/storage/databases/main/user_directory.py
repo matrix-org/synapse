@@ -750,14 +750,23 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 )
             """
 
+        # Either the built-in or a custom user directory search module if
+        # one has been defined in the config.
+        # Used to determine the sort order of results.
+        #
+        # We load the module here as the database must have been initialised first. Thus
+        # loading the module in this class's __init__ function will fail.
+        user_directory_search_module = self.hs.get_user_directory_search_module()
+
+        # Retrieve the ordering SQL and any additional specified arguments
+        (
+            ordering_clause,
+            order_args,
+        ) = user_directory_search_module.get_search_query_ordering(self.database_engine)
+
         if isinstance(self.database_engine, PostgresEngine):
             full_query, exact_query, prefix_query = _parse_query_postgres(search_term)
 
-            # We order by rank and then if they have profile info
-            # The ranking algorithm is hand tweaked for "best" results. Broadly
-            # the idea is we give a higher weight to exact matches.
-            # The array of numbers are the weights for the various part of the
-            # search: (domain, _, display name, localpart)
             sql = """
                 SELECT d.user_id AS user_id, display_name, avatar_url
                 FROM user_directory_search as t
@@ -765,32 +774,18 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 WHERE
                     %s
                     AND vector @@ to_tsquery('simple', ?)
-                ORDER BY
-                    (CASE WHEN d.user_id IS NOT NULL THEN 4.0 ELSE 1.0 END)
-                    * (CASE WHEN display_name IS NOT NULL THEN 1.2 ELSE 1.0 END)
-                    * (CASE WHEN avatar_url IS NOT NULL THEN 1.2 ELSE 1.0 END)
-                    * (
-                        3 * ts_rank_cd(
-                            '{0.1, 0.1, 0.9, 1.0}',
-                            vector,
-                            to_tsquery('simple', ?),
-                            8
-                        )
-                        + ts_rank_cd(
-                            '{0.1, 0.1, 0.9, 1.0}',
-                            vector,
-                            to_tsquery('simple', ?),
-                            8
-                        )
-                    )
-                    DESC,
-                    display_name IS NULL,
-                    avatar_url IS NULL
+                ORDER BY %s
                 LIMIT ?
             """ % (
                 where_clause,
+                ordering_clause,
             )
-            args = join_args + (full_query, exact_query, prefix_query, limit + 1)
+            args = (
+                join_args
+                + (full_query, exact_query, prefix_query)
+                + order_args
+                + (limit + 1,)
+            )
         elif isinstance(self.database_engine, Sqlite3Engine):
             search_query = _parse_query_sqlite(search_term)
 
@@ -802,14 +797,13 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                     %s
                     AND value MATCH ?
                 ORDER BY
-                    rank(matchinfo(user_directory_search)) DESC,
-                    display_name IS NULL,
-                    avatar_url IS NULL
+                    %s
                 LIMIT ?
             """ % (
                 where_clause,
+                ordering_clause,
             )
-            args = join_args + (search_query, limit + 1)
+            args = join_args + (search_query,) + order_args + (limit + 1,)
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
