@@ -119,6 +119,9 @@ from synapse.server_notices.worker_server_notices_sender import (
 )
 from synapse.state import StateHandler, StateResolutionHandler
 from synapse.storage import Databases, DataStore, Storage
+from synapse.storage.databases.main.user_directory_search_module import (
+    UserDirectorySearchModule,
+)
 from synapse.streams.events import EventSources
 from synapse.types import DomainSpecificString
 from synapse.util import Clock
@@ -624,6 +627,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_third_party_event_rules(self) -> ThirdPartyEventRules:
         return ThirdPartyEventRules(self)
+
+    @cache_in_self
+    def get_user_directory_search_module(self) -> UserDirectorySearchModule:
+        return UserDirectorySearchModule(self)
 
     @cache_in_self
     def get_room_member_handler(self):
