@@ -16,7 +16,6 @@
 import itertools
 import json
 import urllib
-from typing import Optional
 
 from synapse.api.constants import EventTypes, RelationTypes
 from synapse.rest import admin
