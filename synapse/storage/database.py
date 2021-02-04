@@ -757,11 +757,8 @@ class DatabasePool:
         Returns:
             A list of dicts where the key is the column header.
         """
-        col_headers = (
-            [intern(str(column[0])) for column in cursor.description]
-            if cursor.description is not None
-            else []
-        )
+        assert cursor.description is not None, "cursor.description was None"
+        col_headers = [intern(str(column[0])) for column in cursor.description]
         results = [dict(zip(col_headers, row)) for row in cursor]
         return results
 

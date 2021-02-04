@@ -107,13 +107,7 @@ class PostgresSequenceGenerator(SequenceGenerator):
     def get_next_id_txn(self, txn: Cursor) -> int:
         txn.execute("SELECT nextval(?)", (self._sequence_name,))
         fetch_res = txn.fetchone()
-        if fetch_res is None:
-            # this should technically not happen, unless the connection/cursor/transaction has been corrupted
-            raise RuntimeError(
-                "nextval for self._sequence_name {} returned empty".format(
-                    repr(self._sequence_name)
-                )
-            )
+        assert fetch_res is not None
         return fetch_res[0]
 
     def get_next_mult_txn(self, txn: Cursor, n: int) -> List[int]:
@@ -156,10 +150,7 @@ class PostgresSequenceGenerator(SequenceGenerator):
             "SELECT last_value, is_called FROM %(seq)s" % {"seq": self._sequence_name}
         )
         fetch_res = txn.fetchone()
-        if fetch_res is None:
-            raise RuntimeError(
-                "Got no value from sequence {}".format(repr(self._sequence_name))
-            )  # should never happen, but doesn't hurt to check
+        assert fetch_res is not None
         last_value, is_called = fetch_res
 
         # If we have an associated stream check the stream_positions table.
