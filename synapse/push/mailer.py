@@ -495,8 +495,8 @@ class Mailer:
             return None
 
         # Get the sender's name and avatar from the room state.
-        state_key = ("m.room.member", event.sender)
-        sender_state_event_id = room_state_ids.get(state_key)
+        type_state_key = ("m.room.member", event.sender)
+        sender_state_event_id = room_state_ids.get(type_state_key)
         if sender_state_event_id:
             sender_state_event = await self.store.get_event(
                 sender_state_event_id
@@ -504,9 +504,9 @@ class Mailer:
         else:
             # Attempt to check the historical state for the room.
             historical_state = await self.state_store.get_state_for_event(
-                event.event_id, StateFilter.from_types((state_key,))
+                event.event_id, StateFilter.from_types((type_state_key,))
             )
-            sender_state_event = historical_state.get(state_key)
+            sender_state_event = historical_state.get(type_state_key)
 
         if sender_state_event:
             sender_name = name_from_member_event(sender_state_event)
@@ -750,16 +750,16 @@ class Mailer:
         member_event_ids = []
         member_events = {}
         for sender_id, event_id in sender_ids.items():
-            state_key = ("m.room.member", sender_id)
-            sender_state_event_id = room_state_ids.get(state_key)
+            type_state_key = ("m.room.member", sender_id)
+            sender_state_event_id = room_state_ids.get(type_state_key)
             if sender_state_event_id:
                 member_event_ids.append(sender_state_event_id)
             else:
                 # Attempt to check the historical state for the room.
                 historical_state = await self.state_store.get_state_for_event(
-                    event_id, StateFilter.from_types((state_key,))
+                    event_id, StateFilter.from_types((type_state_key,))
                 )
-                sender_state_event = historical_state.get(state_key)
+                sender_state_event = historical_state.get(type_state_key)
                 if sender_state_event:
                     member_events[event_id] = sender_state_event
         member_events.update(await self.store.get_events(member_event_ids))
