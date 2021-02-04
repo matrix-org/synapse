@@ -198,9 +198,9 @@ class OIDCConfig(Config):
           #  user_mapping_provider:
           #    config:
           #      subject_claim: "id"
-          #      localpart_template: "{{ user.login }}"
-          #      display_name_template: "{{ user.name }}"
-          #      email_template: "{{ user.email }}"
+          #      localpart_template: "{{{{ user.login }}}}"
+          #      display_name_template: "{{{{ user.name }}}}"
+          #      email_template: "{{{{ user.email }}}}"
 
           # For use with Keycloak
           #
@@ -227,8 +227,8 @@ class OIDCConfig(Config):
           #  user_mapping_provider:
           #    config:
           #      subject_claim: "id"
-          #      localpart_template: "{{ user.login }}"
-          #      display_name_template: "{{ user.name }}"
+          #      localpart_template: "{{{{ user.login }}}}"
+          #      display_name_template: "{{{{ user.name }}}}"
         """.format(
             mapping_provider=DEFAULT_USER_MAPPING_PROVIDER
         )
