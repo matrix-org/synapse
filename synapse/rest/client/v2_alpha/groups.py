@@ -16,12 +16,20 @@
 
 import logging
 from functools import wraps
+from typing import TYPE_CHECKING
 
 from synapse.api.errors import SynapseError
-from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.http.servlet import (
+    RestServlet,
+    assert_params_in_dict,
+    parse_json_object_from_request,
+)
 from synapse.types import GroupID
 
 from ._base import client_patterns
+
+if TYPE_CHECKING:
+    from synapse.app.homeserver import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +56,7 @@ class GroupServlet(RestServlet):
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/profile$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -84,7 +92,7 @@ class GroupSummaryServlet(RestServlet):
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/summary$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -116,7 +124,7 @@ class GroupSummaryRoomsCatServlet(RestServlet):
         "/rooms/(?P<room_id>[^/]*)$"
     )
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -158,7 +166,7 @@ class GroupCategoryServlet(RestServlet):
         "/groups/(?P<group_id>[^/]*)/categories/(?P<category_id>[^/]+)$"
     )
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -205,7 +213,7 @@ class GroupCategoriesServlet(RestServlet):
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/categories/$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -229,7 +237,7 @@ class GroupRoleServlet(RestServlet):
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/roles/(?P<role_id>[^/]+)$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -276,7 +284,7 @@ class GroupRolesServlet(RestServlet):
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/roles/$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -308,7 +316,7 @@ class GroupSummaryUsersRoleServlet(RestServlet):
         "/users/(?P<user_id>[^/]*)$"
     )
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -348,7 +356,7 @@ class GroupRoomServlet(RestServlet):
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/rooms$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -372,7 +380,7 @@ class GroupUsersServlet(RestServlet):
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/users$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -396,7 +404,7 @@ class GroupInvitedUsersServlet(RestServlet):
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/invited_users$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -420,7 +428,7 @@ class GroupSettingJoinPolicyServlet(RestServlet):
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/settings/m.join_policy$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.groups_handler = hs.get_groups_local_handler()
@@ -445,7 +453,7 @@ class GroupCreateServlet(RestServlet):
 
     PATTERNS = client_patterns("/create_group$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -476,7 +484,7 @@ class GroupAdminRoomsServlet(RestServlet):
         "/groups/(?P<group_id>[^/]*)/admin/rooms/(?P<room_id>[^/]*)$"
     )
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -515,7 +523,7 @@ class GroupAdminRoomsConfigServlet(RestServlet):
         "/config/(?P<config_key>[^/]*)$"
     )
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -542,7 +550,7 @@ class GroupAdminUsersInviteServlet(RestServlet):
         "/groups/(?P<group_id>[^/]*)/admin/users/invite/(?P<user_id>[^/]*)$"
     )
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -572,7 +580,7 @@ class GroupAdminUsersKickServlet(RestServlet):
         "/groups/(?P<group_id>[^/]*)/admin/users/remove/(?P<user_id>[^/]*)$"
     )
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -597,7 +605,7 @@ class GroupSelfLeaveServlet(RestServlet):
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/leave$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -622,7 +630,7 @@ class GroupSelfJoinServlet(RestServlet):
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/join$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -647,7 +655,7 @@ class GroupSelfAcceptInviteServlet(RestServlet):
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/accept_invite$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -672,7 +680,7 @@ class GroupSelfUpdatePublicityServlet(RestServlet):
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/update_publicity$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -696,7 +704,7 @@ class PublicisedGroupsForUserServlet(RestServlet):
 
     PATTERNS = client_patterns("/publicised_groups/(?P<user_id>[^/]*)$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -717,7 +725,7 @@ class PublicisedGroupsForUsersServlet(RestServlet):
 
     PATTERNS = client_patterns("/publicised_groups$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -741,7 +749,7 @@ class GroupsForUserServlet(RestServlet):
 
     PATTERNS = client_patterns("/joined_groups$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
