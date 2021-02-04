@@ -42,23 +42,22 @@ MXC_REGEX = re.compile("^mxc://([^/]+)/([^/#?]+)$")
 rand = random.SystemRandom()
 
 
-def random_string(length):
+def random_string(length: int) -> str:
     return "".join(rand.choice(string.ascii_letters) for _ in range(length))
 
 
-def random_string_with_symbols(length):
+def random_string_with_symbols(length: int) -> str:
     return "".join(rand.choice(_string_with_symbols) for _ in range(length))
 
 
-def is_ascii(s):
-    if isinstance(s, bytes):
-        try:
-            s.decode("ascii").encode("ascii")
-        except UnicodeDecodeError:
-            return False
-        except UnicodeEncodeError:
-            return False
-        return True
+def is_ascii(s: bytes) -> bool:
+    try:
+        s.decode("ascii").encode("ascii")
+    except UnicodeDecodeError:
+        return False
+    except UnicodeEncodeError:
+        return False
+    return True
 
 
 def assert_valid_client_secret(client_secret: str) -> None:
