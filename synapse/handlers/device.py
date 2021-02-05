@@ -157,7 +157,7 @@ class DeviceWorkerHandler(BaseHandler):
             # The user may have left the room
             # TODO: Check if they actually did or if we were just invited.
             if room_id not in room_ids:
-                for key, _ in current_state_ids.items():
+                for key in current_state_ids.keys():
                     etype, state_key = key
                     if etype != EventTypes.Member:
                         continue
@@ -180,7 +180,7 @@ class DeviceWorkerHandler(BaseHandler):
                 log_kv(
                     {"event": "encountered empty previous state", "room_id": room_id}
                 )
-                for key, _ in current_state_ids.items():
+                for key in current_state_ids.keys():
                     etype, state_key = key
                     if etype != EventTypes.Member:
                         continue
@@ -199,7 +199,7 @@ class DeviceWorkerHandler(BaseHandler):
             for state_dict in prev_state_ids.values():
                 member_event = state_dict.get((EventTypes.Member, user_id), None)
                 if not member_event or member_event != current_member_id:
-                    for key, _ in current_state_ids.items():
+                    for key in current_state_ids.keys():
                         etype, state_key = key
                         if etype != EventTypes.Member:
                             continue

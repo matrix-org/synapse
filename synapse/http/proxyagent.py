@@ -14,6 +14,7 @@
 # limitations under the License.
 import logging
 import re
+from typing import Optional
 
 from zope.interface import implementer
 
@@ -22,7 +23,7 @@ from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
 from twisted.python.failure import Failure
 from twisted.web.client import URI, BrowserLikePolicyForHTTPS, _AgentBase
 from twisted.web.error import SchemeNotSupported
-from twisted.web.iweb import IAgent
+from twisted.web.iweb import IAgent, IPolicyForHTTPS
 
 from synapse.http.connectproxyclient import HTTPConnectProxyEndpoint
 
@@ -64,7 +65,7 @@ class ProxyAgent(_AgentBase):
         self,
         reactor,
         proxy_reactor=None,
-        contextFactory: BrowserLikePolicyForHTTPS = None,
+        contextFactory: Optional[IPolicyForHTTPS] = None,
         connectTimeout=None,
         bindAddress=None,
         pool=None,

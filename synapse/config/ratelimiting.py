@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict
+from typing import Dict, Optional
 
 from ._base import Config
 
 
 class RateLimitConfig:
     def __init__(
-        self, config: Dict[str, float], defaults: Dict[str, float] = None,
+        self, config: Dict[str, float], defaults: Optional[Dict[str, float]] = None,
     ):
         defaults = defaults or {"per_second": 0.17, "burst_count": 3.0}
         self.per_second = config.get("per_second", defaults["per_second"])

@@ -485,7 +485,7 @@ def timeout_deferred(
 
         try:
             deferred.cancel()
-        except BaseException as e:  # if we throw any exception it'll break time outs
+        except Exception as e:  # if we throw any exception it'll break time outs
             logger.exception("Canceller failed during timeout", exc_info=e)
 
         # the cancel() call should have set off a chain of errbacks which

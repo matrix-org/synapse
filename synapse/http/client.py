@@ -286,7 +286,7 @@ class SimpleHttpClient:
     def __init__(
         self,
         hs: "HomeServer",
-        treq_args: Dict[str, Any] = None,
+        treq_args: Optional[Dict[str, Any]] = None,
         ip_whitelist: Optional[IPSet] = None,
         ip_blacklist: Optional[IPSet] = None,
         http_proxy: Optional[bytes] = None,

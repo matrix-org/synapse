@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Optional
+
 from synapse.config.homeserver import HomeServerConfig
 from synapse.util.ratelimitutils import FederationRateLimiter
 
@@ -89,7 +91,7 @@ def _await_resolution(reactor, d):
     return (reactor.seconds() - start_time) * 1000
 
 
-def build_rc_config(settings: dict = None):
+def build_rc_config(settings: Optional[dict] = None):
     config_dict = default_config("test")
     config_dict.update(settings or {})
     config = HomeServerConfig()

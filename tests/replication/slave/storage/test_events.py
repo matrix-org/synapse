@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import Optional
 
 from canonicaljson import encode_canonical_json
 
@@ -329,13 +330,13 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         room_id=ROOM_ID,
         type="m.room.message",
         key=None,
-        internal: dict = None,
+        internal: Optional[dict] = None,
         depth=None,
-        prev_events: list = None,
-        auth_events: list = None,
-        prev_state: list = None,
+        prev_events: Optional[list] = None,
+        auth_events: Optional[list] = None,
+        prev_state: Optional[list] = None,
         redacts=None,
-        push_actions: list = None,
+        push_actions: Optional[list] = None,
         **content
     ):
         internal = internal or {}

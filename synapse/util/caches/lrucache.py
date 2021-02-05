@@ -57,7 +57,7 @@ def enumerate_leaves(node, depth):
 class _Node:
     __slots__ = ["prev_node", "next_node", "key", "value", "callbacks"]
 
-    def __init__(self, prev_node, next_node, key, value, callbacks: set = None):
+    def __init__(self, prev_node, next_node, key, value, callbacks: Optional[set] = None):
         self.prev_node = prev_node
         self.next_node = next_node
         self.key = key
@@ -176,7 +176,7 @@ class LruCache(Generic[KT, VT]):
 
         self.len = synchronized(cache_len)
 
-        def add_node(key, value, callbacks: set = None):
+        def add_node(key, value, callbacks: Optional[set] = None):
             prev_node = list_root
             next_node = prev_node.next_node
             node = _Node(prev_node, next_node, key, value, callbacks or set())
@@ -237,7 +237,7 @@ class LruCache(Generic[KT, VT]):
         def cache_get(
             key: KT,
             default: Optional[T] = None,
-            callbacks: Iterable[Callable[[], None]] = None,
+            callbacks: Optional[Iterable[Callable[[], None]]] = None,
             update_metrics: bool = True,
         ):
             node = cache.get(key, None)
@@ -254,7 +254,7 @@ class LruCache(Generic[KT, VT]):
 
         @synchronized
         def cache_set(
-            key: KT, value: VT, callbacks: Iterable[Callable[[], None]] = None
+            key: KT, value: VT, callbacks: Optional[Iterable[Callable[[], None]]] = None
         ):
             callbacks = callbacks or []
 

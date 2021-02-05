@@ -134,7 +134,7 @@ class MessageHandler:
         self,
         user_id: str,
         room_id: str,
-        state_filter: StateFilter = None,
+        state_filter: Optional[StateFilter] = None,
         at_token: Optional[StreamToken] = None,
         is_guest: bool = False,
     ) -> List[dict]:
@@ -862,7 +862,7 @@ class EventCreationHandler:
         event: EventBase,
         context: EventContext,
         ratelimit: bool = True,
-        extra_users: List[UserID] = None,
+        extra_users: Optional[List[UserID]] = None,
         ignore_shadow_ban: bool = False,
     ) -> EventBase:
         """Processes a new event.
@@ -1060,7 +1060,7 @@ class EventCreationHandler:
         event: EventBase,
         context: EventContext,
         ratelimit: bool = True,
-        extra_users: List[UserID] = None,
+        extra_users: Optional[List[UserID]] = None,
     ) -> EventBase:
         """Called when we have fully built the event, have already
         calculated the push actions for the event, and checked auth.

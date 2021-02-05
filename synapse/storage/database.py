@@ -671,7 +671,7 @@ class DatabasePool:
 
             for after_callback, after_args, after_kwargs in after_callbacks:
                 after_callback(*after_args, **after_kwargs)
-        except BaseException as e:  # we re-raise the exception, this is fine.
+        except Exception as e:  # we re-raise the exception, this is fine.
             for after_callback, after_args, after_kwargs in exception_callbacks:
                 after_callback(*after_args, **after_kwargs)
             raise e
@@ -900,7 +900,7 @@ class DatabasePool:
         table: str,
         keyvalues: Dict[str, Any],
         values: Dict[str, Any],
-        insertion_values: Dict[str, Any] = None,
+        insertion_values: Optional[Dict[str, Any]] = None,
         desc: str = "simple_upsert",
         lock: bool = True,
     ) -> Optional[bool]:
@@ -966,7 +966,7 @@ class DatabasePool:
         table: str,
         keyvalues: Dict[str, Any],
         values: Dict[str, Any],
-        insertion_values: Dict[str, Any] = None,
+        insertion_values: Optional[Dict[str, Any]] = None,
         lock: bool = True,
     ) -> Optional[bool]:
         """
@@ -1007,7 +1007,7 @@ class DatabasePool:
         table: str,
         keyvalues: Dict[str, Any],
         values: Dict[str, Any],
-        insertion_values: Dict[str, Any] = None,
+        insertion_values: Optional[Dict[str, Any]] = None,
         lock: bool = True,
     ) -> bool:
         """
@@ -1083,7 +1083,7 @@ class DatabasePool:
         table: str,
         keyvalues: Dict[str, Any],
         values: Dict[str, Any],
-        insertion_values: Dict[str, Any] = None,
+        insertion_values: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
         Use the native UPSERT functionality in recent PostgreSQL versions.
@@ -1516,7 +1516,7 @@ class DatabasePool:
         column: str,
         iterable: Iterable[Any],
         retcols: Iterable[str],
-        keyvalues: Dict[str, Any] = None,
+        keyvalues: Optional[Dict[str, Any]] = None,
         desc: str = "simple_select_many_batch",
         batch_size: int = 100,
     ) -> List[Any]:

@@ -1171,7 +1171,7 @@ class GroupServerStore(GroupServerWorkerStore):
         user_id: str,
         membership: str,
         is_admin: bool = False,
-        content: JsonDict = None,
+        content: Optional[JsonDict] = None,
         local_attestation: Optional[dict] = None,
         remote_attestation: Optional[dict] = None,
         is_publicised: bool = False,

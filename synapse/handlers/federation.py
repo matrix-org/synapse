@@ -1682,7 +1682,7 @@ class FederationHandler(BaseHandler):
         room_id: str,
         user_id: str,
         membership: str,
-        content: JsonDict = None,
+        content: Optional[JsonDict] = None,
         params: Optional[Dict[str, Union[str, Iterable[str]]]] = None,
     ) -> Tuple[str, EventBase, RoomVersion]:
         (
@@ -2814,7 +2814,7 @@ class FederationHandler(BaseHandler):
             try:
                 # for each sig on the third_party_invite block of the actual invite
                 for server, signature_block in signed["signatures"].items():
-                    for key_name, _ in signature_block.items():
+                    for key_name in signature_block.keys():
                         if not key_name.startswith("ed25519:"):
                             continue
 

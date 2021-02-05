@@ -191,7 +191,7 @@ def _context_info_cb(ssl_connection, where, ret):
         # ... we further assume that SSLClientConnectionCreator has set the
         # '_synapse_tls_verifier' attribute to a ConnectionVerifier object.
         tls_protocol._synapse_tls_verifier.verify_context_info_cb(ssl_connection, where)
-    except BaseException as e:  # taken from the twisted implementation
+    except Exception as e:  # taken from the twisted implementation
         logger.exception("Error during info_callback", exc_info=e)
         f = Failure(e)
         tls_protocol.failVerification(f)

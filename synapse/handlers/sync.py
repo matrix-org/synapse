@@ -541,7 +541,7 @@ class SyncHandler:
         )
 
     async def get_state_after_event(
-        self, event: EventBase, state_filter: StateFilter = None
+        self, event: EventBase, state_filter: Optional[StateFilter] = None
     ) -> StateMap[str]:
         """
         Get the room state after the given event
@@ -562,7 +562,7 @@ class SyncHandler:
         self,
         room_id: str,
         stream_position: StreamToken,
-        state_filter: StateFilter = None,
+        state_filter: Optional[StateFilter] = None,
     ) -> StateMap[str]:
         """ Get the room state at a particular stream position
 

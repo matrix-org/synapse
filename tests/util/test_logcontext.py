@@ -75,7 +75,7 @@ class LoggingContextTestCase(unittest.TestCase):
             try:
                 self.assertIs(current_context(), sentinel_context)
                 d2.callback(None)
-            except BaseException as e:
+            except Exception as e:
                 d2.errback(twisted.python.failure.Failure(e))
 
         reactor.callLater(0.01, check_logcontext)

@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Optional
+
 from synapse.storage.database import DatabasePool
 from synapse.storage.engines import IncorrectDatabaseSetup
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
@@ -43,7 +45,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         )
 
     def _create_id_generator(
-        self, instance_name="master", writers: list = None
+        self, instance_name="master", writers: Optional[list] = None
     ) -> MultiWriterIdGenerator:
         writers = writers or ["master"]
 
@@ -479,7 +481,7 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
         )
 
     def _create_id_generator(
-        self, instance_name="master", writers: list = None
+        self, instance_name="master", writers: Optional[list] = None
     ) -> MultiWriterIdGenerator:
         writers = writers or ["master"]
 
@@ -614,7 +616,7 @@ class MultiTableMultiWriterIdGeneratorTestCase(HomeserverTestCase):
         )
 
     def _create_id_generator(
-        self, instance_name="master", writers: list = None
+        self, instance_name="master", writers: Optional[list] = None
     ) -> MultiWriterIdGenerator:
         writers = writers or ["master"]
 

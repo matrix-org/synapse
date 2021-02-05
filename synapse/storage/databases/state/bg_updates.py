@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+from typing import Optional
 
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
@@ -73,7 +74,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
             return count
 
     def _get_state_groups_from_groups_txn(
-        self, txn, groups, state_filter: StateFilter = None
+        self, txn, groups, state_filter: Optional[StateFilter] = None
     ):
         state_filter = state_filter or StateFilter.all()
 

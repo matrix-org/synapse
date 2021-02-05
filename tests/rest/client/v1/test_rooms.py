@@ -205,7 +205,7 @@ class RoomPermissionsTestCase(RoomBase):
         )
         self.assertEquals(403, channel.code, msg=channel.result["body"])
 
-    def _test_get_membership(self, room=None, members: list = None, expect_code=None):
+    def _test_get_membership(self, room=None, members: Optional[list] = None, expect_code=None):
         for member in members or []:
             path = "/rooms/%s/state/m.room.member/%s" % (room, member)
             channel = self.make_request("GET", path)

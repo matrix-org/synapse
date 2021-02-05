@@ -118,7 +118,7 @@ class ModuleApi:
         return defer.ensureDeferred(self._auth_handler.check_user_exists(user_id))
 
     @defer.inlineCallbacks
-    def register(self, localpart, displayname=None, emails: list = None):
+    def register(self, localpart, displayname=None, emails: Optional[list] = None):
         """Registers a new user with given localpart and optional displayname, emails.
 
         Also returns an access token for the new user.
@@ -142,7 +142,7 @@ class ModuleApi:
         _, access_token = yield self.register_device(user_id)
         return user_id, access_token
 
-    def register_user(self, localpart, displayname=None, emails: list = None):
+    def register_user(self, localpart, displayname=None, emails: Optional[list] = None):
         """Registers a new user with given localpart and optional displayname, emails.
 
         Args:

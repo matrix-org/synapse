@@ -23,6 +23,8 @@ import shlex
 import sys
 import time
 import urllib
+from typing import Optional
+
 from http import TwistedHttpClient
 
 import nacl.encoding
@@ -714,7 +716,7 @@ class SynapseCmd(cmd.Cmd):
 
     @defer.inlineCallbacks
     def _run_and_pprint(
-        self, method, path, data=None, query_params: dict = None, alt_text=None,
+        self, method, path, data=None, query_params: Optional[dict] = None, alt_text=None,
     ):
         """ Runs an HTTP request and pretty prints the output.
 

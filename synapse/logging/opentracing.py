@@ -480,7 +480,7 @@ def start_active_span_from_request(
 def start_active_span_from_edu(
     edu_content,
     operation_name,
-    references: list = None,
+    references: Optional[list] = None,
     tags=None,
     start_time=None,
     ignore_active_span=False,

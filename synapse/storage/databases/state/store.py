@@ -15,7 +15,7 @@
 
 import logging
 from collections import namedtuple
-from typing import Dict, Iterable, List, Set, Tuple
+from typing import Dict, Iterable, List, Set, Tuple, Optional
 
 from synapse.api.constants import EventTypes
 from synapse.storage._base import SQLBaseStore
@@ -207,7 +207,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         return state_filter.filter_state(state_dict_ids), not missing_types
 
     async def _get_state_for_groups(
-        self, groups: Iterable[int], state_filter: StateFilter = None
+        self, groups: Iterable[int], state_filter: Optional[StateFilter] = None
     ) -> Dict[int, MutableStateMap[str]]:
         """Gets the state at each of a list of state groups, optionally
         filtering by type/state_key

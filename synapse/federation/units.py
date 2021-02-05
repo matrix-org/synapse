@@ -18,6 +18,7 @@ server protocol.
 """
 
 import logging
+from typing import Optional
 
 import attr
 
@@ -98,7 +99,7 @@ class Transaction(JsonEncodedObject):
         "pdus",
     ]
 
-    def __init__(self, transaction_id=None, pdus: list = None, **kwargs):
+    def __init__(self, transaction_id=None, pdus: Optional[list] = None, **kwargs):
         """ If we include a list of pdus then we decode then as PDU's
         automatically.
         """

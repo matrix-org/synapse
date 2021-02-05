@@ -132,7 +132,7 @@ class RestHelper:
         src: str,
         targ: str,
         membership: str,
-        extra_data: dict = None,
+        extra_data: Optional[dict] = None,
         tok: Optional[str] = None,
         expect_code: int = 200,
     ) -> None:
@@ -187,7 +187,7 @@ class RestHelper:
         self,
         room_id,
         type,
-        content: dict = None,
+        content: Optional[dict] = None,
         txn_id=None,
         tok=None,
         expect_code=200,
