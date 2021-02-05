@@ -744,7 +744,11 @@ class EventCreationHandler:
                 prev_events = event_dict["prev_events"]
 
             event, context = await self.create_event(
-                requester, event_dict, txn_id=txn_id, prev_event_ids=prev_events, inherit_depth=inherit_depth
+                requester,
+                event_dict,
+                txn_id=txn_id,
+                prev_event_ids=prev_events,
+                inherit_depth=inherit_depth,
             )
 
             assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (

@@ -38,8 +38,8 @@ from synapse.http.servlet import (
     parse_integer,
     parse_integer_from_args,
     parse_json_object_from_request,
-    parse_strings_from_args,
     parse_string,
+    parse_strings_from_args,
 )
 from synapse.logging.opentracing import set_tag
 from synapse.rest.client.transactions import HttpTransactionCache
