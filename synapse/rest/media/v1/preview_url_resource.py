@@ -725,6 +725,11 @@ def decode_and_calc_og(
     def _attempt_calc_og(body_attempt: Union[bytes, str]) -> Dict[str, Optional[str]]:
         # Attempt to parse the body. If this fails, log and return no metadata.
         tree = etree.fromstring(body_attempt, parser)
+
+        # The data was successfully parsed, but no tree was found.
+        if tree is None:
+            return {}
+
         return _calc_og(tree, media_uri)
 
     # Attempt to parse the body. If this fails, log and return no metadata.

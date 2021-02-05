@@ -149,7 +149,7 @@ class PreviewUrlTestCase(unittest.TestCase):
         skip = "url preview feature requires lxml"
 
     def test_simple(self):
-        html = """
+        html = b"""
         <html>
         <head><title>Foo</title></head>
         <body>
@@ -163,7 +163,7 @@ class PreviewUrlTestCase(unittest.TestCase):
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
 
     def test_comment(self):
-        html = """
+        html = b"""
         <html>
         <head><title>Foo</title></head>
         <body>
@@ -178,7 +178,7 @@ class PreviewUrlTestCase(unittest.TestCase):
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
 
     def test_comment2(self):
-        html = """
+        html = b"""
         <html>
         <head><title>Foo</title></head>
         <body>
@@ -202,7 +202,7 @@ class PreviewUrlTestCase(unittest.TestCase):
         )
 
     def test_script(self):
-        html = """
+        html = b"""
         <html>
         <head><title>Foo</title></head>
         <body>
@@ -217,7 +217,7 @@ class PreviewUrlTestCase(unittest.TestCase):
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
 
     def test_missing_title(self):
-        html = """
+        html = b"""
         <html>
         <body>
         Some text.
@@ -230,7 +230,7 @@ class PreviewUrlTestCase(unittest.TestCase):
         self.assertEqual(og, {"og:title": None, "og:description": "Some text."})
 
     def test_h1_as_title(self):
-        html = """
+        html = b"""
         <html>
         <meta property="og:description" content="Some text."/>
         <body>
@@ -244,7 +244,7 @@ class PreviewUrlTestCase(unittest.TestCase):
         self.assertEqual(og, {"og:title": "Title", "og:description": "Some text."})
 
     def test_missing_title_and_broken_h1(self):
-        html = """
+        html = b"""
         <html>
         <body>
         <h1><a href="foo"/></h1>
@@ -258,13 +258,20 @@ class PreviewUrlTestCase(unittest.TestCase):
         self.assertEqual(og, {"og:title": None, "og:description": "Some text."})
 
     def test_empty(self):
-        html = ""
+        """Test a body with no data in it."""
+        html = b""
+        og = decode_and_calc_og(html, "http://example.com/test.html")
+        self.assertEqual(og, {})
+
+    def test_no_tree(self):
+        """A valid body with no tree in it."""
+        html = b"\x00"
         og = decode_and_calc_og(html, "http://example.com/test.html")
         self.assertEqual(og, {})
 
     def test_invalid_encoding(self):
         """An invalid character encoding should be ignored and treated as UTF-8, if possible."""
-        html = """
+        html = b"""
         <html>
         <head><title>Foo</title></head>
         <body>
