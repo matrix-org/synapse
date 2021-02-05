@@ -42,7 +42,10 @@ from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.metrics import Measure, measure_func
-from synapse.visibility import filter_events_for_client
+from synapse.visibility import (
+    filter_events_for_client,
+    filter_historical_events
+)
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -423,6 +426,7 @@ class SyncHandler:
         potential_recents: Optional[List[EventBase]] = None,
         newly_joined_room: bool = False,
     ) -> TimelineBatch:
+        logger.info("_load_filtered_recents")
         with Measure(self.clock, "load_filtered_recents"):
             timeline_limit = sync_config.filter_collection.timeline_limit()
             block_all_timeline = (
@@ -461,6 +465,8 @@ class SyncHandler:
                 )
             else:
                 recents = []
+
+            logger.info("recents1 %s", recents)
 
             if not limited or block_all_timeline:
                 prev_batch_token = now_token
@@ -534,6 +540,10 @@ class SyncHandler:
 
             prev_batch_token = now_token.copy_and_replace("room_key", room_key)
 
+        # `m.historical` events should not come down /sync
+        recents = await filter_historical_events(recents)
+
+        logger.info("recents2 %s", recents)
         return TimelineBatch(
             events=recents,
             prev_batch=prev_batch_token,
