@@ -44,8 +44,8 @@ class Cursor(Protocol):
         self,
     ) -> Optional[
         Sequence[
-            # fixme: this is an approximate typing of dbapi2's cursor.description, going off of sqlite3 and other
-            #  drivers, it may not be entirely accurate.
+            # Note that this is an approximate typing based on sqlite3 and other
+            # drivers, and may not be entirely accurate.
             Tuple[
                 str,
                 Optional[Any],
