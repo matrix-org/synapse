@@ -98,7 +98,10 @@ class EventBuilder:
         return self._state_key is not None
 
     async def build(
-        self, prev_event_ids: List[str], overriding_prev_events: False, auth_event_ids: Optional[List[str]],
+        self,
+        prev_event_ids: List[str],
+        overriding_prev_events: False,
+        auth_event_ids: Optional[List[str]],
     ) -> EventBase:
         """Transform into a fully signed and hashed event
 

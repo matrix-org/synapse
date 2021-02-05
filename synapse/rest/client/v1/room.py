@@ -230,12 +230,14 @@ class RoomSendEventRestServlet(TransactionRestServlet):
             "type": event_type,
             "content": content,
             "room_id": room_id,
-            "sender": requester.user.to_string()
+            "sender": requester.user.to_string(),
         }
 
         if prev_events:
             event_dict["prev_events"] = prev_events
 
+        # TODO: Put app_service logic back in place once we figure out how to make the Complement tests
+        # run as an app service
         if b"ts" in request.args: # and requester.app_service:
             event_dict["origin_server_ts"] = parse_integer(request, "ts", 0)
 

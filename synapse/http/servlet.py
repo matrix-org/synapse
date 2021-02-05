@@ -148,19 +148,12 @@ def parse_string(
     )
 
 
-def parse_string_value(
-    value,
-    allowed_values,
-    name="",
-    encoding="ascii"
-) -> str:
+def parse_string_value(value, allowed_values, name="", encoding="ascii") -> str:
     if encoding:
         try:
             value = value.decode(encoding)
         except ValueError:
-            raise SynapseError(
-                400, "Query parameter %r must be %s" % (name, encoding)
-            )
+            raise SynapseError(400, "Query parameter %r must be %s" % (name, encoding))
 
     if allowed_values is not None and value not in allowed_values:
         message = "Query parameter %r must be one of [%s]" % (
@@ -170,6 +163,7 @@ def parse_string_value(
         raise SynapseError(400, message)
     else:
         return value
+
 
 def parse_strings_from_args(
     args,
@@ -187,7 +181,10 @@ def parse_strings_from_args(
     if name in args:
         values = args[name]
 
-        return [parse_string_value(value, allowed_values, name=name, encoding=encoding) for value in values]
+        return [
+            parse_string_value(value, allowed_values, name=name, encoding=encoding)
+            for value in values
+        ]
     else:
         if required:
             message = "Missing %s query parameter %r" % (param_type, name)
@@ -218,12 +215,13 @@ def parse_string_from_args(
         param_type=param_type,
         encoding=encoding,
     )
-    
+
     if isinstance(strings, list) and len(strings):
         return strings[0]
 
     # Return the default
     return strings
+
 
 def parse_json_value_from_request(request, allow_empty_body=False):
     """Parse a JSON value from the body of a twisted HTTP request.
@@ -278,6 +276,7 @@ def parse_json_object_from_request(request, allow_empty_body=False):
         raise SynapseError(400, message, errcode=Codes.BAD_JSON)
 
     return content
+
 
 def assert_params_in_dict(body, required):
     absent = []

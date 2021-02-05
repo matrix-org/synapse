@@ -42,10 +42,7 @@ from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.metrics import Measure, measure_func
-from synapse.visibility import (
-    filter_events_for_client,
-    filter_historical_events
-)
+from synapse.visibility import filter_events_for_client, filter_historical_events
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer

@@ -815,7 +815,9 @@ class EventCreationHandler:
         ), "Attempting to create an event with no prev_events"
 
         event = await builder.build(
-            prev_event_ids=prev_event_ids, overriding_prev_events=overriding_prev_events, auth_event_ids=auth_event_ids
+            prev_event_ids=prev_event_ids,
+            overriding_prev_events=overriding_prev_events,
+            auth_event_ids=auth_event_ids,
         )
         context = await self.state.compute_event_context(event)
         if requester:
