@@ -306,12 +306,51 @@ class MediaEncodingTestCase(unittest.TestCase):
         encoding = get_html_media_encoding(
             b"""
         <html>
-        <head>< meta charset = ascii
+        <head><meta charset="ascii">
+        </head>
         </html>
         """,
             "text/html",
         )
         self.assertEqual(encoding, "ascii")
+
+        # A less well-formed version.
+        encoding = get_html_media_encoding(
+            b"""
+        <html>
+        <head>< meta charset = ascii>
+        </head>
+        </html>
+        """,
+            "text/html",
+        )
+        self.assertEqual(encoding, "ascii")
+
+    def test_xml_encoding(self):
+        """A character encoding is found via the meta tag."""
+        encoding = get_html_media_encoding(
+            b"""
+        <?xml version="1.0" encoding="ascii"?>
+        <html>
+        </html>
+        """,
+            "text/html",
+        )
+        self.assertEqual(encoding, "ascii")
+
+    def test_meta_xml_encoding(self):
+        """Meta tags take precedence over XML encoding."""
+        encoding = get_html_media_encoding(
+            b"""
+        <?xml version="1.0" encoding="ascii"?>
+        <html>
+        <head><meta charset="UTF-16">
+        </head>
+        </html>
+        """,
+            "text/html",
+        )
+        self.assertEqual(encoding, "UTF-16")
 
     def test_content_type(self):
         """A character encoding is found via the Content-Type header."""

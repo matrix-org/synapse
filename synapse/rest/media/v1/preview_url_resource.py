@@ -58,7 +58,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_charset_match = re.compile(br"<\s*meta[^>]*charset\s*=\s*([a-z0-9-]+)", flags=re.I)
+_charset_match = re.compile(br'<\s*meta[^>]*charset\s*=\s*"?([a-z0-9-]+)"?', flags=re.I)
+_xml_encoding_match = re.compile(br'\s*<\s*\?\s*xml[^>]*encoding="([a-z0-9-]+)"', flags=re.I)
 _content_type_match = re.compile(r'.*; *charset="?(.*?)"?(;|$)', flags=re.I)
 
 OG_TAG_NAME_MAXLEN = 50
@@ -676,7 +677,12 @@ def get_html_media_encoding(body: bytes, content_type: str) -> str:
     """
     Get the encoding of the body based on the (presumably) HTML body or media_type.
 
-    If a valid character encoding cannot be found, fallback to UTF-8.
+    The precedence used for finding a character encoding is:
+
+    1. meta tag with a charset declared.
+    2. The XML document's character encoding attribute.
+    3. The Content-Type header.
+    4. Fallback to UTF-8.
 
     Args:
         body: The HTML document, as bytes.
@@ -685,13 +691,18 @@ def get_html_media_encoding(body: bytes, content_type: str) -> str:
     Returns:
         The character encoding of the body, as a string.
     """
-    # Let's try and figure out if it has an encoding set in a meta tag.
-    # Limit it to the first 1kb, since it ought to be in the meta tags
-    # at the top.
-    match = _charset_match.search(body[:1000])
+    # Limit searches to the first 1kb, since it ought to be at the top.
+    body_start = body[:1024]
 
-    # If we find a match, it should take precedence over the
-    # Content-Type header, so set it here.
+    # Let's try and figure out if it has an encoding set in a meta tag.
+    match = _charset_match.search(body_start)
+    if match:
+        return match.group(1).decode("ascii")
+
+    # TODO Support <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
+    # If we didn't find a match, see if it an XML document with an encoding.
+    match = _xml_encoding_match.match(body_start)
     if match:
         return match.group(1).decode("ascii")
 
