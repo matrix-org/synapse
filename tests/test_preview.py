@@ -15,6 +15,7 @@
 
 from synapse.rest.media.v1.preview_url_resource import (
     decode_and_calc_og,
+    get_html_media_encoding,
     summarize_paragraphs,
 )
 
@@ -26,7 +27,7 @@ except ImportError:
     lxml = None
 
 
-class PreviewTestCase(unittest.TestCase):
+class SummarizeTestCase(unittest.TestCase):
     if not lxml:
         skip = "url preview feature requires lxml"
 
@@ -144,7 +145,7 @@ class PreviewTestCase(unittest.TestCase):
         )
 
 
-class PreviewUrlTestCase(unittest.TestCase):
+class CalcOgTestCase(unittest.TestCase):
     if not lxml:
         skip = "url preview feature requires lxml"
 
@@ -297,3 +298,37 @@ class PreviewUrlTestCase(unittest.TestCase):
         """
         og = decode_and_calc_og(html, "http://example.com/test.html")
         self.assertEqual(og, {"og:title": "ÿÿ Foo", "og:description": "Some text."})
+
+
+class MediaEncodingTestCase(unittest.TestCase):
+    def test_meta_charset(self):
+        """A character encoding is found via the meta tag."""
+        encoding = get_html_media_encoding(
+            b"""
+        <html>
+        <head>< meta charset = ascii
+        </html>
+        """,
+            "text/html",
+        )
+        self.assertEqual(encoding, "ascii")
+
+    def test_content_type(self):
+        """A character encoding is found via the Content-Type header."""
+        # Test a few variations of the header.
+        headers = (
+            'text/html; charset="ascii";',
+            "text/html;charset=ascii;",
+            'text/html;  charset="ascii"',
+            "text/html; charset=ascii",
+            'text/html; charset="ascii;',
+            'text/html; charset=ascii";',
+        )
+        for header in headers:
+            encoding = get_html_media_encoding(b"", header)
+            self.assertEqual(encoding, "ascii")
+
+    def test_fallback(self):
+        """A character encoding cannot be found in the body or header."""
+        encoding = get_html_media_encoding(b"", "text/html")
+        self.assertEqual(encoding, "utf-8")
