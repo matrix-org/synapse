@@ -233,8 +233,11 @@ class RoomSendEventRestServlet(TransactionRestServlet):
             "sender": requester.user.to_string(),
         }
 
+        inherit_depth = False
         if prev_events:
             event_dict["prev_events"] = prev_events
+            # If backfilling old messages, let's just use the same depth of what we're inserting next to
+            inherit_depth = True
 
         # TODO: Put app_service logic back in place once we figure out how to make the Complement tests
         # run as an app service
@@ -246,7 +249,7 @@ class RoomSendEventRestServlet(TransactionRestServlet):
                 event,
                 _,
             ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                requester, event_dict, txn_id=txn_id
+                requester, event_dict, txn_id=txn_id, inherit_depth=inherit_depth
             )
             event_id = event.event_id
         except ShadowBanError:

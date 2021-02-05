@@ -100,8 +100,8 @@ class EventBuilder:
     async def build(
         self,
         prev_event_ids: List[str],
-        overriding_prev_events: Literal[False] = False,
         auth_event_ids: Optional[List[str]],
+        inherit_depth: bool = False,
     ) -> EventBase:
         """Transform into a fully signed and hashed event
 
@@ -135,7 +135,7 @@ class EventBuilder:
 
         old_depth = await self._store.get_max_depth_of(prev_event_ids)
         # If backfilling old message, let's just use the same depth of what we're inserting next to
-        if overriding_prev_events:
+        if inherit_depth:
             depth = old_depth
         # Otherwise, progress the depth as normal
         else:

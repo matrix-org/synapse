@@ -438,6 +438,7 @@ class EventCreationHandler:
         event_dict: dict,
         txn_id: Optional[str] = None,
         prev_event_ids: Optional[List[str]] = None,
+        inherit_depth: bool = False,
         auth_event_ids: Optional[List[str]] = None,
         require_consent: bool = True,
     ) -> Tuple[EventBase, EventContext]:
@@ -525,6 +526,7 @@ class EventCreationHandler:
             builder=builder,
             requester=requester,
             prev_event_ids=prev_event_ids,
+            inherit_depth=inherit_depth,
             auth_event_ids=auth_event_ids,
         )
 
@@ -682,6 +684,7 @@ class EventCreationHandler:
         self,
         requester: Requester,
         event_dict: dict,
+        inherit_depth: bool = False,
         ratelimit: bool = True,
         txn_id: Optional[str] = None,
         ignore_shadow_ban: bool = False,
@@ -741,7 +744,7 @@ class EventCreationHandler:
                 prev_events = event_dict["prev_events"]
 
             event, context = await self.create_event(
-                requester, event_dict, txn_id=txn_id, prev_event_ids=prev_events
+                requester, event_dict, txn_id=txn_id, prev_event_ids=prev_events, inherit_depth=inherit_depth
             )
 
             assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
@@ -772,6 +775,7 @@ class EventCreationHandler:
         builder: EventBuilder,
         requester: Optional[Requester] = None,
         prev_event_ids: Optional[List[str]] = None,
+        inherit_depth: bool = False,
         auth_event_ids: Optional[List[str]] = None,
     ) -> Tuple[EventBase, EventContext]:
         """Create a new event for a local client
@@ -794,10 +798,7 @@ class EventCreationHandler:
             Tuple of created event, context
         """
 
-        overriding_prev_events = False
         if prev_event_ids is not None:
-            overriding_prev_events = True
-
             assert len(prev_event_ids) <= 10, (
                 "Attempting to create an event with %i prev_events"
                 % (len(prev_event_ids),)
@@ -816,7 +817,7 @@ class EventCreationHandler:
 
         event = await builder.build(
             prev_event_ids=prev_event_ids,
-            overriding_prev_events=overriding_prev_events,
+            inherit_depth=inherit_depth,
             auth_event_ids=auth_event_ids,
         )
         context = await self.state.compute_event_context(event)
