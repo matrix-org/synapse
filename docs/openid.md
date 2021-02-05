@@ -391,7 +391,7 @@ oidc_providers:
 
 ### XWiki
 
-Install [OpenID Connect Provider](https://extensions.xwiki.org/xwiki/bin/view/Extension/OpenID Connect/OpenID Connect Provider/) extension in your [XWiki](https://www.xwiki.org) instance.
+Install [OpenID Connect Provider](https://extensions.xwiki.org/xwiki/bin/view/Extension/OpenID%20Connect/OpenID%20Connect%20Provider/) extension in your [XWiki](https://www.xwiki.org) instance.
 
 Synapse config:
 
