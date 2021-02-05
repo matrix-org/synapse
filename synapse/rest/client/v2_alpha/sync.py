@@ -86,7 +86,6 @@ class SyncRestServlet(RestServlet):
         self._event_serializer = hs.get_event_client_serializer()
 
     async def on_GET(self, request):
-        logger.info("/sync on_GET")
         if b"from" in request.args:
             # /events used to use 'from', but /sync uses 'since'.
             # Lets be helpful and whine if we see a 'from'.
@@ -185,7 +184,6 @@ class SyncRestServlet(RestServlet):
             logger.info("Client has disconnected; not serializing response.")
             return 200, {}
 
-        #logger.info("sync response %s", sync_result)
         time_now = self.clock.time_msec()
         response_content = await self.encode_response(
             time_now, sync_result, requester.access_token_id, filter_collection

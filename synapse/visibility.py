@@ -48,7 +48,6 @@ MEMBERSHIP_PRIORITY = (
 async def filter_historical_events(
     events
 ):
-    logger.info("filter_historical_events %s", ' '.join(map(str, events)))
     filtered_events = [e for e in events if not e.content.get("m.historical", None)]
 
     # remove the None entries

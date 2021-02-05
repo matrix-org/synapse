@@ -426,7 +426,6 @@ class SyncHandler:
         potential_recents: Optional[List[EventBase]] = None,
         newly_joined_room: bool = False,
     ) -> TimelineBatch:
-        logger.info("_load_filtered_recents")
         with Measure(self.clock, "load_filtered_recents"):
             timeline_limit = sync_config.filter_collection.timeline_limit()
             block_all_timeline = (
@@ -465,8 +464,6 @@ class SyncHandler:
                 )
             else:
                 recents = []
-
-            logger.info("recents1 %s", recents)
 
             if not limited or block_all_timeline:
                 prev_batch_token = now_token
@@ -543,7 +540,6 @@ class SyncHandler:
         # `m.historical` events should not come down /sync
         recents = await filter_historical_events(recents)
 
-        logger.info("recents2 %s", recents)
         return TimelineBatch(
             events=recents,
             prev_batch=prev_batch_token,
