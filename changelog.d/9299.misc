@@ -1,1 +1,1 @@
-Update internal database-related types to better match PEP 249.
+Update the `Cursor` type hints to better match PEP 249.
