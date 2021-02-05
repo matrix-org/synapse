@@ -108,7 +108,13 @@ class TwistedHttpClient(HttpClient):
 
     @defer.inlineCallbacks
     def do_request(
-        self, method, url, data=None, qparams=None, jsonreq=True, headers: Optional[dict] = None
+        self,
+        method,
+        url,
+        data=None,
+        qparams=None,
+        jsonreq=True,
+        headers: Optional[dict] = None,
     ):
         headers = headers or {}
         if qparams:
@@ -131,7 +137,9 @@ class TwistedHttpClient(HttpClient):
         defer.returnValue(json.loads(body))
 
     @defer.inlineCallbacks
-    def _create_request(self, method, url, producer=None, headers_dict: Optional[dict] = None):
+    def _create_request(
+        self, method, url, producer=None, headers_dict: Optional[dict] = None
+    ):
         """ Creates and sends a request to the given url
         """
         headers_dict = headers_dict or {}

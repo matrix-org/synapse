@@ -51,7 +51,12 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         self.depth = 1
 
     def inject_room_member(
-        self, room, user, membership, replaces_state=None, extra_content: Optional[dict] = None
+        self,
+        room,
+        user,
+        membership,
+        replaces_state=None,
+        extra_content: Optional[dict] = None,
     ):
         content = {"membership": membership}
         content.update(extra_content or {})

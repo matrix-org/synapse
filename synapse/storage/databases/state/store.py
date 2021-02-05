@@ -15,7 +15,7 @@
 
 import logging
 from collections import namedtuple
-from typing import Dict, Iterable, List, Set, Tuple, Optional
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 from synapse.api.constants import EventTypes
 from synapse.storage._base import SQLBaseStore

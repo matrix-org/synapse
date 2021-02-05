@@ -57,7 +57,9 @@ def enumerate_leaves(node, depth):
 class _Node:
     __slots__ = ["prev_node", "next_node", "key", "value", "callbacks"]
 
-    def __init__(self, prev_node, next_node, key, value, callbacks: Optional[set] = None):
+    def __init__(
+        self, prev_node, next_node, key, value, callbacks: Optional[set] = None
+    ):
         self.prev_node = prev_node
         self.next_node = next_node
         self.key = key
