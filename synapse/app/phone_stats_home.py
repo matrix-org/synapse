@@ -93,15 +93,20 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
 
     stats["daily_active_users"] = await hs.get_datastore().count_daily_users()
     stats["monthly_active_users"] = await hs.get_datastore().count_monthly_users()
+    daily_active_e2ee_rooms = await hs.get_datastore().count_daily_active_e2ee_rooms()
+    stats["daily_active_e2ee_rooms"] = daily_active_e2ee_rooms
+    stats["daily_e2ee_messages"] = await hs.get_datastore().count_daily_e2ee_messages()
+    daily_sent_e2ee_messages = await hs.get_datastore().count_daily_sent_e2ee_messages()
+    stats["daily_sent_e2ee_messages"] = daily_sent_e2ee_messages
     stats["daily_active_rooms"] = await hs.get_datastore().count_daily_active_rooms()
     stats["daily_messages"] = await hs.get_datastore().count_daily_messages()
+    daily_sent_messages = await hs.get_datastore().count_daily_sent_messages()
+    stats["daily_sent_messages"] = daily_sent_messages
 
     r30_results = await hs.get_datastore().count_r30_users()
     for name, count in r30_results.items():
         stats["r30_users_" + name] = count
 
-    daily_sent_messages = await hs.get_datastore().count_daily_sent_messages()
-    stats["daily_sent_messages"] = daily_sent_messages
     stats["cache_factor"] = hs.config.caches.global_factor
     stats["event_cache_size"] = hs.config.caches.event_cache_size
 
