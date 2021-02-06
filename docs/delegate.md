@@ -51,6 +51,12 @@ However, if you really need it, you can find some documentation on how such a
 record should look like and how Synapse will use it in [the Matrix
 specification](https://matrix.org/docs/spec/server_server/latest#resolving-server-names).
 
+## Miscellaneous
+
+If you decided to use delegation, don't forget edit also your `homeserver.yaml`
+configuration and specify `public_baseurl` (e.g. `https://synapse.example.com/`)
+otherwise you will not be able to sign in.
+
 ## Delegation FAQ
 
 ### When do I need delegation?
