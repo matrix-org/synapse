@@ -42,9 +42,6 @@ def _create_rerouter(func_name):
         else:
             destination = get_domain_from_id(group_id)
 
-            if destination == "fosdem.org":
-                raise SynapseError(502, "Failed to contact group server")
-
             try:
                 return await getattr(self.transport_client, func_name)(
                     destination, group_id, *args, **kwargs
