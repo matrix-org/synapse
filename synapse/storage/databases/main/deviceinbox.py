@@ -474,6 +474,10 @@ class DeviceInboxWorkerStore(SQLBaseStore):
     ):
         assert self._can_write_to_device
 
+        logger.info("STORING TODEVICE MESSAGE STREAM ID %s: %s",
+                    stream_id,
+                    messages_by_user_then_device)
+
         local_by_user_then_device = {}
         for user_id, messages_by_device in messages_by_user_then_device.items():
             messages_json_for_user = {}
