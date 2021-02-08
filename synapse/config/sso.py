@@ -41,7 +41,8 @@ class SSOConfig(Config):
         ) = self.read_templates(
             [
                 "sso_login_idp_picker.html",
-                "sso_redirect_confirm.html" "sso_auth_confirm.html",
+                "sso_redirect_confirm.html",
+                "sso_auth_confirm.html",
                 "sso_error.html",
                 "sso_account_deactivated.html",
                 "sso_auth_success.html",
