@@ -37,13 +37,6 @@ class CasConfig(Config):
             if not public_baseurl:
                 raise ConfigError("cas_config requires a public_baseurl to be set")
 
-            # If the service_url is given, use it for backwards compatibility.
-            # Otherwise, use the public_baseurl.
-            if cas_config.get("service_url"):
-                public_baseurl = cas_config["service_url"]
-                if public_baseurl[-1] != "/":
-                    public_baseurl += "/"
-
             # TODO Update this to a _synapse URL.
             self.cas_service_url = public_baseurl + "_matrix/client/r0/login/cas/ticket"
             self.cas_displayname_attribute = cas_config.get("displayname_attribute")
