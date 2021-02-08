@@ -38,6 +38,7 @@ from synapse.api.filtering import Filter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.events import EventBase
 from synapse.events.utils import copy_power_levels_contents
+from synapse.rest.admin._base import assert_user_is_admin
 from synapse.storage.state import StateFilter
 from synapse.types import (
     JsonDict,
@@ -1004,41 +1005,51 @@ class RoomCreationHandler(BaseHandler):
 class RoomContextHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
+        self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
 
     async def get_event_context(
         self,
-        user: UserID,
+        requester: Requester,
         room_id: str,
         event_id: str,
         limit: int,
         event_filter: Optional[Filter],
+        use_admin_priviledge: bool = False,
     ) -> Optional[JsonDict]:
         """Retrieves events, pagination tokens and state around a given event
         in a room.
 
         Args:
-            user
+            requester
             room_id
             event_id
             limit: The maximum number of events to return in total
                 (excluding state).
             event_filter: the filter to apply to the events returned
                 (excluding the target event_id)
-
+            use_admin_priviledge: if `True`, return all events, regardless
+                of whether `user` has access to them. To be used **ONLY**
+                from the admin API.
         Returns:
             dict, or None if the event isn't found
         """
+        user = requester.user
+        if use_admin_priviledge:
+            await assert_user_is_admin(self.auth, requester.user)
+
         before_limit = math.floor(limit / 2.0)
         after_limit = limit - before_limit
 
         users = await self.store.get_users_in_room(room_id)
         is_peeking = user.to_string() not in users
 
-        def filter_evts(events):
-            return filter_events_for_client(
+        async def filter_evts(events):
+            if use_admin_priviledge:
+                return events
+            return await filter_events_for_client(
                 self.storage, user.to_string(), events, is_peeking=is_peeking
             )
 
