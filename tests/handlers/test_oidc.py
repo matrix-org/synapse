@@ -213,7 +213,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         # Throw if the JWKS uri is missing
         with self.metadata_edit({"jwks_uri": None}):
-            self.get_failure(self.provider.load_jwks(force=True), RuntimeError)
+            self.get_failure(self.provider.load_jwks(force=True), ValueError)
 
         # Return empty key set if JWKS are not used
         self.provider._scopes = []  # not asking the openid scope
