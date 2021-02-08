@@ -52,7 +52,8 @@ Once you have installed Python 3, please open a Terminal and run:
 mkdir -p ~/synapse
 python3 -m venv ./env
 source ./env/bin/activate
-pip install -e ".[all,lint,mypy,test,black,tox]"
+pip install -e ".[all,lint,mypy,test]"
+pip install tox
 ```
 
 This will install the developer dependencies for the project.
@@ -72,7 +73,7 @@ changes into our repo.
 Please base your changes on the `develop` branch.
 
 ```sh
-git clone git@github.com:matrix-org/synapse.git
+git clone git@github.com:YOUR_GITHUB_USER_NAME/synapse.git
 ```
 
 # 4. Get in touch.
@@ -82,7 +83,8 @@ Join our developer community on Matrix: #synapse-dev:matrix.org !
 
 # 5. Pick an issue.
 
-Fix your favorite problem of find an issue on https://github.com/matrix-org/synapse/issues/ .
+Fix your favorite problem or perhaps find a [Good First Issue](https://github.com/matrix-org/synapse/issues?q=is%3Aopen+is%3Aissue+label%3A%22Good+First+Issue%22)
+to work on.
 
 
 # 6. Turn coffee and documentation into code and documentation!
@@ -120,7 +122,7 @@ The linters look at your code and do two things:
 - ensure that your code follows the coding style adopted by the project;
 - catch a number of errors in your code.
 
-They're very fast, don't hesitate!
+They're pretty fast, don't hesitate!
 
 ```sh
 source ./env/bin/activate
@@ -130,14 +132,20 @@ source ./env/bin/activate
 Note that the linters *will modify your files* to fix styling errors.
 Make sure that you have saved all your files.
 
+If you wish to restrict the linters to only the files changed since the last commit
+(much faster!), you can instead run:
 
-If you wish to restrict the linters to only run on some files, you can instead run:
+```sh
+source ./env/bin/activate
+./scripts-dev/lint.sh -d
+```
+
+Or if you know exactly which files you wish to lint, you can instead run:
 
 ```sh
 source ./env/bin/activate
 ./scripts-dev/lint.sh path/to/file1.py path/to/file2.py path/to/folder
 ```
-
 
 ## Run the unit tests.
 
@@ -150,11 +158,11 @@ python -m twisted.trial tests
 ```
 
 If you wish to only run *some* unit tests, you may specify
-another module instead of `tests`:
+another module instead of `tests` - or a test class or a method:
 
 ```sh
 source ./env/bin/activate
-python -m twisted.trial tests.rest.admin.test_room
+python -m twisted.trial tests.rest.admin.test_room tests.handlers.test_admin.ExfiltrateData.test_invite
 ```
 
 If your tests fail, you may wish to look at the logs:
@@ -165,22 +173,34 @@ less _trial_temp/test.log
 
 ## Run the integration tests.
 
-The integration tests run the full Synapse, including your changes, to
+The integration tests run a full Synapse, including your changes, to
 see if anything was broken. They are slower than the unit tests but will
 typically catch more errors.
 
-
-The following will run the test suite using postgres. You will need [Docker](https://docs.docker.com/get-docker/) installed.
+To run the entire test suite using Sqlite3, use the following command:
 
 ```sh
+source ./env/bin/activate
+tox -e py36
+```
+
+If you wish to only run *some* integration tests, you may
+similarly specify a module, e.g.:
+
+```sh
+source ./env/bin/activate
+tox -e py36 -- test.rest.admin.test_room
+```
+
+
+
+Or, to run the test suite using postgres, use the following command. You will need [Docker](https://docs.docker.com/get-docker/) installed.
+
+```sh
+source ./env/bin/activate
 ./test_postgresql.sh
 ```
 
-Or, if you prefer running the same tests without postgres or Docker, use this command. 
-
-```sh
-tox -e py36
-```
 
 # 8. Submit your patch.
 
@@ -191,8 +211,12 @@ To prepare a Pull Request, please:
 1. verify that [all the tests pass](#test-test-test), including the coding style;
 2. add a [changelog entry](#changelog);
 3. [sign off](#sign-off) your contribution;
-4. on Github, [create the Pull Request](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request);
-5. on Github, request review from `matrix.org / Synapse Core`.
+4. Push code to commits to your fork of Synapse:
+```sh
+git push origin develop
+```
+5. on Github, [create the Pull Request](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request);
+6. on Github, request review from `matrix.org / Synapse Core`.
 
 ## Changelog
 
@@ -355,12 +379,10 @@ From this point, you should:
 1. Look at the results of the CI pipeline.
   - If there is any error, fix the error.
 2. If a developer has requested changes, make these changes.
-3. Create a new patch with the changes.
-  - Please do NOT overwrite the history. New patches make the reviewer's life easier.
-  - Push this patch to your Pull Request.
+3. Create a new commit with the changes.
+  - Please [do NOT overwrite the history](docs/dev/git.md#on-keeping-the-commit-history-clean). New commits make the reviewer's life easier.
+  - Push this commits to your Pull Request.
 4. Back to 1.
-
-If the CI pipeline detects errors, please fix them. If the developers suggest change, please fix them, too.
 
 Once both the CI and the developers are happy, the patch will be merged into Synapse and released shortly!
 
