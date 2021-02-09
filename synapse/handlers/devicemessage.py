@@ -17,6 +17,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict
 
 from synapse.api.errors import SynapseError
+from synapse.handlers.device import DeviceHandler
 from synapse.logging.context import run_in_background
 from synapse.logging.opentracing import (
     get_active_span_text_map,
@@ -69,8 +70,10 @@ class DeviceMessageHandler:
         # sync. We do all device list resyncing on the master instance, so if
         # we're on a worker we hit the device resync replication API.
         if hs.config.worker.worker_app is None:
+            device_handler = hs.get_device_handler()
+            assert isinstance(device_handler, DeviceHandler)
             self._user_device_resync = (
-                hs.get_device_handler().device_list_updater.user_device_resync
+                device_handler.device_list_updater.user_device_resync
             )
         else:
             self._user_device_resync = ReplicationUserDevicesResyncRestServlet.make_client(

@@ -452,7 +452,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return MacaroonGenerator(self)
 
     @cache_in_self
-    def get_device_handler(self):
+    def get_device_handler(self) -> Union[DeviceWorkerHandler, DeviceHandler]:
         if self.config.worker_app:
             return DeviceWorkerHandler(self)
         else:

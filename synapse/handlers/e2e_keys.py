@@ -27,6 +27,7 @@ from unpaddedbase64 import decode_base64
 from twisted.internet import defer
 
 from synapse.api.errors import CodeMessageException, Codes, NotFoundError, SynapseError
+from synapse.handlers.device import DeviceHandler
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import log_kv, set_tag, tag_args, trace
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
@@ -51,24 +52,26 @@ class E2eKeysHandler:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
         self.federation = hs.get_federation_client()
-        self.device_handler = hs.get_device_handler()
         self.is_mine = hs.is_mine
         self.clock = hs.get_clock()
 
-        self._edu_updater = SigningKeyEduUpdater(hs, self)
-
         federation_registry = hs.get_federation_registry()
 
-        self._is_master = hs.config.worker_app is None
-        if not self._is_master:
+        self.device_handler = None  # type: Optional[DeviceHandler]
+        if hs.config.worker_app is not None:
             self._user_device_resync_client = ReplicationUserDevicesResyncRestServlet.make_client(
                 hs
             )
         else:
+            device_handler = hs.get_device_handler()
+            assert isinstance(device_handler, DeviceHandler)
+            self.device_handler = device_handler
+
             # Only register this edu handler on master as it requires writing
             # device updates to the db
             #
             # FIXME: switch to m.signing_key_update when MSC1756 is merged into the spec
+            self._edu_updater = SigningKeyEduUpdater(hs, device_handler)
             federation_registry.register_edu_handler(
                 "org.matrix.signing_key_update",
                 self._edu_updater.incoming_signing_key_update,
@@ -226,16 +229,23 @@ class E2eKeysHandler:
                 # probably be tracking their device lists. However, we haven't
                 # done an initial sync on the device list so we do it now.
                 try:
-                    if self._is_master:
-                        user_devices = await self.device_handler.device_list_updater.user_device_resync(
+                    if self.device_handler:
+                        user_device_resync = await self.device_handler.device_list_updater.user_device_resync(
                             user_id
                         )
                     else:
-                        user_devices = await self._user_device_resync_client(
+                        user_device_resync = await self._user_device_resync_client(
                             user_id=user_id
                         )
 
-                    user_devices = user_devices["devices"]
+                    if user_device_resync is None:
+                        failures[destination] = {
+                            "status": 503,
+                            "message": "Unable to resync devices",
+                        }
+                        continue
+
+                    user_devices = user_device_resync["devices"]
                     user_results = results.setdefault(user_id, {})
                     for device in user_devices:
                         user_results[device["device_id"]] = device["keys"]
@@ -486,6 +496,7 @@ class E2eKeysHandler:
     async def upload_keys_for_user(
         self, user_id: str, device_id: str, keys: JsonDict
     ) -> JsonDict:
+        assert self.device_handler
 
         time_now = self.clock.time_msec()
 
@@ -611,6 +622,7 @@ class E2eKeysHandler:
             user_id: the user uploading the keys
             keys: the signing keys
         """
+        assert self.device_handler
 
         # if a master key is uploaded, then check it.  Otherwise, load the
         # stored master key, to check signatures on other keys
@@ -702,6 +714,8 @@ class E2eKeysHandler:
         Raises:
             SynapseError: if the signatures dict is not valid.
         """
+        assert self.device_handler
+
         failures = {}
 
         # signatures to be stored.  Each item will be a SignatureListItem
@@ -1080,6 +1094,8 @@ class E2eKeysHandler:
             A tuple of the retrieved key content, the key's ID and the matching VerifyKey.
             If the key cannot be retrieved, all values in the tuple will instead be None.
         """
+        assert self.device_handler
+
         try:
             remote_result = await self.federation.query_user_devices(
                 user.domain, user.to_string()
@@ -1281,11 +1297,11 @@ class SignatureListItem:
 class SigningKeyEduUpdater:
     """Handles incoming signing key updates from federation and updates the DB"""
 
-    def __init__(self, hs: "HomeServer", e2e_keys_handler: E2eKeysHandler):
+    def __init__(self, hs: "HomeServer", device_handler: DeviceHandler):
         self.store = hs.get_datastore()
         self.federation = hs.get_federation_client()
         self.clock = hs.get_clock()
-        self.e2e_keys_handler = e2e_keys_handler
+        self.device_handler = device_handler
 
         self._remote_edu_linearizer = Linearizer(name="remote_signing_key")
 
@@ -1341,8 +1357,7 @@ class SigningKeyEduUpdater:
             user_id: the user whose updates we are processing
         """
 
-        device_handler = self.e2e_keys_handler.device_handler
-        device_list_updater = device_handler.device_list_updater
+        device_list_updater = self.device_handler.device_list_updater
 
         with (await self._remote_edu_linearizer.queue(user_id)):
             pending_updates = self._pending_updates.pop(user_id, [])
@@ -1360,4 +1375,4 @@ class SigningKeyEduUpdater:
                 )
                 device_ids = device_ids + new_device_ids
 
-            await device_handler.notify_device_update(user_id, device_ids)
+            await self.device_handler.notify_device_update(user_id, device_ids)

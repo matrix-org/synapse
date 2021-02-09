@@ -17,6 +17,7 @@ import logging
 from typing import TYPE_CHECKING, Optional
 
 from synapse.api.errors import SynapseError
+from synapse.handlers.device import DeviceHandler
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import Requester, UserID, create_requester
 
@@ -74,6 +75,8 @@ class DeactivateAccountHandler(BaseHandler):
         Returns:
             True if identity server supports removing threepids, otherwise False.
         """
+        assert isinstance(self._device_handler, DeviceHandler)
+
         # FIXME: Theoretically there is a race here wherein user resets
         # password using threepid.
 

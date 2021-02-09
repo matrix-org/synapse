@@ -23,6 +23,7 @@ from synapse.api.constants import MAX_USERID_LENGTH, EventTypes, JoinRules, Logi
 from synapse.api.errors import AuthError, Codes, ConsentNotGivenError, SynapseError
 from synapse.appservice import ApplicationService
 from synapse.config.server import is_threepid_reserved
+from synapse.handlers.device import DeviceHandler
 from synapse.http.servlet import assert_params_in_dict
 from synapse.replication.http.login import RegisterDeviceReplicationServlet
 from synapse.replication.http.register import (
@@ -66,7 +67,9 @@ class RegistrationHandler(BaseHandler):
                 hs
             )
         else:
-            self.device_handler = hs.get_device_handler()
+            device_handler = hs.get_device_handler()
+            assert isinstance(device_handler, DeviceHandler)
+            self.device_handler = device_handler
             self.pusher_pool = hs.get_pusherpool()
 
         self.session_lifetime = hs.config.session_lifetime

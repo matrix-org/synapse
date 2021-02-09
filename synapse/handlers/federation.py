@@ -55,6 +55,7 @@ from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
 from synapse.handlers._base import BaseHandler
+from synapse.handlers.device import DeviceHandler
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import (
     make_deferred_yieldable,
@@ -157,7 +158,9 @@ class FederationHandler(BaseHandler):
                 hs
             )
         else:
-            self._device_list_updater = hs.get_device_handler().device_list_updater
+            device_handler = hs.get_device_handler()
+            assert isinstance(device_handler, DeviceHandler)
+            self._device_list_updater = device_handler.device_list_updater
             self._maybe_store_room_on_outlier_membership = (
                 self.store.maybe_store_room_on_outlier_membership
             )
