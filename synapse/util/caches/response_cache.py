@@ -32,7 +32,7 @@ T = TypeVar("T")
 
 
 @attr.s(slots=True, frozen=True)
-class NoTimedCache(Generic[T]):
+class NoTimedCache:
     obj = attr.ib()
 
 
