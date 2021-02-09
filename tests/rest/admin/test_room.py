@@ -1180,6 +1180,21 @@ class RoomTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.json_body["total"], 3)
 
+    def test_room_state(self):
+        """Test that room state can be requested correctly"""
+        # Create two test rooms
+        room_id = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+
+        url = "/_synapse/admin/v1/rooms/%s/state" % (room_id,)
+        channel = self.make_request(
+            "GET", url.encode("ascii"), access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertIn("state", channel.json_body)
+        # testing that the state events match is painful and not done here. We assume that
+        # the create_room already does the right thing, so no need to verify that we got
+        # the state events it created.
+
 
 class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
 
@@ -1429,6 +1444,90 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         )
         self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(private_room_id, channel.json_body["joined_rooms"][0])
+
+    def test_context_as_non_admin(self):
+        """
+        Test that, without being admin, one cannot use the context admin API
+        """
+        # Create a room.
+        user_id = self.register_user("test", "test")
+        user_tok = self.login("test", "test")
+
+        self.register_user("test_2", "test")
+        user_tok_2 = self.login("test_2", "test")
+
+        room_id = self.helper.create_room_as(user_id, tok=user_tok)
+
+        # Populate the room with events.
+        events = []
+        for i in range(30):
+            events.append(
+                self.helper.send_event(
+                    room_id, "com.example.test", content={"index": i}, tok=user_tok
+                )
+            )
+
+        # Now attempt to find the context using the admin API without being admin.
+        midway = (len(events) - 1) // 2
+        for tok in [user_tok, user_tok_2]:
+            channel = self.make_request(
+                "GET",
+                "/_synapse/admin/v1/rooms/%s/context/%s"
+                % (room_id, events[midway]["event_id"]),
+                access_token=tok,
+            )
+            self.assertEquals(
+                403, int(channel.result["code"]), msg=channel.result["body"]
+            )
+            self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
+    def test_context_as_admin(self):
+        """
+        Test that, as admin, we can find the context of an event without having joined the room.
+        """
+
+        # Create a room. We're not part of it.
+        user_id = self.register_user("test", "test")
+        user_tok = self.login("test", "test")
+        room_id = self.helper.create_room_as(user_id, tok=user_tok)
+
+        # Populate the room with events.
+        events = []
+        for i in range(30):
+            events.append(
+                self.helper.send_event(
+                    room_id, "com.example.test", content={"index": i}, tok=user_tok
+                )
+            )
+
+        # Now let's fetch the context for this room.
+        midway = (len(events) - 1) // 2
+        channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v1/rooms/%s/context/%s"
+            % (room_id, events[midway]["event_id"]),
+            access_token=self.admin_user_tok,
+        )
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEquals(
+            channel.json_body["event"]["event_id"], events[midway]["event_id"]
+        )
+
+        for i, found_event in enumerate(channel.json_body["events_before"]):
+            for j, posted_event in enumerate(events):
+                if found_event["event_id"] == posted_event["event_id"]:
+                    self.assertTrue(j < midway)
+                    break
+            else:
+                self.fail("Event %s from events_before not found" % j)
+
+        for i, found_event in enumerate(channel.json_body["events_after"]):
+            for j, posted_event in enumerate(events):
+                if found_event["event_id"] == posted_event["event_id"]:
+                    self.assertTrue(j > midway)
+                    break
+            else:
+                self.fail("Event %s from events_after not found" % j)
 
 
 class MakeRoomAdminTestCase(unittest.HomeserverTestCase):

@@ -89,7 +89,7 @@ class ConsentConfig(Config):
 
     def read_config(self, config, **kwargs):
         consent_config = config.get("user_consent")
-        self.terms_template = self.read_templates(["terms.html"], autoescape=True)[0]
+        self.terms_template = self.read_template("terms.html")
 
         if consent_config is None:
             return
