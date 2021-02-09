@@ -536,7 +536,6 @@ class SyncHandler:
 
             prev_batch_token = now_token.copy_and_replace("room_key", room_key)
 
-
         if self._msc2716_enabled:
             # `m.historical` events should not come down /sync
             recents = filter_historical_events(recents)
