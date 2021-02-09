@@ -14,10 +14,7 @@
 # limitations under the License.
 import logging
 import operator
-from typing import (
-    Iterable,
-    List,
-)
+from typing import Iterable, List
 
 from synapse.api.constants import (
     AccountDataTypes,
