@@ -169,6 +169,7 @@ class RoomListHandler(BaseHandler):
                 "world_readable": room["history_visibility"]
                 == HistoryVisibility.WORLD_READABLE,
                 "guest_can_join": room["guest_access"] == "can_join",
+                "join_rule": room["join_rules"],
             }
 
             # Filter out Nones – rather omit the field altogether
