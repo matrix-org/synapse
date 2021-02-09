@@ -17,6 +17,8 @@
 import inspect
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
+from synapse.rest.media.v1._base import FileInfo
+from synapse.rest.media.v1.media_storage import ReadableFileWrapper
 from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.types import Collection
 from synapse.util.async_helpers import maybe_awaitable
@@ -214,3 +216,48 @@ class SpamChecker:
                     return behaviour
 
         return RegistrationBehaviour.ALLOW
+
+    async def check_media_file_for_spam(
+        self, file_wrapper: ReadableFileWrapper, file_info: FileInfo
+    ) -> bool:
+        """Checks if a piece of newly uploaded media should be blocked.
+
+        This will be called for local uploads, downloads of remote media, each
+        thumbnail generated for those, and web pages/images used for URL
+        previews.
+
+        Note that care should be taken to not do blocking IO operations in the
+        main thread. For example, to get the contents of a file a module
+        should do::
+
+            async def check_media_file_for_spam(
+                self, file: ReadableFileWrapper, file_info: FileInfo
+            ) -> bool:
+                buffer = BytesIO()
+                await file.write_chunks_to(buffer.write)
+
+                if buffer.getvalue() == b"Hello World":
+                    return True
+
+                return False
+
+
+        Args:
+            file: An object that allows reading the contents of the media.
+            file_info: Metadata about the file.
+
+        Returns:
+            True if the media should be blocked or False if it should be
+            allowed.
+        """
+
+        for spam_checker in self.spam_checkers:
+            # For backwards compatibility, only run if the method exists on the
+            # spam checker
+            checker = getattr(spam_checker, "check_media_file_for_spam", None)
+            if checker:
+                spam = await maybe_awaitable(checker(file_wrapper, file_info))
+                if spam:
+                    return True
+
+        return False
