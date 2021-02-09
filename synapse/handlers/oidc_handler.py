@@ -246,6 +246,7 @@ class OidcProvider:
 
         self._token_generator = token_generator
 
+        self._config = provider
         self._callback_url = hs.config.oidc_callback_url  # type: str
 
         self._scopes = provider.scopes
@@ -254,14 +255,11 @@ class OidcProvider:
             provider.client_id, provider.client_secret, provider.client_auth_method,
         )  # type: ClientAuth
         self._client_auth_method = provider.client_auth_method
-        self._provider_metadata = OpenIDProviderMetadata(
-            issuer=provider.issuer,
-            authorization_endpoint=provider.authorization_endpoint,
-            token_endpoint=provider.token_endpoint,
-            userinfo_endpoint=provider.userinfo_endpoint,
-            jwks_uri=provider.jwks_uri,
-        )  # type: OpenIDProviderMetadata
-        self._provider_needs_discovery = provider.discover
+
+        # cache of metadata for the identity provider (endpoint uris, mostly). This is
+        # loaded on-demand from the discovery endpoint (if discovery is enabled), with
+        # possible overrides from the config.  Access via `load_metadata`.
+        self._provider_metadata = RetryOnExceptionCachedCall(self._load_metadata)
 
         # cache of JWKs used by the identity provider to sign tokens. Loaded on demand
         # from the IdP's jwks_uri, if required.
@@ -292,7 +290,7 @@ class OidcProvider:
 
         self._sso_handler.register_identity_provider(self)
 
-    def _validate_metadata(self):
+    def _validate_metadata(self, m: OpenIDProviderMetadata) -> None:
         """Verifies the provider metadata.
 
         This checks the validity of the currently loaded provider. Not
@@ -311,7 +309,6 @@ class OidcProvider:
         if self._skip_verification is True:
             return
 
-        m = self._provider_metadata
         m.validate_issuer()
         m.validate_authorization_endpoint()
         m.validate_token_endpoint()
@@ -363,11 +360,15 @@ class OidcProvider:
             or self._user_profile_method == "userinfo_endpoint"
         )
 
-    async def load_metadata(self) -> OpenIDProviderMetadata:
-        """Load and validate the provider metadata.
+    async def load_metadata(self, force: bool = False) -> OpenIDProviderMetadata:
+        """Return the provider metadata.
 
-        The values metadatas are discovered if ``oidc_config.discovery`` is
-        ``True`` and then cached.
+        If this is the first call, the metadata is built from the config and from the
+        metadata discovery endpoint (if enabled), and then validated. If the metadata
+        is successfully validated, it is then cached for future use.
+
+        Args:
+            force: If true, any cached metadata is discarded to force a reload.
 
         Raises:
             ValueError: if something in the provider is not valid
@@ -375,18 +376,32 @@ class OidcProvider:
         Returns:
             The provider's metadata.
         """
-        # If we are using the OpenID Discovery documents, it needs to be loaded once
-        # FIXME: should there be a lock here?
-        if self._provider_needs_discovery:
-            url = get_well_known_url(self._provider_metadata["issuer"], external=True)
+        if force:
+            # reset the cached call to ensure we get a new result
+            self._provider_metadata = RetryOnExceptionCachedCall(self._load_metadata)
+
+        return await self._provider_metadata.get()
+
+    async def _load_metadata(self) -> OpenIDProviderMetadata:
+        # init the metadata from our config
+        metadata = OpenIDProviderMetadata(
+            issuer=self._config.issuer,
+            authorization_endpoint=self._config.authorization_endpoint,
+            token_endpoint=self._config.token_endpoint,
+            userinfo_endpoint=self._config.userinfo_endpoint,
+            jwks_uri=self._config.jwks_uri,
+        )  # type: OpenIDProviderMetadata
+
+        # load any data from the discovery endpoint, if enabled
+        if self._config.discover:
+            url = get_well_known_url(self._config.issuer, external=True)
             metadata_response = await self._http_client.get_json(url)
             # TODO: maybe update the other way around to let user override some values?
-            self._provider_metadata.update(metadata_response)
-            self._provider_needs_discovery = False
+            metadata.update(metadata_response)
 
-        self._validate_metadata()
+        self._validate_metadata(metadata)
 
-        return self._provider_metadata
+        return metadata
 
     async def load_jwks(self, force: bool = False) -> JWKS:
         """Load the JSON Web Key Set used to sign ID tokens.
