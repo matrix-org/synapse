@@ -371,9 +371,11 @@ class JoinRoomAliasServlet(RestServlet):
             except Exception:
                 remote_room_hosts = None
         elif RoomAlias.is_valid(room_identifier):
-            handler = self.room_member_handler
             room_alias = RoomAlias.from_string(room_identifier)
-            room_id, remote_room_hosts = await handler.lookup_room_alias(room_alias)
+            room, remote_room_hosts = await self.room_member_handler.lookup_room_alias(
+                room_alias
+            )
+            room_id = room.to_string()
         else:
             raise SynapseError(
                 400, "%s was not legal room ID or room alias" % (room_identifier,)

@@ -38,6 +38,7 @@ from synapse.api.filtering import Filter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.events import EventBase
 from synapse.events.utils import copy_power_levels_contents
+from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.rest.admin._base import assert_user_is_admin
 from synapse.storage.state import StateFilter
 from synapse.types import (
@@ -1195,7 +1196,9 @@ class RoomShutdownHandler:
 
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.room_member_handler = hs.get_room_member_handler()
+        room_member_handler = hs.get_room_member_handler()
+        assert isinstance(room_member_handler, RoomMemberMasterHandler)
+        self.room_member_handler = room_member_handler
         self._room_creation_handler = hs.get_room_creation_handler()
         self._replication = hs.get_replication_data_handler()
         self.event_creation_handler = hs.get_event_creation_handler()

@@ -642,7 +642,9 @@ class HomeServer(metaclass=abc.ABCMeta):
         return ThirdPartyEventRules(self)
 
     @cache_in_self
-    def get_room_member_handler(self):
+    def get_room_member_handler(
+        self,
+    ) -> Union[RoomMemberWorkerHandler, RoomMemberMasterHandler]:
         if self.config.worker_app:
             return RoomMemberWorkerHandler(self)
         return RoomMemberMasterHandler(self)

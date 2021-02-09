@@ -406,10 +406,10 @@ class RegistrationHandler(BaseHandler):
 
                 if RoomAlias.is_valid(r):
                     (
-                        room_id,
+                        room,
                         remote_room_hosts,
                     ) = await room_member_handler.lookup_room_alias(room_alias)
-                    room_id = room_id.to_string()
+                    room_id = room.to_string()
                 else:
                     raise SynapseError(
                         400, "%s was not legal room ID or room alias" % (r,)
