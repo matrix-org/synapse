@@ -236,7 +236,7 @@ class RoomSendEventRestServlet(TransactionRestServlet):
 
         inherit_depth = False
         prev_events = parse_strings_from_args(request.args, "prev_event")
-        if(self._msc2716_enabled):
+        if self._msc2716_enabled:
             if prev_events:
                 event_dict["prev_events"] = prev_events
                 # If backfilling old messages, let's just use the same depth of what we're inserting next to

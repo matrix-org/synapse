@@ -16,7 +16,7 @@
 """ This module contains base REST classes for constructing REST servlets. """
 
 import logging
-from typing import List, Optional, Union
+from typing import Iterable, List, Optional, Union
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.util import json_decoder
@@ -109,11 +109,11 @@ def parse_boolean_from_args(args, name, default=None, required=False):
 
 def parse_string(
     request,
-    name: str,
+    name: Union[bytes, str],
     default: Optional[str] = None,
     required: bool = False,
-    allowed_values: Optional[List[str]] = None,
-    encoding: str="ascii",
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: Optional[str] = "ascii",
 ):
     """
     Parse a string parameter from the request query string.
@@ -166,11 +166,11 @@ def parse_string_value(value, allowed_values, name="", encoding="ascii") -> str:
 
 def parse_strings_from_args(
     args: List[str],
-    name: str,
+    name: Union[bytes, str],
     default: Optional[str] = None,
     required: bool = False,
-    allowed_values: Optional[List[str]] = None,
-    encoding: str = "ascii",
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: Optional[str] = "ascii",
 ) -> Optional[List[Union[bytes, str]]]:
     """
     Parse a string parameter from the request query string list.
@@ -224,10 +224,10 @@ def parse_strings_from_args(
 
 def parse_string_from_args(
     args: List[str],
-    name: str,
+    name: Union[bytes, str],
     default: Optional[str] = None,
     required: bool = False,
-    allowed_values: Optional[List[str]] = None,
+    allowed_values: Optional[Iterable[str]] = None,
     encoding: Optional[str] = "ascii",
 ) -> Optional[Union[bytes, str]]:
     """
