@@ -419,7 +419,8 @@ class OidcProvider:
                 }
         """
         if force:
-            self._jwks.clear()
+            # reset the cached call to ensure we get a new result
+            self._jwks = CachedCall(self._load_jwks)
         return await self._jwks.get()
 
     async def _load_jwks(self) -> JWKS:
@@ -620,7 +621,7 @@ class OidcProvider:
 
         # Try to decode the keys in cache first, then retry by forcing the keys
         # to be reloaded
-        jwk_set = await self.get_jwks()
+        jwk_set = await self.load_jwks()
         try:
             claims = jwt.decode(
                 id_token,
@@ -631,7 +632,7 @@ class OidcProvider:
             )
         except ValueError:
             logger.info("Reloading JWKS after decode error")
-            jwk_set = await self.get_jwks(force=True)  # try reloading the jwks
+            jwk_set = await self.load_jwks(force=True)  # try reloading the jwks
             claims = jwt.decode(
                 id_token,
                 key=jwk_set,

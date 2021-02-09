@@ -13,9 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Awaitable, Callable, Generic, Optional, TypeVar
+from typing import Awaitable, Callable, Generic, Optional, TypeVar, Union
 
 from twisted.internet.defer import Deferred
+from twisted.python.failure import Failure
 
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 
@@ -32,6 +33,10 @@ class CachedCall(Generic[TV]):
     Similar results can be achieved via a lock of some form, but that typically requires
     more boilerplate (and ends up being less efficient).
 
+    Correctly handles Synapse logcontexts (logs and resource usage for the underlying
+    function are logged against the logcontext which is active when get() is first
+    called).
+
     Example usage:
 
         _cached_val = CachedCall(_load_prop)
@@ -46,70 +51,47 @@ class CachedCall(Generic[TV]):
 
     """
 
-    __slots__ = ["callable", "retry_on_exception", "_deferred"]
+    __slots__ = ["_callable", "_deferred", "_result"]
 
-    def __init__(
-        self, callable: Callable[[], Awaitable[TV]], retry_on_exception: bool = False
-    ):
+    def __init__(self, f: Callable[[], Awaitable[TV]]):
         """
         Args:
-            callable: The underlying function. Only one call to this function will be alive
+            f: The underlying function. Only one call to this function will be alive
                 at once (per instance of CachedCall)
-
-            retry_on_exception: If set to True, then, if `callable` raises an Exception,
-                the next call to `get()` will initiate a new call to `callable()`. (Any
-                pending calls to `get()` will still all receive the same Exception.)
-
         """
-        self.callable = callable
-        self.retry_on_exception = retry_on_exception
+        self._callable = f  # type: Optional[Callable[[], Awaitable[TV]]]
         self._deferred = None  # type: Optional[Deferred]
+        self._result = None  # type: Union[None, Failure, TV]
 
     async def get(self) -> TV:
         """Kick off the call if necessary, and return the result"""
 
-        # if we don't already have a fetcher, fire it off now
-        fetch_deferred = self._deferred
-        if not fetch_deferred:
-            self._deferred = run_in_background(self.callable)
+        # Fire off the callable now if this is our first time
+        if not self._deferred:
+            self._deferred = run_in_background(self._callable)
 
-            # take a copy of the deferred before maybe clearing it again
-            fetch_deferred = self._deferred
+            # we will never need the callable again, so make sure it can be GCed
+            self._callable = None
 
-            if self.retry_on_exception:
-                # if there is an exception, reset the deferred so that we try again
-                # next time
-                def eb(f):
-                    self.clear()
-                    return f
+            # once the deferred completes, store the result. We cannot simply leave the
+            # result in the deferred, since if it's a Failure, GCing the deferred
+            # would then log a critical error about unhandled Failures.
+            def got_result(r):
+                self._result = r
 
-                fetch_deferred.addErrback(eb)
-
-        # TODO: consider whether we want to set a maximum number of waiters:
-        #    could be implemented by checking the number of `callbacks` on _deferred.
+            self._deferred.addBoth(got_result)
 
         # TODO: consider cancellation semantics. Currently, if the call to get()
         #    is cancelled, the underlying call will continue (and any future calls
         #    will get the result/exception), which I think is *probably* ok, modulo
-        #    the fact the underlying call may be logged to a cancelled logcontext.
+        #    the fact the underlying call may be logged to a cancelled logcontext,
+        #    and any eventual exception may not be caught.
 
-        # we can now await the deferred. This is made somewhat painful by the desire to
-        # avoid disturbing the result of _deferred: we do so by
-        # constructing a *new* Deferred, which we can then safely pass back to the
-        # twisted coroutine wrapper.
+        # we can now await the deferred, and once it completes, return the result.
+        await make_deferred_yieldable(self._deferred)
+
+        # I *think* this is the easiest way to correctly raise a Failure without having
+        # to gut-wrench into the implementation of Deferred.
         d = Deferred()
-
-        def cb(r):
-            d.callback(r)
-            return r
-
-        fetch_deferred.addBoth(cb)
-
-        return await make_deferred_yieldable(d)
-
-    def clear(self):
-        """Clear any stored result
-
-        This will cause the next call to get() to initiate a new call.
-        """
-        self._deferred = None
+        d.callback(self._result)
+        return await d
