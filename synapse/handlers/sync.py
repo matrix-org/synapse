@@ -535,7 +535,7 @@ class SyncHandler:
             prev_batch_token = now_token.copy_and_replace("room_key", room_key)
 
         # `m.historical` events should not come down /sync
-        recents = await filter_historical_events(recents)
+        recents = filter_historical_events(recents)
 
         return TimelineBatch(
             events=recents,

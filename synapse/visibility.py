@@ -14,6 +14,10 @@
 # limitations under the License.
 import logging
 import operator
+from typing import (
+    Iterable,
+    List,
+)
 
 from synapse.api.constants import (
     AccountDataTypes,
@@ -21,6 +25,7 @@ from synapse.api.constants import (
     HistoryVisibility,
     Membership,
 )
+from synapse.events import EventBase
 from synapse.events.utils import prune_event
 from synapse.storage import Storage
 from synapse.storage.state import StateFilter
@@ -46,14 +51,10 @@ MEMBERSHIP_PRIORITY = (
 )
 
 
-async def filter_historical_events(events):
+def filter_historical_events(events: Iterable[EventBase]) -> List[EventBase]:
     filtered_events = [e for e in events if not e.content.get("m.historical", None)]
 
-    # remove the None entries
-    filtered_events = filter(operator.truth, filtered_events)
-
-    # we turn it into a list before returning it.
-    return list(filtered_events)
+    return filtered_events
 
 
 async def filter_events_for_client(
