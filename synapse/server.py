@@ -758,9 +758,6 @@ class HomeServer(metaclass=abc.ABCMeta):
             reconnect=True,
         )
 
-    async def remove_pusher(self, app_id: str, push_key: str, user_id: str):
-        return await self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
-
     def should_send_federation(self) -> bool:
         "Should this server be sending federation traffic directly?"
         return self.config.send_federation and (
