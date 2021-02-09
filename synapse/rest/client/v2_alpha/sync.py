@@ -12,11 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import itertools
 import logging
+from typing import Any, Callable, Dict, List
 
-from synapse.api.constants import PresenceState
+from synapse.api.constants import Membership, PresenceState
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.api.filtering import DEFAULT_FILTER_COLLECTION, FilterCollection
 from synapse.events.utils import (
@@ -24,7 +24,7 @@ from synapse.events.utils import (
     format_event_raw,
 )
 from synapse.handlers.presence import format_user_presence_state
-from synapse.handlers.sync import SyncConfig
+from synapse.handlers.sync import KnockedSyncResult, SyncConfig
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.types import StreamToken
 from synapse.util import json_decoder
@@ -213,6 +213,10 @@ class SyncRestServlet(RestServlet):
             sync_result.invited, time_now, access_token_id, event_formatter
         )
 
+        knocked = await self.encode_knocked(
+            sync_result.knocked, time_now, access_token_id, event_formatter
+        )
+
         archived = await self.encode_archived(
             sync_result.archived,
             time_now,
@@ -230,11 +234,16 @@ class SyncRestServlet(RestServlet):
                 "left": list(sync_result.device_lists.left),
             },
             "presence": SyncRestServlet.encode_presence(sync_result.presence, time_now),
-            "rooms": {"join": joined, "invite": invited, "leave": archived},
+            "rooms": {
+                Membership.JOIN: joined,
+                Membership.INVITE: invited,
+                Membership.KNOCK: knocked,
+                Membership.LEAVE: archived,
+            },
             "groups": {
-                "join": sync_result.groups.join,
-                "invite": sync_result.groups.invite,
-                "leave": sync_result.groups.leave,
+                Membership.JOIN: sync_result.groups.join,
+                Membership.INVITE: sync_result.groups.invite,
+                Membership.LEAVE: sync_result.groups.leave,
             },
             "device_one_time_keys_count": sync_result.device_one_time_keys_count,
             "org.matrix.msc2732.device_unused_fallback_key_types": sync_result.device_unused_fallback_key_types,
@@ -296,7 +305,7 @@ class SyncRestServlet(RestServlet):
 
         Args:
             rooms(list[synapse.handlers.sync.InvitedSyncResult]): list of
-                sync results for rooms this user is joined to
+                sync results for rooms this user is invited to
             time_now(int): current time - used as a baseline for age
                 calculations
             token_id(int): ID of the user's auth token - used for namespacing
@@ -315,7 +324,7 @@ class SyncRestServlet(RestServlet):
                 time_now,
                 token_id=token_id,
                 event_format=event_formatter,
-                is_invite=True,
+                include_stripped_room_state=True,
             )
             unsigned = dict(invite.get("unsigned", {}))
             invite["unsigned"] = unsigned
@@ -324,6 +333,60 @@ class SyncRestServlet(RestServlet):
             invited[room.room_id] = {"invite_state": {"events": invited_state}}
 
         return invited
+
+    async def encode_knocked(
+        self,
+        rooms: List[KnockedSyncResult],
+        time_now: int,
+        token_id: int,
+        event_formatter: Callable[[Dict], Dict],
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Encode the rooms we've knocked on in a sync result.
+
+        Args:
+            rooms: list of sync results for rooms this user is knocking on
+            time_now: current time - used as a baseline for age calculations
+            token_id: ID of the user's auth token - used for namespacing of transaction IDs
+            event_formatter: function to convert from federation format to client format
+
+        Returns:
+            The list of rooms the user has knocked on, in our response format.
+        """
+        knocked = {}
+        for room in rooms:
+            knock = await self._event_serializer.serialize_event(
+                room.knock,
+                time_now,
+                token_id=token_id,
+                event_format=event_formatter,
+                include_stripped_room_state=True,
+            )
+
+            # Extract the `unsigned` key from the knock event.
+            # This is where we (cheekily) store the knock state events
+            unsigned = knock.setdefault("unsigned", {})
+
+            # Duplicate the dictionary in order to avoid modifying the original
+            unsigned = dict(unsigned)
+
+            # Extract the stripped room state from the unsigned dict
+            # This is for clients to get a little bit of information about
+            # the room they've knocked on, without revealing any sensitive information
+            knocked_state = list(unsigned.pop("knock_room_state", []))
+
+            # Append the actual knock membership event itself as well. This provides
+            # the client with:
+            #
+            # * A knock state event that they can use for easier internal tracking
+            # * The rough timestamp of when the knock occurred contained within the event
+            knocked_state.append(knock)
+
+            # Build the `knock_state` dictionary, which will contain the state of the
+            # room that the client has knocked on
+            knocked[room.room_id] = {"knock_state": {"events": knocked_state}}
+
+        return knocked
 
     async def encode_archived(
         self, rooms, time_now, token_id, event_fields, event_formatter

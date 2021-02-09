@@ -57,7 +57,7 @@ class RoomVersion:
     state_res = attr.ib()  # int; one of the StateResolutionVersions
     enforce_key_validity = attr.ib()  # bool
 
-    # bool: before MSC2261/MSC2432, m.room.aliases had special auth rules and redaction rules
+    # Before MSC2432, m.room.aliases had special auth rules and redaction rules
     special_case_aliases_auth = attr.ib(type=bool)
     # Strictly enforce canonicaljson, do not allow:
     # * Integers outside the range of [-2 ^ 53 + 1, 2 ^ 53 - 1]
@@ -67,6 +67,11 @@ class RoomVersion:
     # bool: MSC2209: Check 'notifications' key while verifying
     # m.room.power_levels auth rules.
     limit_notifications_power_levels = attr.ib(type=bool)
+    # MSC2174/MSC2176: Apply updated redaction rules algorithm.
+    msc2176_redaction_rules = attr.ib(type=bool)
+    # MSC2403: Allows join_rules to be set to 'knock', changes auth rules to allow sending
+    # m.room.membership event with membership 'knock'.
+    allow_knocking = attr.ib(type=bool)
 
 
 class RoomVersions:
@@ -79,6 +84,8 @@ class RoomVersions:
         special_case_aliases_auth=True,
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
+        msc2176_redaction_rules=False,
+        allow_knocking=False,
     )
     V2 = RoomVersion(
         "2",
@@ -89,6 +96,8 @@ class RoomVersions:
         special_case_aliases_auth=True,
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
+        msc2176_redaction_rules=False,
+        allow_knocking=False,
     )
     V3 = RoomVersion(
         "3",
@@ -99,6 +108,8 @@ class RoomVersions:
         special_case_aliases_auth=True,
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
+        msc2176_redaction_rules=False,
+        allow_knocking=False,
     )
     V4 = RoomVersion(
         "4",
@@ -109,6 +120,8 @@ class RoomVersions:
         special_case_aliases_auth=True,
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
+        msc2176_redaction_rules=False,
+        allow_knocking=False,
     )
     V5 = RoomVersion(
         "5",
@@ -119,6 +132,8 @@ class RoomVersions:
         special_case_aliases_auth=True,
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
+        msc2176_redaction_rules=False,
+        allow_knocking=False,
     )
     V6 = RoomVersion(
         "6",
@@ -129,6 +144,32 @@ class RoomVersions:
         special_case_aliases_auth=False,
         strict_canonicaljson=True,
         limit_notifications_power_levels=True,
+        msc2176_redaction_rules=False,
+        allow_knocking=False,
+    )
+    MSC2176 = RoomVersion(
+        "org.matrix.msc2176",
+        RoomDisposition.UNSTABLE,
+        EventFormatVersions.V3,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=False,
+        strict_canonicaljson=True,
+        limit_notifications_power_levels=True,
+        msc2176_redaction_rules=True,
+        allow_knocking=False,
+    )
+    MSC2403_DEV = RoomVersion(
+        "xyz.amorgan.knock",
+        RoomDisposition.UNSTABLE,
+        EventFormatVersions.V3,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=False,
+        strict_canonicaljson=True,
+        limit_notifications_power_levels=True,
+        msc2176_redaction_rules=False,
+        allow_knocking=True,
     )
 
 

@@ -15,10 +15,9 @@
 # limitations under the License.
 
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
-
 import logging
 import re
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Optional
 from urllib import parse as urlparse
 
 from synapse.api.constants import EventTypes, Membership
@@ -37,6 +36,7 @@ from synapse.http.servlet import (
     assert_params_in_dict,
     parse_integer,
     parse_json_object_from_request,
+    parse_list_from_args,
     parse_string,
 )
 from synapse.logging.opentracing import set_tag
@@ -283,10 +283,8 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         if RoomID.is_valid(room_identifier):
             room_id = room_identifier
             try:
-                remote_room_hosts = [
-                    x.decode("ascii") for x in request.args[b"server_name"]
-                ]  # type: Optional[List[str]]
-            except Exception:
+                remote_room_hosts = parse_list_from_args(request.args, "server_name")
+            except KeyError:
                 remote_room_hosts = None
         elif RoomAlias.is_valid(room_identifier):
             handler = self.room_member_handler

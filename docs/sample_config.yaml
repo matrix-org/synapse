@@ -1565,7 +1565,9 @@ metrics_flags:
 
 ## API Configuration ##
 
-# A list of event types that will be included in the room_invite_state
+# A list of event types from a room that will be given to users when they
+# are invited to a room. This allows clients to display information about the
+# room that they've been invited to, without actually being in the room yet.
 #
 #room_invite_state_types:
 #  - "m.room.join_rules"

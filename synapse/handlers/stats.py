@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
+# Copyright 2020 Sorunome
+# Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -225,6 +227,8 @@ class StatsHandler:
                     room_stats_delta["left_members"] -= 1
                 elif prev_membership == Membership.BAN:
                     room_stats_delta["banned_members"] -= 1
+                elif prev_membership == Membership.KNOCK:
+                    room_stats_delta["knocked_members"] -= 1
                 else:
                     raise ValueError(
                         "%r is not a valid prev_membership" % (prev_membership,)
@@ -246,6 +250,8 @@ class StatsHandler:
                     room_stats_delta["left_members"] += 1
                 elif membership == Membership.BAN:
                     room_stats_delta["banned_members"] += 1
+                elif membership == Membership.KNOCK:
+                    room_stats_delta["knocked_members"] += 1
                 else:
                     raise ValueError("%r is not a valid membership" % (membership,))
 

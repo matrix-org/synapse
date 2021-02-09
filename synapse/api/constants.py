@@ -34,7 +34,7 @@ class Membership:
 
     INVITE = "invite"
     JOIN = "join"
-    KNOCK = "knock"
+    KNOCK = "xyz.amorgan.knock"
     LEAVE = "leave"
     BAN = "ban"
     LIST = (INVITE, JOIN, KNOCK, LEAVE, BAN)
@@ -50,7 +50,7 @@ class PresenceState:
 
 class JoinRules:
     PUBLIC = "public"
-    KNOCK = "knock"
+    KNOCK = "xyz.amorgan.knock"
     INVITE = "invite"
     PRIVATE = "private"
 

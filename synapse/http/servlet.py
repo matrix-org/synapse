@@ -14,8 +14,8 @@
 # limitations under the License.
 
 """ This module contains base REST classes for constructing REST servlets. """
-
 import logging
+from typing import Dict, List, Optional, Union
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.util import json_decoder
@@ -147,16 +147,67 @@ def parse_string(
     )
 
 
-def parse_string_from_args(
-    args,
-    name,
-    default=None,
-    required=False,
-    allowed_values=None,
-    param_type="string",
-    encoding="ascii",
+def parse_list_from_args(
+    args: Dict[bytes, List[bytes]],
+    name: Union[bytes, str],
+    encoding: Optional[str] = "ascii",
 ):
+    """Parse and optionally decode a list of values from request query parameters.
 
+    Args:
+        args: A dictionary of query parameters from a request.
+        name: The name of the query parameter to extract values from. If given as bytes,
+            will be decoded as "ascii".
+        encoding: An optional encoding that is used to decode each parameter value with.
+
+    Raises:
+        KeyError: If the given `name` does not exist in `args`.
+        SynapseError: If an argument was not encoded with the specified `encoding`.
+    """
+    if not isinstance(name, bytes):
+        name = name.encode("ascii")
+    args_list = args[name]
+
+    if encoding:
+        # Decode each argument value
+        try:
+            args_list = [value.decode(encoding) for value in args_list]
+        except ValueError:
+            raise SynapseError(400, "Query parameter %r must be %s" % (name, encoding))
+
+    return args_list
+
+
+def parse_string_from_args(
+    args: Dict[bytes, List[bytes]],
+    name: Union[bytes, str],
+    default: Optional[str] = None,
+    required: Optional[bool] = False,
+    allowed_values: Optional[List[bytes]] = None,
+    param_type: Optional[str] = "string",
+    encoding: Optional[str] = "ascii",
+):
+    """Parse and optionally decode a single value from request query parameters.
+
+    Args:
+        args: A dictionary of query parameters from a request.
+        name: The name of the query parameter to extract values from. If given as bytes,
+            will be decoded as "ascii".
+        default: A default value to return if the given argument `name` was not found.
+        required: If this is True, no `default` is provided and the given argument `name`
+            was not found then a SynapseError is raised.
+        allowed_values: A list of allowed values. If specified and the found str is
+            not in this list, a SynapseError is raised.
+        param_type: The expected type of the query parameter's value.
+        encoding: An optional encoding that is used to decode each parameter value with.
+
+    Returns:
+        The found argument value.
+
+    Raises:
+        SynapseError: If the given name was not found in the request arguments,
+        the argument's values were encoded incorrectly or a required value was missing.
+    """
     if not isinstance(name, bytes):
         name = name.encode("ascii")
 

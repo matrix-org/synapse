@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
+# Copyright 2020 Sorunome
+# Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,6 +28,7 @@ from synapse.api.urls import (
     FEDERATION_V2_PREFIX,
 )
 from synapse.logging.utils import log_function
+from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
 
@@ -209,13 +212,24 @@ class TransportLayerClient:
             Fails with ``FederationDeniedError`` if the remote destination
             is not in our federation whitelist
         """
-        valid_memberships = {Membership.JOIN, Membership.LEAVE}
+        valid_memberships = {Membership.JOIN, Membership.LEAVE, Membership.KNOCK}
         if membership not in valid_memberships:
             raise RuntimeError(
                 "make_membership_event called with membership='%s', must be one of %s"
                 % (membership, ",".join(valid_memberships))
             )
-        path = _create_v1_path("/make_%s/%s/%s", membership, room_id, user_id)
+
+        # Knock currently uses an unstable prefix
+        if membership == Membership.KNOCK:
+            # Create a path in the form of /unstable/xyz.amorgan.knock/make_knock/...
+            path = _create_path(
+                FEDERATION_UNSTABLE_PREFIX + "/xyz.amorgan.knock",
+                "/make_knock/%s/%s",
+                room_id,
+                user_id,
+            )
+        else:
+            path = _create_v1_path("/make_%s/%s/%s", membership, room_id, user_id)
 
         ignore_backoff = False
         retry_on_dns_fail = False
@@ -292,6 +306,41 @@ class TransportLayerClient:
         )
 
         return response
+
+    @log_function
+    async def send_knock_v2(
+        self, destination: str, room_id: str, event_id: str, content: JsonDict,
+    ) -> JsonDict:
+        """
+        Sends a signed knock membership event to a remote server. This is the second
+        step for knocking after make_knock.
+
+        Args:
+            destination: The remote homeserver.
+            room_id: The ID of the room to knock on.
+            event_id: The ID of the knock membership event that we're sending.
+            content: The knock membership event that we're sending. Note that this is not the
+                `content` field of the membership event, but the entire signed membership event
+                itself represented as a JSON dict.
+
+        Returns:
+            The remote homeserver can optionally return some state from the room. The response
+            dictionary is in the form:
+
+            {"knock_state_events": [<state event dict>, ...]}
+
+            The list of state events may be empty.
+        """
+        path = _create_path(
+            FEDERATION_UNSTABLE_PREFIX + "/xyz.amorgan.knock",
+            "/send_knock/%s/%s",
+            room_id,
+            event_id,
+        )
+
+        return await self.client.put_json(
+            destination=destination, path=path, data=content
+        )
 
     @log_function
     async def send_invite_v1(self, destination, room_id, event_id, content):

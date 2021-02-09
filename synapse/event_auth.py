@@ -161,6 +161,7 @@ def check(
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug("Auth events: %s", [a.event_id for a in auth_events.values()])
 
+    # 5. If type is m.room.membership
     if event.type == EventTypes.Member:
         _is_membership_change_allowed(event, auth_events)
         logger.debug("Allowing! %s", event)
@@ -247,6 +248,7 @@ def _is_membership_change_allowed(
 
     caller_in_room = caller and caller.membership == Membership.JOIN
     caller_invited = caller and caller.membership == Membership.INVITE
+    caller_knocked = caller and caller.membership == Membership.KNOCK
 
     # get info about the target
     key = (EventTypes.Member, target_user_id)
@@ -289,9 +291,12 @@ def _is_membership_change_allowed(
             raise AuthError(403, "%s is banned from the room" % (target_user_id,))
         return
 
-    if Membership.JOIN != membership:
+    # Require the user to be in the room for membership changes other than join/knock.
+    if Membership.JOIN != membership and Membership.KNOCK != membership:
+        # If the user has been invited or has knocked, they are allowed to change their
+        # membership event to leave
         if (
-            caller_invited
+            (caller_invited or caller_knocked)
             and Membership.LEAVE == membership
             and target_user_id == event.user_id
         ):
@@ -324,7 +329,7 @@ def _is_membership_change_allowed(
             raise AuthError(403, "You are banned from this room")
         elif join_rule == JoinRules.PUBLIC:
             pass
-        elif join_rule == JoinRules.INVITE:
+        elif join_rule in (JoinRules.INVITE, JoinRules.KNOCK):
             if not caller_in_room and not caller_invited:
                 raise AuthError(403, "You are not invited to this room.")
         else:
@@ -343,6 +348,19 @@ def _is_membership_change_allowed(
     elif Membership.BAN == membership:
         if user_level < ban_level or user_level <= target_level:
             raise AuthError(403, "You don't have permission to ban")
+    elif Membership.KNOCK == membership:
+        if join_rule != JoinRules.KNOCK:
+            raise AuthError(403, "You don't have permission to knock")
+        elif target_user_id != event.user_id:
+            raise AuthError(403, "You cannot knock for other users")
+        elif target_in_room:
+            raise AuthError(403, "You cannot knock on a room you are already in")
+        elif caller_knocked:
+            raise AuthError(403, "You already have a pending knock for this room")
+        elif caller_invited:
+            raise AuthError(403, "You are already invited to this room")
+        elif target_banned:
+            raise AuthError(403, "You are banned from this room")
     else:
         raise AuthError(500, "Unknown membership %s" % membership)
 
@@ -699,7 +717,7 @@ def auth_types_for_event(event: EventBase) -> Set[Tuple[str, str]]:
 
     if event.type == EventTypes.Member:
         membership = event.content["membership"]
-        if membership in [Membership.JOIN, Membership.INVITE]:
+        if membership in [Membership.JOIN, Membership.INVITE, Membership.KNOCK]:
             auth_types.add((EventTypes.JoinRules, ""))
 
         auth_types.add((EventTypes.Member, event.state_key))
