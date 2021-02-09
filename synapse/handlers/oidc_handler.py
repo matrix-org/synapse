@@ -341,10 +341,7 @@ class OidcProvider:
         else:
             # If we're not using userinfo, we need a valid jwks to validate the ID token
             if m.get("jwks") is None:
-                if m.get("jwks_uri") is not None:
-                    m.validate_jwks_uri()
-                else:
-                    raise ValueError('"jwks_uri" must be set')
+                m.validate_jwks_uri()
 
     @property
     def _uses_userinfo(self) -> bool:
