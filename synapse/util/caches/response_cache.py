@@ -114,7 +114,7 @@ class ResponseCache(Generic[T]):
                 )
             else:
                 self.pending_result_cache.pop(key, None)
-            return r
+            return r.obj if isinstance(r, NoTimedCache) else r
 
         result.addBoth(remove)
         return result.observe()
