@@ -15,6 +15,8 @@
 import logging
 from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, Optional, TypeVar
 
+import attr
+
 from twisted.internet import defer
 
 from synapse.logging.context import make_deferred_yieldable, run_in_background
@@ -27,6 +29,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
+
+
+@attr.s(slots=True, frozen=True)
+class NoTimedCache(Generic[T]):
+    obj = attr.ib()
 
 
 class ResponseCache(Generic[T]):
@@ -101,7 +108,7 @@ class ResponseCache(Generic[T]):
         self.pending_result_cache[key] = result
 
         def remove(r):
-            if self.timeout_sec:
+            if self.timeout_sec and not isinstance(r, NoTimedCache):
                 self.clock.call_later(
                     self.timeout_sec, self.pending_result_cache.pop, key, None
                 )

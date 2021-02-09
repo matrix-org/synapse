@@ -40,7 +40,7 @@ from synapse.types import (
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.caches.lrucache import LruCache
-from synapse.util.caches.response_cache import ResponseCache
+from synapse.util.caches.response_cache import NoTimedCache, ResponseCache
 from synapse.util.metrics import Measure, measure_func
 from synapse.visibility import filter_events_for_client
 
@@ -330,6 +330,10 @@ class SyncHandler:
             else:
                 lazy_loaded = "false"
             non_empty_sync_counter.labels(sync_type, lazy_loaded).inc()
+
+        # hack: sanity check to invalidate cache, prevent a loop
+        if since_token == result.next_batch:
+            result = NoTimedCache(result)  # type: ignore # because it is unwrapped in ResponseCache.set.<remove>()
 
         return result
 
