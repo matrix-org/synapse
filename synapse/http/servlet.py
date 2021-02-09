@@ -170,8 +170,8 @@ def parse_strings_from_args(
     default: Optional[str] = None,
     required: bool = False,
     allowed_values: Optional[List[str]] = None,
-    encoding: str="ascii",
-) -> Optional[List[Union[bytes,str]]]:
+    encoding: str = "ascii",
+) -> Optional[List[Union[bytes, str]]]:
     """
     Parse a string parameter from the request query string list.
 
@@ -228,8 +228,8 @@ def parse_string_from_args(
     default: Optional[str] = None,
     required: bool = False,
     allowed_values: Optional[List[str]] = None,
-    encoding: Optional[str]="ascii",
-) -> Optional[Union[bytes,str]]:
+    encoding: Optional[str] = "ascii",
+) -> Optional[Union[bytes, str]]:
     """
     Parse the string parameter from the request query string list
     and return the first result.

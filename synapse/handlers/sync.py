@@ -259,6 +259,8 @@ class SyncHandler:
             expiry_ms=LAZY_LOADED_MEMBERS_CACHE_MAX_AGE,
         )
 
+        self._msc2716_enabled = hs.config.experimental._msc2716_enabled
+
     async def wait_for_sync_for_user(
         self,
         requester: Requester,
@@ -534,8 +536,10 @@ class SyncHandler:
 
             prev_batch_token = now_token.copy_and_replace("room_key", room_key)
 
-        # `m.historical` events should not come down /sync
-        recents = filter_historical_events(recents)
+
+        if(self._msc2716_enabled):
+            # `m.historical` events should not come down /sync
+            recents = filter_historical_events(recents)
 
         return TimelineBatch(
             events=recents,

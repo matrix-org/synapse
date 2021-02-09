@@ -27,3 +27,6 @@ class ExperimentalConfig(Config):
 
         # MSC2858 (multiple SSO identity providers)
         self.msc2858_enabled = experimental.get("msc2858_enabled", False)  # type: bool
+
+        # MSC2716 (backfill existing history)
+        self.msc2716_enabled = experimental.get("msc2716_enabled", False)  # type: bool

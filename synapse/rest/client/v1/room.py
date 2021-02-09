@@ -215,6 +215,8 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         super().__init__(hs)
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
+        
+        self._msc2716_enabled = hs.config.experimental._msc2716_enabled
 
     def register(self, http_server):
         # /rooms/$roomid/send/$event_type[/$txn_id]
@@ -224,7 +226,6 @@ class RoomSendEventRestServlet(TransactionRestServlet):
     async def on_POST(self, request, room_id, event_type, txn_id=None):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         content = parse_json_object_from_request(request)
-        prev_events = parse_strings_from_args(request.args, "prev_event")
 
         event_dict = {
             "type": event_type,
@@ -234,10 +235,12 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         }
 
         inherit_depth = False
-        if prev_events:
-            event_dict["prev_events"] = prev_events
-            # If backfilling old messages, let's just use the same depth of what we're inserting next to
-            inherit_depth = True
+        prev_events = parse_strings_from_args(request.args, "prev_event")
+        if(self._msc2716_enabled):
+            if prev_events:
+                event_dict["prev_events"] = prev_events
+                # If backfilling old messages, let's just use the same depth of what we're inserting next to
+                inherit_depth = True
 
         # TODO: Put app_service logic back in place once we figure out how to make the Complement tests
         # run as an app service
