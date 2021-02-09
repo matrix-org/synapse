@@ -215,8 +215,8 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         super().__init__(hs)
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
-        
-        self._msc2716_enabled = hs.config.experimental._msc2716_enabled
+
+        self._msc2716_enabled = hs.config.experimental.msc2716_enabled
 
     def register(self, http_server):
         # /rooms/$roomid/send/$event_type[/$txn_id]

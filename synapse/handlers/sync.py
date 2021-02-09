@@ -259,7 +259,7 @@ class SyncHandler:
             expiry_ms=LAZY_LOADED_MEMBERS_CACHE_MAX_AGE,
         )
 
-        self._msc2716_enabled = hs.config.experimental._msc2716_enabled
+        self._msc2716_enabled = hs.config.experimental.msc2716_enabled
 
     async def wait_for_sync_for_user(
         self,
