@@ -609,7 +609,9 @@ class HomeServer(metaclass=abc.ABCMeta):
             return GroupsLocalHandler(self)
 
     @cache_in_self
-    def get_groups_server_handler(self):
+    def get_groups_server_handler(
+        self,
+    ) -> Union[GroupsServerWorkerHandler, GroupsServerHandler]:
         if self.config.worker_app:
             return GroupsServerWorkerHandler(self)
         else:

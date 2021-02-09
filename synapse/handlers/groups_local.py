@@ -18,6 +18,7 @@ import logging
 from typing import TYPE_CHECKING, Dict, Iterable, List, Set
 
 from synapse.api.errors import HttpResponseException, RequestSendFailed, SynapseError
+from synapse.groups.groups_server import GroupsServerHandler
 from synapse.types import GroupID, JsonDict, get_domain_from_id
 
 if TYPE_CHECKING:
@@ -289,6 +290,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
         logger.info("Asking to create group with ID: %r", group_id)
 
         if self.is_mine_id(group_id):
+            assert isinstance(self.groups_server_handler, GroupsServerHandler)
             res = await self.groups_server_handler.create_group(
                 group_id, user_id, content
             )
@@ -317,6 +319,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
         """Request to join a group
         """
         if self.is_mine_id(group_id):
+            assert isinstance(self.groups_server_handler, GroupsServerHandler)
             await self.groups_server_handler.join_group(group_id, user_id, content)
             local_attestation = None
             remote_attestation = None
@@ -364,6 +367,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
         """Accept an invite to a group
         """
         if self.is_mine_id(group_id):
+            assert isinstance(self.groups_server_handler, GroupsServerHandler)
             await self.groups_server_handler.accept_invite(group_id, user_id, content)
             local_attestation = None
             remote_attestation = None
@@ -412,6 +416,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
         """
         content = {"requester_user_id": requester_user_id, "config": config}
         if self.is_mine_id(group_id):
+            assert isinstance(self.groups_server_handler, GroupsServerHandler)
             res = await self.groups_server_handler.invite_to_group(
                 group_id, user_id, requester_user_id, content
             )
@@ -478,6 +483,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
             # retry if the group server is currently down.
 
         if self.is_mine_id(group_id):
+            assert isinstance(self.groups_server_handler, GroupsServerHandler)
             res = await self.groups_server_handler.remove_user_from_group(
                 group_id, user_id, requester_user_id, content
             )
