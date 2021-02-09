@@ -331,7 +331,8 @@ class SyncHandler:
                 lazy_loaded = "false"
             non_empty_sync_counter.labels(sync_type, lazy_loaded).inc()
 
-        # hack: sanity check to invalidate cache, prevent a loop
+        # fixme hack: sanity check to invalidate cache, prevent a self-referral loop
+        #  replace with contextvars approach once it gets working on twisted (twisted/twisted#1262)
         if since_token == result.next_batch:
             result = NoTimedCache(result)  # type: ignore # because it is unwrapped in ResponseCache.set.<remove>()
 
