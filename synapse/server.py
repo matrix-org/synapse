@@ -425,7 +425,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return PresenceHandler(self)
 
     @cache_in_self
-    def get_typing_handler(self):
+    def get_typing_handler(self) -> Union[TypingWriterHandler, FollowerTypingHandler]:
         if self.config.worker.writers.typing == self.get_instance_name():
             return TypingWriterHandler(self)
         else:
@@ -569,7 +569,9 @@ class HomeServer(metaclass=abc.ABCMeta):
         return TransportLayerClient(self)
 
     @cache_in_self
-    def get_federation_sender(self):
+    def get_federation_sender(
+        self,
+    ) -> Union[FederationSender, FederationRemoteSendQueue]:
         if self.should_send_federation():
             return FederationSender(self)
         elif not self.config.worker_app:
@@ -648,13 +650,15 @@ class HomeServer(metaclass=abc.ABCMeta):
         return FederationHandlerRegistry(self)
 
     @cache_in_self
-    def get_server_notices_manager(self):
+    def get_server_notices_manager(self) -> ServerNoticesManager:
         if self.config.worker_app:
             raise Exception("Workers cannot send server notices")
         return ServerNoticesManager(self)
 
     @cache_in_self
-    def get_server_notices_sender(self):
+    def get_server_notices_sender(
+        self,
+    ) -> Union[WorkerServerNoticesSender, ServerNoticesSender]:
         if self.config.worker_app:
             return WorkerServerNoticesSender(self)
         return ServerNoticesSender(self)
@@ -758,7 +762,7 @@ class HomeServer(metaclass=abc.ABCMeta):
             reconnect=True,
         )
 
-    async def remove_pusher(self, app_id: str, push_key: str, user_id: str):
+    async def remove_pusher(self, app_id: str, push_key: str, user_id: str) -> None:
         return await self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
 
     def should_send_federation(self) -> bool:

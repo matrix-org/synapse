@@ -37,6 +37,7 @@ import synapse.server
 from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.api.errors import AuthError
 from synapse.events import EventBase
+from synapse.federation.sender import FederationSender
 from synapse.handlers.presence import format_user_presence_state
 from synapse.logging.context import PreserveLoggingContext
 from synapse.logging.utils import log_function
@@ -217,7 +218,9 @@ class Notifier:
 
         self.federation_sender = None
         if hs.should_send_federation():
-            self.federation_sender = hs.get_federation_sender()
+            federation_sender = hs.get_federation_sender()
+            assert isinstance(federation_sender, FederationSender)
+            self.federation_sender = federation_sender
 
         self.state_handler = hs.get_state_handler()
 
