@@ -14,7 +14,6 @@
 # limitations under the License.
 
 from synapse.api.constants import EventTypes
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 
 from ._base import Config
 
@@ -35,12 +34,6 @@ class ApiConfig(Config):
         self.room_invite_state_types = config.get(
             "room_invite_state_types", DEFAULT_ROOM_STATE_TYPES
         )
-        msc2403_enabled = config.get("msc2403_enabled", False)
-        if msc2403_enabled:
-            # Enable the MSC2403 unstable room version
-            KNOWN_ROOM_VERSIONS.update(
-                {RoomVersions.MSC2403_DEV.identifier: RoomVersions.MSC2403_DEV}
-            )
 
     def generate_config_section(cls, **kwargs):
         return """\
@@ -56,14 +49,6 @@ class ApiConfig(Config):
         #  - "{RoomAvatar}"
         #  - "{RoomEncryption}"
         #  - "{Name}"
-
-        # Uncomment to enable experimental room knocking support as defined by
-        # MSC2403.
-        #
-        # Note that the APIs used by this feature are unstable and will break in the
-        # future.
-        #
-        #msc2403_enabled: true
         """.format(
             **vars(EventTypes)
         )

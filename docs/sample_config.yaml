@@ -1451,14 +1451,6 @@ metrics_flags:
 #  - "m.room.encryption"
 #  - "m.room.name"
 
-# Uncomment to enable experimental room knocking support as defined by
-# MSC2403.
-#
-# Note that the APIs used by this feature are unstable and will break in the
-# future.
-#
-#msc2403_enabled: true
-
 
 # A list of application service config files to use
 #

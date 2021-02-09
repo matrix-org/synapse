@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.config._base import Config
 from synapse.types import JsonDict
 
@@ -27,3 +28,11 @@ class ExperimentalConfig(Config):
 
         # MSC2858 (multiple SSO identity providers)
         self.msc2858_enabled = experimental.get("msc2858_enabled", False)  # type: bool
+
+        # MSC2403 (room knocking)
+        self.msc2403_enabled = experimental.get("msc2403_enabled", False)  # type: bool
+        if self.msc2403_enabled:
+            # Enable the MSC2403 unstable room version
+            KNOWN_ROOM_VERSIONS.update(
+                {RoomVersions.MSC2403_DEV.identifier: RoomVersions.MSC2403_DEV}
+            )
