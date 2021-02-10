@@ -1,0 +1,1 @@
+Store cached events in the external redis cache, when redis is enabled.
