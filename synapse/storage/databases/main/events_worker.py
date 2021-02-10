@@ -493,7 +493,7 @@ class EventsWorkerStore(SQLBaseStore):
 
     def _invalidate_get_event_cache(self, event_id):
         if self._external_cache.is_enabled():
-            self._external_cache.delete("getEvent", event_id)
+            await self._external_cache.delete("getEvent", event_id)
             return
         self._get_event_cache.invalidate((event_id,))
 
