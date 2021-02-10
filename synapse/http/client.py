@@ -349,6 +349,7 @@ class SimpleHttpClient:
             pool=pool,
             http_proxy=http_proxy,
             https_proxy=https_proxy,
+            no_proxy=no_proxy,
         )
 
         if self._ip_blacklist:
