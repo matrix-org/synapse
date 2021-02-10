@@ -25,7 +25,7 @@ import sys
 import traceback
 from typing import TYPE_CHECKING, Any, Dict, Generator, Iterable, Optional, Union
 from urllib import parse as urlparse
-from urllib.request import getproxies
+from urllib.request import getproxies_environment
 
 import attr
 
@@ -145,7 +145,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         self.max_spider_size = hs.config.max_spider_size
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
-        proxies = getproxies()
+        proxies = getproxies_environment()
         self.client = SimpleHttpClient(
             hs,
             treq_args={"browser_like_redirects": True},
