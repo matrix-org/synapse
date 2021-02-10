@@ -1,0 +1,1 @@
+Fix 'object name reserved for internal use' errors with recent versions of SQLite.

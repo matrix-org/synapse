@@ -162,12 +162,23 @@ else
 fi
 
 # Delete schema_version, applied_schema_deltas and applied_module_schemas tables
+# Also delete any shadow tables from fts4
 # This needs to be done after synapse_port_db is run
 echo "Dropping unwanted db tables..."
 SQL="
 DROP TABLE schema_version;
 DROP TABLE applied_schema_deltas;
 DROP TABLE applied_module_schemas;
+DROP TABLE event_search_content;
+DROP TABLE event_search_segments;
+DROP TABLE event_search_segdir;
+DROP TABLE event_search_docsize;
+DROP TABLE event_search_stat;
+DROP TABLE user_directory_search_content;
+DROP TABLE user_directory_search_segments;
+DROP TABLE user_directory_search_segdir;
+DROP TABLE user_directory_search_docsize;
+DROP TABLE user_directory_search_stat;
 "
 sqlite3 "$SQLITE_DB" <<< "$SQL"
 psql $POSTGRES_DB_NAME -U "$POSTGRES_USERNAME" -w <<< "$SQL"
