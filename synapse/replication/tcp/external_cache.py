@@ -36,6 +36,12 @@ get_counter = Counter(
     labelnames=["cache_name", "hit"],
 )
 
+delete_counter = Counter(
+    "synapse_external_cache_delete",
+    "Number of times we deleted keys from a cache",
+    labelnames=["cache_name"],
+)
+
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +64,21 @@ class ExternalCache:
         just no-op, but the function is useful to avoid doing unnecessary work.
         """
         return self._redis_connection is not None
+
+    async def delete(self, cache_name: str, key: str) -> None:
+        """Delete a key from the named cache
+        """
+        if self._redis_connection is None:
+            return
+        delete_counter.labels(cache_name).inc()
+
+        logger.debug("Deleting %s %s: %r", cache_name, key, encoded_value)
+
+        return await make_deferred_yieldable(
+            self._redis_connection.delete(
+                self._get_redis_key(cache_name, key),
+            )
+        )
 
     async def set(self, cache_name: str, key: str, value: Any, expiry_ms: int) -> None:
         """Add the key/value to the named cache, with the expiry time given.
