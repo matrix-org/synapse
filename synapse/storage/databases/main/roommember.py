@@ -581,7 +581,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # We don't update the event cache hit ratio as it completely throws off
         # the hit ratio counts. After all, we don't populate the cache if we
         # miss it here
-        event_map = self._get_events_from_cache(
+        event_map = await self._get_events_from_cache(
             member_event_ids, allow_rejected=False, update_metrics=False
         )
 

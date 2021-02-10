@@ -72,12 +72,10 @@ class ExternalCache:
             return
         delete_counter.labels(cache_name).inc()
 
-        logger.debug("Deleting %s %s: %r", cache_name, key, encoded_value)
+        logger.debug("Deleting %s %s: %r", cache_name, key)
 
         return await make_deferred_yieldable(
-            self._redis_connection.delete(
-                self._get_redis_key(cache_name, key),
-            )
+            self._redis_connection.delete(self._get_redis_key(cache_name, key),)
         )
 
     async def set(self, cache_name: str, key: str, value: Any, expiry_ms: int) -> None:
