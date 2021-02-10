@@ -291,6 +291,7 @@ class SimpleHttpClient:
         ip_blacklist: Optional[IPSet] = None,
         http_proxy: Optional[bytes] = None,
         https_proxy: Optional[bytes] = None,
+        no_proxy: Optional[bytes] = None,
     ):
         """
         Args:
@@ -302,6 +303,7 @@ class SimpleHttpClient:
                request if it were otherwise caught in a blacklist.
             http_proxy: proxy server to use for http connections. host[:port]
             https_proxy: proxy server to use for https connections. host[:port]
+            no_proxy: locations that should explicitly not use a proxy.
         """
         self.hs = hs
 

@@ -14,6 +14,7 @@
 # limitations under the License.
 import logging
 import re
+from urllib.request import proxy_bypass_environment
 
 from zope.interface import implementer
 
@@ -58,6 +59,12 @@ class ProxyAgent(_AgentBase):
 
         pool (HTTPConnectionPool|None): connection pool to be used. If None, a
             non-persistent pool instance will be created.
+
+        http_proxy (bytes): Proxy server to use for http connections. host[:port]
+
+        https_proxy (bytes): Proxy server to use for https connections. host[:port]
+
+        no_proxy (bytes): Locations that should explicitly not use a proxy.
     """
 
     def __init__(
@@ -70,6 +77,7 @@ class ProxyAgent(_AgentBase):
         pool=None,
         http_proxy=None,
         https_proxy=None,
+        no_proxy=None,
     ):
         _AgentBase.__init__(self, reactor, pool)
 
@@ -91,6 +99,8 @@ class ProxyAgent(_AgentBase):
         self.https_proxy_endpoint = _http_proxy_endpoint(
             https_proxy, self.proxy_reactor, **self._endpoint_kwargs
         )
+
+        self.no_proxy = no_proxy
 
         self._policy_for_https = contextFactory
         self._reactor = reactor
@@ -138,14 +148,29 @@ class ProxyAgent(_AgentBase):
         parsed_uri = URI.fromBytes(uri)
         pool_key = (parsed_uri.scheme, parsed_uri.host, parsed_uri.port)
         request_path = parsed_uri.originForm
+        should_skip_proxy = (
+            proxy_bypass_environment(
+                parsed_uri.host.decode(), proxies={"no": self.no_proxy.decode()},
+            )
+            if self.no_proxy is not None
+            else False
+        )
 
-        if parsed_uri.scheme == b"http" and self.http_proxy_endpoint:
+        if (
+            parsed_uri.scheme == b"http"
+            and self.http_proxy_endpoint
+            and not should_skip_proxy
+        ):
             # Cache *all* connections under the same key, since we are only
             # connecting to a single destination, the proxy:
             pool_key = ("http-proxy", self.http_proxy_endpoint)
             endpoint = self.http_proxy_endpoint
             request_path = uri
-        elif parsed_uri.scheme == b"https" and self.https_proxy_endpoint:
+        elif (
+            parsed_uri.scheme == b"https"
+            and self.https_proxy_endpoint
+            and not should_skip_proxy
+        ):
             endpoint = HTTPConnectProxyEndpoint(
                 self.proxy_reactor,
                 self.https_proxy_endpoint,

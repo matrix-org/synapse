@@ -100,62 +100,25 @@ class MatrixFederationAgentTests(TestCase):
 
         return http_protocol
 
-    def test_http_request(self):
-        agent = ProxyAgent(self.reactor)
+    def _test_request_no_proxy(self, agent, scheme, hostname, path):
+        is_https = scheme == b"https"
 
-        self.reactor.lookups["test.com"] = "1.2.3.4"
-        d = agent.request(b"GET", b"http://test.com")
-
-        # there should be a pending TCP connection
-        clients = self.reactor.tcpClients
-        self.assertEqual(len(clients), 1)
-        (host, port, client_factory, _timeout, _bindAddress) = clients[0]
-        self.assertEqual(host, "1.2.3.4")
-        self.assertEqual(port, 80)
-
-        # make a test server, and wire up the client
-        http_server = self._make_connection(
-            client_factory, _get_test_protocol_factory()
-        )
-
-        # the FakeTransport is async, so we need to pump the reactor
-        self.reactor.advance(0)
-
-        # now there should be a pending request
-        self.assertEqual(len(http_server.requests), 1)
-
-        request = http_server.requests[0]
-        self.assertEqual(request.method, b"GET")
-        self.assertEqual(request.path, b"/")
-        self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [b"test.com"])
-        request.write(b"result")
-        request.finish()
-
-        self.reactor.advance(0)
-
-        resp = self.successResultOf(d)
-        body = self.successResultOf(treq.content(resp))
-        self.assertEqual(body, b"result")
-
-    def test_https_request(self):
-        agent = ProxyAgent(self.reactor, contextFactory=get_test_https_policy())
-
-        self.reactor.lookups["test.com"] = "1.2.3.4"
-        d = agent.request(b"GET", b"https://test.com/abc")
+        self.reactor.lookups[hostname.decode()] = "1.2.3.4"
+        d = agent.request(b"GET", scheme + b"://" + hostname + b"/" + path)
 
         # there should be a pending TCP connection
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients[0]
         self.assertEqual(host, "1.2.3.4")
-        self.assertEqual(port, 443)
+        self.assertEqual(port, 443 if is_https else 80)
 
         # make a test server, and wire up the client
         http_server = self._make_connection(
             client_factory,
             _get_test_protocol_factory(),
-            ssl=True,
-            expected_sni=b"test.com",
+            ssl=is_https,
+            expected_sni=hostname if is_https else None,
         )
 
         # the FakeTransport is async, so we need to pump the reactor
@@ -166,8 +129,8 @@ class MatrixFederationAgentTests(TestCase):
 
         request = http_server.requests[0]
         self.assertEqual(request.method, b"GET")
-        self.assertEqual(request.path, b"/abc")
-        self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [b"test.com"])
+        self.assertEqual(request.path, b"/" + path)
+        self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [hostname])
         request.write(b"result")
         request.finish()
 
@@ -177,8 +140,46 @@ class MatrixFederationAgentTests(TestCase):
         body = self.successResultOf(treq.content(resp))
         self.assertEqual(body, b"result")
 
+    def test_http_request(self):
+        agent = ProxyAgent(self.reactor)
+        self._test_request_no_proxy(agent, b"http", b"test.com", b"")
+
+    def test_https_request(self):
+        agent = ProxyAgent(self.reactor, contextFactory=get_test_https_policy())
+        self._test_request_no_proxy(agent, b"https", b"test.com", b"abc")
+
+    def test_http_request_via_no_proxy(self):
+        agent = ProxyAgent(
+            self.reactor, http_proxy=b"proxy.com:8888", no_proxy=b"test.com,unused.com"
+        )
+        self._test_request_no_proxy(agent, b"http", b"test.com", b"")
+
+    def test_https_request_via_no_proxy(self):
+        agent = ProxyAgent(
+            self.reactor,
+            contextFactory=get_test_https_policy(),
+            https_proxy=b"proxy.com",
+            no_proxy=b"test.com,unused.com",
+        )
+        self._test_request_no_proxy(agent, b"https", b"test.com", b"abc")
+
+    def test_http_request_via_no_proxy_star(self):
+        agent = ProxyAgent(self.reactor, http_proxy=b"proxy.com:8888", no_proxy=b"*")
+        self._test_request_no_proxy(agent, b"http", b"test.com", b"")
+
+    def test_https_request_via_no_proxy_star(self):
+        agent = ProxyAgent(
+            self.reactor,
+            contextFactory=get_test_https_policy(),
+            https_proxy=b"proxy.com",
+            no_proxy=b"*",
+        )
+        self._test_request_no_proxy(agent, b"https", b"test.com", b"abc")
+
     def test_http_request_via_proxy(self):
-        agent = ProxyAgent(self.reactor, http_proxy=b"proxy.com:8888")
+        agent = ProxyAgent(
+            self.reactor, http_proxy=b"proxy.com:8888", no_proxy=b"unused.com"
+        )
 
         self.reactor.lookups["proxy.com"] = "1.2.3.5"
         d = agent.request(b"GET", b"http://test.com")
@@ -219,6 +220,7 @@ class MatrixFederationAgentTests(TestCase):
             self.reactor,
             contextFactory=get_test_https_policy(),
             https_proxy=b"proxy.com",
+            no_proxy=b"unused.com",
         )
 
         self.reactor.lookups["proxy.com"] = "1.2.3.5"
