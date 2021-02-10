@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import collections
 import logging
 import re
@@ -21,7 +20,7 @@ from abc import abstractmethod
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, JoinRules
 from synapse.api.errors import StoreError
 from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.storage._base import SQLBaseStore, db_to_json
@@ -178,11 +177,13 @@ class RoomWorkerStore(SQLBaseStore):
                 INNER JOIN room_stats_current USING (room_id)
                 WHERE
                     (
-                        join_rules = 'public' OR history_visibility = 'world_readable'
+                        join_rules = 'public' OR join_rules = '%(knock_join_rule)s'
+                        OR history_visibility = 'world_readable'
                     )
                     AND joined_members > 0
             """ % {
-                "published_sql": published_sql
+                "published_sql": published_sql,
+                "knock_join_rule": JoinRules.KNOCK,
             }
 
             txn.execute(sql, query_args)
@@ -305,7 +306,7 @@ class RoomWorkerStore(SQLBaseStore):
         sql = """
             SELECT
                 room_id, name, topic, canonical_alias, joined_members,
-                avatar, history_visibility, joined_members, guest_access
+                avatar, history_visibility, guest_access, join_rules
             FROM (
                 %(published_sql)s
             ) published
@@ -313,7 +314,8 @@ class RoomWorkerStore(SQLBaseStore):
             INNER JOIN room_stats_current USING (room_id)
             WHERE
                 (
-                    join_rules = 'public' OR history_visibility = 'world_readable'
+                    join_rules = 'public' OR join_rules = '%(knock_join_rule)s'
+                    OR history_visibility = 'world_readable'
                 )
                 AND joined_members > 0
                 %(where_clause)s
@@ -322,6 +324,7 @@ class RoomWorkerStore(SQLBaseStore):
             "published_sql": published_sql,
             "where_clause": where_clause,
             "dir": "DESC" if forwards else "ASC",
+            "knock_join_rule": JoinRules.KNOCK,
         }
 
         if limit is not None:
