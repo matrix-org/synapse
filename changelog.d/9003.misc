@@ -1,1 +1,1 @@
-Remove fts4 shadow tables from schema dumps.
+Fix 'object name reserved for internal use' errors with recent versions of SQLite.
