@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2018 New Vector Ltd
+# Copyright 2018-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,10 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import abc
 import logging
 import os
 import shutil
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from synapse.config._base import Config
 from synapse.logging.context import defer_to_thread, run_in_background
@@ -27,13 +28,17 @@ from .media_storage import FileResponder
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from synapse.app.homeserver import HomeServer
 
-class StorageProvider:
+
+class StorageProvider(metaclass=abc.ABCMeta):
     """A storage provider is a service that can store uploaded media and
     retrieve them.
     """
 
-    async def store_file(self, path: str, file_info: FileInfo):
+    @abc.abstractmethod
+    async def store_file(self, path: str, file_info: FileInfo) -> None:
         """Store the file described by file_info. The actual contents can be
         retrieved by reading the file in file_info.upload_path.
 
@@ -42,6 +47,7 @@ class StorageProvider:
             file_info: The metadata of the file.
         """
 
+    @abc.abstractmethod
     async def fetch(self, path: str, file_info: FileInfo) -> Optional[Responder]:
         """Attempt to fetch the file described by file_info and stream it
         into writer.
@@ -78,10 +84,10 @@ class StorageProviderWrapper(StorageProvider):
         self.store_synchronous = store_synchronous
         self.store_remote = store_remote
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "StorageProviderWrapper[%s]" % (self.backend,)
 
-    async def store_file(self, path, file_info):
+    async def store_file(self, path: str, file_info: FileInfo) -> None:
         if not file_info.server_name and not self.store_local:
             return None
 
@@ -91,7 +97,7 @@ class StorageProviderWrapper(StorageProvider):
         if self.store_synchronous:
             # store_file is supposed to return an Awaitable, but guard
             # against improper implementations.
-            return await maybe_awaitable(self.backend.store_file(path, file_info))
+            await maybe_awaitable(self.backend.store_file(path, file_info))  # type: ignore
         else:
             # TODO: Handle errors.
             async def store():
@@ -103,9 +109,8 @@ class StorageProviderWrapper(StorageProvider):
                     logger.exception("Error storing file")
 
             run_in_background(store)
-            return None
 
-    async def fetch(self, path, file_info):
+    async def fetch(self, path: str, file_info: FileInfo) -> Optional[Responder]:
         # store_file is supposed to return an Awaitable, but guard
         # against improper implementations.
         return await maybe_awaitable(self.backend.fetch(path, file_info))
@@ -115,11 +120,11 @@ class FileStorageProviderBackend(StorageProvider):
     """A storage provider that stores files in a directory on a filesystem.
 
     Args:
-        hs (HomeServer)
+        hs
         config: The config returned by `parse_config`.
     """
 
-    def __init__(self, hs, config):
+    def __init__(self, hs: "HomeServer", config: str):
         self.hs = hs
         self.cache_directory = hs.config.media_store_path
         self.base_directory = config
@@ -127,7 +132,7 @@ class FileStorageProviderBackend(StorageProvider):
     def __str__(self):
         return "FileStorageProviderBackend[%s]" % (self.base_directory,)
 
-    async def store_file(self, path, file_info):
+    async def store_file(self, path: str, file_info: FileInfo) -> None:
         """See StorageProvider.store_file"""
 
         primary_fname = os.path.join(self.cache_directory, path)
@@ -137,19 +142,21 @@ class FileStorageProviderBackend(StorageProvider):
         if not os.path.exists(dirname):
             os.makedirs(dirname)
 
-        return await defer_to_thread(
+        await defer_to_thread(
             self.hs.get_reactor(), shutil.copyfile, primary_fname, backup_fname
         )
 
-    async def fetch(self, path, file_info):
+    async def fetch(self, path: str, file_info: FileInfo) -> Optional[Responder]:
         """See StorageProvider.fetch"""
 
         backup_fname = os.path.join(self.base_directory, path)
         if os.path.isfile(backup_fname):
             return FileResponder(open(backup_fname, "rb"))
 
+        return None
+
     @staticmethod
-    def parse_config(config):
+    def parse_config(config: dict) -> str:
         """Called on startup to parse config supplied. This should parse
         the config and raise if there is a problem.
 

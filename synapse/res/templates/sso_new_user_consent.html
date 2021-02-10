@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Agree to terms and conditions</title>
+    <meta name="viewport" content="width=device-width, user-scalable=no">
+    <style type="text/css">
+      {% include "sso.css" without context %}
+
+      #consent_form {
+        margin-top: 56px;
+      }
+    </style>
+</head>
+    <body>
+        <header>
+            <h1>Your account is nearly ready</h1>
+            <p>Agree to the terms to create your account.</p>
+        </header>
+        <main>
+            {% include "sso_partial_profile.html" %}
+            <form method="post" action="{{my_url}}" id="consent_form">
+                <p>
+                    <input id="accepted_version" type="checkbox" name="accepted_version" value="{{ consent_version }}" required>
+                    <label for="accepted_version">I have read and agree to the <a href="{{ terms_url }}" target="_blank" rel="noopener">terms and conditions</a>.</label>
+                </p>
+                <input type="submit" class="primary-button" value="Continue"/>
+            </form>
+        </main>
+        {% include "sso_footer.html" without context %}
+    </body>
+</html>

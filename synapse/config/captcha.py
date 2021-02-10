@@ -28,9 +28,7 @@ class CaptchaConfig(Config):
             "recaptcha_siteverify_api",
             "https://www.recaptcha.net/recaptcha/api/siteverify",
         )
-        self.recaptcha_template = self.read_templates(
-            ["recaptcha.html"], autoescape=True
-        )[0]
+        self.recaptcha_template = self.read_template("recaptcha.html")
 
     def generate_config_section(self, **kwargs):
         return """\

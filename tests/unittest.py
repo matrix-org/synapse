@@ -20,7 +20,7 @@ import hmac
 import inspect
 import logging
 import time
-from typing import Dict, Iterable, Optional, Tuple, Type, TypeVar, Union
+from typing import Callable, Dict, Iterable, Optional, Tuple, Type, TypeVar, Union
 
 from mock import Mock, patch
 
@@ -386,6 +386,7 @@ class HomeserverTestCase(TestCase):
         custom_headers: Optional[
             Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
         ] = None,
+        client_ip: str = "127.0.0.1",
     ) -> FakeChannel:
         """
         Create a SynapseRequest at the path using the method and containing the
@@ -410,6 +411,9 @@ class HomeserverTestCase(TestCase):
 
             custom_headers: (name, value) pairs to add as request headers
 
+            client_ip: The IP to use as the requesting IP. Useful for testing
+                ratelimiting.
+
         Returns:
             The FakeChannel object which stores the result of the request.
         """
@@ -426,6 +430,7 @@ class HomeserverTestCase(TestCase):
             content_is_form,
             await_result,
             custom_headers,
+            client_ip,
         )
 
     def setup_test_homeserver(self, *args, **kwargs):
@@ -734,5 +739,31 @@ def override_config(extra_config):
     def decorator(func):
         func._extra_config = extra_config
         return func
+
+    return decorator
+
+
+TV = TypeVar("TV")
+
+
+def skip_unless(condition: bool, reason: str) -> Callable[[TV], TV]:
+    """A test decorator which will skip the decorated test unless a condition is set
+
+    For example:
+
+    class MyTestCase(TestCase):
+        @skip_unless(HAS_FOO, "Cannot test without foo")
+        def test_foo(self):
+            ...
+
+    Args:
+        condition: If true, the test will be skipped
+        reason: the reason to give for skipping the test
+    """
+
+    def decorator(f: TV) -> TV:
+        if not condition:
+            f.skip = reason  # type: ignore
+        return f
 
     return decorator

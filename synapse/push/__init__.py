@@ -40,7 +40,7 @@ class PusherConfig:
     ts = attr.ib(type=int)
     lang = attr.ib(type=Optional[str])
     data = attr.ib(type=Optional[JsonDict])
-    last_stream_ordering = attr.ib(type=Optional[int])
+    last_stream_ordering = attr.ib(type=int)
     last_success = attr.ib(type=Optional[int])
     failing_since = attr.ib(type=Optional[int])
 

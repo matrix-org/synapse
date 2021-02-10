@@ -1,1 +1,0 @@
-Fix small bug in v2 state resolution algorithm, which could also cause performance issues for rooms with large numbers of power levels.

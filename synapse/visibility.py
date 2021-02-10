@@ -80,6 +80,7 @@ async def filter_events_for_client(
     events = [e for e in events if not e.internal_metadata.is_soft_failed()]
 
     types = ((EventTypes.RoomHistoryVisibility, ""), (EventTypes.Member, user_id))
+
     event_id_to_state = await storage.state.get_state_for_events(
         frozenset(e.event_id for e in events),
         state_filter=StateFilter.from_types(types),
@@ -233,7 +234,7 @@ async def filter_events_for_client(
 
         elif visibility == HistoryVisibility.SHARED and is_peeking:
             # if the visibility is shared, users cannot see the event unless
-            # they have *subequently* joined the room (or were members at the
+            # they have *subsequently* joined the room (or were members at the
             # time, of course)
             #
             # XXX: if the user has subsequently joined and then left again,

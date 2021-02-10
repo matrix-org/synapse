@@ -42,6 +42,7 @@ class ResourceLimitsServerNotices:
         self._auth = hs.get_auth()
         self._config = hs.config
         self._resouce_limited = False
+        self._account_data_handler = hs.get_account_data_handler()
         self._message_handler = hs.get_message_handler()
         self._state = hs.get_state_handler()
 
@@ -177,7 +178,7 @@ class ResourceLimitsServerNotices:
                 # tag already present, nothing to do here
                 need_to_set_tag = False
         if need_to_set_tag:
-            max_id = await self._store.add_tag_to_room(
+            max_id = await self._account_data_handler.add_tag_to_room(
                 user_id, room_id, SERVER_NOTICE_ROOM_TAG, {}
             )
             self._notifier.on_new_event("account_data_key", max_id, users=[user_id])
