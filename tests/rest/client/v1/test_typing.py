@@ -18,8 +18,6 @@
 
 from mock import Mock
 
-from twisted.internet import defer
-
 from synapse.rest.client.v1 import room
 from synapse.types import UserID
 
@@ -59,32 +57,6 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
             return None
 
         hs.get_datastore().insert_client_ip = _insert_client_ip
-
-        def get_room_members(room_id):
-            if room_id == self.room_id:
-                return defer.succeed([self.user])
-            else:
-                return defer.succeed([])
-
-        @defer.inlineCallbacks
-        def fetch_room_distributions_into(
-            room_id, localusers=None, remotedomains=None, ignore_user=None
-        ):
-            members = yield get_room_members(room_id)
-            for member in members:
-                if ignore_user is not None and member == ignore_user:
-                    continue
-
-                if hs.is_mine(member):
-                    if localusers is not None:
-                        localusers.add(member)
-                else:
-                    if remotedomains is not None:
-                        remotedomains.add(member.domain)
-
-        hs.get_room_member_handler().fetch_room_distributions_into = (
-            fetch_room_distributions_into
-        )
 
         return hs
 
