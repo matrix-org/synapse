@@ -1196,9 +1196,7 @@ class RoomShutdownHandler:
 
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        room_member_handler = hs.get_room_member_handler()
-        assert isinstance(room_member_handler, RoomMemberMasterHandler)
-        self.room_member_handler = room_member_handler
+        self.room_member_handler = hs.get_room_member_handler()
         self._room_creation_handler = hs.get_room_creation_handler()
         self._replication = hs.get_replication_data_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -1259,6 +1257,7 @@ class RoomShutdownHandler:
                 migrated from the old room to the new.
             new_room_id: A string representing the room ID of the new room.
         """
+        assert isinstance(self.room_member_handler, RoomMemberMasterHandler)
 
         if not new_room_name:
             new_room_name = self.DEFAULT_ROOM_NAME

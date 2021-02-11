@@ -33,9 +33,7 @@ class SetPasswordHandler(BaseHandler):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self._auth_handler = hs.get_auth_handler()
-        device_handler = hs.get_device_handler()
-        assert isinstance(device_handler, DeviceHandler)
-        self._device_handler = device_handler
+        self._device_handler = hs.get_device_handler()
 
     async def set_password(
         self,
@@ -44,6 +42,8 @@ class SetPasswordHandler(BaseHandler):
         logout_devices: bool,
         requester: Optional[Requester] = None,
     ) -> None:
+        assert isinstance(self._device_handler, DeviceHandler)
+
         if not self.hs.config.password_localdb_enabled:
             raise SynapseError(403, "Password change disabled", errcode=Codes.FORBIDDEN)
 
