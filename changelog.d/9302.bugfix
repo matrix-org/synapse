@@ -1,1 +1,0 @@
-Fix new ratelimiting for invites to respect the `ratelimit` flag on application services. Introduced in v1.27.0rc1.
