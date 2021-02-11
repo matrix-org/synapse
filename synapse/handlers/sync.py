@@ -461,8 +461,13 @@ class SyncHandler:
                     recents,
                     always_include_ids=current_state_ids,
                 )
+
+                if self._msc2716_enabled:
+                    # `m.historical` events should not come down /sync
+                    recents = filter_historical_events(recents)
             else:
                 recents = []
+
 
             if not limited or block_all_timeline:
                 prev_batch_token = now_token
@@ -524,6 +529,10 @@ class SyncHandler:
                 loaded_recents.extend(recents)
                 recents = loaded_recents
 
+                if self._msc2716_enabled:
+                    # `m.historical` events should not come down /sync
+                    recents = filter_historical_events(recents)
+
                 if len(events) <= load_limit:
                     limited = False
                     break
@@ -535,10 +544,6 @@ class SyncHandler:
                 room_key = recents[0].internal_metadata.before
 
             prev_batch_token = now_token.copy_and_replace("room_key", room_key)
-
-        if self._msc2716_enabled:
-            # `m.historical` events should not come down /sync
-            recents = filter_historical_events(recents)
 
         return TimelineBatch(
             events=recents,
