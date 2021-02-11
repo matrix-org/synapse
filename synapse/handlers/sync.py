@@ -468,7 +468,6 @@ class SyncHandler:
             else:
                 recents = []
 
-
             if not limited or block_all_timeline:
                 prev_batch_token = now_token
                 if recents:
