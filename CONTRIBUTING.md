@@ -40,7 +40,7 @@ license - in our case, this is almost always Apache Software License v2 (see
 
 The code of Synapse is written in Python 3. To do pretty much anything, you'll need [a recent version of Python 3](https://wiki.python.org/moin/BeginnersGuide/Download).
 
-The source code of Synapse is hosted on Github. You will also need [a recent version of git](https://github.com/git-guides/install-git).
+The source code of Synapse is hosted on GitHub. You will also need [a recent version of git](https://github.com/git-guides/install-git).
 
 For some tests, you will need [a recent version of Docker](https://docs.docker.com/get-docker/).
 
@@ -48,7 +48,7 @@ For some tests, you will need [a recent version of Docker](https://docs.docker.c
 # 3. Get the source.
 
 The preferred and easiest way to contribute changes is to fork the relevant
-project on github, and then [create a pull request](
+project on GitHub, and then [create a pull request](
 https://help.github.com/articles/using-pull-requests/) to ask us to pull your
 changes into our repo.
 
@@ -66,10 +66,11 @@ can find many good git tutorials on the web.
 
 ## Under Unix (macOS, Linux, BSD, ...)
 
-Once you have installed Python 3 and added the source, please open a Terminal and run:
+Once you have installed Python 3 and added the source, please open a terminal and
+setup a *virtualenv*, as follows:
 
 ```sh
-cd WHERE_YOU_HAVE_CLONED_THE_REPOSITORY
+cd path/where/you/have/cloned/the/repository
 python3 -m venv ./env
 source ./env/bin/activate
 pip install -e ".[all,lint,mypy,test]"
@@ -108,10 +109,10 @@ Synapse developers. [docs/admin_api](docs/admin_api) houses documentation
 regarding Synapse's Admin API, which is used mostly by sysadmins and external
 service developers.
 
-If you add new files added to either of these folders, please use [Github-Flavoured
+If you add new files added to either of these folders, please use [GitHub-Flavoured
 Markdown](https://guides.github.com/features/mastering-markdown/).
 
-Some documentation also exists in [Synapse's Github
+Some documentation also exists in [Synapse's GitHub
 Wiki](https://github.com/matrix-org/synapse/wiki), although this is primarily
 contributed to by community authors.
 
@@ -161,7 +162,7 @@ was broken. They are slower than the linters but will typically catch more error
 
 ```sh
 source ./env/bin/activate
-python -m twisted.trial tests
+trial tests
 ```
 
 If you wish to only run *some* unit tests, you may specify
@@ -169,7 +170,7 @@ another module instead of `tests` - or a test class or a method:
 
 ```sh
 source ./env/bin/activate
-python -m twisted.trial tests.rest.admin.test_room tests.handlers.test_admin.ExfiltrateData.test_invite
+trial tests.rest.admin.test_room tests.handlers.test_admin.ExfiltrateData.test_invite
 ```
 
 If your tests fail, you may wish to look at the logs:
@@ -180,33 +181,19 @@ less _trial_temp/test.log
 
 ## Run the integration tests.
 
-The integration tests run a full Synapse, including your changes, to
-see if anything was broken. They are slower than the unit tests but will
+The integration tests are a more comprehensive suite of tests. They
+run a full version of Synapse, including your changes, to check if
+anything was broken. They are slower than the unit tests but will
 typically catch more errors.
 
-To run the entire test suite using Sqlite3, use the following command:
+The following command will let you run the integration test with the most common
+configuration:
 
 ```sh
-source ./env/bin/activate
-tox -e py36
+$ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v /path/to/where/you/want/logs\:/logs matrixdotorg/sytest-synapse:py37
 ```
 
-If you wish to only run *some* integration tests, you may
-similarly specify a module, e.g.:
-
-```sh
-source ./env/bin/activate
-tox -e py36 -- test.rest.admin.test_room
-```
-
-
-
-Or, to run the test suite using postgres, use the following command. You will need [Docker](https://docs.docker.com/get-docker/) installed.
-
-```sh
-source ./env/bin/activate
-./test_postgresql.sh
-```
+This configuration should generally cover  your needs. For more details about other configurations, see [documentation in the SyTest repo](https://github.com/matrix-org/sytest/blob/develop/docker/README.md).
 
 
 # 9. Submit your patch.
@@ -218,9 +205,9 @@ To prepare a Pull Request, please:
 1. verify that [all the tests pass](#test-test-test), including the coding style;
 2. [sign off](#sign-off) your contribution;
 3. `git push` your commit to your fork of Synapse;
-4. on Github, [create the Pull Request](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request);
+4. on GitHub, [create the Pull Request](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request);
 5. add a [changelog entry](#changelog) and push it to your Pull Request;
-6. on Github, request review from `matrix.org / Synapse Core`;
+6. for most contributors, that's all - however, if you are a member of the organization `matrix-org`, on GitHub, please request a review from `matrix.org / Synapse Core`.
 
 
 ## Changelog
