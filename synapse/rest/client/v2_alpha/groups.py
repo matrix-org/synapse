@@ -20,7 +20,8 @@ from typing import TYPE_CHECKING, Tuple
 
 from twisted.web.http import Request
 
-from synapse.api.errors import SynapseError
+from synapse.api.constants import MAX_GROUP_CATEGORYID_LENGTH, MAX_GROUP_ROLEID_LENGTH, MAX_GROUPID_LENGTH
+from synapse.api.errors import Codes, SynapseError
 from synapse.handlers.groups_local import GroupsLocalHandler
 from synapse.http.servlet import (
     RestServlet,
@@ -144,6 +145,17 @@ class GroupSummaryRoomsCatServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
+        if not category_id:
+            raise SynapseError(400, "category_id cannot be empty", Codes.INVALID_PARAM)
+
+        if len(category_id) > MAX_GROUP_CATEGORYID_LENGTH:
+            raise SynapseError(
+                400,
+                "category_id may not be longer than %s characters"
+                % (MAX_GROUP_CATEGORYID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
+
         content = parse_json_object_from_request(request)
         assert isinstance(self.groups_handler, GroupsLocalHandler)
         resp = await self.groups_handler.update_group_summary_room(
@@ -204,6 +216,17 @@ class GroupCategoryServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
+
+        if not category_id:
+            raise SynapseError(400, "category_id cannot be empty", Codes.INVALID_PARAM)
+
+        if len(category_id) > MAX_GROUP_CATEGORYID_LENGTH:
+            raise SynapseError(
+                400,
+                "category_id may not be longer than %s characters"
+                % (MAX_GROUP_CATEGORYID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
 
         content = parse_json_object_from_request(request)
         assert isinstance(self.groups_handler, GroupsLocalHandler)
@@ -284,6 +307,17 @@ class GroupRoleServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
+        if not role_id:
+            raise SynapseError(400, "role_id cannot be empty", Codes.INVALID_PARAM)
+
+        if len(role_id) > MAX_GROUP_ROLEID_LENGTH:
+            raise SynapseError(
+                400,
+                "role_id may not be longer than %s characters"
+                % (MAX_GROUP_ROLEID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
+
         content = parse_json_object_from_request(request)
         assert isinstance(self.groups_handler, GroupsLocalHandler)
         resp = await self.groups_handler.update_group_role(
@@ -357,6 +391,17 @@ class GroupSummaryUsersRoleServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
+
+        if not role_id:
+            raise SynapseError(400, "role_id cannot be empty", Codes.INVALID_PARAM)
+
+        if len(role_id) > MAX_GROUP_ROLEID_LENGTH:
+            raise SynapseError(
+                400,
+                "role_id may not be longer than %s characters"
+                % (MAX_GROUP_ROLEID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
 
         content = parse_json_object_from_request(request)
         assert isinstance(self.groups_handler, GroupsLocalHandler)
@@ -504,6 +549,16 @@ class GroupCreateServlet(RestServlet):
         content = parse_json_object_from_request(request)
         localpart = content.pop("localpart")
         group_id = GroupID(localpart, self.server_name).to_string()
+
+        if not localpart:
+            raise SynapseError(400, "Group ID cannot be empty", Codes.INVALID_PARAM)
+
+        if len(group_id) > MAX_GROUPID_LENGTH:
+            raise SynapseError(
+                400,
+                "Group ID may not be longer than %s characters" % (MAX_GROUPID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
 
         assert isinstance(self.groups_handler, GroupsLocalHandler)
         result = await self.groups_handler.create_group(
