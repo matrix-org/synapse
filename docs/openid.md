@@ -388,3 +388,25 @@ oidc_providers:
         localpart_template: "{{ user.login }}"
         display_name_template: "{{ user.full_name }}" 
 ```
+
+### XWiki
+
+Install [OpenID Connect Provider](https://extensions.xwiki.org/xwiki/bin/view/Extension/OpenID%20Connect/OpenID%20Connect%20Provider/) extension in your [XWiki](https://www.xwiki.org) instance.
+
+Synapse config:
+
+```yaml
+oidc_providers:
+  - idp_id: xwiki
+    idp_name: "XWiki"
+    issuer: "https://myxwikihost/xwiki/oidc/"
+    client_id: "your-client-id" # TO BE FILLED
+    # Needed until https://github.com/matrix-org/synapse/issues/9212 is fixed
+    client_secret: "dontcare"
+    scopes: ["openid", "profile"]
+    user_profile_method: "userinfo_endpoint"
+    user_mapping_provider:
+      config:
+        localpart_template: "{{ user.preferred_username }}"
+        display_name_template: "{{ user.name }}"
+```
