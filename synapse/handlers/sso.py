@@ -16,10 +16,12 @@ import abc
 import logging
 from typing import (
     TYPE_CHECKING,
+    Any,
     Awaitable,
     Callable,
     Dict,
     Iterable,
+    List,
     Mapping,
     Optional,
     Set,
@@ -34,6 +36,7 @@ from twisted.web.iweb import IRequest
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, NotFoundError, RedirectException, SynapseError
+from synapse.config.sso import SsoAttributeRequirement
 from synapse.handlers.ui_auth import UIAuthSessionDataConstants
 from synapse.http import get_request_user_agent
 from synapse.http.server import respond_with_html, respond_with_redirect
@@ -893,6 +896,41 @@ class SsoHandler:
             logger.info("Expiring mapping session %s", session_id)
             del self._username_mapping_sessions[session_id]
 
+    def check_required_attributes(
+        self,
+        request: SynapseRequest,
+        attributes: Mapping[str, List[Any]],
+        attribute_requirements: Iterable[SsoAttributeRequirement],
+    ) -> bool:
+        """
+        Confirm that the required attributes were present in the SSO response.
+
+        If all requirements are met, this will return True.
+
+        If any requirement is not met, then the request will be finalized by
+        showing an error page to the user and False will be returned.
+
+        Args:
+            request: The request to (potentially) respond to.
+            attributes: The attributes from the SSO IdP.
+            attribute_requirements: The requirements that attributes must meet.
+
+        Returns:
+            True if all requirements are met, False if any attribute fails to
+            meet the requirement.
+
+        """
+        # Ensure that the attributes of the logged in user meet the required
+        # attributes.
+        for requirement in attribute_requirements:
+            if not _check_attribute_requirement(attributes, requirement):
+                self.render_error(
+                    request, "unauthorised", "You are not authorised to log in here."
+                )
+                return False
+
+        return True
+
 
 def get_username_mapping_session_cookie_from_request(request: IRequest) -> str:
     """Extract the session ID from the cookie
@@ -903,3 +941,36 @@ def get_username_mapping_session_cookie_from_request(request: IRequest) -> str:
     if not session_id:
         raise SynapseError(code=400, msg="missing session_id")
     return session_id.decode("ascii", errors="replace")
+
+
+def _check_attribute_requirement(
+    attributes: Mapping[str, List[Any]], req: SsoAttributeRequirement
+) -> bool:
+    """Check if SSO attributes meet the proper requirements.
+
+    Args:
+        attributes: A mapping of attributes to an iterable of one or more values.
+        requirement: The configured requirement to check.
+
+    Returns:
+        True if the required attribute was found and had a proper value.
+    """
+    if req.attribute not in attributes:
+        logger.info("SSO attribute missing: %s", req.attribute)
+        return False
+
+    # If the requirement is None, the attribute existing is enough.
+    if req.value is None:
+        return True
+
+    values = attributes[req.attribute]
+    if req.value in values:
+        return True
+
+    logger.info(
+        "SSO attribute %s did not match required value '%s' (was '%s')",
+        req.attribute,
+        req.value,
+        values,
+    )
+    return False
