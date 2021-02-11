@@ -829,8 +829,8 @@ class EventCreationHandler:
 
         event = await builder.build(
             prev_event_ids=prev_event_ids,
-            inherit_depth=inherit_depth,
             auth_event_ids=auth_event_ids,
+            inherit_depth=inherit_depth,
         )
         context = await self.state.compute_event_context(event)
         if requester:
