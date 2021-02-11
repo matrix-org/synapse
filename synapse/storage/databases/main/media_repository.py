@@ -15,7 +15,6 @@
 from enum import Enum
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
 

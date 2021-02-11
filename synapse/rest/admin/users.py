@@ -817,39 +817,30 @@ class UserMediaRestServlet(RestServlet):
                 errcode=Codes.INVALID_PARAM,
             )
 
-        order_by = parse_string(
-            request, "order_by", default=MediaSortOrder.CREATED_TS.value
-        )
-        if order_by not in (
-            MediaSortOrder.MEDIA_ID.value,
-            MediaSortOrder.UPLOAD_NAME.value,
-            MediaSortOrder.CREATED_TS.value,
-            MediaSortOrder.LAST_ACCESS_TS.value,
-            MediaSortOrder.MEDIA_LENGTH.value,
-            MediaSortOrder.MEDIA_TYPE.value,
-            MediaSortOrder.QUARANTINED_BY.value,
-            MediaSortOrder.SAFE_FROM_QUARANTINE.value,
-        ):
-            raise SynapseError(
-                400,
-                "Unknown value for order_by: %s" % (order_by,),
-                errcode=Codes.INVALID_PARAM,
-            )
-
-        direction = parse_string(request, "dir", default="f")
-        if direction not in ("f", "b"):
-            raise SynapseError(
-                400, "Unknown direction: %s" % (direction,), errcode=Codes.INVALID_PARAM
-            )
-
         # If neither `order_by` nor `dir` is set, set the default order
         # to newest media is on top for backward compatibility.
-        if (
-            parse_string(request, "order_by") is None
-            and parse_string(request, "dir") is None
-        ):
+        if b"order_by" not in request.args and b"dir" not in request.args:
             order_by = MediaSortOrder.CREATED_TS.value
             direction = "b"
+        else:
+            order_by = parse_string(
+                request,
+                "order_by",
+                default=MediaSortOrder.CREATED_TS.value,
+                allowed_values=(
+                    MediaSortOrder.MEDIA_ID.value,
+                    MediaSortOrder.UPLOAD_NAME.value,
+                    MediaSortOrder.CREATED_TS.value,
+                    MediaSortOrder.LAST_ACCESS_TS.value,
+                    MediaSortOrder.MEDIA_LENGTH.value,
+                    MediaSortOrder.MEDIA_TYPE.value,
+                    MediaSortOrder.QUARANTINED_BY.value,
+                    MediaSortOrder.SAFE_FROM_QUARANTINE.value,
+                ),
+            )
+            direction = parse_string(
+                request, "dir", default="f", allowed_values=("f", "b")
+            )
 
         media, total = await self.store.get_local_media_by_user_paginate(
             start, limit, user_id, order_by, direction

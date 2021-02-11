@@ -1522,7 +1522,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+        self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
 
         # invalid search order
         channel = self.make_request(
@@ -1530,7 +1530,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+        self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
 
         # negative limit
         channel = self.make_request(
