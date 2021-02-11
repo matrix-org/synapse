@@ -462,8 +462,8 @@ class EventCreationHandler:
 
                 If None, they will be requested from the database.
 
-            inherit_depth: True if you want to inherit the oldest depth from the
-                prev_event_ids and hang an event off the prev_events
+            inherit_depth: True to use the oldest depth from the prev_event_ids
+                (instead of calculating a new depth).
 
             auth_event_ids:
                 The event ids to use as the auth_events for the new event.
@@ -702,8 +702,8 @@ class EventCreationHandler:
         Args:
             requester: The requester sending the event.
             event_dict: An entire event.
-            inherit_depth: True if you want to inherit the oldest depth from the
-                event_dict["prev_events"] and hang the event off of the prev_events
+            inherit_depth: True to use the oldest depth from the event_dict["prev_events"]
+                (instead of calculating a new depth).
             ratelimit: Whether to rate limit this send.
             txn_id: The transaction ID.
             ignore_shadow_ban: True if shadow-banned users should be allowed to
@@ -800,8 +800,8 @@ class EventCreationHandler:
 
                 If None, they will be requested from the database.
 
-            inherit_depth: True if you want to inherit the oldest depth from the
-                prev_event_ids and hang the event off of the prev_events
+            inherit_depth: True to use the oldest depth from the prev_event_ids
+                (instead of calculating a new depth).
 
             auth_event_ids:
                 The event ids to use as the auth_events for the new event.

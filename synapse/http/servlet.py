@@ -114,7 +114,7 @@ def parse_string(
     required: bool = False,
     allowed_values: Optional[Iterable[str]] = None,
     encoding: Optional[str] = "ascii",
-):
+) -> Optional[Union[bytes, str]]:
     """
     Parse a string parameter from the request query string.
 
@@ -123,18 +123,18 @@ def parse_string(
 
     Args:
         request: the twisted HTTP request.
-        name (bytes|unicode): the name of the query parameter.
-        default (bytes|unicode|None): value to use if the parameter is absent,
+        name: the name of the query parameter.
+        default: value to use if the parameter is absent,
             defaults to None. Must be bytes if encoding is None.
-        required (bool): whether to raise a 400 SynapseError if the
+        required: whether to raise a 400 SynapseError if the
             parameter is absent, defaults to False.
-        allowed_values (list[bytes|unicode]): List of allowed values for the
+        allowed_values: List of allowed values for the
             string, or None if any value is allowed, defaults to None. Must be
             the same type as name, if given.
-        encoding (str|None): The encoding to decode the string content with.
+        encoding: The encoding to decode the string content with.
 
     Returns:
-        bytes/unicode|None: A string value or the default. Unicode if encoding
+        A string value or the default. Unicode if encoding
         was given, bytes otherwise.
 
     Raises:
@@ -147,7 +147,7 @@ def parse_string(
     )
 
 
-def parse_string_value(value, allowed_values, name="", encoding="ascii") -> str:
+def _parse_string_value(value: Union[str, bytes], allowed_values: Optional[Iterable[str]], name: str, encoding: Optional[str]) -> str:
     if encoding:
         try:
             value = value.decode(encoding)
@@ -179,19 +179,19 @@ def parse_strings_from_args(
     decoded to Unicode using the encoding, otherwise it will be encoded
 
     Args:
-        args (List[str]): the twisted HTTP request.args list.
-        name (bytes|unicode): the name of the query parameter.
-        default (bytes|unicode|None): value to use if the parameter is absent,
+        args: the twisted HTTP request.args list.
+        name: the name of the query parameter.
+        default: value to use if the parameter is absent,
             defaults to None. Must be bytes if encoding is None.
-        required (bool): whether to raise a 400 SynapseError if the
+        required : whether to raise a 400 SynapseError if the
             parameter is absent, defaults to False.
         allowed_values (list[bytes|unicode]): List of allowed values for the
             string, or None if any value is allowed, defaults to None. Must be
             the same type as name, if given.
-        encoding (str|None): The encoding to decode the string content with.
+        encoding: The encoding to decode the string content with.
 
     Returns:
-        bytes/unicode|None: A string value or the default. Unicode if encoding
+        A string value or the default. Unicode if encoding
         was given, bytes otherwise.
 
     Raises:
@@ -207,7 +207,7 @@ def parse_strings_from_args(
         values = args[name]
 
         return [
-            parse_string_value(value, allowed_values, name=name, encoding=encoding)
+            _parse_string_value(value, allowed_values, name=name, encoding=encoding)
             for value in values
         ]
     else:
@@ -238,19 +238,19 @@ def parse_string_from_args(
     decoded to Unicode using the encoding, otherwise it will be encoded
 
     Args:
-        args (List[str]): the twisted HTTP request.args list.
-        name (bytes|unicode): the name of the query parameter.
-        default (bytes|unicode|None): value to use if the parameter is absent,
+        args: the twisted HTTP request.args list.
+        name: the name of the query parameter.
+        default: value to use if the parameter is absent,
             defaults to None. Must be bytes if encoding is None.
-        required (bool): whether to raise a 400 SynapseError if the
+        required: whether to raise a 400 SynapseError if the
             parameter is absent, defaults to False.
-        allowed_values (list[bytes|unicode]): List of allowed values for the
+        allowed_values: List of allowed values for the
             string, or None if any value is allowed, defaults to None. Must be
             the same type as name, if given.
-        encoding (str|None): The encoding to decode the string content with.
+        encoding: The encoding to decode the string content with.
 
     Returns:
-        bytes/unicode|None: A string value or the default. Unicode if encoding
+        A string value or the default. Unicode if encoding
         was given, bytes otherwise.
 
     Raises:
@@ -268,7 +268,7 @@ def parse_string_from_args(
         encoding=encoding,
     )
 
-    if isinstance(strings, list) and len(strings):
+    if isinstance(strings, list):
         return strings[0]
 
     # Return the default

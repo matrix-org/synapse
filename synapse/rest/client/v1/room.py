@@ -36,7 +36,6 @@ from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
     parse_integer,
-    parse_integer_from_args,
     parse_json_object_from_request,
     parse_string,
     parse_strings_from_args,
@@ -237,14 +236,12 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         inherit_depth = False
         prev_events = parse_strings_from_args(request.args, "prev_event")
         if self._msc2716_enabled:
-            if prev_events:
+            if prev_events and requester.app_service:
                 event_dict["prev_events"] = prev_events
                 # If backfilling old messages, let's just use the same depth of what we're inserting next to
                 inherit_depth = True
 
-        # TODO: Put app_service logic back in place once we figure out how to make the Complement tests
-        # run as an app service
-        if b"ts" in request.args: # and requester.app_service:
+        if b"ts" in request.args and requester.app_service:
             event_dict["origin_server_ts"] = parse_integer(request, "ts", 0)
 
         try:
