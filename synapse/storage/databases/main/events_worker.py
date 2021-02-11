@@ -63,6 +63,7 @@ EVENT_QUEUE_THREADS = 3  # Max number of threads that will fetch events
 EVENT_QUEUE_ITERATIONS = 3  # No. times we block waiting for requests for events
 EVENT_QUEUE_TIMEOUT_S = 0.1  # Timeout when waiting for requests for events
 EVENT_EXPIRY_TIME = 24 * 60 * 60 * 1000
+GET_EVENT_CACHE_NAME = "getEvent"
 
 _EventCacheEntry = namedtuple("_EventCacheEntry", ("event", "redacted_event"))
 
@@ -495,30 +496,28 @@ class EventsWorkerStore(SQLBaseStore):
         self._get_event_cache.invalidate((event_id,))
         if self._external_cache.is_enabled():
             # XXX: Is there danger in doing this?
-            # We could hold a set of recently evicted keys in memory if 
+            # We could hold a set of recently evicted keys in memory if
             # we need this to by syncronous?
             run_as_background_process(
                 "getEvent_external_cache_delete",
                 self._external_cache.delete,
-                "getEvent",
-                event_id
+                GET_EVENT_CACHE_NAME,
+                event_id,
             )
 
-    def _create_event_cache_entry_from_external_cache_entry(self, external_entry: Tuple[JsonDict, Optional[JsonDict]]) -> Optional[_EventCacheEntry]:
+    def _create_event_cache_entry_from_external_cache_entry(
+        self, external_entry: Tuple[JsonDict, Optional[JsonDict]]
+    ) -> Optional[_EventCacheEntry]:
         """Create a _EventCacheEntry from a tuple of dicts
         Args:
             external_entry: A tuple of event, redacted_event
         Returns:
-            A _EventCacheEntry containing the frozen event(s) 
+            A _EventCacheEntry containing the frozen event(s)
         """
         original_ev = make_event_from_dict(
             event_dict=external_entry[0].get("event_dict"),
-            room_version=KNOWN_ROOM_VERSIONS[
-                external_entry[0].get("room_version")
-            ],
-            internal_metadata_dict=external_entry[0].get(
-                "internal_metadata_dict"
-            ),
+            room_version=KNOWN_ROOM_VERSIONS[external_entry[0].get("room_version")],
+            internal_metadata_dict=external_entry[0].get("internal_metadata_dict"),
             rejected_reason=external_entry[0].get("rejected_reason"),
         )
         original_ev.internal_metadata.stream_ordering = external_entry[0].get(
@@ -528,18 +527,11 @@ class EventsWorkerStore(SQLBaseStore):
         if external_entry[1]:
             redacted_ev = make_event_from_dict(
                 event_dict=external_entry[1].get("event_dict"),
-                room_version=KNOWN_ROOM_VERSIONS[
-                    external_entry[1].get("room_version")
-                ],
-                internal_metadata_dict=external_entry[1].get(
-                    "internal_metadata_dict"
-                ),
+                room_version=KNOWN_ROOM_VERSIONS[external_entry[1].get("room_version")],
+                internal_metadata_dict=external_entry[1].get("internal_metadata_dict"),
                 rejected_reason=external_entry[1].get("rejected_reason"),
             )
-        return _EventCacheEntry(
-            event=original_ev, redacted_event=redacted_ev
-        )
-
+        return _EventCacheEntry(event=original_ev, redacted_event=redacted_ev)
 
     async def _get_events_from_cache(self, events, allow_rejected, update_metrics=True):
         """Fetch events from the caches
@@ -564,9 +556,13 @@ class EventsWorkerStore(SQLBaseStore):
 
             if not ret and self._external_cache.is_enabled():
                 # L2 cache - external
-                cache_result = await self._external_cache.get("getEvent", event_id)
+                cache_result = await self._external_cache.get(
+                    GET_EVENT_CACHE_NAME, event_id
+                )
                 if cache_result:
-                    ret = self._create_event_cache_entry_from_external_cache_entry(cache_result)
+                    ret = self._create_event_cache_entry_from_external_cache_entry(
+                        cache_result
+                    )
                     # We got a hit here, store it in the L1 cache
                     self._get_event_cache.set((event_id,), ret)
 
@@ -878,7 +874,7 @@ class EventsWorkerStore(SQLBaseStore):
                     redacted_event=redacted_event,
                 )
                 await self._external_cache.set(
-                    "getEvent",
+                    GET_EVENT_CACHE_NAME,
                     event_id,
                     redis_cache_entry,
                     expiry_ms=EVENT_EXPIRY_TIME,
