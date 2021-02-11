@@ -497,7 +497,7 @@ class EventsWorkerStore(SQLBaseStore):
         if self._external_cache.is_enabled():
             # XXX: Is there danger in doing this?
             # We could hold a set of recently evicted keys in memory if
-            # we need this to by syncronous?
+            # we need this to be synchronous?
             run_as_background_process(
                 "getEvent_external_cache_delete",
                 self._external_cache.delete,
