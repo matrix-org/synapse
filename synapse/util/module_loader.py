@@ -49,7 +49,8 @@ def load_module(provider: dict, config_path: Iterable[str]) -> Tuple[Type, Any]:
     module = importlib.import_module(module)
     provider_class = getattr(module, clz)
 
-    module_config = provider.get("config")
+    # Load the module config. If None, pass an empty dictionary instead
+    module_config = provider.get("config") or {}
     try:
         provider_config = provider_class.parse_config(module_config)
     except jsonschema.ValidationError as e:

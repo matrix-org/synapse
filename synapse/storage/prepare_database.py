@@ -619,9 +619,9 @@ def _get_or_create_schema_state(
 
     txn.execute("SELECT version, upgraded FROM schema_version")
     row = txn.fetchone()
-    current_version = int(row[0]) if row else None
 
-    if current_version:
+    if row is not None:
+        current_version = int(row[0])
         txn.execute(
             "SELECT file FROM applied_schema_deltas WHERE version >= ?",
             (current_version,),

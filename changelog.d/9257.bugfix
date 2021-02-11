@@ -1,0 +1,1 @@
+Fix long-standing bug where sending email push would fail for rooms that the server had since left.

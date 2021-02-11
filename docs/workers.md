@@ -16,6 +16,9 @@ workers only work with PostgreSQL-based Synapse deployments. SQLite should only
 be used for demo purposes and any admin considering workers should already be
 running PostgreSQL.
 
+See also https://matrix.org/blog/2020/11/03/how-we-fixed-synapses-scalability
+for a higher level overview.
+
 ## Main process/worker communication
 
 The processes communicate with each other via a Synapse-specific protocol called
@@ -37,6 +40,9 @@ which relays replication commands between processes. This can give a significant
 cpu saving on the main process and will be a prerequisite for upcoming
 performance improvements.
 
+If Redis support is enabled Synapse will use it as a shared cache, as well as a
+pub/sub mechanism.
+
 See the [Architectural diagram](#architectural-diagram) section at the end for
 a visualisation of what this looks like.
 
@@ -56,7 +62,7 @@ The appropriate dependencies must also be installed for Synapse. If using a
 virtualenv, these can be installed with:
 
 ```sh
-pip install matrix-synapse[redis]
+pip install "matrix-synapse[redis]"
 ```
 
 Note that these dependencies are included when synapse is installed with `pip
@@ -214,6 +220,7 @@ expressions:
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/members$
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/state$
     ^/_matrix/client/(api/v1|r0|unstable)/account/3pid$
+    ^/_matrix/client/(api/v1|r0|unstable)/devices$
     ^/_matrix/client/(api/v1|r0|unstable)/keys/query$
     ^/_matrix/client/(api/v1|r0|unstable)/keys/changes$
     ^/_matrix/client/versions$
@@ -221,7 +228,6 @@ expressions:
     ^/_matrix/client/(api/v1|r0|unstable)/joined_groups$
     ^/_matrix/client/(api/v1|r0|unstable)/publicised_groups$
     ^/_matrix/client/(api/v1|r0|unstable)/publicised_groups/
-    ^/_synapse/client/password_reset/email/submit_token$
 
     # Registration/login requests
     ^/_matrix/client/(api/v1|r0|unstable)/login$
@@ -252,24 +258,28 @@ Additionally, the following endpoints should be included if Synapse is configure
 to use SSO (you only need to include the ones for whichever SSO provider you're
 using):
 
+    # for all SSO providers
+    ^/_matrix/client/(api/v1|r0|unstable)/login/sso/redirect
+    ^/_synapse/client/pick_idp$
+    ^/_synapse/client/pick_username
+    ^/_synapse/client/new_user_consent$
+    ^/_synapse/client/sso_register$
+
     # OpenID Connect requests.
-    ^/_matrix/client/(api/v1|r0|unstable)/login/sso/redirect$
-    ^/_synapse/oidc/callback$
+    ^/_synapse/client/oidc/callback$
 
     # SAML requests.
-    ^/_matrix/client/(api/v1|r0|unstable)/login/sso/redirect$
-    ^/_matrix/saml2/authn_response$
+    ^/_synapse/client/saml2/authn_response$
 
     # CAS requests.
-    ^/_matrix/client/(api/v1|r0|unstable)/login/(cas|sso)/redirect$
     ^/_matrix/client/(api/v1|r0|unstable)/login/cas/ticket$
+
+Ensure that all SSO logins go to a single process.
+For multiple workers not handling the SSO endpoints properly, see
+[#7530](https://github.com/matrix-org/synapse/issues/7530).
 
 Note that a HTTP listener with `client` and `federation` resources must be
 configured in the `worker_listeners` option in the worker config.
-
-Ensure that all SSO logins go to a single process (usually the main process). 
-For multiple workers not handling the SSO endpoints properly, see
-[#7530](https://github.com/matrix-org/synapse/issues/7530).
 
 #### Load balancing
 

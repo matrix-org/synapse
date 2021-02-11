@@ -24,6 +24,7 @@ from .cas import CasConfig
 from .consent_config import ConsentConfig
 from .database import DatabaseConfig
 from .emailconfig import EmailConfig
+from .experimental import ExperimentalConfig
 from .federation import FederationConfig
 from .groups import GroupsConfig
 from .jwt_config import JWTConfig
@@ -57,6 +58,7 @@ class HomeServerConfig(RootConfig):
 
     config_classes = [
         ServerConfig,
+        ExperimentalConfig,
         TlsConfig,
         FederationConfig,
         CacheConfig,

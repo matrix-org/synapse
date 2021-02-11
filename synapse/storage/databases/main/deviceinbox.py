@@ -54,9 +54,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 db=database,
                 stream_name="to_device",
                 instance_name=self._instance_name,
-                table="device_inbox",
-                instance_column="instance_name",
-                id_column="stream_id",
+                tables=[("device_inbox", "instance_name", "stream_id")],
                 sequence_name="device_inbox_sequence",
                 writers=hs.config.worker.writers.to_device,
             )
