@@ -136,7 +136,7 @@ class EventBuilder:
             prev_events = prev_event_ids
 
         old_depth = await self._store.get_max_depth_of(prev_event_ids)
-        # If backfilling old message, let's just use the same depth of what we're inserting next to
+        # If backfilling old message, use the same depth as what we're inserting next to.
         if inherit_depth:
             depth = old_depth
         # Otherwise, progress the depth as normal
