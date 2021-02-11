@@ -47,7 +47,7 @@ T = TypeVar("T")
 V = TypeVar("V")
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s
 class ConstantProperty(Generic[T, V]):
     """A descriptor that returns the given constant, ignoring attempts to set
     it.
