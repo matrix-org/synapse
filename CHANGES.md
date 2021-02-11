@@ -10,7 +10,7 @@ Features
 Bugfixes
 --------
 
-- Fix new ratelimiting for invites to respect the `ratelimit` flag on application services. Introduced in v1.27.0rc1. ([\#9302](https://github.com/matrix-org/synapse/issues/9302))
+- Fix ratelimiting introduced in v1.27.0rc1 for invites to respect the `ratelimit` flag on application services. ([\#9302](https://github.com/matrix-org/synapse/issues/9302))
 - Do not automatically calculate `public_baseurl` since it can be wrong in some situations. Reverts behaviour introduced in v1.26.0. ([\#9313](https://github.com/matrix-org/synapse/issues/9313))
 
 
