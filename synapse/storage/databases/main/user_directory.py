@@ -558,8 +558,8 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
 
-        self._prioritise_local_users_in_search = (
-            hs.config.user_directory_search_prioritise_local_users
+        self._prefer_local_users_in_search = (
+            hs.config.user_directory_search_prefer_local_users
         )
         self._server_name = hs.config.server_name
 
@@ -762,7 +762,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
 
         # If enabled, this config option will rank local users higher than those on
         # remote instances.
-        if self._prioritise_local_users_in_search:
+        if self._prefer_local_users_in_search:
             # The statement checks whether a given user's user ID contains a domain name
             # that matches the local server
             if isinstance(self.database_engine, PostgresEngine):

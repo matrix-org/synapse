@@ -549,13 +549,13 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             "user_directory": {
                 "enabled": True,
                 "search_all_users": True,
-                "prioritise_local_users": True,
+                "prefer_local_users": True,
             }
         }
     )
-    def test_prioritise_local_users(self):
+    def test_prefer_local_users(self):
         """Tests that local users are shown higher in search results when
-        user_directory.prioritise_local_users is True.
+        user_directory.prefer_local_users is True.
         """
         # Create a room and few users to test the directory with
         searching_user = self.register_user("searcher", "password")
