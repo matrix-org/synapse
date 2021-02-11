@@ -176,8 +176,8 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             elif MediaSortOrder(order_by) == MediaSortOrder.SAFE_FROM_QUARANTINE:
                 order_by_column = "safe_from_quarantine"
             else:
-                raise StoreError(
-                    500, "Incorrect value for order_by provided: %s" % order_by
+                raise ValueError(
+                    "Incorrect value for order_by provided: %s" % (order_by,)
                 )
 
             if direction == "b":
