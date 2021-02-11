@@ -491,10 +491,18 @@ class EventsWorkerStore(SQLBaseStore):
 
         return event_entry_map
 
-    async def _invalidate_get_event_cache(self, event_id):
+    def _invalidate_get_event_cache(self, event_id):
         self._get_event_cache.invalidate((event_id,))
         if self._external_cache.is_enabled():
-            await self._external_cache.delete("getEvent", event_id)
+            # XXX: Is there danger in doing this?
+            # We could hold a set of recently evicted keys in memory if 
+            # we need this to by syncronous?
+            run_as_background_process(
+                "getEvent_external_cache_delete",
+                self._external_cache.delete,
+                "getEvent",
+                event_id
+            )
 
     def _create_event_cache_entry_from_external_cache_entry(self, external_entry: Tuple[JsonDict, Optional[JsonDict]]) -> Optional[_EventCacheEntry]:
         """Create a _EventCacheEntry from a tuple of dicts
