@@ -746,9 +746,7 @@ class EventCreationHandler:
                     assert event.internal_metadata.stream_ordering
                     return event, event.internal_metadata.stream_ordering
 
-            prev_events = None
-            if "prev_events" in event_dict:
-                prev_events = event_dict["prev_events"]
+            prev_events = event_dict.get("prev_events")
 
             event, context = await self.create_event(
                 requester,
