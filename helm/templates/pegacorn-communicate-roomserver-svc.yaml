@@ -1,0 +1,30 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+#    fabric8.io/git-commit: 9835f5100a549e30a10dd1303b0952234aea14b9
+    prometheus.io/port: "9779"
+    fabric8.io/iconUrl: img/icons/camel.svg
+    fabric8.io/git-branch: master
+    prometheus.io/scrape: "true"
+    fabric8.io/scm-tag: HEAD
+  labels:
+    app: {{ .Values.serviceName }}
+    provider: fabric8
+    version: 1.0.0-SNAPSHOT
+    group: net.fhirbox.pegacorn
+  name: {{ .Values.serviceName }}
+spec:
+  ports:
+  - name: synapse
+    port: {{ .Values.basePort }}
+    protocol: TCP
+    targetPort: 8448
+    nodePort: {{ if (.Values.serviceType) and (eq .Values.serviceType "NodePort")}} {{ .Values.basePort }} {{ end }}
+#TODO end remove once testing is done    
+  selector:
+    app: {{ .Values.serviceName }}
+    provider: fabric8
+    group: net.fhirbox.pegacorn
+  type: {{ .Values.serviceType | default "LoadBalancer" }}
