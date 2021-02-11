@@ -766,17 +766,17 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             # The statement checks whether a given user's user ID contains a domain name
             # that matches the local server
             if isinstance(self.database_engine, PostgresEngine):
-                statement = "* (CASE WHEN user_id LIKE '%:' || ? THEN 2.0 ELSE 1.0 END)"
+                statement = "* (CASE WHEN user_id LIKE ? THEN 2.0 ELSE 1.0 END)"
             elif isinstance(self.database_engine, Sqlite3Engine):
                 # Note that we need to include a comma at the end for valid SQL
-                statement = "user_id LIKE '%:' || ? DESC,"
+                statement = "user_id LIKE ? DESC,"
             else:
                 # This should be unreachable.
                 raise Exception("Unrecognized database engine")
             additional_ordering_statements.append(statement)
 
             # Append the local server name as an argument to the final query
-            ordering_arguments += (self._server_name,)
+            ordering_arguments += ("%:" + self._server_name,)
 
         if isinstance(self.database_engine, PostgresEngine):
             full_query, exact_query, prefix_query = _parse_query_postgres(search_term)
