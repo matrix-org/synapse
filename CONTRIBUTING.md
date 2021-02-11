@@ -44,12 +44,32 @@ The source code of Synapse is hosted on Github. You will also need [a recent ver
 
 For some tests, you will need [a recent version of Docker](https://docs.docker.com/get-docker/).
 
-## Under Unix (macOS, Linux, BSD, ...)
 
-Once you have installed Python 3, please open a Terminal and run:
+# 3. Get the source.
+
+The preferred and easiest way to contribute changes is to fork the relevant
+project on github, and then [create a pull request](
+https://help.github.com/articles/using-pull-requests/) to ask us to pull your
+changes into our repo.
+
+Please base your changes on the `develop` branch.
 
 ```sh
-mkdir -p ~/synapse
+git clone git@github.com:YOUR_GITHUB_USER_NAME/synapse.git
+git checkout develop
+```
+
+If you need help getting started with git, this is beyond the scope of the document, but you
+can find many good git tutorials on the web.
+
+# 4. Install the dependencies
+
+## Under Unix (macOS, Linux, BSD, ...)
+
+Once you have installed Python 3 and added the source, please open a Terminal and run:
+
+```sh
+cd WHERE_YOU_HAVE_CLONED_THE_REPOSITORY
 python3 -m venv ./env
 source ./env/bin/activate
 pip install -e ".[all,lint,mypy,test]"
@@ -63,31 +83,18 @@ This will install the developer dependencies for the project.
 TBD
 
 
-# 3. Get the source.
-
-The preferred and easiest way to contribute changes is to fork the relevant
-project on github, and then [create a pull request](
-https://help.github.com/articles/using-pull-requests/) to ask us to pull your
-changes into our repo.
-
-Please base your changes on the `develop` branch.
-
-```sh
-git clone git@github.com:YOUR_GITHUB_USER_NAME/synapse.git
-```
-
-# 4. Get in touch.
+# 5. Get in touch.
 
 Join our developer community on Matrix: #synapse-dev:matrix.org !
 
 
-# 5. Pick an issue.
+# 6. Pick an issue.
 
 Fix your favorite problem or perhaps find a [Good First Issue](https://github.com/matrix-org/synapse/issues?q=is%3Aopen+is%3Aissue+label%3A%22Good+First+Issue%22)
 to work on.
 
 
-# 6. Turn coffee and documentation into code and documentation!
+# 7. Turn coffee and documentation into code and documentation!
 
 Synapse's code style is documented [here](docs/code_style.md). Please follow
 it, including the conventions for the [sample configuration
@@ -109,7 +116,7 @@ Wiki](https://github.com/matrix-org/synapse/wiki), although this is primarily
 contributed to by community authors.
 
 
-# 7. Test, test, test!
+# 8. Test, test, test!
 <a name="test-test-test"></a>
 
 While you're developing and before submitting a patch, you'll
@@ -129,7 +136,7 @@ source ./env/bin/activate
 ./scripts-dev/lint.sh
 ```
 
-Note that the linters *will modify your files* to fix styling errors.
+Note that this script *will modify your files* to fix styling errors.
 Make sure that you have saved all your files.
 
 If you wish to restrict the linters to only the files changed since the last commit
@@ -202,21 +209,19 @@ source ./env/bin/activate
 ```
 
 
-# 8. Submit your patch.
+# 9. Submit your patch.
 
 Once you're happy with your patch, it's time to prepare a Pull Request.
 
 To prepare a Pull Request, please:
 
 1. verify that [all the tests pass](#test-test-test), including the coding style;
-2. add a [changelog entry](#changelog);
-3. [sign off](#sign-off) your contribution;
-4. Push code to commits to your fork of Synapse:
-```sh
-git push origin develop
-```
-5. on Github, [create the Pull Request](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request);
-6. on Github, request review from `matrix.org / Synapse Core`.
+2. [sign off](#sign-off) your contribution;
+3. `git push` your commit to your fork of Synapse;
+4. on Github, [create the Pull Request](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request);
+5. add a [changelog entry](#changelog) and push it to your Pull Request;
+6. on Github, request review from `matrix.org / Synapse Core`;
+
 
 ## Changelog
 
@@ -367,7 +372,7 @@ flag to `git commit`, which uses the name and email set in your
 `user.name` and `user.email` git configs.
 
 
-# 9. Turn feedback into better code.
+# 10. Turn feedback into better code.
 
 Once the Pull Request is opened, you will see a few things:
 
@@ -380,13 +385,13 @@ From this point, you should:
   - If there is any error, fix the error.
 2. If a developer has requested changes, make these changes.
 3. Create a new commit with the changes.
-  - Please [do NOT overwrite the history](docs/dev/git.md#on-keeping-the-commit-history-clean). New commits make the reviewer's life easier.
+  - Please do NOT overwrite the history. New commits make the reviewer's life easier.
   - Push this commits to your Pull Request.
 4. Back to 1.
 
 Once both the CI and the developers are happy, the patch will be merged into Synapse and released shortly!
 
-# 10. Find a new issue.
+# 11. Find a new issue.
 
 By now, you know the drill!
 
