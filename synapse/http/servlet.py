@@ -114,7 +114,7 @@ def parse_string(
     required: bool = False,
     allowed_values: Optional[Iterable[str]] = None,
     encoding: Optional[str] = "ascii",
-) -> Optional[Union[bytes, str]]:
+):
     """
     Parse a string parameter from the request query string.
 
