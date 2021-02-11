@@ -1,3 +1,25 @@
+Synapse 1.27.0rc2 (2021-02-11)
+==============================
+
+Features
+--------
+
+- Further improvements to the user experience of registration via single sign-on. ([\#9297](https://github.com/matrix-org/synapse/issues/9297))
+
+
+Bugfixes
+--------
+
+- Fix new ratelimiting for invites to respect the `ratelimit` flag on application services. Introduced in v1.27.0rc1. ([\#9302](https://github.com/matrix-org/synapse/issues/9302))
+- Do not automatically calculate `public_baseurl` since it can be wrong in some situations. ([\#9313](https://github.com/matrix-org/synapse/issues/9313))
+
+
+Improved Documentation
+----------------------
+
+- Clarify the sample configuration for changes made to the template loading code. ([\#9310](https://github.com/matrix-org/synapse/issues/9310))
+
+
 Synapse 1.27.0rc1 (2021-02-02)
 ==============================
 
