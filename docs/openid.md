@@ -54,7 +54,8 @@ Here are a few configs for providers that should work with Synapse.
 ### Microsoft Azure Active Directory
 Azure AD can act as an OpenID Connect Provider. Register a new application under
 *App registrations* in the Azure AD management console. The RedirectURI for your
-application should point to your matrix server: `[synapse public baseurl]/_synapse/oidc/callback`
+application should point to your matrix server:
+`[synapse public baseurl]/_synapse/client/oidc/callback`
 
 Go to *Certificates & secrets* and register a new client secret. Make note of your
 Directory (tenant) ID as it will be used in the Azure links.
@@ -94,7 +95,7 @@ staticClients:
 - id: synapse
   secret: secret
   redirectURIs:
-  - '[synapse public baseurl]/_synapse/oidc/callback'
+  - '[synapse public baseurl]/_synapse/client/oidc/callback'
   name: 'Synapse'
 ```
 
@@ -140,7 +141,7 @@ Follow the [Getting Started Guide](https://www.keycloak.org/getting-started) to 
 | Enabled | `On` |
 | Client Protocol | `openid-connect` |
 | Access Type | `confidential` |
-| Valid Redirect URIs | `[synapse public baseurl]/_synapse/oidc/callback` |
+| Valid Redirect URIs | `[synapse public baseurl]/_synapse/client/oidc/callback` |
 
 5. Click `Save`
 6. On the Credentials tab, update the fields:
@@ -168,7 +169,7 @@ oidc_providers:
 ### [Auth0][auth0]
 
 1. Create a regular web application for Synapse
-2. Set the Allowed Callback URLs to `[synapse public baseurl]/_synapse/oidc/callback`
+2. Set the Allowed Callback URLs to `[synapse public baseurl]/_synapse/client/oidc/callback`
 3. Add a rule to add the `preferred_username` claim.
    <details>
     <summary>Code sample</summary>
@@ -217,7 +218,7 @@ login mechanism needs an attribute to uniquely identify users, and that endpoint
 does not return a `sub` property, an alternative `subject_claim` has to be set.
 
 1. Create a new OAuth application: https://github.com/settings/applications/new.
-2. Set the callback URL to `[synapse public baseurl]/_synapse/oidc/callback`.
+2. Set the callback URL to `[synapse public baseurl]/_synapse/client/oidc/callback`.
 
 Synapse config:
 
@@ -225,6 +226,7 @@ Synapse config:
 oidc_providers:
   - idp_id: github
     idp_name: Github
+    idp_brand: "org.matrix.github"  # optional: styling hint for clients
     discover: false
     issuer: "https://github.com/"
     client_id: "your-client-id" # TO BE FILLED
@@ -250,6 +252,7 @@ oidc_providers:
    oidc_providers:
      - idp_id: google
        idp_name: Google
+       idp_brand: "org.matrix.google"  # optional: styling hint for clients
        issuer: "https://accounts.google.com/"
        client_id: "your-client-id" # TO BE FILLED
        client_secret: "your-client-secret" # TO BE FILLED
@@ -260,13 +263,13 @@ oidc_providers:
            display_name_template: "{{ user.name }}"
    ```
 4. Back in the Google console, add this Authorized redirect URI: `[synapse
-   public baseurl]/_synapse/oidc/callback`.
+   public baseurl]/_synapse/client/oidc/callback`.
 
 ### Twitch
 
 1. Setup a developer account on [Twitch](https://dev.twitch.tv/)
 2. Obtain the OAuth 2.0 credentials by [creating an app](https://dev.twitch.tv/console/apps/)
-3. Add this OAuth Redirect URL: `[synapse public baseurl]/_synapse/oidc/callback`
+3. Add this OAuth Redirect URL: `[synapse public baseurl]/_synapse/client/oidc/callback`
 
 Synapse config:
 
@@ -288,7 +291,7 @@ oidc_providers:
 
 1. Create a [new application](https://gitlab.com/profile/applications).
 2. Add the `read_user` and `openid` scopes.
-3. Add this Callback URL: `[synapse public baseurl]/_synapse/oidc/callback`
+3. Add this Callback URL: `[synapse public baseurl]/_synapse/client/oidc/callback`
 
 Synapse config:
 
@@ -296,6 +299,7 @@ Synapse config:
 oidc_providers:
   - idp_id: gitlab
     idp_name: Gitlab
+    idp_brand: "org.matrix.gitlab"  # optional: styling hint for clients
     issuer: "https://gitlab.com/"
     client_id: "your-client-id" # TO BE FILLED
     client_secret: "your-client-secret" # TO BE FILLED
@@ -320,7 +324,7 @@ one so requires a little more configuration.
 2. Once the app is created, add "Facebook Login" and choose "Web". You don't
    need to go through the whole form here.
 3. In the left-hand menu, open "Products"/"Facebook Login"/"Settings".
-   * Add `[synapse public baseurl]/_synapse/oidc/callback` as an OAuth Redirect
+   * Add `[synapse public baseurl]/_synapse/client/oidc/callback` as an OAuth Redirect
      URL.
 4. In the left-hand menu, open "Settings/Basic". Here you can copy the "App ID"
    and "App Secret" for use below.
@@ -350,3 +354,59 @@ Relevant documents:
  * https://developers.facebook.com/docs/facebook-login/manually-build-a-login-flow
  * Using Facebook's Graph API: https://developers.facebook.com/docs/graph-api/using-graph-api/
  * Reference to the User endpoint: https://developers.facebook.com/docs/graph-api/reference/user
+
+### Gitea
+
+Gitea is, like Github, not an OpenID provider, but just an OAuth2 provider.
+
+The [`/user` API endpoint](https://try.gitea.io/api/swagger#/user/userGetCurrent)
+can be used to retrieve information on the authenticated user. As the Synapse
+login mechanism needs an attribute to uniquely identify users, and that endpoint
+does not return a `sub` property, an alternative `subject_claim` has to be set.
+
+1. Create a new application.
+2. Add this Callback URL: `[synapse public baseurl]/_synapse/oidc/callback`
+
+Synapse config:
+
+```yaml
+oidc_providers:
+  - idp_id: gitea
+    idp_name: Gitea
+    discover: false
+    issuer: "https://your-gitea.com/"
+    client_id: "your-client-id" # TO BE FILLED
+    client_secret: "your-client-secret" # TO BE FILLED
+    client_auth_method: client_secret_post
+    scopes: [] # Gitea doesn't support Scopes
+    authorization_endpoint: "https://your-gitea.com/login/oauth/authorize"
+    token_endpoint: "https://your-gitea.com/login/oauth/access_token"
+    userinfo_endpoint: "https://your-gitea.com/api/v1/user"
+    user_mapping_provider:
+      config:
+        subject_claim: "id"
+        localpart_template: "{{ user.login }}"
+        display_name_template: "{{ user.full_name }}" 
+```
+
+### XWiki
+
+Install [OpenID Connect Provider](https://extensions.xwiki.org/xwiki/bin/view/Extension/OpenID%20Connect/OpenID%20Connect%20Provider/) extension in your [XWiki](https://www.xwiki.org) instance.
+
+Synapse config:
+
+```yaml
+oidc_providers:
+  - idp_id: xwiki
+    idp_name: "XWiki"
+    issuer: "https://myxwikihost/xwiki/oidc/"
+    client_id: "your-client-id" # TO BE FILLED
+    # Needed until https://github.com/matrix-org/synapse/issues/9212 is fixed
+    client_secret: "dontcare"
+    scopes: ["openid", "profile"]
+    user_profile_method: "userinfo_endpoint"
+    user_mapping_provider:
+      config:
+        localpart_template: "{{ user.preferred_username }}"
+        display_name_template: "{{ user.name }}"
+```

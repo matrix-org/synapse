@@ -15,7 +15,7 @@
 
 import time
 import urllib.parse
-from typing import Any, Dict, Union
+from typing import Any, Dict, List, Union
 from urllib.parse import urlencode
 
 from mock import Mock
@@ -29,8 +29,7 @@ from synapse.appservice import ApplicationService
 from synapse.rest.client.v1 import login, logout
 from synapse.rest.client.v2_alpha import devices, register
 from synapse.rest.client.v2_alpha.account import WhoamiRestServlet
-from synapse.rest.synapse.client.pick_idp import PickIdpResource
-from synapse.rest.synapse.client.pick_username import pick_username_resource
+from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.types import create_requester
 
 from tests import unittest
@@ -423,11 +422,8 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         return config
 
     def create_resource_dict(self) -> Dict[str, Resource]:
-        from synapse.rest.oidc import OIDCResource
-
         d = super().create_resource_dict()
-        d["/_synapse/client/pick_idp"] = PickIdpResource(self.hs)
-        d["/_synapse/oidc"] = OIDCResource(self.hs)
+        d.update(build_synapse_client_resource_tree(self.hs))
         return d
 
     def test_get_login_flows(self):
@@ -497,13 +493,21 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.result)
 
         # parse the form to check it has fields assumed elsewhere in this class
+        html = channel.result["body"].decode("utf-8")
         p = TestHtmlParser()
-        p.feed(channel.result["body"].decode("utf-8"))
+        p.feed(html)
         p.close()
 
-        self.assertCountEqual(p.radios["idp"], ["cas", "oidc", "oidc-idp1", "saml"])
+        # there should be a link for each href
+        returned_idps = []  # type: List[str]
+        for link in p.links:
+            path, query = link.split("?", 1)
+            self.assertEqual(path, "pick_idp")
+            params = urllib.parse.parse_qs(query)
+            self.assertEqual(params["redirectUrl"], [TEST_CLIENT_REDIRECT_URL])
+            returned_idps.append(params["idp"][0])
 
-        self.assertEqual(p.hiddens["redirectUrl"], TEST_CLIENT_REDIRECT_URL)
+        self.assertCountEqual(returned_idps, ["cas", "oidc", "oidc-idp1", "saml"])
 
     def test_multi_sso_redirect_to_cas(self):
         """If CAS is chosen, should redirect to the CAS server"""
@@ -1211,11 +1215,8 @@ class UsernamePickerTestCase(HomeserverTestCase):
         return config
 
     def create_resource_dict(self) -> Dict[str, Resource]:
-        from synapse.rest.oidc import OIDCResource
-
         d = super().create_resource_dict()
-        d["/_synapse/client/pick_username"] = pick_username_resource(self.hs)
-        d["/_synapse/oidc"] = OIDCResource(self.hs)
+        d.update(build_synapse_client_resource_tree(self.hs))
         return d
 
     def test_username_picker(self):
@@ -1229,7 +1230,7 @@ class UsernamePickerTestCase(HomeserverTestCase):
         # that should redirect to the username picker
         self.assertEqual(channel.code, 302, channel.result)
         picker_url = channel.headers.getRawHeaders("Location")[0]
-        self.assertEqual(picker_url, "/_synapse/client/pick_username")
+        self.assertEqual(picker_url, "/_synapse/client/pick_username/account_details")
 
         # ... with a username_mapping_session cookie
         cookies = {}  # type: Dict[str,str]
@@ -1253,12 +1254,11 @@ class UsernamePickerTestCase(HomeserverTestCase):
         self.assertApproximates(session.expiry_time_ms, expected_expiry, tolerance=1000)
 
         # Now, submit a username to the username picker, which should serve a redirect
-        # back to the client
-        submit_path = picker_url + "/submit"
+        # to the completion page
         content = urlencode({b"username": b"bobby"}).encode("utf8")
         chan = self.make_request(
             "POST",
-            path=submit_path,
+            path=picker_url,
             content=content,
             content_is_form=True,
             custom_headers=[
@@ -1270,6 +1270,16 @@ class UsernamePickerTestCase(HomeserverTestCase):
         )
         self.assertEqual(chan.code, 302, chan.result)
         location_headers = chan.headers.getRawHeaders("Location")
+
+        # send a request to the completion page, which should 302 to the client redirectUrl
+        chan = self.make_request(
+            "GET",
+            path=location_headers[0],
+            custom_headers=[("Cookie", "username_mapping_session=" + session_id)],
+        )
+        self.assertEqual(chan.code, 302, chan.result)
+        location_headers = chan.headers.getRawHeaders("Location")
+
         # ensure that the returned location matches the requested redirect URL
         path, query = location_headers[0].split("?", 1)
         self.assertEqual(path, "https://x")

@@ -1,1 +1,0 @@
-Fix bug where we sometimes didn't detect that Redis connections had died, causing workers to not see new data.

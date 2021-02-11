@@ -1,1 +1,0 @@
-Emit an error at startup if different Identity Providers are configured with the same `idp_id`.

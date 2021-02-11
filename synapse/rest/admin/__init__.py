@@ -42,8 +42,10 @@ from synapse.rest.admin.rooms import (
     JoinRoomAliasServlet,
     ListRoomRestServlet,
     MakeRoomAdminRestServlet,
+    RoomEventContextServlet,
     RoomMembersRestServlet,
     RoomRestServlet,
+    RoomStateRestServlet,
     ShutdownRoomRestServlet,
 )
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
@@ -213,6 +215,7 @@ def register_servlets(hs, http_server):
     """
     register_servlets_for_client_rest_resource(hs, http_server)
     ListRoomRestServlet(hs).register(http_server)
+    RoomStateRestServlet(hs).register(http_server)
     RoomRestServlet(hs).register(http_server)
     RoomMembersRestServlet(hs).register(http_server)
     DeleteRoomRestServlet(hs).register(http_server)
@@ -236,6 +239,7 @@ def register_servlets(hs, http_server):
     MakeRoomAdminRestServlet(hs).register(http_server)
     ShadowBanRestServlet(hs).register(http_server)
     ForwardExtremitiesRestServlet(hs).register(http_server)
+    RoomEventContextServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(hs, http_server):

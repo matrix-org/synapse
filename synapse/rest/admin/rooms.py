@@ -15,9 +15,11 @@
 import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, List, Optional, Tuple
+from urllib import parse as urlparse
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
+from synapse.api.filtering import Filter
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -33,6 +35,7 @@ from synapse.rest.admin._base import (
 )
 from synapse.storage.databases.main.room import RoomSortOrder
 from synapse.types import JsonDict, RoomAlias, RoomID, UserID, create_requester
+from synapse.util import json_decoder
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -288,6 +291,45 @@ class RoomMembersRestServlet(RestServlet):
 
         members = await self.store.get_users_in_room(room_id)
         ret = {"members": members, "total": len(members)}
+
+        return 200, ret
+
+
+class RoomStateRestServlet(RestServlet):
+    """
+    Get full state within a room.
+    """
+
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)/state")
+
+    def __init__(self, hs: "HomeServer"):
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+        self.clock = hs.get_clock()
+        self._event_serializer = hs.get_event_client_serializer()
+
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
+
+        ret = await self.store.get_room(room_id)
+        if not ret:
+            raise NotFoundError("Room not found")
+
+        event_ids = await self.store.get_current_state_ids(room_id)
+        events = await self.store.get_events(event_ids.values())
+        now = self.clock.time_msec()
+        room_state = await self._event_serializer.serialize_events(
+            events.values(),
+            now,
+            # We don't bother bundling aggregations in when asked for state
+            # events, as clients won't use them.
+            bundle_aggregations=False,
+        )
+        ret = {"state": room_state}
 
         return 200, ret
 
@@ -566,3 +608,65 @@ class ForwardExtremitiesRestServlet(RestServlet):
 
         extremities = await self.store.get_forward_extremities_for_room(room_id)
         return 200, {"count": len(extremities), "results": extremities}
+
+
+class RoomEventContextServlet(RestServlet):
+    """
+    Provide the context for an event.
+    This API is designed to be used when system administrators wish to look at
+    an abuse report and understand what happened during and immediately prior
+    to this event.
+    """
+
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]*)/context/(?P<event_id>[^/]*)$")
+
+    def __init__(self, hs):
+        super().__init__()
+        self.clock = hs.get_clock()
+        self.room_context_handler = hs.get_room_context_handler()
+        self._event_serializer = hs.get_event_client_serializer()
+        self.auth = hs.get_auth()
+
+    async def on_GET(self, request, room_id, event_id):
+        requester = await self.auth.get_user_by_req(request, allow_guest=False)
+        await assert_user_is_admin(self.auth, requester.user)
+
+        limit = parse_integer(request, "limit", default=10)
+
+        # picking the API shape for symmetry with /messages
+        filter_str = parse_string(request, b"filter", encoding="utf-8")
+        if filter_str:
+            filter_json = urlparse.unquote(filter_str)
+            event_filter = Filter(
+                json_decoder.decode(filter_json)
+            )  # type: Optional[Filter]
+        else:
+            event_filter = None
+
+        results = await self.room_context_handler.get_event_context(
+            requester,
+            room_id,
+            event_id,
+            limit,
+            event_filter,
+            use_admin_priviledge=True,
+        )
+
+        if not results:
+            raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
+
+        time_now = self.clock.time_msec()
+        results["events_before"] = await self._event_serializer.serialize_events(
+            results["events_before"], time_now
+        )
+        results["event"] = await self._event_serializer.serialize_event(
+            results["event"], time_now
+        )
+        results["events_after"] = await self._event_serializer.serialize_events(
+            results["events_after"], time_now
+        )
+        results["state"] = await self._event_serializer.serialize_events(
+            results["state"], time_now
+        )
+
+        return 200, results

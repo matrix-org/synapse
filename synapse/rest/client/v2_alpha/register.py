@@ -126,6 +126,8 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
+        self.identity_handler.ratelimit_request_token_requests(request, "email", email)
+
         existing_user_id = await self.hs.get_datastore().get_user_id_by_threepid(
             "email", email
         )
@@ -191,6 +193,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
             body, ["client_secret", "country", "phone_number", "send_attempt"]
         )
         client_secret = body["client_secret"]
+        assert_valid_client_secret(client_secret)
         country = body["country"]
         phone_number = body["phone_number"]
         send_attempt = body["send_attempt"]
@@ -204,6 +207,10 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
                 "Phone numbers are not authorized to register on this server",
                 Codes.THREEPID_DENIED,
             )
+
+        self.identity_handler.ratelimit_request_token_requests(
+            request, "msisdn", msisdn
+        )
 
         existing_user_id = await self.hs.get_datastore().get_user_id_by_threepid(
             "msisdn", msisdn
@@ -287,6 +294,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
 
         sid = parse_string(request, "sid", required=True)
         client_secret = parse_string(request, "client_secret", required=True)
+        assert_valid_client_secret(client_secret)
         token = parse_string(request, "token", required=True)
 
         # Attempt to validate a 3PID session

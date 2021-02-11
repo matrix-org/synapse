@@ -187,7 +187,7 @@ After updating the homeserver configuration, you must restart synapse:
     ```
   * If you use systemd:
     ```
-    systemctl restart synapse.service
+    systemctl restart matrix-synapse.service
     ```
 ... and then reload any clients (or wait an hour for them to refresh their
 settings).

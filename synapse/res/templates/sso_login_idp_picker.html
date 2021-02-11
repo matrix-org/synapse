@@ -2,30 +2,60 @@
 <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <link rel="stylesheet" href="/_matrix/static/client/login/style.css">
-        <title>{{ server_name }} Login</title>
+        <title>Choose identity provider</title>
+        <style type="text/css">
+          {% include "sso.css" without context %}
+
+          .providers {
+            list-style: none;
+            padding: 0;
+          }
+
+          .providers li {
+            margin: 12px;
+          }
+
+          .providers a {
+            display: block;
+            border-radius: 4px;
+            border: 1px solid #17191C;
+            padding: 8px;
+            text-align: center;
+            text-decoration: none;
+            color: #17191C;
+            display: flex;
+            align-items: center;
+            font-weight: bold;
+          }
+
+          .providers a img {
+            width: 24px;
+            height: 24px;
+          }
+          .providers a span {
+            flex: 1;
+          }
+        </style>
     </head>
     <body>
-        <div id="container">
-            <h1 id="title">{{ server_name }} Login</h1>
-            <div class="login_flow">
-                <p>Choose one of the following identity providers:</p>
-            <form>
-                <input type="hidden" name="redirectUrl" value="{{ redirect_url }}">
-                <ul class="radiobuttons">
-{% for p in providers %}
-                    <li>
-                        <input type="radio" name="idp" id="prov{{ loop.index }}" value="{{ p.idp_id }}">
-                        <label for="prov{{ loop.index }}">{{ p.idp_name }}</label>
-{% if p.idp_icon %}
+        <header>
+            <h1>Log in to {{ server_name }} </h1>
+            <p>Choose an identity provider to log in</p>
+        </header>
+        <main>
+            <ul class="providers">
+                {% for p in providers %}
+                <li>
+                    <a href="pick_idp?idp={{ p.idp_id }}&redirectUrl={{ redirect_url | urlencode }}">
+                        {% if p.idp_icon %}
                         <img src="{{ p.idp_icon | mxc_to_http(32, 32) }}"/>
-{% endif %}
-                    </li>
-{% endfor %}
-                </ul>
-                <input type="submit" class="button button--full-width" id="button-submit" value="Submit">
-            </form>
-            </div>
-        </div>
+                        {% endif %}
+                        <span>{{ p.idp_name }}</span>
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </main>
+        {% include "sso_footer.html" without context %}
     </body>
 </html>

@@ -85,6 +85,17 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             burst_count=hs.config.ratelimiting.rc_joins_remote.burst_count,
         )
 
+        self._invites_per_room_limiter = Ratelimiter(
+            clock=self.clock,
+            rate_hz=hs.config.ratelimiting.rc_invites_per_room.per_second,
+            burst_count=hs.config.ratelimiting.rc_invites_per_room.burst_count,
+        )
+        self._invites_per_user_limiter = Ratelimiter(
+            clock=self.clock,
+            rate_hz=hs.config.ratelimiting.rc_invites_per_user.per_second,
+            burst_count=hs.config.ratelimiting.rc_invites_per_user.burst_count,
+        )
+
         # This is only used to get at ratelimit function, and
         # maybe_kick_guest_users. It's fine there are multiple of these as
         # it doesn't store state.
@@ -143,6 +154,16 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             room_id
         """
         raise NotImplementedError()
+
+    def ratelimit_invite(self, room_id: Optional[str], invitee_user_id: str):
+        """Ratelimit invites by room and by target user.
+
+        If room ID is missing then we just rate limit by target user.
+        """
+        if room_id:
+            self._invites_per_room_limiter.ratelimit(room_id)
+
+        self._invites_per_user_limiter.ratelimit(invitee_user_id)
 
     async def _local_membership_update(
         self,
@@ -387,8 +408,14 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 raise SynapseError(403, "This room has been blocked on this server")
 
         if effective_membership_state == Membership.INVITE:
+            target_id = target.to_string()
+            if ratelimit:
+                # Don't ratelimit application services.
+                if not requester.app_service or requester.app_service.is_rate_limited():
+                    self.ratelimit_invite(room_id, target_id)
+
             # block any attempts to invite the server notices mxid
-            if target.to_string() == self._server_notices_mxid:
+            if target_id == self._server_notices_mxid:
                 raise SynapseError(HTTPStatus.FORBIDDEN, "Cannot invite this user")
 
             block_invite = False
@@ -412,7 +439,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     block_invite = True
 
                 if not await self.spam_checker.user_may_invite(
-                    requester.user.to_string(), target.to_string(), room_id
+                    requester.user.to_string(), target_id, room_id
                 ):
                     logger.info("Blocking invite due to spam checker")
                     block_invite = True

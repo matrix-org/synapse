@@ -18,17 +18,17 @@
 import argparse
 import errno
 import os
-import time
-import urllib.parse
 from collections import OrderedDict
 from hashlib import sha256
 from textwrap import dedent
-from typing import Any, Callable, Iterable, List, MutableMapping, Optional
+from typing import Any, Iterable, List, MutableMapping, Optional
 
 import attr
 import jinja2
 import pkg_resources
 import yaml
+
+from synapse.util.templates import _create_mxc_to_http_filter, _format_ts_filter
 
 
 class ConfigError(Exception):
@@ -262,6 +262,7 @@ class Config:
             # Search the custom template directory as well
             search_directories.insert(0, custom_template_directory)
 
+        # TODO: switch to synapse.util.templates.build_jinja_env
         loader = jinja2.FileSystemLoader(search_directories)
         env = jinja2.Environment(loader=loader, autoescape=jinja2.select_autoescape(),)
 
@@ -275,38 +276,6 @@ class Config:
 
         # Load the templates
         return [env.get_template(filename) for filename in filenames]
-
-
-def _format_ts_filter(value: int, format: str):
-    return time.strftime(format, time.localtime(value / 1000))
-
-
-def _create_mxc_to_http_filter(public_baseurl: str) -> Callable:
-    """Create and return a jinja2 filter that converts MXC urls to HTTP
-
-    Args:
-        public_baseurl: The public, accessible base URL of the homeserver
-    """
-
-    def mxc_to_http_filter(value, width, height, resize_method="crop"):
-        if value[0:6] != "mxc://":
-            return ""
-
-        server_and_media_id = value[6:]
-        fragment = None
-        if "#" in server_and_media_id:
-            server_and_media_id, fragment = server_and_media_id.split("#", 1)
-            fragment = "#" + fragment
-
-        params = {"width": width, "height": height, "method": resize_method}
-        return "%s_matrix/media/v1/thumbnail/%s?%s%s" % (
-            public_baseurl,
-            server_and_media_id,
-            urllib.parse.urlencode(params),
-            fragment or "",
-        )
-
-    return mxc_to_http_filter
 
 
 class RootConfig:
