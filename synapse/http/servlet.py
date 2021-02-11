@@ -147,7 +147,12 @@ def parse_string(
     )
 
 
-def _parse_string_value(value: Union[str, bytes], allowed_values: Optional[Iterable[str]], name: str, encoding: Optional[str]) -> str:
+def _parse_string_value(
+    value: Union[str, bytes],
+    allowed_values: Optional[Iterable[str]],
+    name: str,
+    encoding: Optional[str],
+) -> str:
     if encoding:
         try:
             value = value.decode(encoding)
