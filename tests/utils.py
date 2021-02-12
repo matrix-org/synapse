@@ -159,6 +159,7 @@ def default_config(name, parse=False):
         },
         "rc_3pid_validation": {"per_second": 10000, "burst_count": 10000},
         "saml2_enabled": False,
+        "public_baseurl": None,
         "default_identity_server": None,
         "key_refresh_interval": 24 * 60 * 60 * 1000,
         "old_signing_keys": {},
