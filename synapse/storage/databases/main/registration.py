@@ -110,6 +110,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 "creation_ts",
                 "user_type",
                 "deactivated",
+                "shadow_banned",
             ],
             allow_none=True,
             desc="get_user_by_id",

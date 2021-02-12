@@ -742,6 +742,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
             self.assertIn("admin", u)
             self.assertIn("user_type", u)
             self.assertIn("deactivated", u)
+            self.assertIn("shadow_banned", u)
             self.assertIn("displayname", u)
             self.assertIn("avatar_url", u)
 
@@ -1091,6 +1092,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(False, channel.json_body["admin"])
         self.assertEqual(False, channel.json_body["is_guest"])
         self.assertEqual(False, channel.json_body["deactivated"])
+        self.assertEqual(False, channel.json_body["shadow_banned"])
         self.assertEqual("mxc://fibble/wibble", channel.json_body["avatar_url"])
 
     @override_config(
