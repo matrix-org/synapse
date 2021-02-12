@@ -1114,14 +1114,12 @@ class PresenceEventSource:
         """Returns the set of users that the given user should see presence
         updates for
         """
-        user_id = user.to_string()
-        users_interested_in = set()
-        users_interested_in.add(user_id)  # So that we receive our own presence
+        user_id = user.to_string
 
-        users_who_share_room = await self.store.get_users_who_share_room_with_user(
-            user_id, on_invalidate=cache_context.invalidate
+        users_interested_in = await self.store.get_users_who_share_room_with_user(
+            user_id,
         )
-        users_interested_in.update(users_who_share_room)
+        users_interested_in.update(user_id)  # So that we receive our own presence
 
         if explicit_room_id:
             user_ids = await self.store.get_users_in_room(

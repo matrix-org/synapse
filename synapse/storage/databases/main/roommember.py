@@ -37,7 +37,7 @@ from synapse.storage.roommember import (
 from synapse.types import Collection, PersistedEventPosition, get_domain_from_id
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import intern_string
-from synapse.util.caches.descriptors import _CacheContext, cached, cachedList
+from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
@@ -484,24 +484,35 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
         return frozenset(r.room_id for r in rooms)
 
-    @cached(max_entries=500000, cache_context=True, iterable=True)
-    async def get_users_who_share_room_with_user(
-        self, user_id: str, cache_context: _CacheContext
-    ) -> Set[str]:
+    @cached(max_entries=500000, iterable=True)
+    async def get_users_who_share_room_with_user(self, user_id: str) -> Set[str]:
         """Returns the set of users who share a room with `user_id`
         """
-        room_ids = await self.get_rooms_for_user(
-            user_id, on_invalidate=cache_context.invalidate
+
+        def _get_users_who_share_room_with_user(txn):
+            txn.execute(
+                """
+                SELECT DISTINCT p2.user_id
+                FROM users_in_public_rooms as p1
+                INNER JOIN users_in_public_rooms as p2
+                    ON p1.room_id = p2.room_id
+                    AND p1.user_id = ?
+                UNION
+                SELECT DISTINCT user_id
+                FROM users_who_share_private_rooms
+                WHERE
+                    user_id = ?
+                """,
+                (user_id, user_id),
+            )
+            rows = self.db_pool.cursor_to_dict(txn)
+            return rows
+
+        rows = await self.db_pool.runInteraction(
+            "get_users_who_share_room_with_user", _get_users_who_share_room_with_user
         )
 
-        user_who_share_room = set()
-        for room_id in room_ids:
-            user_ids = await self.get_users_in_room(
-                room_id, on_invalidate=cache_context.invalidate
-            )
-            user_who_share_room.update(user_ids)
-
-        return user_who_share_room
+        return {row["user_id"] for row in rows}
 
     async def get_joined_users_from_context(
         self, event: EventBase, context: EventContext
