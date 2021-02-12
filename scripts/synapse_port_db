@@ -36,6 +36,7 @@ from synapse.logging.context import (
     make_deferred_yieldable,
     run_in_background,
 )
+from synapse.replication.tcp.external_cache import ExternalCache
 from synapse.storage.database import DatabasePool, make_conn
 from synapse.storage.databases.main.client_ips import ClientIpBackgroundUpdateStore
 from synapse.storage.databases.main.deviceinbox import DeviceInboxBackgroundUpdateStore
@@ -206,13 +207,19 @@ class Store(
             "Attempt to set room_is_public during port_db: database not empty?"
         )
 
-
 class MockHomeserver:
     def __init__(self, config):
         self.clock = Clock(reactor)
         self.config = config
         self.hostname = config.server_name
         self.version_string = "Synapse/" + get_version_string(synapse)
+        self.external_cache = ExternalCache(self)
+
+    def get_outbound_redis_connection(self):
+        return None
+
+    def get_external_cache(self):
+        return self.external_cache
 
     def get_clock(self):
         return self.clock
