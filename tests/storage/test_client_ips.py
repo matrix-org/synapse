@@ -372,7 +372,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 class ClientIpAuthTestCase(unittest.HomeserverTestCase):
 
     servlets = [
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        synapse.rest.admin.register_servlets,
         login.register_servlets,
     ]
 
@@ -416,7 +416,7 @@ class ClientIpAuthTestCase(unittest.HomeserverTestCase):
             self.reactor,
             self.site,
             "GET",
-            "/_synapse/admin/v1/users/" + self.user_id,
+            "/_synapse/admin/v2/users/" + self.user_id,
             access_token=access_token,
             custom_headers=headers1.items(),
             **make_request_args,
