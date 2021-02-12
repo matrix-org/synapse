@@ -77,7 +77,7 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
 
     def test_power_levels(self):
         """
-        Another user can upgrade the room if the power level is increased.
+        Another user can upgrade the room if their power level is increased.
         """
         # The other user doesn't have the proper power level.
         channel = self._upgrade_room(self.other_token)
@@ -101,7 +101,7 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
 
     def test_power_levels_user_default(self):
         """
-        Another user can upgrade the room if the default power level is increased.
+        Another user can upgrade the room if the default power level for users is increased.
         """
         # The other user doesn't have the proper power level.
         channel = self._upgrade_room(self.other_token)
