@@ -151,6 +151,3 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
             self.room_id, "m.room.power_levels", tok=self.creator_token,
         )
         self.assertNotIn(self.other, power_levels["users"])
-
-    def test_broken_power_levels(self):
-        pass

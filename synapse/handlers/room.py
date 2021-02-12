@@ -433,11 +433,12 @@ class RoomCreationHandler(BaseHandler):
 
         # Get the user's current power level, this matches the logic in get_user_power_level,
         # but without the entire state map.
-        current_power_levels = power_levels.setdefault("users", {})
-        current_power_level = current_power_levels.get(user_id, 0)
+        user_power_levels = power_levels.setdefault("users", {})
+        users_default = power_levels.get("users_default", 0)
+        current_power_level = user_power_levels.get(user_id, users_default)
         # Raise the requester's power level in the new room if necessary
         if current_power_level < needed_power_level:
-            current_power_levels[user_id] = needed_power_level
+            user_power_levels[user_id] = needed_power_level
 
         await self._send_events_for_new_room(
             requester,
