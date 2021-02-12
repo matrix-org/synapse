@@ -108,7 +108,10 @@ class Signal:
                 return await maybe_awaitable(observer(*args, **kwargs))
             except Exception as e:
                 logger.warning(
-                    "%s signal observer %s failed: %r", self.name, observer, e,
+                    "%s signal observer %s failed: %r",
+                    self.name,
+                    observer,
+                    e,
                 )
 
         deferreds = [run_in_background(do, o) for o in self.observers]

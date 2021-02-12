@@ -61,8 +61,8 @@ class E2eKeysHandler:
 
         self._is_master = hs.config.worker_app is None
         if not self._is_master:
-            self._user_device_resync_client = ReplicationUserDevicesResyncRestServlet.make_client(
-                hs
+            self._user_device_resync_client = (
+                ReplicationUserDevicesResyncRestServlet.make_client(hs)
             )
         else:
             # Only register this edu handler on master as it requires writing
@@ -85,7 +85,7 @@ class E2eKeysHandler:
     async def query_devices(
         self, query_body: JsonDict, timeout: int, from_user_id: str
     ) -> JsonDict:
-        """ Handle a device key query from a client
+        """Handle a device key query from a client
 
         {
             "device_keys": {
@@ -391,8 +391,7 @@ class E2eKeysHandler:
     async def on_federation_query_client_keys(
         self, query_body: Dict[str, Dict[str, Optional[List[str]]]]
     ) -> JsonDict:
-        """ Handle a device key query from a federated server
-        """
+        """Handle a device key query from a federated server"""
         device_keys_query = query_body.get(
             "device_keys", {}
         )  # type: Dict[str, Optional[List[str]]]
@@ -1065,7 +1064,9 @@ class E2eKeysHandler:
         return key, key_id, verify_key
 
     async def _retrieve_cross_signing_keys_for_remote_user(
-        self, user: UserID, desired_key_type: str,
+        self,
+        user: UserID,
+        desired_key_type: str,
     ) -> Tuple[Optional[dict], Optional[str], Optional[VerifyKey]]:
         """Queries cross-signing keys for a remote user and saves them to the database
 
@@ -1269,8 +1270,7 @@ def _one_time_keys_match(old_key_json: str, new_key: JsonDict) -> bool:
 
 @attr.s(slots=True)
 class SignatureListItem:
-    """An item in the signature list as used by upload_signatures_for_device_keys.
-    """
+    """An item in the signature list as used by upload_signatures_for_device_keys."""
 
     signing_key_id = attr.ib(type=str)
     target_user_id = attr.ib(type=str)
@@ -1355,8 +1355,12 @@ class SigningKeyEduUpdater:
             logger.info("pending updates: %r", pending_updates)
 
             for master_key, self_signing_key in pending_updates:
-                new_device_ids = await device_list_updater.process_cross_signing_key_update(
-                    user_id, master_key, self_signing_key,
+                new_device_ids = (
+                    await device_list_updater.process_cross_signing_key_update(
+                        user_id,
+                        master_key,
+                        self_signing_key,
+                    )
                 )
                 device_ids = device_ids + new_device_ids
 

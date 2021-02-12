@@ -324,7 +324,8 @@ class SsoHandler:
 
         # Check if we already have a mapping for this user.
         previously_registered_user_id = await self._store.get_user_by_external_id(
-            auth_provider_id, remote_user_id,
+            auth_provider_id,
+            remote_user_id,
         )
 
         # A match was found, return the user ID.
@@ -413,7 +414,8 @@ class SsoHandler:
         with await self._mapping_lock.queue(auth_provider_id):
             # first of all, check if we already have a mapping for this user
             user_id = await self.get_sso_user_by_remote_user_id(
-                auth_provider_id, remote_user_id,
+                auth_provider_id,
+                remote_user_id,
             )
 
             # Check for grandfathering of users.
@@ -458,7 +460,8 @@ class SsoHandler:
         )
 
     async def _call_attribute_mapper(
-        self, sso_to_matrix_id_mapper: Callable[[int], Awaitable[UserAttributes]],
+        self,
+        sso_to_matrix_id_mapper: Callable[[int], Awaitable[UserAttributes]],
     ) -> UserAttributes:
         """Call the attribute mapper function in a loop, until we get a unique userid"""
         for i in range(self._MAP_USERNAME_RETRIES):
@@ -629,7 +632,8 @@ class SsoHandler:
         """
 
         user_id = await self.get_sso_user_by_remote_user_id(
-            auth_provider_id, remote_user_id,
+            auth_provider_id,
+            remote_user_id,
         )
 
         user_id_to_verify = await self._auth_handler.get_session_data(
@@ -668,7 +672,8 @@ class SsoHandler:
 
         # render an error page.
         html = self._bad_user_template.render(
-            server_name=self._server_name, user_id_to_verify=user_id_to_verify,
+            server_name=self._server_name,
+            user_id_to_verify=user_id_to_verify,
         )
         respond_with_html(request, 200, html)
 
@@ -692,7 +697,9 @@ class SsoHandler:
         raise SynapseError(400, "unknown session")
 
     async def check_username_availability(
-        self, localpart: str, session_id: str,
+        self,
+        localpart: str,
+        session_id: str,
     ) -> bool:
         """Handle an "is username available" callback check
 
@@ -830,7 +837,8 @@ class SsoHandler:
         )
 
         attributes = UserAttributes(
-            localpart=session.chosen_localpart, emails=session.emails_to_use,
+            localpart=session.chosen_localpart,
+            emails=session.emails_to_use,
         )
 
         if session.use_display_name:

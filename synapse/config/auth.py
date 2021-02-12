@@ -18,8 +18,7 @@ from ._base import Config
 
 
 class AuthConfig(Config):
-    """Password and login configuration
-    """
+    """Password and login configuration"""
 
     section = "auth"
 

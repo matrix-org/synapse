@@ -104,8 +104,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
         self.synapse_handler.send_positions_to_connection(self)
 
     def messageReceived(self, pattern: str, channel: str, message: str):
-        """Received a message from redis.
-        """
+        """Received a message from redis."""
         with PreserveLoggingContext(self._logging_context):
             self._parse_and_dispatch_message(message)
 
@@ -118,7 +117,8 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
             cmd = parse_command_from_line(message)
         except Exception:
             logger.exception(
-                "Failed to parse replication line: %r", message,
+                "Failed to parse replication line: %r",
+                message,
             )
             return
 

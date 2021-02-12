@@ -128,8 +128,7 @@ class UserTypes:
 
 
 class RelationTypes:
-    """The types of relations known to this server.
-    """
+    """The types of relations known to this server."""
 
     ANNOTATION = "m.annotation"
     REPLACE = "m.replace"

@@ -45,8 +45,7 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_query_local_devices_no_devices(self):
-        """If the user has no devices, we expect an empty list.
-        """
+        """If the user has no devices, we expect an empty list."""
         local_user = "@boris:" + self.hs.hostname
         res = yield defer.ensureDeferred(
             self.handler.query_local_devices({local_user: None})
@@ -243,7 +242,8 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
             )
         )
         self.assertEqual(
-            res, {"failures": {}, "one_time_keys": {local_user: {device_id: otk}}},
+            res,
+            {"failures": {}, "one_time_keys": {local_user: {device_id: otk}}},
         )
 
         res = yield defer.ensureDeferred(

@@ -294,7 +294,10 @@ class AuthTestCase(unittest.TestCase):
                 return defer.succeed(None)
             return defer.succeed(
                 TokenLookupResult(
-                    user_id=USER_ID, is_guest=False, token_id=1234, device_id="DEVICE",
+                    user_id=USER_ID,
+                    is_guest=False,
+                    token_id=1234,
+                    device_id="DEVICE",
                 )
             )
 

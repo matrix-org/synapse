@@ -241,7 +241,9 @@ class ProfileTestCase(unittest.TestCase):
         # Set avatar to an empty string
         yield defer.ensureDeferred(
             self.handler.set_avatar_url(
-                self.frank, synapse.types.create_requester(self.frank), "",
+                self.frank,
+                synapse.types.create_requester(self.frank),
+                "",
             )
         )
 

@@ -72,7 +72,10 @@ class IdentityHandler(BaseHandler):
         )
 
     def ratelimit_request_token_requests(
-        self, request: SynapseRequest, medium: str, address: str,
+        self,
+        request: SynapseRequest,
+        medium: str,
+        address: str,
     ):
         """Used to ratelimit requests to `/requestToken` by IP and address.
 

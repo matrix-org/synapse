@@ -580,8 +580,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         )
 
     async def _expire_url_cache_data(self) -> None:
-        """Clean up expired url cache content, media and thumbnails.
-        """
+        """Clean up expired url cache content, media and thumbnails."""
         # TODO: Delete from backup media store
 
         assert self._worker_run_media_background_jobs

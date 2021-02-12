@@ -34,7 +34,7 @@ PATH_PREFIX = "/_matrix/client/r0"
 
 
 class MockHandlerProfileTestCase(unittest.TestCase):
-    """ Tests rest layer of profile management.
+    """Tests rest layer of profile management.
 
     Todo: move these into ProfileTestCase
     """

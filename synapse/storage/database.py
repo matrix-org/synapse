@@ -85,8 +85,7 @@ UNIQUE_INDEX_BACKGROUND_UPDATES = {
 def make_pool(
     reactor, db_config: DatabaseConnectionConfig, engine: BaseDatabaseEngine
 ) -> adbapi.ConnectionPool:
-    """Get the connection pool for the database.
-    """
+    """Get the connection pool for the database."""
 
     # By default enable `cp_reconnect`. We need to fiddle with db_args in case
     # someone has explicitly set `cp_reconnect`.
@@ -432,8 +431,7 @@ class DatabasePool:
         )
 
     def is_running(self) -> bool:
-        """Is the database pool currently running
-        """
+        """Is the database pool currently running"""
         return self._db_pool.running
 
     async def _check_safe_to_upsert(self) -> None:
@@ -546,7 +544,11 @@ class DatabasePool:
                     # This can happen if the database disappears mid
                     # transaction.
                     transaction_logger.warning(
-                        "[TXN OPERROR] {%s} %s %d/%d", name, e, i, N,
+                        "[TXN OPERROR] {%s} %s %d/%d",
+                        name,
+                        e,
+                        i,
+                        N,
                     )
                     if i < N:
                         i += 1
@@ -567,7 +569,9 @@ class DatabasePool:
                                 conn.rollback()
                             except self.engine.module.Error as e1:
                                 transaction_logger.warning(
-                                    "[TXN EROLL] {%s} %s", name, e1,
+                                    "[TXN EROLL] {%s} %s",
+                                    name,
+                                    e1,
                                 )
                             continue
                     raise
@@ -1406,7 +1410,10 @@ class DatabasePool:
 
     @staticmethod
     def simple_select_onecol_txn(
-        txn: LoggingTransaction, table: str, keyvalues: Dict[str, Any], retcol: str,
+        txn: LoggingTransaction,
+        table: str,
+        keyvalues: Dict[str, Any],
+        retcol: str,
     ) -> List[Any]:
         sql = ("SELECT %(retcol)s FROM %(table)s") % {"retcol": retcol, "table": table}
 
@@ -1716,7 +1723,11 @@ class DatabasePool:
             desc: description of the transaction, for logging and metrics
         """
         await self.runInteraction(
-            desc, self.simple_delete_one_txn, table, keyvalues, db_autocommit=True,
+            desc,
+            self.simple_delete_one_txn,
+            table,
+            keyvalues,
+            db_autocommit=True,
         )
 
     @staticmethod

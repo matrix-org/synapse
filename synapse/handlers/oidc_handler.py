@@ -72,8 +72,7 @@ JWKS = TypedDict("JWKS", {"keys": List[JWK]})
 
 
 class OidcHandler:
-    """Handles requests related to the OpenID Connect login flow.
-    """
+    """Handles requests related to the OpenID Connect login flow."""
 
     def __init__(self, hs: "HomeServer"):
         self._sso_handler = hs.get_sso_handler()
@@ -215,8 +214,7 @@ class OidcHandler:
 
 
 class OidcError(Exception):
-    """Used to catch errors when calling the token_endpoint
-    """
+    """Used to catch errors when calling the token_endpoint"""
 
     def __init__(self, error, error_description=None):
         self.error = error
@@ -250,7 +248,9 @@ class OidcProvider:
         self._scopes = provider.scopes
         self._user_profile_method = provider.user_profile_method
         self._client_auth = ClientAuth(
-            provider.client_id, provider.client_secret, provider.client_auth_method,
+            provider.client_id,
+            provider.client_secret,
+            provider.client_auth_method,
         )  # type: ClientAuth
         self._client_auth_method = provider.client_auth_method
         self._provider_metadata = OpenIDProviderMetadata(
@@ -492,7 +492,10 @@ class OidcProvider:
         # We're not using the SimpleHttpClient util methods as we don't want to
         # check the HTTP status code and we do the body encoding ourself.
         response = await self._http_client.request(
-            method="POST", uri=uri, data=body.encode("utf-8"), headers=headers,
+            method="POST",
+            uri=uri,
+            data=body.encode("utf-8"),
+            headers=headers,
         )
 
         # This is used in multiple error messages below
@@ -949,7 +952,9 @@ class OidcSessionTokenGenerator:
             A signed macaroon token with the session information.
         """
         macaroon = pymacaroons.Macaroon(
-            location=self._server_name, identifier="key", key=self._macaroon_secret_key,
+            location=self._server_name,
+            identifier="key",
+            key=self._macaroon_secret_key,
         )
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("type = session")

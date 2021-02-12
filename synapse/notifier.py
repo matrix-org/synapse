@@ -75,7 +75,7 @@ def count(func: Callable[[T], bool], it: Iterable[T]) -> int:
 
 
 class _NotificationListener:
-    """ This represents a single client connection to the events stream.
+    """This represents a single client connection to the events stream.
     The events stream handler will have yielded to the deferred, so to
     notify the handler it is sufficient to resolve the deferred.
     """
@@ -119,7 +119,10 @@ class _NotifierUserStream:
             self.notify_deferred = ObservableDeferred(defer.Deferred())
 
     def notify(
-        self, stream_key: str, stream_id: Union[int, RoomStreamToken], time_now_ms: int,
+        self,
+        stream_key: str,
+        stream_id: Union[int, RoomStreamToken],
+        time_now_ms: int,
     ):
         """Notify any listeners for this user of a new event from an
         event source.
@@ -140,7 +143,7 @@ class _NotifierUserStream:
             noify_deferred.callback(self.current_token)
 
     def remove(self, notifier: "Notifier"):
-        """ Remove this listener from all the indexes in the Notifier
+        """Remove this listener from all the indexes in the Notifier
         it knows about.
         """
 
@@ -186,7 +189,7 @@ class _PendingRoomEventEntry:
 
 
 class Notifier:
-    """ This class is responsible for notifying any listeners when there are
+    """This class is responsible for notifying any listeners when there are
     new events available for it.
 
     Primarily used from the /events stream.
@@ -265,8 +268,7 @@ class Notifier:
         max_room_stream_token: RoomStreamToken,
         extra_users: Collection[UserID] = [],
     ):
-        """Unwraps event and calls `on_new_room_event_args`.
-        """
+        """Unwraps event and calls `on_new_room_event_args`."""
         self.on_new_room_event_args(
             event_pos=event_pos,
             room_id=event.room_id,
@@ -341,7 +343,10 @@ class Notifier:
 
         if users or rooms:
             self.on_new_event(
-                "room_key", max_room_stream_token, users=users, rooms=rooms,
+                "room_key",
+                max_room_stream_token,
+                users=users,
+                rooms=rooms,
             )
             self._on_updated_room_token(max_room_stream_token)
 
@@ -392,7 +397,7 @@ class Notifier:
         users: Collection[Union[str, UserID]] = [],
         rooms: Collection[str] = [],
     ):
-        """ Used to inform listeners that something has happened event wise.
+        """Used to inform listeners that something has happened event wise.
 
         Will wake up all listeners for the given users and rooms.
         """
@@ -418,7 +423,9 @@ class Notifier:
 
             # Notify appservices
             self._notify_app_services_ephemeral(
-                stream_key, new_token, users,
+                stream_key,
+                new_token,
+                users,
             )
 
     def on_new_replication_data(self) -> None:
@@ -502,7 +509,7 @@ class Notifier:
         is_guest: bool = False,
         explicit_room_id: str = None,
     ) -> EventStreamResult:
-        """ For the given user and rooms, return any new events for them. If
+        """For the given user and rooms, return any new events for them. If
         there are no new events wait for up to `timeout` milliseconds for any
         new events to happen before returning.
 
@@ -651,8 +658,7 @@ class Notifier:
             cb()
 
     def notify_remote_server_up(self, server: str):
-        """Notify any replication that a remote server has come back up
-        """
+        """Notify any replication that a remote server has come back up"""
         # We call federation_sender directly rather than registering as a
         # callback as a) we already have a reference to it and b) it introduces
         # circular dependencies.

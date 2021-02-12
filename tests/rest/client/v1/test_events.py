@@ -150,6 +150,8 @@ class GetEventsTestCase(unittest.HomeserverTestCase):
         event_id = resp["event_id"]
 
         channel = self.make_request(
-            "GET", "/events/" + event_id, access_token=self.token,
+            "GET",
+            "/events/" + event_id,
+            access_token=self.token,
         )
         self.assertEquals(channel.code, 200, msg=channel.result)

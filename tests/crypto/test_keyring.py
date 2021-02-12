@@ -400,7 +400,10 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
         )
 
     def build_perspectives_response(
-        self, server_name: str, signing_key: SigningKey, valid_until_ts: int,
+        self,
+        server_name: str,
+        signing_key: SigningKey,
+        valid_until_ts: int,
     ) -> dict:
         """
         Build a valid perspectives server response to a request for the given key
@@ -455,7 +458,9 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
         VALID_UNTIL_TS = 200 * 1000
 
         response = self.build_perspectives_response(
-            SERVER_NAME, testkey, VALID_UNTIL_TS,
+            SERVER_NAME,
+            testkey,
+            VALID_UNTIL_TS,
         )
 
         self.expect_outgoing_key_query(SERVER_NAME, "key1", response)

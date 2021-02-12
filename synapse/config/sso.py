@@ -18,8 +18,7 @@ from ._base import Config
 
 
 class SSOConfig(Config):
-    """SSO Configuration
-    """
+    """SSO Configuration"""
 
     section = "sso"
 

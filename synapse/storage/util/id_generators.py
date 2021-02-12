@@ -277,7 +277,9 @@ class MultiWriterIdGenerator:
         self._load_current_ids(db_conn, tables)
 
     def _load_current_ids(
-        self, db_conn, tables: List[Tuple[str, str, str]],
+        self,
+        db_conn,
+        tables: List[Tuple[str, str, str]],
     ):
         cur = db_conn.cursor(txn_name="_load_current_ids")
 
@@ -364,7 +366,10 @@ class MultiWriterIdGenerator:
             rows.sort()
 
             with self._lock:
-                for (instance, stream_id,) in rows:
+                for (
+                    instance,
+                    stream_id,
+                ) in rows:
                     stream_id = self._return_factor * stream_id
                     self._add_persisted_position(stream_id)
 
@@ -481,8 +486,7 @@ class MultiWriterIdGenerator:
         return self.get_persisted_upto_position()
 
     def get_current_token_for_writer(self, instance_name: str) -> int:
-        """Returns the position of the given writer.
-        """
+        """Returns the position of the given writer."""
 
         # If we don't have an entry for the given instance name, we assume it's a
         # new writer.
@@ -581,8 +585,7 @@ class MultiWriterIdGenerator:
                 break
 
     def _update_stream_positions_table_txn(self, txn: Cursor):
-        """Update the `stream_positions` table with newly persisted position.
-        """
+        """Update the `stream_positions` table with newly persisted position."""
 
         if not self._writers:
             return
@@ -622,8 +625,7 @@ class _AsyncCtxManagerWrapper:
 
 @attr.s(slots=True)
 class _MultiWriterCtxManager:
-    """Async context manager returned by MultiWriterIdGenerator
-    """
+    """Async context manager returned by MultiWriterIdGenerator"""
 
     id_gen = attr.ib(type=MultiWriterIdGenerator)
     multiple_ids = attr.ib(type=Optional[int], default=None)
