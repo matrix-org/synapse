@@ -43,27 +43,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class UsersRestServlet(RestServlet):
-    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)$")
-
-    def __init__(self, hs):
-        self.hs = hs
-        self.store = hs.get_datastore()
-        self.auth = hs.get_auth()
-        self.admin_handler = hs.get_admin_handler()
-
-    async def on_GET(self, request, user_id):
-        target_user = UserID.from_string(user_id)
-        await assert_requester_is_admin(self.auth, request)
-
-        if not self.hs.is_mine(target_user):
-            raise SynapseError(400, "Can only users a local user")
-
-        ret = await self.store.get_users()
-
-        return 200, ret
-
-
 class UsersRestServletV2(RestServlet):
     PATTERNS = admin_patterns("/users$", "v2")
 
