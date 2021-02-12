@@ -675,7 +675,7 @@ class PersistedEventPosition:
         persisted in the same room after this position will be after the
         returned `RoomStreamToken`.
 
-        Note: no guarentees are made about ordering w.r.t. events in other
+        Note: no guarantees are made about ordering w.r.t. events in other
         rooms.
         """
         # Doing the naive thing satisfies the desired properties described in

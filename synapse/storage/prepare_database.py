@@ -113,7 +113,7 @@ def prepare_database(
             # which should be empty.
             if config is None:
                 raise ValueError(
-                    "config==None in prepare_database, but databse is not empty"
+                    "config==None in prepare_database, but database is not empty"
                 )
 
             # if it's a worker app, refuse to upgrade the database, to avoid multiple

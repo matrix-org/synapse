@@ -497,7 +497,7 @@ def timeout_deferred(
     delayed_call = reactor.callLater(timeout, time_it_out)
 
     def convert_cancelled(value: failure.Failure):
-        # if the orgininal deferred was cancelled, and our timeout has fired, then
+        # if the original deferred was cancelled, and our timeout has fired, then
         # the reason it was cancelled was due to our timeout. Turn the CancelledError
         # into a TimeoutError.
         if timed_out[0] and value.check(CancelledError):
