@@ -585,7 +585,11 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(expected_state.state, PresenceState.ONLINE)
         self.federation_sender.send_presence_to_destinations.assert_called_once_with(
-            destinations={"server2", "server3"}, states=[expected_state]
+            # server1 is included here as it appears when getting the current hosts for
+            # the room. send_presence_to_destinations will remove the host server before
+            # sending out presence.
+            destinations=frozenset({"server1", "server2", "server3"}),
+            states=[expected_state],
         )
 
     def _add_new_user(self, room_id, user_id):

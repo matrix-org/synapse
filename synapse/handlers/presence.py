@@ -909,9 +909,6 @@ class PresenceHandler(BasePresenceHandler):
             state = await self.current_state_for_user(user_id)
             hosts = await self.state.get_current_hosts_in_room(room_id)
 
-            # Filter out ourselves.
-            hosts = {host for host in hosts if host != self.server_name}
-
             self.federation.send_presence_to_destinations(
                 states=[state], destinations=hosts
             )
@@ -1114,7 +1111,7 @@ class PresenceEventSource:
         """Returns the set of users that the given user should see presence
         updates for
         """
-        user_id = user.to_string
+        user_id = user.to_string()
 
         users_interested_in = await self.store.get_users_who_share_room_with_user(
             user_id,
