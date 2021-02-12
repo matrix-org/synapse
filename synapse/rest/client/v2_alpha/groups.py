@@ -16,7 +16,7 @@
 
 import logging
 from functools import wraps
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from twisted.web.http import Request
 
@@ -144,15 +144,15 @@ class GroupSummaryRoomsCatServlet(RestServlet):
 
     @_validate_group_id
     async def on_PUT(
-        self, request: Request, group_id: str, category_id: str, room_id: str
+        self, request: Request, group_id: str, category_id: Optional[str], room_id: str
     ):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        if not category_id:
+        if category_id == "":
             raise SynapseError(400, "category_id cannot be empty", Codes.INVALID_PARAM)
 
-        if len(category_id) > MAX_GROUP_CATEGORYID_LENGTH:
+        if category_id and len(category_id) > MAX_GROUP_CATEGORYID_LENGTH:
             raise SynapseError(
                 400,
                 "category_id may not be longer than %s characters"
@@ -391,15 +391,15 @@ class GroupSummaryUsersRoleServlet(RestServlet):
 
     @_validate_group_id
     async def on_PUT(
-        self, request: Request, group_id: str, role_id: str, user_id: str
+        self, request: Request, group_id: str, role_id: Optional[str], user_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        if not role_id:
+        if role_id == "":
             raise SynapseError(400, "role_id cannot be empty", Codes.INVALID_PARAM)
 
-        if len(role_id) > MAX_GROUP_ROLEID_LENGTH:
+        if role_id and len(role_id) > MAX_GROUP_ROLEID_LENGTH:
             raise SynapseError(
                 400,
                 "role_id may not be longer than %s characters"
