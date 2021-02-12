@@ -20,7 +20,11 @@ from typing import TYPE_CHECKING, Tuple
 
 from twisted.web.http import Request
 
-from synapse.api.constants import MAX_GROUP_CATEGORYID_LENGTH, MAX_GROUP_ROLEID_LENGTH, MAX_GROUPID_LENGTH
+from synapse.api.constants import (
+    MAX_GROUP_CATEGORYID_LENGTH,
+    MAX_GROUP_ROLEID_LENGTH,
+    MAX_GROUPID_LENGTH,
+)
 from synapse.api.errors import Codes, SynapseError
 from synapse.handlers.groups_local import GroupsLocalHandler
 from synapse.http.servlet import (
