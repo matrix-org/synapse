@@ -693,7 +693,12 @@ class RegisterRestServlet(RestServlet):
         if not params.get("inhibit_login", False):
             device_id = params.get("device_id")
             initial_display_name = params.get("initial_device_display_name")
-            device_id, access_token = await self.registration_handler.register_device(
+            (
+                device_id,
+                access_token,
+                valid_until_ms,
+                refresh_token,
+            ) = await self.registration_handler.register_device(
                 user_id,
                 device_id,
                 initial_display_name,
@@ -702,6 +707,10 @@ class RegisterRestServlet(RestServlet):
             )
 
             result.update({"access_token": access_token, "device_id": device_id})
+
+            if refresh_token is not None:
+                result["refresh_token"] = refresh_token
+
         return result
 
     async def _do_guest_registration(self, params, address=None):
