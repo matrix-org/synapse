@@ -1,0 +1,107 @@
+Setup a Synapse server running in Docker using Kubernete and Helm
+=================================================================
+These instructions will setup Synapse to use SSL.
+SQLite is being used but this will be changed to Postgres.
+
+
+Git
+===
+https://github.com/fhirfactory/pegacorn-communicate-serverside-roomserver
+
+
+Image
+=======
+Docker Hub image "matrixdotorg/synapse" is being used.
+
+matrixdotorg - https://hub.docker.com/r/matrixdotorg/synapse/
+
+
+Setup
+=====
+This only needs to be done once.
+
+FROM https://github.com/matrix-org/synapse/blob/master/docker/README.md#generating-a-configuration-file
+
+1) On the host machine create the following directories:
+	mkdir -p /var/lib/docker/volumes/synapse-data/_data/config
+	mkdir -p /var/lib/docker/volumes/synapse-data/_data/data
+	chmod -R 777 /var/lib/docker/volumes/synapse-data/_data
+	
+2) Then run:
+	docker run -it --rm --mount type=volume,src=synapse-data,dst=/var/lib/synapse/ -e SYNAPSE_SERVER_NAME=chs.local.gov.au -e SYNAPSE_CONFIG_DIR=/var/lib/synapse/config -e SYNAPSE_DATA_DIR=/var/lib/synapse/data/ -e SYNAPSE_REPORT_STATS=no matrixdotorg/synapse:v1.26.0 generate
+	
+	The SYNAPSE_SERVER_NAME element will be the last part of a user id
+	
+	This will create the following required files in var/lib/docker/volumes/synapse-data/_data/config
+		homeserver.yaml ** This is a default file and needs to be update for ssl **
+		<your server name>.log.config
+		<your server name>.signing.key
+		
+	the var/lib/docker/volumes/synapse-data/_data/data directory will be empty at this stage.
+	
+    # cp -r /var/lib/docker/volumes/synapse-data/_data/config /host_mnt/e/dev/aether-host-files/LocalWorkstations/synapse-v1.26.0
+	
+3) Create your server certificate and key and make sure they are in pem format, and that the key does NOT have a passphrase:
+Create-Cert-Set -certSubject 'pegacorn-communicate-roomserver.site-a' -certPwd 'Password' -doNOTSecureKeyFileWithAPwd $True
+
+4) Copy /host_mnt/e/dev/aether-host-files/LocalWorkstations/synapse-v1.26.0/homeserver.yaml, the .log.config and .signing.key files to /host_mnt/e/dev/aether-host-files/LocalWorkstations/synapse/ .
+
+5) Modify the default file /host_mnt/e/dev/aether-host-files/LocalWorkstations/synapse/homeserver.yaml and commit all 3 files git.
+
+	Changes made for SSL
+		1) Uncomment the following under listeners:
+			 - port: 8448
+		       type: http
+		       tls: true
+		       resources:
+		         - names: [client, federation]
+		
+		2) Uncomment the tls_certificate_path and change the value to:
+			tls_certificate_path: "/var/lib/synapse/certificates/pegacorn-communicate-roomserver.site-a.cer"
+			
+		3) Uncomment the tls_private_key_path and change the valaue to:
+			tls_private_key_path: "/var/lib/synapse/certificates/pegacorn-communicate-roomserver.site-a.key"
+
+6) Copy the certificates and config files to a host path location.  Remember this location as it is needed for the helm command.
+	cp -r /host_mnt/e/dev/aether-host-files/LocalWorkstations/* /data/
+	mkdir -p /data/synapse/tmp-data
+	chmod -R 777 /data/synapse/tmp-data
+		
+7) Add the following to the hosts file
+	pegacorn-communicate-roomserver.site-a
+	
+	
+Build and deploy
+================
+E:
+cd \dev\github\pegacorn-communicate-serverside-roomserver
+OLD NO LONGER REQUIRED docker build --rm -t pegacorn/pegacorn-communicate-roomserver:1.0 .
+\helm\helm upgrade pegacorn-communicate-roomserver-site-a --install --namespace site-a --set serviceName=pegacorn-communicate-roomserver,basePort=30880,hostPathCerts=/data/certificates,hostPath=/data/synapse,imageTag=v1.26.0,numOfPods=1 helm
+
+On the container these are the file locations:
+	certificates - /var/lib/synapse/certificates
+	configuration - /var/lib/synapse/config
+	data - /var/lib/synapse/data
+	
+/var/lib/synapse is the dst from the generate command run in the setup.
+/var/lib/docker/volumes/synapse-data/_data is where the generate command writes the files too.
+
+hostPathCerts - The location to get the certificate and key from.
+hostPath - The location of the config generated when running the generate command in the setup
+
+
+URL
+===
+Go to the below URL and if everything has been configured correctly then a page will appear containing: "It works! Synapse is running".
+	https://pegacorn-communicate-roomserver.site-a:30880/_matrix/static/
+	
+	
+Create a new user
+=================
+FROM - https://github.com/matrix-org/synapse/blob/master/INSTALL.md#registering-a-user
+
+1) Login in to the container - docker exec -it <container id> sh
+2) cd /var/lib/synapse/config
+3) Run command: register_new_matrix_user -c homeserver.yaml https://localhost:8448
+
+You can now build and deploy pegacorn-communicate-web and logon using the created user.

@@ -1,0 +1,31 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    {{- if (.Values.dnsEntry) }} 
+    # From https://docs.microsoft.com/en-us/azure/aks/internal-lb#create-an-internal-load-balancer
+    service.beta.kubernetes.io/azure-load-balancer-internal: "{{ .Values.loadBalancerInternal | default true }}"
+#    service.beta.kubernetes.io/azure-dns-label-name: {{ .Values.dnsEntry }}
+    # From https://github.com/kubernetes-sigs/external-dns/blob/master/docs/tutorials/rfc2136.md
+    external-dns.alpha.kubernetes.io/hostname: {{ .Values.dnsEntry }}
+    {{- end }}    
+#    prometheus.io/port: "9779"
+#    prometheus.io/scrape: "true"
+  labels:
+    app: {{ .Values.serviceName }}
+    version: "{{ .Values.imageTag }}"
+  name: {{ .Values.serviceName }}
+spec:
+  ports:
+  - name: synapse
+    port: {{ add 0 .Values.basePort }}
+    protocol: TCP
+    targetPort: 8448
+    nodePort: {{ if (.Values.serviceType) and (eq .Values.serviceType "NodePort")}} {{ add 0 .Values.basePort }} {{ end }}
+  selector:
+    app: {{ .Values.serviceName }}
+  type: {{ .Values.serviceType | default "LoadBalancer" }}
+  {{- if (.Values.loadBalancerIP) }} 
+  loadBalancerIP: {{ .Values.loadBalancerIP }}
+  {{- end }}

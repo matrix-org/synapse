@@ -1,8 +1,4 @@
 ---
 name: pegacorn-communicate-roomserver
-sources:
-- https://github.com/fhirbox/pegacorn-communicate-roomserver
-version: 1.0.0-SNAPSHOT
 version: 1.0.0-SNAPSHOT
 description: pegacorn-communicate-roomserver
-icon: img/icons/camel.svg
