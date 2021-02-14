@@ -101,7 +101,7 @@ spec:
         # and https://www.alibabacloud.com/blog/kubernetes-demystified-restrictions-on-java-application-resources_594108
         resources:
           requests:
-            memory: "{{ add 128 .Values.jvmMaxHeapSizeMB }}Mi"
+            memory: "{{ (add 128 .Values.jvmMaxHeapSizeMB) | default 2048 }}Mi"
         image: matrixdotorg/synapse:{{ .Values.imageTag }}            
         imagePullPolicy: {{ .Values.imagePullPolicy | default "IfNotPresent" }}
         livenessProbe:
