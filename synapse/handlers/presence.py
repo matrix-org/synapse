@@ -1114,9 +1114,9 @@ class PresenceEventSource:
         user_id = user.to_string()
 
         users_interested_in = await self.store.get_users_who_share_room_with_user(
-            user_id,
+            user_id, on_invalidate=cache_context.invalidate
         )
-        users_interested_in.update(user_id)  # So that we receive our own presence
+        users_interested_in.add(user_id)  # So that we receive our own presence
 
         if explicit_room_id:
             user_ids = await self.store.get_users_in_room(
