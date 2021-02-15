@@ -223,11 +223,11 @@ class PersistEventsStore:
 
         def _get_events_which_are_prevs_txn(txn, batch):
             sql = """
-            SELECT prev_event_id, internal_metadata
+            SELECT prev_event_id, ej.internal_metadata
             FROM event_edges
                 INNER JOIN events USING (event_id)
                 LEFT JOIN rejections USING (event_id)
-                LEFT JOIN event_json USING (event_id)
+                LEFT JOIN event_json ej USING (event_id)
             WHERE
                 NOT events.outlier
                 AND rejections.event_id IS NULL
@@ -277,12 +277,12 @@ class PersistEventsStore:
             while to_recursively_check:
                 sql = """
                 SELECT
-                    event_id, prev_event_id, internal_metadata,
+                    event_id, prev_event_id, ej.internal_metadata,
                     rejections.event_id IS NOT NULL
                 FROM event_edges
                     INNER JOIN events USING (event_id)
                     LEFT JOIN rejections USING (event_id)
-                    LEFT JOIN event_json USING (event_id)
+                    LEFT JOIN event_json ej USING (event_id)
                 WHERE
                     NOT events.outlier
                     AND
@@ -560,9 +560,9 @@ class PersistEventsStore:
         # fetch their auth event info.
         while missing_auth_chains:
             sql = """
-                SELECT event_id, events.type, state_key, chain_id, sequence_number
+                SELECT event_id, events.type, se.state_key, chain_id, sequence_number
                 FROM events
-                INNER JOIN state_events USING (event_id)
+                INNER JOIN state_events se USING (event_id)
                 LEFT JOIN event_auth_chains USING (event_id)
                 WHERE
             """

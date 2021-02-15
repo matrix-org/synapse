@@ -720,8 +720,8 @@ class RoomWorkerStore(SQLBaseStore):
             the hostname and the value is the media ID.
         """
         sql = """
-            SELECT stream_ordering, json FROM events
-            JOIN event_json USING (room_id, event_id)
+            SELECT stream_ordering, ej.json FROM events
+            JOIN event_json ej USING (room_id, event_id)
             WHERE room_id = ?
                 %(where_clause)s
                 AND contains_url = ? AND outlier = ?

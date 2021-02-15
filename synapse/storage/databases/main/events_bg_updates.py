@@ -399,8 +399,9 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             # First, we get `batch_size` events from the table, pulling out
             # their successor events, if any, and the successor events'
             # rejection status.
+
             txn.execute(
-                """SELECT prev_event_id, event_id, internal_metadata,
+                """SELECT prev_event_id, event_id, ej.internal_metadata,
                     rejections.event_id IS NOT NULL, events.outlier
                 FROM (
                     SELECT event_id AS prev_event_id
@@ -409,7 +410,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 ) AS f
                 LEFT JOIN event_edges USING (prev_event_id)
                 LEFT JOIN events USING (event_id)
-                LEFT JOIN event_json USING (event_id)
+                LEFT JOIN event_json ej USING (event_id)
                 LEFT JOIN rejections USING (event_id)
                 """,
                 (batch_size,),
@@ -444,11 +445,11 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 to_check, to_defer = batch[:100], batch[100:]
                 soft_failed_events_to_lookup = set(to_defer)
 
-                sql = """SELECT prev_event_id, event_id, internal_metadata,
+                sql = """SELECT prev_event_id, event_id, ej.internal_metadata,
                     rejections.event_id IS NOT NULL
                     FROM event_edges
                     INNER JOIN events USING (event_id)
-                    INNER JOIN event_json USING (event_id)
+                    INNER JOIN event_json ej USING (event_id)
                     LEFT JOIN rejections USING (event_id)
                     WHERE
                         NOT events.outlier
@@ -710,11 +711,11 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 SELECT DISTINCT
                     event_id,
                     COALESCE(room_version, '1'),
-                    json,
+                    ej.json,
                     state_events.event_id IS NOT NULL,
                     event_auth.event_id IS NOT NULL
                 FROM rejections
-                INNER JOIN event_json USING (event_id)
+                INNER JOIN event_json ej USING (event_id)
                 LEFT JOIN rooms USING (room_id)
                 LEFT JOIN state_events USING (event_id)
                 LEFT JOIN event_auth USING (event_id)
