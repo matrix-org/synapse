@@ -1277,6 +1277,9 @@ class PersistEventsStore:
                 sql = "UPDATE event_json SET internal_metadata = ? WHERE event_id = ?"
                 txn.execute(sql, (metadata_json, event.event_id))
 
+                sql = "UPDATE events SET internal_metadata = ?, outlier = ? WHERE event_id = ?"
+                txn.execute(sql, (metadata_json, False, event.event_id))
+
                 # Add an entry to the ex_outlier_stream table to replicate the
                 # change in outlier status to our workers.
                 stream_order = event.internal_metadata.stream_ordering
@@ -1292,23 +1295,23 @@ class PersistEventsStore:
                     },
                 )
 
-                sql = "UPDATE events SET outlier = ? WHERE event_id = ?"
-                txn.execute(sql, (False, event.event_id))
-
                 # Update the event_backward_extremities table now that this
                 # event isn't an outlier any more.
                 self._update_backward_extremeties(txn, [event])
 
         return [ec for ec in events_and_contexts if ec[0] not in to_remove]
 
-    def _store_event_txn(self, txn, events_and_contexts):
+    def _store_event_txn(
+        self,
+        txn: LoggingTransaction,
+        events_and_contexts: Iterable[Tuple[EventBase, EventContext]],
+    ):
         """Insert new events into the event, event_json, redaction and
         state_events tables.
 
         Args:
-            txn (twisted.enterprise.adbapi.Connection): db connection
-            events_and_contexts (list[(EventBase, EventContext)]): events
-                we are persisting
+            txn: db connection
+            events_and_contexts: events we are persisting
         """
 
         if not events_and_contexts:
@@ -1371,8 +1374,15 @@ class PersistEventsStore:
                     "contains_url": (
                         "url" in event.content and isinstance(event.content["url"], str)
                     ),
+                    "internal_metadata": json_encoder.encode(
+                        event.internal_metadata.get_dict()
+                    ),
+                    "json": json_encoder.encode(event_dict(event)),
+                    "format_version": event.format_version,
+                    "state_key": event.get("state_key"),
+                    "rejection_reason": ctx.rejected or None,
                 }
-                for event, _ in events_and_contexts
+                for event, ctx in events_and_contexts
             ],
         )
 
@@ -1406,8 +1416,9 @@ class PersistEventsStore:
             }
 
             # TODO: How does this work with backfilling?
+            #   richvdh: pretty sure it's never used.
             if hasattr(event, "replaces_state"):
-                vals["prev_state"] = event.replaces_state
+                vals["prev_state"] = event.replaces_state  # type: ignore
 
             state_values.append(vals)
 

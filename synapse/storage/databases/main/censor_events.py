@@ -144,6 +144,13 @@ class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBase
             updatevalues={"json": pruned_json},
         )
 
+        self.db_pool.simple_update_one_txn(
+            txn,
+            table="events",
+            keyvalues={"event_id": event_id},
+            updatevalues={"json": pruned_json},
+        )
+
     async def expire_event(self, event_id: str) -> None:
         """Retrieve and expire an event that has expired, and delete its associated
         expiry timestamp. If the event can't be retrieved, delete its associated
