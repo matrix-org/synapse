@@ -222,17 +222,28 @@ class PersistEventsStore:
         results: List[str] = []
 
         def _get_events_which_are_prevs_txn(txn, batch):
-            sql = """
-            SELECT prev_event_id, ej.internal_metadata
-            FROM event_edges
-                INNER JOIN events USING (event_id)
-                LEFT JOIN rejections USING (event_id)
-                LEFT JOIN event_json ej USING (event_id)
-            WHERE
-                NOT events.outlier
-                AND rejections.event_id IS NULL
-                AND
-            """
+            if self.store.USE_EVENT_JSON:
+                sql = """
+                SELECT prev_event_id, ej.internal_metadata
+                FROM event_edges
+                    INNER JOIN events USING (event_id)
+                    LEFT JOIN rejections USING (event_id)
+                    LEFT JOIN event_json ej USING (event_id)
+                WHERE
+                    NOT events.outlier
+                    AND rejections.event_id IS NULL
+                    AND
+                """
+            else:
+                sql = """
+                SELECT prev_event_id, events.internal_metadata
+                FROM event_edges
+                    INNER JOIN events USING (event_id)
+                WHERE
+                    NOT events.outlier
+                    AND events.rejection_reason IS NULL
+                    AND
+                """
 
             clause, args = make_in_list_sql_clause(
                 self.database_engine, "prev_event_id", batch
@@ -274,7 +285,7 @@ class PersistEventsStore:
         def _get_prevs_before_rejected_txn(txn, batch):
             to_recursively_check = batch
 
-            while to_recursively_check:
+            if self.store.USE_EVENT_JSON:
                 sql = """
                 SELECT
                     event_id, prev_event_id, ej.internal_metadata,
@@ -287,7 +298,19 @@ class PersistEventsStore:
                     NOT events.outlier
                     AND
                 """
+            else:
+                sql = """
+                SELECT
+                    event_id, prev_event_id, events.internal_metadata,
+                    events.rejection_reason IS NOT NULL
+                FROM event_edges
+                    INNER JOIN events USING (event_id)
+                WHERE
+                    NOT events.outlier
+                    AND
+                """
 
+            while to_recursively_check:
                 clause, args = make_in_list_sql_clause(
                     self.database_engine, "event_id", to_recursively_check
                 )
@@ -478,6 +501,7 @@ class PersistEventsStore:
         event_to_room_id = {e.event_id: e.room_id for e in state_events.values()}
 
         self._add_chain_cover_index(
+            self.store.USE_EVENT_JSON,
             txn,
             self.db_pool,
             self.store.event_chain_id_gen,
@@ -489,6 +513,7 @@ class PersistEventsStore:
     @classmethod
     def _add_chain_cover_index(
         cls,
+        use_event_json: bool,
         txn,
         db_pool: DatabasePool,
         event_chain_id_gen: SequenceGenerator,
@@ -558,7 +583,7 @@ class PersistEventsStore:
 
         # We loop here in case we find an out of band membership and need to
         # fetch their auth event info.
-        while missing_auth_chains:
+        if use_event_json:
             sql = """
                 SELECT event_id, events.type, se.state_key, chain_id, sequence_number
                 FROM events
@@ -566,6 +591,17 @@ class PersistEventsStore:
                 LEFT JOIN event_auth_chains USING (event_id)
                 WHERE
             """
+        else:
+            sql = """
+                SELECT event_id, events.type, events.state_key, chain_id, sequence_number
+                FROM events
+                LEFT JOIN event_auth_chains USING (event_id)
+                WHERE
+                    events.state_key IS NOT NULL AND
+            """
+
+        while missing_auth_chains:
+
             clause, args = make_in_list_sql_clause(
                 txn.database_engine,
                 "event_id",
@@ -1551,13 +1587,7 @@ class PersistEventsStore:
     def _add_to_cache(self, txn, events_and_contexts):
         to_prefill = []
 
-        rows = []
-        N = 200
-        for i in range(0, len(events_and_contexts), N):
-            ev_map = {e[0].event_id: e[0] for e in events_and_contexts[i : i + N]}
-            if not ev_map:
-                break
-
+        if self.store.USE_EVENT_JSON:
             sql = (
                 "SELECT "
                 " e.event_id as event_id, "
@@ -1568,6 +1598,22 @@ class PersistEventsStore:
                 " LEFT JOIN redactions as r ON e.event_id = r.redacts"
                 " WHERE "
             )
+        else:
+            sql = (
+                "SELECT "
+                " e.event_id as event_id, "
+                " r.redacts as redacts,"
+                " e.rejection_reason as rejects "
+                " FROM events as e"
+                " LEFT JOIN redactions as r ON e.event_id = r.redacts"
+                " WHERE "
+            )
+
+        N = 200
+        for i in range(0, len(events_and_contexts), N):
+            ev_map = {e[0].event_id: e[0] for e in events_and_contexts[i : i + N]}
+            if not ev_map:
+                break
 
             clause, args = make_in_list_sql_clause(
                 self.database_engine, "e.event_id", list(ev_map)

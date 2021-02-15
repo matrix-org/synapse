@@ -38,6 +38,11 @@ class SQLBaseStore(metaclass=ABCMeta):
     per data store (and not one per physical database).
     """
 
+    # if set to True, we will query the `event_json`, `rejections` and `state_events`
+    # tables when fetching event data. When False, we rely on it all being in the
+    # `events` table.
+    USE_EVENT_JSON = False
+
     def __init__(self, database: DatabasePool, db_conn: Connection, hs: "HomeServer"):
         self.hs = hs
         self._clock = hs.get_clock()

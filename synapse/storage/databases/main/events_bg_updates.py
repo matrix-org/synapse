@@ -400,8 +400,8 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             # their successor events, if any, and the successor events'
             # rejection status.
 
-            txn.execute(
-                """SELECT prev_event_id, event_id, ej.internal_metadata,
+            if self.USE_EVENT_JSON:
+                sql = """SELECT prev_event_id, event_id, ej.internal_metadata,
                     rejections.event_id IS NOT NULL, events.outlier
                 FROM (
                     SELECT event_id AS prev_event_id
@@ -412,8 +412,21 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 LEFT JOIN events USING (event_id)
                 LEFT JOIN event_json ej USING (event_id)
                 LEFT JOIN rejections USING (event_id)
-                """,
-                (batch_size,),
+                """
+            else:
+                sql = """SELECT prev_event_id, event_id, events.internal_metadata,
+                    events.rejection_reason IS NOT NULL, events.outlier
+                FROM (
+                    SELECT event_id AS prev_event_id
+                    FROM _extremities_to_check
+                    LIMIT ?
+                ) AS f
+                LEFT JOIN event_edges USING (prev_event_id)
+                LEFT JOIN events USING (event_id)
+                """
+
+            txn.execute(
+                sql, (batch_size,),
             )
 
             for prev_event_id, event_id, metadata, rejected, outlier in txn:
@@ -438,13 +451,8 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             # Now we recursively check all the soft-failed descendants we
             # found above in the same way, until we have nothing left to
             # check.
-            while soft_failed_events_to_lookup:
-                # We only want to do 100 at a time, so we split given list
-                # into two.
-                batch = list(soft_failed_events_to_lookup)
-                to_check, to_defer = batch[:100], batch[100:]
-                soft_failed_events_to_lookup = set(to_defer)
 
+            if self.USE_EVENT_JSON:
                 sql = """SELECT prev_event_id, event_id, ej.internal_metadata,
                     rejections.event_id IS NOT NULL
                     FROM event_edges
@@ -455,6 +463,23 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                         NOT events.outlier
                         AND
                 """
+            else:
+                sql = """SELECT prev_event_id, event_id, events.internal_metadata,
+                    events.rejection_reason IS NOT NULL
+                    FROM event_edges
+                    INNER JOIN events USING (event_id)
+                    WHERE
+                        NOT events.outlier
+                        AND
+                """
+
+            while soft_failed_events_to_lookup:
+                # We only want to do 100 at a time, so we split given list
+                # into two.
+                batch = list(soft_failed_events_to_lookup)
+                to_check, to_defer = batch[:100], batch[100:]
+                soft_failed_events_to_lookup = set(to_defer)
+
                 clause, args = make_in_list_sql_clause(
                     self.database_engine, "prev_event_id", to_check
                 )
@@ -928,22 +953,42 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             extra_clause = "AND events.room_id = ?"
             tuple_args.append(last_room_id)
 
-        sql = """
-            SELECT
-                event_id, state_events.type, state_events.state_key,
-                topological_ordering, stream_ordering,
-                events.room_id
-            FROM events
-            INNER JOIN state_events USING (event_id)
-            LEFT JOIN event_auth_chains USING (event_id)
-            LEFT JOIN event_auth_chain_to_calculate USING (event_id)
-            WHERE event_auth_chains.event_id IS NULL
-                AND event_auth_chain_to_calculate.event_id IS NULL
-                AND %(tuple_cmp)s
-                %(extra)s
-            ORDER BY events.room_id, topological_ordering, stream_ordering
-            %(limit)s
-        """ % {
+        if self.USE_EVENT_JSON:
+            sqlf = """
+                SELECT
+                    event_id, state_events.type, state_events.state_key,
+                    topological_ordering, stream_ordering,
+                    events.room_id
+                FROM events
+                INNER JOIN state_events USING (event_id)
+                LEFT JOIN event_auth_chains USING (event_id)
+                LEFT JOIN event_auth_chain_to_calculate USING (event_id)
+                WHERE event_auth_chains.event_id IS NULL
+                    AND event_auth_chain_to_calculate.event_id IS NULL
+                    AND %(tuple_cmp)s
+                    %(extra)s
+                ORDER BY events.room_id, topological_ordering, stream_ordering
+                %(limit)s
+            """
+        else:
+            sqlf = """
+                SELECT
+                    event_id, events.type, events.state_key,
+                    topological_ordering, stream_ordering,
+                    events.room_id
+                FROM events
+                LEFT JOIN event_auth_chains USING (event_id)
+                LEFT JOIN event_auth_chain_to_calculate USING (event_id)
+                WHERE events.state_key IS NOT NULL
+                    AND event_auth_chains.event_id IS NULL
+                    AND event_auth_chain_to_calculate.event_id IS NULL
+                    AND %(tuple_cmp)s
+                    %(extra)s
+                ORDER BY events.room_id, topological_ordering, stream_ordering
+                %(limit)s
+            """
+
+        sql = sqlf % {
             "tuple_cmp": tuple_clause,
             "limit": "LIMIT ?" if batch_size is not None else "",
             "extra": extra_clause,
@@ -996,9 +1041,10 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
         # Calculate and persist the chain cover index for this set of events.
         #
-        # Annoyingly we need to gut wrench into the persit event store so that
+        # Annoyingly we need to gut wrench into the persist event store so that
         # we can reuse the function to calculate the chain cover for rooms.
         PersistEventsStore._add_chain_cover_index(
+            self.USE_EVENT_JSON,
             txn,
             self.db_pool,
             self.event_chain_id_gen,

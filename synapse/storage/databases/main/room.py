@@ -719,15 +719,26 @@ class RoomWorkerStore(SQLBaseStore):
             The local and remote media as a lists of tuples where the key is
             the hostname and the value is the media ID.
         """
-        sql = """
-            SELECT stream_ordering, ej.json FROM events
-            JOIN event_json ej USING (room_id, event_id)
-            WHERE room_id = ?
-                %(where_clause)s
-                AND contains_url = ? AND outlier = ?
-            ORDER BY stream_ordering DESC
-            LIMIT ?
-        """
+        if self.USE_EVENT_JSON:
+            sql = """
+                SELECT stream_ordering, ej.json FROM events
+                JOIN event_json ej USING (room_id, event_id)
+                WHERE room_id = ?
+                    %(where_clause)s
+                    AND contains_url = ? AND outlier = ?
+                ORDER BY stream_ordering DESC
+                LIMIT ?
+            """
+        else:
+            sql = """
+                SELECT stream_ordering, json FROM events
+                WHERE room_id = ?
+                    %(where_clause)s
+                    AND contains_url = ? AND outlier = ?
+                ORDER BY stream_ordering DESC
+                LIMIT ?
+            """
+
         txn.execute(sql % {"where_clause": ""}, (room_id, True, False, 100))
 
         local_media_mxcs = []

@@ -905,7 +905,8 @@ class EventsWorkerStore(SQLBaseStore):
             Dict[str, Dict]: a map from event id to event info.
         """
         event_dict = {}
-        for evs in batch_iter(event_ids, 200):
+
+        if self.USE_EVENT_JSON:
             sql = """\
                 SELECT
                   e.event_id,
@@ -921,7 +922,22 @@ class EventsWorkerStore(SQLBaseStore):
                   LEFT JOIN rooms r ON r.room_id = e.room_id
                   LEFT JOIN rejections as rej USING (event_id)
                 WHERE """
+        else:
+            sql = """\
+                SELECT
+                  e.event_id,
+                  e.stream_ordering,
+                  e.internal_metadata,
+                  e.json,
+                  e.format_version,
+                  r.room_version,
+                  e.rejection_reason,
+                  e.outlier
+                FROM events AS e
+                  LEFT JOIN rooms r ON r.room_id = e.room_id
+                WHERE """
 
+        for evs in batch_iter(event_ids, 200):
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "e.event_id", evs
             )
@@ -1181,20 +1197,35 @@ class EventsWorkerStore(SQLBaseStore):
         """
 
         def get_all_new_forward_event_rows(txn):
-            sql = (
-                "SELECT e.stream_ordering, e.event_id, e.room_id, e.type,"
-                " se.state_key, redacts, relates_to_id, membership, rejections.reason IS NOT NULL"
-                " FROM events AS e"
-                " LEFT JOIN redactions USING (event_id)"
-                " LEFT JOIN state_events se USING (event_id)"
-                " LEFT JOIN event_relations USING (event_id)"
-                " LEFT JOIN room_memberships USING (event_id)"
-                " LEFT JOIN rejections USING (event_id)"
-                " WHERE ? < stream_ordering AND stream_ordering <= ?"
-                " AND instance_name = ?"
-                " ORDER BY stream_ordering ASC"
-                " LIMIT ?"
-            )
+            if self.USE_EVENT_JSON:
+                sql = (
+                    "SELECT e.stream_ordering, e.event_id, e.room_id, e.type, se.state_key,"
+                    " redacts, relates_to_id, membership, rejections.reason IS NOT NULL"
+                    " FROM events AS e"
+                    " LEFT JOIN redactions USING (event_id)"
+                    " LEFT JOIN state_events se USING (event_id)"
+                    " LEFT JOIN event_relations USING (event_id)"
+                    " LEFT JOIN room_memberships USING (event_id)"
+                    " LEFT JOIN rejections USING (event_id)"
+                    " WHERE ? < stream_ordering AND stream_ordering <= ?"
+                    " AND instance_name = ?"
+                    " ORDER BY stream_ordering ASC"
+                    " LIMIT ?"
+                )
+            else:
+                sql = (
+                    "SELECT e.stream_ordering, e.event_id, e.room_id, e.type, e.state_key,"
+                    " redacts, relates_to_id, membership, e.rejection_reason IS NOT NULL"
+                    " FROM events AS e"
+                    " LEFT JOIN redactions USING (event_id)"
+                    " LEFT JOIN event_relations USING (event_id)"
+                    " LEFT JOIN room_memberships USING (event_id)"
+                    " WHERE ? < stream_ordering AND stream_ordering <= ?"
+                    " AND instance_name = ?"
+                    " ORDER BY stream_ordering ASC"
+                    " LIMIT ?"
+                )
+
             txn.execute(sql, (last_id, current_id, instance_name, limit))
             return txn.fetchall()
 
@@ -1218,21 +1249,36 @@ class EventsWorkerStore(SQLBaseStore):
         """
 
         def get_ex_outlier_stream_rows_txn(txn):
-            sql = (
-                "SELECT event_stream_ordering, e.event_id, e.room_id, e.type,"
-                " se.state_key, redacts, relates_to_id, membership, rejections.reason IS NOT NULL"
-                " FROM events AS e"
-                " INNER JOIN ex_outlier_stream AS out USING (event_id)"
-                " LEFT JOIN redactions USING (event_id)"
-                " LEFT JOIN state_events se USING (event_id)"
-                " LEFT JOIN event_relations USING (event_id)"
-                " LEFT JOIN room_memberships USING (event_id)"
-                " LEFT JOIN rejections USING (event_id)"
-                " WHERE ? < event_stream_ordering"
-                " AND event_stream_ordering <= ?"
-                " AND out.instance_name = ?"
-                " ORDER BY event_stream_ordering ASC"
-            )
+            if self.USE_EVENT_JSON:
+                sql = (
+                    "SELECT event_stream_ordering, e.event_id, e.room_id, e.type, se.state_key,"
+                    " redacts, relates_to_id, membership, rejections.reason IS NOT NULL"
+                    " FROM events AS e"
+                    " INNER JOIN ex_outlier_stream AS out USING (event_id)"
+                    " LEFT JOIN redactions USING (event_id)"
+                    " LEFT JOIN state_events se USING (event_id)"
+                    " LEFT JOIN event_relations USING (event_id)"
+                    " LEFT JOIN room_memberships USING (event_id)"
+                    " LEFT JOIN rejections USING (event_id)"
+                    " WHERE ? < event_stream_ordering"
+                    " AND event_stream_ordering <= ?"
+                    " AND out.instance_name = ?"
+                    " ORDER BY event_stream_ordering ASC"
+                )
+            else:
+                sql = (
+                    "SELECT event_stream_ordering, e.event_id, e.room_id, e.type, e.state_key,"
+                    " redacts, relates_to_id, membership, e.rejection_reason IS NOT NULL"
+                    " FROM events AS e"
+                    " INNER JOIN ex_outlier_stream AS out USING (event_id)"
+                    " LEFT JOIN redactions USING (event_id)"
+                    " LEFT JOIN event_relations USING (event_id)"
+                    " LEFT JOIN room_memberships USING (event_id)"
+                    " WHERE ? < event_stream_ordering"
+                    " AND event_stream_ordering <= ?"
+                    " AND out.instance_name = ?"
+                    " ORDER BY event_stream_ordering ASC"
+                )
 
             txn.execute(sql, (last_id, current_id, instance_name))
             return txn.fetchall()
@@ -1272,18 +1318,31 @@ class EventsWorkerStore(SQLBaseStore):
             return [], current_id, False
 
         def get_all_new_backfill_event_rows(txn):
-            sql = (
-                "SELECT -e.stream_ordering, e.event_id, e.room_id, e.type,"
-                " se.state_key, redacts, relates_to_id"
-                " FROM events AS e"
-                " LEFT JOIN redactions USING (event_id)"
-                " LEFT JOIN state_events se USING (event_id)"
-                " LEFT JOIN event_relations USING (event_id)"
-                " WHERE ? > stream_ordering AND stream_ordering >= ?"
-                "  AND instance_name = ?"
-                " ORDER BY stream_ordering ASC"
-                " LIMIT ?"
-            )
+            if self.USE_EVENT_JSON:
+                sql = (
+                    "SELECT -e.stream_ordering, e.event_id, e.room_id, e.type, se.state_key,"
+                    " redacts, relates_to_id"
+                    " FROM events AS e"
+                    " LEFT JOIN redactions USING (event_id)"
+                    " LEFT JOIN state_events se USING (event_id)"
+                    " LEFT JOIN event_relations USING (event_id)"
+                    " WHERE ? > stream_ordering AND stream_ordering >= ?"
+                    "  AND instance_name = ?"
+                    " ORDER BY stream_ordering ASC"
+                    " LIMIT ?"
+                )
+            else:
+                sql = (
+                    "SELECT -e.stream_ordering, e.event_id, e.room_id, e.type, e.state_key,"
+                    " redacts, relates_to_id"
+                    " FROM events AS e"
+                    " LEFT JOIN redactions USING (event_id)"
+                    " LEFT JOIN event_relations USING (event_id)"
+                    " WHERE ? > stream_ordering AND stream_ordering >= ?"
+                    "  AND instance_name = ?"
+                    " ORDER BY stream_ordering ASC"
+                    " LIMIT ?"
+                )
             txn.execute(sql, (-last_id, -current_id, instance_name, limit))
             new_event_updates = [(row[0], row[1:]) for row in txn]
 
@@ -1294,19 +1353,33 @@ class EventsWorkerStore(SQLBaseStore):
             else:
                 upper_bound = current_id
 
-            sql = (
-                "SELECT -event_stream_ordering, e.event_id, e.room_id, e.type,"
-                " se.state_key, redacts, relates_to_id"
-                " FROM events AS e"
-                " INNER JOIN ex_outlier_stream AS out USING (event_id)"
-                " LEFT JOIN redactions USING (event_id)"
-                " LEFT JOIN state_events se USING (event_id)"
-                " LEFT JOIN event_relations USING (event_id)"
-                " WHERE ? > event_stream_ordering"
-                " AND event_stream_ordering >= ?"
-                " AND out.instance_name = ?"
-                " ORDER BY event_stream_ordering DESC"
-            )
+            if self.USE_EVENT_JSON:
+                sql = (
+                    "SELECT -event_stream_ordering, e.event_id, e.room_id, e.type, se.state_key,"
+                    + " redacts, relates_to_id"
+                    " FROM events AS e"
+                    " INNER JOIN ex_outlier_stream AS out USING (event_id)"
+                    " LEFT JOIN redactions USING (event_id)"
+                    " LEFT JOIN state_events se USING (event_id)"
+                    " LEFT JOIN event_relations USING (event_id)"
+                    " WHERE ? > event_stream_ordering"
+                    " AND event_stream_ordering >= ?"
+                    " AND out.instance_name = ?"
+                    " ORDER BY event_stream_ordering DESC"
+                )
+            else:
+                sql = (
+                    "SELECT -event_stream_ordering, e.event_id, e.room_id, e.type, e.state_key,"
+                    " redacts, relates_to_id"
+                    " FROM events AS e"
+                    " INNER JOIN ex_outlier_stream AS out USING (event_id)"
+                    " LEFT JOIN redactions USING (event_id)"
+                    " LEFT JOIN event_relations USING (event_id)"
+                    " WHERE ? > event_stream_ordering"
+                    " AND event_stream_ordering >= ?"
+                    " AND out.instance_name = ?"
+                    " ORDER BY event_stream_ordering DESC"
+                )
             txn.execute(sql, (-last_id, -upper_bound, instance_name))
             new_event_updates.extend((row[0], row[1:]) for row in txn)
 

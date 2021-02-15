@@ -22,10 +22,19 @@ logger = logging.getLogger(__name__)
 
 class RejectionsStore(SQLBaseStore):
     async def get_rejection_reason(self, event_id: str) -> Optional[str]:
-        return await self.db_pool.simple_select_one_onecol(
-            table="rejections",
-            retcol="reason",
-            keyvalues={"event_id": event_id},
-            allow_none=True,
-            desc="get_rejection_reason",
-        )
+        if self.USE_EVENT_JSON:
+            return await self.db_pool.simple_select_one_onecol(
+                table="rejections",
+                retcol="reason",
+                keyvalues={"event_id": event_id},
+                allow_none=True,
+                desc="get_rejection_reason",
+            )
+        else:
+            return await self.db_pool.simple_select_one_onecol(
+                table="events",
+                retcol="rejection_reason",
+                keyvalues={"event_id": event_id},
+                allow_none=True,
+                desc="get_rejection_reason",
+            )
