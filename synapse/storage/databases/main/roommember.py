@@ -496,9 +496,10 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 FROM users_in_public_rooms as p1
                 INNER JOIN users_in_public_rooms as p2
                     ON p1.room_id = p2.room_id
+                    AND p1.user_id != p2.user_id
                     AND p1.user_id = ?
-                UNION
-                SELECT DISTINCT user_id
+                UNION ALL
+                SELECT DISTINCT other_user_id
                 FROM users_who_share_private_rooms
                 WHERE
                     user_id = ?
@@ -512,7 +513,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             "get_users_who_share_room_with_user", _get_users_who_share_room_with_user
         )
 
-        return {row["user_id"] for row in rows}
+        return {row.get("user_id") or row.get("other_user_id") for row in rows}
 
     async def get_joined_users_from_context(
         self, event: EventBase, context: EventContext
