@@ -80,6 +80,10 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             extra_users (list(UserID)): Any extra users to notify about event
         """
 
+        # we only expect this interface to be used for local events, so they shouldn't
+        # be outliers.
+        assert not event.internal_metadata.is_outlier()
+
         serialized_context = await context.serialize(event, store)
 
         payload = {
