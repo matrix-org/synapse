@@ -18,6 +18,7 @@ from mock import Mock
 
 from twisted.python.failure import Failure
 from twisted.web.client import ResponseDone
+from twisted.web.iweb import UNKNOWN_LENGTH
 
 from synapse.http.client import BodyExceededMaxSize, read_body_with_max_size
 
@@ -27,12 +28,12 @@ from tests.unittest import TestCase
 class ReadBodyWithMaxSizeTests(TestCase):
     def setUp(self):
         """Start reading the body, returns the response, result and proto"""
-        self.response = Mock()
+        response = Mock(length=UNKNOWN_LENGTH)
         self.result = BytesIO()
-        self.deferred = read_body_with_max_size(self.response, self.result, 6)
+        self.deferred = read_body_with_max_size(response, self.result, 6)
 
         # Fish the protocol out of the response.
-        self.protocol = self.response.deliverBody.call_args[0][0]
+        self.protocol = response.deliverBody.call_args[0][0]
         self.protocol.transport = Mock()
 
     def _cleanup_error(self):

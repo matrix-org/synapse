@@ -56,7 +56,7 @@ from twisted.web.client import (
 )
 from twisted.web.http import PotentialDataLoss
 from twisted.web.http_headers import Headers
-from twisted.web.iweb import IAgent, IBodyProducer, IResponse
+from twisted.web.iweb import UNKNOWN_LENGTH, IAgent, IBodyProducer, IResponse
 
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.http import QuieterFileBodyProducer, RequestTimedOutError, redact_uri
@@ -801,9 +801,8 @@ def read_body_with_max_size(
     """
     # If the Content-Length header gives a size larger than the maximum allowed
     # size, do not bother downloading the body.
-    if max_size is not None:
-        content_length_headers = response.headers.getRawHeaders(b"Content-Length", None)
-        if content_length_headers and int(content_length_headers[0]) > max_size:
+    if max_size is not None and response.length != UNKNOWN_LENGTH:
+        if response.length > max_size:
             return defer.fail(BodyExceededMaxSize())
 
     d = defer.Deferred()
