@@ -710,17 +710,18 @@ class OidcProvider:
         # and one with no SameSite, in the hope that at least one of them will get
         # back to us.
         #
-        # Secure is necessary for SameSite=None
+        # Secure is necessary for SameSite=None (and, empirically, also breaks things
+        # on iOS 12.)
         #
         # we have to build the cookie by hand rather than calling request.addCookie
         # to work around https://twistedmatrix.com/trac/ticket/10088
         #
         for cookie_name, options in [
-            (SESSION_COOKIE_NAME, b"; SameSite=None"),
+            (SESSION_COOKIE_NAME, b"; Secure; SameSite=None"),
             (SESSION_COOKIE_NAME_IOS_HACK, b""),
         ]:
             request.cookies.append(
-                b"%s=%s; Path=/_synapse/client/oidc; Max-Age=3600; HttpOnly; Secure%s"
+                b"%s=%s; Path=/_synapse/client/oidc; Max-Age=3600; HttpOnly%s"
                 % (cookie_name, cookie.encode("utf-8"), options)
             )
 
