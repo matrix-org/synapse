@@ -35,8 +35,8 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_scheduler = Mock()
         hs = Mock()
         hs.get_datastore.return_value = self.mock_store
-        self.mock_store.get_received_ts.return_value = defer.succeed(0)
-        self.mock_store.set_appservice_last_pos.return_value = defer.succeed(None)
+        self.mock_store.get_received_ts.return_value = make_awaitable(0)
+        self.mock_store.set_appservice_last_pos.return_value = make_awaitable(None)
         hs.get_application_service_api.return_value = self.mock_as_api
         hs.get_application_service_scheduler.return_value = self.mock_scheduler
         hs.get_clock.return_value = MockClock()
@@ -50,16 +50,16 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             self._mkservice(is_interested=False),
         ]
 
-        self.mock_as_api.query_user.return_value = defer.succeed(True)
+        self.mock_as_api.query_user.return_value = make_awaitable(True)
         self.mock_store.get_app_services.return_value = services
-        self.mock_store.get_user_by_id.return_value = defer.succeed([])
+        self.mock_store.get_user_by_id.return_value = make_awaitable([])
 
         event = Mock(
             sender="@someone:anywhere", type="m.room.message", room_id="!foo:bar"
         )
         self.mock_store.get_new_events_for_appservice.side_effect = [
-            defer.succeed((0, [event])),
-            defer.succeed((0, [])),
+            make_awaitable((0, [event])),
+            make_awaitable((0, [])),
         ]
         self.handler.notify_interested_services(RoomStreamToken(None, 0))
 
@@ -72,13 +72,13 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         services = [self._mkservice(is_interested=True)]
         services[0].is_interested_in_user.return_value = True
         self.mock_store.get_app_services.return_value = services
-        self.mock_store.get_user_by_id.return_value = defer.succeed(None)
+        self.mock_store.get_user_by_id.return_value = make_awaitable(None)
 
         event = Mock(sender=user_id, type="m.room.message", room_id="!foo:bar")
-        self.mock_as_api.query_user.return_value = defer.succeed(True)
+        self.mock_as_api.query_user.return_value = make_awaitable(True)
         self.mock_store.get_new_events_for_appservice.side_effect = [
-            defer.succeed((0, [event])),
-            defer.succeed((0, [])),
+            make_awaitable((0, [event])),
+            make_awaitable((0, [])),
         ]
 
         self.handler.notify_interested_services(RoomStreamToken(None, 0))
@@ -90,13 +90,13 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         services = [self._mkservice(is_interested=True)]
         services[0].is_interested_in_user.return_value = True
         self.mock_store.get_app_services.return_value = services
-        self.mock_store.get_user_by_id.return_value = defer.succeed({"name": user_id})
+        self.mock_store.get_user_by_id.return_value = make_awaitable({"name": user_id})
 
         event = Mock(sender=user_id, type="m.room.message", room_id="!foo:bar")
-        self.mock_as_api.query_user.return_value = defer.succeed(True)
+        self.mock_as_api.query_user.return_value = make_awaitable(True)
         self.mock_store.get_new_events_for_appservice.side_effect = [
-            defer.succeed((0, [event])),
-            defer.succeed((0, [])),
+            make_awaitable((0, [event])),
+            make_awaitable((0, [])),
         ]
 
         self.handler.notify_interested_services(RoomStreamToken(None, 0))
@@ -106,7 +106,6 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             "query_user called when it shouldn't have been.",
         )
 
-    @defer.inlineCallbacks
     def test_query_room_alias_exists(self):
         room_alias_str = "#foo:bar"
         room_alias = Mock()
@@ -127,8 +126,8 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             Mock(room_id=room_id, servers=servers)
         )
 
-        result = yield defer.ensureDeferred(
-            self.handler.query_room_alias_exists(room_alias)
+        result = self.successResultOf(
+            defer.ensureDeferred(self.handler.query_room_alias_exists(room_alias))
         )
 
         self.mock_as_api.query_alias.assert_called_once_with(
