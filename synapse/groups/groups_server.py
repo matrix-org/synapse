@@ -345,7 +345,6 @@ class GroupsServerWorkerHandler:
         chunk = []
         for room_result in room_results:
             room_id = room_result["room_id"]
-            assert isinstance(room_id, str)
 
             joined_users = await self.store.get_users_in_room(room_id)
             entry = await self.room_list_handler.generate_room_entry(
