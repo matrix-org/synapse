@@ -47,8 +47,26 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-SESSION_COOKIE_NAME = b"oidc_session"
-SESSION_COOKIE_NAME_IOS_HACK = b"oidc_session_no_samesite"
+# we want the cookie to be returned to us even when the request is the POSTed
+# result of a form on another domain, as is used with `response_mode=form_post`.
+#
+# Modern browsers will not do so unless we set SameSite=None; however *older*
+# browsers (including all versions of Safari on iOS 12?) don't support
+# SameSite=None, and interpret it as SameSite=Strict:
+# https://bugs.webkit.org/show_bug.cgi?id=198181
+#
+# As a rather painful workaround, we set *two* cookies, one with SameSite=None
+# and one with no SameSite, in the hope that at least one of them will get
+# back to us.
+#
+# Secure is necessary for SameSite=None (and, empirically, also breaks things
+# on iOS 12.)
+#
+# Here we have the names of the cookies, and the options we use to set them.
+_SESSION_COOKIES = [
+    (b"oidc_session", b"Path=/_synapse/client/oidc; HttpOnly; Secure; SameSite=None"),
+    (b"oidc_session_no_samesite", b"Path=/_synapse/client/oidc; HttpOnly"),
+]
 
 #: A token exchanged from the token endpoint, as per RFC6749 sec 5.1. and
 #: OpenID.Core sec 3.1.3.3.
@@ -150,12 +168,14 @@ class OidcHandler:
         # otherwise, it is presumably a successful response. see:
         #   https://tools.ietf.org/html/rfc6749#section-4.1.2
 
-        # Fetch the session cookie. See notes in handle_redirect_request about why
-        # we have two of these.
-        session = request.getCookie(SESSION_COOKIE_NAME)  # type: Optional[bytes]
-        if session is None:
-            session = request.getCookie(SESSION_COOKIE_NAME_IOS_HACK)
-        if session is None:
+        # Fetch the session cookie. See the comments on SESSION_COOKIES for why there
+        # are two.
+
+        for cookie_name, _ in _SESSION_COOKIES:
+            session = request.getCookie(cookie_name)  # type: Optional[bytes]
+            if session is not None:
+                break
+        else:
             logger.info("Received OIDC callback, with no session cookie")
             self._sso_handler.render_error(
                 request, "missing_session", "No session cookie found"
@@ -165,13 +185,15 @@ class OidcHandler:
         # Remove the cookies. There is a good chance that if the callback failed
         # once, it will fail next time and the code will already be exchanged.
         # Removing the cookies early avoids spamming the provider with token requests.
-        for cookie_name, options in [
-            (SESSION_COOKIE_NAME, b"; SameSite=None"),
-            (SESSION_COOKIE_NAME_IOS_HACK, b""),
-        ]:
+        #
+        # we have to build the header by hand rather than calling request.addCookie
+        # because the latter does not support SameSite=None
+        # (https://twistedmatrix.com/trac/ticket/10088)
+
+        for cookie_name, options in _SESSION_COOKIES:
             request.cookies.append(
-                b"%s=; Path=/_synapse/client/oidc; Expires=Thu, Jan 01 1970 00:00:00 UTC; "
-                b"HttpOnly; Secure%s" % (cookie_name, options)
+                b"%s=; Expires=Thu, Jan 01 1970 00:00:00 UTC; %s"
+                % (cookie_name, options)
             )
 
         # Check for the state query parameter
@@ -698,30 +720,15 @@ class OidcProvider:
             ),
         )
 
-        # we want the cookie to be returned to us even when the request is the POSTed
-        # result of a form on another domain, as is used with `response_mode=form_post`.
+        # Set the cookies. See the comments on _SESSION_COOKIES for why there are two.
         #
-        # Modern browsers will not do so unless we set SameSite=None; however *older*
-        # browsers (including all versions of Safari on iOS 12?) don't support
-        # SameSite=None, and interpret it as SameSite=Strict:
-        # https://bugs.webkit.org/show_bug.cgi?id=198181
-        #
-        # As a rather painful workaround, we set *two* cookies, one with SameSite=None
-        # and one with no SameSite, in the hope that at least one of them will get
-        # back to us.
-        #
-        # Secure is necessary for SameSite=None (and, empirically, also breaks things
-        # on iOS 12.)
-        #
-        # we have to build the cookie by hand rather than calling request.addCookie
-        # to work around https://twistedmatrix.com/trac/ticket/10088
-        #
-        for cookie_name, options in [
-            (SESSION_COOKIE_NAME, b"; Secure; SameSite=None"),
-            (SESSION_COOKIE_NAME_IOS_HACK, b""),
-        ]:
+        # we have to build the header by hand rather than calling request.addCookie
+        # because the latter does not support SameSite=None
+        # (https://twistedmatrix.com/trac/ticket/10088)
+
+        for cookie_name, options in _SESSION_COOKIES:
             request.cookies.append(
-                b"%s=%s; Path=/_synapse/client/oidc; Max-Age=3600; HttpOnly%s"
+                b"%s=%s; Max-Age=3600; %s"
                 % (cookie_name, cookie.encode("utf-8"), options)
             )
 
