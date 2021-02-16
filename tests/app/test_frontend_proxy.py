@@ -23,7 +23,7 @@ class FrontendProxyTests(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         hs = self.setup_test_homeserver(
-            http_client=None, homeserver_to_use=GenericWorkerServer
+            federation_http_client=None, homeserver_to_use=GenericWorkerServer
         )
 
         return hs
@@ -57,7 +57,7 @@ class FrontendProxyTests(HomeserverTestCase):
         self.assertEqual(len(self.reactor.tcpServers), 1)
         site = self.reactor.tcpServers[0][1]
 
-        _, channel = make_request(self.reactor, site, "PUT", "presence/a/status")
+        channel = make_request(self.reactor, site, "PUT", "presence/a/status")
 
         # 400 + unrecognised, because nothing is registered
         self.assertEqual(channel.code, 400)
@@ -77,7 +77,7 @@ class FrontendProxyTests(HomeserverTestCase):
         self.assertEqual(len(self.reactor.tcpServers), 1)
         site = self.reactor.tcpServers[0][1]
 
-        _, channel = make_request(self.reactor, site, "PUT", "presence/a/status")
+        channel = make_request(self.reactor, site, "PUT", "presence/a/status")
 
         # 401, because the stub servlet still checks authentication
         self.assertEqual(channel.code, 401)

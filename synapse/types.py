@@ -37,6 +37,7 @@ from signedjson.key import decode_verify_key_bytes
 from unpaddedbase64 import decode_base64
 
 from synapse.api.errors import Codes, SynapseError
+from synapse.util.stringutils import parse_and_validate_server_name
 
 if TYPE_CHECKING:
     from synapse.appservice.api import ApplicationService
@@ -257,8 +258,13 @@ class DomainSpecificString(
 
     @classmethod
     def is_valid(cls: Type[DS], s: str) -> bool:
+        """Parses the input string and attempts to ensure it is valid."""
         try:
-            cls.from_string(s)
+            obj = cls.from_string(s)
+            # Apply additional validation to the domain. This is only done
+            # during  is_valid (and not part of from_string) since it is
+            # possible for invalid data to exist in room-state, etc.
+            parse_and_validate_server_name(obj.domain)
             return True
         except Exception:
             return False
@@ -349,15 +355,17 @@ NON_MXID_CHARACTER_PATTERN = re.compile(
 )
 
 
-def map_username_to_mxid_localpart(username, case_sensitive=False):
+def map_username_to_mxid_localpart(
+    username: Union[str, bytes], case_sensitive: bool = False
+) -> str:
     """Map a username onto a string suitable for a MXID
 
     This follows the algorithm laid out at
     https://matrix.org/docs/spec/appendices.html#mapping-from-other-character-sets.
 
     Args:
-        username (unicode|bytes): username to be mapped
-        case_sensitive (bool): true if TEST and test should be mapped
+        username: username to be mapped
+        case_sensitive: true if TEST and test should be mapped
             onto different mxids
 
     Returns:

@@ -78,6 +78,7 @@ class FederationBase:
 
         ctx = current_context()
 
+        @defer.inlineCallbacks
         def callback(_, pdu: EventBase):
             with PreserveLoggingContext(ctx):
                 if not check_event_content_hash(pdu):
@@ -105,7 +106,11 @@ class FederationBase:
                         )
                     return redacted_event
 
-                if self.spam_checker.check_event_for_spam(pdu):
+                result = yield defer.ensureDeferred(
+                    self.spam_checker.check_event_for_spam(pdu)
+                )
+
+                if result:
                     logger.warning(
                         "Event contains spam, redacting %s: %s",
                         pdu.event_id,

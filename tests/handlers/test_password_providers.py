@@ -432,6 +432,29 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
 
     @override_config(
         {
+            **providers_config(CustomAuthProvider),
+            "password_config": {"enabled": False, "localdb_enabled": False},
+        }
+    )
+    def test_custom_auth_password_disabled_localdb_enabled(self):
+        """Check the localdb_enabled == enabled == False
+
+        Regression test for https://github.com/matrix-org/synapse/issues/8914: check
+        that setting *both* `localdb_enabled` *and* `password: enabled` to False doesn't
+        cause an exception.
+        """
+        self.register_user("localuser", "localpass")
+
+        flows = self._get_login_flows()
+        self.assertEqual(flows, [{"type": "test.login_type"}] + ADDITIONAL_LOGIN_FLOWS)
+
+        # login shouldn't work and should be rejected with a 400 ("unknown login type")
+        channel = self._send_password_login("localuser", "localpass")
+        self.assertEqual(channel.code, 400, channel.result)
+        mock_password_provider.check_auth.assert_not_called()
+
+    @override_config(
+        {
             **providers_config(PasswordCustomAuthProvider),
             "password_config": {"enabled": False},
         }
@@ -528,7 +551,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 400, channel.result)
 
     def _get_login_flows(self) -> JsonDict:
-        _, channel = self.make_request("GET", "/_matrix/client/r0/login")
+        channel = self.make_request("GET", "/_matrix/client/r0/login")
         self.assertEqual(channel.code, 200, channel.result)
         return channel.json_body["flows"]
 
@@ -537,7 +560,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
 
     def _send_login(self, type, user, **params) -> FakeChannel:
         params.update({"identifier": {"type": "m.id.user", "user": user}, "type": type})
-        _, channel = self.make_request("POST", "/_matrix/client/r0/login", params)
+        channel = self.make_request("POST", "/_matrix/client/r0/login", params)
         return channel
 
     def _start_delete_device_session(self, access_token, device_id) -> str:
@@ -574,7 +597,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self, access_token: str, device: str, body: Union[JsonDict, bytes] = b"",
     ) -> FakeChannel:
         """Delete an individual device."""
-        _, channel = self.make_request(
+        channel = self.make_request(
             "DELETE", "devices/" + device, body, access_token=access_token
         )
         return channel

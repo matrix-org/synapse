@@ -27,7 +27,7 @@ from tests.unittest import HomeserverTestCase
 class FederationReaderOpenIDListenerTests(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(
-            http_client=None, homeserver_to_use=GenericWorkerServer
+            federation_http_client=None, homeserver_to_use=GenericWorkerServer
         )
         return hs
 
@@ -73,7 +73,7 @@ class FederationReaderOpenIDListenerTests(HomeserverTestCase):
                 return
             raise
 
-        _, channel = make_request(
+        channel = make_request(
             self.reactor, site, "GET", "/_matrix/federation/v1/openid/userinfo"
         )
 
@@ -84,7 +84,7 @@ class FederationReaderOpenIDListenerTests(HomeserverTestCase):
 class SynapseHomeserverOpenIDListenerTests(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(
-            http_client=None, homeserver_to_use=SynapseHomeServer
+            federation_http_client=None, homeserver_to_use=SynapseHomeServer
         )
         return hs
 
@@ -121,7 +121,7 @@ class SynapseHomeserverOpenIDListenerTests(HomeserverTestCase):
                 return
             raise
 
-        _, channel = make_request(
+        channel = make_request(
             self.reactor, site, "GET", "/_matrix/federation/v1/openid/userinfo"
         )
 

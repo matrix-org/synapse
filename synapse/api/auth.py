@@ -23,7 +23,7 @@ from twisted.web.server import Request
 import synapse.types
 from synapse import event_auth
 from synapse.api.auth_blocking import AuthBlocking
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -31,7 +31,10 @@ from synapse.api.errors import (
     MissingClientTokenError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.appservice import ApplicationService
 from synapse.events import EventBase
+from synapse.http import get_request_user_agent
+from synapse.http.site import SynapseRequest
 from synapse.logging import opentracing as opentracing
 from synapse.storage.databases.main.registration import TokenLookupResult
 from synapse.types import StateMap, UserID
@@ -184,8 +187,8 @@ class Auth:
             AuthError if access is denied for the user in the access token
         """
         try:
-            ip_addr = self.hs.get_ip_from_request(request)
-            user_agent = request.get_user_agent("")
+            ip_addr = request.getClientIP()
+            user_agent = get_request_user_agent(request)
 
             access_token = self.get_access_token_from_request(request)
 
@@ -273,7 +276,7 @@ class Auth:
             return None, None
 
         if app_service.ip_range_whitelist:
-            ip_address = IPAddress(self.hs.get_ip_from_request(request))
+            ip_address = IPAddress(request.getClientIP())
             if ip_address not in app_service.ip_range_whitelist:
                 return None, None
 
@@ -474,7 +477,7 @@ class Auth:
         now = self.hs.get_clock().time_msec()
         return now < expiry
 
-    def get_appservice_by_req(self, request):
+    def get_appservice_by_req(self, request: SynapseRequest) -> ApplicationService:
         token = self.get_access_token_from_request(request)
         service = self.store.get_app_service_by_token(token)
         if not service:
@@ -646,7 +649,8 @@ class Auth:
             )
             if (
                 visibility
-                and visibility.content["history_visibility"] == "world_readable"
+                and visibility.content.get("history_visibility")
+                == HistoryVisibility.WORLD_READABLE
             ):
                 return Membership.JOIN, None
             raise AuthError(

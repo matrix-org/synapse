@@ -206,7 +206,7 @@ def _setup_stdlib_logging(config, log_config_path, logBeginner: LogBeginner) -> 
     # filter options, but care must when using e.g. MemoryHandler to buffer
     # writes.
 
-    log_context_filter = LoggingContextFilter(request="")
+    log_context_filter = LoggingContextFilter()
     log_metadata_filter = MetadataFilter({"server_name": config.server_name})
     old_factory = logging.getLogRecordFactory()
 

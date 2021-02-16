@@ -1,8 +1,45 @@
+matrix-synapse-py3 (1.27.0) stable; urgency=medium
+
+  [ Dan Callahan ]
+  * Fix build on Ubuntu 16.04 LTS (Xenial).
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.27.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 16 Feb 2021 13:11:28 +0000
+
+matrix-synapse-py3 (1.26.0) stable; urgency=medium
+
+  [ Richard van der Hoff ]
+  * Remove dependency on `python3-distutils`.
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.26.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 27 Jan 2021 12:43:35 -0500
+
+matrix-synapse-py3 (1.25.0) stable; urgency=medium
+
+  [ Dan Callahan ]
+  * Update dependencies to account for the removal of the transitional
+    dh-systemd package from Debian Bullseye.
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.25.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 13 Jan 2021 10:14:55 +0000
+
 matrix-synapse-py3 (1.24.0) stable; urgency=medium
 
   * New synapse release 1.24.0.
 
  -- Synapse Packaging team <packages@matrix.org>  Wed, 09 Dec 2020 10:14:30 +0000
+
+matrix-synapse-py3 (1.23.1) stable; urgency=medium
+
+  * New synapse release 1.23.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 09 Dec 2020 10:40:39 +0000
 
 matrix-synapse-py3 (1.23.0) stable; urgency=medium
 

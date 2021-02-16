@@ -86,8 +86,8 @@ REQUIREMENTS = [
 
 CONDITIONAL_REQUIREMENTS = {
     "matrix-synapse-ldap3": ["matrix-synapse-ldap3>=0.1"],
-    # we use execute_batch, which arrived in psycopg 2.7.
-    "postgres": ["psycopg2>=2.7"],
+    # we use execute_values with the fetch param, which arrived in psycopg 2.8.
+    "postgres": ["psycopg2>=2.8"],
     # ACME support is required to provision TLS certificates from authorities
     # that use the protocol, such as Let's Encrypt.
     "acme": [

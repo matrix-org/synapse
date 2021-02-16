@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Synapse Login</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no">
+    <style type="text/css">
+      {% include "sso.css" without context %}
+
+      .username_input {
+        display: flex;
+        border: 2px solid #418DED;
+        border-radius: 8px;
+        padding: 12px;
+        position: relative;
+        margin: 16px 0;
+        align-items: center;
+        font-size: 12px;
+      }
+
+      .username_input.invalid {
+        border-color: #FE2928;
+      }
+
+      .username_input.invalid input, .username_input.invalid label {
+        color: #FE2928;
+      }
+
+      .username_input div, .username_input input {
+        line-height: 18px;
+        font-size: 14px;
+      }
+
+      .username_input label {
+        position: absolute;
+        top: -8px;
+        left: 14px;
+        font-size: 80%;
+        background: white;
+        padding: 2px;
+      }
+
+      .username_input input {
+        flex: 1;
+        display: block;
+        min-width: 0;
+        border: none;
+      }
+
+      .username_input div {
+        color: #8D99A5;
+      }
+
+      .idp-pick-details {
+        border: 1px solid #E9ECF1;
+        border-radius: 8px;
+        margin: 24px 0;
+      }
+
+      .idp-pick-details h2 {
+        margin: 0;
+        padding: 8px 12px;
+      }
+
+      .idp-pick-details .idp-detail {
+        border-top: 1px solid #E9ECF1;
+        padding: 12px;
+      }
+      .idp-pick-details .check-row {
+        display: flex;
+        align-items: center;
+      }
+
+      .idp-pick-details .check-row .name {
+        flex: 1;
+      }
+
+      .idp-pick-details .use, .idp-pick-details .idp-value {
+        color: #737D8C;
+      }
+
+      .idp-pick-details .idp-value {
+        margin: 0;
+        margin-top: 8px;
+      }
+
+      .idp-pick-details .avatar {
+        width: 53px;
+        height: 53px;
+        border-radius: 100%;
+        display: block;
+        margin-top: 8px;
+      }
+
+      output {
+        padding: 0 14px;
+        display: block;
+      }
+
+      output.error {
+        color: #FE2928;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Your account is nearly ready</h1>
+      <p>Check your details before creating an account on {{ server_name }}</p>
+    </header>
+    <main>
+      <form method="post" class="form__input" id="form">
+        <div class="username_input" id="username_input">
+          <label for="field-username">Username</label>
+          <div class="prefix">@</div>
+          <input type="text" name="username" id="field-username" autofocus>
+          <div class="postfix">:{{ server_name }}</div>
+        </div>
+        <output for="username_input" id="field-username-output"></output>
+        <input type="submit" value="Continue" class="primary-button">
+        {% if user_attributes %}
+        <section class="idp-pick-details">
+          <h2><img src="{{ idp.idp_icon | mxc_to_http(24, 24) }}"/>Information from {{ idp.idp_name }}</h2>
+          {% if user_attributes.avatar_url %}
+          <div class="idp-detail idp-avatar">
+            <div class="check-row">
+              <label for="idp-avatar" class="name">Avatar</label>
+              <label for="idp-avatar" class="use">Use</label>
+              <input type="checkbox" name="use_avatar" id="idp-avatar" value="true" checked>
+            </div>
+            <img src="{{ user_attributes.avatar_url }}" class="avatar" />
+          </div>
+          {% endif %}
+          {% if user_attributes.display_name %}
+          <div class="idp-detail">
+            <div class="check-row">
+              <label for="idp-displayname" class="name">Display name</label>
+              <label for="idp-displayname" class="use">Use</label>
+              <input type="checkbox" name="use_display_name" id="idp-displayname" value="true" checked>
+            </div>
+            <p class="idp-value">{{ user_attributes.display_name }}</p>
+          </div>
+          {% endif %}
+          {% for email in user_attributes.emails %}
+          <div class="idp-detail">
+            <div class="check-row">
+              <label for="idp-email{{ loop.index }}" class="name">E-mail</label>
+              <label for="idp-email{{ loop.index }}" class="use">Use</label>
+              <input type="checkbox" name="use_email" id="idp-email{{ loop.index }}" value="{{ email }}" checked>
+            </div>
+            <p class="idp-value">{{ email }}</p>
+          </div>
+          {% endfor %}
+        </section>
+        {% endif %}
+      </form>
+    </main>
+    <script type="text/javascript">
+      {% include "sso_auth_account_details.js" without context %}
+    </script>
+  </body>
+</html>

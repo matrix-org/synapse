@@ -26,11 +26,10 @@ import treq
 from canonicaljson import encode_canonical_json
 from prometheus_client import Counter
 from signedjson.sign import sign_json
-from zope.interface import implementer
 
 from twisted.internet import defer
 from twisted.internet.error import DNSLookupError
-from twisted.internet.interfaces import IReactorPluggableNameResolver, IReactorTime
+from twisted.internet.interfaces import IReactorTime
 from twisted.internet.task import _EPSILON, Cooperator
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IBodyProducer, IResponse
@@ -38,16 +37,19 @@ from twisted.web.iweb import IBodyProducer, IResponse
 import synapse.metrics
 import synapse.util.retryutils
 from synapse.api.errors import (
+    Codes,
     FederationDeniedError,
     HttpResponseException,
     RequestSendFailed,
+    SynapseError,
 )
 from synapse.http import QuieterFileBodyProducer
 from synapse.http.client import (
     BlacklistingAgentWrapper,
-    IPBlacklistingResolver,
+    BlacklistingReactorWrapper,
+    BodyExceededMaxSize,
     encode_query_args,
-    readBodyToFile,
+    read_body_with_max_size,
 )
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.logging.context import make_deferred_yieldable
@@ -172,6 +174,16 @@ async def _handle_json_response(
         d = timeout_deferred(d, timeout=timeout_sec, reactor=reactor)
 
         body = await make_deferred_yieldable(d)
+    except ValueError as e:
+        # The JSON content was invalid.
+        logger.warning(
+            "{%s} [%s] Failed to parse JSON response - %s %s",
+            request.txn_id,
+            request.destination,
+            request.method,
+            request.uri.decode("ascii"),
+        )
+        raise RequestSendFailed(e, can_retry=False) from e
     except defer.TimeoutError as e:
         logger.warning(
             "{%s} [%s] Timed out reading response - %s %s",
@@ -221,23 +233,11 @@ class MatrixFederationHttpClient:
         self.signing_key = hs.signing_key
         self.server_name = hs.hostname
 
-        real_reactor = hs.get_reactor()
-
         # We need to use a DNS resolver which filters out blacklisted IP
         # addresses, to prevent DNS rebinding.
-        nameResolver = IPBlacklistingResolver(
-            real_reactor, None, hs.config.federation_ip_range_blacklist
+        self.reactor = BlacklistingReactorWrapper(
+            hs.get_reactor(), None, hs.config.federation_ip_range_blacklist
         )
-
-        @implementer(IReactorPluggableNameResolver)
-        class Reactor:
-            def __getattr__(_self, attr):
-                if attr == "nameResolver":
-                    return nameResolver
-                else:
-                    return getattr(real_reactor, attr)
-
-        self.reactor = Reactor()
 
         user_agent = hs.version_string
         if hs.config.user_agent_suffix:
@@ -245,7 +245,10 @@ class MatrixFederationHttpClient:
         user_agent = user_agent.encode("ascii")
 
         self.agent = MatrixFederationAgent(
-            self.reactor, tls_client_options_factory, user_agent
+            self.reactor,
+            tls_client_options_factory,
+            user_agent,
+            hs.config.federation_ip_range_blacklist,
         )
 
         # Use a BlacklistingAgentWrapper to prevent circumventing the IP
@@ -985,9 +988,15 @@ class MatrixFederationHttpClient:
         headers = dict(response.headers.getAllRawHeaders())
 
         try:
-            d = readBodyToFile(response, output_stream, max_size)
+            d = read_body_with_max_size(response, output_stream, max_size)
             d.addTimeout(self.default_timeout, self.reactor)
             length = await make_deferred_yieldable(d)
+        except BodyExceededMaxSize:
+            msg = "Requested file is too large > %r bytes" % (max_size,)
+            logger.warning(
+                "{%s} [%s] %s", request.txn_id, request.destination, msg,
+            )
+            raise SynapseError(502, msg, Codes.TOO_LARGE)
         except Exception as e:
             logger.warning(
                 "{%s} [%s] Error reading response: %s",

@@ -95,6 +95,8 @@ class EventTypes:
 
     Presence = "m.presence"
 
+    Dummy = "org.matrix.dummy_event"
+
 
 class RejectedReason:
     AUTH_ERROR = "auth_error"
@@ -160,3 +162,10 @@ class RoomEncryptionAlgorithms:
 class AccountDataTypes:
     DIRECT = "m.direct"
     IGNORED_USER_LIST = "m.ignored_user_list"
+
+
+class HistoryVisibility:
+    INVITED = "invited"
+    JOINED = "joined"
+    SHARED = "shared"
+    WORLD_READABLE = "world_readable"

@@ -26,7 +26,9 @@ class ThirdPartyRulesConfig(Config):
 
         provider = config.get("third_party_event_rules", None)
         if provider is not None:
-            self.third_party_event_rules = load_module(provider)
+            self.third_party_event_rules = load_module(
+                provider, ("third_party_event_rules",)
+            )
 
     def generate_config_section(self, **kwargs):
         return """\

@@ -53,6 +53,15 @@ class WriterLocations:
         default=["master"], type=List[str], converter=_instance_to_list_converter
     )
     typing = attr.ib(default="master", type=str)
+    to_device = attr.ib(
+        default=["master"], type=List[str], converter=_instance_to_list_converter,
+    )
+    account_data = attr.ib(
+        default=["master"], type=List[str], converter=_instance_to_list_converter,
+    )
+    receipts = attr.ib(
+        default=["master"], type=List[str], converter=_instance_to_list_converter,
+    )
 
 
 class WorkerConfig(Config):
@@ -84,6 +93,9 @@ class WorkerConfig(Config):
 
         # The port on the main synapse for HTTP replication endpoint
         self.worker_replication_http_port = config.get("worker_replication_http_port")
+
+        # The shared secret used for authentication when connecting to the main synapse.
+        self.worker_replication_secret = config.get("worker_replication_secret", None)
 
         self.worker_name = config.get("worker_name", self.worker_app)
 
@@ -121,7 +133,7 @@ class WorkerConfig(Config):
 
         # Check that the configured writers for events and typing also appears in
         # `instance_map`.
-        for stream in ("events", "typing"):
+        for stream in ("events", "typing", "to_device", "account_data", "receipts"):
             instances = _instance_to_list_converter(getattr(self.writers, stream))
             for instance in instances:
                 if instance != "master" and instance not in self.instance_map:
@@ -129,6 +141,21 @@ class WorkerConfig(Config):
                         "Instance %r is configured to write %s but does not appear in `instance_map` config."
                         % (instance, stream)
                     )
+
+        if len(self.writers.to_device) != 1:
+            raise ConfigError(
+                "Must only specify one instance to handle `to_device` messages."
+            )
+
+        if len(self.writers.account_data) != 1:
+            raise ConfigError(
+                "Must only specify one instance to handle `account_data` messages."
+            )
+
+        if len(self.writers.receipts) != 1:
+            raise ConfigError(
+                "Must only specify one instance to handle `receipts` messages."
+            )
 
         self.events_shard_config = ShardedWorkerHandlingConfig(self.writers.events)
 
@@ -185,6 +212,13 @@ class WorkerConfig(Config):
         # data). If not provided this defaults to the main process.
         #
         #run_background_tasks_on: worker1
+
+        # A shared secret used by the replication APIs to authenticate HTTP requests
+        # from workers.
+        #
+        # By default this is unused and traffic is not authenticated.
+        #
+        #worker_replication_secret: ""
         """
 
     def read_arguments(self, args):

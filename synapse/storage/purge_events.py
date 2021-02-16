@@ -15,7 +15,12 @@
 
 import itertools
 import logging
-from typing import Set
+from typing import TYPE_CHECKING, Set
+
+from synapse.storage.databases import Databases
+
+if TYPE_CHECKING:
+    from synapse.app.homeserver import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +29,10 @@ class PurgeEventsStorage:
     """High level interface for purging rooms and event history.
     """
 
-    def __init__(self, hs, stores):
+    def __init__(self, hs: "HomeServer", stores: Databases):
         self.stores = stores
 
-    async def purge_room(self, room_id: str):
+    async def purge_room(self, room_id: str) -> None:
         """Deletes all record of a room
         """
 

@@ -17,6 +17,9 @@ import os
 from collections import namedtuple
 from typing import Dict, List
 
+from netaddr import IPSet
+
+from synapse.config.server import DEFAULT_IP_RANGE_BLACKLIST
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module
 
@@ -142,7 +145,7 @@ class ContentRepositoryConfig(Config):
         # them to be started.
         self.media_storage_providers = []  # type: List[tuple]
 
-        for provider_config in storage_providers:
+        for i, provider_config in enumerate(storage_providers):
             # We special case the module "file_system" so as not to need to
             # expose FileStorageProviderBackend
             if provider_config["module"] == "file_system":
@@ -151,7 +154,9 @@ class ContentRepositoryConfig(Config):
                     ".FileStorageProviderBackend"
                 )
 
-            provider_class, parsed_config = load_module(provider_config)
+            provider_class, parsed_config = load_module(
+                provider_config, ("media_storage_providers", "<item %i>" % i)
+            )
 
             wrapper_config = MediaStorageProviderConfig(
                 provider_config.get("store_local", False),
@@ -182,9 +187,6 @@ class ContentRepositoryConfig(Config):
                     "to work"
                 )
 
-            # netaddr is a dependency for url_preview
-            from netaddr import IPSet
-
             self.url_preview_ip_range_blacklist = IPSet(
                 config["url_preview_ip_range_blacklist"]
             )
@@ -212,6 +214,10 @@ class ContentRepositoryConfig(Config):
         )
         # strip final NL
         formatted_thumbnail_sizes = formatted_thumbnail_sizes[:-1]
+
+        ip_range_blacklist = "\n".join(
+            "        #  - '%s'" % ip for ip in DEFAULT_IP_RANGE_BLACKLIST
+        )
 
         return (
             r"""
@@ -283,15 +289,7 @@ class ContentRepositoryConfig(Config):
         # you uncomment the following list as a starting point.
         #
         #url_preview_ip_range_blacklist:
-        #  - '127.0.0.0/8'
-        #  - '10.0.0.0/8'
-        #  - '172.16.0.0/12'
-        #  - '192.168.0.0/16'
-        #  - '100.64.0.0/10'
-        #  - '169.254.0.0/16'
-        #  - '::1/128'
-        #  - 'fe80::/64'
-        #  - 'fc00::/7'
+%(ip_range_blacklist)s
 
         # List of IP address CIDR ranges that the URL preview spider is allowed
         # to access even if they are specified in url_preview_ip_range_blacklist.

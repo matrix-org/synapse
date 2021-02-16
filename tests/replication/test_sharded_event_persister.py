@@ -180,7 +180,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         )
 
         # Do an initial sync so that we're up to date.
-        request, channel = make_request(
+        channel = make_request(
             self.reactor, sync_hs_site, "GET", "/sync", access_token=access_token
         )
         next_batch = channel.json_body["next_batch"]
@@ -206,7 +206,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
 
         # Check that syncing still gets the new event, despite the gap in the
         # stream IDs.
-        request, channel = make_request(
+        channel = make_request(
             self.reactor,
             sync_hs_site,
             "GET",
@@ -236,7 +236,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         response = self.helper.send(room_id2, body="Hi!", tok=self.other_access_token)
         first_event_in_room2 = response["event_id"]
 
-        request, channel = make_request(
+        channel = make_request(
             self.reactor,
             sync_hs_site,
             "GET",
@@ -261,7 +261,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         self.helper.send(room_id1, body="Hi again!", tok=self.other_access_token)
         self.helper.send(room_id2, body="Hi again!", tok=self.other_access_token)
 
-        request, channel = make_request(
+        channel = make_request(
             self.reactor,
             sync_hs_site,
             "GET",
@@ -279,7 +279,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         # Paginating back in the first room should not produce any results, as
         # no events have happened in it. This tests that we are correctly
         # filtering results based on the vector clock portion.
-        request, channel = make_request(
+        channel = make_request(
             self.reactor,
             sync_hs_site,
             "GET",
@@ -292,7 +292,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
 
         # Paginating back on the second room should produce the first event
         # again. This tests that pagination isn't completely broken.
-        request, channel = make_request(
+        channel = make_request(
             self.reactor,
             sync_hs_site,
             "GET",
@@ -307,7 +307,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         )
 
         # Paginating forwards should give the same results
-        request, channel = make_request(
+        channel = make_request(
             self.reactor,
             sync_hs_site,
             "GET",
@@ -318,7 +318,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         )
         self.assertListEqual([], channel.json_body["chunk"])
 
-        request, channel = make_request(
+        channel = make_request(
             self.reactor,
             sync_hs_site,
             "GET",
