@@ -784,7 +784,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
             group_id, requester_user_id, and_exists=True
         )
         if not group_info:
-            raise SynapseError(400, "Group does not exist", errcode=Codes.BAD_STATE)
+            raise SynapseError(404, "Group does not exist", errcode=Codes.NOT_FOUND)
         if group_info["join_policy"] != "open":
             raise SynapseError(403, "Group is not publicly joinable")
 
