@@ -699,18 +699,6 @@ class SimpleHttpClient:
 
         resp_headers = dict(response.headers.getAllRawHeaders())
 
-        if (
-            b"Content-Length" in resp_headers
-            and max_size
-            and int(resp_headers[b"Content-Length"][0]) > max_size
-        ):
-            logger.warning("Requested URL is too large > %r bytes" % (max_size,))
-            raise SynapseError(
-                502,
-                "Requested file is too large > %r bytes" % (max_size,),
-                Codes.TOO_LARGE,
-            )
-
         if response.code > 299:
             logger.warning("Got %d when downloading %s" % (response.code, url))
             raise SynapseError(502, "Got error %d" % (response.code,), Codes.UNKNOWN)
@@ -811,6 +799,12 @@ def read_body_with_max_size(
     Returns:
         A Deferred which resolves to the length of the read body.
     """
+    # If the Content-Length header gives a size larger than the maximum allowed
+    # size, do not bother downloading the body.
+    if max_size is not None:
+        content_length_headers = response.headers.getRawHeaders(b"Content-Length", None)
+        if content_length_headers and int(content_length_headers[0]) > max_size:
+            return defer.fail(BodyExceededMaxSize())
 
     d = defer.Deferred()
     response.deliverBody(_ReadBodyWithMaxSizeProtocol(stream, d, max_size))
