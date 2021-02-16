@@ -169,7 +169,10 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         )
 
     async def get_local_media_before(
-        self, before_ts: int, size_gt: int, keep_profiles: bool,
+        self,
+        before_ts: int,
+        size_gt: int,
+        keep_profiles: bool,
     ) -> List[str]:
 
         # to find files that have never been accessed (last_access_ts IS NULL)
@@ -454,10 +457,14 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         )
 
     async def get_remote_media_thumbnail(
-        self, origin: str, media_id: str, t_width: int, t_height: int, t_type: str,
+        self,
+        origin: str,
+        media_id: str,
+        t_width: int,
+        t_height: int,
+        t_type: str,
     ) -> Optional[Dict[str, Any]]:
-        """Fetch the thumbnail info of given width, height and type.
-        """
+        """Fetch the thumbnail info of given width, height and type."""
 
         return await self.db_pool.simple_select_one(
             table="remote_media_cache_thumbnails",

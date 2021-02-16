@@ -750,7 +750,11 @@ class FederationClient(FederationBase):
         return resp[1]
 
     async def send_invite(
-        self, destination: str, room_id: str, event_id: str, pdu: EventBase,
+        self,
+        destination: str,
+        room_id: str,
+        event_id: str,
+        pdu: EventBase,
     ) -> EventBase:
         room_version = await self.store.get_room_version(room_id)
 

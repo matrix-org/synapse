@@ -196,8 +196,7 @@ class ErrorCommand(_SimpleCommand):
 
 
 class PingCommand(_SimpleCommand):
-    """Sent by either side as a keep alive. The data is arbitrary (often timestamp)
-    """
+    """Sent by either side as a keep alive. The data is arbitrary (often timestamp)"""
 
     NAME = "PING"
 

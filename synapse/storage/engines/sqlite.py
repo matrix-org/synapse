@@ -29,7 +29,10 @@ class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
         super().__init__(database_module, database_config)
 
         database = database_config.get("args", {}).get("database")
-        self._is_in_memory = database in (None, ":memory:",)
+        self._is_in_memory = database in (
+            None,
+            ":memory:",
+        )
 
         if platform.python_implementation() == "PyPy":
             # pypy's sqlite3 module doesn't handle bytearrays, convert them
@@ -63,8 +66,7 @@ class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
 
     @property
     def supports_using_any_list(self):
-        """Do we support using `a = ANY(?)` and passing a list
-        """
+        """Do we support using `a = ANY(?)` and passing a list"""
         return False
 
     def check_database(self, db_conn, allow_outdated_version: bool = False):

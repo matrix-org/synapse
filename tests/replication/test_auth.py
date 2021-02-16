@@ -79,8 +79,7 @@ class WorkerAuthenticationTestCase(BaseMultiWorkerStreamTestCase):
         )
 
     def test_no_auth(self):
-        """With no authentication the request should finish.
-        """
+        """With no authentication the request should finish."""
         channel = self._test_register()
         self.assertEqual(channel.code, 200)
 
@@ -89,8 +88,7 @@ class WorkerAuthenticationTestCase(BaseMultiWorkerStreamTestCase):
 
     @override_config({"main_replication_secret": "my-secret"})
     def test_missing_auth(self):
-        """If the main process expects a secret that is not provided, an error results.
-        """
+        """If the main process expects a secret that is not provided, an error results."""
         channel = self._test_register()
         self.assertEqual(channel.code, 500)
 
@@ -101,15 +99,13 @@ class WorkerAuthenticationTestCase(BaseMultiWorkerStreamTestCase):
         }
     )
     def test_unauthorized(self):
-        """If the main process receives the wrong secret, an error results.
-        """
+        """If the main process receives the wrong secret, an error results."""
         channel = self._test_register()
         self.assertEqual(channel.code, 500)
 
     @override_config({"worker_replication_secret": "my-secret"})
     def test_authorized(self):
-        """The request should finish when the worker provides the authentication header.
-        """
+        """The request should finish when the worker provides the authentication header."""
         channel = self._test_register()
         self.assertEqual(channel.code, 200)
 

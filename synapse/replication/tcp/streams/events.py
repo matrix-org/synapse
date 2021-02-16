@@ -113,8 +113,7 @@ TypeToRow = {Row.TypeId: Row for Row in _EventRows}
 
 
 class EventsStream(Stream):
-    """We received a new event, or an event went from being an outlier to not
-    """
+    """We received a new event, or an event went from being an outlier to not"""
 
     NAME = "events"
 

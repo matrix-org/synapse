@@ -579,7 +579,7 @@ class ResetPasswordRestServlet(RestServlet):
             }
         Returns:
             200 OK with empty object if success otherwise an error.
-        """
+    """
 
     PATTERNS = admin_patterns("/reset_password/(?P<target_user_id>[^/]*)")
 

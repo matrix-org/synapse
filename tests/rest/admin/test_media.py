@@ -63,7 +63,11 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
 
         url = "/_synapse/admin/v1/media/%s/%s" % (self.server_name, "12345")
 
-        channel = self.make_request("DELETE", url, access_token=self.other_user_token,)
+        channel = self.make_request(
+            "DELETE",
+            url,
+            access_token=self.other_user_token,
+        )
 
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
@@ -74,7 +78,11 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         """
         url = "/_synapse/admin/v1/media/%s/%s" % (self.server_name, "12345")
 
-        channel = self.make_request("DELETE", url, access_token=self.admin_user_tok,)
+        channel = self.make_request(
+            "DELETE",
+            url,
+            access_token=self.admin_user_tok,
+        )
 
         self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
@@ -85,7 +93,11 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         """
         url = "/_synapse/admin/v1/media/%s/%s" % ("unknown_domain", "12345")
 
-        channel = self.make_request("DELETE", url, access_token=self.admin_user_tok,)
+        channel = self.make_request(
+            "DELETE",
+            url,
+            access_token=self.admin_user_tok,
+        )
 
         self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Can only delete local media", channel.json_body["error"])
@@ -139,12 +151,17 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v1/media/%s/%s" % (self.server_name, media_id)
 
         # Delete media
-        channel = self.make_request("DELETE", url, access_token=self.admin_user_tok,)
+        channel = self.make_request(
+            "DELETE",
+            url,
+            access_token=self.admin_user_tok,
+        )
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(1, channel.json_body["total"])
         self.assertEqual(
-            media_id, channel.json_body["deleted_media"][0],
+            media_id,
+            channel.json_body["deleted_media"][0],
         )
 
         # Attempt to access media
@@ -207,7 +224,9 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         self.other_user_token = self.login("user", "pass")
 
         channel = self.make_request(
-            "POST", self.url, access_token=self.other_user_token,
+            "POST",
+            self.url,
+            access_token=self.other_user_token,
         )
 
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
@@ -220,7 +239,9 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v1/media/%s/delete" % "unknown_domain"
 
         channel = self.make_request(
-            "POST", url + "?before_ts=1234", access_token=self.admin_user_tok,
+            "POST",
+            url + "?before_ts=1234",
+            access_token=self.admin_user_tok,
         )
 
         self.assertEqual(400, channel.code, msg=channel.json_body)
@@ -230,7 +251,11 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         """
         If the parameter `before_ts` is missing, an error is returned.
         """
-        channel = self.make_request("POST", self.url, access_token=self.admin_user_tok,)
+        channel = self.make_request(
+            "POST",
+            self.url,
+            access_token=self.admin_user_tok,
+        )
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.MISSING_PARAM, channel.json_body["errcode"])
@@ -243,7 +268,9 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         If parameters are invalid, an error is returned.
         """
         channel = self.make_request(
-            "POST", self.url + "?before_ts=-1234", access_token=self.admin_user_tok,
+            "POST",
+            self.url + "?before_ts=-1234",
+            access_token=self.admin_user_tok,
         )
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
@@ -304,7 +331,8 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(1, channel.json_body["total"])
         self.assertEqual(
-            media_id, channel.json_body["deleted_media"][0],
+            media_id,
+            channel.json_body["deleted_media"][0],
         )
 
         self._access_media(server_and_media_id, False)
@@ -340,7 +368,8 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(1, channel.json_body["total"])
         self.assertEqual(
-            server_and_media_id.split("/")[1], channel.json_body["deleted_media"][0],
+            server_and_media_id.split("/")[1],
+            channel.json_body["deleted_media"][0],
         )
 
         self._access_media(server_and_media_id, False)
@@ -374,7 +403,8 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(1, channel.json_body["total"])
         self.assertEqual(
-            server_and_media_id.split("/")[1], channel.json_body["deleted_media"][0],
+            server_and_media_id.split("/")[1],
+            channel.json_body["deleted_media"][0],
         )
 
         self._access_media(server_and_media_id, False)
@@ -417,7 +447,8 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(1, channel.json_body["total"])
         self.assertEqual(
-            server_and_media_id.split("/")[1], channel.json_body["deleted_media"][0],
+            server_and_media_id.split("/")[1],
+            channel.json_body["deleted_media"][0],
         )
 
         self._access_media(server_and_media_id, False)
@@ -461,7 +492,8 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(1, channel.json_body["total"])
         self.assertEqual(
-            server_and_media_id.split("/")[1], channel.json_body["deleted_media"][0],
+            server_and_media_id.split("/")[1],
+            channel.json_body["deleted_media"][0],
         )
 
         self._access_media(server_and_media_id, False)

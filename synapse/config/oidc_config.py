@@ -355,9 +355,10 @@ def _parse_oidc_config_dict(
     ump_config.setdefault("module", DEFAULT_USER_MAPPING_PROVIDER)
     ump_config.setdefault("config", {})
 
-    (user_mapping_provider_class, user_mapping_provider_config,) = load_module(
-        ump_config, config_path + ("user_mapping_provider",)
-    )
+    (
+        user_mapping_provider_class,
+        user_mapping_provider_config,
+    ) = load_module(ump_config, config_path + ("user_mapping_provider",))
 
     # Ensure loaded user mapping module has defined all necessary methods
     required_methods = [
@@ -372,7 +373,11 @@ def _parse_oidc_config_dict(
     if missing_methods:
         raise ConfigError(
             "Class %s is missing required "
-            "methods: %s" % (user_mapping_provider_class, ", ".join(missing_methods),),
+            "methods: %s"
+            % (
+                user_mapping_provider_class,
+                ", ".join(missing_methods),
+            ),
             config_path + ("user_mapping_provider", "module"),
         )
 

@@ -512,7 +512,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         # Mismatching session
         session = self._generate_oidc_session_token(
-            state="state", nonce="nonce", client_redirect_url="http://client/redirect",
+            state="state",
+            nonce="nonce",
+            client_redirect_url="http://client/redirect",
         )
         request.args = {}
         request.args[b"state"] = [b"mismatching state"]
@@ -567,7 +569,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
         # Internal server error with no JSON body
         self.http_client.request = simple_async_mock(
             return_value=FakeResponse(
-                code=500, phrase=b"Internal Server Error", body=b"Not JSON",
+                code=500,
+                phrase=b"Internal Server Error",
+                body=b"Not JSON",
             )
         )
         exc = self.get_failure(self.provider._exchange_code(code), OidcError)
@@ -587,7 +591,11 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         # 4xx error without "error" field
         self.http_client.request = simple_async_mock(
-            return_value=FakeResponse(code=400, phrase=b"Bad request", body=b"{}",)
+            return_value=FakeResponse(
+                code=400,
+                phrase=b"Bad request",
+                body=b"{}",
+            )
         )
         exc = self.get_failure(self.provider._exchange_code(code), OidcError)
         self.assertEqual(exc.value.error, "server_error")
@@ -595,7 +603,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
         # 2xx error with "error" field
         self.http_client.request = simple_async_mock(
             return_value=FakeResponse(
-                code=200, phrase=b"OK", body=b'{"error": "some_error"}',
+                code=200,
+                phrase=b"OK",
+                body=b'{"error": "some_error"}',
             )
         )
         exc = self.get_failure(self.provider._exchange_code(code), OidcError)
@@ -632,7 +642,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
         state = "state"
         client_redirect_url = "http://client/redirect"
         session = self._generate_oidc_session_token(
-            state=state, nonce="nonce", client_redirect_url=client_redirect_url,
+            state=state,
+            nonce="nonce",
+            client_redirect_url=client_redirect_url,
         )
         request = _build_callback_request("code", state, session)
 
@@ -895,7 +907,9 @@ async def _make_callback_with_userinfo(
     session = handler._token_generator.generate_oidc_session_token(
         state=state,
         session_data=OidcSessionData(
-            idp_id="oidc", nonce="nonce", client_redirect_url=client_redirect_url,
+            idp_id="oidc",
+            nonce="nonce",
+            client_redirect_url=client_redirect_url,
         ),
     )
     request = _build_callback_request("code", state, session)

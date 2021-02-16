@@ -310,7 +310,9 @@ class LoginRestServlet(RestServlet):
         except jwt.PyJWTError as e:
             # A JWT error occurred, return some info back to the client.
             raise LoginError(
-                403, "JWT validation failed: %s" % (str(e),), errcode=Codes.FORBIDDEN,
+                403,
+                "JWT validation failed: %s" % (str(e),),
+                errcode=Codes.FORBIDDEN,
             )
 
         user = payload.get("sub", None)
@@ -375,7 +377,9 @@ class SsoRedirectServlet(RestServlet):
             request, "redirectUrl", required=True, encoding=None
         )
         sso_url = await self._sso_handler.handle_redirect_request(
-            request, client_redirect_url, idp_id,
+            request,
+            client_redirect_url,
+            idp_id,
         )
         logger.info("Redirecting to %s", sso_url)
         request.redirect(sso_url)

@@ -325,7 +325,10 @@ class MediaRepository:
         # Failed to find the file anywhere, lets download it.
 
         try:
-            media_info = await self._download_remote_file(server_name, media_id,)
+            media_info = await self._download_remote_file(
+                server_name,
+                media_id,
+            )
         except SynapseError:
             raise
         except Exception as e:
@@ -351,7 +354,11 @@ class MediaRepository:
         responder = await self.media_storage.fetch_media(file_info)
         return responder, media_info
 
-    async def _download_remote_file(self, server_name: str, media_id: str,) -> dict:
+    async def _download_remote_file(
+        self,
+        server_name: str,
+        media_id: str,
+    ) -> dict:
         """Attempt to download the remote file from the given server name,
         using the given file_id as the local id.
 
@@ -773,7 +780,11 @@ class MediaRepository:
                         )
                     except Exception as e:
                         thumbnail_exists = await self.store.get_remote_media_thumbnail(
-                            server_name, media_id, t_width, t_height, t_type,
+                            server_name,
+                            media_id,
+                            t_width,
+                            t_height,
+                            t_type,
                         )
                         if not thumbnail_exists:
                             raise e
@@ -832,7 +843,10 @@ class MediaRepository:
         return await self._remove_local_media_from_disk([media_id])
 
     async def delete_old_local_media(
-        self, before_ts: int, size_gt: int = 0, keep_profiles: bool = True,
+        self,
+        before_ts: int,
+        size_gt: int = 0,
+        keep_profiles: bool = True,
     ) -> Tuple[List[str], int]:
         """
         Delete local or remote media from this server by size and timestamp. Removes
@@ -849,7 +863,9 @@ class MediaRepository:
             A tuple of (list of deleted media IDs, total deleted media IDs).
         """
         old_media = await self.store.get_local_media_before(
-            before_ts, size_gt, keep_profiles,
+            before_ts,
+            size_gt,
+            keep_profiles,
         )
         return await self._remove_local_media_from_disk(old_media)
 

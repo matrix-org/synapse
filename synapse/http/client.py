@@ -398,7 +398,8 @@ class SimpleHttpClient:
                 body_producer = None
                 if data is not None:
                     body_producer = QuieterFileBodyProducer(
-                        BytesIO(data), cooperator=self._cooperator,
+                        BytesIO(data),
+                        cooperator=self._cooperator,
                     )
 
                 request_deferred = treq.request(
@@ -413,7 +414,9 @@ class SimpleHttpClient:
                 # we use our own timeout mechanism rather than treq's as a workaround
                 # for https://twistedmatrix.com/trac/ticket/9534.
                 request_deferred = timeout_deferred(
-                    request_deferred, 60, self.hs.get_reactor(),
+                    request_deferred,
+                    60,
+                    self.hs.get_reactor(),
                 )
 
                 # turn timeouts into RequestTimedOutErrors

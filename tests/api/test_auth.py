@@ -276,7 +276,10 @@ class AuthTestCase(unittest.HomeserverTestCase):
             if token != tok:
                 return None
             return TokenLookupResult(
-                user_id=USER_ID, is_guest=False, token_id=1234, device_id="DEVICE",
+                user_id=USER_ID,
+                is_guest=False,
+                token_id=1234,
+                device_id="DEVICE",
             )
 
         self.store.get_user_by_access_token = get_user

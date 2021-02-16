@@ -482,7 +482,8 @@ class MakeRoomAdminRestServlet(RestServlet):
 
             if not admin_user_id:
                 raise SynapseError(
-                    400, "No local admin user in room",
+                    400,
+                    "No local admin user in room",
                 )
 
             pl_content = power_levels.content
@@ -492,7 +493,8 @@ class MakeRoomAdminRestServlet(RestServlet):
             admin_user_id = create_event.sender
             if not self.is_mine_id(admin_user_id):
                 raise SynapseError(
-                    400, "No local admin user in room",
+                    400,
+                    "No local admin user in room",
                 )
 
         # Grant the user power equal to the room admin by attempting to send an
@@ -502,7 +504,8 @@ class MakeRoomAdminRestServlet(RestServlet):
         new_pl_content["users"][user_to_add] = new_pl_content["users"][admin_user_id]
 
         fake_requester = create_requester(
-            admin_user_id, authenticated_entity=requester.authenticated_entity,
+            admin_user_id,
+            authenticated_entity=requester.authenticated_entity,
         )
 
         try:

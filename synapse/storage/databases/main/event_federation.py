@@ -71,7 +71,9 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         return await self.get_events_as_list(event_ids)
 
     async def get_auth_chain_ids(
-        self, event_ids: Collection[str], include_given: bool = False,
+        self,
+        event_ids: Collection[str],
+        include_given: bool = False,
     ) -> List[str]:
         """Get auth events for given event_ids. The events *must* be state events.
 
@@ -273,7 +275,8 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                     # origin chain.
                     if origin_sequence_number <= chains.get(origin_chain_id, 0):
                         chains[target_chain_id] = max(
-                            target_sequence_number, chains.get(target_chain_id, 0),
+                            target_sequence_number,
+                            chains.get(target_chain_id, 0),
                         )
 
                 seen_chains.add(target_chain_id)
@@ -632,8 +635,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         )
 
     async def get_min_depth(self, room_id: str) -> int:
-        """For the given room, get the minimum depth we have seen for it.
-        """
+        """For the given room, get the minimum depth we have seen for it."""
         return await self.db_pool.runInteraction(
             "get_min_depth", self._get_min_depth_interaction, room_id
         )
@@ -858,12 +860,13 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             )
 
         await self.db_pool.runInteraction(
-            "_delete_old_forward_extrem_cache", _delete_old_forward_extrem_cache_txn,
+            "_delete_old_forward_extrem_cache",
+            _delete_old_forward_extrem_cache_txn,
         )
 
 
 class EventFederationStore(EventFederationWorkerStore):
-    """ Responsible for storing and serving up the various graphs associated
+    """Responsible for storing and serving up the various graphs associated
     with an event. Including the main event graph and the auth chains for an
     event.
 

@@ -86,7 +86,7 @@ class DeviceWorkerHandler(BaseHandler):
 
     @trace
     async def get_device(self, user_id: str, device_id: str) -> JsonDict:
-        """ Retrieve the given device
+        """Retrieve the given device
 
         Args:
             user_id: The user to get the device from
@@ -341,7 +341,7 @@ class DeviceHandler(DeviceWorkerHandler):
 
     @trace
     async def delete_device(self, user_id: str, device_id: str) -> None:
-        """ Delete the given device
+        """Delete the given device
 
         Args:
             user_id: The user to delete the device from.
@@ -386,7 +386,7 @@ class DeviceHandler(DeviceWorkerHandler):
         await self.delete_devices(user_id, device_ids)
 
     async def delete_devices(self, user_id: str, device_ids: List[str]) -> None:
-        """ Delete several devices
+        """Delete several devices
 
         Args:
             user_id: The user to delete devices from.
@@ -417,7 +417,7 @@ class DeviceHandler(DeviceWorkerHandler):
         await self.notify_device_update(user_id, device_ids)
 
     async def update_device(self, user_id: str, device_id: str, content: dict) -> None:
-        """ Update the given device
+        """Update the given device
 
         Args:
             user_id: The user to update devices of.
@@ -534,7 +534,9 @@ class DeviceHandler(DeviceWorkerHandler):
             device id of the dehydrated device
         """
         device_id = await self.check_device_registered(
-            user_id, None, initial_device_display_name,
+            user_id,
+            None,
+            initial_device_display_name,
         )
         old_device_id = await self.store.store_dehydrated_device(
             user_id, device_id, device_data
@@ -803,7 +805,8 @@ class DeviceListUpdater:
                 try:
                     # Try to resync the current user's devices list.
                     result = await self.user_device_resync(
-                        user_id=user_id, mark_failed_as_stale=False,
+                        user_id=user_id,
+                        mark_failed_as_stale=False,
                     )
 
                     # user_device_resync only returns a result if it managed to
@@ -813,14 +816,17 @@ class DeviceListUpdater:
                     # self.store.update_remote_device_list_cache).
                     if result:
                         logger.debug(
-                            "Successfully resynced the device list for %s", user_id,
+                            "Successfully resynced the device list for %s",
+                            user_id,
                         )
                 except Exception as e:
                     # If there was an issue resyncing this user, e.g. if the remote
                     # server sent a malformed result, just log the error instead of
                     # aborting all the subsequent resyncs.
                     logger.debug(
-                        "Could not resync the device list for %s: %s", user_id, e,
+                        "Could not resync the device list for %s: %s",
+                        user_id,
+                        e,
                     )
         finally:
             # Allow future calls to retry resyncinc out of sync device lists.
@@ -855,7 +861,9 @@ class DeviceListUpdater:
             return None
         except (RequestSendFailed, HttpResponseException) as e:
             logger.warning(
-                "Failed to handle device list update for %s: %s", user_id, e,
+                "Failed to handle device list update for %s: %s",
+                user_id,
+                e,
             )
 
             if mark_failed_as_stale:
@@ -931,7 +939,9 @@ class DeviceListUpdater:
 
         # Handle cross-signing keys.
         cross_signing_device_ids = await self.process_cross_signing_key_update(
-            user_id, master_key, self_signing_key,
+            user_id,
+            master_key,
+            self_signing_key,
         )
         device_ids = device_ids + cross_signing_device_ids
 

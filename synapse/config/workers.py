@@ -33,8 +33,7 @@ def _instance_to_list_converter(obj: Union[str, List[str]]) -> List[str]:
 
 @attr.s
 class InstanceLocationConfig:
-    """The host and port to talk to an instance via HTTP replication.
-    """
+    """The host and port to talk to an instance via HTTP replication."""
 
     host = attr.ib(type=str)
     port = attr.ib(type=int)
@@ -54,13 +53,19 @@ class WriterLocations:
     )
     typing = attr.ib(default="master", type=str)
     to_device = attr.ib(
-        default=["master"], type=List[str], converter=_instance_to_list_converter,
+        default=["master"],
+        type=List[str],
+        converter=_instance_to_list_converter,
     )
     account_data = attr.ib(
-        default=["master"], type=List[str], converter=_instance_to_list_converter,
+        default=["master"],
+        type=List[str],
+        converter=_instance_to_list_converter,
     )
     receipts = attr.ib(
-        default=["master"], type=List[str], converter=_instance_to_list_converter,
+        default=["master"],
+        type=List[str],
+        converter=_instance_to_list_converter,
     )
 
 
@@ -107,7 +112,9 @@ class WorkerConfig(Config):
         if manhole:
             self.worker_listeners.append(
                 ListenerConfig(
-                    port=manhole, bind_addresses=["127.0.0.1"], type="manhole",
+                    port=manhole,
+                    bind_addresses=["127.0.0.1"],
+                    type="manhole",
                 )
             )
 

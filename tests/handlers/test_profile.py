@@ -208,7 +208,9 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         # Set avatar to an empty string
         self.get_success(
             self.handler.set_avatar_url(
-                self.frank, synapse.types.create_requester(self.frank), "",
+                self.frank,
+                synapse.types.create_requester(self.frank),
+                "",
             )
         )
 

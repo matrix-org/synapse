@@ -231,8 +231,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         }
     )
     def test_no_local_user_fallback_login(self):
-        """localdb_enabled can block login with the local password
-        """
+        """localdb_enabled can block login with the local password"""
         self.register_user("localuser", "localpass")
 
         # check_password must return an awaitable
@@ -251,8 +250,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         }
     )
     def test_no_local_user_fallback_ui_auth(self):
-        """localdb_enabled can block ui auth with the local password
-        """
+        """localdb_enabled can block ui auth with the local password"""
         self.register_user("localuser", "localpass")
 
         # allow login via the auth provider
@@ -594,7 +592,10 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         )
 
     def _delete_device(
-        self, access_token: str, device: str, body: Union[JsonDict, bytes] = b"",
+        self,
+        access_token: str,
+        device: str,
+        body: Union[JsonDict, bytes] = b"",
     ) -> FakeChannel:
         """Delete an individual device."""
         channel = self.make_request(

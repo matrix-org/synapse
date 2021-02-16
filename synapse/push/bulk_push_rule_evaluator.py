@@ -144,8 +144,7 @@ class BulkPushRuleEvaluator:
 
     @lru_cache()
     def _get_rules_for_room(self, room_id: str) -> "RulesForRoom":
-        """Get the current RulesForRoom object for the given room id
-        """
+        """Get the current RulesForRoom object for the given room id"""
         # It's important that RulesForRoom gets added to self._get_rules_for_room.cache
         # before any lookup methods get called on it as otherwise there may be
         # a race if invalidate_all gets called (which assumes its in the cache)
@@ -252,7 +251,9 @@ class BulkPushRuleEvaluator:
         # notified for this event. (This will then get handled when we persist
         # the event)
         await self.store.add_push_actions_to_staging(
-            event.event_id, actions_by_user, count_as_unread,
+            event.event_id,
+            actions_by_user,
+            count_as_unread,
         )
 
 

@@ -85,7 +85,9 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
 
         # Increase the power levels so that this user can upgrade.
         power_levels = self.helper.get_state(
-            self.room_id, "m.room.power_levels", tok=self.creator_token,
+            self.room_id,
+            "m.room.power_levels",
+            tok=self.creator_token,
         )
         power_levels["users"][self.other] = 100
         self.helper.send_state(
@@ -109,7 +111,9 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
 
         # Increase the power levels so that this user can upgrade.
         power_levels = self.helper.get_state(
-            self.room_id, "m.room.power_levels", tok=self.creator_token,
+            self.room_id,
+            "m.room.power_levels",
+            tok=self.creator_token,
         )
         power_levels["users_default"] = 100
         self.helper.send_state(
@@ -133,7 +137,9 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
 
         # Increase the power levels so that this user can upgrade.
         power_levels = self.helper.get_state(
-            self.room_id, "m.room.power_levels", tok=self.creator_token,
+            self.room_id,
+            "m.room.power_levels",
+            tok=self.creator_token,
         )
         power_levels["events"]["m.room.tombstone"] = 0
         self.helper.send_state(
@@ -148,6 +154,8 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.result)
 
         power_levels = self.helper.get_state(
-            self.room_id, "m.room.power_levels", tok=self.creator_token,
+            self.room_id,
+            "m.room.power_levels",
+            tok=self.creator_token,
         )
         self.assertNotIn(self.other, power_levels["users"])

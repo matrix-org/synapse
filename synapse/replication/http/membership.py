@@ -160,7 +160,10 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
 
         # hopefully we're now on the master, so this won't recurse!
         event_id, stream_id = await self.member_handler.remote_reject_invite(
-            invite_event_id, txn_id, requester, event_content,
+            invite_event_id,
+            txn_id,
+            requester,
+            event_content,
         )
 
         return 200, {"event_id": event_id, "stream_id": stream_id}
