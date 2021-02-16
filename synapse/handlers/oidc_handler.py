@@ -383,21 +383,30 @@ class OidcProvider:
         return await self._provider_metadata.get()
 
     async def _load_metadata(self) -> OpenIDProviderMetadata:
-        # init the metadata from our config
-        metadata = OpenIDProviderMetadata(
-            issuer=self._config.issuer,
-            authorization_endpoint=self._config.authorization_endpoint,
-            token_endpoint=self._config.token_endpoint,
-            userinfo_endpoint=self._config.userinfo_endpoint,
-            jwks_uri=self._config.jwks_uri,
-        )
+        # start out with just the issuer (unlike the other settings, discovered issuer
+        # takes precedence over configured issuer, because configured issuer is
+        # required for discovery to take place.)
+        #
+        metadata = OpenIDProviderMetadata(issuer=self._config.issuer)
 
         # load any data from the discovery endpoint, if enabled
         if self._config.discover:
             url = get_well_known_url(self._config.issuer, external=True)
             metadata_response = await self._http_client.get_json(url)
-            # TODO: maybe update the other way around to let user override some values?
             metadata.update(metadata_response)
+
+        # override any discovered data with any settings in our config
+        if self._config.authorization_endpoint:
+            metadata["authorization_endpoint"] = self._config.authorization_endpoint
+
+        if self._config.token_endpoint:
+            metadata["token_endpoint"] = self._config.token_endpoint
+
+        if self._config.userinfo_endpoint:
+            metadata["userinfo_endpoint"] = self._config.userinfo_endpoint
+
+        if self._config.jwks_uri:
+            metadata["jwks_uri"] = self._config.jwks_uri
 
         self._validate_metadata(metadata)
 
