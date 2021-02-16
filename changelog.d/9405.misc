@@ -1,1 +1,0 @@
-Add rustc as a dependency when building Docker images.
