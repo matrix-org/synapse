@@ -70,7 +70,7 @@ class GroupsServerWorkerHandler:
         If group does exist then return group.
 
         Args:
-            group_id: The group ID to cehck.
+            group_id: The group ID to check.
             requester_user_id: The user ID of the requester.
             and_exists: whether to also check if group exists
             and_is_admin: whether to also check if given str is a user_id
@@ -917,7 +917,6 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         Args:
             group_id: The group ID to delete.
             requester_user_id: The user requesting to delete the group.
-
         """
 
         await self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
