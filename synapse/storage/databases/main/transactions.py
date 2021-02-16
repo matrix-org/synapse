@@ -197,7 +197,7 @@ class TransactionStore(TransactionWorkerStore):
         retry_interval: int,
     ) -> None:
         """Sets the current retry timings for a given destination.
-        Both timings should be zero if retrying is no longer occuring.
+        Both timings should be zero if retrying is no longer occurring.
 
         Args:
             destination

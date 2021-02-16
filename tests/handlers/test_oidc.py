@@ -24,7 +24,7 @@ from synapse.handlers.sso import MappingException
 from synapse.server import HomeServer
 from synapse.types import UserID
 
-from tests.test_utils import FakeResponse, simple_async_mock
+from tests.test_utils import FakeResponse, get_awaitable_result, simple_async_mock
 from tests.unittest import HomeserverTestCase, override_config
 
 try:
@@ -131,7 +131,6 @@ class OidcHandlerTestCase(HomeserverTestCase):
         return config
 
     def make_homeserver(self, reactor, clock):
-
         self.http_client = Mock(spec=["get_json"])
         self.http_client.get_json.side_effect = get_json
         self.http_client.user_agent = "Synapse Test"
@@ -151,7 +150,15 @@ class OidcHandlerTestCase(HomeserverTestCase):
         return hs
 
     def metadata_edit(self, values):
-        return patch.dict(self.provider._provider_metadata, values)
+        """Modify the result that will be returned by the well-known query"""
+
+        async def patched_get_json(uri):
+            res = await get_json(uri)
+            if uri == WELL_KNOWN:
+                res.update(values)
+            return res
+
+        return patch.object(self.http_client, "get_json", patched_get_json)
 
     def assertRenderedError(self, error, error_description=None):
         self.render_error.assert_called_once()
@@ -212,7 +219,14 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.http_client.get_json.assert_called_once_with(JWKS_URI)
 
         # Throw if the JWKS uri is missing
-        with self.metadata_edit({"jwks_uri": None}):
+        original = self.provider.load_metadata
+
+        async def patched_load_metadata():
+            m = (await original()).copy()
+            m.update({"jwks_uri": None})
+            return m
+
+        with patch.object(self.provider, "load_metadata", patched_load_metadata):
             self.get_failure(self.provider.load_jwks(force=True), RuntimeError)
 
         # Return empty key set if JWKS are not used
@@ -222,55 +236,60 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.http_client.get_json.assert_not_called()
         self.assertEqual(jwks, {"keys": []})
 
-    @override_config({"oidc_config": COMMON_CONFIG})
     def test_validate_config(self):
         """Provider metadatas are extensively validated."""
         h = self.provider
 
+        def force_load_metadata():
+            async def force_load():
+                return await h.load_metadata(force=True)
+
+            return get_awaitable_result(force_load())
+
         # Default test config does not throw
-        h._validate_metadata()
+        force_load_metadata()
 
         with self.metadata_edit({"issuer": None}):
-            self.assertRaisesRegex(ValueError, "issuer", h._validate_metadata)
+            self.assertRaisesRegex(ValueError, "issuer", force_load_metadata)
 
         with self.metadata_edit({"issuer": "http://insecure/"}):
-            self.assertRaisesRegex(ValueError, "issuer", h._validate_metadata)
+            self.assertRaisesRegex(ValueError, "issuer", force_load_metadata)
 
         with self.metadata_edit({"issuer": "https://invalid/?because=query"}):
-            self.assertRaisesRegex(ValueError, "issuer", h._validate_metadata)
+            self.assertRaisesRegex(ValueError, "issuer", force_load_metadata)
 
         with self.metadata_edit({"authorization_endpoint": None}):
             self.assertRaisesRegex(
-                ValueError, "authorization_endpoint", h._validate_metadata
+                ValueError, "authorization_endpoint", force_load_metadata
             )
 
         with self.metadata_edit({"authorization_endpoint": "http://insecure/auth"}):
             self.assertRaisesRegex(
-                ValueError, "authorization_endpoint", h._validate_metadata
+                ValueError, "authorization_endpoint", force_load_metadata
             )
 
         with self.metadata_edit({"token_endpoint": None}):
-            self.assertRaisesRegex(ValueError, "token_endpoint", h._validate_metadata)
+            self.assertRaisesRegex(ValueError, "token_endpoint", force_load_metadata)
 
         with self.metadata_edit({"token_endpoint": "http://insecure/token"}):
-            self.assertRaisesRegex(ValueError, "token_endpoint", h._validate_metadata)
+            self.assertRaisesRegex(ValueError, "token_endpoint", force_load_metadata)
 
         with self.metadata_edit({"jwks_uri": None}):
-            self.assertRaisesRegex(ValueError, "jwks_uri", h._validate_metadata)
+            self.assertRaisesRegex(ValueError, "jwks_uri", force_load_metadata)
 
         with self.metadata_edit({"jwks_uri": "http://insecure/jwks.json"}):
-            self.assertRaisesRegex(ValueError, "jwks_uri", h._validate_metadata)
+            self.assertRaisesRegex(ValueError, "jwks_uri", force_load_metadata)
 
         with self.metadata_edit({"response_types_supported": ["id_token"]}):
             self.assertRaisesRegex(
-                ValueError, "response_types_supported", h._validate_metadata
+                ValueError, "response_types_supported", force_load_metadata
             )
 
         with self.metadata_edit(
             {"token_endpoint_auth_methods_supported": ["client_secret_basic"]}
         ):
             # should not throw, as client_secret_basic is the default auth method
-            h._validate_metadata()
+            force_load_metadata()
 
         with self.metadata_edit(
             {"token_endpoint_auth_methods_supported": ["client_secret_post"]}
@@ -278,7 +297,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             self.assertRaisesRegex(
                 ValueError,
                 "token_endpoint_auth_methods_supported",
-                h._validate_metadata,
+                force_load_metadata,
             )
 
         # Tests for configs that require the userinfo endpoint
@@ -287,24 +306,24 @@ class OidcHandlerTestCase(HomeserverTestCase):
         h._user_profile_method = "userinfo_endpoint"
         self.assertTrue(h._uses_userinfo)
 
-        # Revert the profile method and do not request the "openid" scope.
+        # Revert the profile method and do not request the "openid" scope: this should
+        # mean that we check for a userinfo endpoint
         h._user_profile_method = "auto"
         h._scopes = []
         self.assertTrue(h._uses_userinfo)
-        self.assertRaisesRegex(ValueError, "userinfo_endpoint", h._validate_metadata)
+        with self.metadata_edit({"userinfo_endpoint": None}):
+            self.assertRaisesRegex(ValueError, "userinfo_endpoint", force_load_metadata)
 
-        with self.metadata_edit(
-            {"userinfo_endpoint": USERINFO_ENDPOINT, "jwks_uri": None}
-        ):
-            # Shouldn't raise with a valid userinfo, even without
-            h._validate_metadata()
+        with self.metadata_edit({"jwks_uri": None}):
+            # Shouldn't raise with a valid userinfo, even without jwks
+            force_load_metadata()
 
     @override_config({"oidc_config": {"skip_verification": True}})
     def test_skip_verification(self):
         """Provider metadata validation can be disabled by config."""
         with self.metadata_edit({"issuer": "http://insecure"}):
             # This should not throw
-            self.provider._validate_metadata()
+            get_awaitable_result(self.provider.load_metadata())
 
     def test_redirect_request(self):
         """The redirect request has the right arguments & generates a valid session cookie."""

@@ -184,7 +184,7 @@ class MediaRepository:
     async def get_local_media(
         self, request: Request, media_id: str, name: Optional[str]
     ) -> None:
-        """Responds to reqests for local media, if exists, or returns 404.
+        """Responds to requests for local media, if exists, or returns 404.
 
         Args:
             request: The incoming request.
@@ -306,7 +306,7 @@ class MediaRepository:
         media_info = await self.store.get_cached_remote_media(server_name, media_id)
 
         # file_id is the ID we use to track the file locally. If we've already
-        # seen the file then reuse the existing ID, otherwise genereate a new
+        # seen the file then reuse the existing ID, otherwise generate a new
         # one.
 
         # If we have an entry in the DB, try and look for it
@@ -943,10 +943,10 @@ class MediaRepositoryResource(Resource):
 
            <thumbnail>
 
-    The thumbnail methods are "crop" and "scale". "scale" trys to return an
+    The thumbnail methods are "crop" and "scale". "scale" tries to return an
     image where either the width or the height is smaller than the requested
     size. The client should then scale and letterbox the image if it needs to
-    fit within a given rectangle. "crop" trys to return an image where the
+    fit within a given rectangle. "crop" tries to return an image where the
     width and height are close to the requested size and the aspect matches
     the requested size. The client should scale the image if it needs to fit
     within a given rectangle.

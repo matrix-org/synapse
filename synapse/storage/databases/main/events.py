@@ -1065,7 +1065,7 @@ class PersistEventsStore:
             # Figure out the changes of membership to invalidate the
             # `get_rooms_for_user` cache.
             # We find out which membership events we may have deleted
-            # and which we have added, then we invlidate the caches for all
+            # and which we have added, then we invalidate the caches for all
             # those users.
             members_changed = {
                 state_key

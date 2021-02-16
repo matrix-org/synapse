@@ -1,8 +1,12 @@
-matrix-synapse-py3 (1.26.0+nmu1) UNRELEASED; urgency=medium
+matrix-synapse-py3 (1.27.0) stable; urgency=medium
 
+  [ Dan Callahan ]
   * Fix build on Ubuntu 16.04 LTS (Xenial).
 
- -- Dan Callahan <danc@element.io>  Thu, 28 Jan 2021 16:21:03 +0000
+  [ Synapse Packaging team ]
+  * New synapse release 1.27.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 16 Feb 2021 13:11:28 +0000
 
 matrix-synapse-py3 (1.26.0) stable; urgency=medium
 

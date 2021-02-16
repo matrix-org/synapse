@@ -752,7 +752,7 @@ class PushersRestServlet(RestServlet):
 
     Returns:
         pushers: Dictionary containing pushers information.
-        total: Number of pushers in dictonary `pushers`.
+        total: Number of pushers in dictionary `pushers`.
     """
 
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/pushers$")

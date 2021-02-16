@@ -525,7 +525,7 @@ class RulesForRoom:
 class _Invalidation:
     # _Invalidation is passed as an `on_invalidate` callback to bulk_get_push_rules,
     # which means that it it is stored on the bulk_get_push_rules cache entry. In order
-    # to ensure that we don't accumulate lots of redunant callbacks on the cache entry,
+    # to ensure that we don't accumulate lots of redundant callbacks on the cache entry,
     # we need to ensure that two _Invalidation objects are "equal" if they refer to the
     # same `cache` and `room_id`.
     #

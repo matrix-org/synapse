@@ -1368,8 +1368,6 @@ class FederationHandler(BaseHandler):
 
         await self._clean_room_for_join(room_id)
 
-        handled_events = set()
-
         try:
             # Try the host we successfully got a response to /make_join/
             # request first.
@@ -1388,10 +1386,6 @@ class FederationHandler(BaseHandler):
             state = ret["state"]
             auth_chain = ret["auth_chain"]
             auth_chain.sort(key=lambda e: e.depth)
-
-            handled_events.update([s.event_id for s in state])
-            handled_events.update([a.event_id for a in auth_chain])
-            handled_events.add(event.event_id)
 
             logger.debug("do_invite_join auth_chain: %s", auth_chain)
             logger.debug("do_invite_join state: %s", state)

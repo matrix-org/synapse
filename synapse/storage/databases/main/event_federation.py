@@ -374,7 +374,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         # and state sets {A} and {B} then walking the auth chains of A and B
         # would immediately show that C is reachable by both. However, if we
         # stopped at C then we'd only reach E via the auth chain of B and so E
-        # would errornously get included in the returned difference.
+        # would erroneously get included in the returned difference.
         #
         # The other thing that we do is limit the number of auth chains we walk
         # at once, due to practical limits (i.e. we can only query the database
@@ -500,7 +500,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
                         a_ids = new_aids
 
-                # Mark that the auth event is reachable by the approriate sets.
+                # Mark that the auth event is reachable by the appropriate sets.
                 sets.intersection_update(event_to_missing_sets[event_id])
 
             search.sort()
