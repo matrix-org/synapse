@@ -329,8 +329,8 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(len(params["state"]), 1)
         self.assertEqual(len(params["nonce"]), 1)
 
-        # Check what is in the cookie
-        self.assertEqual(len(req.cookies), 1)  # one cookie
+        # Check what is in the cookies
+        self.assertEqual(len(req.cookies), 2)  # two cookies
         cookie_header = req.cookies[0]
 
         # The cookie name and path don't really matter, just that it has to be coherent
