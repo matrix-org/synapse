@@ -78,7 +78,7 @@ class ExternalCache:
             self._redis_connection.delete(self._get_redis_key(cache_name, key),)
         )
 
-    async def set(self, cache_name: str, key: str, value: Any, expiry_ms: int) -> None:
+    async def set(self, cache_name: str, key: str, value: Any, expiry_ms: Optional[int] = None) -> None:
         """Add the key/value to the named cache, with the expiry time given.
         """
 

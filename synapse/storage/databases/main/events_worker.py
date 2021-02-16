@@ -62,7 +62,6 @@ logger = logging.getLogger(__name__)
 EVENT_QUEUE_THREADS = 3  # Max number of threads that will fetch events
 EVENT_QUEUE_ITERATIONS = 3  # No. times we block waiting for requests for events
 EVENT_QUEUE_TIMEOUT_S = 0.1  # Timeout when waiting for requests for events
-EVENT_EXPIRY_TIME = 24 * 60 * 60 * 1000
 GET_EVENT_CACHE_NAME = "getEvent"
 
 _EventCacheEntry = namedtuple("_EventCacheEntry", ("event", "redacted_event"))
@@ -877,7 +876,6 @@ class EventsWorkerStore(SQLBaseStore):
                     GET_EVENT_CACHE_NAME,
                     event_id,
                     redis_cache_entry,
-                    expiry_ms=EVENT_EXPIRY_TIME,
                 )
 
         return result_map
