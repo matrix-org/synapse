@@ -390,7 +390,7 @@ class OidcProvider:
             token_endpoint=self._config.token_endpoint,
             userinfo_endpoint=self._config.userinfo_endpoint,
             jwks_uri=self._config.jwks_uri,
-        )  # type: OpenIDProviderMetadata
+        )
 
         # load any data from the discovery endpoint, if enabled
         if self._config.discover:
