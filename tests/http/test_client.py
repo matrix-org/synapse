@@ -89,7 +89,7 @@ class ReadBodyWithMaxSizeTests(TestCase):
         self.protocol.dataReceived(b"1234567890")
         self.assertIsInstance(self.deferred.result, Failure)
         self.assertIsInstance(self.deferred.result.value, BodyExceededMaxSize)
-        self.protocol.transport.loseConnection.assert_called_once()
+        self.protocol.transport.abortConnection.assert_called_once()
 
         # More data might have come in.
         self.protocol.dataReceived(b"1234567890")
