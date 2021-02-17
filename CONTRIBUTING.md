@@ -369,11 +369,11 @@ Once the Pull Request is opened, you will see a few things:
 From this point, you should:
 
 1. Look at the results of the CI pipeline.
-  - If there is any error, fix the error.
+   - If there is any error, fix the error.
 2. If a developer has requested changes, make these changes.
 3. Create a new commit with the changes.
-  - Please do NOT overwrite the history. New commits make the reviewer's life easier.
-  - Push this commits to your Pull Request.
+   - Please do NOT overwrite the history. New commits make the reviewer's life easier.
+   - Push this commits to your Pull Request.
 4. Back to 1.
 
 Once both the CI and the developers are happy, the patch will be merged into Synapse and released shortly!
