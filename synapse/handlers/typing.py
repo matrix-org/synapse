@@ -61,7 +61,8 @@ class FollowerTypingHandler:
 
         if hs.config.worker.writers.typing != hs.get_instance_name():
             hs.get_federation_registry().register_instance_for_edu(
-                "m.typing", hs.config.worker.writers.typing,
+                "m.typing",
+                hs.config.worker.writers.typing,
             )
 
         # map room IDs to serial numbers
@@ -76,8 +77,7 @@ class FollowerTypingHandler:
         self.clock.looping_call(self._handle_timeouts, 5000)
 
     def _reset(self) -> None:
-        """Reset the typing handler's data caches.
-        """
+        """Reset the typing handler's data caches."""
         # map room IDs to serial numbers
         self._room_serials = {}
         # map room IDs to sets of users currently typing
@@ -149,8 +149,7 @@ class FollowerTypingHandler:
     def process_replication_rows(
         self, token: int, rows: List[TypingStream.TypingStreamRow]
     ) -> None:
-        """Should be called whenever we receive updates for typing stream.
-        """
+        """Should be called whenever we receive updates for typing stream."""
 
         if self._latest_room_serial > token:
             # The master has gone backwards. To prevent inconsistent data, just

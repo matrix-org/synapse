@@ -32,8 +32,7 @@ logger = logging.getLogger(__name__)
 
 @attr.s(slots=True, frozen=True)
 class _CalculateChainCover:
-    """Return value for _calculate_chain_cover_txn.
-    """
+    """Return value for _calculate_chain_cover_txn."""
 
     # The last room_id/depth/stream processed.
     room_id = attr.ib(type=str)
@@ -127,11 +126,13 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         )
 
         self.db_pool.updates.register_background_update_handler(
-            "rejected_events_metadata", self._rejected_events_metadata,
+            "rejected_events_metadata",
+            self._rejected_events_metadata,
         )
 
         self.db_pool.updates.register_background_update_handler(
-            "chain_cover", self._chain_cover_index,
+            "chain_cover",
+            self._chain_cover_index,
         )
 
     async def _background_reindex_fields_sender(self, progress, batch_size):
@@ -462,8 +463,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         return num_handled
 
     async def _redactions_received_ts(self, progress, batch_size):
-        """Handles filling out the `received_ts` column in redactions.
-        """
+        """Handles filling out the `received_ts` column in redactions."""
         last_event_id = progress.get("last_event_id", "")
 
         def _redactions_received_ts_txn(txn):
@@ -518,8 +518,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         return count
 
     async def _event_fix_redactions_bytes(self, progress, batch_size):
-        """Undoes hex encoded censored redacted event JSON.
-        """
+        """Undoes hex encoded censored redacted event JSON."""
 
         def _event_fix_redactions_bytes_txn(txn):
             # This update is quite fast due to new index.
@@ -642,7 +641,13 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 LIMIT ?
             """
 
-            txn.execute(sql, (last_event_id, batch_size,))
+            txn.execute(
+                sql,
+                (
+                    last_event_id,
+                    batch_size,
+                ),
+            )
 
             return [(row[0], row[1], db_to_json(row[2]), row[3], row[4]) for row in txn]  # type: ignore
 
@@ -910,7 +915,11 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         # Annoyingly we need to gut wrench into the persit event store so that
         # we can reuse the function to calculate the chain cover for rooms.
         PersistEventsStore._add_chain_cover_index(
-            txn, self.db_pool, event_to_room_id, event_to_types, event_to_auth_chain,
+            txn,
+            self.db_pool,
+            event_to_room_id,
+            event_to_types,
+            event_to_auth_chain,
         )
 
         return _CalculateChainCover(

@@ -44,8 +44,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         user: UserID,
         content: dict,
     ) -> Tuple[str, int]:
-        """Implements RoomMemberHandler._remote_join
-        """
+        """Implements RoomMemberHandler._remote_join"""
         if len(remote_room_hosts) == 0:
             raise SynapseError(404, "No known servers")
 
@@ -80,8 +79,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         return ret["event_id"], ret["stream_id"]
 
     async def _user_left_room(self, target: UserID, room_id: str) -> None:
-        """Implements RoomMemberHandler._user_left_room
-        """
+        """Implements RoomMemberHandler._user_left_room"""
         await self._notify_change_client(
             user_id=target.to_string(), room_id=room_id, change="left"
         )

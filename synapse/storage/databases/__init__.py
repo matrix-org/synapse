@@ -56,7 +56,10 @@ class Databases:
                     database_config.databases,
                 )
                 prepare_database(
-                    db_conn, engine, hs.config, databases=database_config.databases,
+                    db_conn,
+                    engine,
+                    hs.config,
+                    databases=database_config.databases,
                 )
 
                 database = DatabasePool(hs, database_config, engine)

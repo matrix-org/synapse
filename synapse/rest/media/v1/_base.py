@@ -137,7 +137,7 @@ def add_file_headers(
         # section 3.6 [2] to be a `token` or a `quoted-string`, where a `token`
         # is (essentially) a single US-ASCII word, and a `quoted-string` is a
         # US-ASCII string surrounded by double-quotes, using backslash as an
-        # escape charater. Note that %-encoding is *not* permitted.
+        # escape character. Note that %-encoding is *not* permitted.
         #
         # `filename*` is defined to be an `ext-value`, which is defined in
         # RFC5987 section 3.2.1 [3] to be `charset "'" [ language ] "'" value-chars`,

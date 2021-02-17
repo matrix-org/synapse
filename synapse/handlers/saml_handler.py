@@ -23,7 +23,6 @@ from saml2.client import Saml2Client
 
 from synapse.api.errors import SynapseError
 from synapse.config import ConfigError
-from synapse.config.saml2_config import SamlAttributeRequirement
 from synapse.handlers._base import BaseHandler
 from synapse.handlers.sso import MappingException, UserAttributes
 from synapse.http.servlet import parse_string
@@ -122,7 +121,8 @@ class SamlHandler(BaseHandler):
 
         now = self.clock.time_msec()
         self._outstanding_requests_dict[reqid] = Saml2SessionData(
-            creation_time=now, ui_auth_session_id=ui_auth_session_id,
+            creation_time=now,
+            ui_auth_session_id=ui_auth_session_id,
         )
 
         for key, value in info["headers"]:
@@ -239,12 +239,10 @@ class SamlHandler(BaseHandler):
 
         # Ensure that the attributes of the logged in user meet the required
         # attributes.
-        for requirement in self._saml2_attribute_requirements:
-            if not _check_attribute_requirement(saml2_auth.ava, requirement):
-                self._sso_handler.render_error(
-                    request, "unauthorised", "You are not authorised to log in here."
-                )
-                return
+        if not self._sso_handler.check_required_attributes(
+            request, saml2_auth.ava, self._saml2_attribute_requirements
+        ):
+            return
 
         # Call the mapper to register/login the user
         try:
@@ -373,21 +371,6 @@ class SamlHandler(BaseHandler):
             del self._outstanding_requests_dict[reqid]
 
 
-def _check_attribute_requirement(ava: dict, req: SamlAttributeRequirement) -> bool:
-    values = ava.get(req.attribute, [])
-    for v in values:
-        if v == req.value:
-            return True
-
-    logger.info(
-        "SAML2 attribute %s did not match required value '%s' (was '%s')",
-        req.attribute,
-        req.value,
-        values,
-    )
-    return False
-
-
 DOT_REPLACE_PATTERN = re.compile(
     ("[^%s]" % (re.escape("".join(mxid_localpart_allowed_characters)),))
 )
@@ -468,7 +451,8 @@ class DefaultSamlMappingProvider:
             mxid_source = saml_response.ava[self._mxid_source_attribute][0]
         except KeyError:
             logger.warning(
-                "SAML2 response lacks a '%s' attestation", self._mxid_source_attribute,
+                "SAML2 response lacks a '%s' attestation",
+                self._mxid_source_attribute,
             )
             raise SynapseError(
                 400, "%s not in SAML2 response" % (self._mxid_source_attribute,)

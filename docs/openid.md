@@ -365,7 +365,7 @@ login mechanism needs an attribute to uniquely identify users, and that endpoint
 does not return a `sub` property, an alternative `subject_claim` has to be set.
 
 1. Create a new application.
-2. Add this Callback URL: `[synapse public baseurl]/_synapse/oidc/callback`
+2. Add this Callback URL: `[synapse public baseurl]/_synapse/client/oidc/callback`
 
 Synapse config:
 
