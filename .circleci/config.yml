@@ -52,9 +52,9 @@ commands:
         default: "v0.4.1"
     steps:
       - setup_remote_docker:
-          # 19.03.13 was the most recent available on circleci at the time of
+          # 20.10.2 was the most recent available on circleci at the time of
           # writing.
-          version: 19.03.13
+          version: 20.10.2
       - run: apk add --no-cache curl
       - run: mkdir -vp ~/.docker/cli-plugins/ ~/dockercache
       - run: curl --silent -L "https://github.com/docker/buildx/releases/download/<< parameters.buildx_version >>/buildx-<< parameters.buildx_version >>.linux-amd64" > ~/.docker/cli-plugins/docker-buildx
@@ -64,7 +64,10 @@ commands:
       # create a context named `builder` for the builds
       - run: docker context create builder
       # create a buildx builder using the new context, and set it as the default
-      - run: docker buildx create builder --use
+      - run: docker buildx create --driver docker-container --driver-opt network=host builder --use
+      # Start a registry so that have somewhere to store our temporary docker
+      # images (as multi arch builds don't work with stand local docker store)
+      - run: docker run -d -p 127.0.0.1:5000:5000 --name registry registry:2
 
   docker_build:
     description: Builds and pushed images to dockerhub using buildx
@@ -75,4 +78,5 @@ commands:
       tag:
         type: string
     steps:
-      - run: docker buildx build -f docker/Dockerfile --push --platform << parameters.platforms >> --label gitsha1=${CIRCLE_SHA1} << parameters.tag >> --progress=plain .
+      - run: docker buildx build -f docker/Dockerfile-cargo-cache --push -t 127.0.0.1:5000/cargo_cache --platform << parameters.platforms >> --progress=plain .
+      - run: docker buildx build -f docker/Dockerfile --push --platform << parameters.platforms >> --label gitsha1=${CIRCLE_SHA1} << parameters.tag >> --build-arg BASE_IMAGE=127.0.0.1:5000/cargo_cache --build-arg CARGO_NET_OFFLINE=true --progress=plain  .
