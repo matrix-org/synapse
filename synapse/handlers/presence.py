@@ -349,10 +349,13 @@ class PresenceHandler(BasePresenceHandler):
                 [self.user_to_current_state[user_id] for user_id in unpersisted]
             )
 
-    async def _update_states(self, new_states):
+    async def _update_states(self, new_states: Iterable[UserPresenceState]) -> None:
         """Updates presence of users. Sets the appropriate timeouts. Pokes
         the notifier and federation if and only if the changed presence state
         should be sent to clients/servers.
+
+        Args:
+            new_states: The new user presence state updates to process.
         """
         now = self.clock.time_msec()
 
@@ -368,7 +371,7 @@ class PresenceHandler(BasePresenceHandler):
             new_states_dict = {}
             for new_state in new_states:
                 new_states_dict[new_state.user_id] = new_state
-            new_state = new_states_dict.values()
+            new_states = new_states_dict.values()
 
             for new_state in new_states:
                 user_id = new_state.user_id
