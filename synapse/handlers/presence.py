@@ -660,17 +660,6 @@ class PresenceHandler(BasePresenceHandler):
 
         self._push_to_remotes(states)
 
-    async def notify_for_states(self, state, stream_id):
-        parties = await get_interested_parties(self.store, [state])
-        room_ids_to_states, users_to_states = parties
-
-        self.notifier.on_new_event(
-            "presence_key",
-            stream_id,
-            rooms=room_ids_to_states.keys(),
-            users=[UserID.from_string(u) for u in users_to_states],
-        )
-
     def _push_to_remotes(self, states):
         """Sends state updates to remote servers.
 
