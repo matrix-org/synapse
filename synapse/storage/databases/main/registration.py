@@ -388,9 +388,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 self._invalidate_cache_and_stream(
                     txn, self.get_user_by_access_token, (token,)
                 )
-            self._invalidate_cache_and_stream(
-                txn, self.get_user_by_id, (user_id,)
-            )
+            self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 
         await self.db_pool.runInteraction("set_shadow_banned", set_shadow_banned_txn)
 
