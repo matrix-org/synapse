@@ -234,8 +234,15 @@ class FederationKnockingTestCase(
 
         channel = self.make_request(
             "GET",
-            "/_matrix/federation/unstable/%s/make_knock/%s/%s"
-            % (KNOCK_UNSTABLE_IDENTIFIER, room_id, fake_knocking_user_id),
+            "/_matrix/federation/unstable/%s/make_knock/%s/%s?ver=%s"
+            % (
+                KNOCK_UNSTABLE_IDENTIFIER,
+                room_id,
+                fake_knocking_user_id,
+                # Inform the remote that we support the room version of the room we're
+                # knocking on
+                RoomVersions.MSC2403_DEV.identifier,
+            ),
         )
         self.assertEquals(200, channel.code, channel.result)
 
