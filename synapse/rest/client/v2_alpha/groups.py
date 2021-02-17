@@ -16,11 +16,16 @@
 
 import logging
 from functools import wraps
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from twisted.web.http import Request
 
-from synapse.api.errors import SynapseError
+from synapse.api.constants import (
+    MAX_GROUP_CATEGORYID_LENGTH,
+    MAX_GROUP_ROLEID_LENGTH,
+    MAX_GROUPID_LENGTH,
+)
+from synapse.api.errors import Codes, SynapseError
 from synapse.handlers.groups_local import GroupsLocalHandler
 from synapse.http.servlet import (
     RestServlet,
@@ -84,7 +89,9 @@ class GroupServlet(RestServlet):
         assert_params_in_dict(
             content, ("name", "avatar_url", "short_description", "long_description")
         )
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot create group profiles."
         await self.groups_handler.update_group_profile(
             group_id, requester_user_id, content
         )
@@ -137,13 +144,26 @@ class GroupSummaryRoomsCatServlet(RestServlet):
 
     @_validate_group_id
     async def on_PUT(
-        self, request: Request, group_id: str, category_id: str, room_id: str
+        self, request: Request, group_id: str, category_id: Optional[str], room_id: str
     ):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
+        if category_id == "":
+            raise SynapseError(400, "category_id cannot be empty", Codes.INVALID_PARAM)
+
+        if category_id and len(category_id) > MAX_GROUP_CATEGORYID_LENGTH:
+            raise SynapseError(
+                400,
+                "category_id may not be longer than %s characters"
+                % (MAX_GROUP_CATEGORYID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
+
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group summaries."
         resp = await self.groups_handler.update_group_summary_room(
             group_id,
             requester_user_id,
@@ -161,7 +181,9 @@ class GroupSummaryRoomsCatServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group profiles."
         resp = await self.groups_handler.delete_group_summary_room(
             group_id, requester_user_id, room_id=room_id, category_id=category_id
         )
@@ -202,8 +224,21 @@ class GroupCategoryServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
+        if not category_id:
+            raise SynapseError(400, "category_id cannot be empty", Codes.INVALID_PARAM)
+
+        if len(category_id) > MAX_GROUP_CATEGORYID_LENGTH:
+            raise SynapseError(
+                400,
+                "category_id may not be longer than %s characters"
+                % (MAX_GROUP_CATEGORYID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
+
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group categories."
         resp = await self.groups_handler.update_group_category(
             group_id, requester_user_id, category_id=category_id, content=content
         )
@@ -217,7 +252,9 @@ class GroupCategoryServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group categories."
         resp = await self.groups_handler.delete_group_category(
             group_id, requester_user_id, category_id=category_id
         )
@@ -279,8 +316,21 @@ class GroupRoleServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
+        if not role_id:
+            raise SynapseError(400, "role_id cannot be empty", Codes.INVALID_PARAM)
+
+        if len(role_id) > MAX_GROUP_ROLEID_LENGTH:
+            raise SynapseError(
+                400,
+                "role_id may not be longer than %s characters"
+                % (MAX_GROUP_ROLEID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
+
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group roles."
         resp = await self.groups_handler.update_group_role(
             group_id, requester_user_id, role_id=role_id, content=content
         )
@@ -294,7 +344,9 @@ class GroupRoleServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group roles."
         resp = await self.groups_handler.delete_group_role(
             group_id, requester_user_id, role_id=role_id
         )
@@ -347,13 +399,26 @@ class GroupSummaryUsersRoleServlet(RestServlet):
 
     @_validate_group_id
     async def on_PUT(
-        self, request: Request, group_id: str, role_id: str, user_id: str
+        self, request: Request, group_id: str, role_id: Optional[str], user_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
+        if role_id == "":
+            raise SynapseError(400, "role_id cannot be empty", Codes.INVALID_PARAM)
+
+        if role_id and len(role_id) > MAX_GROUP_ROLEID_LENGTH:
+            raise SynapseError(
+                400,
+                "role_id may not be longer than %s characters"
+                % (MAX_GROUP_ROLEID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
+
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group summaries."
         resp = await self.groups_handler.update_group_summary_user(
             group_id,
             requester_user_id,
@@ -371,7 +436,9 @@ class GroupSummaryUsersRoleServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group summaries."
         resp = await self.groups_handler.delete_group_summary_user(
             group_id, requester_user_id, user_id=user_id, role_id=role_id
         )
@@ -465,7 +532,9 @@ class GroupSettingJoinPolicyServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
 
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group join policy."
         result = await self.groups_handler.set_group_join_policy(
             group_id, requester_user_id, content
         )
@@ -494,7 +563,19 @@ class GroupCreateServlet(RestServlet):
         localpart = content.pop("localpart")
         group_id = GroupID(localpart, self.server_name).to_string()
 
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        if not localpart:
+            raise SynapseError(400, "Group ID cannot be empty", Codes.INVALID_PARAM)
+
+        if len(group_id) > MAX_GROUPID_LENGTH:
+            raise SynapseError(
+                400,
+                "Group ID may not be longer than %s characters" % (MAX_GROUPID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
+
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot create groups."
         result = await self.groups_handler.create_group(
             group_id, requester_user_id, content
         )
@@ -523,7 +604,9 @@ class GroupAdminRoomsServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify rooms in a group."
         result = await self.groups_handler.add_room_to_group(
             group_id, requester_user_id, room_id, content
         )
@@ -537,7 +620,9 @@ class GroupAdminRoomsServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group categories."
         result = await self.groups_handler.remove_room_from_group(
             group_id, requester_user_id, room_id
         )
@@ -567,7 +652,9 @@ class GroupAdminRoomsConfigServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group categories."
         result = await self.groups_handler.update_room_in_group(
             group_id, requester_user_id, room_id, config_key, content
         )
@@ -597,7 +684,9 @@ class GroupAdminUsersInviteServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
         config = content.get("config", {})
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot invite users to a group."
         result = await self.groups_handler.invite(
             group_id, user_id, requester_user_id, config
         )
@@ -624,7 +713,9 @@ class GroupAdminUsersKickServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot kick users from a group."
         result = await self.groups_handler.remove_user_from_group(
             group_id, user_id, requester_user_id, content
         )
@@ -649,7 +740,9 @@ class GroupSelfLeaveServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot leave a group for a users."
         result = await self.groups_handler.remove_user_from_group(
             group_id, requester_user_id, requester_user_id, content
         )
@@ -674,7 +767,9 @@ class GroupSelfJoinServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot join a user to a group."
         result = await self.groups_handler.join_group(
             group_id, requester_user_id, content
         )
@@ -699,7 +794,9 @@ class GroupSelfAcceptInviteServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot accept an invite to a group."
         result = await self.groups_handler.accept_invite(
             group_id, requester_user_id, content
         )
