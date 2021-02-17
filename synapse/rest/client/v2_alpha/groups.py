@@ -89,7 +89,9 @@ class GroupServlet(RestServlet):
         assert_params_in_dict(
             content, ("name", "avatar_url", "short_description", "long_description")
         )
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot create group profiles."
         await self.groups_handler.update_group_profile(
             group_id, requester_user_id, content
         )
@@ -159,7 +161,9 @@ class GroupSummaryRoomsCatServlet(RestServlet):
             )
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group summaries."
         resp = await self.groups_handler.update_group_summary_room(
             group_id,
             requester_user_id,
@@ -177,7 +181,9 @@ class GroupSummaryRoomsCatServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group profiles."
         resp = await self.groups_handler.delete_group_summary_room(
             group_id, requester_user_id, room_id=room_id, category_id=category_id
         )
@@ -230,7 +236,9 @@ class GroupCategoryServlet(RestServlet):
             )
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group categories."
         resp = await self.groups_handler.update_group_category(
             group_id, requester_user_id, category_id=category_id, content=content
         )
@@ -244,7 +252,9 @@ class GroupCategoryServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group categories."
         resp = await self.groups_handler.delete_group_category(
             group_id, requester_user_id, category_id=category_id
         )
@@ -318,7 +328,9 @@ class GroupRoleServlet(RestServlet):
             )
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group roles."
         resp = await self.groups_handler.update_group_role(
             group_id, requester_user_id, role_id=role_id, content=content
         )
@@ -332,7 +344,9 @@ class GroupRoleServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group roles."
         resp = await self.groups_handler.delete_group_role(
             group_id, requester_user_id, role_id=role_id
         )
@@ -402,7 +416,9 @@ class GroupSummaryUsersRoleServlet(RestServlet):
             )
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group summaries."
         resp = await self.groups_handler.update_group_summary_user(
             group_id,
             requester_user_id,
@@ -420,7 +436,9 @@ class GroupSummaryUsersRoleServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group summaries."
         resp = await self.groups_handler.delete_group_summary_user(
             group_id, requester_user_id, user_id=user_id, role_id=role_id
         )
@@ -514,7 +532,9 @@ class GroupSettingJoinPolicyServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
 
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group join policy."
         result = await self.groups_handler.set_group_join_policy(
             group_id, requester_user_id, content
         )
@@ -553,7 +573,9 @@ class GroupCreateServlet(RestServlet):
                 Codes.INVALID_PARAM,
             )
 
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot create groups."
         result = await self.groups_handler.create_group(
             group_id, requester_user_id, content
         )
@@ -582,7 +604,9 @@ class GroupAdminRoomsServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify rooms in a group."
         result = await self.groups_handler.add_room_to_group(
             group_id, requester_user_id, room_id, content
         )
@@ -596,7 +620,9 @@ class GroupAdminRoomsServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group categories."
         result = await self.groups_handler.remove_room_from_group(
             group_id, requester_user_id, room_id
         )
@@ -626,7 +652,9 @@ class GroupAdminRoomsConfigServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group categories."
         result = await self.groups_handler.update_room_in_group(
             group_id, requester_user_id, room_id, config_key, content
         )
@@ -656,7 +684,9 @@ class GroupAdminUsersInviteServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
         config = content.get("config", {})
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot invite users to a group."
         result = await self.groups_handler.invite(
             group_id, user_id, requester_user_id, config
         )
@@ -683,7 +713,9 @@ class GroupAdminUsersKickServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot kick users from a group."
         result = await self.groups_handler.remove_user_from_group(
             group_id, user_id, requester_user_id, content
         )
@@ -708,7 +740,9 @@ class GroupSelfLeaveServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot leave a group for a users."
         result = await self.groups_handler.remove_user_from_group(
             group_id, requester_user_id, requester_user_id, content
         )
@@ -733,7 +767,9 @@ class GroupSelfJoinServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot join a user to a group."
         result = await self.groups_handler.join_group(
             group_id, requester_user_id, content
         )
@@ -758,7 +794,9 @@ class GroupSelfAcceptInviteServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot accept an invite to a group."
         result = await self.groups_handler.accept_invite(
             group_id, requester_user_id, content
         )

@@ -655,7 +655,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
             groups_local = self.hs.get_groups_local_handler()
             assert isinstance(
                 groups_local, GroupsLocalHandler
-            ), "Misconfiguration of workers for groups."
+            ), "Workers cannot invites users to groups."
             res = await groups_local.on_invite(group_id, user_id, content)
             local_attestation = None
         else:
@@ -801,7 +801,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
                 groups_local = self.hs.get_groups_local_handler()
                 assert isinstance(
                     groups_local, GroupsLocalHandler
-                ), "Misconfiguration of workers for groups."
+                ), "Workers cannot remove users from groups."
                 await groups_local.user_removed_from_group(group_id, user_id, {})
             else:
                 await self.transport_client.remove_user_from_group_notification(
@@ -926,7 +926,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
                 groups_local = self.hs.get_groups_local_handler()
                 assert isinstance(
                     groups_local, GroupsLocalHandler
-                ), "Misconfiguration of workers for groups."
+                ), "Workers cannot kick users from groups."
                 await groups_local.user_removed_from_group(group_id, user_id, {})
             else:
                 await self.transport_client.remove_user_from_group_notification(
