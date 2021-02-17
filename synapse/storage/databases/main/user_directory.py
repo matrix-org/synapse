@@ -336,8 +336,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         return len(users_to_work_on)
 
     async def is_room_world_readable_or_publicly_joinable(self, room_id):
-        """Check if the room is either world_readable or publically joinable
-        """
+        """Check if the room is either world_readable or publically joinable"""
 
         # Create a state filter that only queries join and history state event
         types_to_filter = (
@@ -516,8 +515,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         )
 
     async def delete_all_from_user_dir(self) -> None:
-        """Delete the entire user directory
-        """
+        """Delete the entire user directory"""
 
         def _delete_all_from_user_dir_txn(txn):
             txn.execute("DELETE FROM user_directory")
@@ -760,26 +758,18 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         additional_ordering_statements = []
         ordering_arguments = ()
 
-        # If enabled, this config option will rank local users higher than those on
-        # remote instances.
-        if self._prefer_local_users_in_search:
-            # The statement checks whether a given user's user ID contains a domain name
-            # that matches the local server
-            if isinstance(self.database_engine, PostgresEngine):
-                statement = "* (CASE WHEN user_id LIKE ? THEN 2.0 ELSE 1.0 END)"
-            elif isinstance(self.database_engine, Sqlite3Engine):
-                # Note that we need to include a comma at the end for valid SQL
-                statement = "user_id LIKE ? DESC,"
-            else:
-                # This should be unreachable.
-                raise Exception("Unrecognized database engine")
-            additional_ordering_statements.append(statement)
-
-            # Append the local server name as an argument to the final query
-            ordering_arguments += ("%:" + self._server_name,)
-
         if isinstance(self.database_engine, PostgresEngine):
             full_query, exact_query, prefix_query = _parse_query_postgres(search_term)
+
+            # If enabled, this config option will rank local users higher than those on
+            # remote instances.
+            if self._prefer_local_users_in_search:
+                # This statement checks whether a given user's user ID contains a server name
+                # that matches the local server
+                statement = "* (CASE WHEN user_id LIKE ? THEN 2.0 ELSE 1.0 END)"
+                additional_ordering_statements.append(statement)
+
+                ordering_arguments += ("%:" + self._server_name,)
 
             # We order by rank and then if they have profile info
             # The ranking algorithm is hand tweaked for "best" results. Broadly
@@ -828,6 +818,18 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             )
         elif isinstance(self.database_engine, Sqlite3Engine):
             search_query = _parse_query_sqlite(search_term)
+
+            # If enabled, this config option will rank local users higher than those on
+            # remote instances.
+            if self._prefer_local_users_in_search:
+                # This statement checks whether a given user's user ID contains a server name
+                # that matches the local server
+                #
+                # Note that we need to include a comma at the end for valid SQL
+                statement = "user_id LIKE ? DESC,"
+                additional_ordering_statements.append(statement)
+
+                ordering_arguments += ("%:" + self._server_name,)
 
             sql = """
                 SELECT d.user_id AS user_id, display_name, avatar_url
