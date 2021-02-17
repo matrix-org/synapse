@@ -261,7 +261,7 @@ using):
     # for all SSO providers
     ^/_matrix/client/(api/v1|r0|unstable)/login/sso/redirect
     ^/_synapse/client/pick_idp$
-    ^/_synapse/client/pick_username
+    ^/_synapse/client/pick_username$
     ^/_synapse/client/new_user_consent$
     ^/_synapse/client/sso_register$
 
