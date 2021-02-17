@@ -26,15 +26,13 @@ logger = logging.getLogger(__name__)
 
 
 class PurgeEventsStorage:
-    """High level interface for purging rooms and event history.
-    """
+    """High level interface for purging rooms and event history."""
 
     def __init__(self, hs: "HomeServer", stores: Databases):
         self.stores = stores
 
     async def purge_room(self, room_id: str) -> None:
-        """Deletes all record of a room
-        """
+        """Deletes all record of a room"""
 
         state_groups_to_delete = await self.stores.main.purge_room(room_id)
         await self.stores.state.purge_room_state(room_id, state_groups_to_delete)

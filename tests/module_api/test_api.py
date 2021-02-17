@@ -100,7 +100,10 @@ class ModuleApiTestCase(HomeserverTestCase):
 
         # Check that the event was sent
         self.event_creation_handler.create_and_send_nonmember_event.assert_called_with(
-            expected_requester, event_dict, ratelimit=False, ignore_shadow_ban=True,
+            expected_requester,
+            event_dict,
+            ratelimit=False,
+            ignore_shadow_ban=True,
         )
 
         # Create and send a state event

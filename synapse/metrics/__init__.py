@@ -155,8 +155,7 @@ class InFlightGauge:
             self._registrations.setdefault(key, set()).add(callback)
 
     def unregister(self, key, callback):
-        """Registers that we've exited a block with labels `key`.
-        """
+        """Registers that we've exited a block with labels `key`."""
 
         with self._lock:
             self._registrations.setdefault(key, set()).discard(callback)
@@ -402,7 +401,9 @@ class PyPyGCStats:
         #     Total time spent in GC:  0.073                  # s.total_gc_time
 
         pypy_gc_time = CounterMetricFamily(
-            "pypy_gc_time_seconds_total", "Total time spent in PyPy GC", labels=[],
+            "pypy_gc_time_seconds_total",
+            "Total time spent in PyPy GC",
+            labels=[],
         )
         pypy_gc_time.add_metric([], s.total_gc_time / 1000)
         yield pypy_gc_time

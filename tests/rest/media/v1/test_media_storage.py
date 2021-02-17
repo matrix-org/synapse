@@ -167,7 +167,16 @@ class _TestImage:
             ),
         ),
         # an empty file
-        (_TestImage(b"", b"image/gif", b".gif", None, None, False,),),
+        (
+            _TestImage(
+                b"",
+                b"image/gif",
+                b".gif",
+                None,
+                None,
+                False,
+            ),
+        ),
     ],
 )
 class MediaRepoTests(unittest.HomeserverTestCase):
@@ -469,8 +478,7 @@ class SpamCheckerTestCase(unittest.HomeserverTestCase):
         return config
 
     def test_upload_innocent(self):
-        """Attempt to upload some innocent data that should be allowed.
-        """
+        """Attempt to upload some innocent data that should be allowed."""
 
         image_data = unhexlify(
             b"89504e470d0a1a0a0000000d4948445200000001000000010806"

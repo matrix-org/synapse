@@ -328,7 +328,9 @@ class FederationSender:
         # to allow us to perform catch-up later on if the remote is unreachable
         # for a while.
         await self.store.store_destination_rooms_entries(
-            destinations, pdu.room_id, pdu.internal_metadata.stream_ordering,
+            destinations,
+            pdu.room_id,
+            pdu.internal_metadata.stream_ordering,
         )
 
         for destination in destinations:
@@ -475,7 +477,10 @@ class FederationSender:
         self, states: List[UserPresenceState], destinations: Iterable[str]
     ) -> None:
         """Send the given presence states to the given destinations.
-            destinations
+
+        Args:
+            states: The user presence states to send.
+            destinations: The hostnames to send the updated states to.
         """
 
         if not states or not self.hs.config.use_presence:
@@ -616,8 +621,8 @@ class FederationSender:
         last_processed = None  # type: Optional[str]
 
         while True:
-            destinations_to_wake = await self.store.get_catch_up_outstanding_destinations(
-                last_processed
+            destinations_to_wake = (
+                await self.store.get_catch_up_outstanding_destinations(last_processed)
             )
 
             if not destinations_to_wake:

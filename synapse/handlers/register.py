@@ -63,8 +63,8 @@ class RegistrationHandler(BaseHandler):
             self._register_device_client = RegisterDeviceReplicationServlet.make_client(
                 hs
             )
-            self._post_registration_client = ReplicationPostRegisterActionsServlet.make_client(
-                hs
+            self._post_registration_client = (
+                ReplicationPostRegisterActionsServlet.make_client(hs)
             )
         else:
             device_handler = hs.get_device_handler()
@@ -192,12 +192,15 @@ class RegistrationHandler(BaseHandler):
         self.check_registration_ratelimit(address)
 
         result = await self.spam_checker.check_registration_for_spam(
-            threepid, localpart, user_agent_ips or [],
+            threepid,
+            localpart,
+            user_agent_ips or [],
         )
 
         if result == RegistrationBehaviour.DENY:
             logger.info(
-                "Blocked registration of %r", localpart,
+                "Blocked registration of %r",
+                localpart,
             )
             # We return a 429 to make it not obvious that they've been
             # denied.
@@ -206,7 +209,8 @@ class RegistrationHandler(BaseHandler):
         shadow_banned = result == RegistrationBehaviour.SHADOW_BAN
         if shadow_banned:
             logger.info(
-                "Shadow banning registration of %r", localpart,
+                "Shadow banning registration of %r",
+                localpart,
             )
 
         # do not check_auth_blocking if the call is coming through the Admin API
@@ -372,7 +376,9 @@ class RegistrationHandler(BaseHandler):
                     config["room_alias_name"] = room_alias.localpart
 
                     info, _ = await room_creation_handler.create_room(
-                        fake_requester, config=config, ratelimit=False,
+                        fake_requester,
+                        config=config,
+                        ratelimit=False,
                     )
 
                     # If the room does not require an invite, but another user
@@ -756,7 +762,10 @@ class RegistrationHandler(BaseHandler):
             return
 
         await self._auth_handler.add_threepid(
-            user_id, threepid["medium"], threepid["address"], threepid["validated_at"],
+            user_id,
+            threepid["medium"],
+            threepid["address"],
+            threepid["validated_at"],
         )
 
         # And we add an email pusher for them by default, but only
@@ -808,5 +817,8 @@ class RegistrationHandler(BaseHandler):
             raise
 
         await self._auth_handler.add_threepid(
-            user_id, threepid["medium"], threepid["address"], threepid["validated_at"],
+            user_id,
+            threepid["medium"],
+            threepid["address"],
+            threepid["validated_at"],
         )

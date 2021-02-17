@@ -1001,7 +1001,9 @@ class StatsStore(StateDeltasStore):
                 ORDER BY {order_by_column} {order}
                 LIMIT ? OFFSET ?
             """.format(
-                sql_base=sql_base, order_by_column=order_by_column, order=order,
+                sql_base=sql_base,
+                order_by_column=order_by_column,
+                order=order,
             )
 
             args += [limit, start]

@@ -73,8 +73,7 @@ class ApplicationServiceWorkerStore(SQLBaseStore):
         return self.services_cache
 
     def get_if_app_services_interested_in_user(self, user_id: str) -> bool:
-        """Check if the user is one associated with an app service (exclusively)
-        """
+        """Check if the user is one associated with an app service (exclusively)"""
         if self.exclusive_user_regex:
             return bool(self.exclusive_user_regex.match(user_id))
         else:

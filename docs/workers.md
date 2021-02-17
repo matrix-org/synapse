@@ -373,7 +373,15 @@ Handles sending push notifications to sygnal and email. Doesn't handle any
 REST endpoints itself, but you should set `start_pushers: False` in the
 shared configuration file to stop the main synapse sending push notifications.
 
-Note this worker cannot be load-balanced: only one instance should be active.
+To run multiple instances at once the `pusher_instances` option should list all
+pusher instances by their worker name, e.g.:
+
+```yaml
+pusher_instances:
+    - pusher_worker1
+    - pusher_worker2
+```
+
 
 ### `synapse.app.appservice`
 

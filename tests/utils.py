@@ -159,6 +159,7 @@ def default_config(name, parse=False):
         },
         "rc_3pid_validation": {"per_second": 10000, "burst_count": 10000},
         "saml2_enabled": False,
+        "public_baseurl": None,
         "default_identity_server": None,
         "key_refresh_interval": 24 * 60 * 60 * 1000,
         "old_signing_keys": {},
@@ -262,7 +263,10 @@ def setup_test_homeserver(
         db_conn.close()
 
     hs = homeserver_to_use(
-        name, config=config, version_string="Synapse/tests", reactor=reactor,
+        name,
+        config=config,
+        version_string="Synapse/tests",
+        reactor=reactor,
     )
 
     # Install @cache_in_self attributes
@@ -364,7 +368,7 @@ class MockHttpResource:
     def trigger(
         self, http_method, path, content, mock_request, federation_auth_origin=None
     ):
-        """ Fire an HTTP event.
+        """Fire an HTTP event.
 
         Args:
             http_method : The HTTP method
@@ -527,8 +531,7 @@ class MockClock:
 
 
 async def create_room(hs, room_id: str, creator_id: str):
-    """Creates and persist a creation event for the given room
-    """
+    """Creates and persist a creation event for the given room"""
 
     persistence_store = hs.get_storage().persistence
     store = hs.get_datastore()

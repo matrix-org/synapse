@@ -87,7 +87,9 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
     arg_kinds.append(ARG_NAMED_OPT)  # Arg is an optional kwarg.
 
     signature = signature.copy_modified(
-        arg_types=arg_types, arg_names=arg_names, arg_kinds=arg_kinds,
+        arg_types=arg_types,
+        arg_names=arg_names,
+        arg_kinds=arg_kinds,
     )
 
     return signature
