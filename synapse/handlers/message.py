@@ -1423,6 +1423,7 @@ class EventCreationHandler:
         event = await builder.build(
             prev_event_ids=original_event.prev_event_ids(),
             auth_event_ids=original_event.auth_event_ids(),
+            inherit_depth=False,
         )
 
         # we rebuild the event context, to be on the safe side. If nothing else,

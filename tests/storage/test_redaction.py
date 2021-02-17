@@ -235,7 +235,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
                 self,
                 prev_event_ids,
                 auth_event_ids,
-                inherit_depth: bool = False,
+                inherit_depth: bool,
             ):
                 built_event = yield defer.ensureDeferred(
                     self._base_builder.build(

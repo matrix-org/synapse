@@ -101,7 +101,7 @@ class EventBuilder:
         self,
         prev_event_ids: List[str],
         auth_event_ids: Optional[List[str]],
-        inherit_depth: bool = False,
+        inherit_depth: bool,
     ) -> EventBase:
         """Transform into a fully signed and hashed event
 
