@@ -370,7 +370,7 @@ From this point, you should:
 
 1. Look at the results of the CI pipeline.
    - If there is any error, fix the error.
-2. If a developer has requested changes, make these changes.
+2. If a developer has requested changes, make these changes and let us know if it is ready for a developer to review again.
 3. Create a new commit with the changes.
    - Please do NOT overwrite the history. New commits make the reviewer's life easier.
    - Push this commits to your Pull Request.
