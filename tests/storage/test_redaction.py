@@ -232,7 +232,10 @@ class RedactionTestCase(unittest.HomeserverTestCase):
 
             @defer.inlineCallbacks
             def build(
-                self, prev_event_ids, auth_event_ids, inherit_depth: bool = False,
+                self,
+                prev_event_ids,
+                auth_event_ids,
+                inherit_depth: bool = False,
             ):
                 built_event = yield defer.ensureDeferred(
                     self._base_builder.build(
