@@ -1,0 +1,21 @@
+# A docker file that caches the cargo index for the cryptography deps. This is
+# mainly useful for multi-arch builds where fetching the index from the internet
+# fails for 32bit archs built on 64 bit platforms.
+
+ARG PYTHON_VERSION=3.8
+
+FROM --platform=$BUILDPLATFORM docker.io/python:${PYTHON_VERSION}-slim as builder
+
+RUN apt-get update && apt-get install -y \
+    rustc \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip download --no-binary cryptography --no-deps cryptography
+
+RUN tar -xf cryptography*.tar.gz --wildcards cryptography*/src/rust/
+
+RUN cd cryptography*/src/rust && cargo fetch
+
+FROM docker.io/python:${PYTHON_VERSION}-slim
+
+COPY --from=builder /root/.cargo /root/.cargo

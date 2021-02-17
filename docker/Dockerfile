@@ -12,11 +12,13 @@
 #
 
 ARG PYTHON_VERSION=3.8
+ARG BASE_IMAGE=docker.io/python:${PYTHON_VERSION}-slim
+ARG CARGO_NET_OFFLINE=false
 
 ###
 ### Stage 0: builder
 ###
-FROM docker.io/python:${PYTHON_VERSION}-slim as builder
+FROM ${BASE_IMAGE} as builder
 
 # install the OS build deps
 RUN apt-get update && apt-get install -y \
@@ -31,6 +33,8 @@ RUN apt-get update && apt-get install -y \
     rustc \
     zlib1g-dev \
  && rm -rf /var/lib/apt/lists/*
+
+ENV CARGO_NET_OFFLINE=${CARGO_NET_OFFLINE}
 
 # Build dependencies that are not available as wheels, to speed up rebuilds
 RUN pip install --prefix="/install" --no-warn-script-location \
