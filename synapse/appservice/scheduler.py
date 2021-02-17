@@ -68,7 +68,7 @@ MAX_EPHEMERAL_EVENTS_PER_TRANSACTION = 100
 
 
 class ApplicationServiceScheduler:
-    """ Public facing API for this module. Does the required DI to tie the
+    """Public facing API for this module. Does the required DI to tie the
     components together. This also serves as the "event_pool", which in this
     case is a simple array.
     """

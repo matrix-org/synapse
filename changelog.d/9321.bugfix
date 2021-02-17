@@ -1,1 +1,2 @@
-Assert a maximum length for the `client_secret` parameter for spec compliance.
+Assert a maximum length for some parameters for spec compliance.
+

@@ -289,7 +289,8 @@ class EmailConfig(Config):
                 self.email_notif_template_html,
                 self.email_notif_template_text,
             ) = self.read_templates(
-                [notif_template_html, notif_template_text], template_dir,
+                [notif_template_html, notif_template_text],
+                template_dir,
             )
 
             self.email_notif_for_new_users = email_config.get(
@@ -311,7 +312,8 @@ class EmailConfig(Config):
                 self.account_validity_template_html,
                 self.account_validity_template_text,
             ) = self.read_templates(
-                [expiry_template_html, expiry_template_text], template_dir,
+                [expiry_template_html, expiry_template_text],
+                template_dir,
             )
 
         subjects_config = email_config.get("subjects", {})

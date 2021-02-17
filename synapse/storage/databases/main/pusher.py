@@ -179,7 +179,9 @@ class PusherWorkerStore(SQLBaseStore):
         raise NotImplementedError()
 
     @cachedList(
-        cached_method_name="get_if_user_has_pusher", list_name="user_ids", num_args=1,
+        cached_method_name="get_if_user_has_pusher",
+        list_name="user_ids",
+        num_args=1,
     )
     async def get_if_users_have_pushers(
         self, user_ids: Iterable[str]
@@ -263,7 +265,8 @@ class PusherWorkerStore(SQLBaseStore):
         params_by_room = {}
         for row in res:
             params_by_room[row["room_id"]] = ThrottleParams(
-                row["last_sent_ts"], row["throttle_ms"],
+                row["last_sent_ts"],
+                row["throttle_ms"],
             )
 
         return params_by_room

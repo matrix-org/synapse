@@ -101,7 +101,7 @@ class AuthConfig(Config):
             # session to be active.
             #
             # This defaults to 0, meaning the user is queried for their credentials
-            # before every action, but this can be overridden to alow a single
+            # before every action, but this can be overridden to allow a single
             # validation to be re-used.  This weakens the protections afforded by
             # the user-interactive authentication process, by allowing for multiple
             # (and potentially different) operations to use the same validation session.

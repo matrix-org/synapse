@@ -81,8 +81,7 @@ class WellKnownLookupResult:
 
 
 class WellKnownResolver:
-    """Handles well-known lookups for matrix servers.
-    """
+    """Handles well-known lookups for matrix servers."""
 
     def __init__(
         self,

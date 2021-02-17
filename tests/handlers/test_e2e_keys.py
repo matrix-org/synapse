@@ -33,8 +33,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         self.store = self.hs.get_datastore()
 
     def test_query_local_devices_no_devices(self):
-        """If the user has no devices, we expect an empty list.
-        """
+        """If the user has no devices, we expect an empty list."""
         local_user = "@boris:" + self.hs.hostname
         res = self.get_success(self.handler.query_local_devices({local_user: None}))
         self.assertDictEqual(res, {local_user: {}})
@@ -102,7 +101,9 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         # Error when replacing string key with dict
         self.get_failure(
             self.handler.upload_keys_for_user(
-                local_user, device_id, {"one_time_keys": {"alg1:k1": {"key": "key"}}},
+                local_user,
+                device_id,
+                {"one_time_keys": {"alg1:k1": {"key": "key"}}},
             ),
             SynapseError,
         )
@@ -215,7 +216,8 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             )
         )
         self.assertEqual(
-            res, {"failures": {}, "one_time_keys": {local_user: {device_id: otk}}},
+            res,
+            {"failures": {}, "one_time_keys": {local_user: {device_id: otk}}},
         )
 
         res = self.get_success(

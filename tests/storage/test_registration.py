@@ -145,7 +145,10 @@ class RegistrationStoreTestCase(unittest.TestCase):
         try:
             yield defer.ensureDeferred(
                 self.store.validate_threepid_session(
-                    "fake_sid", "fake_client_secret", "fake_token", 0,
+                    "fake_sid",
+                    "fake_client_secret",
+                    "fake_token",
+                    0,
                 )
             )
         except ThreepidValidationError as e:
@@ -158,7 +161,10 @@ class RegistrationStoreTestCase(unittest.TestCase):
         try:
             yield defer.ensureDeferred(
                 self.store.validate_threepid_session(
-                    "fake_sid", "fake_client_secret", "fake_token", 0,
+                    "fake_sid",
+                    "fake_client_secret",
+                    "fake_token",
+                    0,
                 )
             )
         except ThreepidValidationError as e:

@@ -33,8 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 class CasError(Exception):
-    """Used to catch errors when validating the CAS ticket.
-    """
+    """Used to catch errors when validating the CAS ticket."""
 
     def __init__(self, error, error_description=None):
         self.error = error
@@ -100,7 +99,10 @@ class CasHandler:
         Returns:
             The URL to use as a "service" parameter.
         """
-        return "%s?%s" % (self._cas_service_url, urllib.parse.urlencode(args),)
+        return "%s?%s" % (
+            self._cas_service_url,
+            urllib.parse.urlencode(args),
+        )
 
     async def _validate_ticket(
         self, ticket: str, service_args: Dict[str, str]
@@ -296,7 +298,10 @@ class CasHandler:
         # first check if we're doing a UIA
         if session:
             return await self._sso_handler.complete_sso_ui_auth_request(
-                self.idp_id, cas_response.username, session, request,
+                self.idp_id,
+                cas_response.username,
+                session,
+                request,
             )
 
         # otherwise, we're handling a login request.
@@ -366,7 +371,8 @@ class CasHandler:
             user_id = UserID(localpart, self._hostname).to_string()
 
             logger.debug(
-                "Looking for existing account based on mapped %s", user_id,
+                "Looking for existing account based on mapped %s",
+                user_id,
             )
 
             users = await self._store.get_users_by_id_case_insensitive(user_id)

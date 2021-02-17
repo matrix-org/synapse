@@ -250,7 +250,8 @@ class RetentionNoDefaultPolicyTestCase(unittest.HomeserverTestCase):
         mock_federation_client = Mock(spec=["backfill"])
 
         self.hs = self.setup_test_homeserver(
-            config=config, federation_client=mock_federation_client,
+            config=config,
+            federation_client=mock_federation_client,
         )
         return self.hs
 

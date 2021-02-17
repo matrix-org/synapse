@@ -63,8 +63,7 @@ class StatsHandler:
             self.clock.call_later(0, self.notify_new_event)
 
     def notify_new_event(self) -> None:
-        """Called when there may be more deltas to process
-        """
+        """Called when there may be more deltas to process"""
         if not self.stats_enabled or self._is_processing:
             return
 

@@ -122,7 +122,8 @@ class _LruCachedFunction(Generic[F]):
 
 
 def lru_cache(
-    max_entries: int = 1000, cache_context: bool = False,
+    max_entries: int = 1000,
+    cache_context: bool = False,
 ) -> Callable[[F], _LruCachedFunction[F]]:
     """A method decorator that applies a memoizing cache around the function.
 
@@ -156,7 +157,9 @@ def lru_cache(
 
     def func(orig: F) -> _LruCachedFunction[F]:
         desc = LruCacheDescriptor(
-            orig, max_entries=max_entries, cache_context=cache_context,
+            orig,
+            max_entries=max_entries,
+            cache_context=cache_context,
         )
         return cast(_LruCachedFunction[F], desc)
 
@@ -170,14 +173,18 @@ class LruCacheDescriptor(_CacheDescriptorBase):
         sentinel = object()
 
     def __init__(
-        self, orig, max_entries: int = 1000, cache_context: bool = False,
+        self,
+        orig,
+        max_entries: int = 1000,
+        cache_context: bool = False,
     ):
         super().__init__(orig, num_args=None, cache_context=cache_context)
         self.max_entries = max_entries
 
     def __get__(self, obj, owner):
         cache = LruCache(
-            cache_name=self.orig.__name__, max_size=self.max_entries,
+            cache_name=self.orig.__name__,
+            max_size=self.max_entries,
         )  # type: LruCache[CacheKey, Any]
 
         get_cache_key = self.cache_key_builder
@@ -212,7 +219,7 @@ class LruCacheDescriptor(_CacheDescriptorBase):
 
 
 class DeferredCacheDescriptor(_CacheDescriptorBase):
-    """ A method decorator that applies a memoizing cache around the function.
+    """A method decorator that applies a memoizing cache around the function.
 
     This caches deferreds, rather than the results themselves. Deferreds that
     fail are removed from the cache.

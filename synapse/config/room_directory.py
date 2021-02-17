@@ -123,7 +123,7 @@ class RoomDirectoryConfig(Config):
             alias (str)
 
         Returns:
-            boolean: True if user is allowed to crate the alias
+            boolean: True if user is allowed to create the alias
         """
         for rule in self._alias_creation_rules:
             if rule.matches(user_id, room_id, [alias]):

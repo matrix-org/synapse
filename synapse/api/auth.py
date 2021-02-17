@@ -168,7 +168,7 @@ class Auth:
         rights: str = "access",
         allow_expired: bool = False,
     ) -> synapse.types.Requester:
-        """ Get a registered user's ID.
+        """Get a registered user's ID.
 
         Args:
             request: An HTTP request with an access_token query parameter.
@@ -294,9 +294,12 @@ class Auth:
         return user_id, app_service
 
     async def get_user_by_access_token(
-        self, token: str, rights: str = "access", allow_expired: bool = False,
+        self,
+        token: str,
+        rights: str = "access",
+        allow_expired: bool = False,
     ) -> TokenLookupResult:
-        """ Validate access token and get user_id from it
+        """Validate access token and get user_id from it
 
         Args:
             token: The access token to get the user by
@@ -489,7 +492,7 @@ class Auth:
         return service
 
     async def is_server_admin(self, user: UserID) -> bool:
-        """ Check if the given user is a local server admin.
+        """Check if the given user is a local server admin.
 
         Args:
             user: user to check
@@ -500,7 +503,10 @@ class Auth:
         return await self.store.is_server_admin(user)
 
     def compute_auth_events(
-        self, event, current_state_ids: StateMap[str], for_verification: bool = False,
+        self,
+        event,
+        current_state_ids: StateMap[str],
+        for_verification: bool = False,
     ) -> List[str]:
         """Given an event and current state return the list of event IDs used
         to auth an event.
