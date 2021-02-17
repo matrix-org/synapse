@@ -22,11 +22,11 @@ jobs:
     steps:
       - checkout
       - docker_prepare
-      - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
+      # - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
       # for `latest`, we don't want the arm images to disappear, so don't update the tag
       # until all of the platforms are built.
       - docker_build:
-          tag: -t matrixdotorg/synapse:latest
+          tag: -t 127.0.0.1:5000/synapse:erikj-test
           platforms: linux/amd64,linux/arm/v7,linux/arm64
 
 workflows:
@@ -41,7 +41,7 @@ workflows:
       - dockerhubuploadlatest:
           filters:
             branches:
-              only: master
+              only: erikj/arm_docker_cache
 
 commands:
   docker_prepare:
