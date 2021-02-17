@@ -96,7 +96,9 @@ class IgnoredUsersTestCase(unittest.HomeserverTestCase):
         # No ignored_users key.
         self.get_success(
             self.store.add_account_data_for_user(
-                self.user, AccountDataTypes.IGNORED_USER_LIST, {},
+                self.user,
+                AccountDataTypes.IGNORED_USER_LIST,
+                {},
             )
         )
 

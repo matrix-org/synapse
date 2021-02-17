@@ -98,7 +98,9 @@ async def main(reactor, loops):
 
     logger = logging.getLogger("synapse.logging.test_terse_json")
     _setup_stdlib_logging(
-        hs_config, log_config, logBeginner=beginner,
+        hs_config,
+        log_config,
+        logBeginner=beginner,
     )
 
     # Wait for it to connect...

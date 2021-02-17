@@ -338,7 +338,10 @@ class LoggingContext:
         if self.previous_context != old_context:
             logcontext_error(
                 "Expected previous context %r, found %r"
-                % (self.previous_context, old_context,)
+                % (
+                    self.previous_context,
+                    old_context,
+                )
             )
         return self
 
@@ -562,7 +565,7 @@ class LoggingContextFilter(logging.Filter):
 class PreserveLoggingContext:
     """Context manager which replaces the logging context
 
-     The previous logging context is restored on exit."""
+    The previous logging context is restored on exit."""
 
     __slots__ = ["_old_context", "_new_context"]
 
@@ -585,7 +588,10 @@ class PreserveLoggingContext:
             else:
                 logcontext_error(
                     "Expected logging context %s but found %s"
-                    % (self._new_context, context,)
+                    % (
+                        self._new_context,
+                        context,
+                    )
                 )
 
 

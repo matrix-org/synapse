@@ -365,7 +365,10 @@ class BaseFederationServlet:
                 continue
 
             server.register_paths(
-                method, (pattern,), self._wrap(code), self.__class__.__name__,
+                method,
+                (pattern,),
+                self._wrap(code),
+                self.__class__.__name__,
             )
 
 
@@ -382,7 +385,7 @@ class FederationSendServlet(BaseFederationServlet):
 
     # This is when someone is trying to send us a bunch of data.
     async def on_PUT(self, origin, content, query, transaction_id):
-        """ Called on PUT /send/<transaction_id>/
+        """Called on PUT /send/<transaction_id>/
 
         Args:
             request (twisted.web.http.Request): The HTTP request.
@@ -856,8 +859,7 @@ class FederationVersionServlet(BaseFederationServlet):
 
 
 class FederationGroupsProfileServlet(BaseFederationServlet):
-    """Get/set the basic profile of a group on behalf of a user
-    """
+    """Get/set the basic profile of a group on behalf of a user"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/profile"
 
@@ -896,8 +898,7 @@ class FederationGroupsSummaryServlet(BaseFederationServlet):
 
 
 class FederationGroupsRoomsServlet(BaseFederationServlet):
-    """Get the rooms in a group on behalf of a user
-    """
+    """Get the rooms in a group on behalf of a user"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/rooms"
 
@@ -912,8 +913,7 @@ class FederationGroupsRoomsServlet(BaseFederationServlet):
 
 
 class FederationGroupsAddRoomsServlet(BaseFederationServlet):
-    """Add/remove room from group
-    """
+    """Add/remove room from group"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/room/(?P<room_id>[^/]*)"
 
@@ -941,8 +941,7 @@ class FederationGroupsAddRoomsServlet(BaseFederationServlet):
 
 
 class FederationGroupsAddRoomsConfigServlet(BaseFederationServlet):
-    """Update room config in group
-    """
+    """Update room config in group"""
 
     PATH = (
         "/groups/(?P<group_id>[^/]*)/room/(?P<room_id>[^/]*)"
@@ -962,8 +961,7 @@ class FederationGroupsAddRoomsConfigServlet(BaseFederationServlet):
 
 
 class FederationGroupsUsersServlet(BaseFederationServlet):
-    """Get the users in a group on behalf of a user
-    """
+    """Get the users in a group on behalf of a user"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/users"
 
@@ -978,8 +976,7 @@ class FederationGroupsUsersServlet(BaseFederationServlet):
 
 
 class FederationGroupsInvitedUsersServlet(BaseFederationServlet):
-    """Get the users that have been invited to a group
-    """
+    """Get the users that have been invited to a group"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/invited_users"
 
@@ -996,8 +993,7 @@ class FederationGroupsInvitedUsersServlet(BaseFederationServlet):
 
 
 class FederationGroupsInviteServlet(BaseFederationServlet):
-    """Ask a group server to invite someone to the group
-    """
+    """Ask a group server to invite someone to the group"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/invite"
 
@@ -1014,8 +1010,7 @@ class FederationGroupsInviteServlet(BaseFederationServlet):
 
 
 class FederationGroupsAcceptInviteServlet(BaseFederationServlet):
-    """Accept an invitation from the group server
-    """
+    """Accept an invitation from the group server"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/accept_invite"
 
@@ -1029,8 +1024,7 @@ class FederationGroupsAcceptInviteServlet(BaseFederationServlet):
 
 
 class FederationGroupsJoinServlet(BaseFederationServlet):
-    """Attempt to join a group
-    """
+    """Attempt to join a group"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/join"
 
@@ -1044,8 +1038,7 @@ class FederationGroupsJoinServlet(BaseFederationServlet):
 
 
 class FederationGroupsRemoveUserServlet(BaseFederationServlet):
-    """Leave or kick a user from the group
-    """
+    """Leave or kick a user from the group"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/remove"
 
@@ -1062,8 +1055,7 @@ class FederationGroupsRemoveUserServlet(BaseFederationServlet):
 
 
 class FederationGroupsLocalInviteServlet(BaseFederationServlet):
-    """A group server has invited a local user
-    """
+    """A group server has invited a local user"""
 
     PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/invite"
 
@@ -1077,8 +1069,7 @@ class FederationGroupsLocalInviteServlet(BaseFederationServlet):
 
 
 class FederationGroupsRemoveLocalUserServlet(BaseFederationServlet):
-    """A group server has removed a local user
-    """
+    """A group server has removed a local user"""
 
     PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/remove"
 
@@ -1094,8 +1085,7 @@ class FederationGroupsRemoveLocalUserServlet(BaseFederationServlet):
 
 
 class FederationGroupsRenewAttestaionServlet(BaseFederationServlet):
-    """A group or user's server renews their attestation
-    """
+    """A group or user's server renews their attestation"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/renew_attestation/(?P<user_id>[^/]*)"
 
@@ -1167,8 +1157,7 @@ class FederationGroupsSummaryRoomsServlet(BaseFederationServlet):
 
 
 class FederationGroupsCategoriesServlet(BaseFederationServlet):
-    """Get all categories for a group
-    """
+    """Get all categories for a group"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/categories/?"
 
@@ -1183,8 +1172,7 @@ class FederationGroupsCategoriesServlet(BaseFederationServlet):
 
 
 class FederationGroupsCategoryServlet(BaseFederationServlet):
-    """Add/remove/get a category in a group
-    """
+    """Add/remove/get a category in a group"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/categories/(?P<category_id>[^/]+)"
 
@@ -1237,8 +1225,7 @@ class FederationGroupsCategoryServlet(BaseFederationServlet):
 
 
 class FederationGroupsRolesServlet(BaseFederationServlet):
-    """Get roles in a group
-    """
+    """Get roles in a group"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/roles/?"
 
@@ -1253,8 +1240,7 @@ class FederationGroupsRolesServlet(BaseFederationServlet):
 
 
 class FederationGroupsRoleServlet(BaseFederationServlet):
-    """Add/remove/get a role in a group
-    """
+    """Add/remove/get a role in a group"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/roles/(?P<role_id>[^/]+)"
 
@@ -1362,8 +1348,7 @@ class FederationGroupsSummaryUsersServlet(BaseFederationServlet):
 
 
 class FederationGroupsBulkPublicisedServlet(BaseFederationServlet):
-    """Get roles in a group
-    """
+    """Get roles in a group"""
 
     PATH = "/get_groups_publicised"
 
@@ -1376,8 +1361,7 @@ class FederationGroupsBulkPublicisedServlet(BaseFederationServlet):
 
 
 class FederationGroupsSettingJoinPolicyServlet(BaseFederationServlet):
-    """Sets whether a group is joinable without an invite or knock
-    """
+    """Sets whether a group is joinable without an invite or knock"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/settings/m.join_policy"
 

@@ -43,8 +43,7 @@ def _log_debug_as_f(f, msg, msg_args):
 
 
 def log_function(f):
-    """ Function decorator that logs every call to that function.
-    """
+    """Function decorator that logs every call to that function."""
     func_name = f.__name__
 
     @wraps(f)

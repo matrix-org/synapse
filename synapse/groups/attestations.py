@@ -64,8 +64,7 @@ UPDATE_ATTESTATION_TIME_MS = 1 * 24 * 60 * 60 * 1000
 
 
 class GroupAttestationSigning:
-    """Creates and verifies group attestations.
-    """
+    """Creates and verifies group attestations."""
 
     def __init__(self, hs: "HomeServer"):
         self.keyring = hs.get_keyring()
@@ -134,8 +133,7 @@ class GroupAttestationSigning:
 
 
 class GroupAttestionRenewer:
-    """Responsible for sending and receiving attestation updates.
-    """
+    """Responsible for sending and receiving attestation updates."""
 
     def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
@@ -153,8 +151,7 @@ class GroupAttestionRenewer:
     async def on_renew_attestation(
         self, group_id: str, user_id: str, content: JsonDict
     ) -> JsonDict:
-        """When a remote updates an attestation
-        """
+        """When a remote updates an attestation"""
         attestation = content["attestation"]
 
         if not self.is_mine_id(group_id) and not self.is_mine_id(user_id):
@@ -172,8 +169,7 @@ class GroupAttestionRenewer:
         return run_as_background_process("renew_attestations", self._renew_attestations)
 
     async def _renew_attestations(self) -> None:
-        """Called periodically to check if we need to update any of our attestations
-        """
+        """Called periodically to check if we need to update any of our attestations"""
 
         now = self.clock.time_msec()
 

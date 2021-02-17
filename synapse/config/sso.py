@@ -35,8 +35,7 @@ class SsoAttributeRequirement:
 
 
 class SSOConfig(Config):
-    """SSO Configuration
-    """
+    """SSO Configuration"""
 
     section = "sso"
 

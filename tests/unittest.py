@@ -255,7 +255,10 @@ class HomeserverTestCase(TestCase):
                 # We need a valid token ID to satisfy foreign key constraints.
                 token_id = self.get_success(
                     self.hs.get_datastore().add_access_token_to_user(
-                        self.helper.auth_user_id, "some_fake_token", None, None,
+                        self.helper.auth_user_id,
+                        "some_fake_token",
+                        None,
+                        None,
                     )
                 )
 

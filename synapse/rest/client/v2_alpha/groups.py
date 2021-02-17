@@ -59,8 +59,7 @@ def _validate_group_id(f):
 
 
 class GroupServlet(RestServlet):
-    """Get the group profile
-    """
+    """Get the group profile"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/profile$")
 
@@ -99,8 +98,7 @@ class GroupServlet(RestServlet):
 
 
 class GroupSummaryServlet(RestServlet):
-    """Get the full group summary
-    """
+    """Get the full group summary"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/summary$")
 
@@ -188,8 +186,7 @@ class GroupSummaryRoomsCatServlet(RestServlet):
 
 
 class GroupCategoryServlet(RestServlet):
-    """Get/add/update/delete a group category
-    """
+    """Get/add/update/delete a group category"""
 
     PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/categories/(?P<category_id>[^/]+)$"
@@ -256,8 +253,7 @@ class GroupCategoryServlet(RestServlet):
 
 
 class GroupCategoriesServlet(RestServlet):
-    """Get all group categories
-    """
+    """Get all group categories"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/categories/$")
 
@@ -280,8 +276,7 @@ class GroupCategoriesServlet(RestServlet):
 
 
 class GroupRoleServlet(RestServlet):
-    """Get/add/update/delete a group role
-    """
+    """Get/add/update/delete a group role"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/roles/(?P<role_id>[^/]+)$")
 
@@ -346,8 +341,7 @@ class GroupRoleServlet(RestServlet):
 
 
 class GroupRolesServlet(RestServlet):
-    """Get all group roles
-    """
+    """Get all group roles"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/roles/$")
 
@@ -435,8 +429,7 @@ class GroupSummaryUsersRoleServlet(RestServlet):
 
 
 class GroupRoomServlet(RestServlet):
-    """Get all rooms in a group
-    """
+    """Get all rooms in a group"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/rooms$")
 
@@ -459,8 +452,7 @@ class GroupRoomServlet(RestServlet):
 
 
 class GroupUsersServlet(RestServlet):
-    """Get all users in a group
-    """
+    """Get all users in a group"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/users$")
 
@@ -483,8 +475,7 @@ class GroupUsersServlet(RestServlet):
 
 
 class GroupInvitedUsersServlet(RestServlet):
-    """Get users invited to a group
-    """
+    """Get users invited to a group"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/invited_users$")
 
@@ -507,8 +498,7 @@ class GroupInvitedUsersServlet(RestServlet):
 
 
 class GroupSettingJoinPolicyServlet(RestServlet):
-    """Set group join policy
-    """
+    """Set group join policy"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/settings/m.join_policy$")
 
@@ -533,8 +523,7 @@ class GroupSettingJoinPolicyServlet(RestServlet):
 
 
 class GroupCreateServlet(RestServlet):
-    """Create a group
-    """
+    """Create a group"""
 
     PATTERNS = client_patterns("/create_group$")
 
@@ -573,8 +562,7 @@ class GroupCreateServlet(RestServlet):
 
 
 class GroupAdminRoomsServlet(RestServlet):
-    """Add a room to the group
-    """
+    """Add a room to the group"""
 
     PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/admin/rooms/(?P<room_id>[^/]*)$"
@@ -617,8 +605,7 @@ class GroupAdminRoomsServlet(RestServlet):
 
 
 class GroupAdminRoomsConfigServlet(RestServlet):
-    """Update the config of a room in a group
-    """
+    """Update the config of a room in a group"""
 
     PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/admin/rooms/(?P<room_id>[^/]*)"
@@ -648,8 +635,7 @@ class GroupAdminRoomsConfigServlet(RestServlet):
 
 
 class GroupAdminUsersInviteServlet(RestServlet):
-    """Invite a user to the group
-    """
+    """Invite a user to the group"""
 
     PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/admin/users/invite/(?P<user_id>[^/]*)$"
@@ -679,8 +665,7 @@ class GroupAdminUsersInviteServlet(RestServlet):
 
 
 class GroupAdminUsersKickServlet(RestServlet):
-    """Kick a user from the group
-    """
+    """Kick a user from the group"""
 
     PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/admin/users/remove/(?P<user_id>[^/]*)$"
@@ -707,8 +692,7 @@ class GroupAdminUsersKickServlet(RestServlet):
 
 
 class GroupSelfLeaveServlet(RestServlet):
-    """Leave a joined group
-    """
+    """Leave a joined group"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/leave$")
 
@@ -733,8 +717,7 @@ class GroupSelfLeaveServlet(RestServlet):
 
 
 class GroupSelfJoinServlet(RestServlet):
-    """Attempt to join a group, or knock
-    """
+    """Attempt to join a group, or knock"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/join$")
 
@@ -759,8 +742,7 @@ class GroupSelfJoinServlet(RestServlet):
 
 
 class GroupSelfAcceptInviteServlet(RestServlet):
-    """Accept a group invite
-    """
+    """Accept a group invite"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/accept_invite$")
 
@@ -785,8 +767,7 @@ class GroupSelfAcceptInviteServlet(RestServlet):
 
 
 class GroupSelfUpdatePublicityServlet(RestServlet):
-    """Update whether we publicise a users membership of a group
-    """
+    """Update whether we publicise a users membership of a group"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/update_publicity$")
 
@@ -809,8 +790,7 @@ class GroupSelfUpdatePublicityServlet(RestServlet):
 
 
 class PublicisedGroupsForUserServlet(RestServlet):
-    """Get the list of groups a user is advertising
-    """
+    """Get the list of groups a user is advertising"""
 
     PATTERNS = client_patterns("/publicised_groups/(?P<user_id>[^/]*)$")
 
@@ -830,8 +810,7 @@ class PublicisedGroupsForUserServlet(RestServlet):
 
 
 class PublicisedGroupsForUsersServlet(RestServlet):
-    """Get the list of groups a user is advertising
-    """
+    """Get the list of groups a user is advertising"""
 
     PATTERNS = client_patterns("/publicised_groups$")
 
@@ -854,8 +833,7 @@ class PublicisedGroupsForUsersServlet(RestServlet):
 
 
 class GroupsForUserServlet(RestServlet):
-    """Get all groups the logged in user is joined to
-    """
+    """Get all groups the logged in user is joined to"""
 
     PATTERNS = client_patterns("/joined_groups$")
 
