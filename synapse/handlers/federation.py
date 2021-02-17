@@ -1470,10 +1470,14 @@ class FederationHandler(BaseHandler):
         """
         logger.debug("Knocking on room %s on behalf of user %s", room_id, knockee)
 
+        # Inform the remote server of the room versions we support
+        supported_room_versions = list(KNOWN_ROOM_VERSIONS.keys())
+
         # Ask the remote server to create a valid knock event for us. Once received,
         # we sign the event
+        params = {"ver": supported_room_versions}  # type: Dict[str, Iterable[str]]
         origin, event, event_format_version = await self._make_and_verify_event(
-            target_hosts, room_id, knockee, Membership.KNOCK, content,
+            target_hosts, room_id, knockee, Membership.KNOCK, content, params=params
         )
 
         # Record the room ID and its version so that we have a record of the room
@@ -1875,6 +1879,7 @@ class FederationHandler(BaseHandler):
             raise SynapseError(403, "User not from origin", Codes.FORBIDDEN)
 
         room_version = await self.store.get_room_version_id(room_id)
+
         builder = self.event_builder_factory.new(
             room_version,
             {

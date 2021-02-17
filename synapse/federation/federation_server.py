@@ -568,7 +568,7 @@ class FederationServer(FederationBase):
         return {}
 
     async def on_make_knock_request(
-        self, origin: str, room_id: str, user_id: str,
+        self, origin: str, room_id: str, user_id: str, supported_versions: List[str]
     ) -> Dict[str, Union[EventBase, str]]:
         """We've received a /make_knock/ request, so we create a partial knock
         event for the room and hand that back, along with the room version, to the knocking
@@ -579,16 +579,22 @@ class FederationServer(FederationBase):
             origin: The (verified) server name of the requesting server.
             room_id: The room to create the knock event in.
             user_id: The user to create the knock for.
+            supported_versions: The room versions supported by the requesting server.
 
         Returns:
             The partial knock event.
         """
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, room_id)
-        pdu = await self.handler.on_make_knock_request(origin, room_id, user_id)
 
         room_version = await self.store.get_room_version_id(room_id)
+        if room_version not in supported_versions:
+            logger.warning(
+                "Room version %s not in %s", room_version, supported_versions
+            )
+            raise IncompatibleRoomVersionError(room_version=room_version)
 
+        pdu = await self.handler.on_make_knock_request(origin, room_id, user_id)
         time_now = self._clock.time_msec()
         return {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
 
