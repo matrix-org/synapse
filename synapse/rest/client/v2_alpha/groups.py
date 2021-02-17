@@ -16,7 +16,7 @@
 
 import logging
 from functools import wraps
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from twisted.web.http import Request
 
@@ -251,7 +251,7 @@ class GroupCategoryServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
-        
+
         assert isinstance(
             self.groups_handler, GroupsLocalHandler
         ), "Workers cannot modify group categories."

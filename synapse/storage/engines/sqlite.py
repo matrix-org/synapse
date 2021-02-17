@@ -39,11 +39,6 @@ class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
             # back to bytes.
             database_module.register_adapter(bytearray, lambda array: bytes(array))
 
-        if platform.python_implementation() == "PyPy":
-            # pypy's sqlite3 module doesn't handle bytearrays, convert them
-            # back to bytes.
-            database_module.register_adapter(bytearray, lambda array: bytes(array))
-
         # The current max state_group, or None if we haven't looked
         # in the DB yet.
         self._current_state_group_id = None

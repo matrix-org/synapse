@@ -70,7 +70,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
         self.assertEqual(res, 404)
 
     def test_create_version(self):
-        """Check that we can create and then retrieve versions."""      
+        """Check that we can create and then retrieve versions."""
         res = self.get_success(
             self.handler.create_version(
                 self.local_user,
