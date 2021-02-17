@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>SSO redirect confirmation</title>
+    <title>Agree to terms and conditions</title>
     <meta name="viewport" content="width=device-width, user-scalable=no">
     <style type="text/css">
       {% include "sso.css" without context %}
@@ -18,22 +18,15 @@
             <p>Agree to the terms to create your account.</p>
         </header>
         <main>
-            <!-- {% if user_profile.avatar_url and user_profile.display_name %} -->
-            <div class="profile">
-                <img src="{{ user_profile.avatar_url | mxc_to_http(64, 64) }}" class="avatar" />
-                <div class="profile-details">
-                    <div class="display-name">{{ user_profile.display_name }}</div>
-                    <div class="user-id">{{ user_id }}</div>
-                </div>
-            </div>
-            <!-- {% endif %} -->
+            {% include "sso_partial_profile.html" %}
             <form method="post" action="{{my_url}}" id="consent_form">
                 <p>
                     <input id="accepted_version" type="checkbox" name="accepted_version" value="{{ consent_version }}" required>
-                    <label for="accepted_version">I have read and agree to the <a href="{{ terms_url }}" target="_blank">terms and conditions</a>.</label>
+                    <label for="accepted_version">I have read and agree to the <a href="{{ terms_url }}" target="_blank" rel="noopener">terms and conditions</a>.</label>
                 </p>
                 <input type="submit" class="primary-button" value="Continue"/>
             </form>
         </main>
+        {% include "sso_footer.html" without context %}
     </body>
 </html>

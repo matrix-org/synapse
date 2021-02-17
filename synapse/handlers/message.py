@@ -65,8 +65,7 @@ logger = logging.getLogger(__name__)
 
 
 class MessageHandler:
-    """Contains some read only APIs to get state about a room
-    """
+    """Contains some read only APIs to get state about a room"""
 
     def __init__(self, hs):
         self.auth = hs.get_auth()
@@ -88,9 +87,13 @@ class MessageHandler:
             )
 
     async def get_room_data(
-        self, user_id: str, room_id: str, event_type: str, state_key: str,
+        self,
+        user_id: str,
+        room_id: str,
+        event_type: str,
+        state_key: str,
     ) -> dict:
-        """ Get data from a room.
+        """Get data from a room.
 
         Args:
             user_id
@@ -174,7 +177,10 @@ class MessageHandler:
                 raise NotFoundError("Can't find event for token %s" % (at_token,))
 
             visible_events = await filter_events_for_client(
-                self.storage, user_id, last_events, filter_send_to_client=False,
+                self.storage,
+                user_id,
+                last_events,
+                filter_send_to_client=False,
             )
 
             event = last_events[0]
@@ -571,7 +577,7 @@ class EventCreationHandler:
     async def _is_exempt_from_privacy_policy(
         self, builder: EventBuilder, requester: Requester
     ) -> bool:
-        """"Determine if an event to be sent is exempt from having to consent
+        """ "Determine if an event to be sent is exempt from having to consent
         to the privacy policy
 
         Args:
@@ -793,9 +799,10 @@ class EventCreationHandler:
         """
 
         if prev_event_ids is not None:
-            assert len(prev_event_ids) <= 10, (
-                "Attempting to create an event with %i prev_events"
-                % (len(prev_event_ids),)
+            assert (
+                len(prev_event_ids) <= 10
+            ), "Attempting to create an event with %i prev_events" % (
+                len(prev_event_ids),
             )
         else:
             prev_event_ids = await self.store.get_prev_events_for_room(builder.room_id)
@@ -821,7 +828,8 @@ class EventCreationHandler:
         )
         if not third_party_result:
             logger.info(
-                "Event %s forbidden by third-party rules", event,
+                "Event %s forbidden by third-party rules",
+                event,
             )
             raise SynapseError(
                 403, "This event is not allowed in this context", Codes.FORBIDDEN
@@ -1316,7 +1324,11 @@ class EventCreationHandler:
                 # Since this is a dummy-event it is OK if it is sent by a
                 # shadow-banned user.
                 await self.handle_new_client_event(
-                    requester, event, context, ratelimit=False, ignore_shadow_ban=True,
+                    requester,
+                    event,
+                    context,
+                    ratelimit=False,
+                    ignore_shadow_ban=True,
                 )
                 return True
             except AuthError:

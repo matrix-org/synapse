@@ -85,7 +85,8 @@ class PerDestinationQueue:
             # processing. We have a guard in `attempt_new_transaction` that
             # ensure we don't start sending stuff.
             logger.error(
-                "Create a per destination queue for %s on wrong worker", destination,
+                "Create a per destination queue for %s on wrong worker",
+                destination,
             )
             self._should_send_on_this_instance = False
 
@@ -440,8 +441,10 @@ class PerDestinationQueue:
 
         if first_catch_up_check:
             # first catchup so get last_successful_stream_ordering from database
-            self._last_successful_stream_ordering = await self._store.get_destination_last_successful_stream_ordering(
-                self._destination
+            self._last_successful_stream_ordering = (
+                await self._store.get_destination_last_successful_stream_ordering(
+                    self._destination
+                )
             )
 
         if self._last_successful_stream_ordering is None:
@@ -457,7 +460,8 @@ class PerDestinationQueue:
         # get at most 50 catchup room/PDUs
         while True:
             event_ids = await self._store.get_catch_up_room_event_ids(
-                self._destination, self._last_successful_stream_ordering,
+                self._destination,
+                self._last_successful_stream_ordering,
             )
 
             if not event_ids:

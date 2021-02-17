@@ -84,8 +84,7 @@ class StreamChangeCache:
         return False
 
     def has_entity_changed(self, entity: EntityType, stream_pos: int) -> bool:
-        """Returns True if the entity may have been updated since stream_pos
-        """
+        """Returns True if the entity may have been updated since stream_pos"""
         assert isinstance(stream_pos, int)
 
         if stream_pos < self._earliest_known_stream_pos:
@@ -133,8 +132,7 @@ class StreamChangeCache:
         return result
 
     def has_any_entity_changed(self, stream_pos: int) -> bool:
-        """Returns if any entity has changed
-        """
+        """Returns if any entity has changed"""
         assert type(stream_pos) is int
 
         if not self._cache:

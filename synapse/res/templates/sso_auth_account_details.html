@@ -1,11 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title>Synapse Login</title>
+    <title>Create your account</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no">
+    <script type="text/javascript">
+      let wasKeyboard = false;
+      document.addEventListener("mousedown", function() { wasKeyboard = false; });
+      document.addEventListener("keydown", function() { wasKeyboard = true; });
+      document.addEventListener("focusin", function() {
+        if (wasKeyboard) {
+          document.body.classList.add("keyboard-focus");
+        } else {
+          document.body.classList.remove("keyboard-focus");
+        }
+      });
+    </script>
     <style type="text/css">
       {% include "sso.css" without context %}
+
+      body.keyboard-focus :focus, body.keyboard-focus .username_input:focus-within {
+        outline: 3px solid #17191C;
+        outline-offset: 4px;
+      }
 
       .username_input {
         display: flex;
@@ -33,11 +50,12 @@
 
       .username_input label {
         position: absolute;
-        top: -8px;
+        top: -5px;
         left: 14px;
-        font-size: 80%;
+        font-size: 10px;
+        line-height: 10px;
         background: white;
-        padding: 2px;
+        padding: 0 2px;
       }
 
       .username_input input {
@@ -45,6 +63,13 @@
         display: block;
         min-width: 0;
         border: none;
+      }
+
+      /* only clear the outline if we know it will be shown on the parent div using :focus-within */
+      @supports selector(:focus-within) {
+        .username_input input {
+          outline: none !important;
+        }
       }
 
       .username_input div {
@@ -65,6 +90,7 @@
       .idp-pick-details .idp-detail {
         border-top: 1px solid #E9ECF1;
         padding: 12px;
+        display: block;
       }
       .idp-pick-details .check-row {
         display: flex;
@@ -117,43 +143,44 @@
         </div>
         <output for="username_input" id="field-username-output"></output>
         <input type="submit" value="Continue" class="primary-button">
-        {% if user_attributes %}
+        {% if user_attributes.avatar_url or user_attributes.display_name or user_attributes.emails %}
         <section class="idp-pick-details">
           <h2><img src="{{ idp.idp_icon | mxc_to_http(24, 24) }}"/>Information from {{ idp.idp_name }}</h2>
           {% if user_attributes.avatar_url %}
-          <div class="idp-detail idp-avatar">
+          <label class="idp-detail idp-avatar" for="idp-avatar">
             <div class="check-row">
-              <label for="idp-avatar" class="name">Avatar</label>
-              <label for="idp-avatar" class="use">Use</label>
+              <span class="name">Avatar</span>
+              <span class="use">Use</span>
               <input type="checkbox" name="use_avatar" id="idp-avatar" value="true" checked>
             </div>
             <img src="{{ user_attributes.avatar_url }}" class="avatar" />
-          </div>
+          </label>
           {% endif %}
           {% if user_attributes.display_name %}
-          <div class="idp-detail">
+          <label class="idp-detail" for="idp-displayname">
             <div class="check-row">
-              <label for="idp-displayname" class="name">Display name</label>
-              <label for="idp-displayname" class="use">Use</label>
+              <span class="name">Display name</span>
+              <span class="use">Use</span>
               <input type="checkbox" name="use_display_name" id="idp-displayname" value="true" checked>
             </div>
             <p class="idp-value">{{ user_attributes.display_name }}</p>
-          </div>
+          </label>
           {% endif %}
           {% for email in user_attributes.emails %}
-          <div class="idp-detail">
+          <label class="idp-detail" for="idp-email{{ loop.index }}">
             <div class="check-row">
-              <label for="idp-email{{ loop.index }}" class="name">E-mail</label>
-              <label for="idp-email{{ loop.index }}" class="use">Use</label>
+              <span class="name">E-mail</span>
+              <span class="use">Use</span>
               <input type="checkbox" name="use_email" id="idp-email{{ loop.index }}" value="{{ email }}" checked>
             </div>
             <p class="idp-value">{{ email }}</p>
-          </div>
+          </label>
           {% endfor %}
         </section>
         {% endif %}
       </form>
     </main>
+    {% include "sso_footer.html" without context %}
     <script type="text/javascript">
       {% include "sso_auth_account_details.js" without context %}
     </script>

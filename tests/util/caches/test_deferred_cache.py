@@ -232,7 +232,10 @@ class DeferredCacheTestCase(TestCase):
 
     def test_eviction_iterable(self):
         cache = DeferredCache(
-            "test", max_entries=3, apply_cache_factor_from_config=False, iterable=True,
+            "test",
+            max_entries=3,
+            apply_cache_factor_from_config=False,
+            iterable=True,
         )
 
         cache.prefill(1, ["one", "two"])

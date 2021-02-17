@@ -39,7 +39,7 @@ class TransportLayerClient:
 
     @log_function
     def get_room_state_ids(self, destination, room_id, event_id):
-        """ Requests all state for a given room from the given server at the
+        """Requests all state for a given room from the given server at the
         given event. Returns the state's event_id's
 
         Args:
@@ -63,7 +63,7 @@ class TransportLayerClient:
 
     @log_function
     def get_event(self, destination, event_id, timeout=None):
-        """ Requests the pdu with give id and origin from the given server.
+        """Requests the pdu with give id and origin from the given server.
 
         Args:
             destination (str): The host name of the remote homeserver we want
@@ -84,7 +84,7 @@ class TransportLayerClient:
 
     @log_function
     def backfill(self, destination, room_id, event_tuples, limit):
-        """ Requests `limit` previous PDUs in a given context before list of
+        """Requests `limit` previous PDUs in a given context before list of
         PDUs.
 
         Args:
@@ -118,7 +118,7 @@ class TransportLayerClient:
 
     @log_function
     async def send_transaction(self, transaction, json_data_callback=None):
-        """ Sends the given Transaction to its destination
+        """Sends the given Transaction to its destination
 
         Args:
             transaction (Transaction)
@@ -551,8 +551,7 @@ class TransportLayerClient:
 
     @log_function
     def get_group_profile(self, destination, group_id, requester_user_id):
-        """Get a group profile
-        """
+        """Get a group profile"""
         path = _create_v1_path("/groups/%s/profile", group_id)
 
         return self.client.get_json(
@@ -584,8 +583,7 @@ class TransportLayerClient:
 
     @log_function
     def get_group_summary(self, destination, group_id, requester_user_id):
-        """Get a group summary
-        """
+        """Get a group summary"""
         path = _create_v1_path("/groups/%s/summary", group_id)
 
         return self.client.get_json(
@@ -597,8 +595,7 @@ class TransportLayerClient:
 
     @log_function
     def get_rooms_in_group(self, destination, group_id, requester_user_id):
-        """Get all rooms in a group
-        """
+        """Get all rooms in a group"""
         path = _create_v1_path("/groups/%s/rooms", group_id)
 
         return self.client.get_json(
@@ -611,8 +608,7 @@ class TransportLayerClient:
     def add_room_to_group(
         self, destination, group_id, requester_user_id, room_id, content
     ):
-        """Add a room to a group
-        """
+        """Add a room to a group"""
         path = _create_v1_path("/groups/%s/room/%s", group_id, room_id)
 
         return self.client.post_json(
@@ -626,8 +622,7 @@ class TransportLayerClient:
     def update_room_in_group(
         self, destination, group_id, requester_user_id, room_id, config_key, content
     ):
-        """Update room in group
-        """
+        """Update room in group"""
         path = _create_v1_path(
             "/groups/%s/room/%s/config/%s", group_id, room_id, config_key
         )
@@ -641,8 +636,7 @@ class TransportLayerClient:
         )
 
     def remove_room_from_group(self, destination, group_id, requester_user_id, room_id):
-        """Remove a room from a group
-        """
+        """Remove a room from a group"""
         path = _create_v1_path("/groups/%s/room/%s", group_id, room_id)
 
         return self.client.delete_json(
@@ -654,8 +648,7 @@ class TransportLayerClient:
 
     @log_function
     def get_users_in_group(self, destination, group_id, requester_user_id):
-        """Get users in a group
-        """
+        """Get users in a group"""
         path = _create_v1_path("/groups/%s/users", group_id)
 
         return self.client.get_json(
@@ -667,8 +660,7 @@ class TransportLayerClient:
 
     @log_function
     def get_invited_users_in_group(self, destination, group_id, requester_user_id):
-        """Get users that have been invited to a group
-        """
+        """Get users that have been invited to a group"""
         path = _create_v1_path("/groups/%s/invited_users", group_id)
 
         return self.client.get_json(
@@ -680,8 +672,7 @@ class TransportLayerClient:
 
     @log_function
     def accept_group_invite(self, destination, group_id, user_id, content):
-        """Accept a group invite
-        """
+        """Accept a group invite"""
         path = _create_v1_path("/groups/%s/users/%s/accept_invite", group_id, user_id)
 
         return self.client.post_json(
@@ -690,8 +681,7 @@ class TransportLayerClient:
 
     @log_function
     def join_group(self, destination, group_id, user_id, content):
-        """Attempts to join a group
-        """
+        """Attempts to join a group"""
         path = _create_v1_path("/groups/%s/users/%s/join", group_id, user_id)
 
         return self.client.post_json(
@@ -702,8 +692,7 @@ class TransportLayerClient:
     def invite_to_group(
         self, destination, group_id, user_id, requester_user_id, content
     ):
-        """Invite a user to a group
-        """
+        """Invite a user to a group"""
         path = _create_v1_path("/groups/%s/users/%s/invite", group_id, user_id)
 
         return self.client.post_json(
@@ -730,8 +719,7 @@ class TransportLayerClient:
     def remove_user_from_group(
         self, destination, group_id, requester_user_id, user_id, content
     ):
-        """Remove a user from a group
-        """
+        """Remove a user from a group"""
         path = _create_v1_path("/groups/%s/users/%s/remove", group_id, user_id)
 
         return self.client.post_json(
@@ -772,8 +760,7 @@ class TransportLayerClient:
     def update_group_summary_room(
         self, destination, group_id, user_id, room_id, category_id, content
     ):
-        """Update a room entry in a group summary
-        """
+        """Update a room entry in a group summary"""
         if category_id:
             path = _create_v1_path(
                 "/groups/%s/summary/categories/%s/rooms/%s",
@@ -796,8 +783,7 @@ class TransportLayerClient:
     def delete_group_summary_room(
         self, destination, group_id, user_id, room_id, category_id
     ):
-        """Delete a room entry in a group summary
-        """
+        """Delete a room entry in a group summary"""
         if category_id:
             path = _create_v1_path(
                 "/groups/%s/summary/categories/%s/rooms/%s",
@@ -817,8 +803,7 @@ class TransportLayerClient:
 
     @log_function
     def get_group_categories(self, destination, group_id, requester_user_id):
-        """Get all categories in a group
-        """
+        """Get all categories in a group"""
         path = _create_v1_path("/groups/%s/categories", group_id)
 
         return self.client.get_json(
@@ -830,8 +815,7 @@ class TransportLayerClient:
 
     @log_function
     def get_group_category(self, destination, group_id, requester_user_id, category_id):
-        """Get category info in a group
-        """
+        """Get category info in a group"""
         path = _create_v1_path("/groups/%s/categories/%s", group_id, category_id)
 
         return self.client.get_json(
@@ -845,8 +829,7 @@ class TransportLayerClient:
     def update_group_category(
         self, destination, group_id, requester_user_id, category_id, content
     ):
-        """Update a category in a group
-        """
+        """Update a category in a group"""
         path = _create_v1_path("/groups/%s/categories/%s", group_id, category_id)
 
         return self.client.post_json(
@@ -861,8 +844,7 @@ class TransportLayerClient:
     def delete_group_category(
         self, destination, group_id, requester_user_id, category_id
     ):
-        """Delete a category in a group
-        """
+        """Delete a category in a group"""
         path = _create_v1_path("/groups/%s/categories/%s", group_id, category_id)
 
         return self.client.delete_json(
@@ -874,8 +856,7 @@ class TransportLayerClient:
 
     @log_function
     def get_group_roles(self, destination, group_id, requester_user_id):
-        """Get all roles in a group
-        """
+        """Get all roles in a group"""
         path = _create_v1_path("/groups/%s/roles", group_id)
 
         return self.client.get_json(
@@ -887,8 +868,7 @@ class TransportLayerClient:
 
     @log_function
     def get_group_role(self, destination, group_id, requester_user_id, role_id):
-        """Get a roles info
-        """
+        """Get a roles info"""
         path = _create_v1_path("/groups/%s/roles/%s", group_id, role_id)
 
         return self.client.get_json(
@@ -902,8 +882,7 @@ class TransportLayerClient:
     def update_group_role(
         self, destination, group_id, requester_user_id, role_id, content
     ):
-        """Update a role in a group
-        """
+        """Update a role in a group"""
         path = _create_v1_path("/groups/%s/roles/%s", group_id, role_id)
 
         return self.client.post_json(
@@ -916,8 +895,7 @@ class TransportLayerClient:
 
     @log_function
     def delete_group_role(self, destination, group_id, requester_user_id, role_id):
-        """Delete a role in a group
-        """
+        """Delete a role in a group"""
         path = _create_v1_path("/groups/%s/roles/%s", group_id, role_id)
 
         return self.client.delete_json(
@@ -931,8 +909,7 @@ class TransportLayerClient:
     def update_group_summary_user(
         self, destination, group_id, requester_user_id, user_id, role_id, content
     ):
-        """Update a users entry in a group
-        """
+        """Update a users entry in a group"""
         if role_id:
             path = _create_v1_path(
                 "/groups/%s/summary/roles/%s/users/%s", group_id, role_id, user_id
@@ -950,8 +927,7 @@ class TransportLayerClient:
 
     @log_function
     def set_group_join_policy(self, destination, group_id, requester_user_id, content):
-        """Sets the join policy for a group
-        """
+        """Sets the join policy for a group"""
         path = _create_v1_path("/groups/%s/settings/m.join_policy", group_id)
 
         return self.client.put_json(
@@ -966,8 +942,7 @@ class TransportLayerClient:
     def delete_group_summary_user(
         self, destination, group_id, requester_user_id, user_id, role_id
     ):
-        """Delete a users entry in a group
-        """
+        """Delete a users entry in a group"""
         if role_id:
             path = _create_v1_path(
                 "/groups/%s/summary/roles/%s/users/%s", group_id, role_id, user_id
@@ -983,8 +958,7 @@ class TransportLayerClient:
         )
 
     def bulk_get_publicised_groups(self, destination, user_ids):
-        """Get the groups a list of users are publicising
-        """
+        """Get the groups a list of users are publicising"""
 
         path = _create_v1_path("/get_groups_publicised")
 

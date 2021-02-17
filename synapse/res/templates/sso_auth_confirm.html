@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <title>Authentication</title>
+        <title>Confirm it's you</title>
         <meta name="viewport" content="width=device-width, user-scalable=no">
         <style type="text/css">
             {% include "sso.css" without context %}
@@ -24,5 +24,6 @@
                 Continue with {{ idp.idp_name }}
             </a>
         </main>
+        {% include "sso_footer.html" without context %}
     </body>
 </html>

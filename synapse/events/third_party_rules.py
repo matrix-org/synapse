@@ -40,7 +40,8 @@ class ThirdPartyEventRules:
 
         if module is not None:
             self.third_party_rules = module(
-                config=config, module_api=hs.get_module_api(),
+                config=config,
+                module_api=hs.get_module_api(),
             )
 
     async def check_event_allowed(

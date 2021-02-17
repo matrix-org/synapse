@@ -589,8 +589,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         )
 
     def _add_new_user(self, room_id, user_id):
-        """Add new user to the room by creating an event and poking the federation API.
-        """
+        """Add new user to the room by creating an event and poking the federation API."""
 
         hostname = get_domain_from_id(user_id)
 

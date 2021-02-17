@@ -249,8 +249,7 @@ class SynapseRequest(Request):
         )
 
     def _finished_processing(self):
-        """Log the completion of this request and update the metrics
-        """
+        """Log the completion of this request and update the metrics"""
         assert self.logcontext is not None
         usage = self.logcontext.get_resource_usage()
 
@@ -276,7 +275,8 @@ class SynapseRequest(Request):
             # authenticated (e.g. and admin is puppetting a user) then we log both.
             if self.requester.user.to_string() != authenticated_entity:
                 authenticated_entity = "{},{}".format(
-                    authenticated_entity, self.requester.user.to_string(),
+                    authenticated_entity,
+                    self.requester.user.to_string(),
                 )
         elif self.requester is not None:
             # This shouldn't happen, but we log it so we don't lose information
@@ -322,8 +322,7 @@ class SynapseRequest(Request):
             logger.warning("Failed to stop metrics: %r", e)
 
     def _should_log_request(self) -> bool:
-        """Whether we should log at INFO that we processed the request.
-        """
+        """Whether we should log at INFO that we processed the request."""
         if self.path == b"/health":
             return False
 

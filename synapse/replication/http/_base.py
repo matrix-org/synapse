@@ -273,7 +273,10 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         pattern = re.compile("^/_synapse/replication/%s/%s$" % (self.NAME, args))
 
         http_server.register_paths(
-            method, [pattern], self._check_auth_and_handle, self.__class__.__name__,
+            method,
+            [pattern],
+            self._check_auth_and_handle,
+            self.__class__.__name__,
         )
 
     def _check_auth_and_handle(self, request, **kwargs):

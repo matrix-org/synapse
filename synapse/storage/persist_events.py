@@ -411,8 +411,8 @@ class EventsPersistenceStorage:
                         )
 
                     for room_id, ev_ctx_rm in events_by_room.items():
-                        latest_event_ids = await self.main_store.get_latest_event_ids_in_room(
-                            room_id
+                        latest_event_ids = (
+                            await self.main_store.get_latest_event_ids_in_room(room_id)
                         )
                         new_latest_event_ids = await self._calculate_new_extremities(
                             room_id, ev_ctx_rm, latest_event_ids
@@ -889,7 +889,8 @@ class EventsPersistenceStorage:
                 continue
 
             logger.debug(
-                "Not dropping as too new and not in new_senders: %s", new_senders,
+                "Not dropping as too new and not in new_senders: %s",
+                new_senders,
             )
 
             return new_latest_event_ids
@@ -1004,7 +1005,10 @@ class EventsPersistenceStorage:
 
         remote_event_ids = [
             event_id
-            for (typ, state_key,), event_id in current_state.items()
+            for (
+                typ,
+                state_key,
+            ), event_id in current_state.items()
             if typ == EventTypes.Member and not self.is_mine_id(state_key)
         ]
         rows = await self.main_store.get_membership_from_event_ids(remote_event_ids)
