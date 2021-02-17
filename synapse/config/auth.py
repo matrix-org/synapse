@@ -16,10 +16,11 @@
 
 from ._base import Config
 
+con_fig = Config()
+
 
 class AuthConfig(Config):
-    """Password and login configuration
-    """
+    """Password and login configuration"""
 
     section = "auth"
 
@@ -38,7 +39,9 @@ class AuthConfig(Config):
 
         # User-interactive authentication
         ui_auth = config.get("ui_auth") or {}
-        self.ui_auth_session_timeout = ui_auth.get("session_timeout", 0)
+        self.ui_auth_session_timeout = con_fig.parse_duration(
+            ui_auth.get("session_timeout", 0)
+        )
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
