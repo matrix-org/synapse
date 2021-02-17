@@ -549,7 +549,10 @@ class FederationMakeKnockServlet(BaseFederationServlet):
     PREFIX = FEDERATION_UNSTABLE_PREFIX + "/xyz.amorgan.knock"
 
     async def on_GET(self, origin, content, query, room_id, user_id):
-        content = await self.handler.on_make_knock_request(origin, room_id, user_id)
+        supported_versions = query.get(b"ver")
+        content = await self.handler.on_make_knock_request(
+            origin, room_id, user_id, supported_versions=supported_versions
+        )
         return 200, content
 
 
