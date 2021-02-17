@@ -327,7 +327,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
     def test_redirect_request(self):
         """The redirect request has the right arguments & generates a valid session cookie."""
-        req = Mock(spec=["addCookie"])
+        req = Mock(spec=["cookies"])
+        req.cookies = []
+
         url = self.get_success(
             self.provider.handle_redirect_request(req, b"http://client/redirect")
         )
@@ -346,19 +348,16 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(len(params["state"]), 1)
         self.assertEqual(len(params["nonce"]), 1)
 
-        # Check what is in the cookie
-        # note: python3.5 mock does not have the .called_once() method
-        calls = req.addCookie.call_args_list
-        self.assertEqual(len(calls), 1)  # called once
-        # For some reason, call.args does not work with python3.5
-        args = calls[0][0]
-        kwargs = calls[0][1]
+        # Check what is in the cookies
+        self.assertEqual(len(req.cookies), 2)  # two cookies
+        cookie_header = req.cookies[0]
 
         # The cookie name and path don't really matter, just that it has to be coherent
         # between the callback & redirect handlers.
-        self.assertEqual(args[0], b"oidc_session")
-        self.assertEqual(kwargs["path"], "/_synapse/client/oidc")
-        cookie = args[1]
+        parts = [p.strip() for p in cookie_header.split(b";")]
+        self.assertIn(b"Path=/_synapse/client/oidc", parts)
+        name, cookie = parts[0].split(b"=")
+        self.assertEqual(name, b"oidc_session")
 
         macaroon = pymacaroons.Macaroon.deserialize(cookie)
         state = self.handler._token_generator._get_value_from_macaroon(
@@ -489,7 +488,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
     def test_callback_session(self):
         """The callback verifies the session presence and validity"""
-        request = Mock(spec=["args", "getCookie", "addCookie"])
+        request = Mock(spec=["args", "getCookie", "cookies"])
 
         # Missing cookie
         request.args = {}
@@ -943,13 +942,14 @@ def _build_callback_request(
         spec=[
             "args",
             "getCookie",
-            "addCookie",
+            "cookies",
             "requestHeaders",
             "getClientIP",
             "getHeader",
         ]
     )
 
+    request.cookies = []
     request.getCookie.return_value = session
     request.args = {}
     request.args[b"code"] = [code.encode("utf-8")]

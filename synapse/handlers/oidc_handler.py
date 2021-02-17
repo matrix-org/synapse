@@ -48,7 +48,26 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-SESSION_COOKIE_NAME = b"oidc_session"
+# we want the cookie to be returned to us even when the request is the POSTed
+# result of a form on another domain, as is used with `response_mode=form_post`.
+#
+# Modern browsers will not do so unless we set SameSite=None; however *older*
+# browsers (including all versions of Safari on iOS 12?) don't support
+# SameSite=None, and interpret it as SameSite=Strict:
+# https://bugs.webkit.org/show_bug.cgi?id=198181
+#
+# As a rather painful workaround, we set *two* cookies, one with SameSite=None
+# and one with no SameSite, in the hope that at least one of them will get
+# back to us.
+#
+# Secure is necessary for SameSite=None (and, empirically, also breaks things
+# on iOS 12.)
+#
+# Here we have the names of the cookies, and the options we use to set them.
+_SESSION_COOKIES = [
+    (b"oidc_session", b"Path=/_synapse/client/oidc; HttpOnly; Secure; SameSite=None"),
+    (b"oidc_session_no_samesite", b"Path=/_synapse/client/oidc; HttpOnly"),
+]
 
 #: A token exchanged from the token endpoint, as per RFC6749 sec 5.1. and
 #: OpenID.Core sec 3.1.3.3.
@@ -149,26 +168,33 @@ class OidcHandler:
         # otherwise, it is presumably a successful response. see:
         #   https://tools.ietf.org/html/rfc6749#section-4.1.2
 
-        # Fetch the session cookie
-        session = request.getCookie(SESSION_COOKIE_NAME)  # type: Optional[bytes]
-        if session is None:
+        # Fetch the session cookie. See the comments on SESSION_COOKIES for why there
+        # are two.
+
+        for cookie_name, _ in _SESSION_COOKIES:
+            session = request.getCookie(cookie_name)  # type: Optional[bytes]
+            if session is not None:
+                break
+        else:
             logger.info("Received OIDC callback, with no session cookie")
             self._sso_handler.render_error(
                 request, "missing_session", "No session cookie found"
             )
             return
 
-        # Remove the cookie. There is a good chance that if the callback failed
+        # Remove the cookies. There is a good chance that if the callback failed
         # once, it will fail next time and the code will already be exchanged.
-        # Removing it early avoids spamming the provider with token requests.
-        request.addCookie(
-            SESSION_COOKIE_NAME,
-            b"",
-            path="/_synapse/oidc",
-            expires="Thu, Jan 01 1970 00:00:00 UTC",
-            httpOnly=True,
-            sameSite="lax",
-        )
+        # Removing the cookies early avoids spamming the provider with token requests.
+        #
+        # we have to build the header by hand rather than calling request.addCookie
+        # because the latter does not support SameSite=None
+        # (https://twistedmatrix.com/trac/ticket/10088)
+
+        for cookie_name, options in _SESSION_COOKIES:
+            request.cookies.append(
+                b"%s=; Expires=Thu, Jan 01 1970 00:00:00 UTC; %s"
+                % (cookie_name, options)
+            )
 
         # Check for the state query parameter
         if b"state" not in request.args:
@@ -722,14 +748,18 @@ class OidcProvider:
                 ui_auth_session_id=ui_auth_session_id,
             ),
         )
-        request.addCookie(
-            SESSION_COOKIE_NAME,
-            cookie,
-            path="/_synapse/client/oidc",
-            max_age="3600",
-            httpOnly=True,
-            sameSite="lax",
-        )
+
+        # Set the cookies. See the comments on _SESSION_COOKIES for why there are two.
+        #
+        # we have to build the header by hand rather than calling request.addCookie
+        # because the latter does not support SameSite=None
+        # (https://twistedmatrix.com/trac/ticket/10088)
+
+        for cookie_name, options in _SESSION_COOKIES:
+            request.cookies.append(
+                b"%s=%s; Max-Age=3600; %s"
+                % (cookie_name, cookie.encode("utf-8"), options)
+            )
 
         metadata = await self.load_metadata()
         authorization_endpoint = metadata.get("authorization_endpoint")
