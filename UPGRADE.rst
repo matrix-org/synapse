@@ -85,6 +85,22 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+Upgrading to v1.xx.0
+====================
+
+Removal old List Accounts Admin API
+-----------------------------------
+
+Remove old List Accounts Admin API:
+
+* ``GET /_synapse/admin/v1/users/<user_id>``
+
+The new `List Accounts Admin API <https://github.com/matrix-org/synapse/blob/master/docs/admin_api/user_admin_api.rst#list-accounts>`_
+is accessible under ``GET /_synapse/admin/v2/users``.
+The new API is available since Synapse 1.7.0 (2019-12-13).
+
+The deprecation of the old endpoints was announced with Synapse 1.xx.0 (released on 2021-xx-xx).
+
 Upgrading to v1.27.0
 ====================
 
