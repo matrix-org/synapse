@@ -224,7 +224,9 @@ class Config:
         return self.read_templates([filename])[0]
 
     def read_templates(
-        self, filenames: List[str], custom_template_directory: Optional[str] = None,
+        self,
+        filenames: List[str],
+        custom_template_directory: Optional[str] = None,
     ) -> List[jinja2.Template]:
         """Load a list of template files from disk using the given variables.
 
@@ -264,7 +266,10 @@ class Config:
 
         # TODO: switch to synapse.util.templates.build_jinja_env
         loader = jinja2.FileSystemLoader(search_directories)
-        env = jinja2.Environment(loader=loader, autoescape=jinja2.select_autoescape(),)
+        env = jinja2.Environment(
+            loader=loader,
+            autoescape=jinja2.select_autoescape(),
+        )
 
         # Update the environment with our custom filters
         env.filters.update(
@@ -825,8 +830,7 @@ class ShardedWorkerHandlingConfig:
     instances = attr.ib(type=List[str])
 
     def should_handle(self, instance_name: str, key: str) -> bool:
-        """Whether this instance is responsible for handling the given key.
-        """
+        """Whether this instance is responsible for handling the given key."""
         # If multiple instances are not defined we always return true
         if not self.instances or len(self.instances) == 1:
             return True

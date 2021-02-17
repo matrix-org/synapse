@@ -149,8 +149,7 @@ KNOWN_KEYS = {
 
 
 def intern_string(string):
-    """Takes a (potentially) unicode string and interns it if it's ascii
-    """
+    """Takes a (potentially) unicode string and interns it if it's ascii"""
     if string is None:
         return None
 
@@ -161,8 +160,7 @@ def intern_string(string):
 
 
 def intern_dict(dictionary):
-    """Takes a dictionary and interns well known keys and their values
-    """
+    """Takes a dictionary and interns well known keys and their values"""
     return {
         KNOWN_KEYS.get(key, key): _intern_known_values(key, value)
         for key, value in dictionary.items()

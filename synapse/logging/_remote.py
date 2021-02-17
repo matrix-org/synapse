@@ -174,7 +174,9 @@ class RemoteHandler(logging.Handler):
 
             # Make a new producer and start it.
             self._producer = LogProducer(
-                buffer=self._buffer, transport=result.transport, format=self.format,
+                buffer=self._buffer,
+                transport=result.transport,
+                format=self.format,
             )
             result.transport.registerProducer(self._producer, True)
             self._producer.resumeProducing()

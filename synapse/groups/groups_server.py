@@ -165,16 +165,14 @@ class GroupsServerWorkerHandler:
         }
 
     async def get_group_categories(self, group_id, requester_user_id):
-        """Get all categories in a group (as seen by user)
-        """
+        """Get all categories in a group (as seen by user)"""
         await self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
 
         categories = await self.store.get_group_categories(group_id=group_id)
         return {"categories": categories}
 
     async def get_group_category(self, group_id, requester_user_id, category_id):
-        """Get a specific category in a group (as seen by user)
-        """
+        """Get a specific category in a group (as seen by user)"""
         await self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
 
         res = await self.store.get_group_category(
@@ -186,24 +184,21 @@ class GroupsServerWorkerHandler:
         return res
 
     async def get_group_roles(self, group_id, requester_user_id):
-        """Get all roles in a group (as seen by user)
-        """
+        """Get all roles in a group (as seen by user)"""
         await self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
 
         roles = await self.store.get_group_roles(group_id=group_id)
         return {"roles": roles}
 
     async def get_group_role(self, group_id, requester_user_id, role_id):
-        """Get a specific role in a group (as seen by user)
-        """
+        """Get a specific role in a group (as seen by user)"""
         await self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
 
         res = await self.store.get_group_role(group_id=group_id, role_id=role_id)
         return res
 
     async def get_group_profile(self, group_id, requester_user_id):
-        """Get the group profile as seen by requester_user_id
-        """
+        """Get the group profile as seen by requester_user_id"""
 
         await self.check_group_is_ours(group_id, requester_user_id)
 
@@ -350,8 +345,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
     async def update_group_summary_room(
         self, group_id, requester_user_id, room_id, category_id, content
     ):
-        """Add/update a room to the group summary
-        """
+        """Add/update a room to the group summary"""
         await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
@@ -375,8 +369,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
     async def delete_group_summary_room(
         self, group_id, requester_user_id, room_id, category_id
     ):
-        """Remove a room from the summary
-        """
+        """Remove a room from the summary"""
         await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
@@ -409,8 +402,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
     async def update_group_category(
         self, group_id, requester_user_id, category_id, content
     ):
-        """Add/Update a group category
-        """
+        """Add/Update a group category"""
         await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
@@ -428,8 +420,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         return {}
 
     async def delete_group_category(self, group_id, requester_user_id, category_id):
-        """Delete a group category
-        """
+        """Delete a group category"""
         await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
@@ -441,8 +432,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         return {}
 
     async def update_group_role(self, group_id, requester_user_id, role_id, content):
-        """Add/update a role in a group
-        """
+        """Add/update a role in a group"""
         await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
@@ -458,8 +448,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         return {}
 
     async def delete_group_role(self, group_id, requester_user_id, role_id):
-        """Remove role from group
-        """
+        """Remove role from group"""
         await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
@@ -471,8 +460,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
     async def update_group_summary_user(
         self, group_id, requester_user_id, user_id, role_id, content
     ):
-        """Add/update a users entry in the group summary
-        """
+        """Add/update a users entry in the group summary"""
         await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
@@ -494,8 +482,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
     async def delete_group_summary_user(
         self, group_id, requester_user_id, user_id, role_id
     ):
-        """Remove a user from the group summary
-        """
+        """Remove a user from the group summary"""
         await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
@@ -507,8 +494,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         return {}
 
     async def update_group_profile(self, group_id, requester_user_id, content):
-        """Update the group profile
-        """
+        """Update the group profile"""
         await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
@@ -539,8 +525,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         await self.store.update_group_profile(group_id, profile)
 
     async def add_room_to_group(self, group_id, requester_user_id, room_id, content):
-        """Add room to group
-        """
+        """Add room to group"""
         RoomID.from_string(room_id)  # Ensure valid room id
 
         await self.check_group_is_ours(
@@ -556,8 +541,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
     async def update_room_in_group(
         self, group_id, requester_user_id, room_id, config_key, content
     ):
-        """Update room in group
-        """
+        """Update room in group"""
         RoomID.from_string(room_id)  # Ensure valid room id
 
         await self.check_group_is_ours(
@@ -576,8 +560,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         return {}
 
     async def remove_room_from_group(self, group_id, requester_user_id, room_id):
-        """Remove room from group
-        """
+        """Remove room from group"""
         await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
@@ -587,8 +570,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         return {}
 
     async def invite_to_group(self, group_id, user_id, requester_user_id, content):
-        """Invite user to group
-        """
+        """Invite user to group"""
 
         group = await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
@@ -724,8 +706,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         return {"state": "join", "attestation": local_attestation}
 
     async def knock(self, group_id, requester_user_id, content):
-        """A user requests becoming a member of the group
-        """
+        """A user requests becoming a member of the group"""
         await self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
 
         raise NotImplementedError()
@@ -918,8 +899,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
 
 def _parse_join_policy_from_contents(content):
-    """Given a content for a request, return the specified join policy or None
-    """
+    """Given a content for a request, return the specified join policy or None"""
 
     join_policy_dict = content.get("m.join_policy")
     if join_policy_dict:
@@ -929,8 +909,7 @@ def _parse_join_policy_from_contents(content):
 
 
 def _parse_join_policy_dict(join_policy_dict):
-    """Given a dict for the "m.join_policy" config return the join policy specified
-    """
+    """Given a dict for the "m.join_policy" config return the join policy specified"""
     join_policy_type = join_policy_dict.get("type")
     if not join_policy_type:
         return "invite"

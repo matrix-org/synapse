@@ -40,3 +40,12 @@ class WellKnownTests(unittest.HomeserverTestCase):
                 "m.identity_server": {"base_url": "https://testis"},
             },
         )
+
+    def test_well_known_no_public_baseurl(self):
+        self.hs.config.public_baseurl = None
+
+        channel = self.make_request(
+            "GET", "/.well-known/matrix/client", shorthand=False
+        )
+
+        self.assertEqual(channel.code, 404)

@@ -365,7 +365,7 @@ login mechanism needs an attribute to uniquely identify users, and that endpoint
 does not return a `sub` property, an alternative `subject_claim` has to be set.
 
 1. Create a new application.
-2. Add this Callback URL: `[synapse public baseurl]/_synapse/oidc/callback`
+2. Add this Callback URL: `[synapse public baseurl]/_synapse/client/oidc/callback`
 
 Synapse config:
 
@@ -387,4 +387,26 @@ oidc_providers:
         subject_claim: "id"
         localpart_template: "{{ user.login }}"
         display_name_template: "{{ user.full_name }}" 
+```
+
+### XWiki
+
+Install [OpenID Connect Provider](https://extensions.xwiki.org/xwiki/bin/view/Extension/OpenID%20Connect/OpenID%20Connect%20Provider/) extension in your [XWiki](https://www.xwiki.org) instance.
+
+Synapse config:
+
+```yaml
+oidc_providers:
+  - idp_id: xwiki
+    idp_name: "XWiki"
+    issuer: "https://myxwikihost/xwiki/oidc/"
+    client_id: "your-client-id" # TO BE FILLED
+    # Needed until https://github.com/matrix-org/synapse/issues/9212 is fixed
+    client_secret: "dontcare"
+    scopes: ["openid", "profile"]
+    user_profile_method: "userinfo_endpoint"
+    user_mapping_provider:
+      config:
+        localpart_template: "{{ user.preferred_username }}"
+        display_name_template: "{{ user.name }}"
 ```

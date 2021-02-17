@@ -70,10 +70,12 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         ):
             self._known_servers_count = 1
             self.hs.get_clock().looping_call(
-                self._count_known_servers, 60 * 1000,
+                self._count_known_servers,
+                60 * 1000,
             )
             self.hs.get_clock().call_later(
-                1000, self._count_known_servers,
+                1000,
+                self._count_known_servers,
             )
             LaterGauge(
                 "synapse_federation_known_servers",
@@ -174,7 +176,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     @cached(max_entries=100000)
     async def get_room_summary(self, room_id: str) -> Dict[str, MemberSummary]:
-        """ Get the details of a room roughly suitable for use by the room
+        """Get the details of a room roughly suitable for use by the room
         summary extension to /sync. Useful when lazy loading room members.
         Args:
             room_id: The room ID to query
@@ -488,8 +490,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     async def get_users_who_share_room_with_user(
         self, user_id: str, cache_context: _CacheContext
     ) -> Set[str]:
-        """Returns the set of users who share a room with `user_id`
-        """
+        """Returns the set of users who share a room with `user_id`"""
         room_ids = await self.get_rooms_for_user(
             user_id, on_invalidate=cache_context.invalidate
         )
@@ -618,7 +619,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         raise NotImplementedError()
 
     @cachedList(
-        cached_method_name="_get_joined_profile_from_event_id", list_name="event_ids",
+        cached_method_name="_get_joined_profile_from_event_id",
+        list_name="event_ids",
     )
     async def _get_joined_profiles_from_event_ids(self, event_ids: Iterable[str]):
         """For given set of member event_ids check if they point to a join
@@ -802,8 +804,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     async def get_membership_from_event_ids(
         self, member_event_ids: Iterable[str]
     ) -> List[dict]:
-        """Get user_id and membership of a set of event IDs.
-        """
+        """Get user_id and membership of a set of event IDs."""
 
         return await self.db_pool.simple_select_many_batch(
             table="room_memberships",

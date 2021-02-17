@@ -207,7 +207,8 @@ class ProfileHandler(BaseHandler):
         # This must be done by the target user himself.
         if by_admin:
             requester = create_requester(
-                target_user, authenticated_entity=requester.authenticated_entity,
+                target_user,
+                authenticated_entity=requester.authenticated_entity,
             )
 
         await self.store.set_profile_displayname(
