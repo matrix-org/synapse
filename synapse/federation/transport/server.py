@@ -15,7 +15,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import functools
 import logging
 import re
@@ -34,6 +33,7 @@ from synapse.http.servlet import (
     parse_boolean_from_args,
     parse_integer_from_args,
     parse_json_object_from_request,
+    parse_list_from_args,
     parse_string_from_args,
 )
 from synapse.logging.context import run_in_background
@@ -552,8 +552,12 @@ class FederationMakeKnockServlet(BaseFederationServlet):
     PREFIX = FEDERATION_UNSTABLE_PREFIX + "/xyz.amorgan.knock"
 
     async def on_GET(self, origin, content, query, room_id, user_id):
-        versions = query.get(b"ver")
-        supported_versions = [v.decode("utf-8") for v in versions]
+        try:
+            # Retrieve the room versions the remote homeserver claims to support
+            supported_versions = parse_list_from_args(query, "ver", encoding="utf-8")
+        except KeyError:
+            raise SynapseError(400, "Missing required query parameter 'ver'")
+
         content = await self.handler.on_make_knock_request(
             origin, room_id, user_id, supported_versions=supported_versions
         )
