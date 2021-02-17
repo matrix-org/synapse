@@ -1744,7 +1744,11 @@ class SyncHandler:
             room_entries.append(entry)
 
         return _RoomChanges(
-            room_entries, invited, knocked, newly_joined_rooms, newly_left_rooms,
+            room_entries,
+            invited,
+            knocked,
+            newly_joined_rooms,
+            newly_left_rooms,
         )
 
     async def _get_all_rooms(

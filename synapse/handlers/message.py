@@ -1181,7 +1181,8 @@ class EventCreationHandler:
                 event.unsigned[
                     "knock_room_state"
                 ] = await self.store.get_stripped_room_state_from_event_context(
-                    context, DEFAULT_ROOM_STATE_TYPES,
+                    context,
+                    DEFAULT_ROOM_STATE_TYPES,
                 )
 
         if event.type == EventTypes.Redaction:

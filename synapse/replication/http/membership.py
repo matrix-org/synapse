@@ -145,7 +145,10 @@ class ReplicationRemoteKnockRestServlet(ReplicationEndpoint):
         }
 
     async def _handle_request(  # type: ignore
-        self, request: Request, room_id: str, user_id: str,
+        self,
+        request: Request,
+        room_id: str,
+        user_id: str,
     ):
         content = parse_json_object_from_request(request)
 
@@ -281,7 +284,9 @@ class ReplicationRemoteRescindKnockRestServlet(ReplicationEndpoint):
         }
 
     async def _handle_request(  # type: ignore
-        self, request: Request, knock_event_id: str,
+        self,
+        request: Request,
+        knock_event_id: str,
     ):
         content = parse_json_object_from_request(request)
 
@@ -294,7 +299,10 @@ class ReplicationRemoteRescindKnockRestServlet(ReplicationEndpoint):
 
         # hopefully we're now on the master, so this won't recurse!
         event_id, stream_id = await self.member_handler.remote_rescind_knock(
-            knock_event_id, txn_id, requester, event_content,
+            knock_event_id,
+            txn_id,
+            requester,
+            event_content,
         )
 
         return 200, {"event_id": event_id, "stream_id": stream_id}

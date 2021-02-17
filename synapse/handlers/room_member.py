@@ -131,7 +131,11 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     async def remote_knock(
-        self, remote_room_hosts: List[str], room_id: str, user: UserID, content: dict,
+        self,
+        remote_room_hosts: List[str],
+        room_id: str,
+        user: UserID,
+        content: dict,
     ) -> Tuple[str, int]:
         """Try and knock on a room that this server is not in
 
@@ -1329,7 +1333,11 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         return result_event.event_id, result_event.internal_metadata.stream_ordering
 
     async def remote_knock(
-        self, remote_room_hosts: List[str], room_id: str, user: UserID, content: dict,
+        self,
+        remote_room_hosts: List[str],
+        room_id: str,
+        user: UserID,
+        content: dict,
     ) -> Tuple[str, int]:
         """Sends a knock to a room. Attempts to do so via one remote out of a given list.
 

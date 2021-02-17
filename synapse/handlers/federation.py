@@ -1451,7 +1451,11 @@ class FederationHandler(BaseHandler):
 
     @log_function
     async def do_knock(
-        self, target_hosts: List[str], room_id: str, knockee: str, content: JsonDict,
+        self,
+        target_hosts: List[str],
+        room_id: str,
+        knockee: str,
+        content: JsonDict,
     ) -> Tuple[str, int]:
         """Sends the knock to the remote server.
 

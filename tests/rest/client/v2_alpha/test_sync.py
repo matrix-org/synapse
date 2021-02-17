@@ -344,7 +344,9 @@ class SyncKnockTestCase(
 
         # Perform an initial sync for the knocking user.
         channel = self.make_request(
-            "GET", self.url % self.next_batch, access_token=self.tok,
+            "GET",
+            self.url % self.next_batch,
+            access_token=self.tok,
         )
         self.assertEqual(channel.code, 200, channel.json_body)
 
@@ -376,7 +378,9 @@ class SyncKnockTestCase(
 
         # Check that /sync includes stripped state from the room
         channel = self.make_request(
-            "GET", self.url % self.next_batch, access_token=self.knocker_tok,
+            "GET",
+            self.url % self.next_batch,
+            access_token=self.knocker_tok,
         )
         self.assertEqual(channel.code, 200, channel.json_body)
 
