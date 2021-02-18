@@ -2266,7 +2266,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.json_body["total"], len(expected_media_list))
 
         returned_order = [row["media_id"] for row in channel.json_body["media"]]
-        self.assertListEqual(expected_media_list, returned_order)
+        self.assertEqual(expected_media_list, returned_order)
         self._check_fields(channel.json_body["media"])
 
 
