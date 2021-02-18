@@ -100,8 +100,12 @@ Create a new user
 =================
 FROM - https://github.com/matrix-org/synapse/blob/master/INSTALL.md#registering-a-user
 
-1) Login in to the container - docker exec -it <container id> sh
+1) Login in to the container - docker exec -it <synapse container id> sh
 2) cd /var/lib/synapse/config
 3) Run command: register_new_matrix_user -c homeserver.yaml https://localhost:8448
+4) Enter your desired username to login: e.q: pegacorn-admin-user
+5) Choose a password and confirm it when prompted
+6) You will be prompted with question: "Make admin [no]?", type [no] if you would like account to be normal user, type [yes] if you would like to use account you have created as an admin user. Typing Y or N or Yes or No might result exception thrown on command as it may not be able to interpret.
+7) Account you have created can be used locally and set in the container you are using and and is not persisted in database after you turn off container orchestration.
 
 You can now build and deploy pegacorn-communicate-web and logon using the created user.
