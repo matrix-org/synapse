@@ -1,0 +1,1 @@
+Properly document that Synapse v1.27.0 requires updating the sAML2 callback URL (similar to OpenID Connect). See [UPGRADE.rst](UPGRADE.rst) for more information.
