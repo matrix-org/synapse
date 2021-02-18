@@ -114,6 +114,7 @@ class ThumbnailResource(DirectServeJsonResource):
             m_type,
             thumbnail_infos,
             media_id,
+            media_id,
             url_cache=media_info["url_cache"],
             server_name=None,
         )
@@ -269,6 +270,7 @@ class ThumbnailResource(DirectServeJsonResource):
             method,
             m_type,
             thumbnail_infos,
+            media_id,
             media_info["filesystem_id"],
             url_cache=None,
             server_name=server_name,
@@ -282,6 +284,7 @@ class ThumbnailResource(DirectServeJsonResource):
         desired_method: str,
         desired_type: str,
         thumbnail_infos: List[Dict[str, Any]],
+        media_id: str,
         file_id: str,
         url_cache: Optional[str] = None,
         server_name: Optional[str] = None,
@@ -317,8 +320,52 @@ class ThumbnailResource(DirectServeJsonResource):
                 return
 
             responder = await self.media_storage.fetch_media(file_info)
+            if responder:
+                await respond_with_responder(
+                    request,
+                    responder,
+                    file_info.thumbnail_type,
+                    file_info.thumbnail_length,
+                )
+                return
+
+            # If we can't find the thumbnail we regenerate it. This can happen
+            # if e.g. we've deleted the thumbnails but still have the original
+            # image somewhere.
+            #
+            # Since we have an entry for the thumbnail in the DB we a) know we
+            # have have successfully generated the thumbnail in the past (so we
+            # don't need to worry about repeatedly failing to generate
+            # thumbnails), and b) have already calculated that appropriate
+            # width/height/method so we can just call the "generate exact"
+            # methods.
+
+            if server_name:
+                await self.media_repo.generate_remote_exact_thumbnail(
+                    server_name,
+                    file_id=file_id,
+                    media_id=media_id,
+                    t_width=file_info.thumbnail_width,
+                    t_height=file_info.thumbnail_height,
+                    t_method=file_info.thumbnail_method,
+                    t_type=file_info.thumbnail_type,
+                )
+            else:
+                await self.media_repo.generate_local_exact_thumbnail(
+                    media_id=media_id,
+                    t_width=file_info.thumbnail_width,
+                    t_height=file_info.thumbnail_height,
+                    t_method=file_info.thumbnail_method,
+                    t_type=file_info.thumbnail_type,
+                    url_cache=url_cache,
+                )
+
+            responder = await self.media_storage.fetch_media(file_info)
             await respond_with_responder(
-                request, responder, file_info.thumbnail_type, file_info.thumbnail_length
+                request,
+                responder,
+                file_info.thumbnail_type,
+                file_info.thumbnail_length,
             )
         else:
             logger.info("Failed to find any generated thumbnails")
