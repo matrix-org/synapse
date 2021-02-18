@@ -159,26 +159,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         def get_local_media_by_user_paginate_txn(txn):
 
             # Set ordering
-            if MediaSortOrder(order_by) == MediaSortOrder.MEDIA_ID:
-                order_by_column = "media_id"
-            elif MediaSortOrder(order_by) == MediaSortOrder.UPLOAD_NAME:
-                order_by_column = "upload_name"
-            elif MediaSortOrder(order_by) == MediaSortOrder.CREATED_TS:
-                order_by_column = "created_ts"
-            elif MediaSortOrder(order_by) == MediaSortOrder.LAST_ACCESS_TS:
-                order_by_column = "last_access_ts"
-            elif MediaSortOrder(order_by) == MediaSortOrder.MEDIA_LENGTH:
-                order_by_column = "media_length"
-            elif MediaSortOrder(order_by) == MediaSortOrder.MEDIA_TYPE:
-                order_by_column = "media_type"
-            elif MediaSortOrder(order_by) == MediaSortOrder.QUARANTINED_BY:
-                order_by_column = "quarantined_by"
-            elif MediaSortOrder(order_by) == MediaSortOrder.SAFE_FROM_QUARANTINE:
-                order_by_column = "safe_from_quarantine"
-            else:
-                raise ValueError(
-                    "Incorrect value for order_by provided: %s" % (order_by,)
-                )
+            order_by_column = MediaSortOrder(order_by).value
 
             if direction == "b":
                 order = "DESC"
