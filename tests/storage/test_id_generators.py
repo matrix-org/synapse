@@ -86,7 +86,11 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
         def _insert(txn):
             txn.execute(
-                "INSERT INTO foobar VALUES (?, ?)", (stream_id, instance_name,),
+                "INSERT INTO foobar VALUES (?, ?)",
+                (
+                    stream_id,
+                    instance_name,
+                ),
             )
             txn.execute("SELECT setval('foobar_seq', ?)", (stream_id,))
             txn.execute(
@@ -138,8 +142,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self.assertEqual(id_gen.get_current_token_for_writer("master"), 8)
 
     def test_out_of_order_finish(self):
-        """Test that IDs persisted out of order are correctly handled
-        """
+        """Test that IDs persisted out of order are correctly handled"""
 
         # Prefill table with 7 rows written by 'master'
         self._insert_rows("master", 7)
@@ -246,8 +249,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self.assertEqual(second_id_gen.get_positions(), {"first": 8, "second": 9})
 
     def test_get_next_txn(self):
-        """Test that the `get_next_txn` function works correctly.
-        """
+        """Test that the `get_next_txn` function works correctly."""
 
         # Prefill table with 7 rows written by 'master'
         self._insert_rows("master", 7)
@@ -386,8 +388,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self.assertEqual(id_gen_worker.get_positions(), {"master": 9})
 
     def test_writer_config_change(self):
-        """Test that changing the writer config correctly works.
-        """
+        """Test that changing the writer config correctly works."""
 
         self._insert_row_with_id("first", 3)
         self._insert_row_with_id("second", 5)
@@ -434,8 +435,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self.assertEqual(id_gen_5.get_current_token_for_writer("third"), 6)
 
     def test_sequence_consistency(self):
-        """Test that we error out if the table and sequence diverges.
-        """
+        """Test that we error out if the table and sequence diverges."""
 
         # Prefill with some rows
         self._insert_row_with_id("master", 3)
@@ -452,8 +452,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
 
 class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
-    """Tests MultiWriterIdGenerator that produce *negative* stream IDs.
-    """
+    """Tests MultiWriterIdGenerator that produce *negative* stream IDs."""
 
     if not USE_POSTGRES_FOR_TESTS:
         skip = "Requires Postgres"
@@ -494,12 +493,15 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
         return self.get_success(self.db_pool.runWithConnection(_create))
 
     def _insert_row(self, instance_name: str, stream_id: int):
-        """Insert one row as the given instance with given stream_id.
-        """
+        """Insert one row as the given instance with given stream_id."""
 
         def _insert(txn):
             txn.execute(
-                "INSERT INTO foobar VALUES (?, ?)", (stream_id, instance_name,),
+                "INSERT INTO foobar VALUES (?, ?)",
+                (
+                    stream_id,
+                    instance_name,
+                ),
             )
             txn.execute(
                 """

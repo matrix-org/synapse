@@ -198,7 +198,9 @@ class RoomCreationHandler(BaseHandler):
         if r is None:
             raise NotFoundError("Unknown room id %s" % (old_room_id,))
         new_room_id = await self._generate_room_id(
-            creator_id=user_id, is_public=r["is_public"], room_version=new_version,
+            creator_id=user_id,
+            is_public=r["is_public"],
+            room_version=new_version,
         )
 
         logger.info("Creating new room %s to replace %s", new_room_id, old_room_id)
@@ -236,7 +238,9 @@ class RoomCreationHandler(BaseHandler):
 
         # now send the tombstone
         await self.event_creation_handler.handle_new_client_event(
-            requester=requester, event=tombstone_event, context=tombstone_context,
+            requester=requester,
+            event=tombstone_event,
+            context=tombstone_context,
         )
 
         old_room_state = await tombstone_context.get_current_state_ids()
@@ -257,7 +261,10 @@ class RoomCreationHandler(BaseHandler):
         # finally, shut down the PLs in the old room, and update them in the new
         # room.
         await self._update_upgraded_room_pls(
-            requester, old_room_id, new_room_id, old_room_state,
+            requester,
+            old_room_id,
+            new_room_id,
+            old_room_state,
         )
 
         return new_room_id
@@ -425,17 +432,20 @@ class RoomCreationHandler(BaseHandler):
 
         # Copy over user power levels now as this will not be possible with >100PL users once
         # the room has been created
-
         # Calculate the minimum power level needed to clone the room
         event_power_levels = power_levels.get("events", {})
-        state_default = power_levels.get("state_default", 0)
-        ban = power_levels.get("ban")
+        state_default = power_levels.get("state_default", 50)
+        ban = power_levels.get("ban", 50)
         needed_power_level = max(state_default, ban, max(event_power_levels.values()))
 
+        # Get the user's current power level, this matches the logic in get_user_power_level,
+        # but without the entire state map.
+        user_power_levels = power_levels.setdefault("users", {})
+        users_default = power_levels.get("users_default", 0)
+        current_power_level = user_power_levels.get(user_id, users_default)
         # Raise the requester's power level in the new room if necessary
-        current_power_level = power_levels["users"][user_id]
         if current_power_level < needed_power_level:
-            power_levels["users"][user_id] = needed_power_level
+            user_power_levels[user_id] = needed_power_level
 
         await self._send_events_for_new_room(
             requester,
@@ -567,7 +577,7 @@ class RoomCreationHandler(BaseHandler):
         ratelimit: bool = True,
         creator_join_profile: Optional[JsonDict] = None,
     ) -> Tuple[dict, int]:
-        """ Creates a new room.
+        """Creates a new room.
 
         Args:
             requester:
@@ -688,7 +698,9 @@ class RoomCreationHandler(BaseHandler):
         is_public = visibility == "public"
 
         room_id = await self._generate_room_id(
-            creator_id=user_id, is_public=is_public, room_version=room_version,
+            creator_id=user_id,
+            is_public=is_public,
+            room_version=room_version,
         )
 
         # Check whether this visibility value is blocked by a third party module
@@ -829,7 +841,7 @@ class RoomCreationHandler(BaseHandler):
         if room_alias:
             result["room_alias"] = room_alias.to_string()
 
-        # Always wait for room creation to progate before returning
+        # Always wait for room creation to propagate before returning
         await self._replication.wait_for_stream_position(
             self.hs.config.worker.events_shard_config.get_instance(room_id),
             "events",
@@ -881,7 +893,10 @@ class RoomCreationHandler(BaseHandler):
                 _,
                 last_stream_id,
             ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                creator, event, ratelimit=False, ignore_shadow_ban=True,
+                creator,
+                event,
+                ratelimit=False,
+                ignore_shadow_ban=True,
             )
             return last_stream_id
 
@@ -981,7 +996,10 @@ class RoomCreationHandler(BaseHandler):
         return last_sent_stream_id
 
     async def _generate_room_id(
-        self, creator_id: str, is_public: bool, room_version: RoomVersion,
+        self,
+        creator_id: str,
+        is_public: bool,
+        room_version: RoomVersion,
     ):
         # autogen room IDs and try to create it. We may clash, so just
         # try a few times till one goes through, giving up eventually.

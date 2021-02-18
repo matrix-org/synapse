@@ -124,8 +124,7 @@ class PostgresSequenceGenerator(SequenceGenerator):
         stream_name: Optional[str] = None,
         positive: bool = True,
     ):
-        """See SequenceGenerator.check_consistency for docstring.
-        """
+        """See SequenceGenerator.check_consistency for docstring."""
 
         txn = db_conn.cursor(txn_name="sequence.check_consistency")
 

@@ -78,8 +78,7 @@ class PusherPool:
         self.pushers = {}  # type: Dict[str, Dict[str, Pusher]]
 
     def start(self) -> None:
-        """Starts the pushers off in a background process.
-        """
+        """Starts the pushers off in a background process."""
         if not self._should_start_pushers:
             logger.info("Not starting pushers because they are disabled in the config")
             return
@@ -297,8 +296,7 @@ class PusherPool:
         return pusher
 
     async def _start_pushers(self) -> None:
-        """Start all the pushers
-        """
+        """Start all the pushers"""
         pushers = await self.store.get_all_pushers()
 
         # Stagger starting up the pushers so we don't completely drown the
@@ -335,7 +333,8 @@ class PusherPool:
             return None
         except Exception:
             logger.exception(
-                "Couldn't start pusher id %i: caught Exception", pusher_config.id,
+                "Couldn't start pusher id %i: caught Exception",
+                pusher_config.id,
             )
             return None
 

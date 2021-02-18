@@ -71,7 +71,9 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         return await self.get_events_as_list(event_ids)
 
     async def get_auth_chain_ids(
-        self, event_ids: Collection[str], include_given: bool = False,
+        self,
+        event_ids: Collection[str],
+        include_given: bool = False,
     ) -> List[str]:
         """Get auth events for given event_ids. The events *must* be state events.
 
@@ -273,7 +275,8 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                     # origin chain.
                     if origin_sequence_number <= chains.get(origin_chain_id, 0):
                         chains[target_chain_id] = max(
-                            target_sequence_number, chains.get(target_chain_id, 0),
+                            target_sequence_number,
+                            chains.get(target_chain_id, 0),
                         )
 
                 seen_chains.add(target_chain_id)
@@ -371,7 +374,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         # and state sets {A} and {B} then walking the auth chains of A and B
         # would immediately show that C is reachable by both. However, if we
         # stopped at C then we'd only reach E via the auth chain of B and so E
-        # would errornously get included in the returned difference.
+        # would erroneously get included in the returned difference.
         #
         # The other thing that we do is limit the number of auth chains we walk
         # at once, due to practical limits (i.e. we can only query the database
@@ -497,7 +500,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
                         a_ids = new_aids
 
-                # Mark that the auth event is reachable by the approriate sets.
+                # Mark that the auth event is reachable by the appropriate sets.
                 sets.intersection_update(event_to_missing_sets[event_id])
 
             search.sort()
@@ -632,8 +635,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         )
 
     async def get_min_depth(self, room_id: str) -> int:
-        """For the given room, get the minimum depth we have seen for it.
-        """
+        """For the given room, get the minimum depth we have seen for it."""
         return await self.db_pool.runInteraction(
             "get_min_depth", self._get_min_depth_interaction, room_id
         )
@@ -858,12 +860,13 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             )
 
         await self.db_pool.runInteraction(
-            "_delete_old_forward_extrem_cache", _delete_old_forward_extrem_cache_txn,
+            "_delete_old_forward_extrem_cache",
+            _delete_old_forward_extrem_cache_txn,
         )
 
 
 class EventFederationStore(EventFederationWorkerStore):
-    """ Responsible for storing and serving up the various graphs associated
+    """Responsible for storing and serving up the various graphs associated
     with an event. Including the main event graph and the auth chains for an
     event.
 

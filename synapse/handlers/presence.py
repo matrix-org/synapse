@@ -349,10 +349,13 @@ class PresenceHandler(BasePresenceHandler):
                 [self.user_to_current_state[user_id] for user_id in unpersisted]
             )
 
-    async def _update_states(self, new_states):
+    async def _update_states(self, new_states: Iterable[UserPresenceState]) -> None:
         """Updates presence of users. Sets the appropriate timeouts. Pokes
         the notifier and federation if and only if the changed presence state
         should be sent to clients/servers.
+
+        Args:
+            new_states: The new user presence state updates to process.
         """
         now = self.clock.time_msec()
 
@@ -368,7 +371,7 @@ class PresenceHandler(BasePresenceHandler):
             new_states_dict = {}
             for new_state in new_states:
                 new_states_dict[new_state.user_id] = new_state
-            new_state = new_states_dict.values()
+            new_states = new_states_dict.values()
 
             for new_state in new_states:
                 user_id = new_state.user_id
@@ -635,8 +638,7 @@ class PresenceHandler(BasePresenceHandler):
             self.external_process_last_updated_ms.pop(process_id, None)
 
     async def current_state_for_user(self, user_id):
-        """Get the current presence state for a user.
-        """
+        """Get the current presence state for a user."""
         res = await self.current_state_for_users([user_id])
         return res[user_id]
 
@@ -658,17 +660,6 @@ class PresenceHandler(BasePresenceHandler):
 
         self._push_to_remotes(states)
 
-    async def notify_for_states(self, state, stream_id):
-        parties = await get_interested_parties(self.store, [state])
-        room_ids_to_states, users_to_states = parties
-
-        self.notifier.on_new_event(
-            "presence_key",
-            stream_id,
-            rooms=room_ids_to_states.keys(),
-            users=[UserID.from_string(u) for u in users_to_states],
-        )
-
     def _push_to_remotes(self, states):
         """Sends state updates to remote servers.
 
@@ -678,8 +669,7 @@ class PresenceHandler(BasePresenceHandler):
         self.federation.send_presence(states)
 
     async def incoming_presence(self, origin, content):
-        """Called when we receive a `m.presence` EDU from a remote server.
-        """
+        """Called when we receive a `m.presence` EDU from a remote server."""
         if not self._presence_enabled:
             return
 
@@ -729,8 +719,7 @@ class PresenceHandler(BasePresenceHandler):
             await self._update_states(updates)
 
     async def set_state(self, target_user, state, ignore_status_msg=False):
-        """Set the presence state of the user.
-        """
+        """Set the presence state of the user."""
         status_msg = state.get("status_msg", None)
         presence = state["presence"]
 
@@ -758,8 +747,7 @@ class PresenceHandler(BasePresenceHandler):
         await self._update_states([prev_state.copy_and_replace(**new_fields)])
 
     async def is_visible(self, observed_user, observer_user):
-        """Returns whether a user can see another user's presence.
-        """
+        """Returns whether a user can see another user's presence."""
         observer_room_ids = await self.store.get_rooms_for_user(
             observer_user.to_string()
         )
@@ -953,8 +941,7 @@ class PresenceHandler(BasePresenceHandler):
 
 
 def should_notify(old_state, new_state):
-    """Decides if a presence state change should be sent to interested parties.
-    """
+    """Decides if a presence state change should be sent to interested parties."""
     if old_state == new_state:
         return False
 

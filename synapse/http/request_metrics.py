@@ -213,8 +213,7 @@ class RequestMetrics:
         self.update_metrics()
 
     def update_metrics(self):
-        """Updates the in flight metrics with values from this request.
-        """
+        """Updates the in flight metrics with values from this request."""
         new_stats = self.start_context.get_resource_usage()
 
         diff = new_stats - self._request_stats

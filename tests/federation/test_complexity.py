@@ -150,8 +150,8 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         )
 
         # Artificially raise the complexity
-        self.hs.get_datastore().get_current_state_event_counts = lambda x: make_awaitable(
-            600
+        self.hs.get_datastore().get_current_state_event_counts = (
+            lambda x: make_awaitable(600)
         )
 
         d = handler._remote_join(

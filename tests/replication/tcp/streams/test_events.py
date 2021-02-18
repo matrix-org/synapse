@@ -129,7 +129,10 @@ class EventsStreamTestCase(BaseStreamTestCase):
         )
         pls["users"][OTHER_USER] = 50
         self.helper.send_state(
-            self.room_id, EventTypes.PowerLevels, pls, tok=self.user_tok,
+            self.room_id,
+            EventTypes.PowerLevels,
+            pls,
+            tok=self.user_tok,
         )
 
         # this is the point in the DAG where we make a fork
@@ -255,8 +258,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
             self.assertIsNone(sr.event_id)
 
     def test_update_function_state_row_limit(self):
-        """Test replication with many state events over several stream ids.
-        """
+        """Test replication with many state events over several stream ids."""
 
         # we want to generate lots of state changes, but for this test, we want to
         # spread out the state changes over a few stream IDs.
@@ -282,7 +284,10 @@ class EventsStreamTestCase(BaseStreamTestCase):
         )
         pls["users"].update({u: 50 for u in user_ids})
         self.helper.send_state(
-            self.room_id, EventTypes.PowerLevels, pls, tok=self.user_tok,
+            self.room_id,
+            EventTypes.PowerLevels,
+            pls,
+            tok=self.user_tok,
         )
 
         # this is the point in the DAG where we make a fork

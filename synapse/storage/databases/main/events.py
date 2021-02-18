@@ -399,7 +399,9 @@ class PersistEventsStore:
         self._update_current_state_txn(txn, state_delta_for_room, min_stream_order)
 
     def _persist_event_auth_chain_txn(
-        self, txn: LoggingTransaction, events: List[EventBase],
+        self,
+        txn: LoggingTransaction,
+        events: List[EventBase],
     ) -> None:
 
         # We only care about state events, so this if there are no state events.
@@ -470,7 +472,11 @@ class PersistEventsStore:
         event_to_room_id = {e.event_id: e.room_id for e in state_events.values()}
 
         self._add_chain_cover_index(
-            txn, self.db_pool, event_to_room_id, event_to_types, event_to_auth_chain,
+            txn,
+            self.db_pool,
+            event_to_room_id,
+            event_to_types,
+            event_to_auth_chain,
         )
 
     @classmethod
@@ -517,7 +523,10 @@ class PersistEventsStore:
             # simple_select_many, but this case happens rarely and almost always
             # with a single row.)
             auth_events = db_pool.simple_select_onecol_txn(
-                txn, "event_auth", keyvalues={"event_id": event_id}, retcol="auth_id",
+                txn,
+                "event_auth",
+                keyvalues={"event_id": event_id},
+                retcol="auth_id",
             )
 
             events_to_calc_chain_id_for.add(event_id)
@@ -550,7 +559,9 @@ class PersistEventsStore:
                 WHERE
             """
             clause, args = make_in_list_sql_clause(
-                txn.database_engine, "event_id", missing_auth_chains,
+                txn.database_engine,
+                "event_id",
+                missing_auth_chains,
             )
             txn.execute(sql + clause, args)
 
@@ -704,7 +715,8 @@ class PersistEventsStore:
                 if chain_map[a_id][0] != chain_id
             }
             for start_auth_id, end_auth_id in itertools.permutations(
-                event_to_auth_chain.get(event_id, []), r=2,
+                event_to_auth_chain.get(event_id, []),
+                r=2,
             ):
                 if chain_links.exists_path_from(
                     chain_map[start_auth_id], chain_map[end_auth_id]
@@ -888,8 +900,7 @@ class PersistEventsStore:
         txn: LoggingTransaction,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
     ):
-        """Persist the mapping from transaction IDs to event IDs (if defined).
-        """
+        """Persist the mapping from transaction IDs to event IDs (if defined)."""
 
         to_insert = []
         for event, _ in events_and_contexts:
@@ -909,7 +920,9 @@ class PersistEventsStore:
 
         if to_insert:
             self.db_pool.simple_insert_many_txn(
-                txn, table="event_txn_id", values=to_insert,
+                txn,
+                table="event_txn_id",
+                values=to_insert,
             )
 
     def _update_current_state_txn(
@@ -941,7 +954,9 @@ class PersistEventsStore:
                 txn.execute(sql, (stream_id, self._instance_name, room_id))
 
                 self.db_pool.simple_delete_txn(
-                    txn, table="current_state_events", keyvalues={"room_id": room_id},
+                    txn,
+                    table="current_state_events",
+                    keyvalues={"room_id": room_id},
                 )
             else:
                 # We're still in the room, so we update the current state as normal.
@@ -1050,7 +1065,7 @@ class PersistEventsStore:
             # Figure out the changes of membership to invalidate the
             # `get_rooms_for_user` cache.
             # We find out which membership events we may have deleted
-            # and which we have added, then we invlidate the caches for all
+            # and which we have added, then we invalidate the caches for all
             # those users.
             members_changed = {
                 state_key
@@ -1608,8 +1623,7 @@ class PersistEventsStore:
         )
 
     def _store_room_members_txn(self, txn, events, backfilled):
-        """Store a room member in the database.
-        """
+        """Store a room member in the database."""
 
         def str_or_none(val: Any) -> Optional[str]:
             return val if isinstance(val, str) else None
@@ -2001,8 +2015,7 @@ class PersistEventsStore:
 
 @attr.s(slots=True)
 class _LinkMap:
-    """A helper type for tracking links between chains.
-    """
+    """A helper type for tracking links between chains."""
 
     # Stores the set of links as nested maps: source chain ID -> target chain ID
     # -> source sequence number -> target sequence number.
@@ -2108,7 +2121,9 @@ class _LinkMap:
                 yield (src_chain, src_seq, target_chain, target_seq)
 
     def exists_path_from(
-        self, src_tuple: Tuple[int, int], target_tuple: Tuple[int, int],
+        self,
+        src_tuple: Tuple[int, int],
+        target_tuple: Tuple[int, int],
     ) -> bool:
         """Checks if there is a path between the source chain ID/sequence and
         target chain ID/sequence.

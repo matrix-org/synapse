@@ -62,7 +62,8 @@ def chunk_seq(iseq: ISeq, maxlen: int) -> Iterable[ISeq]:
 
 
 def sorted_topologically(
-    nodes: Iterable[T], graph: Mapping[T, Collection[T]],
+    nodes: Iterable[T],
+    graph: Mapping[T, Collection[T]],
 ) -> Generator[T, None, None]:
     """Given a set of nodes and a graph, yield the nodes in toplogical order.
 

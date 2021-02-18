@@ -51,7 +51,8 @@ class DownloadResource(DirectServeJsonResource):
             b" object-src 'self';",
         )
         request.setHeader(
-            b"Referrer-Policy", b"no-referrer",
+            b"Referrer-Policy",
+            b"no-referrer",
         )
         server_name, media_id, name = parse_media_id(request)
         if server_name == self.server_name:

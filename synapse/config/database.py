@@ -207,8 +207,7 @@ class DatabaseConfig(Config):
         )
 
     def get_single_database(self) -> DatabaseConnectionConfig:
-        """Returns the database if there is only one, useful for e.g. tests
-        """
+        """Returns the database if there is only one, useful for e.g. tests"""
         if not self.databases:
             raise Exception("More than one database exists")
 

@@ -1,0 +1,1 @@
+Fix a long-standing bug when upgrading a room: "TypeError: '>' not supported between instances of 'NoneType' and 'int'".

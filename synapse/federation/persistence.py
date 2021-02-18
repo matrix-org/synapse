@@ -30,8 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 class TransactionActions:
-    """ Defines persistence actions that relate to handling Transactions.
-    """
+    """Defines persistence actions that relate to handling Transactions."""
 
     def __init__(self, datastore):
         self.store = datastore
@@ -57,8 +56,7 @@ class TransactionActions:
     async def set_response(
         self, origin: str, transaction: Transaction, code: int, response: JsonDict
     ) -> None:
-        """Persist how we responded to a transaction.
-        """
+        """Persist how we responded to a transaction."""
         transaction_id = transaction.transaction_id  # type: ignore
         if not transaction_id:
             raise RuntimeError("Cannot persist a transaction with no transaction_id")

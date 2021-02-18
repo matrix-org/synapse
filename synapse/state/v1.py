@@ -95,7 +95,11 @@ async def resolve_events_with_store(
         if event.room_id != room_id:
             raise Exception(
                 "Attempting to state-resolve for room %s with event %s which is in %s"
-                % (room_id, event.event_id, event.room_id,)
+                % (
+                    room_id,
+                    event.event_id,
+                    event.room_id,
+                )
             )
 
     # get the ids of the auth events which allow us to authenticate the
@@ -119,7 +123,11 @@ async def resolve_events_with_store(
         if event.room_id != room_id:
             raise Exception(
                 "Attempting to state-resolve for room %s with event %s which is in %s"
-                % (room_id, event.event_id, event.room_id,)
+                % (
+                    room_id,
+                    event.event_id,
+                    event.room_id,
+                )
             )
 
     state_map.update(state_map_new)
@@ -243,7 +251,7 @@ def _resolve_with_state(
 def _resolve_state_events(
     conflicted_state: StateMap[List[EventBase]], auth_events: MutableStateMap[EventBase]
 ) -> StateMap[EventBase]:
-    """ This is where we actually decide which of the conflicted state to
+    """This is where we actually decide which of the conflicted state to
     use.
 
     We resolve conflicts in the following order:

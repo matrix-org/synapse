@@ -43,8 +43,7 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
         self.room_id = info["room_id"]
 
     def run_background_update(self):
-        """Re run the background update to clean up the extremities.
-        """
+        """Re run the background update to clean up the extremities."""
         # Make sure we don't clash with in progress updates.
         self.assertTrue(
             self.store.db_pool.updates._all_done, "Background updates are still ongoing"

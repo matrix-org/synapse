@@ -54,8 +54,7 @@ class QuieterFileBodyProducer(FileBodyProducer):
 
 
 def get_request_user_agent(request: IRequest, default: str = "") -> str:
-    """Return the last User-Agent header, or the given default.
-    """
+    """Return the last User-Agent header, or the given default."""
     # There could be raw utf-8 bytes in the User-Agent header.
 
     # N.B. if you don't do this, the logger explodes cryptically
