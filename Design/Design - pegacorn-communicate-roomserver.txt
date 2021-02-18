@@ -63,12 +63,16 @@ Create-Cert-Set -certSubject 'pegacorn-communicate-roomserver.site-a' -certPwd '
 			tls_private_key_path: "/var/lib/synapse/certificates/pegacorn-communicate-roomserver.site-a.key"
 
 6) Copy the certificates and config files to a host path location.  Remember this location as it is needed for the helm command.
-	cp -r /host_mnt/e/dev/aether-host-files/LocalWorkstations/* /data/
+    cp -rf /host_mnt/e/dev/aether-host-files/common/* /data/
+	cp -rf /host_mnt/e/dev/aether-host-files/LocalWorkstations/* /data/
 	mkdir -p /data/synapse/tmp-data
 	chmod -R 777 /data/synapse/tmp-data
 		
 7) Add the following to the hosts file
 	pegacorn-communicate-roomserver.site-a
+	
+8) In a command prompt create the kubernetes secrets
+	kubectl create secret generic pegacorn-communicate-roomserver-secrets --from-literal=azureTenantId="<Get from lastpass.com>" --from-literal=azureClientId="<Get from lastpass.com>" --from-literal=azureClientSecret="<Get from lastpass.com>" --namespace=site-a
 	
 	
 Build and deploy
@@ -76,7 +80,7 @@ Build and deploy
 E:
 cd \dev\github\pegacorn-communicate-serverside-roomserver
 OLD NO LONGER REQUIRED docker build --rm -t pegacorn/pegacorn-communicate-roomserver:1.0 .
-\helm\helm upgrade pegacorn-communicate-roomserver-site-a --install --namespace site-a --set serviceName=pegacorn-communicate-roomserver,basePort=30880,hostPathCerts=/data/certificates,hostPath=/data/synapse,imageTag=v1.26.0,numOfPods=1 helm
+\helm\helm upgrade pegacorn-communicate-roomserver-site-a --install --namespace site-a --set serviceName=pegacorn-communicate-roomserver,basePort=30880,hostPathCerts=/data/certificates,hostPath=/data/synapse,allowPasswordLogin=true,imageTag=v1.26.0,matrixServerName=chs.local.gov.au,numOfPods=1 helm
 
 On the container these are the file locations:
 	certificates - /var/lib/synapse/certificates
@@ -93,7 +97,7 @@ hostPath - The location of the config generated when running the generate comman
 URL
 ===
 Go to the below URL and if everything has been configured correctly then a page will appear containing: "It works! Synapse is running".
-	https://pegacorn-communicate-roomserver.site-a:30880/_matrix/static/
+	https://pegacorn-communicate-roomserver.site-a:30880
 	
 	
 Create a new user
@@ -101,11 +105,10 @@ Create a new user
 FROM - https://github.com/matrix-org/synapse/blob/master/INSTALL.md#registering-a-user
 
 1) Login in to the container - docker exec -it <synapse container id> sh
-2) cd /var/lib/synapse/config
-3) Run command: register_new_matrix_user -c homeserver.yaml https://localhost:8448
-4) Enter your desired username to login: e.q: pegacorn-admin-user
-5) Choose a password and confirm it when prompted
-6) You will be prompted with question: "Make admin [no]?", type [no] if you would like account to be normal user, type [yes] if you would like to use account you have created as an admin user. Typing Y or N or Yes or No might result exception thrown on command as it may not be able to interpret.
-7) Account you have created can be used locally and set in the container you are using and and is not persisted in database after you turn off container orchestration.
+2) Run command: register_new_matrix_user -c /var/lib/synapse/config/homeserver.yaml https://localhost:8448
+3) Enter your desired username to login: e.q: pegacorn-admin-user
+4) Choose a password and confirm it when prompted
+5) You will be prompted with question: "Make admin [no]?", type [no] if you would like account to be normal user, type [yes] if you would like to use account you have created as an admin user. Typing Y or N or Yes or No might result exception thrown on command as it may not be able to interpret.
+6) Account you have created can be used locally and set in the container you are using and and is not persisted in database after you turn off container orchestration.
 
 You can now build and deploy pegacorn-communicate-web and logon using the created user.

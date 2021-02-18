@@ -37,16 +37,51 @@ spec:
 #                operator: In
 #                values:
 #                - High
+      initContainers:
+      - env:
+        - name: AZURE_TENANT_ID
+          valueFrom:
+           secretKeyRef:
+            name: {{ .Values.serviceName }}-secrets
+            key: azureTenantId
+        - name: AZURE_CLIENT_ID
+          valueFrom:
+           secretKeyRef:
+            name: {{ .Values.serviceName }}-secrets
+            key: azureClientId
+        - name: AZURE_CLIENT_SECRET
+          valueFrom:
+           secretKeyRef:
+            name: {{ .Values.serviceName }}-secrets
+            key: azureClientSecret
+        name: init
+        image: alpine
+        command: 
+          - sh
+          - "-c"
+          - "echo Updating /var/lib/synapse/config/homeserver.yaml file;
+            [ -e /var/lib/synapse/config/homeserver-with-placeholders.yaml ] || cp /var/lib/synapse/config/homeserver.yaml /var/lib/synapse/config/homeserver-with-placeholders.yaml;
+            /bin/cp -f /var/lib/synapse/config/homeserver-with-placeholders.yaml /var/lib/synapse/config/homeserver.yaml;
+            sed -i \"s/<MatrixServerName>/{{ .Values.matrixServerName }}/\" /var/lib/synapse/config/homeserver.yaml;
+            sed -i \"s/<publicBaseHostNameAndPort>/{{ .Values.externalDnsEntry | default (print (.Values.dnsEntry | default (print .Values.serviceName "." .Release.Namespace) ) ":" .Values.basePort) }}/\" /var/lib/synapse/config/homeserver.yaml;
+            sed -i \"s/<tenant id>/${AZURE_TENANT_ID}/\" /var/lib/synapse/config/homeserver.yaml;
+            sed -i \"s/<client id>/${AZURE_CLIENT_ID}/\" /var/lib/synapse/config/homeserver.yaml;
+            sed -i \"s/<client secret>/${AZURE_CLIENT_SECRET}/\" /var/lib/synapse/config/homeserver.yaml;
+            sed -i \"s/<AllowPasswordLogin>/{{ .Values.allowPasswordLogin | default "false" }}/\" /var/lib/synapse/config/homeserver.yaml;
+            echo START of /var/lib/synapse/config/homeserver.yaml file content;
+            echo ' ';
+            cat /var/lib/synapse/config/homeserver.yaml;
+            echo ' ';
+            echo END of /var/lib/synapse/config/homeserver.yaml file content;"
+        volumeMounts:
+        - name: config
+          mountPath: /var/lib/synapse/config
       containers:
       - env:
-        - name: SYNAPSE_SERVER_NAME
-          value: {{ .Values.synapseServerName }}
         - name: SYNAPSE_CONFIG_DIR
           value: /var/lib/synapse/config
         - name: SYNAPSE_DATA_DIR
           value: /var/lib/synapse/data
-        - name: SYNAPSE_REPORT_STATS
-          value: "{{ .Values.reportStats | default "no" }}"          
         {{- if (.Values.dnsEntry) }} 
         - name: DNS_ENTRY
           value: {{ .Values.dnsEntry }}
