@@ -1,7 +1,19 @@
-Next release
-============
+Synapse 1.xx.0 (2021-xx-xx)
+===========================
 
 Note that this release drops support for ARMv7 in the official Docker images, due to repeated problems building for ARMv7 (and the associated maintenance burden this entails).
+
+Removal warning
+---------------
+
+The v1 list accounts API is deprecated and will be removed in a future release.
+This API was undocumented and misleading. It can be replaced by the
+[v2 list accounts API](https://github.com/matrix-org/synapse/blob/master/docs/admin_api/user_admin_api.rst#list-accounts),
+which has been available since Synapse 1.7.0 (2019-12-13).
+
+Please check if you're using any scripts which use the admin API and replace
+`GET /_synapse/admin/v1/users/<user_id>` with `GET /_synapse/admin/v2/users`.
+
 
 Synapse 1.27.0 (2021-02-16)
 ===========================

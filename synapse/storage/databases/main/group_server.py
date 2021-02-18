@@ -14,7 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
+
+from typing_extensions import TypedDict
 
 from synapse.api.errors import SynapseError
 from synapse.storage._base import SQLBaseStore, db_to_json
@@ -25,6 +27,9 @@ from synapse.util import json_encoder
 # database to avoid the fun of null != null
 _DEFAULT_CATEGORY_ID = ""
 _DEFAULT_ROLE_ID = ""
+
+# A room in a group.
+_RoomInGroup = TypedDict("_RoomInGroup", {"room_id": str, "is_public": bool})
 
 
 class GroupServerWorkerStore(SQLBaseStore):
@@ -72,7 +77,7 @@ class GroupServerWorkerStore(SQLBaseStore):
 
     async def get_rooms_in_group(
         self, group_id: str, include_private: bool = False
-    ) -> List[Dict[str, Union[str, bool]]]:
+    ) -> List[_RoomInGroup]:
         """Retrieve the rooms that belong to a given group. Does not return rooms that
         lack members.
 

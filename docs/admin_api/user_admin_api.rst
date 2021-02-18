@@ -29,8 +29,9 @@ It returns a JSON body like the following:
             }
         ],
         "avatar_url": "<avatar_url>",
-        "admin": false,
-        "deactivated": false,
+        "admin": 0,
+        "deactivated": 0,
+        "shadow_banned": 0,
         "password_hash": "$2b$12$p9B4GkqYdRTPGD",
         "creation_ts": 1560432506,
         "appservice_id": null,
@@ -150,6 +151,7 @@ A JSON body is returned with the following shape:
                 "admin": 0,
                 "user_type": null,
                 "deactivated": 0,
+                "shadow_banned": 0,
                 "displayname": "<User One>",
                 "avatar_url": null
             }, {
@@ -158,6 +160,7 @@ A JSON body is returned with the following shape:
                 "admin": 1,
                 "user_type": null,
                 "deactivated": 0,
+                "shadow_banned": 0,
                 "displayname": "<User Two>",
                 "avatar_url": "<avatar_url>"
             }
@@ -262,7 +265,7 @@ The following actions are performed when deactivating an user:
 - Reject all pending invites
 - Remove all account validity information related to the user
 
-The following additional actions are performed during deactivation if``erase``
+The following additional actions are performed during deactivation if ``erase``
 is set to ``true``:
 
 - Remove the user's display name

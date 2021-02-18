@@ -143,6 +143,10 @@ class UserDirectoryHandler(StateDeltasHandler):
         if self.pos is None:
             self.pos = await self.store.get_user_directory_stream_pos()
 
+        # If still None then the initial background update hasn't happened yet.
+        if self.pos is None:
+            return None
+
         # Loop round handling deltas until we're up to date
         while True:
             with Measure(self.clock, "user_dir_delta"):
