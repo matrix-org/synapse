@@ -898,7 +898,7 @@ class PresenceHandler(BasePresenceHandler):
         # Send out user presence updates for each destination
         for destination, user_state_set in presence_destinations.items():
             self.federation.send_presence_to_destinations(
-                states=user_state_set, destinations=[destination]
+                destinations=[destination], states=user_state_set
             )
 
     async def _on_user_joined_room(
