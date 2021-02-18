@@ -2310,14 +2310,19 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
 
         # order by quarantined_by
         # one media is in quarantine, others are ordered by media_ids
-        # Different sort order of SQlite and PostreSQL for bool
+
+        # Different sort order of SQlite and PostreSQL
+        # If a media is not in quarantine `quarantined_by` is NULL
+        # SQLite considers NULL to be smaller than any other value.
+        # PostreSQL considers NULL to be larger than any other value.
+
         # self._order_test(sorted([media1, media2]) + [media3], "quarantined_by")
         # self._order_test(sorted([media1, media2]) + [media3], "quarantined_by", "f")
         # self._order_test([media3] + sorted([media1, media2]), "quarantined_by", "b")
 
         # order by safe_from_quarantine
         # one media is safe from quarantine, others are ordered by media_ids
-        self._order_test(sorted([media1, media3]) + [media2]), "safe_from_quarantine"
+        self._order_test(sorted([media1, media3]) + [media2], "safe_from_quarantine")
         self._order_test(
             sorted([media1, media3]) + [media2], "safe_from_quarantine", "f"
         )
