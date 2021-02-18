@@ -9,7 +9,7 @@ This API was undocumented and misleading. It can be replaced by the
 [v2 list accounts API](https://github.com/matrix-org/synapse/blob/master/docs/admin_api/user_admin_api.rst#list-accounts),
 which has been available since Synapse 1.7.0 (2019-12-13).
 
-Please check any scripts you might have for the admin API and replace
+Please check if you're using any scripts which use the admin API and replace
 `GET /_synapse/admin/v1/users/<user_id>` with `GET /_synapse/admin/v2/users`.
 
 
