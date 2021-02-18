@@ -2241,6 +2241,9 @@ ui_auth:
     # seconds.
     #
     #session_timeout: 15000
+    # Now ui_auth also allow standard duration formats such as "15s" to allow
+    # for credential validation to last for 15 seconds.
+    # session_timeout: "15s"
 
 
 # Configuration for sending emails from Synapse.
