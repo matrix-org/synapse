@@ -2088,7 +2088,9 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         """
         # unkown order_by
         channel = self.make_request(
-            "GET", self.url + "?order_by=bar", access_token=self.admin_user_tok,
+            "GET",
+            self.url + "?order_by=bar",
+            access_token=self.admin_user_tok,
         )
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
@@ -2096,7 +2098,9 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
 
         # invalid search order
         channel = self.make_request(
-            "GET", self.url + "?dir=bar", access_token=self.admin_user_tok,
+            "GET",
+            self.url + "?dir=bar",
+            access_token=self.admin_user_tok,
         )
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
@@ -2339,7 +2343,10 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             self._create_media_and_access(user_token, image_data)
 
     def _create_media_and_access(
-        self, user_token: str, image_data: bytes, filename: str = "image1.png",
+        self,
+        user_token: str,
+        image_data: bytes,
+        filename: str = "image1.png",
     ) -> str:
         """
         Create one media for a specific user, access and returns `media_id`
@@ -2387,15 +2394,15 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         Args:
             content: List that is checked for content
         """
-        for u in content:
-            self.assertIn("name", u)
-            self.assertIn("is_guest", u)
-            self.assertIn("admin", u)
-            self.assertIn("user_type", u)
-            self.assertIn("deactivated", u)
-            self.assertIn("shadow_banned", u)
-            self.assertIn("displayname", u)
-            self.assertIn("avatar_url", u)
+        for m in content:
+            self.assertIn("media_id", m)
+            self.assertIn("media_type", m)
+            self.assertIn("media_length", m)
+            self.assertIn("upload_name", m)
+            self.assertIn("created_ts", m)
+            self.assertIn("last_access_ts", m)
+            self.assertIn("quarantined_by", m)
+            self.assertIn("safe_from_quarantine", m)
 
     def _order_test(
         self,
@@ -2418,7 +2425,9 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         if dir is not None and dir in ("b", "f"):
             url += "dir=%s" % (dir,)
         channel = self.make_request(
-            "GET", url.encode("ascii"), access_token=self.admin_user_tok,
+            "GET",
+            url.encode("ascii"),
+            access_token=self.admin_user_tok,
         )
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], len(expected_media_list))

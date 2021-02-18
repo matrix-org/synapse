@@ -190,7 +190,8 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                 ORDER BY {order_by_column} {order}, media_id ASC
                 LIMIT ? OFFSET ?
             """.format(
-                order_by_column=order_by_column, order=order,
+                order_by_column=order_by_column,
+                order=order,
             )
 
             args += [limit, start]
