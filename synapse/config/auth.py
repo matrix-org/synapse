@@ -95,8 +95,8 @@ class AuthConfig(Config):
               #require_uppercase: true
 
         ui_auth:
-            # The number of milliseconds to allow a user-interactive authentication
-            # session to be active.
+            # The amount of time to allow a user-interactive authentication session
+            # to be active.
             #
             # This defaults to 0, meaning the user is queried for their credentials
             # before every action, but this can be overridden to allow a single
@@ -107,8 +107,5 @@ class AuthConfig(Config):
             # Uncomment below to allow for credential validation to last for 15
             # seconds.
             #
-            #session_timeout: 15000
-            # Now ui_auth also allow standard duration formats such as "15s" to allow
-            # for credential validation to last for 15 seconds.
-            # session_timeout: "15s"
+            #session_timeout: "15s"
         """
