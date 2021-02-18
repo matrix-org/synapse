@@ -1,1 +1,0 @@
-Fix a long-standing bug in the deduplication of old presence, resulting in no deduplication.
