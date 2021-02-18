@@ -1,6 +1,8 @@
 Synapse 1.xx.0 (2021-xx-xx)
 ===========================
 
+Note that this release drops support for ARMv7 in the official Docker images, due to repeated problems building for ARMv7 (and the associated maintenance burden this entails).
+
 Removal warning
 ---------------
 
