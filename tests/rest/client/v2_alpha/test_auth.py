@@ -343,7 +343,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
             },
         )
 
-    @unittest.override_config({"ui_auth": {"session_timeout": 5 * 1000}})
+    @unittest.override_config({"ui_auth": {"session_timeout": "5s"}})
     def test_can_reuse_session(self):
         """
         The session can be reused if configured.

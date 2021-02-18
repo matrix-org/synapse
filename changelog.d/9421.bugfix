@@ -1,0 +1,1 @@
+Reduce the amount of memory used when generating the URL preview of a file that is larger than the `max_spider_size`.
