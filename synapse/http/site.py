@@ -333,13 +333,27 @@ class SynapseRequest(Request):
 
 
 class XForwardedForRequest(SynapseRequest):
-    def __init__(self, *args, **kw):
-        SynapseRequest.__init__(self, *args, **kw)
-
     """
     Add a layer on top of another request that only uses the value of an
     X-Forwarded-For header as the result of C{getClientIP}.
+
+    XXX: I think the right way to do this is with request.setHost().
     """
+
+    def __init__(self, *args, **kw):
+        SynapseRequest.__init__(self, *args, **kw)
+
+        forwarded_header = self.getHeader(b"x-forwarded-proto")
+        if forwarded_header is not None:
+            self._is_secure = forwarded_header.lower() == b"https"
+        else:
+            logger.warning(
+                "received request lacks an x-forwarded-proto header: assuming https"
+            )
+            self._is_secure = True
+
+    def isSecure(self):
+        return self._is_secure
 
     def getClientIP(self):
         """
