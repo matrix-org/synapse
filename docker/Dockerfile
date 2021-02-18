@@ -38,7 +38,9 @@ ENV CARGO_NET_OFFLINE=${CARGO_NET_OFFLINE}
 
 # Build dependencies that are not available as wheels, to speed up rebuilds
 RUN pip install --prefix="/install" --no-warn-script-location \
-        cryptography \
+        cryptography
+
+RUN pip install --prefix="/install" --no-warn-script-location \
         frozendict \
         jaeger-client \
         opentracing \
