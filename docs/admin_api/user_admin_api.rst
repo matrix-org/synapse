@@ -377,7 +377,7 @@ The following fields are returned in the JSON response body:
 
 
 List media of a user
-=====================
+====================
 Gets a list of all local media that a specific ``user_id`` has created.
 By default, the response is ordered by descending creation date and ascending media ID.
 The newest media is on top. You can change the order with parameters
@@ -440,7 +440,7 @@ The following parameters should be set in the URL:
   Defaults to ``0``.
 - ``order_by`` - The method by which to sort the returned list of media.
   If the ordered field has duplicates, the second order is always by ascending ``media_id``,
-  which guarantees a complete ordering. Valid values are:
+  which guarantees a stable ordering. Valid values are:
 
   - ``media_id`` - Media are ordered alphabetically by ``media_id``.
   - ``upload_name`` - Media are ordered alphabetically by name the media was uploaded with.
@@ -462,7 +462,7 @@ The following parameters should be set in the URL:
 If neither ``order_by`` nor ``dir`` is set, the default order is newest media on top
 (corresponds to ``order_by`` = ``created_ts`` and ``dir`` = ``b``).
 
-Caution. The database has only indexes on the columns ``media_id``,
+Caution. The database only has indexes on the columns ``media_id``,
 ``user_id`` and ``created_ts``. This means that if a different sort order is used
 (``upload_name``, ``last_access_ts``, ``media_length``, ``media_type``,
 ``quarantined_by`` or ``safe_from_quarantine``), this can cause a large load on the
