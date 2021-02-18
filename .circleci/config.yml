@@ -79,4 +79,6 @@ commands:
         type: string
     steps:
       - run: docker buildx build -f docker/Dockerfile-cargo-cache --push -t 127.0.0.1:5000/cargo_cache --platform << parameters.platforms >> --progress=plain .
-      - run: docker buildx build -f docker/Dockerfile --push --platform << parameters.platforms >> --label gitsha1=${CIRCLE_SHA1} << parameters.tag >> --build-arg BASE_IMAGE=127.0.0.1:5000/cargo_cache --build-arg CARGO_NET_OFFLINE=true --progress=plain  .
+      - run:
+          command: docker buildx build -f docker/Dockerfile --push --platform << parameters.platforms >> --label gitsha1=${CIRCLE_SHA1} << parameters.tag >> --build-arg BASE_IMAGE=127.0.0.1:5000/cargo_cache --build-arg CARGO_NET_OFFLINE=true --progress=plain  .
+          no_output_timeout: 30m
