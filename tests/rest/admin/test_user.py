@@ -2106,61 +2106,61 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
 
         # order by default ("created_ts")
         # default is backwards
-        self._order_test(None, [media3, media2, media1])
-        self._order_test(None, "f", [media1, media2, media3])
-        self._order_test(None, "b", [media3, media2, media1])
+        self._order_test([media3, media2, media1], None)
+        self._order_test([media1, media2, media3], None, "f")
+        self._order_test([media3, media2, media1], None, "b")
 
         # sort by media_id
         sorted_media = sorted([media1, media2, media3], reverse=False)
         sorted_media_reverse = sorted(sorted_media, reverse=True)
 
         # order by media_id
-        self._order_test("media_id", sorted_media)
-        self._order_test("media_id", "f", sorted_media)
-        self._order_test("media_id", "b", sorted_media_reverse)
+        self._order_test(sorted_media, "media_id")
+        self._order_test(sorted_media, "media_id", "f")
+        self._order_test(sorted_media_reverse, "media_id", "b")
 
         # order by upload_name
-        self._order_test("upload_name", [media3, media2, media1])
-        self._order_test("upload_name", "f", [media3, media2, media1])
-        self._order_test("upload_name", "b", [media1, media2, media3])
+        self._order_test([media3, media2, media1], "upload_name")
+        self._order_test([media3, media2, media1], "upload_name", "f")
+        self._order_test([media1, media2, media3], "upload_name", "b")
 
         # order by media_type
         # result is ordered by media_id
         # because of uploaded media_type is always 'application/json'
-        self._order_test("media_type", sorted_media)
-        self._order_test("media_type", "f", sorted_media)
-        self._order_test("media_type", "b", sorted_media)
+        self._order_test(sorted_media, "media_type")
+        self._order_test(sorted_media, "media_type", "f")
+        self._order_test(sorted_media, "media_type", "b")
 
         # order by media_length
-        self._order_test("media_length", [media2, media3, media1])
-        self._order_test("media_length", "f", [media2, media3, media1])
-        self._order_test("media_length", "b", [media1, media3, media2])
+        self._order_test([media2, media3, media1], "media_length")
+        self._order_test([media2, media3, media1], "media_length", "f")
+        self._order_test([media1, media3, media2], "media_length", "b")
 
         # order by created_ts
-        self._order_test("created_ts", [media1, media2, media3])
-        self._order_test("created_ts", "f", [media1, media2, media3])
-        self._order_test("created_ts", "b", [media3, media2, media1])
+        self._order_test([media1, media2, media3], "created_ts")
+        self._order_test([media1, media2, media3], "created_ts", "f")
+        self._order_test([media3, media2, media1], "created_ts", "b")
 
         # order by last_access_ts
-        self._order_test("last_access_ts", [media1, media2, media3])
-        self._order_test("last_access_ts", "f", [media1, media2, media3])
-        self._order_test("last_access_ts", "b", [media3, media2, media1])
+        self._order_test([media1, media2, media3], "last_access_ts")
+        self._order_test([media1, media2, media3], "last_access_ts", "f")
+        self._order_test([media3, media2, media1], "last_access_ts", "b")
 
         # order by quarantined_by
         # one media is in quarantine, others are ordered by media_ids
-        # Different sort order of SQlite and PostreSQL foor bool
-        # self._order_test("quarantined_by", sorted([media1, media2]) + [media3])
-        # self._order_test("quarantined_by", "f", sorted([media1, media2]) + [media3])
-        # self._order_test("quarantined_by", "b", [media3] + sorted([media1, media2]))
+        # Different sort order of SQlite and PostreSQL for bool
+        # self._order_test(sorted([media1, media2]) + [media3], "quarantined_by")
+        # self._order_test(sorted([media1, media2]) + [media3], "quarantined_by", "f")
+        # self._order_test([media3] + sorted([media1, media2]), "quarantined_by", "b")
 
         # order by safe_from_quarantine
         # one media is safe from quarantine, others are ordered by media_ids
-        self._order_test("safe_from_quarantine", sorted([media1, media3]) + [media2])
+        self._order_test(sorted([media1, media3]) + [media2]), "safe_from_quarantine"
         self._order_test(
-            "safe_from_quarantine", "f", sorted([media1, media3]) + [media2]
+            sorted([media1, media3]) + [media2], "safe_from_quarantine", "f"
         )
         self._order_test(
-            "safe_from_quarantine", "b", [media2] + sorted([media1, media3])
+            [media2] + sorted([media1, media3]), "safe_from_quarantine", "b"
         )
 
     def _create_media_for_user(self, user_token: str, number_media: int):
@@ -2241,17 +2241,17 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
 
     def _order_test(
         self,
+        expected_media_list: List[str],
         order_by: Optional[str],
         dir: Optional[str] = None,
-        expected_media_list: List[str],
     ):
         """Request the list of media in a certain order. Assert that order is what
         we expect
         Args:
-            order_by: The type of ordering to give the server
-            dir: The direction of ordering to give the server
             expected_media_list: The list of media_ids in the order we expect to get
                 back from the server
+            order_by: The type of ordering to give the server
+            dir: The direction of ordering to give the server
         """
 
         url = self.url + "?"
