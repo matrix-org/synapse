@@ -4,15 +4,13 @@ Synapse 1.xx.0 (2021-xx-xx)
 Removal warning
 ---------------
 
-The old List Accounts API is deprecated and will be removed in a future release. They will be replaced by the
-[List Accounts API](https://github.com/matrix-org/synapse/blob/master/docs/admin_api/user_admin_api.rst#list-accounts).
+The v1 list accounts API is deprecated and will be removed in a future release.
+This API was undocumented and misleading. It can be replaced by the
+[v2 list accounts API](https://github.com/matrix-org/synapse/blob/master/docs/admin_api/user_admin_api.rst#list-accounts),
+which has been available since Synapse 1.7.0 (2019-12-13).
 
-The new API is available since Synapse 1.7.0 (2019-12-13).
-
-The old API has no documentation and unit tests. It is misleading.
-It expects user_id and returns a list of all users.
-
-`GET /_synapse/admin/v2/users` replaces `GET /_synapse/admin/v1/users/<user_id>`.
+Please check any scripts you might have for the admin API and replace
+`GET /_synapse/admin/v1/users/<user_id>` with `GET /_synapse/admin/v2/users`.
 
 
 Synapse 1.27.0 (2021-02-16)
