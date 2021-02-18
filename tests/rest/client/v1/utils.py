@@ -550,6 +550,20 @@ class RestHelper:
             "/_matrix/client/r0/login/sso/redirect?" + urllib.parse.urlencode(params),
         )
 
+        # that should 302 us to the public base url
+        assert channel.code == 302
+        location = channel.headers.getRawHeaders("Location")[0]
+        parts = urllib.parse.urlsplit(location)
+        channel = make_request(
+            self.hs.get_reactor(),
+            self.site,
+            "GET",
+            urllib.parse.urlunsplit(("", "") + parts[2:]),
+            custom_headers=[
+                ("Host", parts[1]),
+            ],
+        )
+
         assert channel.code == 302
         channel.extract_cookies(cookies)
         return channel.headers.getRawHeaders("Location")[0]
