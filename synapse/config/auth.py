@@ -16,8 +16,6 @@
 
 from ._base import Config
 
-con_fig = Config()
-
 
 class AuthConfig(Config):
     """Password and login configuration"""
@@ -39,7 +37,7 @@ class AuthConfig(Config):
 
         # User-interactive authentication
         ui_auth = config.get("ui_auth") or {}
-        self.ui_auth_session_timeout = con_fig.parse_duration(
+        self.ui_auth_session_timeout = self.parse_duration(
             ui_auth.get("session_timeout", 0)
         )
 
@@ -110,4 +108,7 @@ class AuthConfig(Config):
             # seconds.
             #
             #session_timeout: 15000
+            # Now ui_auth also allow standard duration formats such as "15s" to allow
+            # for credential validation to last for 15 seconds.
+            # session_timeout: "15s"
         """
