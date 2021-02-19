@@ -1,1 +1,0 @@
-Fix bug where Synapse would occaisonally stop reconnecting after the connection was lost.

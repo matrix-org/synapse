@@ -474,7 +474,7 @@ class FederationSender:
             self._processing_pending_presence = False
 
     def send_presence_to_destinations(
-        self, states: List[UserPresenceState], destinations: Iterable[str]
+        self, states: Iterable[UserPresenceState], destinations: Iterable[str]
     ) -> None:
         """Send the given presence states to the given destinations.
 
