@@ -892,8 +892,9 @@ class PresenceHandler(BasePresenceHandler):
 
             # Insert the destinations and respective updates into our destinations dict
             for destination in destinations:
-                presence_destinations.setdefault(destination, set())
-                presence_destinations[destination].update(user_presence_states)
+                presence_destinations.setdefault(destination, set()).update(
+                    user_presence_states
+                )
 
         # Send out user presence updates for each destination
         for destination, user_state_set in presence_destinations.items():
@@ -905,7 +906,15 @@ class PresenceHandler(BasePresenceHandler):
         self, room_id: str, user_id: str
     ) -> Tuple[List[str], List[UserPresenceState]]:
         """Called when we detect a user joining the room via the current state
-        delta stream.
+        delta stream. Returns the destinations that need to be updated and the
+        presence updates to send to them.
+
+        Args:
+            room_id: The ID of the room that the user has joined.
+            user_id: The ID of the user that has joined the room.
+
+        Returns:
+            A tuple of (list of destinations, list of presence updates).
         """
         if self.is_mine_id(user_id):
             # If this is a local user then we need to send their presence
