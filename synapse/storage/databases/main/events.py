@@ -42,6 +42,7 @@ from synapse.logging.utils import log_function
 from synapse.storage._base import db_to_json, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.search import SearchEntry
+from synapse.storage.types import Connection
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
 from synapse.types import StateMap, get_domain_from_id
 from synapse.util import json_encoder
@@ -90,7 +91,11 @@ class PersistEventsStore:
     """
 
     def __init__(
-        self, hs: "HomeServer", db: DatabasePool, main_data_store: "DataStore"
+        self,
+        hs: "HomeServer",
+        db: DatabasePool,
+        main_data_store: "DataStore",
+        db_conn: Connection,
     ):
         self.hs = hs
         self.db_pool = db
@@ -108,6 +113,12 @@ class PersistEventsStore:
             self.store._backfill_id_gen
         )  # type: MultiWriterIdGenerator
         self._stream_id_gen = self.store._stream_id_gen  # type: MultiWriterIdGenerator
+
+        # The consistency of this cannot be checked when the ID generator is
+        # created since the database might not yet be up-to-date.
+        self.db_pool.event_chain_id_gen.check_consistency(
+            db_conn, "event_auth_chains", "chain_id"  # type: ignore
+        )
 
         # This should only exist on instances that are configured to write
         assert (

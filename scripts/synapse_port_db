@@ -635,6 +635,7 @@ class Porter(object):
             await self._setup_sequence(
                 "account_data_sequence", ("room_account_data", "room_tags_revisions", "account_data"))
             await self._setup_sequence("receipts_sequence", ("receipts_linearized", ))
+            await self._setup_auth_chain_sequence()
 
             # Step 3. Get tables.
             self.progress.set_state("Fetching tables")
@@ -933,11 +934,25 @@ class Porter(object):
         next_id = max(current_stream_ids) + 1
 
         def r(txn):
-            txn.execute(
-                "ALTER SEQUENCE %s RESTART WITH %s", (sequence_name, next_id,)
-            )
+            sql = "ALTER SEQUENCE %s RESTART WITH" % (sequence_name, )
+            txn.execute(sql + " %s", (next_id, ))
 
         await self.postgres_store.db_pool.runInteraction("_setup_%s" % (sequence_name,), r)
+
+    async def _setup_auth_chain_sequence(self) -> None:
+        curr_chain_id = await self.sqlite_store.db_pool.simple_select_one_onecol(
+            table="event_auth_chains", keyvalues={}, retcol="MAX(chain_id)", allow_none=True
+        )
+
+        def r(txn):
+            txn.execute(
+                "ALTER SEQUENCE event_auth_chain_id RESTART WITH %s",
+                (curr_chain_id,),
+            )
+
+        await self.postgres_store.db_pool.runInteraction(
+            "_setup_event_auth_chain_id", r,
+        )
 
 
 
