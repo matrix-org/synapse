@@ -859,7 +859,7 @@ class Porter(object):
 
         return done, remaining + done
 
-    async def _setup_state_group_id_seq(self):
+    async def _setup_state_group_id_seq(self) -> None:
         curr_id = await self.sqlite_store.db_pool.simple_select_one_onecol(
             table="state_groups", keyvalues={}, retcol="MAX(id)", allow_none=True
         )
@@ -873,7 +873,7 @@ class Porter(object):
 
         await self.postgres_store.db_pool.runInteraction("setup_state_group_id_seq", r)
 
-    async def _setup_user_id_seq(self):
+    async def _setup_user_id_seq(self) -> None:
         curr_id = await self.sqlite_store.db_pool.runInteraction(
             "setup_user_id_seq", find_max_generated_user_id_localpart
         )
@@ -882,9 +882,9 @@ class Porter(object):
             next_id = curr_id + 1
             txn.execute("ALTER SEQUENCE user_id_seq RESTART WITH %s", (next_id,))
 
-        return self.postgres_store.db_pool.runInteraction("setup_user_id_seq", r)
+        await self.postgres_store.db_pool.runInteraction("setup_user_id_seq", r)
 
-    async def _setup_events_stream_seqs(self):
+    async def _setup_events_stream_seqs(self) -> None:
         """Set the event stream sequences to the correct values.
         """
 
@@ -913,7 +913,7 @@ class Porter(object):
                 (curr_backward_id + 1,),
             )
 
-        return await self.postgres_store.db_pool.runInteraction(
+        await self.postgres_store.db_pool.runInteraction(
             "_setup_events_stream_seqs", _setup_events_stream_seqs_set_pos,
         )
 
