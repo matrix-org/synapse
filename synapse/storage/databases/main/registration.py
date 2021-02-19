@@ -69,6 +69,14 @@ class TokenLookupResult:
         return self.user_id
 
 
+@attr.s(frozen=True, slots=True)
+class RefreshTokenLookupResult:
+    user_id = attr.ib(type=str)
+    device_id = attr.ib(type=str)
+    token_id = attr.ib(type=int)
+    valid = attr.ib(type=bool)
+
+
 class RegistrationWorkerStore(CacheInvalidationWorkerStore):
     def __init__(
         self,
@@ -1042,6 +1050,32 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="update_access_token_last_validated",
         )
 
+    async def lookup_refresh_token(
+        self, token: str
+    ) -> Optional[RefreshTokenLookupResult]:
+        d = await self.db_pool.simple_select_one(
+            "refresh_tokens",
+            {"token": token},
+            ["id", "user_id", "device_id", "valid"],
+            allow_none=True,
+            desc="lookup_refresh_token",
+        )
+
+        if d is not None:
+            d["token_id"] = d["id"]
+            del d["id"]
+            return RefreshTokenLookupResult(**d)
+
+        return None
+
+    async def invalidate_refresh_token(self, token_id: int) -> None:
+        await self.db_pool.simple_update_one(
+            "refresh_tokens",
+            {"id": token_id},
+            {"valid": False},
+            desc="invalidate_refresh_token",
+        )
+
 
 class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
     def __init__(
@@ -1233,6 +1267,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         self._ignore_unknown_session_error = hs.config.request_token_inhibit_3pid_errors
 
         self._access_tokens_id_gen = IdGenerator(db_conn, "access_tokens", "id")
+        self._refresh_tokens_id_gen = IdGenerator(db_conn, "refresh_tokens", "id")
 
     async def add_access_token_to_user(
         self,
@@ -1241,6 +1276,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         device_id: Optional[str],
         valid_until_ms: Optional[int],
         puppets_user_id: Optional[str] = None,
+        refresh_token_id: Optional[int] = None,
     ) -> int:
         """Adds an access token for the given user.
 
@@ -1267,6 +1303,26 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                 "valid_until_ms": valid_until_ms,
                 "puppets_user_id": puppets_user_id,
                 "last_validated": now,
+                "refresh_token_id": refresh_token_id,
+            },
+            desc="add_access_token_to_user",
+        )
+
+        return next_id
+
+    async def add_refresh_token_to_user(
+        self, user_id: str, token: str, device_id: Optional[str],
+    ) -> int:
+        next_id = self._refresh_tokens_id_gen.get_next()
+
+        await self.db_pool.simple_insert(
+            "refresh_tokens",
+            {
+                "id": next_id,
+                "user_id": user_id,
+                "device_id": device_id,
+                "token": token,
+                "valid": True,
             },
             desc="add_access_token_to_user",
         )
@@ -1568,6 +1624,14 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             )
 
         await self.db_pool.runInteraction("delete_access_token", f)
+
+    async def delete_refresh_token(self, refresh_token: str) -> None:
+        def f(txn):
+            self.db_pool.simple_delete_one_txn(
+                txn, table="refresh_tokens", keyvalues={"token": refresh_token}
+            )
+
+        await self.db_pool.runInteraction("delete_refresh_token", f)
 
     async def add_user_pending_deactivation(self, user_id: str) -> None:
         """

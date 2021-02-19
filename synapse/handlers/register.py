@@ -738,10 +738,7 @@ class RegistrationHandler(BaseHandler):
             valid_until_ms = self.clock.time_msec() + self.session_lifetime
 
         refresh_token = None
-
-        if should_issue_refresh_token:
-            refresh_token = "FAKEREFRESHTOKEN"
-            valid_until_ms = self.clock.time_msec() + 60 * 1000
+        refresh_token_id = None
 
         registered_device_id = await self.device_handler.check_device_registered(
             user_id, device_id, initial_display_name
@@ -752,11 +749,21 @@ class RegistrationHandler(BaseHandler):
                 user_id, ["guest = true"]
             )
         else:
+            if should_issue_refresh_token:
+                (
+                    refresh_token,
+                    refresh_token_id,
+                ) = await self._auth_handler.get_refresh_token_for_user_id(
+                    user_id, device_id=registered_device_id,
+                )
+                valid_until_ms = self.clock.time_msec() + 60 * 1000
+
             access_token = await self._auth_handler.get_access_token_for_user_id(
                 user_id,
                 device_id=registered_device_id,
                 valid_until_ms=valid_until_ms,
                 is_appservice_ghost=is_appservice_ghost,
+                refresh_token_id=refresh_token_id,
             )
 
         return {

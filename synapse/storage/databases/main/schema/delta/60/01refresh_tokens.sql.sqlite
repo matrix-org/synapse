@@ -1,0 +1,31 @@
+CREATE TABLE refresh_tokens (
+  id BIGINT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  device_id TEXT,
+  token TEXT NOT NULL,
+  valid BOOLEAN NOT NULL,
+  UNIQUE(token)
+);
+
+-- Adding the refresh_token column to access tokens
+CREATE TABLE "access_tokens2" (
+  id BIGINT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  device_id TEXT,
+  token TEXT NOT NULL,
+  valid_until_ms BIGINT,
+  puppets_user_id TEXT,
+  last_validated BIGINT,
+  refresh_token_id BIGINT,
+  UNIQUE(token),
+  FOREIGN KEY (refresh_token_id)
+    REFERENCES refresh_tokens (id) ON DELETE CASCADE
+);
+
+INSERT INTO access_tokens2(id, user_id, device_id, token, valid_until_ms, puppets_user_id, last_validated)
+    SELECT id, user_id, device_id, token, valid_until_ms, puppets_user_id, last_validated FROM access_tokens;
+
+DROP TABLE access_tokens;
+ALTER TABLE access_tokens2 RENAME TO access_tokens;
+
+CREATE INDEX access_tokens_device_id ON access_tokens (user_id, device_id);

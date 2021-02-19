@@ -446,6 +446,40 @@ def _get_auth_flow_dict_for_idp(
     return e
 
 
+class RefreshTokenServlet(RestServlet):
+    PATTERNS = client_patterns(
+        "/org.matrix.msc2918.refresh_token/refresh$", releases=(), unstable=True
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        self._auth_handler = hs.get_auth_handler()
+        self._clock = hs.get_clock()
+
+    async def on_POST(
+        self, request: SynapseRequest,
+    ):
+        refresh_submission = parse_json_object_from_request(request)
+
+        try:
+            token = refresh_submission["refresh_token"]
+            valid_until_ms = self._clock.time_msec() + 60 * 1000
+            access_token, refresh_token = await self._auth_handler.refresh_token(
+                token, valid_until_ms
+            )
+            expires_in_ms = valid_until_ms - self._clock.time_msec()
+            return (
+                200,
+                {
+                    "access_token": access_token,
+                    "refresh_token": refresh_token,
+                    "expires_in": int(expires_in_ms / 1000),
+                },
+            )
+
+        except KeyError:
+            raise SynapseError(400, "Missing JSON keys.")
+
+
 class SsoRedirectServlet(RestServlet):
     PATTERNS = list(client_patterns("/login/(cas|sso)/redirect$", v1=True)) + [
         re.compile(
@@ -553,6 +587,7 @@ class CasTicketServlet(RestServlet):
 
 def register_servlets(hs, http_server):
     LoginRestServlet(hs).register(http_server)
+    RefreshTokenServlet(hs).register(http_server)
     SsoRedirectServlet(hs).register(http_server)
     if hs.config.cas_enabled:
         CasTicketServlet(hs).register(http_server)

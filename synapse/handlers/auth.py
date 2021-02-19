@@ -772,6 +772,40 @@ class AuthHandler(BaseHandler):
             "params": params,
         }
 
+    async def refresh_token(
+        self, refresh_token: str, valid_until_ms: Optional[int],
+    ) -> Tuple[str, str]:
+        existing_token = await self.store.lookup_refresh_token(refresh_token)
+        if existing_token is None:
+            raise SynapseError(400, "refresh token does not exist")
+
+        if not existing_token.valid:
+            raise SynapseError(400, "refresh token isn't valid anymore")
+
+        (
+            new_refresh_token,
+            new_refresh_token_id,
+        ) = await self.get_refresh_token_for_user_id(
+            user_id=existing_token.user_id, device_id=existing_token.device_id
+        )
+        access_token = await self.get_access_token_for_user_id(
+            user_id=existing_token.user_id,
+            device_id=existing_token.device_id,
+            valid_until_ms=valid_until_ms,
+            refresh_token_id=new_refresh_token_id,
+        )
+        await self.store.invalidate_refresh_token(existing_token.token_id)
+        return access_token, new_refresh_token
+
+    async def get_refresh_token_for_user_id(
+        self, user_id: str, device_id: Optional[str],
+    ) -> Tuple[str, int]:
+        refresh_token = self.macaroon_gen.generate_refresh_token(user_id)
+        refresh_token_id = await self.store.add_refresh_token_to_user(
+            user_id=user_id, token=refresh_token, device_id=device_id,
+        )
+        return refresh_token, refresh_token_id
+
     async def get_access_token_for_user_id(
         self,
         user_id: str,
@@ -779,6 +813,7 @@ class AuthHandler(BaseHandler):
         valid_until_ms: Optional[int],
         puppets_user_id: Optional[str] = None,
         is_appservice_ghost: bool = False,
+        refresh_token_id: Optional[int] = None,
     ) -> str:
         """
         Creates a new access token for the user with the given user ID.
@@ -829,6 +864,7 @@ class AuthHandler(BaseHandler):
             device_id=device_id,
             valid_until_ms=valid_until_ms,
             puppets_user_id=puppets_user_id,
+            refresh_token_id=refresh_token_id,
         )
 
         # the device *should* have been registered before we got here; however,
@@ -1588,6 +1624,21 @@ class AuthHandler(BaseHandler):
 class MacaroonGenerator:
 
     hs = attr.ib()
+
+    def generate_refresh_token(
+        self, user_id: str, extra_caveats: Optional[List[str]] = None
+    ) -> str:
+        extra_caveats = extra_caveats or []
+        macaroon = self._generate_base_macaroon(user_id)
+        macaroon.add_first_party_caveat("type = refresh")
+        # Include a nonce, to make sure that each login gets a different
+        # access token.
+        macaroon.add_first_party_caveat(
+            "nonce = %s" % (stringutils.random_string_with_symbols(16),)
+        )
+        for caveat in extra_caveats:
+            macaroon.add_first_party_caveat(caveat)
+        return macaroon.serialize()
 
     def generate_access_token(
         self, user_id: str, extra_caveats: Optional[List[str]] = None
