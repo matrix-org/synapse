@@ -310,8 +310,7 @@ class ProfileHandler(BaseHandler):
         await self._update_join_states(requester, target_user)
 
     async def on_profile_query(self, args: JsonDict) -> JsonDict:
-        """Handles federation profile query requests.
-        """
+        """Handles federation profile query requests."""
 
         if not self.hs.config.allow_profile_lookup_over_federation:
             raise SynapseError(
