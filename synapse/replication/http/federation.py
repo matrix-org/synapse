@@ -213,8 +213,9 @@ class ReplicationGetQueryRestServlet(ReplicationEndpoint):
             content = parse_json_object_from_request(request)
 
             args = content["args"]
+            args["origin"] = content["origin"]
 
-        logger.info("Got %r query", query_type)
+        logger.info("Got %r query from %s", query_type, args["origin"])
 
         result = await self.registry.on_query(query_type, args)
 
