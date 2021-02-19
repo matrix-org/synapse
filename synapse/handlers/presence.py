@@ -914,7 +914,7 @@ class PresenceHandler(BasePresenceHandler):
             user_id: The ID of the user that has joined the room.
 
         Returns:
-            A tuple of (list of destinations, list of presence updates).
+            A tuple of destinations and presence updates to send to them.
         """
         if self.is_mine_id(user_id):
             # If this is a local user then we need to send their presence
