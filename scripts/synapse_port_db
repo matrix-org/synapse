@@ -22,7 +22,7 @@ import logging
 import sys
 import time
 import traceback
-from typing import Dict, Optional, Set
+from typing import Dict, Iterable, Optional, Set
 
 import yaml
 
@@ -629,7 +629,9 @@ class Porter(object):
             await self._setup_state_group_id_seq()
             await self._setup_user_id_seq()
             await self._setup_events_stream_seqs()
-            await self._setup_device_inbox_seq()
+            await self._setup_sequence(
+                "device_inbox_sequence", ("device_inbox", "device_federation_outbox")
+            )
 
             # Step 3. Get tables.
             self.progress.set_state("Fetching tables")
@@ -912,31 +914,28 @@ class Porter(object):
             "_setup_events_stream_seqs", _setup_events_stream_seqs_set_pos,
         )
 
-    async def _setup_device_inbox_seq(self):
-        """Set the device inbox sequence to the correct value.
+    async def _setup_sequence(self, sequence_name: str, stream_id_tables: Iterable[str]) -> None:
+        """Set a sequence to the correct value.
         """
-        curr_local_id = await self.sqlite_store.db_pool.simple_select_one_onecol(
-            table="device_inbox",
-            keyvalues={},
-            retcol="COALESCE(MAX(stream_id), 1)",
-            allow_none=True,
-        )
+        current_stream_ids = []
+        for stream_id_table in stream_id_tables:
+            max_stream_id = await self.sqlite_store.db_pool.simple_select_one_onecol(
+                table=stream_id_table,
+                keyvalues={},
+                retcol="COALESCE(MAX(stream_id), 1)",
+                allow_none=True,
+            )
+            current_stream_ids.append(max_stream_id)
 
-        curr_federation_id = await self.sqlite_store.db_pool.simple_select_one_onecol(
-            table="device_federation_outbox",
-            keyvalues={},
-            retcol="COALESCE(MAX(stream_id), 1)",
-            allow_none=True,
-        )
-
-        next_id = max(curr_local_id, curr_federation_id) + 1
+        next_id = max(current_stream_ids) + 1
 
         def r(txn):
             txn.execute(
-                "ALTER SEQUENCE device_inbox_sequence RESTART WITH %s", (next_id,)
+                "ALTER SEQUENCE %s RESTART WITH %s", (sequence_name, next_id,)
             )
 
-        return self.postgres_store.db_pool.runInteraction("_setup_device_inbox_seq", r)
+        await self.postgres_store.db_pool.runInteraction("_setup_%s" % (sequence_name,), r)
+
 
 
 ##############################################
