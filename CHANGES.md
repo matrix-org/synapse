@@ -1,4 +1,4 @@
-Synapse 1.28.0rc1 (2021-02-18)
+Synapse 1.28.0rc1 (2021-02-19)
 ==============================
 
 Note that this release drops support for ARMv7 in the official Docker images, due to repeated problems building for ARMv7 (and the associated maintenance burden this entails).
