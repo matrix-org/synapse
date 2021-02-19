@@ -14,7 +14,7 @@ jobs:
           platforms: linux/amd64
       - docker_build:
           tag: -t matrixdotorg/synapse:${CIRCLE_TAG}
-          platforms: linux/amd64,linux/arm/v7,linux/arm64
+          platforms: linux/amd64,linux/arm64
 
   dockerhubuploadlatest:
     docker:
@@ -27,7 +27,7 @@ jobs:
       # until all of the platforms are built.
       - docker_build:
           tag: -t matrixdotorg/synapse:latest
-          platforms: linux/amd64,linux/arm/v7,linux/arm64
+          platforms: linux/amd64,linux/arm64
 
 workflows:
   build:

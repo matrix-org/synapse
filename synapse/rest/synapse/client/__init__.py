@@ -54,11 +54,7 @@ def build_synapse_client_resource_tree(hs: "HomeServer") -> Mapping[str, Resourc
     if hs.config.saml2_enabled:
         from synapse.rest.synapse.client.saml2 import SAML2Resource
 
-        res = SAML2Resource(hs)
-        resources["/_synapse/client/saml2"] = res
-
-        # This is also mounted under '/_matrix' for backwards-compatibility.
-        resources["/_matrix/saml2"] = res
+        resources["/_synapse/client/saml2"] = SAML2Resource(hs)
 
     return resources
 
