@@ -244,7 +244,7 @@ class MediaStorage:
                     await consumer.wait()
                 return local_path
 
-        raise Exception("file could not be found")
+        raise NotFoundError()
 
     def _file_info_to_path(self, file_info: FileInfo) -> str:
         """Converts file_info into a relative path.
