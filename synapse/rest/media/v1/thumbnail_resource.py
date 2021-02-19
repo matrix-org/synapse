@@ -340,6 +340,13 @@ class ThumbnailResource(DirectServeJsonResource):
             # width/height/method so we can just call the "generate exact"
             # methods.
 
+            # First let's check that we do actually have the original image
+            # still. This will throw a 404 if we don't.
+            # TODO: We should refetch the thumbnails for remote media.
+            await self.media_storage.ensure_media_is_in_local_cache(
+                FileInfo(server_name, file_id, url_cache=url_cache)
+            )
+
             if server_name:
                 await self.media_repo.generate_remote_exact_thumbnail(
                     server_name,
