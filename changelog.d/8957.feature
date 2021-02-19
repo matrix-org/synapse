@@ -1,1 +1,1 @@
-Add rate limiters to key sharing requests.
+Add rate limiters to cross-user key sharing requests.

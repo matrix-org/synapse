@@ -103,8 +103,8 @@ class RatelimitConfig(Config):
         )
 
         # Ratelimit cross-user key requests:
-        # * For locacl requests this is done by the sending devie.
-        # * For requests received over federation this is done by the origin.
+        # * For local requests this is keyed by the sending device.
+        # * For requests received over federation this is keyed by the origin.
         #
         # Note that this isn't exposed in the configuration as it is obscure.
         self.rc_key_requests = RateLimitConfig(

@@ -190,7 +190,7 @@ class DeviceMessageHandler:
             if (
                 message_type == EduTypes.RoomKeyRequest
                 and user_id != sender_user_id
-                and self._ratelimiter.can_do_action(requester.device_id)
+                and self._ratelimiter.can_do_action((sender_user_id, requester.device_id))
             ):
                 continue
 
