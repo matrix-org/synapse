@@ -23,11 +23,10 @@ from twisted.web.http_headers import Headers
 
 
 class HttpClient:
-    """ Interface for talking json over http
-    """
+    """Interface for talking json over http"""
 
     def put_json(self, url, data):
-        """ Sends the specifed json data using PUT
+        """Sends the specifed json data using PUT
 
         Args:
             url (str): The URL to PUT data to.
@@ -41,7 +40,7 @@ class HttpClient:
         pass
 
     def get_json(self, url, args=None):
-        """ Gets some json from the given host homeserver and path
+        """Gets some json from the given host homeserver and path
 
         Args:
             url (str): The URL to GET data from.
@@ -58,7 +57,7 @@ class HttpClient:
 
 
 class TwistedHttpClient(HttpClient):
-    """ Wrapper around the twisted HTTP client api.
+    """Wrapper around the twisted HTTP client api.
 
     Attributes:
         agent (twisted.web.client.Agent): The twisted Agent used to send the
@@ -87,8 +86,7 @@ class TwistedHttpClient(HttpClient):
         defer.returnValue(json.loads(body))
 
     def _create_put_request(self, url, json_data, headers_dict={}):
-        """ Wrapper of _create_request to issue a PUT request
-        """
+        """Wrapper of _create_request to issue a PUT request"""
 
         if "Content-Type" not in headers_dict:
             raise defer.error(RuntimeError("Must include Content-Type header for PUTs"))
@@ -98,8 +96,7 @@ class TwistedHttpClient(HttpClient):
         )
 
     def _create_get_request(self, url, headers_dict={}):
-        """ Wrapper of _create_request to issue a GET request
-        """
+        """Wrapper of _create_request to issue a GET request"""
         return self._create_request("GET", url, headers_dict=headers_dict)
 
     @defer.inlineCallbacks
@@ -127,8 +124,7 @@ class TwistedHttpClient(HttpClient):
 
     @defer.inlineCallbacks
     def _create_request(self, method, url, producer=None, headers_dict={}):
-        """ Creates and sends a request to the given url
-        """
+        """Creates and sends a request to the given url"""
         headers_dict["User-Agent"] = ["Synapse Cmd Client"]
 
         retries_left = 5
@@ -185,8 +181,7 @@ class _RawProducer:
 
 
 class _JsonProducer:
-    """ Used by the twisted http client to create the HTTP body from json
-    """
+    """Used by the twisted http client to create the HTTP body from json"""
 
     def __init__(self, jsn):
         self.data = jsn

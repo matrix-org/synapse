@@ -48,8 +48,7 @@ class _GetStateGroupDelta(
 
 
 class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
-    """A data store for fetching/storing state groups.
-    """
+    """A data store for fetching/storing state groups."""
 
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
@@ -89,7 +88,8 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             50000,
         )
         self._state_group_members_cache = DictionaryCache(
-            "*stateGroupMembersCache*", 500000,
+            "*stateGroupMembersCache*",
+            500000,
         )
 
         def get_max_state_group_txn(txn: Cursor):

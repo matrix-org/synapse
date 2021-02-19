@@ -44,8 +44,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         self.token2 = self.login("user2", "password")
 
     def test_single_public_joined_room(self):
-        """Test that we write *all* events for a public room
-        """
+        """Test that we write *all* events for a public room"""
         room_id = self.helper.create_room_as(
             self.user1, tok=self.token1, is_public=True
         )
@@ -116,8 +115,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         self.assertEqual(counter[(EventTypes.Member, self.user2)], 1)
 
     def test_single_left_room(self):
-        """Tests that we don't see events in the room after we leave.
-        """
+        """Tests that we don't see events in the room after we leave."""
         room_id = self.helper.create_room_as(self.user1, tok=self.token1)
         self.helper.send(room_id, body="Hello!", tok=self.token1)
         self.helper.join(room_id, self.user2, tok=self.token2)
@@ -190,8 +188,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         self.assertEqual(counter[(EventTypes.Member, self.user2)], 3)
 
     def test_invite(self):
-        """Tests that pending invites get handled correctly.
-        """
+        """Tests that pending invites get handled correctly."""
         room_id = self.helper.create_room_as(self.user1, tok=self.token1)
         self.helper.send(room_id, body="Hello!", tok=self.token1)
         self.helper.invite(room_id, self.user1, self.user2, tok=self.token1)

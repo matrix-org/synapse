@@ -116,8 +116,7 @@ class EmailPusher(Pusher):
         self._is_processing = True
 
     def _resume_processing(self) -> None:
-        """Used by tests to resume processing of events after pausing.
-        """
+        """Used by tests to resume processing of events after pausing."""
         assert self._is_processing
         self._is_processing = False
         self._start_processing()
@@ -157,8 +156,10 @@ class EmailPusher(Pusher):
         being run.
         """
         start = 0 if INCLUDE_ALL_UNREAD_NOTIFS else self.last_stream_ordering
-        unprocessed = await self.store.get_unread_push_actions_for_user_in_range_for_email(
-            self.user_id, start, self.max_stream_ordering
+        unprocessed = (
+            await self.store.get_unread_push_actions_for_user_in_range_for_email(
+                self.user_id, start, self.max_stream_ordering
+            )
         )
 
         soonest_due_at = None  # type: Optional[int]
@@ -222,12 +223,14 @@ class EmailPusher(Pusher):
         self, last_stream_ordering: int
     ) -> None:
         self.last_stream_ordering = last_stream_ordering
-        pusher_still_exists = await self.store.update_pusher_last_stream_ordering_and_success(
-            self.app_id,
-            self.email,
-            self.user_id,
-            last_stream_ordering,
-            self.clock.time_msec(),
+        pusher_still_exists = (
+            await self.store.update_pusher_last_stream_ordering_and_success(
+                self.app_id,
+                self.email,
+                self.user_id,
+                last_stream_ordering,
+                self.clock.time_msec(),
+            )
         )
         if not pusher_still_exists:
             # The pusher has been deleted while we were processing, so
@@ -298,7 +301,8 @@ class EmailPusher(Pusher):
                     current_throttle_ms * THROTTLE_MULTIPLIER, THROTTLE_MAX_MS
                 )
         self.throttle_params[room_id] = ThrottleParams(
-            self.clock.time_msec(), new_throttle_ms,
+            self.clock.time_msec(),
+            new_throttle_ms,
         )
         assert self.pusher_id is not None
         await self.store.set_throttle_params(

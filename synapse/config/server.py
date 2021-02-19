@@ -52,7 +52,12 @@ def _6to4(network: IPNetwork) -> IPNetwork:
     hex_network = hex(network.first)[2:]
     hex_network = ("0" * (8 - len(hex_network))) + hex_network
     return IPNetwork(
-        "2002:%s:%s::/%d" % (hex_network[:4], hex_network[4:], 16 + network.prefixlen,)
+        "2002:%s:%s::/%d"
+        % (
+            hex_network[:4],
+            hex_network[4:],
+            16 + network.prefixlen,
+        )
     )
 
 
@@ -230,11 +235,7 @@ class ServerConfig(Config):
         self.print_pidfile = config.get("print_pidfile")
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
-        self.public_baseurl = config.get("public_baseurl") or "https://%s/" % (
-            self.server_name,
-        )
-        if self.public_baseurl[-1] != "/":
-            self.public_baseurl += "/"
+        self.public_baseurl = config.get("public_baseurl")
 
         # Whether to enable user presence.
         self.use_presence = config.get("use_presence", True)
@@ -258,7 +259,14 @@ class ServerConfig(Config):
         # Whether to require sharing a room with a user to retrieve their
         # profile data
         self.limit_profile_requests_to_users_who_share_rooms = config.get(
-            "limit_profile_requests_to_users_who_share_rooms", False,
+            "limit_profile_requests_to_users_who_share_rooms",
+            False,
+        )
+
+        # Whether to retrieve and display profile data for a user when they
+        # are invited to a room
+        self.include_profile_data_on_invite = config.get(
+            "include_profile_data_on_invite", True
         )
 
         if "restrict_public_rooms_to_local_users" in config and (
@@ -386,6 +394,9 @@ class ServerConfig(Config):
             config_path=("federation_ip_range_blacklist",),
         )
 
+        if self.public_baseurl is not None:
+            if self.public_baseurl[-1] != "/":
+                self.public_baseurl += "/"
         self.start_pushers = config.get("start_pushers", True)
 
         # (undocumented) option for torturing the worker-mode replication a bit,
@@ -615,7 +626,9 @@ class ServerConfig(Config):
         if manhole:
             self.listeners.append(
                 ListenerConfig(
-                    port=manhole, bind_addresses=["127.0.0.1"], type="manhole",
+                    port=manhole,
+                    bind_addresses=["127.0.0.1"],
+                    type="manhole",
                 )
             )
 
@@ -651,7 +664,8 @@ class ServerConfig(Config):
         # and letting the client know which email address is bound to an account and
         # which one isn't.
         self.request_token_inhibit_3pid_errors = config.get(
-            "request_token_inhibit_3pid_errors", False,
+            "request_token_inhibit_3pid_errors",
+            False,
         )
 
         # List of users trialing the new experimental default push rules. This setting is
@@ -813,10 +827,6 @@ class ServerConfig(Config):
         # Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
         # 'listeners' below).
         #
-        # If this is left unset, it defaults to 'https://<server_name>/'. (Note that
-        # that will not work unless you configure Synapse or a reverse-proxy to listen
-        # on port 443.)
-        #
         #public_baseurl: https://example.com/
 
         # Set the soft limit on the number of file descriptors synapse can use
@@ -843,6 +853,14 @@ class ServerConfig(Config):
         # requesting server. Defaults to 'false'.
         #
         #limit_profile_requests_to_users_who_share_rooms: true
+
+        # Uncomment to prevent a user's profile data from being retrieved and
+        # displayed in a room until they have joined it. By default, a user's
+        # profile data is included in an invite event, regardless of the values
+        # of the above two settings, and whether or not the users share a server.
+        # Defaults to 'true'.
+        #
+        #include_profile_data_on_invite: false
 
         # If set to 'true', removes the need for authentication to access the server's
         # public rooms directory through the client API, meaning that anyone can

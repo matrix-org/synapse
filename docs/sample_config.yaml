@@ -74,10 +74,6 @@ pid_file: DATADIR/homeserver.pid
 # Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
 # 'listeners' below).
 #
-# If this is left unset, it defaults to 'https://<server_name>/'. (Note that
-# that will not work unless you configure Synapse or a reverse-proxy to listen
-# on port 443.)
-#
 #public_baseurl: https://example.com/
 
 # Set the soft limit on the number of file descriptors synapse can use
@@ -104,6 +100,14 @@ pid_file: DATADIR/homeserver.pid
 # requesting server. Defaults to 'false'.
 #
 #limit_profile_requests_to_users_who_share_rooms: true
+
+# Uncomment to prevent a user's profile data from being retrieved and
+# displayed in a room until they have joined it. By default, a user's
+# profile data is included in an invite event, regardless of the values
+# of the above two settings, and whether or not the users share a server.
+# Defaults to 'true'.
+#
+#include_profile_data_on_invite: false
 
 # If set to 'true', removes the need for authentication to access the server's
 # public rooms directory through the client API, meaning that anyone can
@@ -703,6 +707,12 @@ acme:
 #  - matrix.org
 #  - example.com
 
+# Uncomment to disable profile lookup over federation. By default, the
+# Federation API allows other homeservers to obtain profile data of any user
+# on this homeserver. Defaults to 'true'.
+#
+#allow_profile_lookup_over_federation: false
+
 
 ## Caching ##
 
@@ -1177,9 +1187,8 @@ account_validity:
   # send an email to the account's email address with a renewal link. By
   # default, no such emails are sent.
   #
-  # If you enable this setting, you will also need to fill out the 'email'
-  # configuration section. You should also check that 'public_baseurl' is set
-  # correctly.
+  # If you enable this setting, you will also need to fill out the 'email' and
+  # 'public_baseurl' configuration sections.
   #
   #renew_at: 1w
 
@@ -1270,7 +1279,8 @@ account_validity:
 # The identity server which we suggest that clients should use when users log
 # in on this server.
 #
-# (By default, no suggestion is made, so it is left up to the client.)
+# (By default, no suggestion is made, so it is left up to the client.
+# This setting is ignored unless public_baseurl is also set.)
 #
 #default_identity_server: https://matrix.org
 
@@ -1294,6 +1304,8 @@ account_validity:
 # Servers handling the these requests must answer the `/requestToken` endpoints defined
 # by the Matrix Identity Service API specification:
 # https://matrix.org/docs/spec/identity_service/latest
+#
+# If a delegate is specified, the config option public_baseurl must also be filled out.
 #
 account_threepid_delegates:
     #email: https://example.com     # Delegate email sending to example.com
@@ -1948,9 +1960,9 @@ sso:
     # phishing attacks from evil.site. To avoid this, include a slash after the
     # hostname: "https://my.client/".
     #
-    # The login fallback page (used by clients that don't natively support the
-    # required login flows) is automatically whitelisted in addition to any URLs
-    # in this list.
+    # If public_baseurl is set, then the login fallback page (used by clients
+    # that don't natively support the required login flows) is whitelisted in
+    # addition to any URLs in this list.
     #
     # By default, this list is empty.
     #
@@ -2230,11 +2242,11 @@ password_config:
       #require_uppercase: true
 
 ui_auth:
-    # The number of milliseconds to allow a user-interactive authentication
-    # session to be active.
+    # The amount of time to allow a user-interactive authentication session
+    # to be active.
     #
     # This defaults to 0, meaning the user is queried for their credentials
-    # before every action, but this can be overridden to alow a single
+    # before every action, but this can be overridden to allow a single
     # validation to be re-used.  This weakens the protections afforded by
     # the user-interactive authentication process, by allowing for multiple
     # (and potentially different) operations to use the same validation session.
@@ -2242,7 +2254,7 @@ ui_auth:
     # Uncomment below to allow for credential validation to last for 15
     # seconds.
     #
-    #session_timeout: 15000
+    #session_timeout: "15s"
 
 
 # Configuration for sending emails from Synapse.
@@ -2542,9 +2554,14 @@ spam_checker:
 # rebuild the user_directory search indexes, see
 # https://github.com/matrix-org/synapse/blob/master/docs/user_directory.md
 #
+# 'prefer_local_users' defines whether to prioritise local users in
+# search query results. If True, local users are more likely to appear above
+# remote users when searching the user directory. Defaults to false.
+#
 #user_directory:
 #  enabled: true
 #  search_all_users: false
+#  prefer_local_users: false
 
 
 # User Consent configuration

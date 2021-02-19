@@ -275,7 +275,9 @@ class ModuleApi:
                 redirect them directly if whitelisted).
         """
         self._auth_handler._complete_sso_login(
-            registered_user_id, request, client_redirect_url,
+            registered_user_id,
+            request,
+            client_redirect_url,
         )
 
     async def complete_sso_login_async(
@@ -352,7 +354,10 @@ class ModuleApi:
             event,
             _,
         ) = await self._hs.get_event_creation_handler().create_and_send_nonmember_event(
-            requester, event_dict, ratelimit=False, ignore_shadow_ban=True,
+            requester,
+            event_dict,
+            ratelimit=False,
+            ignore_shadow_ban=True,
         )
 
         return event

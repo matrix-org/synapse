@@ -64,7 +64,8 @@ class DeviceMessageHandler:
             )
         else:
             hs.get_federation_registry().register_instances_for_edu(
-                "m.direct_to_device", hs.config.worker.writers.to_device,
+                "m.direct_to_device",
+                hs.config.worker.writers.to_device,
             )
 
         # The handler to call when we think a user's device list might be out of
@@ -75,8 +76,8 @@ class DeviceMessageHandler:
                 hs.get_device_handler().device_list_updater.user_device_resync
             )
         else:
-            self._user_device_resync = ReplicationUserDevicesResyncRestServlet.make_client(
-                hs
+            self._user_device_resync = (
+                ReplicationUserDevicesResyncRestServlet.make_client(hs)
             )
 
         self._ratelimiter = Ratelimiter(

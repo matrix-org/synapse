@@ -124,7 +124,8 @@ class InitialSyncHandler(BaseHandler):
 
         joined_rooms = [r.room_id for r in room_list if r.membership == Membership.JOIN]
         receipt = await self.store.get_linearized_receipts_for_rooms(
-            joined_rooms, to_key=int(now_token.receipt_key),
+            joined_rooms,
+            to_key=int(now_token.receipt_key),
         )
 
         tags_by_room = await self.store.get_tags_for_user(user_id)
@@ -169,7 +170,10 @@ class InitialSyncHandler(BaseHandler):
                         self.state_handler.get_current_state, event.room_id
                     )
                 elif event.membership == Membership.LEAVE:
-                    room_end_token = RoomStreamToken(None, event.stream_ordering,)
+                    room_end_token = RoomStreamToken(
+                        None,
+                        event.stream_ordering,
+                    )
                     deferred_room_state = run_in_background(
                         self.state_store.get_state_for_events, [event.event_id]
                     )
@@ -284,7 +288,9 @@ class InitialSyncHandler(BaseHandler):
             membership,
             member_event_id,
         ) = await self.auth.check_user_in_room_or_world_readable(
-            room_id, user_id, allow_departed_users=True,
+            room_id,
+            user_id,
+            allow_departed_users=True,
         )
         is_peeking = member_event_id is None
 

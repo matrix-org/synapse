@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 class RoomUpgradeRestServlet(RestServlet):
-    """Handler for room uprade requests.
+    """Handler for room upgrade requests.
 
     Handles requests of the form:
 

@@ -40,12 +40,12 @@ the reverse proxy and the homeserver.
 
 ```
 server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
 
     # For the federation port
-    listen 8448 ssl default_server;
-    listen [::]:8448 ssl default_server;
+    listen 8448 ssl http2 default_server;
+    listen [::]:8448 ssl http2 default_server;
 
     server_name matrix.example.com;
 

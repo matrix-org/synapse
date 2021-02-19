@@ -361,7 +361,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
     async def count_e2e_one_time_keys(
         self, user_id: str, device_id: str
     ) -> Dict[str, int]:
-        """ Count the number of one time keys the server has for a device
+        """Count the number of one time keys the server has for a device
         Returns:
             A mapping from algorithm to number of keys for that algorithm.
         """
@@ -494,7 +494,9 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
         )
 
     def _get_bare_e2e_cross_signing_keys_bulk_txn(
-        self, txn: Connection, user_ids: List[str],
+        self,
+        txn: Connection,
+        user_ids: List[str],
     ) -> Dict[str, Dict[str, dict]]:
         """Returns the cross-signing keys for a set of users.  The output of this
         function should be passed to _get_e2e_cross_signing_signatures_txn if
@@ -556,7 +558,10 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
         return result
 
     def _get_e2e_cross_signing_signatures_txn(
-        self, txn: Connection, keys: Dict[str, Dict[str, dict]], from_user_id: str,
+        self,
+        txn: Connection,
+        keys: Dict[str, Dict[str, dict]],
+        from_user_id: str,
     ) -> Dict[str, Dict[str, dict]]:
         """Returns the cross-signing signatures made by a user on a set of keys.
 

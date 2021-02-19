@@ -79,13 +79,16 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         # call `find_max_generated_user_id_localpart` each time, which is
         # expensive if there are many entries.
         self._user_id_seq = build_sequence_generator(
-            database.engine, find_max_generated_user_id_localpart, "user_id_seq",
+            database.engine,
+            find_max_generated_user_id_localpart,
+            "user_id_seq",
         )
 
         self._account_validity = hs.config.account_validity
         if hs.config.run_background_tasks and self._account_validity.enabled:
             self._clock.call_later(
-                0.0, self._set_expiration_date_when_missing,
+                0.0,
+                self._set_expiration_date_when_missing,
             )
 
         # Create a background job for culling expired 3PID validity tokens
@@ -110,6 +113,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 "creation_ts",
                 "user_type",
                 "deactivated",
+                "shadow_banned",
             ],
             allow_none=True,
             desc="get_user_by_id",
@@ -369,23 +373,25 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         """
 
         def set_shadow_banned_txn(txn):
+            user_id = user.to_string()
             self.db_pool.simple_update_one_txn(
                 txn,
                 table="users",
-                keyvalues={"name": user.to_string()},
+                keyvalues={"name": user_id},
                 updatevalues={"shadow_banned": shadow_banned},
             )
             # In order for this to apply immediately, clear the cache for this user.
             tokens = self.db_pool.simple_select_onecol_txn(
                 txn,
                 table="access_tokens",
-                keyvalues={"user_id": user.to_string()},
+                keyvalues={"user_id": user_id},
                 retcol="token",
             )
             for token in tokens:
                 self._invalidate_cache_and_stream(
                     txn, self.get_user_by_access_token, (token,)
                 )
+            self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 
         await self.db_pool.runInteraction("set_shadow_banned", set_shadow_banned_txn)
 

@@ -31,7 +31,9 @@ class SortedList(MutableSequence[_T]):
 
     DEFAULT_LOAD_FACTOR: int = ...
     def __init__(
-        self, iterable: Optional[Iterable[_T]] = ..., key: Optional[_Key[_T]] = ...,
+        self,
+        iterable: Optional[Iterable[_T]] = ...,
+        key: Optional[_Key[_T]] = ...,
     ): ...
     # NB: currently mypy does not honour return type, see mypy #3307
     @overload
@@ -76,10 +78,18 @@ class SortedList(MutableSequence[_T]):
     def __len__(self) -> int: ...
     def reverse(self) -> None: ...
     def islice(
-        self, start: Optional[int] = ..., stop: Optional[int] = ..., reverse=bool,
+        self,
+        start: Optional[int] = ...,
+        stop: Optional[int] = ...,
+        reverse=bool,
     ) -> Iterator[_T]: ...
     def _islice(
-        self, min_pos: int, min_idx: int, max_pos: int, max_idx: int, reverse: bool,
+        self,
+        min_pos: int,
+        min_idx: int,
+        max_pos: int,
+        max_idx: int,
+        reverse: bool,
     ) -> Iterator[_T]: ...
     def irange(
         self,

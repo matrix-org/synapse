@@ -36,8 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 class ReplicationStreamProtocolFactory(Factory):
-    """Factory for new replication connections.
-    """
+    """Factory for new replication connections."""
 
     def __init__(self, hs):
         self.command_handler = hs.get_tcp_replication()
@@ -181,7 +180,8 @@ class ReplicationStreamer:
                             raise
 
                         logger.debug(
-                            "Sending %d updates", len(updates),
+                            "Sending %d updates",
+                            len(updates),
                         )
 
                         if updates:

@@ -44,7 +44,9 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         self.room_id = self.helper.create_room_as(self.user_id, tok=self.access_token)
 
         self.info = self.get_success(
-            self.hs.get_datastore().get_user_by_access_token(self.access_token,)
+            self.hs.get_datastore().get_user_by_access_token(
+                self.access_token,
+            )
         )
         self.token_id = self.info.token_id
 
@@ -169,8 +171,7 @@ class ServerAclValidationTestCase(unittest.HomeserverTestCase):
         self.room_id = self.helper.create_room_as(self.user_id, tok=self.access_token)
 
     def test_allow_server_acl(self):
-        """Test that sending an ACL that blocks everyone but ourselves works.
-        """
+        """Test that sending an ACL that blocks everyone but ourselves works."""
 
         self.helper.send_state(
             self.room_id,
@@ -181,8 +182,7 @@ class ServerAclValidationTestCase(unittest.HomeserverTestCase):
         )
 
     def test_deny_server_acl_block_outselves(self):
-        """Test that sending an ACL that blocks ourselves does not work.
-        """
+        """Test that sending an ACL that blocks ourselves does not work."""
         self.helper.send_state(
             self.room_id,
             EventTypes.ServerACL,
@@ -192,8 +192,7 @@ class ServerAclValidationTestCase(unittest.HomeserverTestCase):
         )
 
     def test_deny_redact_server_acl(self):
-        """Test that attempting to redact an ACL is blocked.
-        """
+        """Test that attempting to redact an ACL is blocked."""
 
         body = self.helper.send_state(
             self.room_id,

@@ -252,8 +252,7 @@ class Linearizer:
         self.key_to_defer = {}  # type: Dict[Hashable, _LinearizerEntry]
 
     def is_queued(self, key: Hashable) -> bool:
-        """Checks whether there is a process queued up waiting
-        """
+        """Checks whether there is a process queued up waiting"""
         entry = self.key_to_defer.get(key)
         if not entry:
             # No entry so nothing is waiting.
@@ -452,7 +451,9 @@ R = TypeVar("R")
 
 
 def timeout_deferred(
-    deferred: defer.Deferred, timeout: float, reactor: IReactorTime,
+    deferred: defer.Deferred,
+    timeout: float,
+    reactor: IReactorTime,
 ) -> defer.Deferred:
     """The in built twisted `Deferred.addTimeout` fails to time out deferreds
     that have a canceller that throws exceptions. This method creates a new
@@ -497,7 +498,7 @@ def timeout_deferred(
     delayed_call = reactor.callLater(timeout, time_it_out)
 
     def convert_cancelled(value: failure.Failure):
-        # if the orgininal deferred was cancelled, and our timeout has fired, then
+        # if the original deferred was cancelled, and our timeout has fired, then
         # the reason it was cancelled was due to our timeout. Turn the CancelledError
         # into a TimeoutError.
         if timed_out[0] and value.check(CancelledError):
@@ -529,8 +530,7 @@ def timeout_deferred(
 
 @attr.s(slots=True, frozen=True)
 class DoneAwaitable:
-    """Simple awaitable that returns the provided value.
-    """
+    """Simple awaitable that returns the provided value."""
 
     value = attr.ib()
 
@@ -545,8 +545,7 @@ class DoneAwaitable:
 
 
 def maybe_awaitable(value: Union[Awaitable[R], R]) -> Awaitable[R]:
-    """Convert a value to an awaitable if not already an awaitable.
-    """
+    """Convert a value to an awaitable if not already an awaitable."""
     if inspect.isawaitable(value):
         assert isinstance(value, Awaitable)
         return value

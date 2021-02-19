@@ -279,7 +279,8 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
         ret = self.get_success(
             e2e_handler.upload_signatures_for_device_keys(
-                u1, {u1: {"D1": d1_json, "D2": d2_json}},
+                u1,
+                {u1: {"D1": d1_json, "D2": d2_json}},
             )
         )
         self.assertEqual(ret["failures"], {})
@@ -486,9 +487,11 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
             self.assertGreaterEqual(content["stream_id"], prev_stream_id)
         return content["stream_id"]
 
-    def check_signing_key_update_txn(self, txn: JsonDict,) -> None:
-        """Check that the txn has an EDU with a signing key update.
-        """
+    def check_signing_key_update_txn(
+        self,
+        txn: JsonDict,
+    ) -> None:
+        """Check that the txn has an EDU with a signing key update."""
         edus = txn["edus"]
         self.assertEqual(len(edus), 1)
 
@@ -502,7 +505,9 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
         self.get_success(
             self.hs.get_e2e_keys_handler().upload_keys_for_user(
-                user_id, device_id, {"device_keys": device_dict},
+                user_id,
+                device_id,
+                {"device_keys": device_dict},
             )
         )
         return sk

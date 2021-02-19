@@ -73,7 +73,9 @@ class PowerLevelsTestCase(HomeserverTestCase):
 
         # Mod the mod
         room_power_levels = self.helper.get_state(
-            self.room_id, "m.room.power_levels", tok=self.admin_access_token,
+            self.room_id,
+            "m.room.power_levels",
+            tok=self.admin_access_token,
         )
 
         # Update existing power levels with mod at PL50

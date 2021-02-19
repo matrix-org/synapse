@@ -57,8 +57,7 @@ class EventStreamHandler(BaseHandler):
         room_id: Optional[str] = None,
         is_guest: bool = False,
     ) -> JsonDict:
-        """Fetches the events stream for a given user.
-        """
+        """Fetches the events stream for a given user."""
 
         if room_id:
             blocked = await self.store.is_room_blocked(room_id)

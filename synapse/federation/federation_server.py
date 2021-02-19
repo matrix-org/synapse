@@ -86,7 +86,8 @@ received_queries_counter = Counter(
 )
 
 pdu_process_time = Histogram(
-    "synapse_federation_server_pdu_process_time", "Time taken to process an event",
+    "synapse_federation_server_pdu_process_time",
+    "Time taken to process an event",
 )
 
 
@@ -205,7 +206,7 @@ class FederationServer(FederationBase):
     async def _handle_incoming_transaction(
         self, origin: str, transaction: Transaction, request_time: int
     ) -> Tuple[int, Dict[str, Any]]:
-        """ Process an incoming transaction and return the HTTP response
+        """Process an incoming transaction and return the HTTP response
 
         Args:
             origin: the server making the request
@@ -374,8 +375,7 @@ class FederationServer(FederationBase):
         return pdu_results
 
     async def _handle_edus_in_txn(self, origin: str, transaction: Transaction):
-        """Process the EDUs in a received transaction.
-        """
+        """Process the EDUs in a received transaction."""
 
         async def _process_edu(edu_dict):
             received_edus_counter.inc()
@@ -438,7 +438,10 @@ class FederationServer(FederationBase):
             raise AuthError(403, "Host not in room.")
 
         resp = await self._state_ids_resp_cache.wrap(
-            (room_id, event_id), self._on_state_ids_request_compute, room_id, event_id,
+            (room_id, event_id),
+            self._on_state_ids_request_compute,
+            room_id,
+            event_id,
         )
 
         return 200, resp
@@ -680,7 +683,7 @@ class FederationServer(FederationBase):
         )
 
     async def _handle_received_pdu(self, origin: str, pdu: EventBase) -> None:
-        """ Process a PDU received in a federation /send/ transaction.
+        """Process a PDU received in a federation /send/ transaction.
 
         If the event is invalid, then this method throws a FederationError.
         (The error will then be logged and sent back to the sender (which
@@ -914,13 +917,11 @@ class FederationHandlerRegistry:
         self.query_handlers[query_type] = handler
 
     def register_instance_for_edu(self, edu_type: str, instance_name: str):
-        """Register that the EDU handler is on a different instance than master.
-        """
+        """Register that the EDU handler is on a different instance than master."""
         self._edu_type_to_instance[edu_type] = [instance_name]
 
     def register_instances_for_edu(self, edu_type: str, instance_names: List[str]):
-        """Register that the EDU handler is on multiple instances.
-        """
+        """Register that the EDU handler is on multiple instances."""
         self._edu_type_to_instance[edu_type] = instance_names
 
     async def on_edu(self, edu_type: str, origin: str, content: dict):
