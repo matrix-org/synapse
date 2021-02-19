@@ -27,6 +27,7 @@ class UserDirectoryConfig(Config):
         self.user_directory_search_enabled = True
         self.user_directory_search_all_users = False
         self.user_directory_defer_to_id_server = None
+        self.user_directory_search_prefer_local_users = False
         user_directory_config = config.get("user_directory", None)
         if user_directory_config:
             self.user_directory_search_enabled = user_directory_config.get(
@@ -37,6 +38,9 @@ class UserDirectoryConfig(Config):
             )
             self.user_directory_defer_to_id_server = user_directory_config.get(
                 "defer_to_id_server", None
+            )
+            self.user_directory_search_prefer_local_users = user_directory_config.get(
+                "prefer_local_users", False
             )
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
@@ -53,9 +57,14 @@ class UserDirectoryConfig(Config):
         # rebuild the user_directory search indexes, see
         # https://github.com/matrix-org/synapse/blob/master/docs/user_directory.md
         #
+        # 'prefer_local_users' defines whether to prioritise local users in
+        # search query results. If True, local users are more likely to appear above
+        # remote users when searching the user directory. Defaults to false.
+        #
         #user_directory:
         #  enabled: true
         #  search_all_users: false
+        #  prefer_local_users: false
         #
         #  # If this is set, user search will be delegated to this ID server instead
         #  # of synapse performing the search itself.

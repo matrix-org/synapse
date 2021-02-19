@@ -555,6 +555,11 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
 
+        self._prefer_local_users_in_search = (
+            hs.config.user_directory_search_prefer_local_users
+        )
+        self._server_name = hs.config.server_name
+
     async def remove_from_user_dir(self, user_id: str) -> None:
         def _remove_from_user_dir_txn(txn):
             self.db_pool.simple_delete_txn(
@@ -747,8 +752,23 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 )
             """
 
+        # We allow manipulating the ranking algorithm by injecting statements
+        # based on config options.
+        additional_ordering_statements = []
+        ordering_arguments = ()
+
         if isinstance(self.database_engine, PostgresEngine):
             full_query, exact_query, prefix_query = _parse_query_postgres(search_term)
+
+            # If enabled, this config option will rank local users higher than those on
+            # remote instances.
+            if self._prefer_local_users_in_search:
+                # This statement checks whether a given user's user ID contains a server name
+                # that matches the local server
+                statement = "* (CASE WHEN user_id LIKE ? THEN 2.0 ELSE 1.0 END)"
+                additional_ordering_statements.append(statement)
+
+                ordering_arguments += ("%:" + self._server_name,)
 
             # We order by rank and then if they have profile info
             # The ranking algorithm is hand tweaked for "best" results. Broadly
@@ -760,7 +780,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 FROM user_directory_search as t
                 INNER JOIN user_directory AS d USING (user_id)
                 WHERE
-                    %s
+                    %(where_clause)s
                     AND vector @@ to_tsquery('english', ?)
                 ORDER BY
                     (CASE WHEN d.user_id IS NOT NULL THEN 4.0 ELSE 1.0 END)
@@ -780,33 +800,54 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                             8
                         )
                     )
+                    %(order_case_statements)s
                     DESC,
                     display_name IS NULL,
                     avatar_url IS NULL
                 LIMIT ?
-            """ % (
-                where_clause,
+            """ % {
+                "where_clause": where_clause,
+                "order_case_statements": " ".join(additional_ordering_statements),
+            }
+            args = (
+                join_args
+                + (full_query, exact_query, prefix_query)
+                + ordering_arguments
+                + (limit + 1,)
             )
-            args = join_args + (full_query, exact_query, prefix_query, limit + 1)
         elif isinstance(self.database_engine, Sqlite3Engine):
             search_query = _parse_query_sqlite(search_term)
+
+            # If enabled, this config option will rank local users higher than those on
+            # remote instances.
+            if self._prefer_local_users_in_search:
+                # This statement checks whether a given user's user ID contains a server name
+                # that matches the local server
+                #
+                # Note that we need to include a comma at the end for valid SQL
+                statement = "user_id LIKE ? DESC,"
+                additional_ordering_statements.append(statement)
+
+                ordering_arguments += ("%:" + self._server_name,)
 
             sql = """
                 SELECT d.user_id AS user_id, display_name, avatar_url
                 FROM user_directory_search as t
                 INNER JOIN user_directory AS d USING (user_id)
                 WHERE
-                    %s
+                    %(where_clause)s
                     AND value MATCH ?
                 ORDER BY
                     rank(matchinfo(user_directory_search)) DESC,
+                    %(order_statements)s
                     display_name IS NULL,
                     avatar_url IS NULL
                 LIMIT ?
-            """ % (
-                where_clause,
-            )
-            args = join_args + (search_query, limit + 1)
+            """ % {
+                "where_clause": where_clause,
+                "order_statements": " ".join(additional_ordering_statements),
+            }
+            args = join_args + (search_query,) + ordering_arguments + (limit + 1,)
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
