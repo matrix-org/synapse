@@ -632,6 +632,9 @@ class Porter(object):
             await self._setup_sequence(
                 "device_inbox_sequence", ("device_inbox", "device_federation_outbox")
             )
+            await self._setup_sequence(
+                "account_data_sequence", ("room_account_data", "room_tags_revisions", "account_data"))
+            await self._setup_sequence("receipts_sequence", ("receipts_linearized", ))
 
             # Step 3. Get tables.
             self.progress.set_state("Fetching tables")
