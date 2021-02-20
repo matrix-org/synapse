@@ -1,5 +1,7 @@
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2017 New Vector Ltd
+# Copyright 2021 Sorunome
+# Copyright 2021 Famedly GmbH
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,10 +14,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import hashlib
+import hmac
+import json
 import logging
 import urllib.parse
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Union
 
+import unpaddedbase64
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad
+from donna25519 import PrivateKey, PublicKey  # type: ignore
 from prometheus_client import Counter
 
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
@@ -106,9 +115,84 @@ class HttpPusher(Pusher):
 
         self.url = url
         self.http_client = hs.get_proxied_blacklisted_http_client()
-        self.data_minus_url = {}
-        self.data_minus_url.update(self.data)
-        del self.data_minus_url["url"]
+        self.sanitized_data = {}
+        self.sanitized_data.update(self.data)
+        del self.sanitized_data["url"]
+
+        if "algorithm" not in self.data:
+            self.algorithm = "com.famedly.plain"
+        elif self.data["algorithm"] not in (
+            "com.famedly.plain",
+            "com.famedly.curve25519-aes-sha2",
+        ):
+            raise PusherConfigException(
+                "'algorithm' must be one of 'com.famedly.plain' or 'com.famedly.curve25519-aes-sha2'"
+            )
+        else:
+            self.algorithm = self.data["algorithm"]
+
+        if self.algorithm == "com.famedly.curve25519-aes-sha2":
+            base64_public_key = self.data["public_key"]
+            if not isinstance(base64_public_key, str):
+                raise PusherConfigException("'public_key' must be a string")
+            try:
+                self.public_key = PublicKey(
+                    unpaddedbase64.decode_base64(base64_public_key)
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to unpack public key: %s: %s", type(e).__name__, e
+                )
+                raise PusherConfigException(
+                    "'public_key' must be a valid base64-encoded curve25519 public key"
+                )
+            del self.sanitized_data["public_key"]
+
+    def _process_notification_dict(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Called to process a payload according to the algorithm the pusher is
+        configured with. Namely, if the algorithm is `com.famedly.curve25519-aes-sha2`
+        we will encrypt the payload.
+
+        Args:
+            payload: The payload that should be processed
+        """
+        if self.algorithm == "com.famedly.curve25519-aes-sha2":
+            # we have an encrypted pusher, encrypt the payload
+            cleartext_notif = payload["notification"]
+            devices = cleartext_notif["devices"]
+            del cleartext_notif["devices"]
+            cleartext = json.dumps(cleartext_notif)
+
+            # create an ephemeral curve25519 keypair
+            private_key = PrivateKey()
+            # do ECDH
+            secret_key = private_key.do_exchange(self.public_key)
+            # expand with HKDF
+            zerosalt = bytes([0] * 32)
+            prk = hmac.new(zerosalt, secret_key, hashlib.sha256).digest()
+            aes_key = hmac.new(prk, bytes([1]), hashlib.sha256).digest()
+            mac_key = hmac.new(prk, aes_key + bytes([2]), hashlib.sha256).digest()
+            aes_iv = hmac.new(prk, mac_key + bytes([3]), hashlib.sha256).digest()[0:16]
+            # create the ciphertext with AES-CBC-256
+            ciphertext = AES.new(aes_key, AES.MODE_CBC, aes_iv).encrypt(
+                pad(cleartext.encode("utf-8"), AES.block_size)
+            )
+            # create the mac
+            mac = hmac.new(mac_key, ciphertext, hashlib.sha256).digest()[0:8]
+
+            return {
+                "notification": {
+                    "ephemeral": unpaddedbase64.encode_base64(
+                        private_key.get_public().public
+                    ),
+                    "ciphertext": unpaddedbase64.encode_base64(ciphertext),
+                    "mac": unpaddedbase64.encode_base64(mac),
+                    "devices": devices,
+                }
+            }
+
+        # else fall back to just plaintext
+        return payload
 
     def on_started(self, should_check_for_notifs: bool) -> None:
         """Called when this pusher has been started.
@@ -333,12 +417,12 @@ class HttpPusher(Pusher):
                             "app_id": self.app_id,
                             "pushkey": self.pushkey,
                             "pushkey_ts": int(self.pushkey_ts / 1000),
-                            "data": self.data_minus_url,
+                            "data": self.sanitized_data,
                         }
                     ],
                 }
             }
-            return d
+            return self._process_notification_dict(d)
 
         ctx = await push_tools.get_context_for_event(self.storage, event, self.user_id)
 
@@ -359,7 +443,7 @@ class HttpPusher(Pusher):
                         "app_id": self.app_id,
                         "pushkey": self.pushkey,
                         "pushkey_ts": int(self.pushkey_ts / 1000),
-                        "data": self.data_minus_url,
+                        "data": self.sanitized_data,
                         "tweaks": tweaks,
                     }
                 ],
@@ -378,7 +462,7 @@ class HttpPusher(Pusher):
         if "name" in ctx and len(ctx["name"]) > 0:
             d["notification"]["room_name"] = ctx["name"]
 
-        return d
+        return self._process_notification_dict(d)
 
     async def dispatch_push(
         self, event: EventBase, tweaks: Dict[str, bool], badge: int
@@ -410,22 +494,24 @@ class HttpPusher(Pusher):
             badge: number of unread messages
         """
         logger.debug("Sending updated badge count %d to %s", badge, self.name)
-        d = {
-            "notification": {
-                "id": "",
-                "type": None,
-                "sender": "",
-                "counts": {"unread": badge},
-                "devices": [
-                    {
-                        "app_id": self.app_id,
-                        "pushkey": self.pushkey,
-                        "pushkey_ts": int(self.pushkey_ts / 1000),
-                        "data": self.data_minus_url,
-                    }
-                ],
+        d = self._process_notification_dict(
+            {
+                "notification": {
+                    "id": "",
+                    "type": None,
+                    "sender": "",
+                    "counts": {"unread": badge},
+                    "devices": [
+                        {
+                            "app_id": self.app_id,
+                            "pushkey": self.pushkey,
+                            "pushkey_ts": int(self.pushkey_ts / 1000),
+                            "data": self.sanitized_data,
+                        }
+                    ],
+                }
             }
-        }
+        )
         try:
             await self.http_client.post_json_get_json(self.url, d)
             http_badges_processed_counter.inc()

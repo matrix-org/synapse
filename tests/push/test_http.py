@@ -11,7 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import hashlib
+import hmac
+import json
 from unittest.mock import Mock
+
+import unpaddedbase64
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad
+from donna25519 import PrivateKey, PublicKey  # type: ignore
 
 from twisted.internet.defer import Deferred
 
@@ -197,6 +205,105 @@ class HTTPPusherTests(HomeserverTestCase):
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         self.assertTrue(pushers[0].last_stream_ordering > last_stream_ordering)
+
+    def test_sends_encrypted_push(self):
+        """
+        The HTTP pusher will send an encrypted push message if the pusher
+        has been configured with a public key and the corresponding algorithm
+        """
+        private_key = "ocE2RWd/yExYEk0JCAx3100//WQkmM3syidCVFsndS0="
+        public_key = "odb+sBwaK0bZtaAqzcuFR3UVg5Wa1cW7ZMwJY1SnDng"
+
+        # Register the user who gets notified
+        user_id = self.register_user("user", "pass")
+        access_token = self.login("user", "pass")
+
+        # Register the user who sends the message
+        other_user_id = self.register_user("otheruser", "pass")
+        other_access_token = self.login("otheruser", "pass")
+
+        # Register the pusher
+        user_tuple = self.get_success(
+            self.hs.get_datastore().get_user_by_access_token(access_token)
+        )
+        token_id = user_tuple.token_id
+
+        self.get_success(
+            self.hs.get_pusherpool().add_pusher(
+                user_id=user_id,
+                access_token=token_id,
+                kind="http",
+                app_id="m.http",
+                app_display_name="HTTP Push Notifications",
+                device_display_name="pushy push",
+                pushkey="a@example.com",
+                lang=None,
+                data={
+                    "url": "http://example.com/_matrix/push/v1/notify",
+                    "algorithm": "com.famedly.curve25519-aes-sha2",
+                    "public_key": public_key,
+                },
+            )
+        )
+
+        # Create a room
+        room = self.helper.create_room_as(user_id, tok=access_token)
+
+        # The other user joins
+        self.helper.join(room=room, user=other_user_id, tok=other_access_token)
+
+        # The other user sends some messages
+        self.helper.send(room, body="Foxes are cute!", tok=other_access_token)
+
+        # Advance time a bit, so the pusher will register something has happened
+        self.pump()
+
+        # Make the push succeed
+        self.push_attempts[0][0].callback({})
+        self.pump()
+
+        # One push was attempted to be sent -- it'll be the first message
+        self.assertEqual(len(self.push_attempts), 1)
+        self.assertEqual(
+            self.push_attempts[0][1], "http://example.com/_matrix/push/v1/notify"
+        )
+        self.assertEqual(
+            self.push_attempts[0][2]["notification"]["devices"][0]["data"]["algorithm"],
+            "com.famedly.curve25519-aes-sha2",
+        )
+        ephemeral = unpaddedbase64.decode_base64(
+            self.push_attempts[0][2]["notification"]["ephemeral"]
+        )
+        mac = unpaddedbase64.decode_base64(
+            self.push_attempts[0][2]["notification"]["mac"]
+        )
+        ciphertext = unpaddedbase64.decode_base64(
+            self.push_attempts[0][2]["notification"]["ciphertext"]
+        )
+
+        # do the exchange
+        exchanged = PrivateKey.load(
+            unpaddedbase64.decode_base64(private_key)
+        ).do_exchange(PublicKey(ephemeral))
+        # expand with HKDF
+        zerosalt = bytes([0] * 32)
+        prk = hmac.new(zerosalt, exchanged, hashlib.sha256).digest()
+        aes_key = hmac.new(prk, bytes([1]), hashlib.sha256).digest()
+        mac_key = hmac.new(prk, aes_key + bytes([2]), hashlib.sha256).digest()
+        aes_iv = hmac.new(prk, mac_key + bytes([3]), hashlib.sha256).digest()[0:16]
+        # create the cleartext with AES-CBC-256
+        cleartext = json.loads(
+            unpad(
+                AES.new(aes_key, AES.MODE_CBC, aes_iv).decrypt(ciphertext),
+                AES.block_size,
+            ).decode("utf-8")
+        )
+        # create the mac
+        calculated_mac = hmac.new(mac_key, ciphertext, hashlib.sha256).digest()[0:8]
+
+        # test if we decrypted everything correctly
+        self.assertEqual(calculated_mac, mac)
+        self.assertEqual(cleartext["content"]["body"], "Foxes are cute!")
 
     def test_sends_high_priority_for_encrypted(self):
         """
