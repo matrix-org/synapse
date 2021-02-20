@@ -54,8 +54,24 @@ spec:
            secretKeyRef:
             name: {{ .Values.serviceName }}-secrets
             key: azureClientSecret
+        - name: REGISTRATION_SHARED_SECRET
+          valueFrom:
+           secretKeyRef:
+            name: {{ .Values.serviceName }}-secrets
+            key: registrationSharedSecret
+        - name: MACAROON_SECRET_KEY
+          valueFrom:
+           secretKeyRef:
+            name: {{ .Values.serviceName }}-secrets
+            key: macaroonSecretKey
+        - name: FORM_SECRET
+          valueFrom:
+           secretKeyRef:
+            name: {{ .Values.serviceName }}-secrets
+            key: formSecret
         name: init
-        image: alpine
+        image: alpine:3.12.3
+        imagePullPolicy: {{ .Values.imagePullPolicy | default "IfNotPresent" }}
         command: 
           - sh
           - "-c"
@@ -64,9 +80,15 @@ spec:
             /bin/cp -f /var/lib/synapse/config/homeserver-with-placeholders.yaml /var/lib/synapse/config/homeserver.yaml;
             sed -i \"s/<MatrixServerName>/{{ .Values.matrixServerName }}/\" /var/lib/synapse/config/homeserver.yaml;
             sed -i \"s/<publicBaseHostNameAndPort>/{{ .Values.externalDnsEntry | default (print (.Values.dnsEntry | default (print .Values.serviceName "." .Release.Namespace) ) ":" .Values.basePort) }}/\" /var/lib/synapse/config/homeserver.yaml;
+        {{- if (.Values.externalDnsEntry) }} 
+            sed -i \"s/pegacorn-communicate-roomserver.site-a/{{ .Values.externalDnsEntry }}/\" /var/lib/synapse/config/homeserver.yaml;
+        {{- end }}
             sed -i \"s/<tenant id>/${AZURE_TENANT_ID}/\" /var/lib/synapse/config/homeserver.yaml;
             sed -i \"s/<client id>/${AZURE_CLIENT_ID}/\" /var/lib/synapse/config/homeserver.yaml;
             sed -i \"s/<client secret>/${AZURE_CLIENT_SECRET}/\" /var/lib/synapse/config/homeserver.yaml;
+            sed -i \"s/<registrationSharedSecret>/${REGISTRATION_SHARED_SECRET}/\" /var/lib/synapse/config/homeserver.yaml;
+            sed -i \"s/<macaroonSecretKey>/${MACAROON_SECRET_KEY}/\" /var/lib/synapse/config/homeserver.yaml;
+            sed -i \"s/<formSecret>/${FORM_SECRET}/\" /var/lib/synapse/config/homeserver.yaml;
             sed -i \"s/<AllowPasswordLogin>/{{ .Values.allowPasswordLogin | default "false" }}/\" /var/lib/synapse/config/homeserver.yaml;
             echo START of /var/lib/synapse/config/homeserver.yaml file content;
             echo ' ';
@@ -78,6 +100,12 @@ spec:
           mountPath: /var/lib/synapse/config
       containers:
       - env:
+        {{- if (.Values.httpProxyHostAndPort) }} 
+        - name: HTTP_PROXY
+          value: {{ .Values.httpProxyHostAndPort }}
+        - name: HTTPS_PROXY
+          value: {{ .Values.httpProxyHostAndPort }}
+        {{- end }}
         - name: SYNAPSE_CONFIG_DIR
           value: /var/lib/synapse/config
         - name: SYNAPSE_DATA_DIR
@@ -169,7 +197,7 @@ spec:
       volumes:
       - name: data
         hostPath: 
-          path: {{ .Values.hostPath }}/tmp-data
+          path: {{ .Values.hostPath }}-tmp-data
       - name: config
         hostPath: 
           path: {{ .Values.hostPath }}

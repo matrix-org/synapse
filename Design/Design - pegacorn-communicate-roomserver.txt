@@ -44,7 +44,7 @@ FROM https://github.com/matrix-org/synapse/blob/master/docker/README.md#generati
 3) Create your server certificate and key and make sure they are in pem format, and that the key does NOT have a passphrase:
 Create-Cert-Set -certSubject 'pegacorn-communicate-roomserver.site-a' -certPwd 'Password' -doNOTSecureKeyFileWithAPwd $True
 
-4) Copy /host_mnt/e/dev/aether-host-files/LocalWorkstations/synapse-v1.26.0/homeserver.yaml, the .log.config and .signing.key files to /host_mnt/e/dev/aether-host-files/LocalWorkstations/synapse/ .
+4) Copy /host_mnt/e/dev/aether-host-files/LocalWorkstations/synapse-v1.26.0/homeserver.yaml, the <your server name>.log.config (rename to log.config) and <your server name>.signing.key (rename to signing.key) files to /host_mnt/e/dev/aether-host-files/LocalWorkstations/synapse/ .
 
 5) Modify the default file /host_mnt/e/dev/aether-host-files/LocalWorkstations/synapse/homeserver.yaml and commit all 3 files git.
 
@@ -65,14 +65,15 @@ Create-Cert-Set -certSubject 'pegacorn-communicate-roomserver.site-a' -certPwd '
 6) Copy the certificates and config files to a host path location.  Remember this location as it is needed for the helm command.
     cp -rf /host_mnt/e/dev/aether-host-files/common/* /data/
 	cp -rf /host_mnt/e/dev/aether-host-files/LocalWorkstations/* /data/
-	mkdir -p /data/synapse/tmp-data
-	chmod -R 777 /data/synapse/tmp-data
+	mkdir -p /data/synapse-tmp-data
+	chmod -R 666 /data/synapse-tmp-data
 		
 7) Add the following to the hosts file
 	pegacorn-communicate-roomserver.site-a
 	
 8) In a command prompt create the kubernetes secrets
-	kubectl create secret generic pegacorn-communicate-roomserver-secrets --from-literal=azureTenantId="<Get from lastpass.com>" --from-literal=azureClientId="<Get from lastpass.com>" --from-literal=azureClientSecret="<Get from lastpass.com>" --namespace=site-a
+	#NOTE: please ensure none of the secrets contain the ampersand character
+	kubectl create secret generic pegacorn-communicate-roomserver-secrets --from-literal=azureTenantId="<Get from lastpass.com>" --from-literal=azureClientId="<Get from lastpass.com>" --from-literal=azureClientSecret="<Get from lastpass.com>" --from-literal=registrationSharedSecret="<Get from lastpass.com>" --from-literal=macaroonSecretKey="<Get from lastpass.com>" --from-literal=formSecret="<Get from lastpass.com>" --namespace=site-a
 	
 	
 Build and deploy
