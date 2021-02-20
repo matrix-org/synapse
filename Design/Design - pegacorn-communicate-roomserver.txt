@@ -66,7 +66,7 @@ Create-Cert-Set -certSubject 'pegacorn-communicate-roomserver.site-a' -certPwd '
     cp -rf /host_mnt/e/dev/aether-host-files/common/* /data/
 	cp -rf /host_mnt/e/dev/aether-host-files/LocalWorkstations/* /data/
 	mkdir -p /data/synapse-tmp-data
-	chmod -R 666 /data/synapse-tmp-data
+	chmod -R 777 /data/synapse-tmp-data
 		
 7) Add the following to the hosts file
 	pegacorn-communicate-roomserver.site-a
