@@ -189,13 +189,15 @@ class SAML2Config(Config):
         import saml2
 
         public_baseurl = self.public_baseurl
+        if public_baseurl is None:
+            raise ConfigError("saml2_config requires a public_baseurl to be set")
 
         if self.saml2_grandfathered_mxid_source_attribute:
             optional_attributes.add(self.saml2_grandfathered_mxid_source_attribute)
         optional_attributes -= required_attributes
 
-        metadata_url = public_baseurl + "_matrix/saml2/metadata.xml"
-        response_url = public_baseurl + "_matrix/saml2/authn_response"
+        metadata_url = public_baseurl + "_synapse/client/saml2/metadata.xml"
+        response_url = public_baseurl + "_synapse/client/saml2/authn_response"
         return {
             "entityid": metadata_url,
             "service": {
@@ -233,10 +235,10 @@ class SAML2Config(Config):
         # enable SAML login.
         #
         # Once SAML support is enabled, a metadata file will be exposed at
-        # https://<server>:<port>/_matrix/saml2/metadata.xml, which you may be able to
+        # https://<server>:<port>/_synapse/client/saml2/metadata.xml, which you may be able to
         # use to configure your SAML IdP with. Alternatively, you can manually configure
         # the IdP to use an ACS location of
-        # https://<server>:<port>/_matrix/saml2/authn_response.
+        # https://<server>:<port>/_synapse/client/saml2/authn_response.
         #
         saml2_config:
           # `sp_config` is the configuration for the pysaml2 Service Provider.

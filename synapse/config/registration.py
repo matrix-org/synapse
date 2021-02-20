@@ -49,6 +49,10 @@ class AccountValidityConfig(Config):
 
             self.startup_job_max_delta = self.period * 10.0 / 100.0
 
+        if self.renew_by_email_enabled:
+            if "public_baseurl" not in synapse_config:
+                raise ConfigError("Can't send renewal emails without 'public_baseurl'")
+
         template_dir = config.get("template_dir")
 
         if not template_dir:
@@ -105,6 +109,13 @@ class RegistrationConfig(Config):
         account_threepid_delegates = config.get("account_threepid_delegates") or {}
         self.account_threepid_delegate_email = account_threepid_delegates.get("email")
         self.account_threepid_delegate_msisdn = account_threepid_delegates.get("msisdn")
+        if self.account_threepid_delegate_msisdn and not self.public_baseurl:
+            raise ConfigError(
+                "The configuration option `public_baseurl` is required if "
+                "`account_threepid_delegate.msisdn` is set, such that "
+                "clients know where to submit validation tokens to. Please "
+                "configure `public_baseurl`."
+            )
 
         self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
@@ -176,9 +187,7 @@ class RegistrationConfig(Config):
         self.session_lifetime = session_lifetime
 
         # The success template used during fallback auth.
-        self.fallback_success_template = self.read_templates(
-            ["auth_success.html"], autoescape=True
-        )[0]
+        self.fallback_success_template = self.read_template("auth_success.html")
 
     def generate_config_section(self, generate_secrets=False, **kwargs):
         if generate_secrets:
@@ -229,9 +238,8 @@ class RegistrationConfig(Config):
           # send an email to the account's email address with a renewal link. By
           # default, no such emails are sent.
           #
-          # If you enable this setting, you will also need to fill out the 'email'
-          # configuration section. You should also check that 'public_baseurl' is set
-          # correctly.
+          # If you enable this setting, you will also need to fill out the 'email' and
+          # 'public_baseurl' configuration sections.
           #
           #renew_at: 1w
 
@@ -322,7 +330,8 @@ class RegistrationConfig(Config):
         # The identity server which we suggest that clients should use when users log
         # in on this server.
         #
-        # (By default, no suggestion is made, so it is left up to the client.)
+        # (By default, no suggestion is made, so it is left up to the client.
+        # This setting is ignored unless public_baseurl is also set.)
         #
         #default_identity_server: https://matrix.org
 
@@ -346,6 +355,8 @@ class RegistrationConfig(Config):
         # Servers handling the these requests must answer the `/requestToken` endpoints defined
         # by the Matrix Identity Service API specification:
         # https://matrix.org/docs/spec/identity_service/latest
+        #
+        # If a delegate is specified, the config option public_baseurl must also be filled out.
         #
         account_threepid_delegates:
             #email: https://example.com     # Delegate email sending to example.com

@@ -1,3 +1,13 @@
+matrix-synapse-py3 (1.27.0) stable; urgency=medium
+
+  [ Dan Callahan ]
+  * Fix build on Ubuntu 16.04 LTS (Xenial).
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.27.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 16 Feb 2021 13:11:28 +0000
+
 matrix-synapse-py3 (1.26.0) stable; urgency=medium
 
   [ Richard van der Hoff ]

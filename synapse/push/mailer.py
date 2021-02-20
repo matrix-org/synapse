@@ -267,9 +267,21 @@ class Mailer:
             fallback_to_members=True,
         )
 
-        summary_text = await self.make_summary_text(
-            notifs_by_room, state_by_room, notif_events, user_id, reason
-        )
+        if len(notifs_by_room) == 1:
+            # Only one room has new stuff
+            room_id = list(notifs_by_room.keys())[0]
+
+            summary_text = await self.make_summary_text_single_room(
+                room_id,
+                notifs_by_room[room_id],
+                state_by_room[room_id],
+                notif_events,
+                user_id,
+            )
+        else:
+            summary_text = await self.make_summary_text(
+                notifs_by_room, state_by_room, notif_events, reason
+            )
 
         template_vars = {
             "user_display_name": user_display_name,
@@ -492,138 +504,177 @@ class Mailer:
         if "url" in event.content:
             messagevars["image_url"] = event.content["url"]
 
+    async def make_summary_text_single_room(
+        self,
+        room_id: str,
+        notifs: List[Dict[str, Any]],
+        room_state_ids: StateMap[str],
+        notif_events: Dict[str, EventBase],
+        user_id: str,
+    ) -> str:
+        """
+        Make a summary text for the email when only a single room has notifications.
+
+        Args:
+            room_id: The ID of the room.
+            notifs: The notifications for this room.
+            room_state_ids: The state map for the room.
+            notif_events: A map of event ID -> notification event.
+            user_id: The user receiving the notification.
+
+        Returns:
+            The summary text.
+        """
+        # If the room has some kind of name, use it, but we don't
+        # want the generated-from-names one here otherwise we'll
+        # end up with, "new message from Bob in the Bob room"
+        room_name = await calculate_room_name(
+            self.store, room_state_ids, user_id, fallback_to_members=False
+        )
+
+        # See if one of the notifs is an invite event for the user
+        invite_event = None
+        for n in notifs:
+            ev = notif_events[n["event_id"]]
+            if ev.type == EventTypes.Member and ev.state_key == user_id:
+                if ev.content.get("membership") == Membership.INVITE:
+                    invite_event = ev
+                    break
+
+        if invite_event:
+            inviter_member_event_id = room_state_ids.get(
+                ("m.room.member", invite_event.sender)
+            )
+            inviter_name = invite_event.sender
+            if inviter_member_event_id:
+                inviter_member_event = await self.store.get_event(
+                    inviter_member_event_id, allow_none=True
+                )
+                if inviter_member_event:
+                    inviter_name = name_from_member_event(inviter_member_event)
+
+            if room_name is None:
+                return self.email_subjects.invite_from_person % {
+                    "person": inviter_name,
+                    "app": self.app_name,
+                }
+
+            return self.email_subjects.invite_from_person_to_room % {
+                "person": inviter_name,
+                "room": room_name,
+                "app": self.app_name,
+            }
+
+        if len(notifs) == 1:
+            # There is just the one notification, so give some detail
+            sender_name = None
+            event = notif_events[notifs[0]["event_id"]]
+            if ("m.room.member", event.sender) in room_state_ids:
+                state_event_id = room_state_ids[("m.room.member", event.sender)]
+                state_event = await self.store.get_event(state_event_id)
+                sender_name = name_from_member_event(state_event)
+
+            if sender_name is not None and room_name is not None:
+                return self.email_subjects.message_from_person_in_room % {
+                    "person": sender_name,
+                    "room": room_name,
+                    "app": self.app_name,
+                }
+            elif sender_name is not None:
+                return self.email_subjects.message_from_person % {
+                    "person": sender_name,
+                    "app": self.app_name,
+                }
+
+            # The sender is unknown, just use the room name (or ID).
+            return self.email_subjects.messages_in_room % {
+                "room": room_name or room_id,
+                "app": self.app_name,
+            }
+        else:
+            # There's more than one notification for this room, so just
+            # say there are several
+            if room_name is not None:
+                return self.email_subjects.messages_in_room % {
+                    "room": room_name,
+                    "app": self.app_name,
+                }
+
+            return await self.make_summary_text_from_member_events(
+                room_id, notifs, room_state_ids, notif_events
+            )
+
     async def make_summary_text(
         self,
         notifs_by_room: Dict[str, List[Dict[str, Any]]],
         room_state_ids: Dict[str, StateMap[str]],
         notif_events: Dict[str, EventBase],
-        user_id: str,
         reason: Dict[str, Any],
-    ):
-        if len(notifs_by_room) == 1:
-            # Only one room has new stuff
-            room_id = list(notifs_by_room.keys())[0]
+    ) -> str:
+        """
+        Make a summary text for the email when multiple rooms have notifications.
 
-            # If the room has some kind of name, use it, but we don't
-            # want the generated-from-names one here otherwise we'll
-            # end up with, "new message from Bob in the Bob room"
-            room_name = await calculate_room_name(
-                self.store, room_state_ids[room_id], user_id, fallback_to_members=False
-            )
+        Args:
+            notifs_by_room: A map of room ID to the notifications for that room.
+            room_state_ids: A map of room ID to the state map for that room.
+            notif_events: A map of event ID -> notification event.
+            reason: The reason this notification is being sent.
 
-            # See if one of the notifs is an invite event for the user
-            invite_event = None
-            for n in notifs_by_room[room_id]:
-                ev = notif_events[n["event_id"]]
-                if ev.type == EventTypes.Member and ev.state_key == user_id:
-                    if ev.content.get("membership") == Membership.INVITE:
-                        invite_event = ev
-                        break
+        Returns:
+            The summary text.
+        """
+        # Stuff's happened in multiple different rooms
+        # ...but we still refer to the 'reason' room which triggered the mail
+        if reason["room_name"] is not None:
+            return self.email_subjects.messages_in_room_and_others % {
+                "room": reason["room_name"],
+                "app": self.app_name,
+            }
 
-            if invite_event:
-                inviter_member_event_id = room_state_ids[room_id].get(
-                    ("m.room.member", invite_event.sender)
-                )
-                inviter_name = invite_event.sender
-                if inviter_member_event_id:
-                    inviter_member_event = await self.store.get_event(
-                        inviter_member_event_id, allow_none=True
-                    )
-                    if inviter_member_event:
-                        inviter_name = name_from_member_event(inviter_member_event)
+        room_id = reason["room_id"]
+        return await self.make_summary_text_from_member_events(
+            room_id, notifs_by_room[room_id], room_state_ids[room_id], notif_events
+        )
 
-                if room_name is None:
-                    return self.email_subjects.invite_from_person % {
-                        "person": inviter_name,
-                        "app": self.app_name,
-                    }
-                else:
-                    return self.email_subjects.invite_from_person_to_room % {
-                        "person": inviter_name,
-                        "room": room_name,
-                        "app": self.app_name,
-                    }
+    async def make_summary_text_from_member_events(
+        self,
+        room_id: str,
+        notifs: List[Dict[str, Any]],
+        room_state_ids: StateMap[str],
+        notif_events: Dict[str, EventBase],
+    ) -> str:
+        """
+        Make a summary text for the email when only a single room has notifications.
 
-            sender_name = None
-            if len(notifs_by_room[room_id]) == 1:
-                # There is just the one notification, so give some detail
-                event = notif_events[notifs_by_room[room_id][0]["event_id"]]
-                if ("m.room.member", event.sender) in room_state_ids[room_id]:
-                    state_event_id = room_state_ids[room_id][
-                        ("m.room.member", event.sender)
-                    ]
-                    state_event = await self.store.get_event(state_event_id)
-                    sender_name = name_from_member_event(state_event)
+        Args:
+            room_id: The ID of the room.
+            notifs: The notifications for this room.
+            room_state_ids: The state map for the room.
+            notif_events: A map of event ID -> notification event.
 
-                if sender_name is not None and room_name is not None:
-                    return self.email_subjects.message_from_person_in_room % {
-                        "person": sender_name,
-                        "room": room_name,
-                        "app": self.app_name,
-                    }
-                elif sender_name is not None:
-                    return self.email_subjects.message_from_person % {
-                        "person": sender_name,
-                        "app": self.app_name,
-                    }
-            else:
-                # There's more than one notification for this room, so just
-                # say there are several
-                if room_name is not None:
-                    return self.email_subjects.messages_in_room % {
-                        "room": room_name,
-                        "app": self.app_name,
-                    }
-                else:
-                    # If the room doesn't have a name, say who the messages
-                    # are from explicitly to avoid, "messages in the Bob room"
-                    sender_ids = list(
-                        {
-                            notif_events[n["event_id"]].sender
-                            for n in notifs_by_room[room_id]
-                        }
-                    )
+        Returns:
+            The summary text.
+        """
+        # If the room doesn't have a name, say who the messages
+        # are from explicitly to avoid, "messages in the Bob room"
+        sender_ids = {notif_events[n["event_id"]].sender for n in notifs}
 
-                    member_events = await self.store.get_events(
-                        [
-                            room_state_ids[room_id][("m.room.member", s)]
-                            for s in sender_ids
-                        ]
-                    )
+        member_events = await self.store.get_events(
+            [room_state_ids[("m.room.member", s)] for s in sender_ids]
+        )
 
-                    return self.email_subjects.messages_from_person % {
-                        "person": descriptor_from_member_events(member_events.values()),
-                        "app": self.app_name,
-                    }
-        else:
-            # Stuff's happened in multiple different rooms
+        # There was a single sender.
+        if len(sender_ids) == 1:
+            return self.email_subjects.messages_from_person % {
+                "person": descriptor_from_member_events(member_events.values()),
+                "app": self.app_name,
+            }
 
-            # ...but we still refer to the 'reason' room which triggered the mail
-            if reason["room_name"] is not None:
-                return self.email_subjects.messages_in_room_and_others % {
-                    "room": reason["room_name"],
-                    "app": self.app_name,
-                }
-            else:
-                # If the reason room doesn't have a name, say who the messages
-                # are from explicitly to avoid, "messages in the Bob room"
-                room_id = reason["room_id"]
-
-                sender_ids = list(
-                    {
-                        notif_events[n["event_id"]].sender
-                        for n in notifs_by_room[room_id]
-                    }
-                )
-
-                member_events = await self.store.get_events(
-                    [room_state_ids[room_id][("m.room.member", s)] for s in sender_ids]
-                )
-
-                return self.email_subjects.messages_from_person_and_others % {
-                    "person": descriptor_from_member_events(member_events.values()),
-                    "app": self.app_name,
-                }
+        # There was more than one sender, use the first one and a tweaked template.
+        return self.email_subjects.messages_from_person_and_others % {
+            "person": descriptor_from_member_events(list(member_events.values())[:1]),
+            "app": self.app_name,
+        }
 
     def make_room_link(self, room_id: str) -> str:
         if self.hs.config.email_riot_base_url:
@@ -668,6 +719,15 @@ class Mailer:
 
 
 def safe_markup(raw_html: str) -> jinja2.Markup:
+    """
+    Sanitise a raw HTML string to a set of allowed tags and attributes, and linkify any bare URLs.
+
+    Args
+        raw_html: Unsafe HTML.
+
+    Returns:
+        A Markup object ready to safely use in a Jinja template.
+    """
     return jinja2.Markup(
         bleach.linkify(
             bleach.clean(
@@ -684,8 +744,13 @@ def safe_markup(raw_html: str) -> jinja2.Markup:
 
 def safe_text(raw_text: str) -> jinja2.Markup:
     """
-    Process text: treat it as HTML but escape any tags (ie. just escape the
-    HTML) then linkify it.
+    Sanitise text (escape any HTML tags), and then linkify any bare URLs.
+
+    Args
+        raw_text: Unsafe text which might include HTML markup.
+
+    Returns:
+        A Markup object ready to safely use in a Jinja template.
     """
     return jinja2.Markup(
         bleach.linkify(bleach.clean(raw_text, tags=[], attributes={}, strip=False))

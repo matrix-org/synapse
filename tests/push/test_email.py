@@ -187,6 +187,36 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about those messages
         self._check_for_mail()
 
+    def test_multiple_rooms(self):
+        # We want to test multiple notifications from multiple rooms, so we pause
+        # processing of push while we send messages.
+        self.pusher._pause_processing()
+
+        # Create a simple room with multiple other users
+        rooms = [
+            self.helper.create_room_as(self.user_id, tok=self.access_token),
+            self.helper.create_room_as(self.user_id, tok=self.access_token),
+        ]
+
+        for r, other in zip(rooms, self.others):
+            self.helper.invite(
+                room=r, src=self.user_id, tok=self.access_token, targ=other.id
+            )
+            self.helper.join(room=r, user=other.id, tok=other.token)
+
+        # The other users send some messages
+        self.helper.send(rooms[0], body="Hi!", tok=self.others[0].token)
+        self.helper.send(rooms[1], body="There!", tok=self.others[1].token)
+        self.helper.send(rooms[1], body="There!", tok=self.others[1].token)
+
+        # Nothing should have happened yet, as we're paused.
+        assert not self.email_attempts
+
+        self.pusher._resume_processing()
+
+        # We should get emailed about those messages
+        self._check_for_mail()
+
     def test_encrypted_message(self):
         room = self.helper.create_room_as(self.user_id, tok=self.access_token)
         self.helper.invite(

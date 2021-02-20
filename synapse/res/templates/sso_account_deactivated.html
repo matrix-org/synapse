@@ -1,10 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>SSO account deactivated</title>
-</head>
-    <body>
-        <p>This account has been deactivated.</p>
+    <head>
+        <meta charset="UTF-8">
+        <title>SSO account deactivated</title>
+        <meta name="viewport" content="width=device-width, user-scalable=no">
+        <style type="text/css">
+            {% include "sso.css" without context %}
+        </style>
+    </head>
+    <body class="error_page">
+        <header>
+            <h1>Your account has been deactivated</h1>
+            <p>
+                <strong>No account found</strong>
+            </p>
+            <p>
+                Your account might have been deactivated by the server administrator.
+                You can either try to create a new account or contact the server’s
+                administrator.
+            </p>
+        </header>
     </body>
 </html>

@@ -80,9 +80,10 @@ class CasHandler:
         # user-facing name of this auth provider
         self.idp_name = "CAS"
 
-        # we do not currently support icons for CAS auth, but this is required by
+        # we do not currently support brands/icons for CAS auth, but this is required by
         # the SsoIdentityProvider protocol type.
         self.idp_icon = None
+        self.idp_brand = None
 
         self._sso_handler = hs.get_sso_handler()
 
@@ -99,11 +100,7 @@ class CasHandler:
         Returns:
             The URL to use as a "service" parameter.
         """
-        return "%s%s?%s" % (
-            self._cas_service_url,
-            "/_matrix/client/r0/login/cas/ticket",
-            urllib.parse.urlencode(args),
-        )
+        return "%s?%s" % (self._cas_service_url, urllib.parse.urlencode(args),)
 
     async def _validate_ticket(
         self, ticket: str, service_args: Dict[str, str]

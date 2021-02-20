@@ -74,10 +74,6 @@ pid_file: DATADIR/homeserver.pid
 # Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
 # 'listeners' below).
 #
-# If this is left unset, it defaults to 'https://<server_name>/'. (Note that
-# that will not work unless you configure Synapse or a reverse-proxy to listen
-# on port 443.)
-#
 #public_baseurl: https://example.com/
 
 # Set the soft limit on the number of file descriptors synapse can use
@@ -824,6 +820,9 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #     users are joining rooms the server is already in (this is cheap) vs
 #     "remote" for when users are trying to join rooms not on the server (which
 #     can be more expensive)
+#   - one for ratelimiting how often a user or IP can attempt to validate a 3PID.
+#   - two for ratelimiting how often invites can be sent in a room or to a
+#     specific user.
 #
 # The defaults are as shown below.
 #
@@ -857,7 +856,18 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #  remote:
 #    per_second: 0.01
 #    burst_count: 3
-
+#
+#rc_3pid_validation:
+#  per_second: 0.003
+#  burst_count: 5
+#
+#rc_invites:
+#  per_room:
+#    per_second: 0.3
+#    burst_count: 10
+#  per_user:
+#    per_second: 0.003
+#    burst_count: 5
 
 # Ratelimiting settings for incoming federation
 #
@@ -1155,9 +1165,8 @@ account_validity:
   # send an email to the account's email address with a renewal link. By
   # default, no such emails are sent.
   #
-  # If you enable this setting, you will also need to fill out the 'email'
-  # configuration section. You should also check that 'public_baseurl' is set
-  # correctly.
+  # If you enable this setting, you will also need to fill out the 'email' and
+  # 'public_baseurl' configuration sections.
   #
   #renew_at: 1w
 
@@ -1248,7 +1257,8 @@ account_validity:
 # The identity server which we suggest that clients should use when users log
 # in on this server.
 #
-# (By default, no suggestion is made, so it is left up to the client.)
+# (By default, no suggestion is made, so it is left up to the client.
+# This setting is ignored unless public_baseurl is also set.)
 #
 #default_identity_server: https://matrix.org
 
@@ -1272,6 +1282,8 @@ account_validity:
 # Servers handling the these requests must answer the `/requestToken` endpoints defined
 # by the Matrix Identity Service API specification:
 # https://matrix.org/docs/spec/identity_service/latest
+#
+# If a delegate is specified, the config option public_baseurl must also be filled out.
 #
 account_threepid_delegates:
     #email: https://example.com     # Delegate email sending to example.com
@@ -1552,10 +1564,10 @@ trusted_key_servers:
 # enable SAML login.
 #
 # Once SAML support is enabled, a metadata file will be exposed at
-# https://<server>:<port>/_matrix/saml2/metadata.xml, which you may be able to
+# https://<server>:<port>/_synapse/client/saml2/metadata.xml, which you may be able to
 # use to configure your SAML IdP with. Alternatively, you can manually configure
 # the IdP to use an ACS location of
-# https://<server>:<port>/_matrix/saml2/authn_response.
+# https://<server>:<port>/_synapse/client/saml2/authn_response.
 #
 saml2_config:
   # `sp_config` is the configuration for the pysaml2 Service Provider.
@@ -1727,10 +1739,14 @@ saml2_config:
 #       offer the user a choice of login mechanisms.
 #
 #   idp_icon: An optional icon for this identity provider, which is presented
-#       by identity picker pages. If given, must be an MXC URI of the format
-#       mxc://<server-name>/<media-id>. (An easy way to obtain such an MXC URI
-#       is to upload an image to an (unencrypted) room and then copy the "url"
-#       from the source of the event.)
+#       by clients and Synapse's own IdP picker page. If given, must be an
+#       MXC URI of the format mxc://<server-name>/<media-id>. (An easy way to
+#       obtain such an MXC URI is to upload an image to an (unencrypted) room
+#       and then copy the "url" from the source of the event.)
+#
+#   idp_brand: An optional brand for this identity provider, allowing clients
+#       to style the login flow according to the identity provider in question.
+#       See the spec for possible options here.
 #
 #   discover: set to 'false' to disable the use of the OIDC discovery mechanism
 #       to discover endpoints. Defaults to true.
@@ -1791,16 +1807,20 @@ saml2_config:
 #
 #           For the default provider, the following settings are available:
 #
-#             sub: name of the claim containing a unique identifier for the
-#                 user. Defaults to 'sub', which OpenID Connect compliant
-#                 providers should provide.
+#             subject_claim: name of the claim containing a unique identifier
+#                 for the user. Defaults to 'sub', which OpenID Connect
+#                 compliant providers should provide.
 #
 #             localpart_template: Jinja2 template for the localpart of the MXID.
 #                 If this is not set, the user will be prompted to choose their
-#                 own username.
+#                 own username (see 'sso_auth_account_details.html' in the 'sso'
+#                 section of this file).
 #
 #             display_name_template: Jinja2 template for the display name to set
 #                 on first login. If unset, no displayname will be set.
+#
+#             email_template: Jinja2 template for the email address of the user.
+#                 If unset, no email address will be added to the account.
 #
 #             extra_attributes: a map of Jinja2 templates for extra attributes
 #                 to send back to the client during login.
@@ -1837,6 +1857,12 @@ oidc_providers:
   #  userinfo_endpoint: "https://accounts.example.com/userinfo"
   #  jwks_uri: "https://accounts.example.com/.well-known/jwks.json"
   #  skip_verification: true
+  #  user_mapping_provider:
+  #    config:
+  #      subject_claim: "id"
+  #      localpart_template: "{ user.login }"
+  #      display_name_template: "{ user.name }"
+  #      email_template: "{ user.email }"
 
   # For use with Keycloak
   #
@@ -1851,6 +1877,7 @@ oidc_providers:
   #
   #- idp_id: github
   #  idp_name: Github
+  #  idp_brand: org.matrix.github
   #  discover: false
   #  issuer: "https://github.com/"
   #  client_id: "your-client-id" # TO BE FILLED
@@ -1877,10 +1904,6 @@ cas_config:
   # The URL of the CAS authorization endpoint.
   #
   #server_url: "https://cas-server.com"
-
-  # The public URL of the homeserver.
-  #
-  #service_url: "https://homeserver.domain.com:8448"
 
   # The attribute of the CAS response to use as the display name.
   #
@@ -1913,9 +1936,9 @@ sso:
     # phishing attacks from evil.site. To avoid this, include a slash after the
     # hostname: "https://my.client/".
     #
-    # The login fallback page (used by clients that don't natively support the
-    # required login flows) is automatically whitelisted in addition to any URLs
-    # in this list.
+    # If public_baseurl is set, then the login fallback page (used by clients
+    # that don't natively support the required login flows) is whitelisted in
+    # addition to any URLs in this list.
     #
     # By default, this list is empty.
     #
@@ -1936,15 +1959,19 @@ sso:
     #
     #   When rendering, this template is given the following variables:
     #     * redirect_url: the URL that the user will be redirected to after
-    #       login. Needs manual escaping (see
-    #       https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+    #       login.
     #
     #     * server_name: the homeserver's name.
     #
     #     * providers: a list of available Identity Providers. Each element is
     #       an object with the following attributes:
+    #
     #         * idp_id: unique identifier for the IdP
     #         * idp_name: user-facing name for the IdP
+    #         * idp_icon: if specified in the IdP config, an MXC URI for an icon
+    #              for the IdP
+    #         * idp_brand: if specified in the IdP config, a textual identifier
+    #              for the brand of the IdP
     #
     #   The rendered HTML page should contain a form which submits its results
     #   back as a GET request, with the following query parameters:
@@ -1954,32 +1981,100 @@ sso:
     #
     #     * idp: the 'idp_id' of the chosen IDP.
     #
+    # * HTML page to prompt new users to enter a userid and confirm other
+    #   details: 'sso_auth_account_details.html'. This is only shown if the
+    #   SSO implementation (with any user_mapping_provider) does not return
+    #   a localpart.
+    #
+    #   When rendering, this template is given the following variables:
+    #
+    #     * server_name: the homeserver's name.
+    #
+    #     * idp: details of the SSO Identity Provider that the user logged in
+    #       with: an object with the following attributes:
+    #
+    #         * idp_id: unique identifier for the IdP
+    #         * idp_name: user-facing name for the IdP
+    #         * idp_icon: if specified in the IdP config, an MXC URI for an icon
+    #              for the IdP
+    #         * idp_brand: if specified in the IdP config, a textual identifier
+    #              for the brand of the IdP
+    #
+    #     * user_attributes: an object containing details about the user that
+    #       we received from the IdP. May have the following attributes:
+    #
+    #         * display_name: the user's display_name
+    #         * emails: a list of email addresses
+    #
+    #   The template should render a form which submits the following fields:
+    #
+    #     * username: the localpart of the user's chosen user id
+    #
+    # * HTML page allowing the user to consent to the server's terms and
+    #   conditions. This is only shown for new users, and only if
+    #   `user_consent.require_at_registration` is set.
+    #
+    #   When rendering, this template is given the following variables:
+    #
+    #     * server_name: the homeserver's name.
+    #
+    #     * user_id: the user's matrix proposed ID.
+    #
+    #     * user_profile.display_name: the user's proposed display name, if any.
+    #
+    #     * consent_version: the version of the terms that the user will be
+    #       shown
+    #
+    #     * terms_url: a link to the page showing the terms.
+    #
+    #   The template should render a form which submits the following fields:
+    #
+    #     * accepted_version: the version of the terms accepted by the user
+    #       (ie, 'consent_version' from the input variables).
+    #
     # * HTML page for a confirmation step before redirecting back to the client
     #   with the login token: 'sso_redirect_confirm.html'.
     #
-    #   When rendering, this template is given three variables:
-    #     * redirect_url: the URL the user is about to be redirected to. Needs
-    #                     manual escaping (see
-    #                     https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+    #   When rendering, this template is given the following variables:
+    #
+    #     * redirect_url: the URL the user is about to be redirected to.
     #
     #     * display_url: the same as `redirect_url`, but with the query
     #                    parameters stripped. The intention is to have a
     #                    human-readable URL to show to users, not to use it as
-    #                    the final address to redirect to. Needs manual escaping
-    #                    (see https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+    #                    the final address to redirect to.
     #
     #     * server_name: the homeserver's name.
+    #
+    #     * new_user: a boolean indicating whether this is the user's first time
+    #          logging in.
+    #
+    #     * user_id: the user's matrix ID.
+    #
+    #     * user_profile.avatar_url: an MXC URI for the user's avatar, if any.
+    #           None if the user has not set an avatar.
+    #
+    #     * user_profile.display_name: the user's display name. None if the user
+    #           has not set a display name.
     #
     # * HTML page which notifies the user that they are authenticating to confirm
     #   an operation on their account during the user interactive authentication
     #   process: 'sso_auth_confirm.html'.
     #
     #   When rendering, this template is given the following variables:
-    #     * redirect_url: the URL the user is about to be redirected to. Needs
-    #                     manual escaping (see
-    #                     https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+    #     * redirect_url: the URL the user is about to be redirected to.
     #
     #     * description: the operation which the user is being asked to confirm
+    #
+    #     * idp: details of the Identity Provider that we will use to confirm
+    #       the user's identity: an object with the following attributes:
+    #
+    #         * idp_id: unique identifier for the IdP
+    #         * idp_name: user-facing name for the IdP
+    #         * idp_icon: if specified in the IdP config, an MXC URI for an icon
+    #              for the IdP
+    #         * idp_brand: if specified in the IdP config, a textual identifier
+    #              for the brand of the IdP
     #
     # * HTML page shown after a successful user interactive authentication session:
     #   'sso_auth_success.html'.

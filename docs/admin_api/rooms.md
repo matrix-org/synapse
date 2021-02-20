@@ -9,6 +9,7 @@
   * [Response](#response)
   * [Undoing room shutdowns](#undoing-room-shutdowns)
 - [Make Room Admin API](#make-room-admin-api)
+- [Forward Extremities Admin API](#forward-extremities-admin-api)
 
 # List Room API
 
@@ -367,6 +368,36 @@ Response:
 }
 ```
 
+# Room State API
+
+The Room State admin API allows server admins to get a list of all state events in a room.
+
+The response includes the following fields:
+
+* `state` - The current state of the room at the time of request.
+
+## Usage
+
+A standard request:
+
+```
+GET /_synapse/admin/v1/rooms/<room_id>/state
+
+{}
+```
+
+Response:
+
+```json
+{
+  "state": [
+    {"type": "m.room.create", "state_key": "", "etc": true},
+    {"type": "m.room.power_levels", "state_key": "", "etc": true},
+    {"type": "m.room.name", "state_key": "", "etc": true}
+  ]
+}
+```
+
 # Delete Room API
 
 The Delete Room admin API allows server admins to remove rooms from server
@@ -510,4 +541,56 @@ optionally be specified, e.g.:
     {
         "user_id": "@foo:example.com"
     }
+```
+
+# Forward Extremities Admin API
+
+Enables querying and deleting forward extremities from rooms. When a lot of forward
+extremities accumulate in a room, performance can become degraded. For details, see 
+[#1760](https://github.com/matrix-org/synapse/issues/1760).
+
+## Check for forward extremities
+
+To check the status of forward extremities for a room:
+
+```
+    GET /_synapse/admin/v1/rooms/<room_id_or_alias>/forward_extremities
+```
+
+A response as follows will be returned:
+
+```json
+{
+  "count": 1,
+  "results": [
+    {
+      "event_id": "$M5SP266vsnxctfwFgFLNceaCo3ujhRtg_NiiHabcdefgh",
+      "state_group": 439,
+      "depth": 123,
+      "received_ts": 1611263016761
+    }
+  ]
+}    
+```
+
+## Deleting forward extremities
+
+**WARNING**: Please ensure you know what you're doing and have read 
+the related issue [#1760](https://github.com/matrix-org/synapse/issues/1760).
+Under no situations should this API be executed as an automated maintenance task!
+
+If a room has lots of forward extremities, the extra can be
+deleted as follows:
+
+```
+    DELETE /_synapse/admin/v1/rooms/<room_id_or_alias>/forward_extremities
+```
+
+A response as follows will be returned, indicating the amount of forward extremities
+that were deleted.
+
+```json
+{
+  "deleted": 1
+}
 ```

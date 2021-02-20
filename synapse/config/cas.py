@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
+from ._base import Config, ConfigError
 
 
 class CasConfig(Config):
@@ -30,7 +30,15 @@ class CasConfig(Config):
 
         if self.cas_enabled:
             self.cas_server_url = cas_config["server_url"]
-            self.cas_service_url = cas_config["service_url"]
+
+            # The public baseurl is required because it is used by the redirect
+            # template.
+            public_baseurl = self.public_baseurl
+            if not public_baseurl:
+                raise ConfigError("cas_config requires a public_baseurl to be set")
+
+            # TODO Update this to a _synapse URL.
+            self.cas_service_url = public_baseurl + "_matrix/client/r0/login/cas/ticket"
             self.cas_displayname_attribute = cas_config.get("displayname_attribute")
             self.cas_required_attributes = cas_config.get("required_attributes") or {}
         else:
@@ -52,10 +60,6 @@ class CasConfig(Config):
           # The URL of the CAS authorization endpoint.
           #
           #server_url: "https://cas-server.com"
-
-          # The public URL of the homeserver.
-          #
-          #service_url: "https://homeserver.domain.com:8448"
 
           # The attribute of the CAS response to use as the display name.
           #

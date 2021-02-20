@@ -102,7 +102,7 @@ class OidcHandler:
                 ) from e
 
     async def handle_oidc_callback(self, request: SynapseRequest) -> None:
-        """Handle an incoming request to /_synapse/oidc/callback
+        """Handle an incoming request to /_synapse/client/oidc/callback
 
         Since we might want to display OIDC-related errors in a user-friendly
         way, we don't raise SynapseError from here. Instead, we call
@@ -273,6 +273,9 @@ class OidcProvider:
 
         # MXC URI for icon for this auth provider
         self.idp_icon = provider.idp_icon
+
+        # optional brand identifier for this auth provider
+        self.idp_brand = provider.idp_brand
 
         self._sso_handler = hs.get_sso_handler()
 
@@ -640,7 +643,7 @@ class OidcProvider:
 
           - ``client_id``: the client ID set in ``oidc_config.client_id``
           - ``response_type``: ``code``
-          - ``redirect_uri``: the callback URL ; ``{base url}/_synapse/oidc/callback``
+          - ``redirect_uri``: the callback URL ; ``{base url}/_synapse/client/oidc/callback``
           - ``scope``: the list of scopes set in ``oidc_config.scopes``
           - ``state``: a random string
           - ``nonce``: a random string
@@ -681,7 +684,7 @@ class OidcProvider:
         request.addCookie(
             SESSION_COOKIE_NAME,
             cookie,
-            path="/_synapse/oidc",
+            path="/_synapse/client/oidc",
             max_age="3600",
             httpOnly=True,
             sameSite="lax",
@@ -702,7 +705,7 @@ class OidcProvider:
     async def handle_oidc_callback(
         self, request: SynapseRequest, session_data: "OidcSessionData", code: str
     ) -> None:
-        """Handle an incoming request to /_synapse/oidc/callback
+        """Handle an incoming request to /_synapse/client/oidc/callback
 
         By this time we have already validated the session on the synapse side, and
         now need to do the provider-specific operations. This includes:
@@ -1056,7 +1059,8 @@ class OidcSessionData:
 
 
 UserAttributeDict = TypedDict(
-    "UserAttributeDict", {"localpart": Optional[str], "display_name": Optional[str]}
+    "UserAttributeDict",
+    {"localpart": Optional[str], "display_name": Optional[str], "emails": List[str]},
 )
 C = TypeVar("C")
 
@@ -1135,11 +1139,12 @@ def jinja_finalize(thing):
 env = Environment(finalize=jinja_finalize)
 
 
-@attr.s
+@attr.s(slots=True, frozen=True)
 class JinjaOidcMappingConfig:
     subject_claim = attr.ib(type=str)
     localpart_template = attr.ib(type=Optional[Template])
     display_name_template = attr.ib(type=Optional[Template])
+    email_template = attr.ib(type=Optional[Template])
     extra_attributes = attr.ib(type=Dict[str, Template])
 
 
@@ -1156,23 +1161,17 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
     def parse_config(config: dict) -> JinjaOidcMappingConfig:
         subject_claim = config.get("subject_claim", "sub")
 
-        localpart_template = None  # type: Optional[Template]
-        if "localpart_template" in config:
+        def parse_template_config(option_name: str) -> Optional[Template]:
+            if option_name not in config:
+                return None
             try:
-                localpart_template = env.from_string(config["localpart_template"])
+                return env.from_string(config[option_name])
             except Exception as e:
-                raise ConfigError(
-                    "invalid jinja template", path=["localpart_template"]
-                ) from e
+                raise ConfigError("invalid jinja template", path=[option_name]) from e
 
-        display_name_template = None  # type: Optional[Template]
-        if "display_name_template" in config:
-            try:
-                display_name_template = env.from_string(config["display_name_template"])
-            except Exception as e:
-                raise ConfigError(
-                    "invalid jinja template", path=["display_name_template"]
-                ) from e
+        localpart_template = parse_template_config("localpart_template")
+        display_name_template = parse_template_config("display_name_template")
+        email_template = parse_template_config("email_template")
 
         extra_attributes = {}  # type Dict[str, Template]
         if "extra_attributes" in config:
@@ -1192,6 +1191,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             subject_claim=subject_claim,
             localpart_template=localpart_template,
             display_name_template=display_name_template,
+            email_template=email_template,
             extra_attributes=extra_attributes,
         )
 
@@ -1213,16 +1213,23 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             # a usable mxid.
             localpart += str(failures) if failures else ""
 
-        display_name = None  # type: Optional[str]
-        if self._config.display_name_template is not None:
-            display_name = self._config.display_name_template.render(
-                user=userinfo
-            ).strip()
+        def render_template_field(template: Optional[Template]) -> Optional[str]:
+            if template is None:
+                return None
+            return template.render(user=userinfo).strip()
 
-            if display_name == "":
-                display_name = None
+        display_name = render_template_field(self._config.display_name_template)
+        if display_name == "":
+            display_name = None
 
-        return UserAttributeDict(localpart=localpart, display_name=display_name)
+        emails = []  # type: List[str]
+        email = render_template_field(self._config.email_template)
+        if email:
+            emails.append(email)
+
+        return UserAttributeDict(
+            localpart=localpart, display_name=display_name, emails=emails
+        )
 
     async def get_extra_attributes(self, userinfo: UserInfo, token: Token) -> JsonDict:
         extras = {}  # type: Dict[str, str]

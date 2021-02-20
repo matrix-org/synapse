@@ -166,6 +166,11 @@ class EmailConfig(Config):
             if not self.email_notif_from:
                 missing.append("email.notif_from")
 
+            # public_baseurl is required to build password reset and validation links that
+            # will be emailed to users
+            if config.get("public_baseurl") is None:
+                missing.append("public_baseurl")
+
             if missing:
                 raise ConfigError(
                     MISSING_PASSWORD_RESET_CONFIG_ERROR % (", ".join(missing),)
@@ -263,6 +268,9 @@ class EmailConfig(Config):
             missing = []
             if not self.email_notif_from:
                 missing.append("email.notif_from")
+
+            if config.get("public_baseurl") is None:
+                missing.append("public_baseurl")
 
             if missing:
                 raise ConfigError(

@@ -33,7 +33,6 @@ from synapse.api.room_versions import RoomVersions
 from synapse.config.database import DatabaseConnectionConfig
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import DEFAULT_ROOM_VERSION
-from synapse.http.server import HttpServer
 from synapse.logging.context import current_context, set_current_context
 from synapse.server import HomeServer
 from synapse.storage import DataStore
@@ -158,7 +157,9 @@ def default_config(name, parse=False):
             "local": {"per_second": 10000, "burst_count": 10000},
             "remote": {"per_second": 10000, "burst_count": 10000},
         },
+        "rc_3pid_validation": {"per_second": 10000, "burst_count": 10000},
         "saml2_enabled": False,
+        "public_baseurl": None,
         "default_identity_server": None,
         "key_refresh_interval": 24 * 60 * 60 * 1000,
         "old_signing_keys": {},
@@ -351,7 +352,7 @@ def mock_getRawHeaders(headers=None):
 
 
 # This is a mock /resource/ not an entire server
-class MockHttpResource(HttpServer):
+class MockHttpResource:
     def __init__(self, prefix=""):
         self.callbacks = []  # 3-tuple of method/pattern/function
         self.prefix = prefix
