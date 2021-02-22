@@ -40,7 +40,7 @@ from synapse.types import (
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.caches.lrucache import LruCache
-from synapse.util.caches.response_cache import NoTimedCache, ResponseCache
+from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.metrics import Measure, measure_func
 from synapse.visibility import filter_events_for_client
 
@@ -277,8 +277,9 @@ class SyncHandler:
         user_id = sync_config.user.to_string()
         await self.auth.check_auth_blocking(requester=requester)
 
-        res = await self.response_cache.wrap(
+        res = await self.response_cache.wrap_conditional(
             sync_config.request_key,
+            lambda result: since_token != result.next_batch,
             self._wait_for_sync_for_user,
             sync_config,
             since_token,
@@ -330,11 +331,6 @@ class SyncHandler:
             else:
                 lazy_loaded = "false"
             non_empty_sync_counter.labels(sync_type, lazy_loaded).inc()
-
-        # fixme hack: sanity check to invalidate cache, prevent a self-referral loop
-        #  replace with contextvars approach once it gets working on twisted (twisted/twisted#1262)
-        if since_token == result.next_batch:
-            result = NoTimedCache(result)  # type: ignore # because it is unwrapped in ResponseCache.set.<remove>()
 
         return result
 

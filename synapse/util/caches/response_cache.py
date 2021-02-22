@@ -13,9 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, Optional, TypeVar
-
-import attr
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, Optional, Set, TypeVar
 
 from twisted.internet import defer
 
@@ -31,11 +29,6 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-@attr.s(slots=True, frozen=True)
-class NoTimedCache:
-    obj = attr.ib()
-
-
 class ResponseCache(Generic[T]):
     """
     This caches a deferred response. Until the deferred completes it will be
@@ -47,6 +40,7 @@ class ResponseCache(Generic[T]):
     def __init__(self, hs: "HomeServer", name: str, timeout_ms: float = 0):
         # Requests that haven't finished yet.
         self.pending_result_cache = {}  # type: Dict[T, ObservableDeferred]
+        self.pending_conditionals = {}  # type: Dict[T, Set[Callable[[Any], bool]]]
 
         self.clock = hs.get_clock()
         self.timeout_sec = timeout_ms / 1000.0
@@ -108,16 +102,44 @@ class ResponseCache(Generic[T]):
         self.pending_result_cache[key] = result
 
         def remove(r):
-            if self.timeout_sec and not isinstance(r, NoTimedCache):
+            should_cache = all(
+                func(r) for func in self.pending_conditionals.pop(key, [])
+            )
+
+            if self.timeout_sec and should_cache:
                 self.clock.call_later(
                     self.timeout_sec, self.pending_result_cache.pop, key, None
                 )
             else:
                 self.pending_result_cache.pop(key, None)
-            return r.obj if isinstance(r, NoTimedCache) else r
+            return r
 
         result.addBoth(remove)
         return result.observe()
+
+    def add_conditional(self, key: T, conditional: Callable[[Any], bool]):
+        self.pending_conditionals.setdefault(key, set()).add(conditional)
+
+    def wrap_conditional(
+        self,
+        key: T,
+        should_cache: Callable[[Any], bool],
+        callback: "Callable[..., Any]",
+        *args: Any,
+        **kwargs: Any
+    ) -> defer.Deferred:
+        """The same as wrap(), but adds a conditional to the final execution.
+
+        When the final execution completes, *all* conditionals need to return True for it to properly cache,
+        else it'll not be cached in a timed fashion."""
+
+        # See if there's already a result on this key that hasn't yet completed, due to the single-threaded nature of
+        # python, adding a key immediately in the same execution thread will not cause a race condition.
+        result = self.get(key)
+        if not result or isinstance(result, defer.Deferred) and not result.called:
+            self.add_conditional(key, should_cache)
+
+        return self.wrap(key, callback, *args, **kwargs)
 
     def wrap(
         self, key: T, callback: "Callable[..., Any]", *args: Any, **kwargs: Any
