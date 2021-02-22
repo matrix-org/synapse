@@ -670,7 +670,6 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         users.update(rows)
         return list(users)
 
-    @cached()
     async def get_shared_rooms_for_users(
         self, user_id: str, other_user_id: str
     ) -> Set[str]:
