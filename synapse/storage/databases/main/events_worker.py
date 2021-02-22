@@ -63,6 +63,7 @@ EVENT_QUEUE_THREADS = 3  # Max number of threads that will fetch events
 EVENT_QUEUE_ITERATIONS = 3  # No. times we block waiting for requests for events
 EVENT_QUEUE_TIMEOUT_S = 0.1  # Timeout when waiting for requests for events
 GET_EVENT_CACHE_NAME = "getEvent"
+EXTERNAL_CACHE_EXPIRY_SECONDS = 6 * 60 * 60 # 6 hours
 
 _EventCacheEntry = namedtuple("_EventCacheEntry", ("event", "redacted_event"))
 
@@ -507,7 +508,29 @@ class EventsWorkerStore(SQLBaseStore):
                 event_id,
             )
 
-    def _create_event_cache_entry_from_external_cache_entry(
+    def create_external_cache_event_from_event(self, event, redacted_event=None):
+        event_dict_redis = event.get_dict()
+        if redacted_event:
+            redacted_event = self.create_external_cache_event_from_event(redacted_event)[0]
+
+        event_dict = event.get_dict()
+
+        for key, value in event.unsigned.items():
+            if isinstance(value, EventBase):
+                event_dict["unsigned"][value] = { "_cache_event_id": value.event_id() }
+
+        return _EventCacheEntry(
+            event={
+                "event_dict": event_dict,
+                "room_version": event.room_version.identifier,
+                "internal_metadata_dict": event.get_internal_metadata_dict(),
+                "rejected_reason": event.rejected_reason,
+                "stream_ordering": event.internal_metadata.stream_ordering,
+            },
+            redacted_event=redacted_event,
+        )
+
+    async def _create_event_cache_entry_from_external_cache_entry(
         self, external_entry: Tuple[JsonDict, Optional[JsonDict]]
     ) -> Optional[_EventCacheEntry]:
         """Create a _EventCacheEntry from a tuple of dicts
@@ -516,8 +539,15 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
             A _EventCacheEntry containing the frozen event(s)
         """
+        event_dict = external_entry[0].get("event_dict")
+        for key, value in event_dict.get("unsigned", {}).items():
+            # If unsigned contained any events, get them now
+            if isinstance(value, dict) and value.get("_cache_event_id"):
+                event_dict["unsigned"][key] = await self.get_event(value["_cache_event_id"])
+
+
         original_ev = make_event_from_dict(
-            event_dict=external_entry[0].get("event_dict"),
+            event_dict=event_dict,
             room_version=KNOWN_ROOM_VERSIONS[external_entry[0].get("room_version")],
             internal_metadata_dict=external_entry[0].get("internal_metadata_dict"),
             rejected_reason=external_entry[0].get("rejected_reason"),
@@ -559,10 +589,12 @@ class EventsWorkerStore(SQLBaseStore):
             if not ret and self._external_cache.is_enabled():
                 # L2 cache - external
                 cache_result = await self._external_cache.get(
-                    GET_EVENT_CACHE_NAME, event_id
+                    GET_EVENT_CACHE_NAME,
+                    event_id,
+                    EXTERNAL_CACHE_EXPIRY_SECONDS,
                 )
                 if cache_result:
-                    ret = self._create_event_cache_entry_from_external_cache_entry(
+                    ret = await self._create_event_cache_entry_from_external_cache_entry(
                         cache_result
                     )
                     # We got a hit here, store it in the L1 cache
@@ -858,23 +890,7 @@ class EventsWorkerStore(SQLBaseStore):
                 # Store in the L2 cache
                 # Redis cannot store a FrozenEvent, so we transform these
                 # into two dicts
-                if redacted_event:
-                    redacted_event = {
-                        "event_dict": redacted_event._dict,
-                        "room_version": redacted_event.room_version.identifier,
-                        "internal_metadata_dict": redacted_event.internal_metadata.get_dict(),
-                        "rejected_reason": redacted_event.rejected_reason,
-                    }
-                redis_cache_entry = _EventCacheEntry(
-                    event={
-                        "event_dict": original_ev._dict,
-                        "room_version": original_ev.room_version.identifier,
-                        "internal_metadata_dict": original_ev.internal_metadata.get_dict(),
-                        "rejected_reason": original_ev.rejected_reason,
-                        "stream_ordering": original_ev.internal_metadata.stream_ordering,
-                    },
-                    redacted_event=redacted_event,
-                )
+                redis_cache_entry = self.create_external_cache_event_from_event(original_ev, redacted_event)
                 await self._external_cache.set(
                     GET_EVENT_CACHE_NAME,
                     event_id,
