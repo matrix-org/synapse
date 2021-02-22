@@ -845,21 +845,21 @@ class ShardedWorkerHandlingConfig:
     def should_handle(self, instance_name: str, key: str) -> bool:
         """Whether this instance is responsible for handling the given key."""
         # If multiple instances are not defined we always return true
-        if not self.instances or len(self.instances) == 1:
-            return True
+        if not self.instances:
+            return False
 
-        return self.get_instance(key) == instance_name
+        return self._get_instance(key) == instance_name
 
-    def get_instance(self, key: str) -> str:
+    def _get_instance(self, key: str) -> str:
         """Get the instance responsible for handling the given key.
 
-        Note: For things like federation sending the config for which instance
-        is sending is known only to the sender instance if there is only one.
-        Therefore `should_handle` should be used where possible.
+        Note: For federation sending and pushers the config for which instance
+        is sending is known only to the sender instance, so we don't expose this
+        method by default.
         """
 
         if not self.instances:
-            return "master"
+            raise Exception("Unknown worker")
 
         if len(self.instances) == 1:
             return self.instances[0]

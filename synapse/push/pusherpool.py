@@ -59,7 +59,6 @@ class PusherPool:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.pusher_factory = PusherFactory(hs)
-        self._should_start_pushers = hs.config.start_pushers
         self.store = self.hs.get_datastore()
         self.clock = self.hs.get_clock()
 
@@ -68,6 +67,9 @@ class PusherPool:
         # We shard the handling of push notifications by user ID.
         self._pusher_shard_config = hs.config.push.pusher_shard_config
         self._instance_name = hs.get_instance_name()
+        self._should_start_pushers = (
+            self._instance_name in self._pusher_shard_config.instances
+        )
 
         # We can only delete pushers on master.
         self._remove_pusher_client = None
