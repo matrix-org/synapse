@@ -65,8 +65,22 @@ class ExternalCache:
         """
         return self._redis_connection is not None
 
-    async def set(self, cache_name: str, key: str, value: Any, expiry_ms: int) -> None:
-        """Add the key/value to the named cache, with the expiry time given."""
+    async def delete(self, cache_name: str, key: str) -> None:
+        """Delete a key from the named cache
+        """
+        if self._redis_connection is None:
+            return
+        delete_counter.labels(cache_name).inc()
+
+        logger.debug("Deleting %s %s", cache_name, key)
+
+        return await make_deferred_yieldable(
+            self._redis_connection.delete(self._get_redis_key(cache_name, key),)
+        )
+
+    async def set(self, cache_name: str, key: str, value: Any, expiry_ms: Optional[int] = None) -> None:
+        """Add the key/value to the named cache, with the expiry time given.
+        """
 
         if self._redis_connection is None:
             return
@@ -87,14 +101,16 @@ class ExternalCache:
             )
         )
 
-    async def get(self, cache_name: str, key: str) -> Optional[Any]:
+    async def get(self, cache_name: str, key: str, expiry_s: Optional[int] = None) -> Optional[Any]:
         """Look up a key/value in the named cache."""
 
         if self._redis_connection is None:
             return None
 
+        cache_key = self._get_redis_key(cache_name, key)
+
         result = await make_deferred_yieldable(
-            self._redis_connection.get(self._get_redis_key(cache_name, key))
+            self._redis_connection.get(cache_key)
         )
 
         logger.debug("Got cache result %s %s: %r", cache_name, key, result)
@@ -103,6 +119,14 @@ class ExternalCache:
 
         if not result:
             return None
+
+        if expiry_s:
+            # If we are using this key, bump the expiry time
+            # NOTE: txredisapi does not support pexire, so we must use (expire) seconds
+            await make_deferred_yieldable(
+                self._redis_connection.expire(cache_key, expiry_s)
+            )
+
 
         # For some reason the integers get magically converted back to integers
         if isinstance(result, int):
