@@ -17,7 +17,12 @@ from typing import List, Union
 
 import attr
 
-from ._base import Config, ConfigError, ShardedWorkerHandlingConfig
+from ._base import (
+    Config,
+    ConfigError,
+    RoutableShardedWorkerHandlingConfig,
+    ShardedWorkerHandlingConfig,
+)
 from .server import ListenerConfig, parse_listener_def
 
 
@@ -164,7 +169,9 @@ class WorkerConfig(Config):
                 "Must only specify one instance to handle `receipts` messages."
             )
 
-        self.events_shard_config = ShardedWorkerHandlingConfig(self.writers.events)
+        self.events_shard_config = RoutableShardedWorkerHandlingConfig(
+            self.writers.events
+        )
 
         # Whether this worker should run background tasks or not.
         #

@@ -876,4 +876,20 @@ class ShardedWorkerHandlingConfig:
         return self.instances[remainder]
 
 
+@attr.s
+class RoutableShardedWorkerHandlingConfig(ShardedWorkerHandlingConfig):
+    """A version of `ShardedWorkerHandlingConfig` that is used for config
+    options where all instances know which instances are responsible for the
+    sharded work.
+    """
+
+    def __attrs_post_init__(self):
+        # We require that `self.instances` is non-empty.
+        assert self.instances
+
+    def get_instance(self, key: str) -> str:
+        """Get the instance responsible for handling the given key."""
+        return self._get_instance(key)
+
+
 __all__ = ["Config", "RootConfig", "ShardedWorkerHandlingConfig"]
