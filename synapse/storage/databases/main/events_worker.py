@@ -152,7 +152,9 @@ class EventsWorkerStore(SQLBaseStore):
             keylen=3,
             max_size=hs.config.caches.event_cache_size,
         )
-        self._external_cache_event_expiry_ms = hs.config.caches.external_event_cache_expiry_ms;
+        self._external_cache_event_expiry_ms = (
+            hs.config.caches.external_event_cache_expiry_ms
+        )
 
         self._event_fetch_lock = threading.Condition()
         self._event_fetch_list = []
@@ -509,15 +511,16 @@ class EventsWorkerStore(SQLBaseStore):
             )
 
     def create_external_cache_event_from_event(self, event, redacted_event=None):
-        event_dict_redis = event.get_dict()
         if redacted_event:
-            redacted_event = self.create_external_cache_event_from_event(redacted_event)[0]
+            redacted_event = self.create_external_cache_event_from_event(
+                redacted_event
+            )[0]
 
         event_dict = event.get_dict()
 
         for key, value in event.unsigned.items():
             if isinstance(value, EventBase):
-                event_dict["unsigned"][value] = { "_cache_event_id": value.event_id() }
+                event_dict["unsigned"][value] = {"_cache_event_id": value.event_id()}
 
         return _EventCacheEntry(
             event={
@@ -543,8 +546,9 @@ class EventsWorkerStore(SQLBaseStore):
         for key, value in event_dict.get("unsigned", {}).items():
             # If unsigned contained any events, get them now
             if isinstance(value, dict) and value.get("_cache_event_id"):
-                event_dict["unsigned"][key] = await self.get_event(value["_cache_event_id"])
-
+                event_dict["unsigned"][key] = await self.get_event(
+                    value["_cache_event_id"]
+                )
 
         original_ev = make_event_from_dict(
             event_dict=event_dict,
@@ -594,8 +598,10 @@ class EventsWorkerStore(SQLBaseStore):
                     self._external_cache_event_expiry_ms,
                 )
                 if cache_result:
-                    ret = await self._create_event_cache_entry_from_external_cache_entry(
-                        cache_result
+                    ret = (
+                        await self._create_event_cache_entry_from_external_cache_entry(
+                            cache_result
+                        )
                     )
                     # We got a hit here, store it in the L1 cache
                     self._get_event_cache.set((event_id,), ret)
@@ -890,7 +896,9 @@ class EventsWorkerStore(SQLBaseStore):
                 # Store in the L2 cache
                 # Redis cannot store a FrozenEvent, so we transform these
                 # into two dicts
-                redis_cache_entry = self.create_external_cache_event_from_event(original_ev, redacted_event)
+                redis_cache_entry = self.create_external_cache_event_from_event(
+                    original_ev, redacted_event
+                )
                 await self._external_cache.set(
                     GET_EVENT_CACHE_NAME,
                     event_id,

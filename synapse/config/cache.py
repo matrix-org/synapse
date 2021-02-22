@@ -31,7 +31,7 @@ _CACHES_LOCK = threading.Lock()
 
 _DEFAULT_FACTOR_SIZE = 0.5
 _DEFAULT_EVENT_CACHE_SIZE = "10K"
-_DEFAULT_EXTERNAL_CACHE_EXPIRY_MS = 30 * 60 * 1000 # 30 minutes
+_DEFAULT_EXTERNAL_CACHE_EXPIRY_MS = 30 * 60 * 1000  # 30 minutes
 
 
 class CacheProperties:
@@ -117,7 +117,7 @@ class CacheConfig(Config):
         # time will be reset each time the event is accessed.
         # This is only used when Redis is configured.
         # Defaults to 30 minutes
-        # 
+        #
         #external_event_cache_expiry_ms: 1800000
 
         caches:
@@ -158,7 +158,9 @@ class CacheConfig(Config):
         )
 
         self.external_event_cache_expiry_ms = self.parse_(
-            config.get("external_event_cache_expiry_ms", _DEFAULT_EXTERNAL_CACHE_EXPIRY_MS)
+            config.get(
+                "external_event_cache_expiry_ms", _DEFAULT_EXTERNAL_CACHE_EXPIRY_MS
+            )
         )
         if not isinstance(self.external_event_cache_expiry_ms, (int, float)):
             raise ConfigError("external_event_cache_expiry_ms must be a number.")

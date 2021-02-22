@@ -66,8 +66,8 @@ class ExternalCache:
         return self._redis_connection is not None
 
     async def delete(self, cache_name: str, key: str) -> None:
-        """Delete a key from the named cache
-        """
+        """Delete a key from the named cache."""
+
         if self._redis_connection is None:
             return
         delete_counter.labels(cache_name).inc()
@@ -75,12 +75,15 @@ class ExternalCache:
         logger.debug("Deleting %s %s", cache_name, key)
 
         return await make_deferred_yieldable(
-            self._redis_connection.delete(self._get_redis_key(cache_name, key),)
+            self._redis_connection.delete(
+                self._get_redis_key(cache_name, key),
+            )
         )
 
-    async def set(self, cache_name: str, key: str, value: Any, expiry_ms: Optional[int] = None) -> None:
-        """Add the key/value to the named cache, with the expiry time given.
-        """
+    async def set(
+        self, cache_name: str, key: str, value: Any, expiry_ms: Optional[int] = None
+    ) -> None:
+        """Add the key/value to the named cache, with the expiry time given."""
 
         if self._redis_connection is None:
             return
@@ -101,7 +104,9 @@ class ExternalCache:
             )
         )
 
-    async def get(self, cache_name: str, key: str, expiry_ms: Optional[int] = None) -> Optional[Any]:
+    async def get(
+        self, cache_name: str, key: str, expiry_ms: Optional[int] = None
+    ) -> Optional[Any]:
         """Look up a key/value in the named cache."""
 
         if self._redis_connection is None:
@@ -109,9 +114,7 @@ class ExternalCache:
 
         cache_key = self._get_redis_key(cache_name, key)
 
-        result = await make_deferred_yieldable(
-            self._redis_connection.get(cache_key)
-        )
+        result = await make_deferred_yieldable(self._redis_connection.get(cache_key))
 
         logger.debug("Got cache result %s %s: %r", cache_name, key, result)
 
@@ -126,7 +129,6 @@ class ExternalCache:
             await make_deferred_yieldable(
                 self._redis_connection.expire(cache_key, expiry_ms // 1000)
             )
-
 
         # For some reason the integers get magically converted back to integers
         if isinstance(result, int):

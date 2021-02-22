@@ -727,6 +727,13 @@ acme:
 #
 #event_cache_size: 10K
 
+# The expiry time of an event stored in the external cache (Redis). This
+# time will be reset each time the event is accessed.
+# This is only used when Redis is configured.
+# Defaults to 30 minutes
+#
+#external_event_cache_expiry_ms: 1800000
+
 caches:
    # Controls the global cache factor, which is the default cache factor
    # for all caches if a specific factor for that cache is not otherwise
