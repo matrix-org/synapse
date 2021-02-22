@@ -645,9 +645,6 @@ class GenericWorkerServer(HomeServer):
 
         self.get_tcp_replication().start_replication(self)
 
-    async def remove_pusher(self, app_id, push_key, user_id):
-        self.get_tcp_replication().send_remove_pusher(app_id, push_key, user_id)
-
     @cache_in_self
     def get_replication_data_handler(self):
         return GenericWorkerReplicationHandler(self)
