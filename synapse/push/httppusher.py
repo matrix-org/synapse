@@ -74,6 +74,7 @@ class HttpPusher(Pusher):
         self.timed_call = None
         self._is_processing = False
         self._group_unread_count_by_room = hs.config.push_group_unread_count_by_room
+        self._pusherpool = hs.get_pusherpool()
 
         self.data = pusher_config.data
         if self.data is None:
@@ -299,7 +300,7 @@ class HttpPusher(Pusher):
                     )
                 else:
                     logger.info("Pushkey %s was rejected: removing", pk)
-                    await self.hs.remove_pusher(self.app_id, pk, self.user_id)
+                    await self._pusherpool.remove_pusher(self.app_id, pk, self.user_id)
         return True
 
     async def _build_notification_dict(

@@ -220,10 +220,6 @@ Asks the server for the current position of all streams.
 
    Acknowledge receipt of some federation data
 
-#### REMOVE_PUSHER (C)
-
-   Inform the server a pusher should be removed
-
 ### REMOTE_SERVER_UP (S, C)
 
    Inform other processes that a remote server may have come back online.
