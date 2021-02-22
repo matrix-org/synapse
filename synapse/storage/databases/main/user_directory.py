@@ -497,8 +497,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
     async def add_users_in_public_rooms(
         self, room_id: str, user_ids: Iterable[str]
     ) -> None:
-        """Insert entries into the users_who_share_private_rooms table. The first
-        user should be a local user.
+        """Insert entries into the users_in_public_rooms table.
 
         Args:
             room_id
