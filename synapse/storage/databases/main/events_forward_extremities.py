@@ -71,7 +71,9 @@ class EventForwardExtremitiesStore(SQLBaseStore):
             if txn.rowcount > 0:
                 # Invalidate the cache
                 self._invalidate_cache_and_stream(
-                    txn, self.get_latest_event_ids_in_room, (room_id,),
+                    txn,
+                    self.get_latest_event_ids_in_room,
+                    (room_id,),
                 )
 
             return txn.rowcount
@@ -97,5 +99,6 @@ class EventForwardExtremitiesStore(SQLBaseStore):
             return self.db_pool.cursor_to_dict(txn)
 
         return await self.db_pool.runInteraction(
-            "get_forward_extremities_for_room", get_forward_extremities_for_room_txn,
+            "get_forward_extremities_for_room",
+            get_forward_extremities_for_room_txn,
         )

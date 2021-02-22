@@ -144,8 +144,7 @@ class BulkPushRuleEvaluator:
 
     @lru_cache()
     def _get_rules_for_room(self, room_id: str) -> "RulesForRoom":
-        """Get the current RulesForRoom object for the given room id
-        """
+        """Get the current RulesForRoom object for the given room id"""
         # It's important that RulesForRoom gets added to self._get_rules_for_room.cache
         # before any lookup methods get called on it as otherwise there may be
         # a race if invalidate_all gets called (which assumes its in the cache)
@@ -252,7 +251,9 @@ class BulkPushRuleEvaluator:
         # notified for this event. (This will then get handled when we persist
         # the event)
         await self.store.add_push_actions_to_staging(
-            event.event_id, actions_by_user, count_as_unread,
+            event.event_id,
+            actions_by_user,
+            count_as_unread,
         )
 
 
@@ -524,7 +525,7 @@ class RulesForRoom:
 class _Invalidation:
     # _Invalidation is passed as an `on_invalidate` callback to bulk_get_push_rules,
     # which means that it it is stored on the bulk_get_push_rules cache entry. In order
-    # to ensure that we don't accumulate lots of redunant callbacks on the cache entry,
+    # to ensure that we don't accumulate lots of redundant callbacks on the cache entry,
     # we need to ensure that two _Invalidation objects are "equal" if they refer to the
     # same `cache` and `room_id`.
     #

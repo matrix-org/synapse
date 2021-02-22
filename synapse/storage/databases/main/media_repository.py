@@ -169,7 +169,10 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         )
 
     async def get_local_media_before(
-        self, before_ts: int, size_gt: int, keep_profiles: bool,
+        self,
+        before_ts: int,
+        size_gt: int,
+        keep_profiles: bool,
     ) -> List[str]:
 
         # to find files that have never been accessed (last_access_ts IS NULL)
@@ -341,16 +344,16 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         thumbnail_method,
         thumbnail_length,
     ):
-        await self.db_pool.simple_insert(
-            "local_media_repository_thumbnails",
-            {
+        await self.db_pool.simple_upsert(
+            table="local_media_repository_thumbnails",
+            keyvalues={
                 "media_id": media_id,
                 "thumbnail_width": thumbnail_width,
                 "thumbnail_height": thumbnail_height,
                 "thumbnail_method": thumbnail_method,
                 "thumbnail_type": thumbnail_type,
-                "thumbnail_length": thumbnail_length,
             },
+            values={"thumbnail_length": thumbnail_length},
             desc="store_local_thumbnail",
         )
 
@@ -454,10 +457,14 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         )
 
     async def get_remote_media_thumbnail(
-        self, origin: str, media_id: str, t_width: int, t_height: int, t_type: str,
+        self,
+        origin: str,
+        media_id: str,
+        t_width: int,
+        t_height: int,
+        t_type: str,
     ) -> Optional[Dict[str, Any]]:
-        """Fetch the thumbnail info of given width, height and type.
-        """
+        """Fetch the thumbnail info of given width, height and type."""
 
         return await self.db_pool.simple_select_one(
             table="remote_media_cache_thumbnails",
@@ -491,18 +498,18 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         thumbnail_method,
         thumbnail_length,
     ):
-        await self.db_pool.simple_insert(
-            "remote_media_cache_thumbnails",
-            {
+        await self.db_pool.simple_upsert(
+            table="remote_media_cache_thumbnails",
+            keyvalues={
                 "media_origin": origin,
                 "media_id": media_id,
                 "thumbnail_width": thumbnail_width,
                 "thumbnail_height": thumbnail_height,
                 "thumbnail_method": thumbnail_method,
                 "thumbnail_type": thumbnail_type,
-                "thumbnail_length": thumbnail_length,
-                "filesystem_id": filesystem_id,
             },
+            values={"thumbnail_length": thumbnail_length},
+            insertion_values={"filesystem_id": filesystem_id},
             desc="store_remote_media_thumbnail",
         )
 

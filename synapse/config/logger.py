@@ -162,7 +162,10 @@ class LoggingConfig(Config):
         )
 
         logging_group.add_argument(
-            "-f", "--log-file", dest="log_file", help=argparse.SUPPRESS,
+            "-f",
+            "--log-file",
+            dest="log_file",
+            help=argparse.SUPPRESS,
         )
 
     def generate_files(self, config, config_dir_path):

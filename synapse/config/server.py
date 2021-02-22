@@ -52,7 +52,12 @@ def _6to4(network: IPNetwork) -> IPNetwork:
     hex_network = hex(network.first)[2:]
     hex_network = ("0" * (8 - len(hex_network))) + hex_network
     return IPNetwork(
-        "2002:%s:%s::/%d" % (hex_network[:4], hex_network[4:], 16 + network.prefixlen,)
+        "2002:%s:%s::/%d"
+        % (
+            hex_network[:4],
+            hex_network[4:],
+            16 + network.prefixlen,
+        )
     )
 
 
@@ -254,7 +259,14 @@ class ServerConfig(Config):
         # Whether to require sharing a room with a user to retrieve their
         # profile data
         self.limit_profile_requests_to_users_who_share_rooms = config.get(
-            "limit_profile_requests_to_users_who_share_rooms", False,
+            "limit_profile_requests_to_users_who_share_rooms",
+            False,
+        )
+
+        # Whether to retrieve and display profile data for a user when they
+        # are invited to a room
+        self.include_profile_data_on_invite = config.get(
+            "include_profile_data_on_invite", True
         )
 
         if "restrict_public_rooms_to_local_users" in config and (
@@ -614,7 +626,9 @@ class ServerConfig(Config):
         if manhole:
             self.listeners.append(
                 ListenerConfig(
-                    port=manhole, bind_addresses=["127.0.0.1"], type="manhole",
+                    port=manhole,
+                    bind_addresses=["127.0.0.1"],
+                    type="manhole",
                 )
             )
 
@@ -650,7 +664,8 @@ class ServerConfig(Config):
         # and letting the client know which email address is bound to an account and
         # which one isn't.
         self.request_token_inhibit_3pid_errors = config.get(
-            "request_token_inhibit_3pid_errors", False,
+            "request_token_inhibit_3pid_errors",
+            False,
         )
 
         # List of users trialing the new experimental default push rules. This setting is
@@ -838,6 +853,14 @@ class ServerConfig(Config):
         # requesting server. Defaults to 'false'.
         #
         #limit_profile_requests_to_users_who_share_rooms: true
+
+        # Uncomment to prevent a user's profile data from being retrieved and
+        # displayed in a room until they have joined it. By default, a user's
+        # profile data is included in an invite event, regardless of the values
+        # of the above two settings, and whether or not the users share a server.
+        # Defaults to 'true'.
+        #
+        #include_profile_data_on_invite: false
 
         # If set to 'true', removes the need for authentication to access the server's
         # public rooms directory through the client API, meaning that anyone can

@@ -120,7 +120,9 @@ def convert_client_dict_legacy_fields_to_identifier(
     # Ensure the identifier has a type
     if "type" not in identifier:
         raise SynapseError(
-            400, "'identifier' dict has no key 'type'", errcode=Codes.MISSING_PARAM,
+            400,
+            "'identifier' dict has no key 'type'",
+            errcode=Codes.MISSING_PARAM,
         )
 
     return identifier
@@ -351,7 +353,11 @@ class AuthHandler(BaseHandler):
 
         try:
             result, params, session_id = await self.check_ui_auth(
-                flows, request, request_body, description, get_new_session_data,
+                flows,
+                request,
+                request_body,
+                description,
+                get_new_session_data,
             )
         except LoginError:
             # Update the ratelimiter to say we failed (`can_do_action` doesn't raise).
@@ -379,8 +385,7 @@ class AuthHandler(BaseHandler):
         return params, session_id
 
     async def _get_available_ui_auth_types(self, user: UserID) -> Iterable[str]:
-        """Get a list of the authentication types this user can use
-        """
+        """Get a list of the authentication types this user can use"""
 
         ui_auth_types = set()
 
@@ -723,7 +728,9 @@ class AuthHandler(BaseHandler):
         }
 
     def _auth_dict_for_flows(
-        self, flows: List[List[str]], session_id: str,
+        self,
+        flows: List[List[str]],
+        session_id: str,
     ) -> Dict[str, Any]:
         public_flows = []
         for f in flows:
@@ -880,7 +887,9 @@ class AuthHandler(BaseHandler):
         return self._supported_login_types
 
     async def validate_login(
-        self, login_submission: Dict[str, Any], ratelimit: bool = False,
+        self,
+        login_submission: Dict[str, Any],
+        ratelimit: bool = False,
     ) -> Tuple[str, Optional[Callable[[Dict[str, str]], Awaitable[None]]]]:
         """Authenticates the user for the /login API
 
@@ -1023,7 +1032,9 @@ class AuthHandler(BaseHandler):
             raise
 
     async def _validate_userid_login(
-        self, username: str, login_submission: Dict[str, Any],
+        self,
+        username: str,
+        login_submission: Dict[str, Any],
     ) -> Tuple[str, Optional[Callable[[Dict[str, str]], Awaitable[None]]]]:
         """Helper for validate_login
 
@@ -1446,7 +1457,8 @@ class AuthHandler(BaseHandler):
         # is considered OK since the newest SSO attributes should be most valid.
         if extra_attributes:
             self._extra_attributes[registered_user_id] = SsoLoginExtraAttributes(
-                self._clock.time_msec(), extra_attributes,
+                self._clock.time_msec(),
+                extra_attributes,
             )
 
         # Create a login token
@@ -1702,5 +1714,9 @@ class PasswordProvider:
         # This might return an awaitable, if it does block the log out
         # until it completes.
         await maybe_awaitable(
-            g(user_id=user_id, device_id=device_id, access_token=access_token,)
+            g(
+                user_id=user_id,
+                device_id=device_id,
+                access_token=access_token,
+            )
         )

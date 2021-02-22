@@ -611,7 +611,9 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         # matrix access token, mxid, and device id.
         login_token = params[2][1]
         chan = self.make_request(
-            "POST", "/login", content={"type": "m.login.token", "token": login_token},
+            "POST",
+            "/login",
+            content={"type": "m.login.token", "token": login_token},
         )
         self.assertEqual(chan.code, 200, chan.result)
         self.assertEqual(chan.json_body["user_id"], "@user1:test")
@@ -619,7 +621,8 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
     def test_multi_sso_redirect_to_unknown(self):
         """An unknown IdP should cause a 400"""
         channel = self.make_request(
-            "GET", "/_synapse/client/pick_idp?redirectUrl=http://x&idp=xyz",
+            "GET",
+            "/_synapse/client/pick_idp?redirectUrl=http://x&idp=xyz",
         )
         self.assertEqual(channel.code, 400, channel.result)
 
@@ -719,7 +722,8 @@ class CASTestCase(unittest.HomeserverTestCase):
         mocked_http_client.get_raw.side_effect = get_raw
 
         self.hs = self.setup_test_homeserver(
-            config=config, proxied_http_client=mocked_http_client,
+            config=config,
+            proxied_http_client=mocked_http_client,
         )
 
         return self.hs
@@ -1244,7 +1248,9 @@ class UsernamePickerTestCase(HomeserverTestCase):
         # looks ok.
         username_mapping_sessions = self.hs.get_sso_handler()._username_mapping_sessions
         self.assertIn(
-            session_id, username_mapping_sessions, "session id not found in map",
+            session_id,
+            username_mapping_sessions,
+            "session id not found in map",
         )
         session = username_mapping_sessions[session_id]
         self.assertEqual(session.remote_user_id, "tester")
@@ -1299,7 +1305,9 @@ class UsernamePickerTestCase(HomeserverTestCase):
         # finally, submit the matrix login token to the login API, which gives us our
         # matrix access token, mxid, and device id.
         chan = self.make_request(
-            "POST", "/login", content={"type": "m.login.token", "token": login_token},
+            "POST",
+            "/login",
+            content={"type": "m.login.token", "token": login_token},
         )
         self.assertEqual(chan.code, 200, chan.result)
         self.assertEqual(chan.json_body["user_id"], "@bobby:test")

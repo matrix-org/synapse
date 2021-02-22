@@ -21,7 +21,7 @@ import os
 from collections import OrderedDict
 from hashlib import sha256
 from textwrap import dedent
-from typing import Any, Iterable, List, MutableMapping, Optional
+from typing import Any, Iterable, List, MutableMapping, Optional, Union
 
 import attr
 import jinja2
@@ -147,7 +147,20 @@ class Config:
         return int(value) * size
 
     @staticmethod
-    def parse_duration(value):
+    def parse_duration(value: Union[str, int]) -> int:
+        """Convert a duration as a string or integer to a number of milliseconds.
+
+        If an integer is provided it is treated as milliseconds and is unchanged.
+
+        String durations can have a suffix of 's', 'm', 'h', 'd', 'w', or 'y'.
+        No suffix is treated as milliseconds.
+
+        Args:
+            value: The duration to parse.
+
+        Returns:
+            The number of milliseconds in the duration.
+        """
         if isinstance(value, int):
             return value
         second = 1000
@@ -224,7 +237,9 @@ class Config:
         return self.read_templates([filename])[0]
 
     def read_templates(
-        self, filenames: List[str], custom_template_directory: Optional[str] = None,
+        self,
+        filenames: List[str],
+        custom_template_directory: Optional[str] = None,
     ) -> List[jinja2.Template]:
         """Load a list of template files from disk using the given variables.
 
@@ -264,7 +279,10 @@ class Config:
 
         # TODO: switch to synapse.util.templates.build_jinja_env
         loader = jinja2.FileSystemLoader(search_directories)
-        env = jinja2.Environment(loader=loader, autoescape=jinja2.select_autoescape(),)
+        env = jinja2.Environment(
+            loader=loader,
+            autoescape=jinja2.select_autoescape(),
+        )
 
         # Update the environment with our custom filters
         env.filters.update(
@@ -825,8 +843,7 @@ class ShardedWorkerHandlingConfig:
     instances = attr.ib(type=List[str])
 
     def should_handle(self, instance_name: str, key: str) -> bool:
-        """Whether this instance is responsible for handling the given key.
-        """
+        """Whether this instance is responsible for handling the given key."""
         # If multiple instances are not defined we always return true
         if not self.instances or len(self.instances) == 1:
             return True

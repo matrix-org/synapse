@@ -16,11 +16,16 @@
 
 import logging
 from functools import wraps
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from twisted.web.http import Request
 
-from synapse.api.errors import SynapseError
+from synapse.api.constants import (
+    MAX_GROUP_CATEGORYID_LENGTH,
+    MAX_GROUP_ROLEID_LENGTH,
+    MAX_GROUPID_LENGTH,
+)
+from synapse.api.errors import Codes, SynapseError
 from synapse.handlers.groups_local import GroupsLocalHandler
 from synapse.http.servlet import (
     RestServlet,
@@ -54,8 +59,7 @@ def _validate_group_id(f):
 
 
 class GroupServlet(RestServlet):
-    """Get the group profile
-    """
+    """Get the group profile"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/profile$")
 
@@ -85,7 +89,9 @@ class GroupServlet(RestServlet):
         assert_params_in_dict(
             content, ("name", "avatar_url", "short_description", "long_description")
         )
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot create group profiles."
         await self.groups_handler.update_group_profile(
             group_id, requester_user_id, content
         )
@@ -94,8 +100,7 @@ class GroupServlet(RestServlet):
 
 
 class GroupSummaryServlet(RestServlet):
-    """Get the full group summary
-    """
+    """Get the full group summary"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/summary$")
 
@@ -139,13 +144,26 @@ class GroupSummaryRoomsCatServlet(RestServlet):
 
     @_validate_group_id
     async def on_PUT(
-        self, request: Request, group_id: str, category_id: str, room_id: str
+        self, request: Request, group_id: str, category_id: Optional[str], room_id: str
     ):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
+        if category_id == "":
+            raise SynapseError(400, "category_id cannot be empty", Codes.INVALID_PARAM)
+
+        if category_id and len(category_id) > MAX_GROUP_CATEGORYID_LENGTH:
+            raise SynapseError(
+                400,
+                "category_id may not be longer than %s characters"
+                % (MAX_GROUP_CATEGORYID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
+
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group summaries."
         resp = await self.groups_handler.update_group_summary_room(
             group_id,
             requester_user_id,
@@ -163,7 +181,9 @@ class GroupSummaryRoomsCatServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group profiles."
         resp = await self.groups_handler.delete_group_summary_room(
             group_id, requester_user_id, room_id=room_id, category_id=category_id
         )
@@ -172,8 +192,7 @@ class GroupSummaryRoomsCatServlet(RestServlet):
 
 
 class GroupCategoryServlet(RestServlet):
-    """Get/add/update/delete a group category
-    """
+    """Get/add/update/delete a group category"""
 
     PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/categories/(?P<category_id>[^/]+)$"
@@ -205,8 +224,21 @@ class GroupCategoryServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
+        if not category_id:
+            raise SynapseError(400, "category_id cannot be empty", Codes.INVALID_PARAM)
+
+        if len(category_id) > MAX_GROUP_CATEGORYID_LENGTH:
+            raise SynapseError(
+                400,
+                "category_id may not be longer than %s characters"
+                % (MAX_GROUP_CATEGORYID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
+
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group categories."
         resp = await self.groups_handler.update_group_category(
             group_id, requester_user_id, category_id=category_id, content=content
         )
@@ -220,7 +252,9 @@ class GroupCategoryServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group categories."
         resp = await self.groups_handler.delete_group_category(
             group_id, requester_user_id, category_id=category_id
         )
@@ -229,8 +263,7 @@ class GroupCategoryServlet(RestServlet):
 
 
 class GroupCategoriesServlet(RestServlet):
-    """Get all group categories
-    """
+    """Get all group categories"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/categories/$")
 
@@ -253,8 +286,7 @@ class GroupCategoriesServlet(RestServlet):
 
 
 class GroupRoleServlet(RestServlet):
-    """Get/add/update/delete a group role
-    """
+    """Get/add/update/delete a group role"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/roles/(?P<role_id>[^/]+)$")
 
@@ -284,8 +316,21 @@ class GroupRoleServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
+        if not role_id:
+            raise SynapseError(400, "role_id cannot be empty", Codes.INVALID_PARAM)
+
+        if len(role_id) > MAX_GROUP_ROLEID_LENGTH:
+            raise SynapseError(
+                400,
+                "role_id may not be longer than %s characters"
+                % (MAX_GROUP_ROLEID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
+
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group roles."
         resp = await self.groups_handler.update_group_role(
             group_id, requester_user_id, role_id=role_id, content=content
         )
@@ -299,7 +344,9 @@ class GroupRoleServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group roles."
         resp = await self.groups_handler.delete_group_role(
             group_id, requester_user_id, role_id=role_id
         )
@@ -308,8 +355,7 @@ class GroupRoleServlet(RestServlet):
 
 
 class GroupRolesServlet(RestServlet):
-    """Get all group roles
-    """
+    """Get all group roles"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/roles/$")
 
@@ -353,13 +399,26 @@ class GroupSummaryUsersRoleServlet(RestServlet):
 
     @_validate_group_id
     async def on_PUT(
-        self, request: Request, group_id: str, role_id: str, user_id: str
+        self, request: Request, group_id: str, role_id: Optional[str], user_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
+        if role_id == "":
+            raise SynapseError(400, "role_id cannot be empty", Codes.INVALID_PARAM)
+
+        if role_id and len(role_id) > MAX_GROUP_ROLEID_LENGTH:
+            raise SynapseError(
+                400,
+                "role_id may not be longer than %s characters"
+                % (MAX_GROUP_ROLEID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
+
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group summaries."
         resp = await self.groups_handler.update_group_summary_user(
             group_id,
             requester_user_id,
@@ -377,7 +436,9 @@ class GroupSummaryUsersRoleServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group summaries."
         resp = await self.groups_handler.delete_group_summary_user(
             group_id, requester_user_id, user_id=user_id, role_id=role_id
         )
@@ -386,8 +447,7 @@ class GroupSummaryUsersRoleServlet(RestServlet):
 
 
 class GroupRoomServlet(RestServlet):
-    """Get all rooms in a group
-    """
+    """Get all rooms in a group"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/rooms$")
 
@@ -410,8 +470,7 @@ class GroupRoomServlet(RestServlet):
 
 
 class GroupUsersServlet(RestServlet):
-    """Get all users in a group
-    """
+    """Get all users in a group"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/users$")
 
@@ -434,8 +493,7 @@ class GroupUsersServlet(RestServlet):
 
 
 class GroupInvitedUsersServlet(RestServlet):
-    """Get users invited to a group
-    """
+    """Get users invited to a group"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/invited_users$")
 
@@ -458,8 +516,7 @@ class GroupInvitedUsersServlet(RestServlet):
 
 
 class GroupSettingJoinPolicyServlet(RestServlet):
-    """Set group join policy
-    """
+    """Set group join policy"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/settings/m.join_policy$")
 
@@ -475,7 +532,9 @@ class GroupSettingJoinPolicyServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
 
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group join policy."
         result = await self.groups_handler.set_group_join_policy(
             group_id, requester_user_id, content
         )
@@ -484,8 +543,7 @@ class GroupSettingJoinPolicyServlet(RestServlet):
 
 
 class GroupCreateServlet(RestServlet):
-    """Create a group
-    """
+    """Create a group"""
 
     PATTERNS = client_patterns("/create_group$")
 
@@ -505,7 +563,19 @@ class GroupCreateServlet(RestServlet):
         localpart = content.pop("localpart")
         group_id = GroupID(localpart, self.server_name).to_string()
 
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        if not localpart:
+            raise SynapseError(400, "Group ID cannot be empty", Codes.INVALID_PARAM)
+
+        if len(group_id) > MAX_GROUPID_LENGTH:
+            raise SynapseError(
+                400,
+                "Group ID may not be longer than %s characters" % (MAX_GROUPID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
+
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot create groups."
         result = await self.groups_handler.create_group(
             group_id, requester_user_id, content
         )
@@ -514,8 +584,7 @@ class GroupCreateServlet(RestServlet):
 
 
 class GroupAdminRoomsServlet(RestServlet):
-    """Add a room to the group
-    """
+    """Add a room to the group"""
 
     PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/admin/rooms/(?P<room_id>[^/]*)$"
@@ -535,7 +604,9 @@ class GroupAdminRoomsServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify rooms in a group."
         result = await self.groups_handler.add_room_to_group(
             group_id, requester_user_id, room_id, content
         )
@@ -549,7 +620,9 @@ class GroupAdminRoomsServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group categories."
         result = await self.groups_handler.remove_room_from_group(
             group_id, requester_user_id, room_id
         )
@@ -558,8 +631,7 @@ class GroupAdminRoomsServlet(RestServlet):
 
 
 class GroupAdminRoomsConfigServlet(RestServlet):
-    """Update the config of a room in a group
-    """
+    """Update the config of a room in a group"""
 
     PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/admin/rooms/(?P<room_id>[^/]*)"
@@ -580,7 +652,9 @@ class GroupAdminRoomsConfigServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group categories."
         result = await self.groups_handler.update_room_in_group(
             group_id, requester_user_id, room_id, config_key, content
         )
@@ -589,8 +663,7 @@ class GroupAdminRoomsConfigServlet(RestServlet):
 
 
 class GroupAdminUsersInviteServlet(RestServlet):
-    """Invite a user to the group
-    """
+    """Invite a user to the group"""
 
     PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/admin/users/invite/(?P<user_id>[^/]*)$"
@@ -611,7 +684,9 @@ class GroupAdminUsersInviteServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
         config = content.get("config", {})
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot invite users to a group."
         result = await self.groups_handler.invite(
             group_id, user_id, requester_user_id, config
         )
@@ -620,8 +695,7 @@ class GroupAdminUsersInviteServlet(RestServlet):
 
 
 class GroupAdminUsersKickServlet(RestServlet):
-    """Kick a user from the group
-    """
+    """Kick a user from the group"""
 
     PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/admin/users/remove/(?P<user_id>[^/]*)$"
@@ -639,7 +713,9 @@ class GroupAdminUsersKickServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot kick users from a group."
         result = await self.groups_handler.remove_user_from_group(
             group_id, user_id, requester_user_id, content
         )
@@ -648,8 +724,7 @@ class GroupAdminUsersKickServlet(RestServlet):
 
 
 class GroupSelfLeaveServlet(RestServlet):
-    """Leave a joined group
-    """
+    """Leave a joined group"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/leave$")
 
@@ -665,7 +740,9 @@ class GroupSelfLeaveServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot leave a group for a users."
         result = await self.groups_handler.remove_user_from_group(
             group_id, requester_user_id, requester_user_id, content
         )
@@ -674,8 +751,7 @@ class GroupSelfLeaveServlet(RestServlet):
 
 
 class GroupSelfJoinServlet(RestServlet):
-    """Attempt to join a group, or knock
-    """
+    """Attempt to join a group, or knock"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/join$")
 
@@ -691,7 +767,9 @@ class GroupSelfJoinServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot join a user to a group."
         result = await self.groups_handler.join_group(
             group_id, requester_user_id, content
         )
@@ -700,8 +778,7 @@ class GroupSelfJoinServlet(RestServlet):
 
 
 class GroupSelfAcceptInviteServlet(RestServlet):
-    """Accept a group invite
-    """
+    """Accept a group invite"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/accept_invite$")
 
@@ -717,7 +794,9 @@ class GroupSelfAcceptInviteServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        assert isinstance(self.groups_handler, GroupsLocalHandler)
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot accept an invite to a group."
         result = await self.groups_handler.accept_invite(
             group_id, requester_user_id, content
         )
@@ -726,8 +805,7 @@ class GroupSelfAcceptInviteServlet(RestServlet):
 
 
 class GroupSelfUpdatePublicityServlet(RestServlet):
-    """Update whether we publicise a users membership of a group
-    """
+    """Update whether we publicise a users membership of a group"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/update_publicity$")
 
@@ -750,8 +828,7 @@ class GroupSelfUpdatePublicityServlet(RestServlet):
 
 
 class PublicisedGroupsForUserServlet(RestServlet):
-    """Get the list of groups a user is advertising
-    """
+    """Get the list of groups a user is advertising"""
 
     PATTERNS = client_patterns("/publicised_groups/(?P<user_id>[^/]*)$")
 
@@ -771,8 +848,7 @@ class PublicisedGroupsForUserServlet(RestServlet):
 
 
 class PublicisedGroupsForUsersServlet(RestServlet):
-    """Get the list of groups a user is advertising
-    """
+    """Get the list of groups a user is advertising"""
 
     PATTERNS = client_patterns("/publicised_groups$")
 
@@ -795,8 +871,7 @@ class PublicisedGroupsForUsersServlet(RestServlet):
 
 
 class GroupsForUserServlet(RestServlet):
-    """Get all groups the logged in user is joined to
-    """
+    """Get all groups the logged in user is joined to"""
 
     PATTERNS = client_patterns("/joined_groups$")
 

@@ -203,13 +203,11 @@ class AdminHandler(BaseHandler):
 
 
 class ExfiltrationWriter(metaclass=abc.ABCMeta):
-    """Interface used to specify how to write exported data.
-    """
+    """Interface used to specify how to write exported data."""
 
     @abc.abstractmethod
     def write_events(self, room_id: str, events: List[EventBase]) -> None:
-        """Write a batch of events for a room.
-        """
+        """Write a batch of events for a room."""
         raise NotImplementedError()
 
     @abc.abstractmethod
