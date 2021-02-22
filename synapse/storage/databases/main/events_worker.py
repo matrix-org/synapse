@@ -63,7 +63,6 @@ EVENT_QUEUE_THREADS = 3  # Max number of threads that will fetch events
 EVENT_QUEUE_ITERATIONS = 3  # No. times we block waiting for requests for events
 EVENT_QUEUE_TIMEOUT_S = 0.1  # Timeout when waiting for requests for events
 GET_EVENT_CACHE_NAME = "getEvent"
-EXTERNAL_CACHE_EXPIRY_SECONDS = 6 * 60 * 60 # 6 hours
 
 _EventCacheEntry = namedtuple("_EventCacheEntry", ("event", "redacted_event"))
 
@@ -153,6 +152,7 @@ class EventsWorkerStore(SQLBaseStore):
             keylen=3,
             max_size=hs.config.caches.event_cache_size,
         )
+        self._external_cache_event_expiry_ms = hs.config.caches.external_event_cache_expiry_ms;
 
         self._event_fetch_lock = threading.Condition()
         self._event_fetch_list = []
@@ -591,7 +591,7 @@ class EventsWorkerStore(SQLBaseStore):
                 cache_result = await self._external_cache.get(
                     GET_EVENT_CACHE_NAME,
                     event_id,
-                    EXTERNAL_CACHE_EXPIRY_SECONDS,
+                    self._external_cache_event_expiry_ms,
                 )
                 if cache_result:
                     ret = await self._create_event_cache_entry_from_external_cache_entry(
