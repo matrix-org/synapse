@@ -101,7 +101,7 @@ class ExternalCache:
             )
         )
 
-    async def get(self, cache_name: str, key: str, expiry_s: Optional[int] = None) -> Optional[Any]:
+    async def get(self, cache_name: str, key: str, expiry_ms: Optional[int] = None) -> Optional[Any]:
         """Look up a key/value in the named cache."""
 
         if self._redis_connection is None:
@@ -120,11 +120,11 @@ class ExternalCache:
         if not result:
             return None
 
-        if expiry_s:
+        if expiry_ms:
             # If we are using this key, bump the expiry time
             # NOTE: txredisapi does not support pexire, so we must use (expire) seconds
             await make_deferred_yieldable(
-                self._redis_connection.expire(cache_key, expiry_s)
+                self._redis_connection.expire(cache_key, expiry_ms // 1000)
             )
 
 
