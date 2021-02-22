@@ -102,6 +102,16 @@ class RatelimitConfig(Config):
             defaults={"per_second": 0.01, "burst_count": 3},
         )
 
+        # Ratelimit cross-user key requests:
+        # * For local requests this is keyed by the sending device.
+        # * For requests received over federation this is keyed by the origin.
+        #
+        # Note that this isn't exposed in the configuration as it is obscure.
+        self.rc_key_requests = RateLimitConfig(
+            config.get("rc_key_requests", {}),
+            defaults={"per_second": 20, "burst_count": 100},
+        )
+
         self.rc_3pid_validation = RateLimitConfig(
             config.get("rc_3pid_validation") or {},
             defaults={"per_second": 0.003, "burst_count": 5},

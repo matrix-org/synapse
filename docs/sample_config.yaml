@@ -101,6 +101,14 @@ pid_file: DATADIR/homeserver.pid
 #
 #limit_profile_requests_to_users_who_share_rooms: true
 
+# Uncomment to prevent a user's profile data from being retrieved and
+# displayed in a room until they have joined it. By default, a user's
+# profile data is included in an invite event, regardless of the values
+# of the above two settings, and whether or not the users share a server.
+# Defaults to 'true'.
+#
+#include_profile_data_on_invite: false
+
 # If set to 'true', removes the need for authentication to access the server's
 # public rooms directory through the client API, meaning that anyone can
 # query the room directory. Defaults to 'false'.
@@ -698,6 +706,12 @@ acme:
 #federation_metrics_domains:
 #  - matrix.org
 #  - example.com
+
+# Uncomment to disable profile lookup over federation. By default, the
+# Federation API allows other homeservers to obtain profile data of any user
+# on this homeserver. Defaults to 'true'.
+#
+#allow_profile_lookup_over_federation: false
 
 
 ## Caching ##
@@ -2530,19 +2544,35 @@ spam_checker:
 
 # User Directory configuration
 #
-# 'enabled' defines whether users can search the user directory. If
-# false then empty responses are returned to all queries. Defaults to
-# true.
-#
-# 'search_all_users' defines whether to search all users visible to your HS
-# when searching the user directory, rather than limiting to users visible
-# in public rooms.  Defaults to false.  If you set it True, you'll have to
-# rebuild the user_directory search indexes, see
-# https://github.com/matrix-org/synapse/blob/master/docs/user_directory.md
-#
-#user_directory:
-#  enabled: true
-#  search_all_users: false
+user_directory:
+    # Defines whether users can search the user directory. If false then
+    # empty responses are returned to all queries. Defaults to true.
+    #
+    # Uncomment to disable the user directory.
+    #
+    #enabled: false
+
+    # Defines whether to search all users visible to your HS when searching
+    # the user directory, rather than limiting to users visible in public
+    # rooms. Defaults to false.
+    #
+    # If you set it true, you'll have to rebuild the user_directory search
+    # indexes, see:
+    # https://github.com/matrix-org/synapse/blob/master/docs/user_directory.md
+    #
+    # Uncomment to return search results containing all known users, even if that
+    # user does not share a room with the requester.
+    #
+    #search_all_users: true
+
+    # Defines whether to prefer local users in search query results.
+    # If True, local users are more likely to appear above remote users
+    # when searching the user directory. Defaults to false.
+    #
+    # Uncomment to prefer local over remote users in user directory search
+    # results.
+    #
+    #prefer_local_users: true
 
 
 # User Consent configuration
