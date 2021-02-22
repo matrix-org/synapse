@@ -629,6 +629,10 @@ class FakeRedisPubSubProtocol(Protocol):
             self.send("OK")
         elif command == b"GET":
             self.send(None)
+        elif command == b"DEL":
+            self.send("OK")
+        elif command == b"EXPIRE":
+            self.send("OK")
         else:
             raise Exception("Unknown command")
 
