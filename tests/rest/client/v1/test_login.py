@@ -47,8 +47,9 @@ except ImportError:
     HAS_JWT = False
 
 
-# public_base_url used in some tests
-BASE_URL = "https://synapse/"
+# synapse server name: used to populate public_base_url in some tests
+SYNAPSE_SERVER_PUBLIC_HOSTNAME = "synapse"
+BASE_URL = "http://%s/" % (SYNAPSE_SERVER_PUBLIC_HOSTNAME,)
 
 # CAS server used in some tests
 CAS_SERVER = "https://fake.test"
@@ -664,7 +665,11 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
             endpoint += "/" + idp_prov
         endpoint += "?redirectUrl=" + urllib.parse.quote_plus(TEST_CLIENT_REDIRECT_URL)
 
-        return self.make_request("GET", endpoint)
+        return self.make_request(
+            "GET",
+            endpoint,
+            custom_headers=[("Host", SYNAPSE_SERVER_PUBLIC_HOSTNAME)],
+        )
 
     @staticmethod
     def _get_value_from_macaroon(macaroon: pymacaroons.Macaroon, key: str) -> str:

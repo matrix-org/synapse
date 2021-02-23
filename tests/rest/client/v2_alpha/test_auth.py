@@ -161,7 +161,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
 
     def default_config(self):
         config = super().default_config()
-        config["public_baseurl"] = "https://synapse.test"
+        config["public_baseurl"] = "http://synapse.test"
 
         if HAS_OIDC:
             # we enable OIDC as a way of testing SSO flows
