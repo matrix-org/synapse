@@ -9,23 +9,23 @@ of doing so is that it means that you can expose the default https port
 (443) to Matrix clients without needing to run Synapse with root
 privileges.
 
-**NOTE**: Your reverse proxy must not `canonicalise` or `normalise`
-the requested URI in any way (for example, by decoding `%xx` escapes).
-Beware that Apache *will* canonicalise URIs unless you specify
-`nocanon`.
+You should configure your reverse proxy to forward requests to `/_matrix` or
+`/_synapse/client` to Synapse, and have it set the `X-Forwarded-For` and
+`X-Forwarded-Proto` request headers.
 
-When setting up a reverse proxy, remember that Matrix clients and other
-Matrix servers do not necessarily need to connect to your server via the
-same server name or port. Indeed, clients will use port 443 by default,
-whereas servers default to port 8448. Where these are different, we
-refer to the 'client port' and the 'federation port'. See [the Matrix
+You should remember that Matrix clients and other Matrix servers do not
+necessarily need to connect to your server via the same server name or
+port. Indeed, clients will use port 443 by default, whereas servers default to
+port 8448. Where these are different, we refer to the 'client port' and the
+'federation port'. See [the Matrix
 specification](https://matrix.org/docs/spec/server_server/latest#resolving-server-names)
 for more details of the algorithm used for federation connections, and
 [delegate.md](<delegate.md>) for instructions on setting up delegation.
 
-Endpoints that are part of the standardised Matrix specification are
-located under `/_matrix`, whereas endpoints specific to Synapse are
-located under `/_synapse/client`.
+**NOTE**: Your reverse proxy must not `canonicalise` or `normalise`
+the requested URI in any way (for example, by decoding `%xx` escapes).
+Beware that Apache *will* canonicalise URIs unless you specify
+`nocanon`.
 
 Let's assume that we expect clients to connect to our server at
 `https://matrix.example.com`, and other servers to connect at
@@ -52,6 +52,7 @@ server {
     location ~* ^(\/_matrix|\/_synapse\/client) {
         proxy_pass http://localhost:8008;
         proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
         # Nginx by default only allows file uploads up to 1M in size
         # Increase client_max_body_size to match max_upload_size defined in homeserver.yaml
         client_max_body_size 50M;
@@ -102,6 +103,7 @@ example.com:8448 {
     SSLEngine on
     ServerName matrix.example.com;
 
+    RequestHeader set "X-Forwarded-Proto" expr=%{REQUEST_SCHEME}
     AllowEncodedSlashes NoDecode
     ProxyPass /_matrix http://127.0.0.1:8008/_matrix nocanon
     ProxyPassReverse /_matrix http://127.0.0.1:8008/_matrix
@@ -113,6 +115,7 @@ example.com:8448 {
     SSLEngine on
     ServerName example.com;
 
+    RequestHeader set "X-Forwarded-Proto" expr=%{REQUEST_SCHEME}
     AllowEncodedSlashes NoDecode
     ProxyPass /_matrix http://127.0.0.1:8008/_matrix nocanon
     ProxyPassReverse /_matrix http://127.0.0.1:8008/_matrix
@@ -134,6 +137,8 @@ example.com:8448 {
 ```
 frontend https
   bind :::443 v4v6 ssl crt /etc/ssl/haproxy/ strict-sni alpn h2,http/1.1
+  http-request add-header X-Forwarded-Proto https if { ssl_fc }
+  http-request set-header X-Forwarded-For %[src]
 
   # Matrix client traffic
   acl matrix-host hdr(host) -i matrix.example.com
@@ -144,6 +149,9 @@ frontend https
 
 frontend matrix-federation
   bind :::8448 v4v6 ssl crt /etc/ssl/haproxy/synapse.pem alpn h2,http/1.1
+  http-request add-header X-Forwarded-Proto https if { ssl_fc }
+  http-request set-header X-Forwarded-For %[src]
+
   default_backend matrix
 
 backend matrix
