@@ -49,7 +49,6 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
 from synapse.storage.types import Connection, Cursor
-from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import Collection
 
 # python 3 does not have a maximum int value
@@ -384,7 +383,6 @@ class DatabasePool:
         self,
         hs,
         database_config: DatabaseConnectionConfig,
-        db_conn: LoggingDatabaseConnection,
         engine: BaseDatabaseEngine,
     ):
         self.hs = hs
@@ -423,21 +421,6 @@ class DatabasePool:
                 "upsert_safety_check",
                 self._check_safe_to_upsert,
             )
-
-        # We define this sequence here so that it can be referenced from both
-        # the DataStore and PersistEventStore.
-        def get_chain_id_txn(txn):
-            txn.execute("SELECT COALESCE(max(chain_id), 0) FROM event_auth_chains")
-            return txn.fetchone()[0]
-
-        self.event_chain_id_gen = build_sequence_generator(
-            db_conn,
-            engine,
-            get_chain_id_txn,
-            "event_auth_chain_id",
-            table="event_auth_chains",
-            id_column="chain_id",
-        )
 
     def is_running(self) -> bool:
         """Is the database pool currently running"""
