@@ -520,7 +520,7 @@ class EventsWorkerStore(SQLBaseStore):
 
         for key, value in event.unsigned.items():
             if isinstance(value, EventBase):
-                event_dict["unsigned"][value] = {"_cache_event_id": value.event_id()}
+                event_dict["unsigned"][key] = {"_cache_event_id": value.event_id}
 
         return _EventCacheEntry(
             event={
