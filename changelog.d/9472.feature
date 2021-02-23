@@ -1,0 +1,1 @@
+Add support for `X-Forwarded-Proto` header when using a reverse proxy. Administrators using a reverse proxy should ensure this header is set to avoid warnings. See [docs/workers.md](docs/workers.md) for example configurations.
