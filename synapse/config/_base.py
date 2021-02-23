@@ -885,7 +885,8 @@ class RoutableShardedWorkerHandlingConfig(ShardedWorkerHandlingConfig):
 
     def __attrs_post_init__(self):
         # We require that `self.instances` is non-empty.
-        assert self.instances
+        if not self.instances:
+            raise Exception("Got empty list of instances for shard config")
 
     def get_instance(self, key: str) -> str:
         """Get the instance responsible for handling the given key."""

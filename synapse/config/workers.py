@@ -213,6 +213,9 @@ class WorkerConfig(Config):
                 "Must only specify one instance to handle `receipts` messages."
             )
 
+        if len(self.writers.events) == 0:
+            raise ConfigError("Must specify at least one instance to handle `events`.")
+
         self.events_shard_config = RoutableShardedWorkerHandlingConfig(
             self.writers.events
         )
