@@ -106,6 +106,9 @@ CONDITIONAL_REQUIREMENTS = {
         "pysaml2>=4.5.0;python_version>='3.6'",
     ],
     "oidc": ["authlib>=0.14.0"],
+    # systemd-python is necessary for logging to the systemd journal via
+    # `systemd.journal.JournalHandler`, as is documented in
+    # `contrib/systemd/log_config.yaml`.
     "systemd": ["systemd-python>=231"],
     "url_preview": ["lxml>=3.5.0"],
     "sentry": ["sentry-sdk>=0.7.2"],
