@@ -1,0 +1,1 @@
+Revert change in v1.28.0rc1 to remove the deprecated SAML endpoint.
