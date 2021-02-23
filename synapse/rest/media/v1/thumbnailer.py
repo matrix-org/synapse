@@ -101,7 +101,7 @@ class Thumbnailer:
         # If the image has transparency, use RGBA instead.
         if self.image.mode in ["1", "L", "P"]:
             mode = "RGB"
-            if self.image.info.get("transparency", None):
+            if self.image.info.get("transparency", None) is not None:
                 mode = "RGBA"
             self.image = self.image.convert(mode)
         return self.image.resize((width, height), Image.ANTIALIAS)
