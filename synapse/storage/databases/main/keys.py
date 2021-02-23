@@ -20,7 +20,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 from signedjson.key import decode_verify_key_bytes
 
-from synapse.storage._base import SQLBaseStore
+from synapse.storage.databases.main._base import SQLBaseStore
 from synapse.storage.keys import FetchKeyResult
 from synapse.storage.types import Cursor
 from synapse.util.caches.descriptors import cached, cachedList

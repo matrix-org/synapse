@@ -20,8 +20,9 @@ from typing import List, Optional, Set
 
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
-from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
+from synapse.storage._base import db_to_json, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool
+from synapse.storage.databases.main._base import SQLBaseStore
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import Collection

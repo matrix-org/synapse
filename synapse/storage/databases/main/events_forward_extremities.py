@@ -17,7 +17,7 @@ import logging
 from typing import Dict, List
 
 from synapse.api.errors import SynapseError
-from synapse.storage._base import SQLBaseStore
+from synapse.storage.databases.main._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 

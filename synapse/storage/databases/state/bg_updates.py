@@ -15,7 +15,6 @@
 
 import logging
 
-from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.state import StateFilter

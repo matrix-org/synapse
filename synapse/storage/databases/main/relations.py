@@ -20,7 +20,7 @@ import attr
 
 from synapse.api.constants import RelationTypes
 from synapse.events import EventBase
-from synapse.storage._base import SQLBaseStore
+from synapse.storage.databases.main._base import SQLBaseStore
 from synapse.storage.databases.main.stream import generate_pagination_where_clause
 from synapse.storage.relations import (
     AggregationPaginationToken,

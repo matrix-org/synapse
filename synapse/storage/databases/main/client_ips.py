@@ -17,8 +17,8 @@ import logging
 from typing import Dict, List, Optional, Tuple, Union
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
-from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool, make_tuple_comparison_clause
+from synapse.storage.databases.main._base import SQLBaseStore
 from synapse.types import UserID
 from synapse.util.caches.lrucache import LruCache
 

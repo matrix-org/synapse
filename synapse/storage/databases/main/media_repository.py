@@ -16,8 +16,8 @@
 from enum import Enum
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
+from synapse.storage.databases.main._base import SQLBaseStore
 
 BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD = (
     "media_repository_drop_index_wo_method"

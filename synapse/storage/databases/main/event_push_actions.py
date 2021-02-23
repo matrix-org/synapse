@@ -19,8 +19,9 @@ from typing import Dict, List, Optional, Tuple, Union
 import attr
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
-from synapse.storage._base import SQLBaseStore, db_to_json
+from synapse.storage._base import db_to_json
 from synapse.storage.database import DatabasePool, LoggingTransaction
+from synapse.storage.databases.main._base import SQLBaseStore
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 

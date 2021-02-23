@@ -24,8 +24,9 @@ from synapse.appservice import (
 )
 from synapse.config.appservice import load_appservices
 from synapse.events import EventBase
-from synapse.storage._base import SQLBaseStore, db_to_json
+from synapse.storage._base import db_to_json
 from synapse.storage.database import DatabasePool
+from synapse.storage.databases.main._base import SQLBaseStore
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.types import Connection
 from synapse.types import JsonDict

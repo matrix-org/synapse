@@ -19,8 +19,8 @@ from typing import Dict
 
 from synapse.metrics import GaugeBucketCollector
 from synapse.metrics.background_process_metrics import wrap_as_background_process
-from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
+from synapse.storage.databases.main._base import SQLBaseStore
 from synapse.storage.databases.main.event_push_actions import (
     EventPushActionsWorkerStore,
 )

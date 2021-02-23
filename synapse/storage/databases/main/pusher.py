@@ -18,8 +18,9 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Iterator, List, Optional, Tuple
 
 from synapse.push import PusherConfig, ThrottleParams
-from synapse.storage._base import SQLBaseStore, db_to_json
+from synapse.storage._base import db_to_json
 from synapse.storage.database import DatabasePool
+from synapse.storage.databases.main._base import SQLBaseStore
 from synapse.storage.types import Connection
 from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.types import JsonDict

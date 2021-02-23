@@ -15,7 +15,7 @@
 from typing import Any, Dict, List, Optional
 
 from synapse.api.errors import StoreError
-from synapse.storage._base import SQLBaseStore
+from synapse.storage.databases.main._base import SQLBaseStore
 from synapse.storage.databases.main.roommember import ProfileInfo
 
 

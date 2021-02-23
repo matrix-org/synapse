@@ -17,7 +17,7 @@ from collections import namedtuple
 from typing import Iterable, List, Optional
 
 from synapse.api.errors import SynapseError
-from synapse.storage._base import SQLBaseStore
+from synapse.storage.databases.main._base import SQLBaseStore
 from synapse.types import RoomAlias
 from synapse.util.caches.descriptors import cached
 

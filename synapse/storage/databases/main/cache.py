@@ -25,8 +25,8 @@ from synapse.replication.tcp.streams.events import (
     EventsStreamCurrentStateRow,
     EventsStreamEventRow,
 )
-from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
+from synapse.storage.databases.main._base import SQLBaseStore
 from synapse.storage.engines import PostgresEngine
 from synapse.util.iterutils import batch_iter
 

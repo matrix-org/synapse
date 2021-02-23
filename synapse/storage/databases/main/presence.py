@@ -16,7 +16,8 @@
 from typing import List, Tuple
 
 from synapse.api.presence import UserPresenceState
-from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
+from synapse.storage._base import make_in_list_sql_clause
+from synapse.storage.databases.main._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.iterutils import batch_iter
 

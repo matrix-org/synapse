@@ -8,7 +8,7 @@ from synapse.crypto.event_signing import (
     compute_pdu_event_reference_hash,
 )
 from synapse.federation.units import Pdu
-from synapse.storage._base import SQLBaseStore
+from synapse.storage.databases.main._base import SQLBaseStore
 from synapse.storage.pdu import PduStore
 from synapse.storage.signatures import SignatureStore
 

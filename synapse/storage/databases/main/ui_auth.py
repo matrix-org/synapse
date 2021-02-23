@@ -17,8 +17,9 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import attr
 
 from synapse.api.errors import StoreError
-from synapse.storage._base import SQLBaseStore, db_to_json
+from synapse.storage._base import db_to_json
 from synapse.storage.database import LoggingTransaction
+from synapse.storage.databases.main._base import SQLBaseStore
 from synapse.types import JsonDict
 from synapse.util import json_encoder, stringutils
 

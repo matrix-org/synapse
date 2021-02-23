@@ -1,6 +1,6 @@
 from typing import Optional
 
-from synapse.storage._base import SQLBaseStore
+from synapse.storage.databases.main._base import SQLBaseStore
 
 
 class OpenIdStore(SQLBaseStore):

@@ -18,7 +18,6 @@ from collections import namedtuple
 from typing import Dict, Iterable, List, Set, Tuple
 
 from synapse.api.constants import EventTypes
-from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.state.bg_updates import StateBackgroundUpdateStore
 from synapse.storage.state import StateFilter

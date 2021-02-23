@@ -45,12 +45,12 @@ from twisted.internet import defer
 from synapse.api.filtering import Filter
 from synapse.events import EventBase
 from synapse.logging.context import make_deferred_yieldable, run_in_background
-from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
     DatabasePool,
     LoggingTransaction,
     make_in_list_sql_clause,
 )
+from synapse.storage.databases.main._base import SQLBaseStore
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator

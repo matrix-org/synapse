@@ -16,7 +16,8 @@
 from canonicaljson import encode_canonical_json
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.storage._base import SQLBaseStore, db_to_json
+from synapse.storage._base import db_to_json
+from synapse.storage.databases.main._base import SQLBaseStore
 from synapse.types import JsonDict
 from synapse.util.caches.descriptors import cached
 

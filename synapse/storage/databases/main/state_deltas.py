@@ -16,7 +16,7 @@
 import logging
 from typing import Any, Dict, List, Tuple
 
-from synapse.storage._base import SQLBaseStore
+from synapse.storage.databases.main._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 

@@ -20,8 +20,8 @@ from mock import Mock
 
 from twisted.internet import defer
 
-from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
+from synapse.storage.databases.main._base import SQLBaseStore
 from synapse.storage.engines import create_engine
 
 from tests import unittest

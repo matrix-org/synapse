@@ -17,7 +17,7 @@ from typing import Dict, Iterable, List, Tuple
 
 from unpaddedbase64 import encode_base64
 
-from synapse.storage._base import SQLBaseStore
+from synapse.storage.databases.main._base import SQLBaseStore
 from synapse.storage.types import Cursor
 from synapse.util.caches.descriptors import cached, cachedList
 
