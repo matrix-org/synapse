@@ -58,7 +58,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         fake_engine.can_native_upsert = False
         fake_engine.in_transaction.return_value = False
 
-        db = DatabasePool(Mock(), Mock(config=sqlite_config), fake_engine)
+        db = DatabasePool(Mock(), Mock(config=sqlite_config), Mock(), fake_engine)
         db._db_pool = self.db_pool
 
         self.datastore = SQLBaseStore(db, None, hs)

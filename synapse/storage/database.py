@@ -381,7 +381,11 @@ class DatabasePool:
     _TXN_ID = 0
 
     def __init__(
-        self, hs, database_config: DatabaseConnectionConfig, engine: BaseDatabaseEngine
+        self,
+        hs,
+        database_config: DatabaseConnectionConfig,
+        db_conn: LoggingDatabaseConnection,
+        engine: BaseDatabaseEngine,
     ):
         self.hs = hs
         self._clock = hs.get_clock()
@@ -427,7 +431,12 @@ class DatabasePool:
             return txn.fetchone()[0]
 
         self.event_chain_id_gen = build_sequence_generator(
-            engine, get_chain_id_txn, "event_auth_chain_id"
+            db_conn,
+            engine,
+            get_chain_id_txn,
+            "event_auth_chain_id",
+            table="event_auth_chains",
+            id_column="chain_id",
         )
 
     def is_running(self) -> bool:

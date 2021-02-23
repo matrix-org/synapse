@@ -526,7 +526,7 @@ class Porter(object):
                 db_conn, allow_outdated_version=allow_outdated_version
             )
             prepare_database(db_conn, engine, config=self.hs_config)
-            store = Store(DatabasePool(hs, db_config, engine), db_conn, hs)
+            store = Store(DatabasePool(hs, db_config, db_conn, engine), db_conn, hs)
             db_conn.commit()
 
         return store
