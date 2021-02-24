@@ -844,7 +844,8 @@ class ShardedWorkerHandlingConfig:
 
     def should_handle(self, instance_name: str, key: str) -> bool:
         """Whether this instance is responsible for handling the given key."""
-        # If multiple instances are not defined we always return true
+        # If no instances are defined we assume some other worker is handling
+        # this.
         if not self.instances:
             return False
 

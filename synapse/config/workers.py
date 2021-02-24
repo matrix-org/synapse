@@ -26,15 +26,15 @@ from ._base import (
 from .server import ListenerConfig, parse_listener_def
 
 _FEDERATION_SENDER_WITH_SEND_FEDERATION_ENABLED_ERROR = """
-The send_federation must be disabled in the main synapse process
-before they can be run in a separate worker.
+The send_federation config option must be disabled in the main
+synapse process before they can be run in a separate worker.
 
 Please add ``send_federation: false`` to the main config
 """
 
 _PUSHER_WITH_START_PUSHERS_ENABLED_ERROR = """
-The start_pushers must be disabled in the main synapse process
-before they can be run in a separate worker.
+The start_pushers config option must be disabled in the main
+synapse process before they can be run in a separate worker.
 
 Please add ``start_pushers: false`` to the main config
 """
