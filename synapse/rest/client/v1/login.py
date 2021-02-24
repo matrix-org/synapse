@@ -29,7 +29,7 @@ from synapse.http.servlet import (
 from synapse.http.site import SynapseRequest
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
-from synapse.types import JsonDict, UserID
+from synapse.types import JsonDict, UserID, map_username_to_mxid_localpart
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -53,6 +53,7 @@ class LoginRestServlet(RestServlet):
         # JWT configuration variables.
         self.jwt_enabled = hs.config.jwt_enabled
         self.jwt_secret = hs.config.jwt_secret
+        self.jwt_normalize_user_id = hs.config.jwt_normalize_user_id
         self.jwt_algorithm = hs.config.jwt_algorithm
         self.jwt_issuer = hs.config.jwt_issuer
         self.jwt_audiences = hs.config.jwt_audiences
@@ -318,6 +319,9 @@ class LoginRestServlet(RestServlet):
         user = payload.get("sub", None)
         if user is None:
             raise LoginError(403, "Invalid JWT", errcode=Codes.FORBIDDEN)
+
+        if self.jwt_normalize_user_id:
+            user = map_username_to_mxid_localpart(user)
 
         user_id = UserID(user, self.hs.hostname).to_string()
         result = await self._complete_login(

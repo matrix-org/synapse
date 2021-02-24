@@ -34,6 +34,7 @@ class JWTConfig(Config):
 
             # The issuer and audiences are optional, if provided, it is asserted
             # that the claims exist on the JWT.
+            self.jwt_normalize_user_id = jwt_config.get("normalize_user_id", False)
             self.jwt_issuer = jwt_config.get("issuer")
             self.jwt_audiences = jwt_config.get("audiences")
 
@@ -46,6 +47,7 @@ class JWTConfig(Config):
         else:
             self.jwt_enabled = False
             self.jwt_secret = None
+            self.jwt_normalize_user_id = False
             self.jwt_algorithm = None
             self.jwt_issuer = None
             self.jwt_audiences = None
@@ -79,6 +81,12 @@ class JWTConfig(Config):
             # Required if 'enabled' is true.
             #
             #secret: "provided-by-your-issuer"
+
+            # Perform normalization of the user ID and encode unsupported characters.
+            #
+            # Optional, defaults to false.
+            #
+            #normalize_user_id: true
 
             # The algorithm used to sign the JSON web token.
             #

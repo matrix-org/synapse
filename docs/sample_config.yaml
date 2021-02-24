@@ -2162,6 +2162,12 @@ sso:
     #
     #secret: "provided-by-your-issuer"
 
+    # Perform normalization of the user ID and encode unsupported characters.
+    #
+    # Optional, defaults to false.
+    #
+    #normalize_user_id: true
+
     # The algorithm used to sign the JSON web token.
     #
     # Supported algorithms are listed at
