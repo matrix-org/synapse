@@ -350,7 +350,7 @@ class XForwardedForRequest(SynapseRequest):
     def requestReceived(self, command, path, version):
         # this method is called by the Channel once the full request has been
         # received, to dispatch the request to a resource.
-        # We can use it to set the IP address and port according to the
+        # We can use it to set the IP address and protocol according to the
         # headers.
         self._process_forwarded_headers()
         return super().requestReceived(command, path, version)
