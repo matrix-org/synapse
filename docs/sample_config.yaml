@@ -2158,9 +2158,17 @@ sso:
     # This is either the private shared secret or the public key used to
     # decode the contents of the JSON web token.
     #
-    # Required if 'enabled' is true.
+    # Either 'secret' or 'jwks_uri' is required if 'enabled' is true.
     #
     #secret: "provided-by-your-issuer"
+
+    # URI where to fetch the JWKS containing the public keys that
+    # should be used to verify the signature of the JSON web token.
+    # Only used if 'secret' is not provided.
+    #
+    # Either 'secret' or 'jwks_uri' is required if 'enabled' is true.
+    #
+    #jwks_uri: "provided-by-your-issuer"
 
     # Name of the claim containing a unique identifier for the user.
     #

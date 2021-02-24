@@ -53,6 +53,7 @@ class LoginRestServlet(RestServlet):
         # JWT configuration variables.
         self.jwt_enabled = hs.config.jwt_enabled
         self.jwt_secret = hs.config.jwt_secret
+        self.jwt_jwks_uri = hs.config.jwt_jwks_uri
         self.jwt_subject_claim = hs.config.jwt_subject_claim
         self.jwt_normalize_user_id = hs.config.jwt_normalize_user_id
         self.jwt_algorithm = hs.config.jwt_algorithm
@@ -300,11 +301,19 @@ class LoginRestServlet(RestServlet):
             )
 
         import jwt
+        from jwt import PyJWKClient
+
+        key = self.jwt_secret
+
+        if not key and self.jwt_jwks_uri:
+            jwks_client = PyJWKClient(self.jwt_jwks_uri)
+            signing_key = jwks_client.get_signing_key_from_jwt(token)
+            key = signing_key.key
 
         try:
             payload = jwt.decode(
                 token,
-                self.jwt_secret,
+                key,
                 algorithms=[self.jwt_algorithm],
                 issuer=self.jwt_issuer,
                 audience=self.jwt_audiences,

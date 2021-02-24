@@ -29,11 +29,12 @@ class JWTConfig(Config):
         jwt_config = config.get("jwt_config", None)
         if jwt_config:
             self.jwt_enabled = jwt_config.get("enabled", False)
-            self.jwt_secret = jwt_config["secret"]
             self.jwt_algorithm = jwt_config["algorithm"]
 
             # The issuer and audiences are optional, if provided, it is asserted
             # that the claims exist on the JWT.
+            self.jwt_secret = jwt_config.get("secret")
+            self.jwt_jwks_uri = jwt_config.get("jwks_uri")
             self.jwt_subject_claim = jwt_config.get("subject_claim")
             self.jwt_normalize_user_id = jwt_config.get("normalize_user_id", False)
             self.jwt_issuer = jwt_config.get("issuer")
@@ -48,6 +49,7 @@ class JWTConfig(Config):
         else:
             self.jwt_enabled = False
             self.jwt_secret = None
+            self.jwt_jwks_uri = None
             self.jwt_subject_claim = None
             self.jwt_normalize_user_id = False
             self.jwt_algorithm = None
@@ -80,9 +82,17 @@ class JWTConfig(Config):
             # This is either the private shared secret or the public key used to
             # decode the contents of the JSON web token.
             #
-            # Required if 'enabled' is true.
+            # Either 'secret' or 'jwks_uri' is required if 'enabled' is true.
             #
             #secret: "provided-by-your-issuer"
+
+            # URI where to fetch the JWKS containing the public keys that
+            # should be used to verify the signature of the JSON web token.
+            # Only used if 'secret' is not provided.
+            #
+            # Either 'secret' or 'jwks_uri' is required if 'enabled' is true.
+            #
+            #jwks_uri: "provided-by-your-issuer"
 
             # Name of the claim containing a unique identifier for the user.
             #
