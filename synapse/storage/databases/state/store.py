@@ -47,7 +47,7 @@ class _GetStateGroupDelta(
         return len(self.delta_ids) if self.delta_ids else 0
 
 
-class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
+class StateGroupDataStore(StateBackgroundUpdateStore):
     """A data store for fetching/storing state groups."""
 
     def __init__(self, database: DatabasePool, db_conn, hs):
@@ -98,7 +98,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
         self._state_group_seq_gen = build_sequence_generator(
             db_conn,
-            self.database_engine,
+            self.db_pool.engine,
             get_max_state_group_txn,
             "state_group_id_seq",
             table="state_groups",

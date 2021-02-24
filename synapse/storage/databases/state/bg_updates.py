@@ -26,17 +26,20 @@ logger = logging.getLogger(__name__)
 MAX_STATE_DELTA_HOPS = 100
 
 
-class StateGroupBackgroundUpdateStore(SQLBaseStore):
+class StateGroupBackgroundUpdateStore:
     """Defines functions related to state groups needed to run the state background
     updates.
     """
+
+    def __init__(self, database: DatabasePool, db_conn, hs):
+        self.db_pool = database
 
     def _count_state_group_hops_txn(self, txn, state_group):
         """Given a state group, count how many hops there are in the tree.
 
         This is used to ensure the delta chains don't get too long.
         """
-        if isinstance(self.database_engine, PostgresEngine):
+        if isinstance(self.db_pool.engine, PostgresEngine):
             sql = """
                 WITH RECURSIVE state(state_group) AS (
                     VALUES(?::bigint)
@@ -84,7 +87,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
         if where_clause:
             where_clause = " AND (%s)" % (where_clause,)
 
-        if isinstance(self.database_engine, PostgresEngine):
+        if isinstance(self.db_pool.engine, PostgresEngine):
             # Temporarily disable sequential scans in this transaction. This is
             # a temporary hack until we can add the right indices in
             txn.execute("SET LOCAL enable_seqscan=off")
@@ -341,7 +344,7 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
     async def _background_index_state(self, progress, batch_size):
         def reindex_txn(conn):
             conn.rollback()
-            if isinstance(self.database_engine, PostgresEngine):
+            if isinstance(self.db_pool.engine, PostgresEngine):
                 # postgres insists on autocommit for the index
                 conn.set_session(autocommit=True)
                 try:
