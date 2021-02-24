@@ -131,9 +131,10 @@ class ResponseCache(Generic[T]):
         """The same as wrap(), but adds a conditional to the final execution.
 
         When the final execution completes, *all* conditionals need to return True for it to properly cache,
-        else it'll not be cached in a timed fashion."""
+        else it'll not be cached in a timed fashion.
+        """
 
-        # See if there's already a result on this key that hasn't yet completed, due to the single-threaded nature of
+        # See if there's already a result on this key that hasn't yet completed. Due to the single-threaded nature of
         # python, adding a key immediately in the same execution thread will not cause a race condition.
         result = self.get(key)
         if not result or isinstance(result, defer.Deferred) and not result.called:
