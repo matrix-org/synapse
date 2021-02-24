@@ -34,6 +34,7 @@ class JWTConfig(Config):
 
             # The issuer and audiences are optional, if provided, it is asserted
             # that the claims exist on the JWT.
+            self.jwt_subject_claim = jwt_config.get("subject_claim")
             self.jwt_normalize_user_id = jwt_config.get("normalize_user_id", False)
             self.jwt_issuer = jwt_config.get("issuer")
             self.jwt_audiences = jwt_config.get("audiences")
@@ -47,6 +48,7 @@ class JWTConfig(Config):
         else:
             self.jwt_enabled = False
             self.jwt_secret = None
+            self.jwt_subject_claim = None
             self.jwt_normalize_user_id = False
             self.jwt_algorithm = None
             self.jwt_issuer = None
@@ -81,6 +83,12 @@ class JWTConfig(Config):
             # Required if 'enabled' is true.
             #
             #secret: "provided-by-your-issuer"
+
+            # Name of the claim containing a unique identifier for the user.
+            #
+            # Optional, defaults to `sub`.
+            #
+            #subject_claim: "sub"
 
             # Perform normalization of the user ID and encode unsupported characters.
             #
