@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +18,11 @@ from collections import namedtuple
 
 from synapse.api.constants import PresenceState
 
+# An in-memory id attached to all processed UserPresenceState instances.
+# Used by federation sender queues to determine whether a user's given
+# state update has already been sent to a remote.
+incrementing_id = 0
+
 
 class UserPresenceState(
     namedtuple(
@@ -29,6 +35,7 @@ class UserPresenceState(
             "last_user_sync_ts",
             "status_msg",
             "currently_active",
+            "id",  # Set automatically to an incrementing integer
         ),
     )
 ):
@@ -52,11 +59,20 @@ class UserPresenceState(
         return UserPresenceState(**d)
 
     def copy_and_replace(self, **kwargs):
+        global incrementing_id
+
+        # Set a new ID
+        incrementing_id += 1
+        kwargs["id"] = incrementing_id
+
         return self._replace(**kwargs)
 
     @classmethod
     def default(cls, user_id):
         """Returns a default presence state."""
+        global incrementing_id
+
+        incrementing_id += 1
         return cls(
             user_id=user_id,
             state=PresenceState.OFFLINE,
@@ -65,4 +81,5 @@ class UserPresenceState(
             last_user_sync_ts=0,
             status_msg=None,
             currently_active=False,
+            id=incrementing_id,
         )
