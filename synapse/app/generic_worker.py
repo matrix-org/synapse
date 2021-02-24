@@ -919,22 +919,6 @@ def start(config_options):
         # For other worker types we force this to off.
         config.appservice.notify_appservices = False
 
-    if config.worker_app == "synapse.app.pusher":
-        if config.server.start_pushers:
-            sys.stderr.write(
-                "\nThe pushers must be disabled in the main synapse process"
-                "\nbefore they can be run in a separate worker."
-                "\nPlease add ``start_pushers: false`` to the main config"
-                "\n"
-            )
-            sys.exit(1)
-
-        # Force the pushers to start since they will be disabled in the main config
-        config.server.start_pushers = True
-    else:
-        # For other worker types we force this to off.
-        config.server.start_pushers = False
-
     if config.worker_app == "synapse.app.user_dir":
         if config.server.update_user_directory:
             sys.stderr.write(
@@ -950,22 +934,6 @@ def start(config_options):
     else:
         # For other worker types we force this to off.
         config.server.update_user_directory = False
-
-    if config.worker_app == "synapse.app.federation_sender":
-        if config.worker.send_federation:
-            sys.stderr.write(
-                "\nThe send_federation must be disabled in the main synapse process"
-                "\nbefore they can be run in a separate worker."
-                "\nPlease add ``send_federation: false`` to the main config"
-                "\n"
-            )
-            sys.exit(1)
-
-        # Force the pushers to start since they will be disabled in the main config
-        config.worker.send_federation = True
-    else:
-        # For other worker types we force this to off.
-        config.worker.send_federation = False
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 

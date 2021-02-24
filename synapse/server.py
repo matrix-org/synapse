@@ -248,7 +248,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         self.start_time = None  # type: Optional[int]
 
         self._instance_id = random_string(5)
-        self._instance_name = config.worker_name or "master"
+        self._instance_name = config.worker.instance_name
 
         self.version_string = version_string
 
@@ -760,7 +760,4 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     def should_send_federation(self) -> bool:
         "Should this server be sending federation traffic directly?"
-        return self.config.send_federation and (
-            not self.config.worker_app
-            or self.config.worker_app == "synapse.app.federation_sender"
-        )
+        return self.config.send_federation

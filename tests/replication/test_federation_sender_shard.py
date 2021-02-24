@@ -49,7 +49,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
 
         self.make_worker_hs(
             "synapse.app.federation_sender",
-            {"send_federation": True},
+            {"send_federation": False},
             federation_http_client=mock_client,
         )
 
