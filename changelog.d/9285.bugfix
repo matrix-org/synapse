@@ -1,1 +1,1 @@
-Fix bug where a user's pushers were not all deleted when they deactivated their account.
+Fix a bug where users' pushers were not all deleted when they deactivated their account.
