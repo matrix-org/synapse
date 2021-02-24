@@ -137,7 +137,8 @@ example.com:8448 {
 ```
 frontend https
   bind :::443 v4v6 ssl crt /etc/ssl/haproxy/ strict-sni alpn h2,http/1.1
-  http-request add-header X-Forwarded-Proto https if { ssl_fc }
+  http-request set-header X-Forwarded-Proto https if { ssl_fc }
+  http-request set-header X-Forwarded-Proto http if !{ ssl_fc }
   http-request set-header X-Forwarded-For %[src]
 
   # Matrix client traffic
@@ -149,7 +150,8 @@ frontend https
 
 frontend matrix-federation
   bind :::8448 v4v6 ssl crt /etc/ssl/haproxy/synapse.pem alpn h2,http/1.1
-  http-request add-header X-Forwarded-Proto https if { ssl_fc }
+  http-request set-header X-Forwarded-Proto https if { ssl_fc }
+  http-request set-header X-Forwarded-Proto http if !{ ssl_fc }
   http-request set-header X-Forwarded-For %[src]
 
   default_backend matrix
