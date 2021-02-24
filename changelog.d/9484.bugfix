@@ -1,0 +1,1 @@
+Add experimental config feature for timed `/sync` cache, fixes #3880.

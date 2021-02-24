@@ -29,4 +29,6 @@ class ExperimentalConfig(Config):
         self.msc2858_enabled = experimental.get("msc2858_enabled", False)  # type: bool
 
         # Timeout value (in milliseconds) on sync Response Cache
-        self.sync_cache_timeout_ms = experimental.get("sync_cache_timeout_ms", 0)  # type: int
+        self.sync_cache_timeout_ms = experimental.get(
+            "sync_cache_timeout_ms", 0
+        )  # type: int
