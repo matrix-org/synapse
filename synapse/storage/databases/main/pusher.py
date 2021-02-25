@@ -398,17 +398,19 @@ class PusherStore(PusherWorkerStore):
                 keyvalues={"user_name": user_id},
             )
 
-            for stream_id, pusher in zip(stream_ids, pushers):
-                self.db_pool.simple_insert_txn(
-                    txn,
-                    table="deleted_pushers",
-                    values={
+            self.db_pool.simple_insert_many_txn(
+                txn,
+                table="deleted_pushers",
+                values=[
+                    {
                         "stream_id": stream_id,
                         "app_id": pusher.app_id,
                         "pushkey": pusher.pushkey,
                         "user_id": user_id,
-                    },
-                )
+                    }
+                    for stream_id, pusher in zip(stream_ids, pushers)
+                ],
+            )
 
         async with self._pushers_id_gen.get_next_mult(len(pushers)) as stream_ids:
             await self.db_pool.runInteraction(
