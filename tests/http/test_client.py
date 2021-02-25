@@ -104,3 +104,18 @@ class ReadBodyWithMaxSizeTests(TestCase):
         self.assertEqual(result.getvalue(), b"1234567890")
         self._assert_error(deferred, protocol)
         self._cleanup_error(deferred)
+
+    def test_content_length(self):
+        """The body shouldn't be read (at all) if the Content-Length header is too large."""
+        result, deferred, protocol = self._build_response(length=10)
+
+        # Deferred shouldn't be called yet.
+        self.assertFalse(deferred.called)
+
+        # Start sending data.
+        protocol.dataReceived(b"12345")
+        self._assert_error(deferred, protocol)
+        self._cleanup_error(deferred)
+
+        # The data is never consumed.
+        self.assertEqual(result.getvalue(), b"")

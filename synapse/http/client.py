@@ -750,7 +750,32 @@ class BodyExceededMaxSize(Exception):
     """The maximum allowed size of the HTTP body was exceeded."""
 
 
+class _DiscardBodyWithMaxSizeProtocol(protocol.Protocol):
+    """A protocol which immediately errors upon receiving data."""
+
+    def __init__(self, deferred: defer.Deferred):
+        self.deferred = deferred
+
+    def _maybe_fail(self):
+        """
+        Report a max size exceed error and disconnect the first time this is called.
+        """
+        if not self.deferred.called:
+            self.deferred.errback(BodyExceededMaxSize())
+            # Close the connection (forcefully) since all the data will get
+            # discarded anyway.
+            self.transport.abortConnection()
+
+    def dataReceived(self, data: bytes) -> None:
+        self._maybe_fail()
+
+    def connectionLost(self, reason: Failure) -> None:
+        self._maybe_fail()
+
+
 class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
+    """A protocol which reads body to a stream, erroring if the body exceeds a maximum size."""
+
     def __init__(
         self, stream: BinaryIO, deferred: defer.Deferred, max_size: Optional[int]
     ):
@@ -807,13 +832,15 @@ def read_body_with_max_size(
     Returns:
         A Deferred which resolves to the length of the read body.
     """
+    d = defer.Deferred()
+
     # If the Content-Length header gives a size larger than the maximum allowed
     # size, do not bother downloading the body.
     if max_size is not None and response.length != UNKNOWN_LENGTH:
         if response.length > max_size:
-            return defer.fail(BodyExceededMaxSize())
+            response.deliverBody(_DiscardBodyWithMaxSizeProtocol(d))
+            return d
 
-    d = defer.Deferred()
     response.deliverBody(_ReadBodyWithMaxSizeProtocol(stream, d, max_size))
     return d
 
