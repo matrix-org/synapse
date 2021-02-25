@@ -1,3 +1,12 @@
+Synapse 1.28.0 (2021-02-25)
+===========================
+
+Internal Changes
+----------------
+
+- Revert change in v1.28.0rc1 to remove the deprecated SAML endpoint. ([\#9474](https://github.com/matrix-org/synapse/issues/9474))
+
+
 Synapse 1.28.0rc1 (2021-02-19)
 ==============================
 
