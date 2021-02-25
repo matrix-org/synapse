@@ -38,6 +38,12 @@ class ReadBodyWithMaxSizeTests(TestCase):
 
         return result, deferred, protocol
 
+    def _assert_error(self, deferred, protocol):
+        """Ensure that the expected error is received."""
+        self.assertIsInstance(deferred.result, Failure)
+        self.assertIsInstance(deferred.result.value, BodyExceededMaxSize)
+        protocol.transport.abortConnection.assert_called_once()
+
     def _cleanup_error(self, deferred):
         """Ensure that the error in the Deferred is handled gracefully."""
         called = [False]
@@ -66,12 +72,9 @@ class ReadBodyWithMaxSizeTests(TestCase):
 
         # Start sending data.
         protocol.dataReceived(b"1234567890")
-        # Close the connection.
-        protocol.connectionLost(Failure(ResponseDone()))
 
         self.assertEqual(result.getvalue(), b"1234567890")
-        self.assertIsInstance(deferred.result, Failure)
-        self.assertIsInstance(deferred.result.value, BodyExceededMaxSize)
+        self._assert_error(deferred, protocol)
         self._cleanup_error(deferred)
 
     def test_multiple_packets(self):
@@ -93,16 +96,11 @@ class ReadBodyWithMaxSizeTests(TestCase):
 
         # Start sending data.
         protocol.dataReceived(b"1234567890")
-        self.assertIsInstance(deferred.result, Failure)
-        self.assertIsInstance(deferred.result.value, BodyExceededMaxSize)
-        protocol.transport.abortConnection.assert_called_once()
+        self._assert_error(deferred, protocol)
 
         # More data might have come in.
         protocol.dataReceived(b"1234567890")
-        # Close the connection.
-        protocol.connectionLost(Failure(ResponseDone()))
 
         self.assertEqual(result.getvalue(), b"1234567890")
-        self.assertIsInstance(deferred.result, Failure)
-        self.assertIsInstance(deferred.result.value, BodyExceededMaxSize)
+        self._assert_error(deferred, protocol)
         self._cleanup_error(deferred)
