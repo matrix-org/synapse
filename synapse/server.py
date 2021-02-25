@@ -35,7 +35,6 @@ from typing import (
     Union,
     cast,
 )
-from urllib.request import getproxies
 
 import twisted.internet.base
 import twisted.internet.tcp
@@ -370,13 +369,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         """
         An HTTP client that uses configured HTTP(S) proxies.
         """
-        proxies = getproxies()
-        return SimpleHttpClient(
-            self,
-            http_proxy=proxies["http"].encode() if "http" in proxies else None,
-            https_proxy=proxies["https"].encode() if "https" in proxies else None,
-            no_proxy=proxies["no"].encode() if "no" in proxies else None,
-        )
+        return SimpleHttpClient(self, use_proxy=True)
 
     @cache_in_self
     def get_proxied_blacklisted_http_client(self) -> SimpleHttpClient:
@@ -384,14 +377,11 @@ class HomeServer(metaclass=abc.ABCMeta):
         An HTTP client that uses configured HTTP(S) proxies and blacklists IPs
         based on the IP range blacklist/whitelist.
         """
-        proxies = getproxies()
         return SimpleHttpClient(
             self,
             ip_whitelist=self.config.ip_range_whitelist,
             ip_blacklist=self.config.ip_range_blacklist,
-            http_proxy=proxies["http"].encode() if "http" in proxies else None,
-            https_proxy=proxies["https"].encode() if "https" in proxies else None,
-            no_proxy=proxies["no"].encode() if "no" in proxies else None,
+            use_proxy=True,
         )
 
     @cache_in_self

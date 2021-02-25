@@ -25,7 +25,6 @@ import sys
 import traceback
 from typing import TYPE_CHECKING, Any, Dict, Generator, Iterable, Optional, Union
 from urllib import parse as urlparse
-from urllib.request import getproxies
 
 import attr
 
@@ -145,15 +144,12 @@ class PreviewUrlResource(DirectServeJsonResource):
         self.max_spider_size = hs.config.max_spider_size
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
-        proxies = getproxies()
         self.client = SimpleHttpClient(
             hs,
             treq_args={"browser_like_redirects": True},
             ip_whitelist=hs.config.url_preview_ip_range_whitelist,
             ip_blacklist=hs.config.url_preview_ip_range_blacklist,
-            http_proxy=proxies["http"].encode() if "http" in proxies else None,
-            https_proxy=proxies["https"].encode() if "https" in proxies else None,
-            no_proxy=proxies["no"].encode() if "no" in proxies else None,
+            use_proxy=True,
         )
         self.media_repo = media_repo
         self.primary_base_path = media_repo.primary_base_path

@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import os
+from unittest.mock import patch
 
 import treq
 from netaddr import IPSet
@@ -148,38 +150,47 @@ class MatrixFederationAgentTests(TestCase):
         agent = ProxyAgent(self.reactor, contextFactory=get_test_https_policy())
         self._test_request_no_proxy(agent, b"https", b"test.com", b"abc")
 
-    def test_http_request_via_no_proxy(self):
-        agent = ProxyAgent(
-            self.reactor, http_proxy=b"proxy.com:8888", no_proxy=b"test.com,unused.com"
-        )
+    @patch.dict(os.environ, {})
+    def test_http_request_use_proxy_no_environment(self):
+        agent = ProxyAgent(self.reactor, use_proxy=True)
         self._test_request_no_proxy(agent, b"http", b"test.com", b"")
 
+    @patch.dict(os.environ, {"http_proxy": "proxy.com:8888", "NO_PROXY": "test.com"})
+    def test_http_request_via_uppercase_no_proxy(self):
+        agent = ProxyAgent(self.reactor, use_proxy=True)
+        self._test_request_no_proxy(agent, b"http", b"test.com", b"")
+
+    @patch.dict(
+        os.environ, {"http_proxy": "proxy.com:8888", "no_proxy": "test.com,unused.com"}
+    )
+    def test_http_request_via_no_proxy(self):
+        agent = ProxyAgent(self.reactor, use_proxy=True)
+        self._test_request_no_proxy(agent, b"http", b"test.com", b"")
+
+    @patch.dict(
+        os.environ, {"https_proxy": "proxy.com", "no_proxy": "test.com,unused.com"}
+    )
     def test_https_request_via_no_proxy(self):
         agent = ProxyAgent(
-            self.reactor,
-            contextFactory=get_test_https_policy(),
-            https_proxy=b"proxy.com",
-            no_proxy=b"test.com,unused.com",
+            self.reactor, contextFactory=get_test_https_policy(), use_proxy=True,
         )
         self._test_request_no_proxy(agent, b"https", b"test.com", b"abc")
 
+    @patch.dict(os.environ, {"http_proxy": "proxy.com:8888", "no_proxy": "*"})
     def test_http_request_via_no_proxy_star(self):
-        agent = ProxyAgent(self.reactor, http_proxy=b"proxy.com:8888", no_proxy=b"*")
+        agent = ProxyAgent(self.reactor, use_proxy=True)
         self._test_request_no_proxy(agent, b"http", b"test.com", b"")
 
+    @patch.dict(os.environ, {"https_proxy": "proxy.com", "no_proxy": "*"})
     def test_https_request_via_no_proxy_star(self):
         agent = ProxyAgent(
-            self.reactor,
-            contextFactory=get_test_https_policy(),
-            https_proxy=b"proxy.com",
-            no_proxy=b"*",
+            self.reactor, contextFactory=get_test_https_policy(), use_proxy=True,
         )
         self._test_request_no_proxy(agent, b"https", b"test.com", b"abc")
 
+    @patch.dict(os.environ, {"http_proxy": "proxy.com:8888", "no_proxy": "unused.com"})
     def test_http_request_via_proxy(self):
-        agent = ProxyAgent(
-            self.reactor, http_proxy=b"proxy.com:8888", no_proxy=b"unused.com"
-        )
+        agent = ProxyAgent(self.reactor, use_proxy=True)
 
         self.reactor.lookups["proxy.com"] = "1.2.3.5"
         d = agent.request(b"GET", b"http://test.com")
@@ -215,12 +226,10 @@ class MatrixFederationAgentTests(TestCase):
         body = self.successResultOf(treq.content(resp))
         self.assertEqual(body, b"result")
 
+    @patch.dict(os.environ, {"https_proxy": "proxy.com", "no_proxy": "unused.com"})
     def test_https_request_via_proxy(self):
         agent = ProxyAgent(
-            self.reactor,
-            contextFactory=get_test_https_policy(),
-            https_proxy=b"proxy.com",
-            no_proxy=b"unused.com",
+            self.reactor, contextFactory=get_test_https_policy(), use_proxy=True,
         )
 
         self.reactor.lookups["proxy.com"] = "1.2.3.5"
@@ -296,6 +305,7 @@ class MatrixFederationAgentTests(TestCase):
         body = self.successResultOf(treq.content(resp))
         self.assertEqual(body, b"result")
 
+    @patch.dict(os.environ, {"http_proxy": "proxy.com:8888"})
     def test_http_request_via_proxy_with_blacklist(self):
         # The blacklist includes the configured proxy IP.
         agent = ProxyAgent(
@@ -303,7 +313,7 @@ class MatrixFederationAgentTests(TestCase):
                 self.reactor, ip_whitelist=None, ip_blacklist=IPSet(["1.0.0.0/8"])
             ),
             self.reactor,
-            http_proxy=b"proxy.com:8888",
+            use_proxy=True,
         )
 
         self.reactor.lookups["proxy.com"] = "1.2.3.5"
@@ -340,7 +350,8 @@ class MatrixFederationAgentTests(TestCase):
         body = self.successResultOf(treq.content(resp))
         self.assertEqual(body, b"result")
 
-    def test_https_request_via_proxy_with_blacklist(self):
+    @patch.dict(os.environ, {"HTTPS_PROXY": "proxy.com"})
+    def test_https_request_via_uppercase_proxy_with_blacklist(self):
         # The blacklist includes the configured proxy IP.
         agent = ProxyAgent(
             BlacklistingReactorWrapper(
@@ -348,7 +359,7 @@ class MatrixFederationAgentTests(TestCase):
             ),
             self.reactor,
             contextFactory=get_test_https_policy(),
-            https_proxy=b"proxy.com",
+            use_proxy=True,
         )
 
         self.reactor.lookups["proxy.com"] = "1.2.3.5"

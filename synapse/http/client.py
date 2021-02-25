@@ -289,9 +289,7 @@ class SimpleHttpClient:
         treq_args: Dict[str, Any] = {},
         ip_whitelist: Optional[IPSet] = None,
         ip_blacklist: Optional[IPSet] = None,
-        http_proxy: Optional[bytes] = None,
-        https_proxy: Optional[bytes] = None,
-        no_proxy: Optional[bytes] = None,
+        use_proxy: bool = False,
     ):
         """
         Args:
@@ -301,9 +299,8 @@ class SimpleHttpClient:
                 we may not request.
             ip_whitelist: The whitelisted IP addresses, that we can
                request if it were otherwise caught in a blacklist.
-            http_proxy: proxy server to use for http connections. host[:port]
-            https_proxy: proxy server to use for https connections. host[:port]
-            no_proxy: locations that should explicitly not use a proxy.
+            use_proxy: Whether proxy settings should be discovered and used
+                from conventional environment variables. Defaults to false.
         """
         self.hs = hs
 
@@ -347,9 +344,7 @@ class SimpleHttpClient:
             connectTimeout=15,
             contextFactory=self.hs.get_http_client_context_factory(),
             pool=pool,
-            http_proxy=http_proxy,
-            https_proxy=https_proxy,
-            no_proxy=no_proxy,
+            use_proxy=use_proxy,
         )
 
         if self._ip_blacklist:
