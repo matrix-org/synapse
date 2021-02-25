@@ -172,7 +172,9 @@ class MatrixFederationAgentTests(TestCase):
     )
     def test_https_request_via_no_proxy(self):
         agent = ProxyAgent(
-            self.reactor, contextFactory=get_test_https_policy(), use_proxy=True,
+            self.reactor,
+            contextFactory=get_test_https_policy(),
+            use_proxy=True,
         )
         self._test_request_no_proxy(agent, b"https", b"test.com", b"abc")
 
@@ -184,7 +186,9 @@ class MatrixFederationAgentTests(TestCase):
     @patch.dict(os.environ, {"https_proxy": "proxy.com", "no_proxy": "*"})
     def test_https_request_via_no_proxy_star(self):
         agent = ProxyAgent(
-            self.reactor, contextFactory=get_test_https_policy(), use_proxy=True,
+            self.reactor,
+            contextFactory=get_test_https_policy(),
+            use_proxy=True,
         )
         self._test_request_no_proxy(agent, b"https", b"test.com", b"abc")
 
@@ -229,7 +233,9 @@ class MatrixFederationAgentTests(TestCase):
     @patch.dict(os.environ, {"https_proxy": "proxy.com", "no_proxy": "unused.com"})
     def test_https_request_via_proxy(self):
         agent = ProxyAgent(
-            self.reactor, contextFactory=get_test_https_policy(), use_proxy=True,
+            self.reactor,
+            contextFactory=get_test_https_policy(),
+            use_proxy=True,
         )
 
         self.reactor.lookups["proxy.com"] = "1.2.3.5"
