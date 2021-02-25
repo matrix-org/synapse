@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Dict, Iterable, Optional
 
 from prometheus_client import Gauge
 
+from synapse.api.errors import Codes, SynapseError
 from synapse.metrics.background_process_metrics import (
     run_as_background_process,
     wrap_as_background_process,
@@ -112,6 +113,11 @@ class PusherPool:
         Returns:
             The newly created pusher.
         """
+
+        if kind == "email":
+            email_owner = await self.store.get_user_id_by_threepid("email", pushkey)
+            if email_owner != user_id:
+                raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
 
         time_now_msec = self.clock.time_msec()
 
