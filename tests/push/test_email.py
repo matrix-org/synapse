@@ -21,6 +21,7 @@ import pkg_resources
 from twisted.internet.defer import Deferred
 
 import synapse.rest.admin
+from synapse.api.errors import Codes, SynapseError
 from synapse.rest.client.v1 import login, room
 
 from tests.unittest import HomeserverTestCase
@@ -100,12 +101,19 @@ class EmailPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastore().get_user_by_access_token(self.access_token)
         )
-        token_id = user_tuple.token_id
+        self.token_id = user_tuple.token_id
+
+        # We need to add email to account before we can create a pusher.
+        self.get_success(
+            hs.get_datastore().user_add_threepid(
+                self.user_id, "email", "a@example.com", 0, 0
+            )
+        )
 
         self.pusher = self.get_success(
             self.hs.get_pusherpool().add_pusher(
                 user_id=self.user_id,
-                access_token=token_id,
+                access_token=self.token_id,
                 kind="email",
                 app_id="m.email",
                 app_display_name="Email Notifications",
@@ -115,6 +123,28 @@ class EmailPusherTests(HomeserverTestCase):
                 data={},
             )
         )
+
+    def test_need_validated_email(self):
+        """Test that we can only add an email pusher if the user has validated
+        their email.
+        """
+        with self.assertRaises(SynapseError) as cm:
+            self.get_success_or_raise(
+                self.hs.get_pusherpool().add_pusher(
+                    user_id=self.user_id,
+                    access_token=self.token_id,
+                    kind="email",
+                    app_id="m.email",
+                    app_display_name="Email Notifications",
+                    device_display_name="b@example.com",
+                    pushkey="b@example.com",
+                    lang=None,
+                    data={},
+                )
+            )
+
+        self.assertEqual(400, cm.exception.code)
+        self.assertEqual(Codes.THREEPID_NOT_FOUND, cm.exception.errcode)
 
     def test_simple_sends_email(self):
         # Create a simple room with two users
