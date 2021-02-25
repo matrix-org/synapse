@@ -35,6 +35,7 @@ from synapse.rest.admin._base import (
     assert_user_is_admin,
 )
 from synapse.rest.client.v2_alpha._base import client_patterns
+from synapse.storage.databases.main.media_repository import MediaSortOrder
 from synapse.types import JsonDict, UserID
 
 if TYPE_CHECKING:
@@ -579,7 +580,7 @@ class ResetPasswordRestServlet(RestServlet):
             }
         Returns:
             200 OK with empty object if success otherwise an error.
-        """
+    """
 
     PATTERNS = admin_patterns("/reset_password/(?P<target_user_id>[^/]*)")
 
@@ -752,7 +753,7 @@ class PushersRestServlet(RestServlet):
 
     Returns:
         pushers: Dictionary containing pushers information.
-        total: Number of pushers in dictonary `pushers`.
+        total: Number of pushers in dictionary `pushers`.
     """
 
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/pushers$")
@@ -832,8 +833,33 @@ class UserMediaRestServlet(RestServlet):
                 errcode=Codes.INVALID_PARAM,
             )
 
+        # If neither `order_by` nor `dir` is set, set the default order
+        # to newest media is on top for backward compatibility.
+        if b"order_by" not in request.args and b"dir" not in request.args:
+            order_by = MediaSortOrder.CREATED_TS.value
+            direction = "b"
+        else:
+            order_by = parse_string(
+                request,
+                "order_by",
+                default=MediaSortOrder.CREATED_TS.value,
+                allowed_values=(
+                    MediaSortOrder.MEDIA_ID.value,
+                    MediaSortOrder.UPLOAD_NAME.value,
+                    MediaSortOrder.CREATED_TS.value,
+                    MediaSortOrder.LAST_ACCESS_TS.value,
+                    MediaSortOrder.MEDIA_LENGTH.value,
+                    MediaSortOrder.MEDIA_TYPE.value,
+                    MediaSortOrder.QUARANTINED_BY.value,
+                    MediaSortOrder.SAFE_FROM_QUARANTINE.value,
+                ),
+            )
+            direction = parse_string(
+                request, "dir", default="f", allowed_values=("f", "b")
+            )
+
         media, total = await self.store.get_local_media_by_user_paginate(
-            start, limit, user_id
+            start, limit, user_id, order_by, direction
         )
 
         ret = {"media": media, "total": total}

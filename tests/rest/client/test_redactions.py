@@ -181,8 +181,7 @@ class RedactionsTestCase(HomeserverTestCase):
         )
 
     def test_redact_event_as_moderator_ratelimit(self):
-        """Tests that the correct ratelimiting is applied to redactions
-        """
+        """Tests that the correct ratelimiting is applied to redactions"""
 
         message_ids = []
         # as a regular user, send messages to redact

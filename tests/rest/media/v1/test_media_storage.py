@@ -167,7 +167,16 @@ class _TestImage:
             ),
         ),
         # an empty file
-        (_TestImage(b"", b"image/gif", b".gif", None, None, False,),),
+        (
+            _TestImage(
+                b"",
+                b"image/gif",
+                b".gif",
+                None,
+                None,
+                False,
+            ),
+        ),
     ],
 )
 class MediaRepoTests(unittest.HomeserverTestCase):
@@ -222,9 +231,11 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
 
-        self.media_repo = hs.get_media_repository_resource()
-        self.download_resource = self.media_repo.children[b"download"]
-        self.thumbnail_resource = self.media_repo.children[b"thumbnail"]
+        media_resource = hs.get_media_repository_resource()
+        self.download_resource = media_resource.children[b"download"]
+        self.thumbnail_resource = media_resource.children[b"thumbnail"]
+        self.store = hs.get_datastore()
+        self.media_repo = hs.get_media_repository()
 
         self.media_id = "example.com/12345"
 
@@ -348,6 +359,67 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         """
         self._test_thumbnail("scale", None, False)
 
+    def test_thumbnail_repeated_thumbnail(self):
+        """Test that fetching the same thumbnail works, and deleting the on disk
+        thumbnail regenerates it.
+        """
+        self._test_thumbnail(
+            "scale", self.test_image.expected_scaled, self.test_image.expected_found
+        )
+
+        if not self.test_image.expected_found:
+            return
+
+        # Fetching again should work, without re-requesting the image from the
+        # remote.
+        params = "?width=32&height=32&method=scale"
+        channel = make_request(
+            self.reactor,
+            FakeSite(self.thumbnail_resource),
+            "GET",
+            self.media_id + params,
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+
+        self.assertEqual(channel.code, 200)
+        if self.test_image.expected_scaled:
+            self.assertEqual(
+                channel.result["body"],
+                self.test_image.expected_scaled,
+                channel.result["body"],
+            )
+
+        # Deleting the thumbnail on disk then re-requesting it should work as
+        # Synapse should regenerate missing thumbnails.
+        origin, media_id = self.media_id.split("/")
+        info = self.get_success(self.store.get_cached_remote_media(origin, media_id))
+        file_id = info["filesystem_id"]
+
+        thumbnail_dir = self.media_repo.filepaths.remote_media_thumbnail_dir(
+            origin, file_id
+        )
+        shutil.rmtree(thumbnail_dir, ignore_errors=True)
+
+        channel = make_request(
+            self.reactor,
+            FakeSite(self.thumbnail_resource),
+            "GET",
+            self.media_id + params,
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+
+        self.assertEqual(channel.code, 200)
+        if self.test_image.expected_scaled:
+            self.assertEqual(
+                channel.result["body"],
+                self.test_image.expected_scaled,
+                channel.result["body"],
+            )
+
     def _test_thumbnail(self, method, expected_body, expected_found):
         params = "?width=32&height=32&method=" + method
         channel = make_request(
@@ -469,8 +541,7 @@ class SpamCheckerTestCase(unittest.HomeserverTestCase):
         return config
 
     def test_upload_innocent(self):
-        """Attempt to upload some innocent data that should be allowed.
-        """
+        """Attempt to upload some innocent data that should be allowed."""
 
         image_data = unhexlify(
             b"89504e470d0a1a0a0000000d4948445200000001000000010806"

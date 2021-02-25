@@ -45,6 +45,7 @@ from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_cla
 from synapse.storage.database import DatabasePool
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator, StreamIdGenerator
+from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import Collection, JsonDict, get_domain_from_id
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.lrucache import LruCache
@@ -120,7 +121,9 @@ class EventsWorkerStore(SQLBaseStore):
             # SQLite).
             if hs.get_instance_name() in hs.config.worker.writers.events:
                 self._stream_id_gen = StreamIdGenerator(
-                    db_conn, "events", "stream_ordering",
+                    db_conn,
+                    "events",
+                    "stream_ordering",
                 )
                 self._backfill_id_gen = StreamIdGenerator(
                     db_conn,
@@ -140,7 +143,8 @@ class EventsWorkerStore(SQLBaseStore):
         if hs.config.run_background_tasks:
             # We periodically clean out old transaction ID mappings
             self._clock.looping_call(
-                self._cleanup_old_transaction_ids, 5 * 60 * 1000,
+                self._cleanup_old_transaction_ids,
+                5 * 60 * 1000,
             )
 
         self._get_event_cache = LruCache(
@@ -152,6 +156,21 @@ class EventsWorkerStore(SQLBaseStore):
         self._event_fetch_lock = threading.Condition()
         self._event_fetch_list = []
         self._event_fetch_ongoing = 0
+
+        # We define this sequence here so that it can be referenced from both
+        # the DataStore and PersistEventStore.
+        def get_chain_id_txn(txn):
+            txn.execute("SELECT COALESCE(max(chain_id), 0) FROM event_auth_chains")
+            return txn.fetchone()[0]
+
+        self.event_chain_id_gen = build_sequence_generator(
+            db_conn,
+            database.engine,
+            get_chain_id_txn,
+            "event_auth_chain_id",
+            table="event_auth_chains",
+            id_column="chain_id",
+        )
 
     def process_replication_rows(self, stream_name, instance_name, token, rows):
         if stream_name == EventsStream.NAME:
@@ -1325,8 +1344,7 @@ class EventsWorkerStore(SQLBaseStore):
         return rows, to_token, True
 
     async def is_event_after(self, event_id1, event_id2):
-        """Returns True if event_id1 is after event_id2 in the stream
-        """
+        """Returns True if event_id1 is after event_id2 in the stream"""
         to_1, so_1 = await self.get_event_ordering(event_id1)
         to_2, so_2 = await self.get_event_ordering(event_id2)
         return (to_1, so_1) > (to_2, so_2)
@@ -1428,8 +1446,7 @@ class EventsWorkerStore(SQLBaseStore):
 
     @wrap_as_background_process("_cleanup_old_transaction_ids")
     async def _cleanup_old_transaction_ids(self):
-        """Cleans out transaction id mappings older than 24hrs.
-        """
+        """Cleans out transaction id mappings older than 24hrs."""
 
         def _cleanup_old_transaction_ids_txn(txn):
             sql = """
@@ -1440,5 +1457,6 @@ class EventsWorkerStore(SQLBaseStore):
             txn.execute(sql, (one_day_ago,))
 
         return await self.db_pool.runInteraction(
-            "_cleanup_old_transaction_ids", _cleanup_old_transaction_ids_txn,
+            "_cleanup_old_transaction_ids",
+            _cleanup_old_transaction_ids_txn,
         )

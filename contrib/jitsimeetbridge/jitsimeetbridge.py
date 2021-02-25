@@ -193,15 +193,12 @@ class TrivialXmppClient:
         time.sleep(7)
         print("SSRC spammer started")
         while self.running:
-            ssrcMsg = (
-                "<presence to='%(tojid)s' xmlns='jabber:client'><x xmlns='http://jabber.org/protocol/muc'/><c xmlns='http://jabber.org/protocol/caps' hash='sha-1' node='http://jitsi.org/jitsimeet' ver='0WkSdhFnAUxrz4ImQQLdB80GFlE='/><nick xmlns='http://jabber.org/protocol/nick'>%(nick)s</nick><stats xmlns='http://jitsi.org/jitmeet/stats'><stat name='bitrate_download' value='175'/><stat name='bitrate_upload' value='176'/><stat name='packetLoss_total' value='0'/><stat name='packetLoss_download' value='0'/><stat name='packetLoss_upload' value='0'/></stats><media xmlns='http://estos.de/ns/mjs'><source type='audio' ssrc='%(assrc)s' direction='sendre'/><source type='video' ssrc='%(vssrc)s' direction='sendre'/></media></presence>"
-                % {
-                    "tojid": "%s@%s/%s" % (ROOMNAME, ROOMDOMAIN, self.shortJid),
-                    "nick": self.userId,
-                    "assrc": self.ssrcs["audio"],
-                    "vssrc": self.ssrcs["video"],
-                }
-            )
+            ssrcMsg = "<presence to='%(tojid)s' xmlns='jabber:client'><x xmlns='http://jabber.org/protocol/muc'/><c xmlns='http://jabber.org/protocol/caps' hash='sha-1' node='http://jitsi.org/jitsimeet' ver='0WkSdhFnAUxrz4ImQQLdB80GFlE='/><nick xmlns='http://jabber.org/protocol/nick'>%(nick)s</nick><stats xmlns='http://jitsi.org/jitmeet/stats'><stat name='bitrate_download' value='175'/><stat name='bitrate_upload' value='176'/><stat name='packetLoss_total' value='0'/><stat name='packetLoss_download' value='0'/><stat name='packetLoss_upload' value='0'/></stats><media xmlns='http://estos.de/ns/mjs'><source type='audio' ssrc='%(assrc)s' direction='sendre'/><source type='video' ssrc='%(vssrc)s' direction='sendre'/></media></presence>" % {
+                "tojid": "%s@%s/%s" % (ROOMNAME, ROOMDOMAIN, self.shortJid),
+                "nick": self.userId,
+                "assrc": self.ssrcs["audio"],
+                "vssrc": self.ssrcs["video"],
+            }
             res = self.sendIq(ssrcMsg)
             print("reply from ssrc announce: ", res)
             time.sleep(10)

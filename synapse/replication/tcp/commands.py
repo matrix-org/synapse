@@ -196,8 +196,7 @@ class ErrorCommand(_SimpleCommand):
 
 
 class PingCommand(_SimpleCommand):
-    """Sent by either side as a keep alive. The data is arbitrary (often timestamp)
-    """
+    """Sent by either side as a keep alive. The data is arbitrary (often timestamp)"""
 
     NAME = "PING"
 
@@ -326,31 +325,6 @@ class FederationAckCommand(Command):
         return "%s %s" % (self.instance_name, self.token)
 
 
-class RemovePusherCommand(Command):
-    """Sent by the client to request the master remove the given pusher.
-
-    Format::
-
-        REMOVE_PUSHER <app_id> <push_key> <user_id>
-    """
-
-    NAME = "REMOVE_PUSHER"
-
-    def __init__(self, app_id, push_key, user_id):
-        self.user_id = user_id
-        self.app_id = app_id
-        self.push_key = push_key
-
-    @classmethod
-    def from_line(cls, line):
-        app_id, push_key, user_id = line.split(" ", 2)
-
-        return cls(app_id, push_key, user_id)
-
-    def to_line(self):
-        return " ".join((self.app_id, self.push_key, self.user_id))
-
-
 class UserIpCommand(Command):
     """Sent periodically when a worker sees activity from a client.
 
@@ -417,7 +391,6 @@ _COMMANDS = (
     ReplicateCommand,
     UserSyncCommand,
     FederationAckCommand,
-    RemovePusherCommand,
     UserIpCommand,
     RemoteServerUpCommand,
     ClearUserSyncsCommand,
@@ -444,7 +417,6 @@ VALID_CLIENT_COMMANDS = (
     UserSyncCommand.NAME,
     ClearUserSyncsCommand.NAME,
     FederationAckCommand.NAME,
-    RemovePusherCommand.NAME,
     UserIpCommand.NAME,
     ErrorCommand.NAME,
     RemoteServerUpCommand.NAME,

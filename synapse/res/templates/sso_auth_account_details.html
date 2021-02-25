@@ -145,7 +145,7 @@
         <input type="submit" value="Continue" class="primary-button">
         {% if user_attributes.avatar_url or user_attributes.display_name or user_attributes.emails %}
         <section class="idp-pick-details">
-          <h2><img src="{{ idp.idp_icon | mxc_to_http(24, 24) }}"/>Information from {{ idp.idp_name }}</h2>
+          <h2>{% if idp.idp_icon %}<img src="{{ idp.idp_icon | mxc_to_http(24, 24) }}"/>{% endif %}Information from {{ idp.idp_name }}</h2>
           {% if user_attributes.avatar_url %}
           <label class="idp-detail idp-avatar" for="idp-avatar">
             <div class="check-row">

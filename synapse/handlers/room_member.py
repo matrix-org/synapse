@@ -191,7 +191,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # do it up front for efficiency.)
         if txn_id and requester.access_token_id:
             existing_event_id = await self.store.get_event_id_from_transaction_id(
-                room_id, requester.user.to_string(), requester.access_token_id, txn_id,
+                room_id,
+                requester.user.to_string(),
+                requester.access_token_id,
+                txn_id,
             )
             if existing_event_id:
                 event_pos = await self.store.get_position_for_event(existing_event_id)
@@ -238,7 +241,11 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     )
 
         result_event = await self.event_creation_handler.handle_new_client_event(
-            requester, event, context, extra_users=[target], ratelimit=ratelimit,
+            requester,
+            event,
+            context,
+            extra_users=[target],
+            ratelimit=ratelimit,
         )
 
         if event.membership == Membership.LEAVE:
@@ -583,7 +590,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     # send the rejection to the inviter's HS (with fallback to
                     # local event)
                     return await self.remote_reject_invite(
-                        invite.event_id, txn_id, requester, content,
+                        invite.event_id,
+                        txn_id,
+                        requester,
+                        content,
                     )
 
                 # the inviter was on our server, but has now left. Carry on
@@ -1056,8 +1066,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         user: UserID,
         content: dict,
     ) -> Tuple[str, int]:
-        """Implements RoomMemberHandler._remote_join
-        """
+        """Implements RoomMemberHandler._remote_join"""
         # filter ourselves out of remote_room_hosts: do_invite_join ignores it
         # and if it is the only entry we'd like to return a 404 rather than a
         # 500.
@@ -1211,7 +1220,10 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         event.internal_metadata.out_of_band_membership = True
 
         result_event = await self.event_creation_handler.handle_new_client_event(
-            requester, event, context, extra_users=[UserID.from_string(target_user)],
+            requester,
+            event,
+            context,
+            extra_users=[UserID.from_string(target_user)],
         )
         # we know it was persisted, so must have a stream ordering
         assert result_event.internal_metadata.stream_ordering
@@ -1219,8 +1231,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         return result_event.event_id, result_event.internal_metadata.stream_ordering
 
     async def _user_left_room(self, target: UserID, room_id: str) -> None:
-        """Implements RoomMemberHandler._user_left_room
-        """
+        """Implements RoomMemberHandler._user_left_room"""
         user_left_room(self.distributor, target, room_id)
 
     async def forget(self, user: UserID, room_id: str) -> None:

@@ -60,7 +60,10 @@ def parse_drain_configs(
             )
 
         # Either use the default formatter or the tersejson one.
-        if logging_type in (DrainType.CONSOLE_JSON, DrainType.FILE_JSON,):
+        if logging_type in (
+            DrainType.CONSOLE_JSON,
+            DrainType.FILE_JSON,
+        ):
             formatter = "json"  # type: Optional[str]
         elif logging_type in (
             DrainType.CONSOLE_JSON_TERSE,
@@ -131,7 +134,9 @@ def parse_drain_configs(
             )
 
 
-def setup_structured_logging(log_config: dict,) -> dict:
+def setup_structured_logging(
+    log_config: dict,
+) -> dict:
     """
     Convert a legacy structured logging configuration (from Synapse < v1.23.0)
     to one compatible with the new standard library handlers.

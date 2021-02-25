@@ -521,7 +521,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(expected_state.state, PresenceState.ONLINE)
         self.federation_sender.send_presence_to_destinations.assert_called_once_with(
-            destinations=["server2"], states=[expected_state]
+            destinations=["server2"], states={expected_state}
         )
 
         #
@@ -533,7 +533,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
 
         self.federation_sender.send_presence.assert_not_called()
         self.federation_sender.send_presence_to_destinations.assert_called_once_with(
-            destinations=["server3"], states=[expected_state]
+            destinations=["server3"], states={expected_state}
         )
 
     def test_remote_gets_presence_when_local_user_joins(self):
@@ -584,13 +584,18 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             self.presence_handler.current_state_for_user("@test2:server")
         )
         self.assertEqual(expected_state.state, PresenceState.ONLINE)
-        self.federation_sender.send_presence_to_destinations.assert_called_once_with(
-            destinations={"server2", "server3"}, states=[expected_state]
+        self.assertEqual(
+            self.federation_sender.send_presence_to_destinations.call_count, 2
+        )
+        self.federation_sender.send_presence_to_destinations.assert_any_call(
+            destinations=["server3"], states={expected_state}
+        )
+        self.federation_sender.send_presence_to_destinations.assert_any_call(
+            destinations=["server2"], states={expected_state}
         )
 
     def _add_new_user(self, room_id, user_id):
-        """Add new user to the room by creating an event and poking the federation API.
-        """
+        """Add new user to the room by creating an event and poking the federation API."""
 
         hostname = get_domain_from_id(user_id)
 

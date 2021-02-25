@@ -43,7 +43,11 @@ class TestRatelimiter(unittest.TestCase):
 
     def test_allowed_appservice_ratelimited_via_can_requester_do_action(self):
         appservice = ApplicationService(
-            None, "example.com", id="foo", rate_limited=True, sender="@as:example.com",
+            None,
+            "example.com",
+            id="foo",
+            rate_limited=True,
+            sender="@as:example.com",
         )
         as_requester = create_requester("@user:example.com", app_service=appservice)
 
@@ -68,7 +72,11 @@ class TestRatelimiter(unittest.TestCase):
 
     def test_allowed_appservice_via_can_requester_do_action(self):
         appservice = ApplicationService(
-            None, "example.com", id="foo", rate_limited=False, sender="@as:example.com",
+            None,
+            "example.com",
+            id="foo",
+            rate_limited=False,
+            sender="@as:example.com",
         )
         as_requester = create_requester("@user:example.com", app_service=appservice)
 
@@ -113,12 +121,18 @@ class TestRatelimiter(unittest.TestCase):
         limiter = Ratelimiter(clock=None, rate_hz=0.1, burst_count=1)
 
         # First attempt should be allowed
-        allowed, time_allowed = limiter.can_do_action(("test_id",), _time_now_s=0,)
+        allowed, time_allowed = limiter.can_do_action(
+            ("test_id",),
+            _time_now_s=0,
+        )
         self.assertTrue(allowed)
         self.assertEqual(10.0, time_allowed)
 
         # Second attempt, 1s later, will fail
-        allowed, time_allowed = limiter.can_do_action(("test_id",), _time_now_s=1,)
+        allowed, time_allowed = limiter.can_do_action(
+            ("test_id",),
+            _time_now_s=1,
+        )
         self.assertFalse(allowed)
         self.assertEqual(10.0, time_allowed)
 

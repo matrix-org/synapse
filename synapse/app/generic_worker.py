@@ -421,8 +421,7 @@ class GenericWorkerPresence(BasePresenceHandler):
         ]
 
     async def set_state(self, target_user, state, ignore_status_msg=False):
-        """Set the presence state of the user.
-        """
+        """Set the presence state of the user."""
         presence = state["presence"]
 
         valid_presence = (
@@ -645,9 +644,6 @@ class GenericWorkerServer(HomeServer):
                 logger.warning("Unsupported listener type: %s", listener.type)
 
         self.get_tcp_replication().start_replication(self)
-
-    async def remove_pusher(self, app_id, push_key, user_id):
-        self.get_tcp_replication().send_remove_pusher(app_id, push_key, user_id)
 
     @cache_in_self
     def get_replication_data_handler(self):
@@ -923,22 +919,6 @@ def start(config_options):
         # For other worker types we force this to off.
         config.appservice.notify_appservices = False
 
-    if config.worker_app == "synapse.app.pusher":
-        if config.server.start_pushers:
-            sys.stderr.write(
-                "\nThe pushers must be disabled in the main synapse process"
-                "\nbefore they can be run in a separate worker."
-                "\nPlease add ``start_pushers: false`` to the main config"
-                "\n"
-            )
-            sys.exit(1)
-
-        # Force the pushers to start since they will be disabled in the main config
-        config.server.start_pushers = True
-    else:
-        # For other worker types we force this to off.
-        config.server.start_pushers = False
-
     if config.worker_app == "synapse.app.user_dir":
         if config.server.update_user_directory:
             sys.stderr.write(
@@ -954,22 +934,6 @@ def start(config_options):
     else:
         # For other worker types we force this to off.
         config.server.update_user_directory = False
-
-    if config.worker_app == "synapse.app.federation_sender":
-        if config.worker.send_federation:
-            sys.stderr.write(
-                "\nThe send_federation must be disabled in the main synapse process"
-                "\nbefore they can be run in a separate worker."
-                "\nPlease add ``send_federation: false`` to the main config"
-                "\n"
-            )
-            sys.exit(1)
-
-        # Force the pushers to start since they will be disabled in the main config
-        config.worker.send_federation = True
-    else:
-        # For other worker types we force this to off.
-        config.worker.send_federation = False
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
