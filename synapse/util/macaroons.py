@@ -21,6 +21,26 @@ from typing import Callable
 import pymacaroons
 
 
+def get_value_from_macaroon(macaroon: pymacaroons.Macaroon, key: str) -> str:
+    """Extracts a caveat value from a macaroon token.
+
+    Args:
+        macaroon: the token
+        key: the key of the caveat to extract
+
+    Returns:
+        The extracted value
+
+    Raises:
+        KeyError: if the caveat was not in the macaroon
+    """
+    prefix = key + " = "
+    for caveat in macaroon.caveats:
+        if caveat.caveat_id.startswith(prefix):
+            return caveat.caveat_id[len(prefix) :]
+    raise KeyError("No %s caveat in macaroon" % (key,))
+
+
 def satisfy_expiry(v: pymacaroons.Verifier, get_time_ms: Callable[[], int]) -> None:
     """Make a macaroon verifier which accepts 'time' caveats
 
