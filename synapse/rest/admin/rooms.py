@@ -363,7 +363,7 @@ class JoinRoomAliasServlet(RestServlet):
             raise NotFoundError("User not found")
 
         if RoomID.is_valid(room_identifier):
-            room_id = room_identifier
+            resolved_room_id = room_identifier
             try:
                 remote_room_hosts = [
                     x.decode("ascii") for x in request.args[b"server_name"]
@@ -374,6 +374,7 @@ class JoinRoomAliasServlet(RestServlet):
             handler = self.room_member_handler
             room_alias = RoomAlias.from_string(room_identifier)
             room_id, remote_room_hosts = await handler.lookup_room_alias(room_alias)
+            resolved_room_id = room_id.to_string()
         else:
             raise SynapseError(
                 400, "%s was not legal room ID or room alias" % (room_identifier,)
@@ -384,7 +385,7 @@ class JoinRoomAliasServlet(RestServlet):
         )
 
         # send invite if room has "JoinRules.INVITE"
-        room_state = await self.state_handler.get_current_state(room_id)
+        room_state = await self.state_handler.get_current_state(resolved_room_id)
         join_rules_event = room_state.get((EventTypes.JoinRules, ""))
         if join_rules_event:
             if not (join_rules_event.content.get("join_rule") == JoinRules.PUBLIC):
@@ -394,7 +395,7 @@ class JoinRoomAliasServlet(RestServlet):
                 await self.room_member_handler.update_membership(
                     requester=requester,
                     target=fake_requester.user,
-                    room_id=room_id,
+                    room_id=resolved_room_id,
                     action="invite",
                     remote_room_hosts=remote_room_hosts,
                     ratelimit=False,
@@ -403,13 +404,13 @@ class JoinRoomAliasServlet(RestServlet):
         await self.room_member_handler.update_membership(
             requester=fake_requester,
             target=fake_requester.user,
-            room_id=room_id,
+            room_id=resolved_room_id,
             action="join",
             remote_room_hosts=remote_room_hosts,
             ratelimit=False,
         )
 
-        return 200, {"room_id": room_id}
+        return 200, {"room_id": resolved_room_id}
 
 
 class MakeRoomAdminRestServlet(RestServlet):
