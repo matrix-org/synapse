@@ -171,6 +171,13 @@ class SsoLoginExtraAttributes:
     extra_attributes = attr.ib(type=JsonDict)
 
 
+@attr.s(slots=True, frozen=True)
+class LoginTokenAttributes:
+    """Data we store in a short-term login token"""
+
+    user_id = attr.ib(type=str)
+
+
 class AuthHandler(BaseHandler):
     SESSION_EXPIRE_MS = 48 * 60 * 60 * 1000
 
@@ -1165,14 +1172,16 @@ class AuthHandler(BaseHandler):
             return None
         return user_id
 
-    async def validate_short_term_login_token_and_get_user_id(self, login_token: str):
+    async def validate_short_term_login_token(
+        self, login_token: str
+    ) -> LoginTokenAttributes:
         try:
-            user_id = self.macaroon_gen.verify_short_term_login_token(login_token)
+            res = self.macaroon_gen.verify_short_term_login_token(login_token)
         except Exception:
             raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
 
-        await self.auth.check_auth_blocking(user_id)
-        return user_id
+        await self.auth.check_auth_blocking(res.user_id)
+        return res
 
     async def delete_access_token(self, access_token: str):
         """Invalidate a single access token
@@ -1575,7 +1584,7 @@ class MacaroonGenerator:
         macaroon.add_first_party_caveat("time < %d" % (expiry,))
         return macaroon.serialize()
 
-    def verify_short_term_login_token(self, token: str) -> str:
+    def verify_short_term_login_token(self, token: str) -> LoginTokenAttributes:
         """Verify a short-term-login macaroon
 
         Checks that the given token is a valid, unexpired short-term-login token
@@ -1600,7 +1609,7 @@ class MacaroonGenerator:
         satisfy_expiry(v, self.hs.get_clock().time_msec)
         v.verify(macaroon, self.hs.config.key.macaroon_secret_key)
 
-        return user_id
+        return LoginTokenAttributes(user_id=user_id)
 
     def generate_delete_pusher_token(self, user_id: str) -> str:
         macaroon = self._generate_base_macaroon(user_id)
