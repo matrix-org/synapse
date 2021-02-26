@@ -17,8 +17,6 @@ import sys
 
 from synapse import python_dependencies  # noqa: E402
 
-sys.dont_write_bytecode = True
-
 logger = logging.getLogger(__name__)
 
 try:
