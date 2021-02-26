@@ -1,0 +1,1 @@
+Added a fix that invalidates cache for empty timed-out sync responses.

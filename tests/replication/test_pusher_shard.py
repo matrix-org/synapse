@@ -95,7 +95,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
 
         self.make_worker_hs(
             "synapse.app.pusher",
-            {"start_pushers": True},
+            {"start_pushers": False},
             proxied_blacklisted_http_client=http_client_mock,
         )
 
