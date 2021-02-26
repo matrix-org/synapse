@@ -1,0 +1,1 @@
+Fix a bug introduced in v1.25.0: `ValueError: Attempted to iterate a RoomID` when attempting to use `/_synapse/admin/join/` with a room alias.
