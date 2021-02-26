@@ -606,6 +606,7 @@ class SsoHandler:
             default_display_name=attributes.display_name,
             bind_emails=attributes.emails,
             user_agent_ips=[(user_agent, ip_address)],
+            auth_provider_id=auth_provider_id,
         )
 
         await self._store.record_user_external_id(
