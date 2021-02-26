@@ -102,7 +102,18 @@ class MatrixFederationAgentTests(TestCase):
 
         return http_protocol
 
-    def _test_request_no_proxy(self, agent, scheme, hostname, path):
+    def _test_request_direct_connection(self, agent, scheme, hostname, path):
+        """Runs a test case for a direct connection not going through a proxy.
+
+        Args:
+            agent (ProxyAgent): the proxy agent being tested
+
+            scheme (bytes): expected to be either "http" or "https"
+
+            hostname (bytes): the hostname to connect to in the test
+
+            path (bytes): the path to connect to in the test
+        """
         is_https = scheme == b"https"
 
         self.reactor.lookups[hostname.decode()] = "1.2.3.4"
@@ -144,28 +155,27 @@ class MatrixFederationAgentTests(TestCase):
 
     def test_http_request(self):
         agent = ProxyAgent(self.reactor)
-        self._test_request_no_proxy(agent, b"http", b"test.com", b"")
+        self._test_request_direct_connection(agent, b"http", b"test.com", b"")
 
     def test_https_request(self):
         agent = ProxyAgent(self.reactor, contextFactory=get_test_https_policy())
-        self._test_request_no_proxy(agent, b"https", b"test.com", b"abc")
+        self._test_request_direct_connection(agent, b"https", b"test.com", b"abc")
 
-    @patch.dict(os.environ, {})
-    def test_http_request_use_proxy_no_environment(self):
+    def test_http_request_use_proxy_empty_environment(self):
         agent = ProxyAgent(self.reactor, use_proxy=True)
-        self._test_request_no_proxy(agent, b"http", b"test.com", b"")
+        self._test_request_direct_connection(agent, b"http", b"test.com", b"")
 
     @patch.dict(os.environ, {"http_proxy": "proxy.com:8888", "NO_PROXY": "test.com"})
     def test_http_request_via_uppercase_no_proxy(self):
         agent = ProxyAgent(self.reactor, use_proxy=True)
-        self._test_request_no_proxy(agent, b"http", b"test.com", b"")
+        self._test_request_direct_connection(agent, b"http", b"test.com", b"")
 
     @patch.dict(
         os.environ, {"http_proxy": "proxy.com:8888", "no_proxy": "test.com,unused.com"}
     )
     def test_http_request_via_no_proxy(self):
         agent = ProxyAgent(self.reactor, use_proxy=True)
-        self._test_request_no_proxy(agent, b"http", b"test.com", b"")
+        self._test_request_direct_connection(agent, b"http", b"test.com", b"")
 
     @patch.dict(
         os.environ, {"https_proxy": "proxy.com", "no_proxy": "test.com,unused.com"}
@@ -176,12 +186,12 @@ class MatrixFederationAgentTests(TestCase):
             contextFactory=get_test_https_policy(),
             use_proxy=True,
         )
-        self._test_request_no_proxy(agent, b"https", b"test.com", b"abc")
+        self._test_request_direct_connection(agent, b"https", b"test.com", b"abc")
 
     @patch.dict(os.environ, {"http_proxy": "proxy.com:8888", "no_proxy": "*"})
     def test_http_request_via_no_proxy_star(self):
         agent = ProxyAgent(self.reactor, use_proxy=True)
-        self._test_request_no_proxy(agent, b"http", b"test.com", b"")
+        self._test_request_direct_connection(agent, b"http", b"test.com", b"")
 
     @patch.dict(os.environ, {"https_proxy": "proxy.com", "no_proxy": "*"})
     def test_https_request_via_no_proxy_star(self):
@@ -190,7 +200,7 @@ class MatrixFederationAgentTests(TestCase):
             contextFactory=get_test_https_policy(),
             use_proxy=True,
         )
-        self._test_request_no_proxy(agent, b"https", b"test.com", b"abc")
+        self._test_request_direct_connection(agent, b"https", b"test.com", b"abc")
 
     @patch.dict(os.environ, {"http_proxy": "proxy.com:8888", "no_proxy": "unused.com"})
     def test_http_request_via_proxy(self):

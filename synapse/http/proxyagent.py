@@ -61,7 +61,7 @@ class ProxyAgent(_AgentBase):
             non-persistent pool instance will be created.
 
         use_proxy (bool): Whether proxy settings should be discovered and used
-            from conventional environment variables. Defaults to false.
+            from conventional environment variables.
     """
 
     def __init__(
@@ -94,7 +94,7 @@ class ProxyAgent(_AgentBase):
             proxies = getproxies_environment()
             http_proxy = proxies["http"].encode() if "http" in proxies else None
             https_proxy = proxies["https"].encode() if "https" in proxies else None
-            no_proxy = proxies["no"].encode() if "no" in proxies else None
+            no_proxy = proxies["no"] if "no" in proxies else None
 
         self.http_proxy_endpoint = _http_proxy_endpoint(
             http_proxy, self.proxy_reactor, **self._endpoint_kwargs
@@ -157,7 +157,7 @@ class ProxyAgent(_AgentBase):
         if self.no_proxy is not None:
             should_skip_proxy = proxy_bypass_environment(
                 parsed_uri.host.decode(),
-                proxies={"no": self.no_proxy.decode()},
+                proxies={"no": self.no_proxy},
             )
 
         if (

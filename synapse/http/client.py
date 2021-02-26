@@ -300,7 +300,7 @@ class SimpleHttpClient:
             ip_whitelist: The whitelisted IP addresses, that we can
                request if it were otherwise caught in a blacklist.
             use_proxy: Whether proxy settings should be discovered and used
-                from conventional environment variables. Defaults to false.
+                from conventional environment variables.
         """
         self.hs = hs
 
