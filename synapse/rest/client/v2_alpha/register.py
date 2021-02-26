@@ -357,11 +357,6 @@ class UsernameAvailabilityRestServlet(RestServlet):
         )
 
     async def on_GET(self, request):
-        if not self.hs.config.enable_registration:
-            raise SynapseError(
-                403, "Registration has been disabled", errcode=Codes.FORBIDDEN
-            )
-
         ip = request.getClientIP()
         with self.ratelimiter.ratelimit(ip) as wait_deferred:
             await wait_deferred
