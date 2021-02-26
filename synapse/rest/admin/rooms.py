@@ -435,7 +435,9 @@ class MakeRoomAdminRestServlet(RestServlet):
         self.state_handler = hs.get_state_handler()
         self.is_mine_id = hs.is_mine_id
 
-    async def on_POST(self, request, room_identifier):
+    async def on_POST(
+        self, request: SynapseRequest, room_identifier: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
         content = parse_json_object_from_request(request, allow_empty_body=True)
@@ -595,7 +597,9 @@ class ForwardExtremitiesRestServlet(RestServlet):
             )
         return resolved_room_id
 
-    async def on_DELETE(self, request, room_identifier):
+    async def on_DELETE(
+        self, request: SynapseRequest, room_identifier: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
 
@@ -604,7 +608,9 @@ class ForwardExtremitiesRestServlet(RestServlet):
         deleted_count = await self.store.delete_forward_extremities_for_room(room_id)
         return 200, {"deleted": deleted_count}
 
-    async def on_GET(self, request, room_identifier):
+    async def on_GET(
+        self, request: SynapseRequest, room_identifier: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
 
@@ -624,14 +630,16 @@ class RoomEventContextServlet(RestServlet):
 
     PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]*)/context/(?P<event_id>[^/]*)$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.clock = hs.get_clock()
         self.room_context_handler = hs.get_room_context_handler()
         self._event_serializer = hs.get_event_client_serializer()
         self.auth = hs.get_auth()
 
-    async def on_GET(self, request, room_id, event_id):
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str, event_id: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=False)
         await assert_user_is_admin(self.auth, requester.user)
 
