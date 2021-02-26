@@ -442,11 +442,11 @@ class MakeRoomAdminRestServlet(RestServlet):
 
         # Resolve to a room ID, if necessary.
         if RoomID.is_valid(room_identifier):
-            room_id = room_identifier
+            resolved_room_id = room_identifier
         elif RoomAlias.is_valid(room_identifier):
             room_alias = RoomAlias.from_string(room_identifier)
             room_id, _ = await self.room_member_handler.lookup_room_alias(room_alias)
-            room_id = room_id.to_string()
+            resolved_room_id = room_id.to_string()
         else:
             raise SynapseError(
                 400, "%s was not legal room ID or room alias" % (room_identifier,)
@@ -456,7 +456,7 @@ class MakeRoomAdminRestServlet(RestServlet):
         user_to_add = content.get("user_id", requester.user.to_string())
 
         # Figure out which local users currently have power in the room, if any.
-        room_state = await self.state_handler.get_current_state(room_id)
+        room_state = await self.state_handler.get_current_state(resolved_room_id)
         if not room_state:
             raise SynapseError(400, "Server not in room")
 
@@ -517,7 +517,7 @@ class MakeRoomAdminRestServlet(RestServlet):
                     "sender": admin_user_id,
                     "type": EventTypes.PowerLevels,
                     "state_key": "",
-                    "room_id": room_id,
+                    "room_id": resolved_room_id,
                 },
             )
         except AuthError:
@@ -550,7 +550,7 @@ class MakeRoomAdminRestServlet(RestServlet):
         await self.room_member_handler.update_membership(
             fake_requester,
             target=UserID.from_string(user_to_add),
-            room_id=room_id,
+            room_id=resolved_room_id,
             action=Membership.INVITE,
         )
 
