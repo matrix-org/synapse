@@ -542,16 +542,19 @@ class RestHelper:
         if client_redirect_url:
             params["redirectUrl"] = client_redirect_url
 
-        # hit the redirect url (which will issue a cookie and state)
+        # hit the redirect url (which should redirect back to the redirect url. This
+        # is the easiest way of figuring out what the Host header ought to be set to
+        # to keep Synapse happy.
         channel = make_request(
             self.hs.get_reactor(),
             self.site,
             "GET",
             "/_matrix/client/r0/login/sso/redirect?" + urllib.parse.urlencode(params),
         )
-
-        # that should 302 us to the public base url
         assert channel.code == 302
+
+        # hit the redirect url again with the right Host header, which should now issue
+        # a cookie and redirect to the SSO provider.
         location = channel.headers.getRawHeaders("Location")[0]
         parts = urllib.parse.urlsplit(location)
         channel = make_request(

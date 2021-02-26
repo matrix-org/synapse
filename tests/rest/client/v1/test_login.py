@@ -47,8 +47,13 @@ except ImportError:
     HAS_JWT = False
 
 
-# synapse server name: used to populate public_base_url in some tests
+# synapse server name: used to populate public_baseurl in some tests
 SYNAPSE_SERVER_PUBLIC_HOSTNAME = "synapse"
+
+# public_baseurl for some tests. It uses an http:// scheme because
+# FakeChannel.isSecure() returns False, so synapse will see the requested uri as
+# http://..., so using http in the public_baseurl stops Synapse trying to redirect to
+# https://....
 BASE_URL = "http://%s/" % (SYNAPSE_SERVER_PUBLIC_HOSTNAME,)
 
 # CAS server used in some tests
