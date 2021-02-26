@@ -455,9 +455,10 @@ class FederationServer(FederationBase):
     async def _on_context_state_request_compute(
         self, room_id: str, event_id: str
     ) -> Dict[str, list]:
-        pdus = []  # type: Iterable[EventBase]
         if event_id:
-            pdus = await self.handler.get_state_for_pdu(room_id, event_id)
+            pdus = await self.handler.get_state_for_pdu(
+                room_id, event_id
+            )  # type: Iterable[EventBase]
         else:
             pdus = (await self.state.get_current_state(room_id)).values()
 
