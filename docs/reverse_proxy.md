@@ -3,8 +3,9 @@
 It is recommended to put a reverse proxy such as
 [nginx](https://nginx.org/en/docs/http/ngx_http_proxy_module.html),
 [Apache](https://httpd.apache.org/docs/current/mod/mod_proxy_http.html),
-[Caddy](https://caddyserver.com/docs/quick-starts/reverse-proxy) or
-[HAProxy](https://www.haproxy.org/) in front of Synapse. One advantage
+[Caddy](https://caddyserver.com/docs/quick-starts/reverse-proxy),
+[HAProxy](https://www.haproxy.org/) or
+[relayd](https://man.openbsd.org/relayd.8) in front of Synapse. One advantage
 of doing so is that it means that you can expose the default https port
 (443) to Matrix clients without needing to run Synapse with root
 privileges.
@@ -158,6 +159,52 @@ frontend matrix-federation
 
 backend matrix
   server matrix 127.0.0.1:8008
+```
+
+### Relayd
+
+```
+table <webserver>    { 127.0.0.1 }
+table <matrixserver> { 127.0.0.1 }
+
+http protocol "https" {
+    tls { no tlsv1.0, ciphers "HIGH" }
+    tls keypair "example.com"
+    match header set "X-Forwarded-For"   value "$REMOTE_ADDR"
+    match header set "X-Forwarded-Proto" value "https"
+
+    # set CORS header for .well-known/matrix/server, .well-known/matrix/client
+    # httpd does not support setting headers, so do it here
+    match request path "/.well-known/matrix/*" tag "matrix-cors"
+    match response tagged "matrix-cors" header set "Access-Control-Allow-Origin" value "*"
+
+    pass quick path "/_matrix/*"         forward to <matrixserver>
+    pass quick path "/_synapse/client/*" forward to <matrixserver>
+
+    # pass on non-matrix traffic to webserver
+    pass                                 forward to <webserver>
+}
+
+relay "https_traffic" {
+    listen on egress port 443 tls
+    protocol "https"
+    forward to <matrixserver> port 8008 check tcp
+    forward to <webserver>    port 8080 check tcp
+}
+
+http protocol "matrix" {
+    tls { no tlsv1.0, ciphers "HIGH" }
+    tls keypair "example.com"
+    block
+    pass quick path "/_matrix/*"         forward to <matrixserver>
+    pass quick path "/_synapse/client/*" forward to <matrixserver>
+}
+
+relay "matrix_federation" {
+    listen on egress port 8448 tls
+    protocol "matrix"
+    forward to <matrixserver> port 8008 check tcp
+}
 ```
 
 ## Homeserver Configuration
