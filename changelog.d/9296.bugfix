@@ -1,1 +1,0 @@
-Fix bug in Synapse 1.27.0rc1 which meant the "session expired" error page during SSO registration was badly formatted.

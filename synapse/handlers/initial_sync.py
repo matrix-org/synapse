@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Optional, Tuple
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EduTypes, EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.events.validator import EventValidator
 from synapse.handlers.presence import format_user_presence_state
@@ -412,7 +412,7 @@ class InitialSyncHandler(BaseHandler):
 
             return [
                 {
-                    "type": EventTypes.Presence,
+                    "type": EduTypes.Presence,
                     "content": format_user_presence_state(s, time_now),
                 }
                 for s in states

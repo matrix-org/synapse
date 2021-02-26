@@ -34,7 +34,7 @@ from twisted.internet import defer
 from twisted.internet.abstract import isIPAddress
 from twisted.python import failure
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EduTypes, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -44,6 +44,7 @@ from synapse.api.errors import (
     SynapseError,
     UnsupportedRoomVersionError,
 )
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.config.api import DEFAULT_ROOM_STATE_TYPES
 from synapse.events import EventBase
@@ -945,6 +946,13 @@ class FederationHandlerRegistry:
         # EDU received.
         self._edu_type_to_instance = {}  # type: Dict[str, List[str]]
 
+        # A rate limiter for incoming room key requests per origin.
+        self._room_key_request_rate_limiter = Ratelimiter(
+            clock=self.clock,
+            rate_hz=self.config.rc_key_requests.per_second,
+            burst_count=self.config.rc_key_requests.burst_count,
+        )
+
     def register_edu_handler(
         self, edu_type: str, handler: Callable[[str, JsonDict], Awaitable[None]]
     ):
@@ -993,7 +1001,15 @@ class FederationHandlerRegistry:
         self._edu_type_to_instance[edu_type] = instance_names
 
     async def on_edu(self, edu_type: str, origin: str, content: dict):
-        if not self.config.use_presence and edu_type == "m.presence":
+        if not self.config.use_presence and edu_type == EduTypes.Presence:
+            return
+
+        # If the incoming room key requests from a particular origin are over
+        # the limit, drop them.
+        if (
+            edu_type == EduTypes.RoomKeyRequest
+            and not self._room_key_request_rate_limiter.can_do_action(origin)
+        ):
             return
 
         # Check if we have a handler on this instance

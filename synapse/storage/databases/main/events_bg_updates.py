@@ -917,6 +917,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         PersistEventsStore._add_chain_cover_index(
             txn,
             self.db_pool,
+            self.event_chain_id_gen,
             event_to_room_id,
             event_to_types,
             event_to_auth_chain,

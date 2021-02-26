@@ -56,10 +56,8 @@ class SendToDeviceRestServlet(servlet.RestServlet):
         content = parse_json_object_from_request(request)
         assert_params_in_dict(content, ("messages",))
 
-        sender_user_id = requester.user.to_string()
-
         await self.device_message_handler.send_device_message(
-            sender_user_id, message_type, content["messages"]
+            requester, message_type, content["messages"]
         )
 
         response = (200, {})  # type: Tuple[int, dict]

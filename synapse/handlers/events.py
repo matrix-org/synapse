@@ -17,7 +17,7 @@ import logging
 import random
 from typing import TYPE_CHECKING, Iterable, List, Optional
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EduTypes, EventTypes, Membership
 from synapse.api.errors import AuthError, SynapseError
 from synapse.events import EventBase
 from synapse.handlers.presence import format_user_presence_state
@@ -113,7 +113,7 @@ class EventStreamHandler(BaseHandler):
                     states = await presence_handler.get_states(users)
                     to_add.extend(
                         {
-                            "type": EventTypes.Presence,
+                            "type": EduTypes.Presence,
                             "content": format_user_presence_state(state, time_now),
                         }
                         for state in states
