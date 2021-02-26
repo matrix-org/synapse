@@ -13,5 +13,8 @@
  * limitations under the License.
  */
 
+-- This originally was in 58/, but landed after 59/ was created, and so some
+-- servers running develop didn't run this delta. Running it again should be
+-- safe.
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
   (5828, 'rejected_events_metadata', '{}');
