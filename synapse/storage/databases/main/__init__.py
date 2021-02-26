@@ -347,7 +347,7 @@ class DataStore(
             count = txn.fetchone()[0]
 
             sql = (
-                "SELECT name, user_type, is_guest, admin, deactivated, displayname, avatar_url, appservice_id "
+                "SELECT name, user_type, is_guest, admin, deactivated, shadow_banned, displayname, avatar_url, appservice_id "
                 + sql_base
                 + " ORDER BY u.name LIMIT ? OFFSET ?"
             )

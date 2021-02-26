@@ -450,7 +450,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 },
             )
 
-            # Add the messages to the approriate local device inboxes so that
+            # Add the messages to the appropriate local device inboxes so that
             # they'll be sent to the devices when they next sync.
             self._add_messages_to_local_device_inbox_txn(
                 txn, stream_id, local_messages_by_user_then_device

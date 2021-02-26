@@ -58,6 +58,7 @@ def build_synapse_client_resource_tree(hs: "HomeServer") -> Mapping[str, Resourc
         resources["/_synapse/client/saml2"] = res
 
         # This is also mounted under '/_matrix' for backwards-compatibility.
+        # To be removed in Synapse v1.32.0.
         resources["/_matrix/saml2"] = res
 
     return resources

@@ -353,7 +353,11 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
             tok = self.login(localpart, "password")
 
             # Sync with the user's token to mark the user as active.
-            channel = self.make_request("GET", "/sync?timeout=0", access_token=tok,)
+            channel = self.make_request(
+                "GET",
+                "/sync?timeout=0",
+                access_token=tok,
+            )
 
             # Also retrieves the list of invites for this user. We don't care about that
             # one except if we're processing the last user, which should have received an

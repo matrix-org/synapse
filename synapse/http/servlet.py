@@ -258,7 +258,7 @@ def assert_params_in_dict(body, required):
 
 class RestServlet:
 
-    """ A Synapse REST Servlet.
+    """A Synapse REST Servlet.
 
     An implementing class can either provide its own custom 'register' method,
     or use the automatic pattern handling provided by the base class.

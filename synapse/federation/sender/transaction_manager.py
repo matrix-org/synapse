@@ -65,7 +65,10 @@ class TransactionManager:
 
     @measure_func("_send_new_transaction")
     async def send_new_transaction(
-        self, destination: str, pdus: List[EventBase], edus: List[Edu],
+        self,
+        destination: str,
+        pdus: List[EventBase],
+        edus: List[Edu],
     ) -> bool:
         """
         Args:

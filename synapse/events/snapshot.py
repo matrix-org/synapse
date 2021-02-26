@@ -341,8 +341,7 @@ def _encode_state_dict(state_dict):
 
 
 def _decode_state_dict(input):
-    """Decodes a state dict encoded using `_encode_state_dict` above
-    """
+    """Decodes a state dict encoded using `_encode_state_dict` above"""
     if input is None:
         return None
 

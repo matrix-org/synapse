@@ -254,7 +254,8 @@ class MatrixFederationHttpClient:
         # Use a BlacklistingAgentWrapper to prevent circumventing the IP
         # blacklist via IP literals in server names
         self.agent = BlacklistingAgentWrapper(
-            self.agent, ip_blacklist=hs.config.federation_ip_range_blacklist,
+            self.agent,
+            ip_blacklist=hs.config.federation_ip_range_blacklist,
         )
 
         self.clock = hs.get_clock()
@@ -652,7 +653,7 @@ class MatrixFederationHttpClient:
         backoff_on_404: bool = False,
         try_trailing_slash_on_400: bool = False,
     ) -> Union[JsonDict, list]:
-        """ Sends the specified json data using PUT
+        """Sends the specified json data using PUT
 
         Args:
             destination: The remote server to send the HTTP request to.
@@ -740,7 +741,7 @@ class MatrixFederationHttpClient:
         ignore_backoff: bool = False,
         args: Optional[QueryArgs] = None,
     ) -> Union[JsonDict, list]:
-        """ Sends the specified json data using POST
+        """Sends the specified json data using POST
 
         Args:
             destination: The remote server to send the HTTP request to.
@@ -799,7 +800,11 @@ class MatrixFederationHttpClient:
             _sec_timeout = self.default_timeout
 
         body = await _handle_json_response(
-            self.reactor, _sec_timeout, request, response, start_ms,
+            self.reactor,
+            _sec_timeout,
+            request,
+            response,
+            start_ms,
         )
         return body
 
@@ -813,7 +818,7 @@ class MatrixFederationHttpClient:
         ignore_backoff: bool = False,
         try_trailing_slash_on_400: bool = False,
     ) -> Union[JsonDict, list]:
-        """ GETs some json from the given host homeserver and path
+        """GETs some json from the given host homeserver and path
 
         Args:
             destination: The remote server to send the HTTP request to.
@@ -994,7 +999,10 @@ class MatrixFederationHttpClient:
         except BodyExceededMaxSize:
             msg = "Requested file is too large > %r bytes" % (max_size,)
             logger.warning(
-                "{%s} [%s] %s", request.txn_id, request.destination, msg,
+                "{%s} [%s] %s",
+                request.txn_id,
+                request.destination,
+                msg,
             )
             raise SynapseError(502, msg, Codes.TOO_LARGE)
         except Exception as e:

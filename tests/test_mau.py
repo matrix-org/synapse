@@ -242,7 +242,10 @@ class TestMauLimit(unittest.HomeserverTestCase):
         )
 
         channel = self.make_request(
-            "POST", "/register", request_data, access_token=token,
+            "POST",
+            "/register",
+            request_data,
+            access_token=token,
         )
 
         if channel.code != 200:

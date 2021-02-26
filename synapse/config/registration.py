@@ -391,6 +391,8 @@ class RegistrationConfig(Config):
         # By default, any room aliases included in this list will be created
         # as a publicly joinable room when the first user registers for the
         # homeserver. This behaviour can be customised with the settings below.
+        # If the room already exists, make certain it is a publicly joinable
+        # room. The join rule of the room must be set to 'public'.
         #
         #auto_join_rooms:
         #  - "#example:example.com"

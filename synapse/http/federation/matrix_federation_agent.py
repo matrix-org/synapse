@@ -195,8 +195,7 @@ class MatrixFederationAgent:
 
 @implementer(IAgentEndpointFactory)
 class MatrixHostnameEndpointFactory:
-    """Factory for MatrixHostnameEndpoint for parsing to an Agent.
-    """
+    """Factory for MatrixHostnameEndpoint for parsing to an Agent."""
 
     def __init__(
         self,
@@ -261,8 +260,7 @@ class MatrixHostnameEndpoint:
         self._srv_resolver = srv_resolver
 
     def connect(self, protocol_factory: IProtocolFactory) -> defer.Deferred:
-        """Implements IStreamClientEndpoint interface
-        """
+        """Implements IStreamClientEndpoint interface"""
 
         return run_in_background(self._do_connect, protocol_factory)
 
@@ -323,12 +321,19 @@ class MatrixHostnameEndpoint:
         if port or _is_ip_literal(host):
             return [Server(host, port or 8448)]
 
+        logger.debug("Looking up SRV record for %s", host.decode(errors="replace"))
         server_list = await self._srv_resolver.resolve_service(b"_matrix._tcp." + host)
 
         if server_list:
+            logger.debug(
+                "Got %s from SRV lookup for %s",
+                ", ".join(map(str, server_list)),
+                host.decode(errors="replace"),
+            )
             return server_list
 
         # No SRV records, so we fallback to host and 8448
+        logger.debug("No SRV records for %s", host.decode(errors="replace"))
         return [Server(host, 8448)]
 
 

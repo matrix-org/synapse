@@ -165,6 +165,7 @@ pid_file: DATADIR/homeserver.pid
 #  - '100.64.0.0/10'
 #  - '192.0.0.0/24'
 #  - '169.254.0.0/16'
+#  - '192.88.99.0/24'
 #  - '198.18.0.0/15'
 #  - '192.0.2.0/24'
 #  - '198.51.100.0/24'
@@ -173,6 +174,9 @@ pid_file: DATADIR/homeserver.pid
 #  - '::1/128'
 #  - 'fe80::/10'
 #  - 'fc00::/7'
+#  - '2001:db8::/32'
+#  - 'ff00::/8'
+#  - 'fec0::/10'
 
 # List of IP address CIDR ranges that should be allowed for federation,
 # identity servers, push servers, and for checking key validity for
@@ -990,6 +994,7 @@ media_store_path: "DATADIR/media_store"
 #  - '100.64.0.0/10'
 #  - '192.0.0.0/24'
 #  - '169.254.0.0/16'
+#  - '192.88.99.0/24'
 #  - '198.18.0.0/15'
 #  - '192.0.2.0/24'
 #  - '198.51.100.0/24'
@@ -998,6 +1003,9 @@ media_store_path: "DATADIR/media_store"
 #  - '::1/128'
 #  - 'fe80::/10'
 #  - 'fc00::/7'
+#  - '2001:db8::/32'
+#  - 'ff00::/8'
+#  - 'fec0::/10'
 
 # List of IP address CIDR ranges that the URL preview spider is allowed
 # to access even if they are specified in url_preview_ip_range_blacklist.
@@ -1318,6 +1326,8 @@ account_threepid_delegates:
 # By default, any room aliases included in this list will be created
 # as a publicly joinable room when the first user registers for the
 # homeserver. This behaviour can be customised with the settings below.
+# If the room already exists, make certain it is a publicly joinable
+# room. The join rule of the room must be set to 'public'.
 #
 #auto_join_rooms:
 #  - "#example:example.com"
@@ -1860,9 +1870,9 @@ oidc_providers:
   #  user_mapping_provider:
   #    config:
   #      subject_claim: "id"
-  #      localpart_template: "{ user.login }"
-  #      display_name_template: "{ user.name }"
-  #      email_template: "{ user.email }"
+  #      localpart_template: "{{ user.login }}"
+  #      display_name_template: "{{ user.name }}"
+  #      email_template: "{{ user.email }}"
 
   # For use with Keycloak
   #
@@ -1889,8 +1899,8 @@ oidc_providers:
   #  user_mapping_provider:
   #    config:
   #      subject_claim: "id"
-  #      localpart_template: "{ user.login }"
-  #      display_name_template: "{ user.name }"
+  #      localpart_template: "{{ user.login }}"
+  #      display_name_template: "{{ user.name }}"
 
 
 # Enable Central Authentication Service (CAS) for registration and login.
@@ -2218,11 +2228,11 @@ password_config:
       #require_uppercase: true
 
 ui_auth:
-    # The number of milliseconds to allow a user-interactive authentication
-    # session to be active.
+    # The amount of time to allow a user-interactive authentication session
+    # to be active.
     #
     # This defaults to 0, meaning the user is queried for their credentials
-    # before every action, but this can be overridden to alow a single
+    # before every action, but this can be overridden to allow a single
     # validation to be re-used.  This weakens the protections afforded by
     # the user-interactive authentication process, by allowing for multiple
     # (and potentially different) operations to use the same validation session.
@@ -2230,7 +2240,7 @@ ui_auth:
     # Uncomment below to allow for credential validation to last for 15
     # seconds.
     #
-    #session_timeout: 15000
+    #session_timeout: "15s"
 
 
 # Configuration for sending emails from Synapse.

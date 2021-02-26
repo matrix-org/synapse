@@ -347,8 +347,7 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         self._tcp_callbacks[(host, port)] = callback
 
     def connectTCP(self, host, port, factory, timeout=30, bindAddress=None):
-        """Fake L{IReactorTCP.connectTCP}.
-        """
+        """Fake L{IReactorTCP.connectTCP}."""
 
         conn = super().connectTCP(
             host, port, factory, timeout=timeout, bindAddress=None

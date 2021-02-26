@@ -398,7 +398,7 @@ class StateHandler:
     async def resolve_state_groups_for_events(
         self, room_id: str, event_ids: Iterable[str]
     ) -> _StateCacheEntry:
-        """ Given a list of event_ids this method fetches the state at each
+        """Given a list of event_ids this method fetches the state at each
         event, resolves conflicts between them and returns them.
 
         Args:
@@ -570,7 +570,9 @@ class StateResolutionHandler:
                 return cache
 
             logger.info(
-                "Resolving state for %s with groups %s", room_id, list(group_names),
+                "Resolving state for %s with groups %s",
+                room_id,
+                list(group_names),
             )
 
             state_groups_histogram.observe(len(state_groups_ids))
@@ -615,7 +617,7 @@ class StateResolutionHandler:
             event_map:
                 a dict from event_id to event, for any events that we happen to
                 have in flight (eg, those currently being persisted). This will be
-                used as a starting point fof finding the state we need; any missing
+                used as a starting point for finding the state we need; any missing
                 events will be requested via state_map_factory.
 
                 If None, all events will be fetched via state_res_store.
@@ -656,11 +658,15 @@ class StateResolutionHandler:
             return
 
         self._report_biggest(
-            lambda i: i.cpu_time, "CPU time", _biggest_room_by_cpu_counter,
+            lambda i: i.cpu_time,
+            "CPU time",
+            _biggest_room_by_cpu_counter,
         )
 
         self._report_biggest(
-            lambda i: i.db_time, "DB time", _biggest_room_by_db_counter,
+            lambda i: i.db_time,
+            "DB time",
+            _biggest_room_by_db_counter,
         )
 
         self._state_res_metrics.clear()
