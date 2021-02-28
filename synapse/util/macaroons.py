@@ -16,13 +16,40 @@
 
 """Utilities for manipulating macaroons"""
 
-from typing import Callable, Optional
+import enum
+from typing import Callable, Optional, TypeVar, Union, overload
 
 import pymacaroons
 from pymacaroons.exceptions import MacaroonVerificationFailedException
 
+_TV = TypeVar("_TV")
 
+
+class _Sentinel(enum.Enum):
+    # defining a sentinel in this way allows mypy to correctly handle the typing
+    sentinel = object()
+
+
+_SENTINEL = object()
+
+
+@overload
 def get_value_from_macaroon(macaroon: pymacaroons.Macaroon, key: str) -> str:
+    ...
+
+
+@overload
+def get_value_from_macaroon(
+    macaroon: pymacaroons.Macaroon, key: str, default: _TV
+) -> Union[str, _TV]:
+    ...
+
+
+def get_value_from_macaroon(
+    macaroon: pymacaroons.Macaroon,
+    key: str,
+    default=_SENTINEL,
+):
     """Extracts a caveat value from a macaroon token.
 
     Checks that there is exactly one caveat of the form "key = <val>" in the macaroon,
@@ -33,10 +60,10 @@ def get_value_from_macaroon(macaroon: pymacaroons.Macaroon, key: str) -> str:
         key: the key of the caveat to extract
 
     Returns:
-        The extracted value
+        The extracted value, or `default`
 
     Raises:
-        KeyError: if the caveat was not in the macaroon
+        KeyError: if `default` was not given, and the caveat was not in the macaroon
         MacaroonVerificationFailedException: if there are conflicting values for the
              caveat in the macaroon
     """
@@ -59,7 +86,9 @@ def get_value_from_macaroon(macaroon: pymacaroons.Macaroon, key: str) -> str:
 
     if result is not None:
         return result
-    raise KeyError("No %s caveat in macaroon" % (key,))
+    if default is _SENTINEL:
+        raise KeyError("No %s caveat in macaroon" % (key,))
+    return default
 
 
 def satisfy_expiry(v: pymacaroons.Verifier, get_time_ms: Callable[[], int]) -> None:

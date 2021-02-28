@@ -177,6 +177,9 @@ class LoginTokenAttributes:
 
     user_id = attr.ib(type=str)
 
+    # the SSO Identity Provider that the user authenticated with, to get this token
+    auth_provider_id = attr.ib(type=Optional[str])
+
 
 class AuthHandler(BaseHandler):
     SESSION_EXPIRE_MS = 48 * 60 * 60 * 1000
@@ -1601,15 +1604,17 @@ class MacaroonGenerator:
         """
         macaroon = pymacaroons.Macaroon.deserialize(token)
         user_id = get_value_from_macaroon(macaroon, "user_id")
+        auth_provider_id = get_value_from_macaroon(macaroon, "auth_provider_id", None)
 
         v = pymacaroons.Verifier()
         v.satisfy_exact("gen = 1")
         v.satisfy_exact("type = login")
-        v.satisfy_exact("user_id = %s" % (user_id,))
+        v.satisfy_general(lambda c: c.startswith("user_id = "))
+        v.satisfy_general(lambda c: c.startswith("auth_provider_id = "))
         satisfy_expiry(v, self.hs.get_clock().time_msec)
         v.verify(macaroon, self.hs.config.key.macaroon_secret_key)
 
-        return LoginTokenAttributes(user_id=user_id)
+        return LoginTokenAttributes(user_id=user_id, auth_provider_id=auth_provider_id)
 
     def generate_delete_pusher_token(self, user_id: str) -> str:
         macaroon = self._generate_base_macaroon(user_id)

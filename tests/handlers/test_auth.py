@@ -71,6 +71,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         token = self.macaroon_generator.generate_short_term_login_token("a_user", 5000)
         res = self.get_success(self.auth_handler.validate_short_term_login_token(token))
         self.assertEqual("a_user", res.user_id)
+        self.assertIsNone(res.auth_provider_id)
 
         # when we advance the clock, the token should be rejected
         self.reactor.advance(6)
