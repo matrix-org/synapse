@@ -219,6 +219,7 @@ class LoginRestServlet(RestServlet):
         callback: Optional[Callable[[Dict[str, str]], Awaitable[None]]] = None,
         create_non_existent_users: bool = False,
         ratelimit: bool = True,
+        auth_provider_id: Optional[str] = None,
     ) -> Dict[str, str]:
         """Called when we've successfully authed the user and now need to
         actually login them in (e.g. create devices). This gets called on
@@ -234,6 +235,8 @@ class LoginRestServlet(RestServlet):
             create_non_existent_users: Whether to create the user if they don't
                 exist. Defaults to False.
             ratelimit: Whether to ratelimit the login request.
+            auth_provider_id: The SSO IdP the user used, if any (just used for the
+                prometheus metrics).
 
         Returns:
             result: Dictionary of account information after successful login.
@@ -256,7 +259,7 @@ class LoginRestServlet(RestServlet):
         device_id = login_submission.get("device_id")
         initial_display_name = login_submission.get("initial_device_display_name")
         device_id, access_token = await self.registration_handler.register_device(
-            user_id, device_id, initial_display_name
+            user_id, device_id, initial_display_name, auth_provider_id=auth_provider_id
         )
 
         result = {
@@ -286,7 +289,10 @@ class LoginRestServlet(RestServlet):
         res = await auth_handler.validate_short_term_login_token(token)
 
         return await self._complete_login(
-            res.user_id, login_submission, self.auth_handler._sso_login_callback
+            res.user_id,
+            login_submission,
+            self.auth_handler._sso_login_callback,
+            auth_provider_id=res.auth_provider_id,
         )
 
     async def _do_jwt_login(self, login_submission: JsonDict) -> Dict[str, str]:
