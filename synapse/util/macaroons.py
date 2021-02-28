@@ -16,13 +16,17 @@
 
 """Utilities for manipulating macaroons"""
 
-from typing import Callable
+from typing import Callable, Optional
 
 import pymacaroons
+from pymacaroons.exceptions import MacaroonVerificationFailedException
 
 
 def get_value_from_macaroon(macaroon: pymacaroons.Macaroon, key: str) -> str:
     """Extracts a caveat value from a macaroon token.
+
+    Checks that there is exactly one caveat of the form "key = <val>" in the macaroon,
+    and returns the extracted value.
 
     Args:
         macaroon: the token
@@ -33,11 +37,28 @@ def get_value_from_macaroon(macaroon: pymacaroons.Macaroon, key: str) -> str:
 
     Raises:
         KeyError: if the caveat was not in the macaroon
+        MacaroonVerificationFailedException: if there are conflicting values for the
+             caveat in the macaroon
     """
     prefix = key + " = "
+    result = None  # type: Optional[str]
     for caveat in macaroon.caveats:
-        if caveat.caveat_id.startswith(prefix):
-            return caveat.caveat_id[len(prefix) :]
+        if not caveat.caveat_id.startswith(prefix):
+            continue
+
+        val = caveat.caveat_id[len(prefix) :]
+
+        if result is None:
+            # first time we found this caveat: record the value
+            result = val
+        elif val != result:
+            # on subsequent occurrences, raise if the value is different.
+            raise MacaroonVerificationFailedException(
+                "Conflicting values for caveat " + key
+            )
+
+    if result is not None:
+        return result
     raise KeyError("No %s caveat in macaroon" % (key,))
 
 
