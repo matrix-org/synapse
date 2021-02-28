@@ -80,6 +80,14 @@ class AuthTestCase(unittest.HomeserverTestCase):
             AuthError,
         )
 
+    def test_short_term_login_token_gives_auth_provider(self):
+        token = self.macaroon_generator.generate_short_term_login_token(
+            "a_user", auth_provider_id="my_idp"
+        )
+        res = self.get_success(self.auth_handler.validate_short_term_login_token(token))
+        self.assertEqual("a_user", res.user_id)
+        self.assertEqual("my_idp", res.auth_provider_id)
+
     def test_short_term_login_token_cannot_replace_user_id(self):
         token = self.macaroon_generator.generate_short_term_login_token("a_user", 5000)
         macaroon = pymacaroons.Macaroon.deserialize(token)

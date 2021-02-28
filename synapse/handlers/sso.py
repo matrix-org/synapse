@@ -456,6 +456,7 @@ class SsoHandler:
 
         await self._auth_handler.complete_sso_login(
             user_id,
+            auth_provider_id,
             request,
             client_redirect_url,
             extra_login_attributes,
@@ -886,6 +887,7 @@ class SsoHandler:
 
         await self._auth_handler.complete_sso_login(
             user_id,
+            session.auth_provider_id,
             request,
             session.client_redirect_url,
             session.extra_login_attributes,

@@ -203,11 +203,26 @@ class ModuleApi:
         )
 
     def generate_short_term_login_token(
-        self, user_id: str, duration_in_ms: int = (2 * 60 * 1000)
+        self,
+        user_id: str,
+        duration_in_ms: int = (2 * 60 * 1000),
+        auth_provider_id: Optional[str] = None,
     ) -> str:
-        """Generate a login token suitable for m.login.token authentication"""
+        """Generate a login token suitable for m.login.token authentication
+
+        Args:
+            user_id: gives the ID of the user that the token is for
+
+            duration_in_ms: the time that the token will be valid for
+
+            auth_provider_id: the ID of the SSO IdP that the user used to authenticate
+               to get this token, if any. This is encoded in the token so that
+               /login can report stats on number of successful logins by IdP.
+        """
         return self._hs.get_macaroon_generator().generate_short_term_login_token(
-            user_id, duration_in_ms
+            user_id,
+            duration_in_ms,
+            auth_provider_id=auth_provider_id,
         )
 
     @defer.inlineCallbacks
@@ -276,6 +291,7 @@ class ModuleApi:
         """
         self._auth_handler._complete_sso_login(
             registered_user_id,
+            "<unknown>",
             request,
             client_redirect_url,
         )
@@ -286,6 +302,7 @@ class ModuleApi:
         request: SynapseRequest,
         client_redirect_url: str,
         new_user: bool = False,
+        auth_provider_id: str = "<unknown>",
     ):
         """Complete a SSO login by redirecting the user to a page to confirm whether they
         want their access token sent to `client_redirect_url`, or redirect them to that
@@ -299,9 +316,15 @@ class ModuleApi:
                 redirect them directly if whitelisted).
             new_user: set to true to use wording for the consent appropriate to a user
                 who has just registered.
+            auth_provider_id: the ID of the SSO IdP which was used to log in. This
+                is used to track counts of sucessful logins by IdP.
         """
         await self._auth_handler.complete_sso_login(
-            registered_user_id, request, client_redirect_url, new_user=new_user
+            registered_user_id,
+            auth_provider_id,
+            request,
+            client_redirect_url,
+            new_user=new_user,
         )
 
     @defer.inlineCallbacks
