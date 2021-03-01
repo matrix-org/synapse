@@ -80,6 +80,38 @@ class ResponseCache(Generic[T]):
             self._metrics.inc_misses()
             return None
 
+    @staticmethod
+    def _safe_call(func: Callable[[Any], bool], ret_val: Any, key: T) -> bool:
+        """
+        Wraps a conditional checking function with a try-catch, returns False
+        if the conditional function threw an exception during evaluation.
+        """
+        try:
+            return func(ret_val)
+        except Exception as e:
+            logger.warning(
+                "conditional %r threw exception on %s, ignoring and invalidating cache...",
+                func,
+                key,
+                exc_info=e,
+            )
+            return False
+
+    def _remove_cache(self, key: T):
+        self.pending_result_cache.pop(key, None)
+
+    def _test_cache(self, r: Any, key: T):
+        should_cache = all(
+            self._safe_call(func, r, key=key)
+            for func in self.pending_conditionals.pop(key, [])
+        )
+
+        if self.timeout_sec and should_cache:
+            self.clock.call_later(self.timeout_sec, self._remove_cache, key)
+        else:
+            self._remove_cache(key)
+        return r
+
     def set(self, key: T, deferred: defer.Deferred) -> defer.Deferred:
         """Set the entry for the given key to the given deferred.
 
@@ -101,20 +133,8 @@ class ResponseCache(Generic[T]):
         result = ObservableDeferred(deferred, consumeErrors=True)
         self.pending_result_cache[key] = result
 
-        def remove(r):
-            should_cache = all(
-                func(r) for func in self.pending_conditionals.pop(key, [])
-            )
-
-            if self.timeout_sec and should_cache:
-                self.clock.call_later(
-                    self.timeout_sec, self.pending_result_cache.pop, key, None
-                )
-            else:
-                self.pending_result_cache.pop(key, None)
-            return r
-
-        result.addBoth(remove)
+        result.addCallback(self._test_cache, key)
+        result.addErrback(self._remove_cache, key)
         return result.observe()
 
     def add_conditional(self, key: T, conditional: Callable[[Any], bool]):
@@ -130,8 +150,12 @@ class ResponseCache(Generic[T]):
     ) -> defer.Deferred:
         """The same as wrap(), but adds a conditional to the final execution.
 
-        When the final execution completes, *all* conditionals need to return True for it to properly cache,
-        else it'll not be cached in a timed fashion.
+        When the final execution completes, *all* conditionals need to return
+        True for it to properly cache (apart from it also not having thrown an
+        uncaught exception), else the cache will instantly expire.
+
+        (Note that no conditional must throw an uncaught exception too for it to
+        cache)
         """
 
         # See if there's already a result on this key that hasn't yet completed. Due to the single-threaded nature of
@@ -145,7 +169,9 @@ class ResponseCache(Generic[T]):
     def wrap(
         self, key: T, callback: "Callable[..., Any]", *args: Any, **kwargs: Any
     ) -> defer.Deferred:
-        """Wrap together a *get* and *set* call, taking care of logcontexts
+        """Wrap together a *get* and *set* call, taking care of logcontexts.
+
+        Does not cache if the wrapped function throws an uncaught exception.
 
         First looks up the key in the cache, and if it is present makes it
         follow the synapse logcontext rules and returns it.
