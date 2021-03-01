@@ -98,10 +98,16 @@ example.com:8448 {
 
 ### Apache
 
+Enable `mod_proxy`, `mod_proxy_http`, `mod_proxy_balancer`, `mod_headers`
+and `mod_lbmethod_byrequests`.
+
 ```
 <VirtualHost *:443>
     SSLEngine on
-    ServerName matrix.example.com;
+    ServerName matrix.example.com:443
+
+    SSLCertificateFile "/path/to/certificate/file"
+    SSLCertificateKeyFile "/path/to/certificate/keyfile"
 
     RequestHeader set "X-Forwarded-Proto" expr=%{REQUEST_SCHEME}
     AllowEncodedSlashes NoDecode
@@ -111,9 +117,13 @@ example.com:8448 {
     ProxyPassReverse /_synapse/client http://127.0.0.1:8008/_synapse/client
 </VirtualHost>
 
+Listen 8448
 <VirtualHost *:8448>
     SSLEngine on
-    ServerName example.com;
+    ServerName example.com:8448
+
+    SSLCertificateFile "/path/to/certificate/file"
+    SSLCertificateKeyFile "/path/to/certificate/keyfile"
 
     RequestHeader set "X-Forwarded-Proto" expr=%{REQUEST_SCHEME}
     AllowEncodedSlashes NoDecode
