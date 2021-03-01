@@ -29,7 +29,7 @@ from urllib import parse as urlparse
 import attr
 
 from twisted.internet.error import DNSLookupError
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
