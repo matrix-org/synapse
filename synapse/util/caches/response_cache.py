@@ -159,7 +159,7 @@ class ResponseCache(Generic[T]):
         True for it to properly cache (apart from it also not having thrown an
         uncaught exception), else the cache will instantly expire.
 
-        (Note that no conditional must throw an uncaught exception too for it to
+        (Note that also no conditional must throw an uncaught exception for it to
         cache)
         """
 
