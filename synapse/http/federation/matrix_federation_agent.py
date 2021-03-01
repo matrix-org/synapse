@@ -177,17 +177,17 @@ class MatrixFederationAgent:
         # We need to make sure the host header is set to the netloc of the
         # server and that a user-agent is provided.
         if headers is None:
-            headers = Headers()
+            request_headers = Headers()
         else:
-            headers = headers.copy()
+            request_headers = headers.copy()
 
-        if not headers.hasHeader(b"host"):
-            headers.addRawHeader(b"host", parsed_uri.netloc)
-        if not headers.hasHeader(b"user-agent"):
-            headers.addRawHeader(b"user-agent", self.user_agent)
+        if not request_headers.hasHeader(b"host"):
+            request_headers.addRawHeader(b"host", parsed_uri.netloc)
+        if not request_headers.hasHeader(b"user-agent"):
+            request_headers.addRawHeader(b"user-agent", self.user_agent)
 
         res = yield make_deferred_yieldable(
-            self._agent.request(method, uri, headers, bodyProducer)
+            self._agent.request(method, uri, request_headers, bodyProducer)
         )
 
         return res

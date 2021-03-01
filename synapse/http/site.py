@@ -14,7 +14,7 @@
 import contextlib
 import logging
 import time
-from typing import Optional, Union
+from typing import Optional, Type, Union
 
 import attr
 from zope.interface import implementer
@@ -96,13 +96,22 @@ class SynapseRequest(Request):
     def get_request_id(self):
         return "%s-%i" % (self.get_method(), self.request_seq)
 
-    def get_redacted_uri(self):
-        uri = self.uri
+    def get_redacted_uri(self) -> str:
+        """Gets the redacted URI associated with the request (or placeholder if not
+        method has yet been received).
+
+        Note: This is necessary as the placeholder value in twisted is str
+        rather than bytes, so we need to sanitise `self.uri`.
+
+        Returns:
+            The redacted URI as as string.
+        """
+        uri = self.uri  # type: Union[bytes, str]
         if isinstance(uri, bytes):
-            uri = self.uri.decode("ascii", errors="replace")
+            uri = uri.decode("ascii", errors="replace")
         return redact_uri(uri)
 
-    def get_method(self):
+    def get_method(self) -> str:
         """Gets the method associated with the request (or placeholder if not
         method has yet been received).
 
@@ -110,9 +119,9 @@ class SynapseRequest(Request):
         rather than bytes, so we need to sanitise `self.method`.
 
         Returns:
-            str
+            The request method as as string.
         """
-        method = self.method
+        method = self.method  # type: Union[bytes, str]
         if isinstance(method, bytes):
             method = self.method.decode("ascii")
         return method
@@ -432,7 +441,9 @@ class SynapseSite(Site):
 
         assert config.http_options is not None
         proxied = config.http_options.x_forwarded
-        self.requestFactory = XForwardedForRequest if proxied else SynapseRequest
+        self.requestFactory = (
+            XForwardedForRequest if proxied else SynapseRequest
+        )  # type: Type[Request]
         self.access_logger = logging.getLogger(logger_name)
         self.server_version_string = server_version_string.encode("ascii")
 
