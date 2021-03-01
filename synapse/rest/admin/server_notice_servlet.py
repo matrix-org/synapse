@@ -69,9 +69,7 @@ class SendServerNoticeServlet(RestServlet):
             self.__class__.__name__,
         )
 
-    async def on_POST(
-        self, request: SynapseRequest, txn_id: str = None
-    ) -> Tuple[int, JsonDict]:
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ("user_id", "content"))
