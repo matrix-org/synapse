@@ -1,0 +1,1 @@
+Fix #9507 by hardening ResponseCache against errors in execution of to-be-cached functions.
