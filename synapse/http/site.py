@@ -123,7 +123,7 @@ class SynapseRequest(Request):
         """
         method = self.method  # type: Union[bytes, str]
         if isinstance(method, bytes):
-            method = self.method.decode("ascii")
+            return self.method.decode("ascii")
         return method
 
     def render(self, resrc):
