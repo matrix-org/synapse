@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 import urllib.parse
-from typing import List, Optional
+from typing import Any, Generator, List, Optional
 
 from netaddr import AddrFormatError, IPAddress, IPSet
 from zope.interface import implementer
@@ -116,7 +116,7 @@ class MatrixFederationAgent:
         uri: bytes,
         headers: Optional[Headers] = None,
         bodyProducer: Optional[IBodyProducer] = None,
-    ) -> defer.Deferred:
+    ) -> Generator[defer.Deferred, Any, defer.Deferred]:
         """
         Args:
             method: HTTP method: GET/POST/etc
