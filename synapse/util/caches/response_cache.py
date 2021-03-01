@@ -16,6 +16,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, Optional, Set, TypeVar
 
 from twisted.internet import defer
+from twisted.python.failure import Failure
 
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.util.async_helpers import ObservableDeferred
@@ -100,6 +101,10 @@ class ResponseCache(Generic[T]):
     def _remove_cache(self, key: T):
         self.pending_result_cache.pop(key, None)
 
+    def _errback_remove_cache(self, f: Failure, key: T):
+        self._remove_cache(key)
+        return f
+
     def _test_cache(self, r: Any, key: T):
         should_cache = all(
             self._safe_call(func, r, key=key)
@@ -134,7 +139,7 @@ class ResponseCache(Generic[T]):
         self.pending_result_cache[key] = result
 
         result.addCallback(self._test_cache, key)
-        result.addErrback(self._remove_cache, key)
+        result.addErrback(self._errback_remove_cache, key)
         return result.observe()
 
     def add_conditional(self, key: T, conditional: Callable[[Any], bool]):
