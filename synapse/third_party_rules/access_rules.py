@@ -16,8 +16,6 @@ import email.utils
 import logging
 from typing import Dict, List, Optional, Tuple
 
-from twisted.internet import defer
-
 from synapse.api.constants import EventTypes, JoinRules, Membership, RoomCreationPreset
 from synapse.api.errors import SynapseError
 from synapse.config._base import ConfigError
@@ -260,8 +258,7 @@ class RoomAccessRules(object):
             "invite": 50,  # All rooms should require mod to invite, even private
         }
 
-    @defer.inlineCallbacks
-    def check_threepid_can_be_invited(
+    async def check_threepid_can_be_invited(
         self, medium: str, address: str, state_events: StateMap[EventBase],
     ) -> bool:
         """Implements synapse.events.ThirdPartyEventRules.check_threepid_can_be_invited.
@@ -298,7 +295,7 @@ class RoomAccessRules(object):
             return False
 
         # Get the HS this address belongs to from the identity server.
-        res = yield self.module_api.http_client.get_json(
+        res = await self.module_api.http_client.get_json(
             "https://%s/_matrix/identity/api/v1/info" % (self.id_server,),
             {"medium": medium, "address": address},
         )
