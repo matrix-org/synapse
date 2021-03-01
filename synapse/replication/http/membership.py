@@ -15,7 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
@@ -85,10 +85,6 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
         remote_room_hosts = content["remote_room_hosts"]
         event_content = content["content"]
 
-        requester = Requester.deserialize(self.store, content["requester"])
-
-        request.requester = requester
-
         logger.info("remote_join: %s into room: %s", user_id, room_id)
 
         event_id, stream_id = await self.federation_handler.do_invite_join(
@@ -155,8 +151,6 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
         event_content = content["content"]
 
         requester = Requester.deserialize(self.store, content["requester"])
-
-        request.requester = requester
 
         # hopefully we're now on the master, so this won't recurse!
         event_id, stream_id = await self.member_handler.remote_reject_invite(
