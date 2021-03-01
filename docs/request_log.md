@@ -24,11 +24,17 @@ See the following for how to decode the dense data available from the default lo
 | JJJJ  | Time to send response over network once generated |
 | KKKK  | Userland CPU time |
 | LLLL  | System CPU time |
-| MMMM  | Total time waiting for a free DB connection from the pool |
-| NNNN  | Total time waiting for response to DB queries |
+| MMMM  | Total time waiting for a free DB connection from the pool across all parallel DB work from this request |
+| NNNN  | Total time waiting for response to DB queries across all parallel DB work from this request |
 | OOOO  | Count of DB transactions performed |
 | PPPP  | Response body size |
 | QQQQ  | Response status code (prefixed with ! if the socket was closed before the response was generated) |
 | RRRR  | Request |
 | SSSS  | User-agent |
 | TTTT  | Events fetched from DB to service this request (note that this does not include events fetched from the cache) |
+
+
+MMMM / NNNN can be greater than IIII if there are multiple slow database queries running in parallel.
+
+Some actions can result in multiple identical http requests, which will return the same data, but only the first request will report any time in IIII/NNNN/MMMM - the others will be awaiting the first query to return a response and will simultaneously return with the first request, but with very small processing times.
+
