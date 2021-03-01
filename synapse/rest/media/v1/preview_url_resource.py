@@ -58,7 +58,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_charset_match = re.compile(br"<\s*meta[^>]*charset\s*=\s*([a-z0-9-]+)", flags=re.I)
+_charset_match = re.compile(br'<\s*meta[^>]*charset\s*=\s*"?([a-z0-9-]+)"?', flags=re.I)
+_xml_encoding_match = re.compile(
+    br'\s*<\s*\?\s*xml[^>]*encoding="([a-z0-9-]+)"', flags=re.I
+)
 _content_type_match = re.compile(r'.*; *charset="?(.*?)"?(;|$)', flags=re.I)
 
 OG_TAG_NAME_MAXLEN = 50
@@ -300,24 +303,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             with open(media_info["filename"], "rb") as file:
                 body = file.read()
 
-            encoding = None
-
-            # Let's try and figure out if it has an encoding set in a meta tag.
-            # Limit it to the first 1kb, since it ought to be in the meta tags
-            # at the top.
-            match = _charset_match.search(body[:1000])
-
-            # If we find a match, it should take precedence over the
-            # Content-Type header, so set it here.
-            if match:
-                encoding = match.group(1).decode("ascii")
-
-            # If we don't find a match, we'll look at the HTTP Content-Type, and
-            # if that doesn't exist, we'll fall back to UTF-8.
-            if not encoding:
-                content_match = _content_type_match.match(media_info["media_type"])
-                encoding = content_match.group(1) if content_match else "utf-8"
-
+            encoding = get_html_media_encoding(body, media_info["media_type"])
             og = decode_and_calc_og(body, media_info["uri"], encoding)
 
             # pre-cache the image for posterity
@@ -386,7 +372,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         """
         Check whether the URL should be downloaded as oEmbed content instead.
 
-        Params:
+        Args:
             url: The URL to check.
 
         Returns:
@@ -403,7 +389,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         """
         Request content from an oEmbed endpoint.
 
-        Params:
+        Args:
             endpoint: The oEmbed API endpoint.
             url: The URL to pass to the API.
 
@@ -594,8 +580,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         )
 
     async def _expire_url_cache_data(self) -> None:
-        """Clean up expired url cache content, media and thumbnails.
-        """
+        """Clean up expired url cache content, media and thumbnails."""
         # TODO: Delete from backup media store
 
         assert self._worker_run_media_background_jobs
@@ -689,30 +674,101 @@ class PreviewUrlResource(DirectServeJsonResource):
             logger.debug("No media removed from url cache")
 
 
+def get_html_media_encoding(body: bytes, content_type: str) -> str:
+    """
+    Get the encoding of the body based on the (presumably) HTML body or media_type.
+
+    The precedence used for finding a character encoding is:
+
+    1. meta tag with a charset declared.
+    2. The XML document's character encoding attribute.
+    3. The Content-Type header.
+    4. Fallback to UTF-8.
+
+    Args:
+        body: The HTML document, as bytes.
+        content_type: The Content-Type header.
+
+    Returns:
+        The character encoding of the body, as a string.
+    """
+    # Limit searches to the first 1kb, since it ought to be at the top.
+    body_start = body[:1024]
+
+    # Let's try and figure out if it has an encoding set in a meta tag.
+    match = _charset_match.search(body_start)
+    if match:
+        return match.group(1).decode("ascii")
+
+    # TODO Support <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
+    # If we didn't find a match, see if it an XML document with an encoding.
+    match = _xml_encoding_match.match(body_start)
+    if match:
+        return match.group(1).decode("ascii")
+
+    # If we don't find a match, we'll look at the HTTP Content-Type, and
+    # if that doesn't exist, we'll fall back to UTF-8.
+    content_match = _content_type_match.match(content_type)
+    if content_match:
+        return content_match.group(1)
+
+    return "utf-8"
+
+
 def decode_and_calc_og(
     body: bytes, media_uri: str, request_encoding: Optional[str] = None
 ) -> Dict[str, Optional[str]]:
+    """
+    Calculate metadata for an HTML document.
+
+    This uses lxml to parse the HTML document into the OG response. If errors
+    occur during processing of the document, an empty response is returned.
+
+    Args:
+        body: The HTML document, as bytes.
+        media_url: The URI used to download the body.
+        request_encoding: The character encoding of the body, as a string.
+
+    Returns:
+        The OG response as a dictionary.
+    """
     # If there's no body, nothing useful is going to be found.
     if not body:
         return {}
 
     from lxml import etree
 
+    # Create an HTML parser. If this fails, log and return no metadata.
     try:
         parser = etree.HTMLParser(recover=True, encoding=request_encoding)
-        tree = etree.fromstring(body, parser)
-        og = _calc_og(tree, media_uri)
+    except LookupError:
+        # blindly consider the encoding as utf-8.
+        parser = etree.HTMLParser(recover=True, encoding="utf-8")
+    except Exception as e:
+        logger.warning("Unable to create HTML parser: %s" % (e,))
+        return {}
+
+    def _attempt_calc_og(body_attempt: Union[bytes, str]) -> Dict[str, Optional[str]]:
+        # Attempt to parse the body. If this fails, log and return no metadata.
+        tree = etree.fromstring(body_attempt, parser)
+
+        # The data was successfully parsed, but no tree was found.
+        if tree is None:
+            return {}
+
+        return _calc_og(tree, media_uri)
+
+    # Attempt to parse the body. If this fails, log and return no metadata.
+    try:
+        return _attempt_calc_og(body)
     except UnicodeDecodeError:
         # blindly try decoding the body as utf-8, which seems to fix
         # the charset mismatches on https://google.com
-        parser = etree.HTMLParser(recover=True, encoding=request_encoding)
-        tree = etree.fromstring(body.decode("utf-8", "ignore"), parser)
-        og = _calc_og(tree, media_uri)
-
-    return og
+        return _attempt_calc_og(body.decode("utf-8", "ignore"))
 
 
-def _calc_og(tree, media_uri: str) -> Dict[str, Optional[str]]:
+def _calc_og(tree: "etree.Element", media_uri: str) -> Dict[str, Optional[str]]:
     # suck our tree into lxml and define our OG response.
 
     # if we see any image URLs in the OG response, then spider them

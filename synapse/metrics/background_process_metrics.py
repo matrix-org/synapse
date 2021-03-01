@@ -208,7 +208,8 @@ def run_as_background_process(desc: str, func, *args, bg_start_span=True, **kwar
                     return await maybe_awaitable(func(*args, **kwargs))
             except Exception:
                 logger.exception(
-                    "Background process '%s' threw an exception", desc,
+                    "Background process '%s' threw an exception",
+                    desc,
                 )
             finally:
                 _background_process_in_flight_count.labels(desc).dec()
@@ -249,8 +250,7 @@ class BackgroundProcessLoggingContext(LoggingContext):
         self._proc = _BackgroundProcess(name, self)
 
     def start(self, rusage: "Optional[resource._RUsage]"):
-        """Log context has started running (again).
-        """
+        """Log context has started running (again)."""
 
         super().start(rusage)
 
@@ -261,8 +261,7 @@ class BackgroundProcessLoggingContext(LoggingContext):
             _background_processes_active_since_last_scrape.add(self._proc)
 
     def __exit__(self, type, value, traceback) -> None:
-        """Log context has finished.
-        """
+        """Log context has finished."""
 
         super().__exit__(type, value, traceback)
 

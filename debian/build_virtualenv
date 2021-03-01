@@ -33,11 +33,13 @@ esac
 # Use --builtin-venv to use the better `venv` module from CPython 3.4+ rather
 # than the 2/3 compatible `virtualenv`.
 
+# Pin pip to 20.3.4 to fix breakage in 21.0 on py3.5 (xenial)
+
 dh_virtualenv \
     --install-suffix "matrix-synapse" \
     --builtin-venv \
     --python "$SNAKE" \
-    --upgrade-pip \
+    --upgrade-pip-to="20.3.4" \
     --preinstall="lxml" \
     --preinstall="mock" \
     --extra-pip-arg="--no-cache-dir" \

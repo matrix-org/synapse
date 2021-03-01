@@ -97,8 +97,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         return results
 
     def notify_new_event(self) -> None:
-        """Called when there may be more deltas to process
-        """
+        """Called when there may be more deltas to process"""
         if not self.update_user_directory:
             return
 
@@ -134,8 +133,7 @@ class UserDirectoryHandler(StateDeltasHandler):
             )
 
     async def handle_user_deactivated(self, user_id: str) -> None:
-        """Called when a user ID is deactivated
-        """
+        """Called when a user ID is deactivated"""
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
         await self.store.remove_from_user_dir(user_id)
@@ -145,7 +143,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         if self.pos is None:
             self.pos = await self.store.get_user_directory_stream_pos()
 
-        # If still None then the initial background update hasn't happened yet
+        # If still None then the initial background update hasn't happened yet.
         if self.pos is None:
             return None
 
@@ -176,8 +174,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                 await self.store.update_user_directory_stream_pos(max_pos)
 
     async def _handle_deltas(self, deltas: List[Dict[str, Any]]) -> None:
-        """Called with the state deltas to process
-        """
+        """Called with the state deltas to process"""
         for delta in deltas:
             typ = delta["type"]
             state_key = delta["state_key"]
@@ -233,6 +230,11 @@ class UserDirectoryHandler(StateDeltasHandler):
 
                     if change:  # The user joined
                         event = await self.store.get_event(event_id, allow_none=True)
+                        # It isn't expected for this event to not exist, but we
+                        # don't want the entire background process to break.
+                        if event is None:
+                            continue
+
                         profile = ProfileInfo(
                             avatar_url=event.content.get("avatar_url"),
                             display_name=event.content.get("displayname"),

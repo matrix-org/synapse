@@ -85,7 +85,10 @@ class EventAuthTestCase(unittest.TestCase):
 
         # king should be able to send state
         event_auth.check(
-            RoomVersions.V1, _random_state_event(king), auth_events, do_sig_check=False,
+            RoomVersions.V1,
+            _random_state_event(king),
+            auth_events,
+            do_sig_check=False,
         )
 
     def test_alias_event(self):
@@ -99,7 +102,10 @@ class EventAuthTestCase(unittest.TestCase):
 
         # creator should be able to send aliases
         event_auth.check(
-            RoomVersions.V1, _alias_event(creator), auth_events, do_sig_check=False,
+            RoomVersions.V1,
+            _alias_event(creator),
+            auth_events,
+            do_sig_check=False,
         )
 
         # Reject an event with no state key.
@@ -122,7 +128,10 @@ class EventAuthTestCase(unittest.TestCase):
 
         # Note that the member does *not* need to be in the room.
         event_auth.check(
-            RoomVersions.V1, _alias_event(other), auth_events, do_sig_check=False,
+            RoomVersions.V1,
+            _alias_event(other),
+            auth_events,
+            do_sig_check=False,
         )
 
     def test_msc2432_alias_event(self):
@@ -136,7 +145,10 @@ class EventAuthTestCase(unittest.TestCase):
 
         # creator should be able to send aliases
         event_auth.check(
-            RoomVersions.V6, _alias_event(creator), auth_events, do_sig_check=False,
+            RoomVersions.V6,
+            _alias_event(creator),
+            auth_events,
+            do_sig_check=False,
         )
 
         # No particular checks are done on the state key.
@@ -156,7 +168,10 @@ class EventAuthTestCase(unittest.TestCase):
         # Per standard auth rules, the member must be in the room.
         with self.assertRaises(AuthError):
             event_auth.check(
-                RoomVersions.V6, _alias_event(other), auth_events, do_sig_check=False,
+                RoomVersions.V6,
+                _alias_event(other),
+                auth_events,
+                do_sig_check=False,
             )
 
     def test_msc2209(self):

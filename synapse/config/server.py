@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import itertools
 import logging
 import os.path
 import re
@@ -23,7 +24,7 @@ from typing import Any, Dict, Iterable, List, Optional, Set
 
 import attr
 import yaml
-from netaddr import IPSet
+from netaddr import AddrFormatError, IPNetwork, IPSet
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.util.stringutils import parse_and_validate_server_name
@@ -40,6 +41,71 @@ logger = logging.Logger(__name__)
 # in the list.
 DEFAULT_BIND_ADDRESSES = ["::", "0.0.0.0"]
 
+
+def _6to4(network: IPNetwork) -> IPNetwork:
+    """Convert an IPv4 network into a 6to4 IPv6 network per RFC 3056."""
+
+    # 6to4 networks consist of:
+    # * 2002 as the first 16 bits
+    # * The first IPv4 address in the network hex-encoded as the next 32 bits
+    # * The new prefix length needs to include the bits from the 2002 prefix.
+    hex_network = hex(network.first)[2:]
+    hex_network = ("0" * (8 - len(hex_network))) + hex_network
+    return IPNetwork(
+        "2002:%s:%s::/%d"
+        % (
+            hex_network[:4],
+            hex_network[4:],
+            16 + network.prefixlen,
+        )
+    )
+
+
+def generate_ip_set(
+    ip_addresses: Optional[Iterable[str]],
+    extra_addresses: Optional[Iterable[str]] = None,
+    config_path: Optional[Iterable[str]] = None,
+) -> IPSet:
+    """
+    Generate an IPSet from a list of IP addresses or CIDRs.
+
+    Additionally, for each IPv4 network in the list of IP addresses, also
+    includes the corresponding IPv6 networks.
+
+    This includes:
+
+    * IPv4-Compatible IPv6 Address (see RFC 4291, section 2.5.5.1)
+    * IPv4-Mapped IPv6 Address (see RFC 4291, section 2.5.5.2)
+    * 6to4 Address (see RFC 3056, section 2)
+
+    Args:
+        ip_addresses: An iterable of IP addresses or CIDRs.
+        extra_addresses: An iterable of IP addresses or CIDRs.
+        config_path: The path in the configuration for error messages.
+
+    Returns:
+        A new IP set.
+    """
+    result = IPSet()
+    for ip in itertools.chain(ip_addresses or (), extra_addresses or ()):
+        try:
+            network = IPNetwork(ip)
+        except AddrFormatError as e:
+            raise ConfigError(
+                "Invalid IP range provided: %s." % (ip,), config_path
+            ) from e
+        result.add(network)
+
+        # It is possible that these already exist in the set, but that's OK.
+        if ":" not in str(network):
+            result.add(IPNetwork(network).ipv6(ipv4_compatible=True))
+            result.add(IPNetwork(network).ipv6(ipv4_compatible=False))
+            result.add(_6to4(network))
+
+    return result
+
+
+# IP ranges that are considered private / unroutable / don't make sense.
 DEFAULT_IP_RANGE_BLACKLIST = [
     # Localhost
     "127.0.0.0/8",
@@ -53,6 +119,8 @@ DEFAULT_IP_RANGE_BLACKLIST = [
     "192.0.0.0/24",
     # Link-local networks.
     "169.254.0.0/16",
+    # Formerly used for 6to4 relay.
+    "192.88.99.0/24",
     # Testing networks.
     "198.18.0.0/15",
     "192.0.2.0/24",
@@ -66,6 +134,12 @@ DEFAULT_IP_RANGE_BLACKLIST = [
     "fe80::/10",
     # Unique local addresses.
     "fc00::/7",
+    # Testing networks.
+    "2001:db8::/32",
+    # Multicast.
+    "ff00::/8",
+    # Site-local addresses
+    "fec0::/10",
 ]
 
 DEFAULT_ROOM_VERSION = "6"
@@ -161,11 +235,7 @@ class ServerConfig(Config):
         self.print_pidfile = config.get("print_pidfile")
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
-        self.public_baseurl = config.get("public_baseurl") or "https://%s/" % (
-            self.server_name,
-        )
-        if self.public_baseurl[-1] != "/":
-            self.public_baseurl += "/"
+        self.public_baseurl = config.get("public_baseurl")
 
         # Whether to enable user presence.
         self.use_presence = config.get("use_presence", True)
@@ -189,7 +259,8 @@ class ServerConfig(Config):
         # Whether to require sharing a room with a user to retrieve their
         # profile data
         self.limit_profile_requests_to_users_who_share_rooms = config.get(
-            "limit_profile_requests_to_users_who_share_rooms", False,
+            "limit_profile_requests_to_users_who_share_rooms",
+            False,
         )
 
         if "restrict_public_rooms_to_local_users" in config and (
@@ -294,17 +365,15 @@ class ServerConfig(Config):
         )
 
         # Attempt to create an IPSet from the given ranges
-        try:
-            self.ip_range_blacklist = IPSet(ip_range_blacklist)
-        except Exception as e:
-            raise ConfigError("Invalid range(s) provided in ip_range_blacklist.") from e
-        # Always blacklist 0.0.0.0, ::
-        self.ip_range_blacklist.update(["0.0.0.0", "::"])
 
-        try:
-            self.ip_range_whitelist = IPSet(config.get("ip_range_whitelist", ()))
-        except Exception as e:
-            raise ConfigError("Invalid range(s) provided in ip_range_whitelist.") from e
+        # Always blacklist 0.0.0.0, ::
+        self.ip_range_blacklist = generate_ip_set(
+            ip_range_blacklist, ["0.0.0.0", "::"], config_path=("ip_range_blacklist",)
+        )
+
+        self.ip_range_whitelist = generate_ip_set(
+            config.get("ip_range_whitelist", ()), config_path=("ip_range_whitelist",)
+        )
 
         # The federation_ip_range_blacklist is used for backwards-compatibility
         # and only applies to federation and identity servers. If it is not given,
@@ -312,15 +381,16 @@ class ServerConfig(Config):
         federation_ip_range_blacklist = config.get(
             "federation_ip_range_blacklist", ip_range_blacklist
         )
-        try:
-            self.federation_ip_range_blacklist = IPSet(federation_ip_range_blacklist)
-        except Exception as e:
-            raise ConfigError(
-                "Invalid range(s) provided in federation_ip_range_blacklist."
-            ) from e
         # Always blacklist 0.0.0.0, ::
-        self.federation_ip_range_blacklist.update(["0.0.0.0", "::"])
+        self.federation_ip_range_blacklist = generate_ip_set(
+            federation_ip_range_blacklist,
+            ["0.0.0.0", "::"],
+            config_path=("federation_ip_range_blacklist",),
+        )
 
+        if self.public_baseurl is not None:
+            if self.public_baseurl[-1] != "/":
+                self.public_baseurl += "/"
         self.start_pushers = config.get("start_pushers", True)
 
         # (undocumented) option for torturing the worker-mode replication a bit,
@@ -550,7 +620,9 @@ class ServerConfig(Config):
         if manhole:
             self.listeners.append(
                 ListenerConfig(
-                    port=manhole, bind_addresses=["127.0.0.1"], type="manhole",
+                    port=manhole,
+                    bind_addresses=["127.0.0.1"],
+                    type="manhole",
                 )
             )
 
@@ -586,7 +658,8 @@ class ServerConfig(Config):
         # and letting the client know which email address is bound to an account and
         # which one isn't.
         self.request_token_inhibit_3pid_errors = config.get(
-            "request_token_inhibit_3pid_errors", False,
+            "request_token_inhibit_3pid_errors",
+            False,
         )
 
         # List of users trialing the new experimental default push rules. This setting is
@@ -747,10 +820,6 @@ class ServerConfig(Config):
         # reverse proxy, this should be the URL to reach Synapse via the proxy.
         # Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
         # 'listeners' below).
-        #
-        # If this is left unset, it defaults to 'https://<server_name>/'. (Note that
-        # that will not work unless you configure Synapse or a reverse-proxy to listen
-        # on port 443.)
         #
         #public_baseurl: https://example.com/
 

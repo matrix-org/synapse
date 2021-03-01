@@ -196,8 +196,7 @@ class DeactivateAccountHandler(BaseHandler):
             run_as_background_process("user_parter_loop", self._user_parter_loop)
 
     async def _user_parter_loop(self) -> None:
-        """Loop that parts deactivated users from rooms
-        """
+        """Loop that parts deactivated users from rooms"""
         self._user_parter_running = True
         logger.info("Starting user parter")
         try:
@@ -214,8 +213,7 @@ class DeactivateAccountHandler(BaseHandler):
             self._user_parter_running = False
 
     async def _part_user(self, user_id: str) -> None:
-        """Causes the given user_id to leave all the rooms they're joined to
-        """
+        """Causes the given user_id to leave all the rooms they're joined to"""
         user = UserID.from_string(user_id)
 
         rooms_for_user = await self.store.get_rooms_for_user(user_id)

@@ -22,6 +22,7 @@ from typing import Dict, Iterable, Optional, Set
 from typing_extensions import ContextManager
 
 from twisted.internet import address
+from twisted.web.resource import IResource
 
 import synapse
 import synapse.events
@@ -90,9 +91,8 @@ from synapse.replication.tcp.streams import (
     ToDeviceStream,
 )
 from synapse.rest.admin import register_servlets_for_media_repo
-from synapse.rest.client.v1 import events, room
+from synapse.rest.client.v1 import events, login, room
 from synapse.rest.client.v1.initial_sync import InitialSyncRestServlet
-from synapse.rest.client.v1.login import LoginRestServlet
 from synapse.rest.client.v1.profile import (
     ProfileAvatarURLRestServlet,
     ProfileDisplaynameRestServlet,
@@ -127,6 +127,7 @@ from synapse.rest.client.v2_alpha.sendtodevice import SendToDeviceRestServlet
 from synapse.rest.client.versions import VersionsRestServlet
 from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
+from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.server import HomeServer, cache_in_self
 from synapse.storage.databases.main.censor_events import CensorEventsStore
 from synapse.storage.databases.main.client_ips import ClientIpWorkerStore
@@ -420,8 +421,7 @@ class GenericWorkerPresence(BasePresenceHandler):
         ]
 
     async def set_state(self, target_user, state, ignore_status_msg=False):
-        """Set the presence state of the user.
-        """
+        """Set the presence state of the user."""
         presence = state["presence"]
 
         valid_presence = (
@@ -507,7 +507,7 @@ class GenericWorkerServer(HomeServer):
             site_tag = port
 
         # We always include a health resource.
-        resources = {"/health": HealthResource()}
+        resources = {"/health": HealthResource()}  # type: Dict[str, IResource]
 
         for res in listener_config.http_options.resources:
             for name in res.names:
@@ -517,7 +517,7 @@ class GenericWorkerServer(HomeServer):
                     resource = JsonResource(self, canonical_json=False)
 
                     RegisterRestServlet(self).register(resource)
-                    LoginRestServlet(self).register(resource)
+                    login.register_servlets(self, resource)
                     ThreepidRestServlet(self).register(resource)
                     DevicesRestServlet(self).register(resource)
                     KeyQueryServlet(self).register(resource)
@@ -557,6 +557,8 @@ class GenericWorkerServer(HomeServer):
                     groups.register_servlets(self, resource)
 
                     resources.update({CLIENT_API_PREFIX: resource})
+
+                    resources.update(build_synapse_client_resource_tree(self))
                 elif name == "federation":
                     resources.update({FEDERATION_PREFIX: TransportLayerServer(self)})
                 elif name == "media":

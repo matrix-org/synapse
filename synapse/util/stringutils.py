@@ -25,7 +25,7 @@ from synapse.api.errors import Codes, SynapseError
 _string_with_symbols = string.digits + string.ascii_letters + ".,;:^&*-_+=#~@"
 
 # https://matrix.org/docs/spec/client_server/r0.6.0#post-matrix-client-r0-register-email-requesttoken
-client_secret_regex = re.compile(r"^[0-9a-zA-Z\.\=\_\-]+$")
+CLIENT_SECRET_REGEX = re.compile(r"^[0-9a-zA-Z\.=_\-]+$")
 
 # https://matrix.org/docs/spec/client_server/r0.6.1#matrix-content-mxc-uris,
 # together with https://github.com/matrix-org/matrix-doc/issues/2177 which basically
@@ -42,28 +42,31 @@ MXC_REGEX = re.compile("^mxc://([^/]+)/([^/#?]+)$")
 rand = random.SystemRandom()
 
 
-def random_string(length):
+def random_string(length: int) -> str:
     return "".join(rand.choice(string.ascii_letters) for _ in range(length))
 
 
-def random_string_with_symbols(length):
+def random_string_with_symbols(length: int) -> str:
     return "".join(rand.choice(_string_with_symbols) for _ in range(length))
 
 
-def is_ascii(s):
-    if isinstance(s, bytes):
-        try:
-            s.decode("ascii").encode("ascii")
-        except UnicodeDecodeError:
-            return False
-        except UnicodeEncodeError:
-            return False
-        return True
+def is_ascii(s: bytes) -> bool:
+    try:
+        s.decode("ascii").encode("ascii")
+    except UnicodeDecodeError:
+        return False
+    except UnicodeEncodeError:
+        return False
+    return True
 
 
-def assert_valid_client_secret(client_secret):
-    """Validate that a given string matches the client_secret regex defined by the spec"""
-    if client_secret_regex.match(client_secret) is None:
+def assert_valid_client_secret(client_secret: str) -> None:
+    """Validate that a given string matches the client_secret defined by the spec"""
+    if (
+        len(client_secret) <= 0
+        or len(client_secret) > 255
+        or CLIENT_SECRET_REGEX.match(client_secret) is None
+    ):
         raise SynapseError(
             400, "Invalid client_secret parameter", errcode=Codes.INVALID_PARAM
         )

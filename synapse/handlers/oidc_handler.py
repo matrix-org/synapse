@@ -41,13 +41,33 @@ from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
 from synapse.types import JsonDict, UserID, map_username_to_mxid_localpart
 from synapse.util import json_decoder
+from synapse.util.caches.cached_call import RetryOnExceptionCachedCall
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
-SESSION_COOKIE_NAME = b"oidc_session"
+# we want the cookie to be returned to us even when the request is the POSTed
+# result of a form on another domain, as is used with `response_mode=form_post`.
+#
+# Modern browsers will not do so unless we set SameSite=None; however *older*
+# browsers (including all versions of Safari on iOS 12?) don't support
+# SameSite=None, and interpret it as SameSite=Strict:
+# https://bugs.webkit.org/show_bug.cgi?id=198181
+#
+# As a rather painful workaround, we set *two* cookies, one with SameSite=None
+# and one with no SameSite, in the hope that at least one of them will get
+# back to us.
+#
+# Secure is necessary for SameSite=None (and, empirically, also breaks things
+# on iOS 12.)
+#
+# Here we have the names of the cookies, and the options we use to set them.
+_SESSION_COOKIES = [
+    (b"oidc_session", b"Path=/_synapse/client/oidc; HttpOnly; Secure; SameSite=None"),
+    (b"oidc_session_no_samesite", b"Path=/_synapse/client/oidc; HttpOnly"),
+]
 
 #: A token exchanged from the token endpoint, as per RFC6749 sec 5.1. and
 #: OpenID.Core sec 3.1.3.3.
@@ -72,8 +92,7 @@ JWKS = TypedDict("JWKS", {"keys": List[JWK]})
 
 
 class OidcHandler:
-    """Handles requests related to the OpenID Connect login flow.
-    """
+    """Handles requests related to the OpenID Connect login flow."""
 
     def __init__(self, hs: "HomeServer"):
         self._sso_handler = hs.get_sso_handler()
@@ -102,7 +121,7 @@ class OidcHandler:
                 ) from e
 
     async def handle_oidc_callback(self, request: SynapseRequest) -> None:
-        """Handle an incoming request to /_synapse/oidc/callback
+        """Handle an incoming request to /_synapse/client/oidc/callback
 
         Since we might want to display OIDC-related errors in a user-friendly
         way, we don't raise SynapseError from here. Instead, we call
@@ -123,7 +142,6 @@ class OidcHandler:
         Args:
             request: the incoming request from the browser.
         """
-
         # The provider might redirect with an error.
         # In that case, just display it as-is.
         if b"error" in request.args:
@@ -137,8 +155,12 @@ class OidcHandler:
             # either the provider misbehaving or Synapse being misconfigured.
             # The only exception of that is "access_denied", where the user
             # probably cancelled the login flow. In other cases, log those errors.
-            if error != "access_denied":
-                logger.error("Error from the OIDC provider: %s %s", error, description)
+            logger.log(
+                logging.INFO if error == "access_denied" else logging.ERROR,
+                "Received OIDC callback with error: %s %s",
+                error,
+                description,
+            )
 
             self._sso_handler.render_error(request, error, description)
             return
@@ -146,30 +168,37 @@ class OidcHandler:
         # otherwise, it is presumably a successful response. see:
         #   https://tools.ietf.org/html/rfc6749#section-4.1.2
 
-        # Fetch the session cookie
-        session = request.getCookie(SESSION_COOKIE_NAME)  # type: Optional[bytes]
-        if session is None:
-            logger.info("No session cookie found")
+        # Fetch the session cookie. See the comments on SESSION_COOKIES for why there
+        # are two.
+
+        for cookie_name, _ in _SESSION_COOKIES:
+            session = request.getCookie(cookie_name)  # type: Optional[bytes]
+            if session is not None:
+                break
+        else:
+            logger.info("Received OIDC callback, with no session cookie")
             self._sso_handler.render_error(
                 request, "missing_session", "No session cookie found"
             )
             return
 
-        # Remove the cookie. There is a good chance that if the callback failed
+        # Remove the cookies. There is a good chance that if the callback failed
         # once, it will fail next time and the code will already be exchanged.
-        # Removing it early avoids spamming the provider with token requests.
-        request.addCookie(
-            SESSION_COOKIE_NAME,
-            b"",
-            path="/_synapse/oidc",
-            expires="Thu, Jan 01 1970 00:00:00 UTC",
-            httpOnly=True,
-            sameSite="lax",
-        )
+        # Removing the cookies early avoids spamming the provider with token requests.
+        #
+        # we have to build the header by hand rather than calling request.addCookie
+        # because the latter does not support SameSite=None
+        # (https://twistedmatrix.com/trac/ticket/10088)
+
+        for cookie_name, options in _SESSION_COOKIES:
+            request.cookies.append(
+                b"%s=; Expires=Thu, Jan 01 1970 00:00:00 UTC; %s"
+                % (cookie_name, options)
+            )
 
         # Check for the state query parameter
         if b"state" not in request.args:
-            logger.info("State parameter is missing")
+            logger.info("Received OIDC callback, with no state parameter")
             self._sso_handler.render_error(
                 request, "invalid_request", "State parameter is missing"
             )
@@ -183,13 +212,15 @@ class OidcHandler:
                 session, state
             )
         except (MacaroonDeserializationException, ValueError) as e:
-            logger.exception("Invalid session")
+            logger.exception("Invalid session for OIDC callback")
             self._sso_handler.render_error(request, "invalid_session", str(e))
             return
         except MacaroonInvalidSignatureException as e:
-            logger.exception("Could not verify session")
+            logger.exception("Could not verify session for OIDC callback")
             self._sso_handler.render_error(request, "mismatching_session", str(e))
             return
+
+        logger.info("Received OIDC callback for IdP %s", session_data.idp_id)
 
         oidc_provider = self._providers.get(session_data.idp_id)
         if not oidc_provider:
@@ -210,8 +241,7 @@ class OidcHandler:
 
 
 class OidcError(Exception):
-    """Used to catch errors when calling the token_endpoint
-    """
+    """Used to catch errors when calling the token_endpoint"""
 
     def __init__(self, error, error_description=None):
         self.error = error
@@ -240,22 +270,27 @@ class OidcProvider:
 
         self._token_generator = token_generator
 
+        self._config = provider
         self._callback_url = hs.config.oidc_callback_url  # type: str
 
         self._scopes = provider.scopes
         self._user_profile_method = provider.user_profile_method
         self._client_auth = ClientAuth(
-            provider.client_id, provider.client_secret, provider.client_auth_method,
+            provider.client_id,
+            provider.client_secret,
+            provider.client_auth_method,
         )  # type: ClientAuth
         self._client_auth_method = provider.client_auth_method
-        self._provider_metadata = OpenIDProviderMetadata(
-            issuer=provider.issuer,
-            authorization_endpoint=provider.authorization_endpoint,
-            token_endpoint=provider.token_endpoint,
-            userinfo_endpoint=provider.userinfo_endpoint,
-            jwks_uri=provider.jwks_uri,
-        )  # type: OpenIDProviderMetadata
-        self._provider_needs_discovery = provider.discover
+
+        # cache of metadata for the identity provider (endpoint uris, mostly). This is
+        # loaded on-demand from the discovery endpoint (if discovery is enabled), with
+        # possible overrides from the config.  Access via `load_metadata`.
+        self._provider_metadata = RetryOnExceptionCachedCall(self._load_metadata)
+
+        # cache of JWKs used by the identity provider to sign tokens. Loaded on demand
+        # from the IdP's jwks_uri, if required.
+        self._jwks = RetryOnExceptionCachedCall(self._load_jwks)
+
         self._user_mapping_provider = provider.user_mapping_provider_class(
             provider.user_mapping_provider_config
         )
@@ -274,11 +309,14 @@ class OidcProvider:
         # MXC URI for icon for this auth provider
         self.idp_icon = provider.idp_icon
 
+        # optional brand identifier for this auth provider
+        self.idp_brand = provider.idp_brand
+
         self._sso_handler = hs.get_sso_handler()
 
         self._sso_handler.register_identity_provider(self)
 
-    def _validate_metadata(self):
+    def _validate_metadata(self, m: OpenIDProviderMetadata) -> None:
         """Verifies the provider metadata.
 
         This checks the validity of the currently loaded provider. Not
@@ -297,7 +335,6 @@ class OidcProvider:
         if self._skip_verification is True:
             return
 
-        m = self._provider_metadata
         m.validate_issuer()
         m.validate_authorization_endpoint()
         m.validate_token_endpoint()
@@ -332,11 +369,7 @@ class OidcProvider:
                 )
         else:
             # If we're not using userinfo, we need a valid jwks to validate the ID token
-            if m.get("jwks") is None:
-                if m.get("jwks_uri") is not None:
-                    m.validate_jwks_uri()
-                else:
-                    raise ValueError('"jwks_uri" must be set')
+            m.validate_jwks_uri()
 
     @property
     def _uses_userinfo(self) -> bool:
@@ -353,11 +386,15 @@ class OidcProvider:
             or self._user_profile_method == "userinfo_endpoint"
         )
 
-    async def load_metadata(self) -> OpenIDProviderMetadata:
-        """Load and validate the provider metadata.
+    async def load_metadata(self, force: bool = False) -> OpenIDProviderMetadata:
+        """Return the provider metadata.
 
-        The values metadatas are discovered if ``oidc_config.discovery`` is
-        ``True`` and then cached.
+        If this is the first call, the metadata is built from the config and from the
+        metadata discovery endpoint (if enabled), and then validated. If the metadata
+        is successfully validated, it is then cached for future use.
+
+        Args:
+            force: If true, any cached metadata is discarded to force a reload.
 
         Raises:
             ValueError: if something in the provider is not valid
@@ -365,18 +402,41 @@ class OidcProvider:
         Returns:
             The provider's metadata.
         """
-        # If we are using the OpenID Discovery documents, it needs to be loaded once
-        # FIXME: should there be a lock here?
-        if self._provider_needs_discovery:
-            url = get_well_known_url(self._provider_metadata["issuer"], external=True)
+        if force:
+            # reset the cached call to ensure we get a new result
+            self._provider_metadata = RetryOnExceptionCachedCall(self._load_metadata)
+
+        return await self._provider_metadata.get()
+
+    async def _load_metadata(self) -> OpenIDProviderMetadata:
+        # start out with just the issuer (unlike the other settings, discovered issuer
+        # takes precedence over configured issuer, because configured issuer is
+        # required for discovery to take place.)
+        #
+        metadata = OpenIDProviderMetadata(issuer=self._config.issuer)
+
+        # load any data from the discovery endpoint, if enabled
+        if self._config.discover:
+            url = get_well_known_url(self._config.issuer, external=True)
             metadata_response = await self._http_client.get_json(url)
-            # TODO: maybe update the other way around to let user override some values?
-            self._provider_metadata.update(metadata_response)
-            self._provider_needs_discovery = False
+            metadata.update(metadata_response)
 
-        self._validate_metadata()
+        # override any discovered data with any settings in our config
+        if self._config.authorization_endpoint:
+            metadata["authorization_endpoint"] = self._config.authorization_endpoint
 
-        return self._provider_metadata
+        if self._config.token_endpoint:
+            metadata["token_endpoint"] = self._config.token_endpoint
+
+        if self._config.userinfo_endpoint:
+            metadata["userinfo_endpoint"] = self._config.userinfo_endpoint
+
+        if self._config.jwks_uri:
+            metadata["jwks_uri"] = self._config.jwks_uri
+
+        self._validate_metadata(metadata)
+
+        return metadata
 
     async def load_jwks(self, force: bool = False) -> JWKS:
         """Load the JSON Web Key Set used to sign ID tokens.
@@ -406,27 +466,27 @@ class OidcProvider:
                     ]
                 }
         """
+        if force:
+            # reset the cached call to ensure we get a new result
+            self._jwks = RetryOnExceptionCachedCall(self._load_jwks)
+        return await self._jwks.get()
+
+    async def _load_jwks(self) -> JWKS:
         if self._uses_userinfo:
             # We're not using jwt signing, return an empty jwk set
             return {"keys": []}
 
-        # First check if the JWKS are loaded in the provider metadata.
-        # It can happen either if the provider gives its JWKS in the discovery
-        # document directly or if it was already loaded once.
         metadata = await self.load_metadata()
-        jwk_set = metadata.get("jwks")
-        if jwk_set is not None and not force:
-            return jwk_set
 
-        # Loading the JWKS using the `jwks_uri` metadata
+        # Load the JWKS using the `jwks_uri` metadata.
         uri = metadata.get("jwks_uri")
         if not uri:
+            # this should be unreachable: load_metadata validates that
+            # there is a jwks_uri in the metadata if _uses_userinfo is unset
             raise RuntimeError('Missing "jwks_uri" in metadata')
 
         jwk_set = await self._http_client.get_json(uri)
 
-        # Caching the JWKS in the provider's metadata
-        self._provider_metadata["jwks"] = jwk_set
         return jwk_set
 
     async def _exchange_code(self, code: str) -> Token:
@@ -484,7 +544,10 @@ class OidcProvider:
         # We're not using the SimpleHttpClient util methods as we don't want to
         # check the HTTP status code and we do the body encoding ourself.
         response = await self._http_client.request(
-            method="POST", uri=uri, data=body.encode("utf-8"), headers=headers,
+            method="POST",
+            uri=uri,
+            data=body.encode("utf-8"),
+            headers=headers,
         )
 
         # This is used in multiple error messages below
@@ -562,12 +625,15 @@ class OidcProvider:
         Returns:
             UserInfo: an object representing the user.
         """
+        logger.debug("Using the OAuth2 access_token to request userinfo")
         metadata = await self.load_metadata()
 
         resp = await self._http_client.get_json(
             metadata["userinfo_endpoint"],
             headers={"Authorization": ["Bearer {}".format(token["access_token"])]},
         )
+
+        logger.debug("Retrieved user info from userinfo endpoint: %r", resp)
 
         return UserInfo(resp)
 
@@ -597,17 +663,19 @@ class OidcProvider:
             claims_cls = ImplicitIDToken
 
         alg_values = metadata.get("id_token_signing_alg_values_supported", ["RS256"])
-
         jwt = JsonWebToken(alg_values)
 
         claim_options = {"iss": {"values": [metadata["issuer"]]}}
+
+        id_token = token["id_token"]
+        logger.debug("Attempting to decode JWT id_token %r", id_token)
 
         # Try to decode the keys in cache first, then retry by forcing the keys
         # to be reloaded
         jwk_set = await self.load_jwks()
         try:
             claims = jwt.decode(
-                token["id_token"],
+                id_token,
                 key=jwk_set,
                 claims_cls=claims_cls,
                 claims_options=claim_options,
@@ -617,12 +685,14 @@ class OidcProvider:
             logger.info("Reloading JWKS after decode error")
             jwk_set = await self.load_jwks(force=True)  # try reloading the jwks
             claims = jwt.decode(
-                token["id_token"],
+                id_token,
                 key=jwk_set,
                 claims_cls=claims_cls,
                 claims_options=claim_options,
                 claims_params=claims_params,
             )
+
+        logger.debug("Decoded id_token JWT %r; validating", claims)
 
         claims.validate(leeway=120)  # allows 2 min of clock skew
         return UserInfo(claims)
@@ -640,7 +710,7 @@ class OidcProvider:
 
           - ``client_id``: the client ID set in ``oidc_config.client_id``
           - ``response_type``: ``code``
-          - ``redirect_uri``: the callback URL ; ``{base url}/_synapse/oidc/callback``
+          - ``redirect_uri``: the callback URL ; ``{base url}/_synapse/client/oidc/callback``
           - ``scope``: the list of scopes set in ``oidc_config.scopes``
           - ``state``: a random string
           - ``nonce``: a random string
@@ -678,14 +748,18 @@ class OidcProvider:
                 ui_auth_session_id=ui_auth_session_id,
             ),
         )
-        request.addCookie(
-            SESSION_COOKIE_NAME,
-            cookie,
-            path="/_synapse/oidc",
-            max_age="3600",
-            httpOnly=True,
-            sameSite="lax",
-        )
+
+        # Set the cookies. See the comments on _SESSION_COOKIES for why there are two.
+        #
+        # we have to build the header by hand rather than calling request.addCookie
+        # because the latter does not support SameSite=None
+        # (https://twistedmatrix.com/trac/ticket/10088)
+
+        for cookie_name, options in _SESSION_COOKIES:
+            request.cookies.append(
+                b"%s=%s; Max-Age=3600; %s"
+                % (cookie_name, cookie.encode("utf-8"), options)
+            )
 
         metadata = await self.load_metadata()
         authorization_endpoint = metadata.get("authorization_endpoint")
@@ -720,7 +794,7 @@ class OidcProvider:
     async def handle_oidc_callback(
         self, request: SynapseRequest, session_data: "OidcSessionData", code: str
     ) -> None:
-        """Handle an incoming request to /_synapse/oidc/callback
+        """Handle an incoming request to /_synapse/client/oidc/callback
 
         By this time we have already validated the session on the synapse side, and
         now need to do the provider-specific operations. This includes:
@@ -741,19 +815,18 @@ class OidcProvider:
         """
         # Exchange the code with the provider
         try:
-            logger.debug("Exchanging code")
+            logger.debug("Exchanging OAuth2 code for a token")
             token = await self._exchange_code(code)
         except OidcError as e:
-            logger.exception("Could not exchange code")
+            logger.exception("Could not exchange OAuth2 code")
             self._sso_handler.render_error(request, e.error, e.error_description)
             return
 
-        logger.debug("Successfully obtained OAuth2 access token")
+        logger.debug("Successfully obtained OAuth2 token data: %r", token)
 
         # Now that we have a token, get the userinfo, either by decoding the
         # `id_token` or by fetching the `userinfo_endpoint`.
         if self._uses_userinfo:
-            logger.debug("Fetching userinfo")
             try:
                 userinfo = await self._fetch_userinfo(token)
             except Exception as e:
@@ -761,7 +834,6 @@ class OidcProvider:
                 self._sso_handler.render_error(request, "fetch_error", str(e))
                 return
         else:
-            logger.debug("Extracting userinfo from id_token")
             try:
                 userinfo = await self._parse_id_token(token, nonce=session_data.nonce)
             except Exception as e:
@@ -954,7 +1026,9 @@ class OidcSessionTokenGenerator:
             A signed macaroon token with the session information.
         """
         macaroon = pymacaroons.Macaroon(
-            location=self._server_name, identifier="key", key=self._macaroon_secret_key,
+            location=self._server_name,
+            identifier="key",
+            key=self._macaroon_secret_key,
         )
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("type = session")
@@ -1074,7 +1148,8 @@ class OidcSessionData:
 
 
 UserAttributeDict = TypedDict(
-    "UserAttributeDict", {"localpart": Optional[str], "display_name": Optional[str]}
+    "UserAttributeDict",
+    {"localpart": Optional[str], "display_name": Optional[str], "emails": List[str]},
 )
 C = TypeVar("C")
 
@@ -1153,11 +1228,12 @@ def jinja_finalize(thing):
 env = Environment(finalize=jinja_finalize)
 
 
-@attr.s
+@attr.s(slots=True, frozen=True)
 class JinjaOidcMappingConfig:
     subject_claim = attr.ib(type=str)
     localpart_template = attr.ib(type=Optional[Template])
     display_name_template = attr.ib(type=Optional[Template])
+    email_template = attr.ib(type=Optional[Template])
     extra_attributes = attr.ib(type=Dict[str, Template])
 
 
@@ -1174,23 +1250,17 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
     def parse_config(config: dict) -> JinjaOidcMappingConfig:
         subject_claim = config.get("subject_claim", "sub")
 
-        localpart_template = None  # type: Optional[Template]
-        if "localpart_template" in config:
+        def parse_template_config(option_name: str) -> Optional[Template]:
+            if option_name not in config:
+                return None
             try:
-                localpart_template = env.from_string(config["localpart_template"])
+                return env.from_string(config[option_name])
             except Exception as e:
-                raise ConfigError(
-                    "invalid jinja template", path=["localpart_template"]
-                ) from e
+                raise ConfigError("invalid jinja template", path=[option_name]) from e
 
-        display_name_template = None  # type: Optional[Template]
-        if "display_name_template" in config:
-            try:
-                display_name_template = env.from_string(config["display_name_template"])
-            except Exception as e:
-                raise ConfigError(
-                    "invalid jinja template", path=["display_name_template"]
-                ) from e
+        localpart_template = parse_template_config("localpart_template")
+        display_name_template = parse_template_config("display_name_template")
+        email_template = parse_template_config("email_template")
 
         extra_attributes = {}  # type Dict[str, Template]
         if "extra_attributes" in config:
@@ -1210,6 +1280,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             subject_claim=subject_claim,
             localpart_template=localpart_template,
             display_name_template=display_name_template,
+            email_template=email_template,
             extra_attributes=extra_attributes,
         )
 
@@ -1231,16 +1302,23 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             # a usable mxid.
             localpart += str(failures) if failures else ""
 
-        display_name = None  # type: Optional[str]
-        if self._config.display_name_template is not None:
-            display_name = self._config.display_name_template.render(
-                user=userinfo
-            ).strip()
+        def render_template_field(template: Optional[Template]) -> Optional[str]:
+            if template is None:
+                return None
+            return template.render(user=userinfo).strip()
 
-            if display_name == "":
-                display_name = None
+        display_name = render_template_field(self._config.display_name_template)
+        if display_name == "":
+            display_name = None
 
-        return UserAttributeDict(localpart=localpart, display_name=display_name)
+        emails = []  # type: List[str]
+        email = render_template_field(self._config.email_template)
+        if email:
+            emails.append(email)
+
+        return UserAttributeDict(
+            localpart=localpart, display_name=display_name, emails=emails
+        )
 
     async def get_extra_attributes(self, userinfo: UserInfo, token: Token) -> JsonDict:
         extras = {}  # type: Dict[str, str]

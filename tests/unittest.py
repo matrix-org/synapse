@@ -255,7 +255,10 @@ class HomeserverTestCase(TestCase):
                 # We need a valid token ID to satisfy foreign key constraints.
                 token_id = self.get_success(
                     self.hs.get_datastore().add_access_token_to_user(
-                        self.helper.auth_user_id, "some_fake_token", None, None,
+                        self.helper.auth_user_id,
+                        "some_fake_token",
+                        None,
+                        None,
                     )
                 )
 
@@ -386,6 +389,7 @@ class HomeserverTestCase(TestCase):
         custom_headers: Optional[
             Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
         ] = None,
+        client_ip: str = "127.0.0.1",
     ) -> FakeChannel:
         """
         Create a SynapseRequest at the path using the method and containing the
@@ -410,6 +414,9 @@ class HomeserverTestCase(TestCase):
 
             custom_headers: (name, value) pairs to add as request headers
 
+            client_ip: The IP to use as the requesting IP. Useful for testing
+                ratelimiting.
+
         Returns:
             The FakeChannel object which stores the result of the request.
         """
@@ -426,6 +433,7 @@ class HomeserverTestCase(TestCase):
             content_is_form,
             await_result,
             custom_headers,
+            client_ip,
         )
 
     def setup_test_homeserver(self, *args, **kwargs):

@@ -187,7 +187,7 @@ After updating the homeserver configuration, you must restart synapse:
     ```
   * If you use systemd:
     ```
-    systemctl restart synapse.service
+    systemctl restart matrix-synapse.service
     ```
 ... and then reload any clients (or wait an hour for them to refresh their
 settings).
@@ -231,6 +231,12 @@ Here are a few things to try:
    negotiation. On Firefox, check the "Connection Log" on `about:webrtc`.
 
    (Understanding the output is beyond the scope of this document!)
+
+ * You can test your Matrix homeserver TURN setup with https://test.voip.librepush.net/.
+   Note that this test is not fully reliable yet, so don't be discouraged if
+   the test fails.
+   [Here](https://github.com/matrix-org/voip-tester) is the github repo of the
+   source of the tester, where you can file bug reports.
 
  * There is a WebRTC test tool at
    https://webrtc.github.io/samples/src/content/peerconnection/trickle-ice/. To

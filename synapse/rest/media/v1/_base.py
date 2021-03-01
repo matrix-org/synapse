@@ -137,7 +137,7 @@ def add_file_headers(
         # section 3.6 [2] to be a `token` or a `quoted-string`, where a `token`
         # is (essentially) a single US-ASCII word, and a `quoted-string` is a
         # US-ASCII string surrounded by double-quotes, using backslash as an
-        # escape charater. Note that %-encoding is *not* permitted.
+        # escape character. Note that %-encoding is *not* permitted.
         #
         # `filename*` is defined to be an `ext-value`, which is defined in
         # RFC5987 section 3.2.1 [3] to be `charset "'" [ language ] "'" value-chars`,
@@ -300,6 +300,7 @@ class FileInfo:
         thumbnail_height (int)
         thumbnail_method (str)
         thumbnail_type (str): Content type of thumbnail, e.g. image/png
+        thumbnail_length (int): The size of the media file, in bytes.
     """
 
     def __init__(
@@ -312,6 +313,7 @@ class FileInfo:
         thumbnail_height=None,
         thumbnail_method=None,
         thumbnail_type=None,
+        thumbnail_length=None,
     ):
         self.server_name = server_name
         self.file_id = file_id
@@ -321,6 +323,7 @@ class FileInfo:
         self.thumbnail_height = thumbnail_height
         self.thumbnail_method = thumbnail_method
         self.thumbnail_type = thumbnail_type
+        self.thumbnail_length = thumbnail_length
 
 
 def get_filename_from_headers(headers: Dict[bytes, List[bytes]]) -> Optional[str]:

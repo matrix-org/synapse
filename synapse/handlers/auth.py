@@ -61,6 +61,7 @@ from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.module_api import ModuleApi
+from synapse.storage.roommember import ProfileInfo
 from synapse.types import JsonDict, Requester, UserID
 from synapse.util import stringutils as stringutils
 from synapse.util.async_helpers import maybe_awaitable
@@ -119,7 +120,9 @@ def convert_client_dict_legacy_fields_to_identifier(
     # Ensure the identifier has a type
     if "type" not in identifier:
         raise SynapseError(
-            400, "'identifier' dict has no key 'type'", errcode=Codes.MISSING_PARAM,
+            400,
+            "'identifier' dict has no key 'type'",
+            errcode=Codes.MISSING_PARAM,
         )
 
     return identifier
@@ -350,7 +353,11 @@ class AuthHandler(BaseHandler):
 
         try:
             result, params, session_id = await self.check_ui_auth(
-                flows, request, request_body, description, get_new_session_data,
+                flows,
+                request,
+                request_body,
+                description,
+                get_new_session_data,
             )
         except LoginError:
             # Update the ratelimiter to say we failed (`can_do_action` doesn't raise).
@@ -378,8 +385,7 @@ class AuthHandler(BaseHandler):
         return params, session_id
 
     async def _get_available_ui_auth_types(self, user: UserID) -> Iterable[str]:
-        """Get a list of the authentication types this user can use
-        """
+        """Get a list of the authentication types this user can use"""
 
         ui_auth_types = set()
 
@@ -567,16 +573,6 @@ class AuthHandler(BaseHandler):
                         session.session_id, login_type, result
                     )
             except LoginError as e:
-                if login_type == LoginType.EMAIL_IDENTITY:
-                    # riot used to have a bug where it would request a new
-                    # validation token (thus sending a new email) each time it
-                    # got a 401 with a 'flows' field.
-                    # (https://github.com/vector-im/vector-web/issues/2447).
-                    #
-                    # Grandfather in the old behaviour for now to avoid
-                    # breaking old riot deployments.
-                    raise
-
                 # this step failed. Merge the error dict into the response
                 # so that the client can have another go.
                 errordict = e.error_dict()
@@ -732,7 +728,9 @@ class AuthHandler(BaseHandler):
         }
 
     def _auth_dict_for_flows(
-        self, flows: List[List[str]], session_id: str,
+        self,
+        flows: List[List[str]],
+        session_id: str,
     ) -> Dict[str, Any]:
         public_flows = []
         for f in flows:
@@ -889,7 +887,9 @@ class AuthHandler(BaseHandler):
         return self._supported_login_types
 
     async def validate_login(
-        self, login_submission: Dict[str, Any], ratelimit: bool = False,
+        self,
+        login_submission: Dict[str, Any],
+        ratelimit: bool = False,
     ) -> Tuple[str, Optional[Callable[[Dict[str, str]], Awaitable[None]]]]:
         """Authenticates the user for the /login API
 
@@ -1032,7 +1032,9 @@ class AuthHandler(BaseHandler):
             raise
 
     async def _validate_userid_login(
-        self, username: str, login_submission: Dict[str, Any],
+        self,
+        username: str,
+        login_submission: Dict[str, Any],
     ) -> Tuple[str, Optional[Callable[[Dict[str, str]], Awaitable[None]]]]:
         """Helper for validate_login
 
@@ -1387,7 +1389,9 @@ class AuthHandler(BaseHandler):
         )
 
         return self._sso_auth_confirm_template.render(
-            description=session.description, redirect_url=redirect_url,
+            description=session.description,
+            redirect_url=redirect_url,
+            idp=sso_auth_provider,
         )
 
     async def complete_sso_login(
@@ -1396,6 +1400,7 @@ class AuthHandler(BaseHandler):
         request: Request,
         client_redirect_url: str,
         extra_attributes: Optional[JsonDict] = None,
+        new_user: bool = False,
     ):
         """Having figured out a mxid for this user, complete the HTTP request
 
@@ -1406,6 +1411,8 @@ class AuthHandler(BaseHandler):
                 process.
             extra_attributes: Extra attributes which will be passed to the client
                 during successful login. Must be JSON serializable.
+            new_user: True if we should use wording appropriate to a user who has just
+                registered.
         """
         # If the account has been deactivated, do not proceed with the login
         # flow.
@@ -1414,8 +1421,17 @@ class AuthHandler(BaseHandler):
             respond_with_html(request, 403, self._sso_account_deactivated_template)
             return
 
+        profile = await self.store.get_profileinfo(
+            UserID.from_string(registered_user_id).localpart
+        )
+
         self._complete_sso_login(
-            registered_user_id, request, client_redirect_url, extra_attributes
+            registered_user_id,
+            request,
+            client_redirect_url,
+            extra_attributes,
+            new_user=new_user,
+            user_profile_data=profile,
         )
 
     def _complete_sso_login(
@@ -1424,18 +1440,25 @@ class AuthHandler(BaseHandler):
         request: Request,
         client_redirect_url: str,
         extra_attributes: Optional[JsonDict] = None,
+        new_user: bool = False,
+        user_profile_data: Optional[ProfileInfo] = None,
     ):
         """
         The synchronous portion of complete_sso_login.
 
         This exists purely for backwards compatibility of synapse.module_api.ModuleApi.
         """
+
+        if user_profile_data is None:
+            user_profile_data = ProfileInfo(None, None)
+
         # Store any extra attributes which will be passed in the login response.
         # Note that this is per-user so it may overwrite a previous value, this
         # is considered OK since the newest SSO attributes should be most valid.
         if extra_attributes:
             self._extra_attributes[registered_user_id] = SsoLoginExtraAttributes(
-                self._clock.time_msec(), extra_attributes,
+                self._clock.time_msec(),
+                extra_attributes,
             )
 
         # Create a login token
@@ -1461,12 +1484,27 @@ class AuthHandler(BaseHandler):
         # Remove the query parameters from the redirect URL to get a shorter version of
         # it. This is only to display a human-readable URL in the template, but not the
         # URL we redirect users to.
-        redirect_url_no_params = client_redirect_url.split("?")[0]
+        url_parts = urllib.parse.urlsplit(client_redirect_url)
+
+        if url_parts.scheme == "https":
+            # for an https uri, just show the netloc (ie, the hostname. Specifically,
+            # the bit between "//" and "/"; this includes any potential
+            # "username:password@" prefix.)
+            display_url = url_parts.netloc
+        else:
+            # for other uris, strip the query-params (including the login token) and
+            # fragment.
+            display_url = urllib.parse.urlunsplit(
+                (url_parts.scheme, url_parts.netloc, url_parts.path, "", "")
+            )
 
         html = self._sso_redirect_confirm_template.render(
-            display_url=redirect_url_no_params,
+            display_url=display_url,
             redirect_url=redirect_url,
             server_name=self._server_name,
+            new_user=new_user,
+            user_id=registered_user_id,
+            user_profile=user_profile_data,
         )
         respond_with_html(request, 200, html)
 
@@ -1676,5 +1714,9 @@ class PasswordProvider:
         # This might return an awaitable, if it does block the log out
         # until it completes.
         await maybe_awaitable(
-            g(user_id=user_id, device_id=device_id, access_token=access_token,)
+            g(
+                user_id=user_id,
+                device_id=device_id,
+                access_token=access_token,
+            )
         )

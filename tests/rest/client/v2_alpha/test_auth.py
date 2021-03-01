@@ -22,7 +22,7 @@ from synapse.api.constants import LoginType
 from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
 from synapse.rest.client.v1 import login
 from synapse.rest.client.v2_alpha import auth, devices, register
-from synapse.rest.oidc import OIDCResource
+from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.types import JsonDict, UserID
 
 from tests import unittest
@@ -102,7 +102,8 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         """Ensure that fallback auth via a captcha works."""
         # Returns a 401 as per the spec
         channel = self.register(
-            401, {"username": "user", "type": "m.login.password", "password": "bar"},
+            401,
+            {"username": "user", "type": "m.login.password", "password": "bar"},
         )
 
         # Grab the session
@@ -173,9 +174,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
 
     def create_resource_dict(self):
         resource_dict = super().create_resource_dict()
-        if HAS_OIDC:
-            # mount the OIDC resource at /_synapse/oidc
-            resource_dict["/_synapse/oidc"] = OIDCResource(self.hs)
+        resource_dict.update(build_synapse_client_resource_tree(self.hs))
         return resource_dict
 
     def prepare(self, reactor, clock, hs):
@@ -193,7 +192,10 @@ class UIAuthTests(unittest.HomeserverTestCase):
     ) -> FakeChannel:
         """Delete an individual device."""
         channel = self.make_request(
-            "DELETE", "devices/" + device, body, access_token=access_token,
+            "DELETE",
+            "devices/" + device,
+            body,
+            access_token=access_token,
         )
 
         # Ensure the response is sane.
@@ -206,7 +208,10 @@ class UIAuthTests(unittest.HomeserverTestCase):
         # Note that this uses the delete_devices endpoint so that we can modify
         # the payload half-way through some tests.
         channel = self.make_request(
-            "POST", "delete_devices", body, access_token=self.user_tok,
+            "POST",
+            "delete_devices",
+            body,
+            access_token=self.user_tok,
         )
 
         # Ensure the response is sane.
@@ -338,7 +343,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
             },
         )
 
-    @unittest.override_config({"ui_auth": {"session_timeout": 5 * 1000}})
+    @unittest.override_config({"ui_auth": {"session_timeout": "5s"}})
     def test_can_reuse_session(self):
         """
         The session can be reused if configured.
@@ -419,7 +424,10 @@ class UIAuthTests(unittest.HomeserverTestCase):
 
         # and now the delete request should succeed.
         self.delete_device(
-            self.user_tok, self.device_id, 200, body={"auth": {"session": session_id}},
+            self.user_tok,
+            self.device_id,
+            200,
+            body={"auth": {"session": session_id}},
         )
 
     @skip_unless(HAS_OIDC, "requires OIDC")
@@ -445,8 +453,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
     @skip_unless(HAS_OIDC, "requires OIDC")
     @override_config({"oidc_config": TEST_OIDC_CONFIG})
     def test_offers_both_flows_for_upgraded_user(self):
-        """A user that had a password and then logged in with SSO should get both flows
-        """
+        """A user that had a password and then logged in with SSO should get both flows"""
         login_resp = self.helper.login_via_oidc(UserID.from_string(self.user).localpart)
         self.assertEqual(login_resp["user_id"], self.user)
 
@@ -461,8 +468,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
     @skip_unless(HAS_OIDC, "requires OIDC")
     @override_config({"oidc_config": TEST_OIDC_CONFIG})
     def test_ui_auth_fails_for_incorrect_sso_user(self):
-        """If the user tries to authenticate with the wrong SSO user, they get an error
-        """
+        """If the user tries to authenticate with the wrong SSO user, they get an error"""
         # log the user in
         login_resp = self.helper.login_via_oidc(UserID.from_string(self.user).localpart)
         self.assertEqual(login_resp["user_id"], self.user)
