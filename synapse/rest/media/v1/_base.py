@@ -49,7 +49,7 @@ TEXT_CONTENT_TYPES = [
 
 def parse_media_id(request: Request) -> Tuple[str, str, Optional[str]]:
     try:
-        # The type on postpath seems incorrect in Twisted.
+        # The type on postpath seems incorrect in Twisted 21.2.0.
         postpath = request.postpath  # type: List[bytes]  # type: ignore
         assert postpath
 
