@@ -329,9 +329,11 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
 
         logger.info("[purge] removing events from event_auth_chain_links")
         txn.executemany(
-            "DELETE FROM event_auth_chain_links WHERE "
-            "(origin_chain_id = ? AND origin_sequence_number = ?) OR "
-            "(target_chain_id = ? AND target_sequence_number = ?)",
+            """
+            DELETE FROM event_auth_chain_links WHERE
+            (origin_chain_id = ? AND origin_sequence_number = ?) OR
+            (target_chain_id = ? AND target_sequence_number = ?)
+            """,
             (
                 (chain_id, seq_num, chain_id, seq_num)
                 for (chain_id, seq_num) in referenced_chain_id_tuples
