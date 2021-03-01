@@ -17,7 +17,7 @@
 import logging
 from typing import TYPE_CHECKING, Tuple
 
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer
