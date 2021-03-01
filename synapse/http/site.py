@@ -57,7 +57,7 @@ class SynapseRequest(Request):
 
     def __init__(self, channel, *args, **kw):
         Request.__init__(self, channel, *args, **kw)
-        self.site = channel.site
+        self.site = channel.site  # type: SynapseSite
         self._channel = channel  # this is used by the tests
         self.start_time = 0.0
 
