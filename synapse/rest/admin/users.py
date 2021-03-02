@@ -278,9 +278,9 @@ class UserRestServletV2(RestServlet):
                         target_user.to_string()
                     )
 
-            user = await self.admin_handler.get_user(
-                target_user
-            )  # type: JsonDict  # type: ignore
+            user = await self.admin_handler.get_user(target_user)
+            assert user is not None
+
             return 200, user
 
         else:  # create user
@@ -338,11 +338,10 @@ class UserRestServletV2(RestServlet):
                     target_user, requester, body["avatar_url"], True
                 )
 
-            ret = await self.admin_handler.get_user(
-                target_user
-            )  # type: JsonDict  # type: ignore
+            user = await self.admin_handler.get_user(target_user)
+            assert user is not None
 
-            return 201, ret
+            return 201, user
 
 
 class UserRegisterServlet(RestServlet):
