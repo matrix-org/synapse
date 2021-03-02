@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import NotFoundError, SynapseError
 from synapse.http.servlet import (
@@ -20,8 +21,12 @@ from synapse.http.servlet import (
     assert_params_in_dict,
     parse_json_object_from_request,
 )
+from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
-from synapse.types import UserID
+from synapse.types import JsonDict, UserID
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -35,14 +40,16 @@ class DeviceRestServlet(RestServlet):
         "/users/(?P<user_id>[^/]*)/devices/(?P<device_id>[^/]*)$", "v2"
     )
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
         self.store = hs.get_datastore()
 
-    async def on_GET(self, request, user_id, device_id):
+    async def on_GET(
+        self, request: SynapseRequest, user_id, device_id: str
+    ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
         target_user = UserID.from_string(user_id)
@@ -58,7 +65,9 @@ class DeviceRestServlet(RestServlet):
         )
         return 200, device
 
-    async def on_DELETE(self, request, user_id, device_id):
+    async def on_DELETE(
+        self, request: SynapseRequest, user_id: str, device_id: str
+    ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
         target_user = UserID.from_string(user_id)
@@ -72,7 +81,9 @@ class DeviceRestServlet(RestServlet):
         await self.device_handler.delete_device(target_user.to_string(), device_id)
         return 200, {}
 
-    async def on_PUT(self, request, user_id, device_id):
+    async def on_PUT(
+        self, request: SynapseRequest, user_id: str, device_id: str
+    ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
         target_user = UserID.from_string(user_id)
@@ -97,7 +108,7 @@ class DevicesRestServlet(RestServlet):
 
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/devices$", "v2")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         """
         Args:
             hs (synapse.server.HomeServer): server
@@ -107,7 +118,9 @@ class DevicesRestServlet(RestServlet):
         self.device_handler = hs.get_device_handler()
         self.store = hs.get_datastore()
 
-    async def on_GET(self, request, user_id):
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
         target_user = UserID.from_string(user_id)
@@ -130,13 +143,15 @@ class DeleteDevicesRestServlet(RestServlet):
 
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/delete_devices$", "v2")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
         self.store = hs.get_datastore()
 
-    async def on_POST(self, request, user_id):
+    async def on_POST(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
         target_user = UserID.from_string(user_id)
