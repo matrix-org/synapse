@@ -361,7 +361,7 @@ class FederationServer(FederationBase):
                             logger.error(
                                 "Failed to handle PDU %s",
                                 event_id,
-                                exc_info=(f.type, f.value, f.getTracebackObject()),
+                                exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
                             )
 
         await concurrently_execute(
