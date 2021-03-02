@@ -55,25 +55,9 @@ push_rules_delta_state_cache_metric = register_cache(
 )
 
 
-STATE_EVENT_TYPES_TO_MARK_UNREAD = {
-    EventTypes.Topic,
-    EventTypes.Name,
-    EventTypes.RoomAvatar,
-    EventTypes.Tombstone,
-}
-
-
 def _should_count_as_unread(event: EventBase, context: EventContext) -> bool:
     # Exclude rejected and soft-failed events.
     if context.rejected or event.internal_metadata.is_soft_failed():
-        return False
-
-    # Exclude notices.
-    if (
-        not event.is_state()
-        and event.type == EventTypes.Message
-        and event.content.get("msgtype") == "m.notice"
-    ):
         return False
 
     # Exclude edits.
@@ -81,18 +65,13 @@ def _should_count_as_unread(event: EventBase, context: EventContext) -> bool:
     if relates_to.get("rel_type") == RelationTypes.REPLACE:
         return False
 
-    # Mark events that have a non-empty string body as unread.
-    body = event.content.get("body")
-    if isinstance(body, str) and body:
-        return True
-
-    # Mark some state events as unread.
-    if event.is_state() and event.type in STATE_EVENT_TYPES_TO_MARK_UNREAD:
-        return True
-
-    # Mark encrypted events as unread.
-    if not event.is_state() and event.type == EventTypes.Encrypted:
-        return True
+    # Mark encrypted and plain text messages events as unread.
+    if not event.is_state():
+        if event.type == EventTypes.Encrypted:
+            return True
+        elif event.type == EventTypes.Message:
+            body = event.content.get("body")
+            return isinstance(body, str) and bool(body)
 
     return False
 
