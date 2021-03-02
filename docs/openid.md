@@ -47,6 +47,15 @@ setting in your configuration file (or uncomment one of the existing examples).
 See [sample_config.yaml](./sample_config.yaml) for some sample settings, as well as
 the text below for example configurations for specific providers.
 
+One thing to look out for if you are using a generic OpenID Connect provider is to
+manually set the config to use
+```yaml
+user_profile_method: userinfo_endpoint
+```
+as including the `openid` claim does NOT cause the default `auto` config to reliably
+use the userinfo endpoint, contrary to the homeserver.yaml comments. This may cause 
+the `preferred_username` to not be available when setting the localpart_template.
+
 ## Sample configs
 
 Here are a few configs for providers that should work with Synapse.
