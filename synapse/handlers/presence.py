@@ -283,7 +283,9 @@ class PresenceHandler(BasePresenceHandler):
                     "handle_presence_timeouts", self._handle_timeouts
                 )
 
-            self.clock.call_later(30, self.clock.looping_call, run_timeout_handler, 5000)
+            self.clock.call_later(
+                30, self.clock.looping_call, run_timeout_handler, 5000
+            )
 
             def run_persister():
                 return run_as_background_process(
