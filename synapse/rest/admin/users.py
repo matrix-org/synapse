@@ -16,7 +16,7 @@ import hashlib
 import hmac
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, NotFoundError, SynapseError
@@ -55,7 +55,7 @@ class UsersRestServlet(RestServlet):
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
-    ) -> Tuple[int, JsonDict]:
+    ) -> Tuple[int, List[JsonDict]]:
         target_user = UserID.from_string(user_id)
         await assert_requester_is_admin(self.auth, request)
 
@@ -167,7 +167,9 @@ class UserRestServletV2(RestServlet):
         self.registration_handler = hs.get_registration_handler()
         self.pusher_pool = hs.get_pusherpool()
 
-    async def on_GET(self, request: SynapseRequest, user_id) -> Tuple[int, JsonDict]:
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
         target_user = UserID.from_string(user_id)
@@ -357,7 +359,7 @@ class UserRegisterServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         self.auth_handler = hs.get_auth_handler()
         self.reactor = hs.get_reactor()
-        self.nonces = {}  # type: Dict
+        self.nonces = {}  # type: Dict[str, int]
         self.hs = hs
 
     def _clear_old_nonces(self):
@@ -647,7 +649,7 @@ class SearchUsersRestServlet(RestServlet):
 
     async def on_GET(
         self, request: SynapseRequest, target_user_id: str
-    ) -> Tuple[int, Optional[JsonDict]]:
+    ) -> Tuple[int, Optional[List[JsonDict]]]:
         """Get request to search user table for specific users according to
         search term.
         This needs user to have a administrator access in Synapse.

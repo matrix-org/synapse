@@ -16,7 +16,7 @@
 # limitations under the License.
 
 import logging
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 from synapse.api.constants import PresenceState
 from synapse.config.homeserver import HomeServerConfig
@@ -264,7 +264,7 @@ class DataStore(
 
         return [UserPresenceState(**row) for row in rows]
 
-    async def get_users(self) -> JsonDict:
+    async def get_users(self) -> List[JsonDict]:
         """Function to retrieve a list of users in users table.
 
         Returns:
@@ -292,7 +292,7 @@ class DataStore(
         name: Optional[str] = None,
         guests: bool = True,
         deactivated: bool = False,
-    ) -> Tuple[JsonDict, int]:
+    ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of users from
         users list. This will return a json list of users and the
         total number of users matching the filter criteria.
@@ -353,7 +353,7 @@ class DataStore(
             "get_users_paginate_txn", get_users_paginate_txn
         )
 
-    async def search_users(self, term: str) -> Optional[JsonDict]:
+    async def search_users(self, term: str) -> Optional[List[JsonDict]]:
         """Function to search users list for one or more users with
         the matched term.
 
