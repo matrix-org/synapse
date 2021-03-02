@@ -1586,18 +1586,15 @@ class MacaroonGenerator:
     def generate_short_term_login_token(
         self,
         user_id: str,
+        auth_provider_id: str,
         duration_in_ms: int = (2 * 60 * 1000),
-        auth_provider_id: Optional[str] = None,
     ) -> str:
         macaroon = self._generate_base_macaroon(user_id)
         macaroon.add_first_party_caveat("type = login")
         now = self.hs.get_clock().time_msec()
         expiry = now + duration_in_ms
         macaroon.add_first_party_caveat("time < %d" % (expiry,))
-        if auth_provider_id is not None:
-            macaroon.add_first_party_caveat(
-                "auth_provider_id = %s" % (auth_provider_id,)
-            )
+        macaroon.add_first_party_caveat("auth_provider_id = %s" % (auth_provider_id,))
         return macaroon.serialize()
 
     def verify_short_term_login_token(self, token: str) -> LoginTokenAttributes:

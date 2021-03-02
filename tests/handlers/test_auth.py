@@ -68,10 +68,12 @@ class AuthTestCase(unittest.HomeserverTestCase):
         v.verify(macaroon, self.hs.config.macaroon_secret_key)
 
     def test_short_term_login_token_gives_user_id(self):
-        token = self.macaroon_generator.generate_short_term_login_token("a_user", 5000)
+        token = self.macaroon_generator.generate_short_term_login_token(
+            "a_user", "", 5000
+        )
         res = self.get_success(self.auth_handler.validate_short_term_login_token(token))
         self.assertEqual("a_user", res.user_id)
-        self.assertIsNone(res.auth_provider_id)
+        self.assertEqual("", res.auth_provider_id)
 
         # when we advance the clock, the token should be rejected
         self.reactor.advance(6)
@@ -89,7 +91,9 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.assertEqual("my_idp", res.auth_provider_id)
 
     def test_short_term_login_token_cannot_replace_user_id(self):
-        token = self.macaroon_generator.generate_short_term_login_token("a_user", 5000)
+        token = self.macaroon_generator.generate_short_term_login_token(
+            "a_user", "", 5000
+        )
         macaroon = pymacaroons.Macaroon.deserialize(token)
 
         res = self.get_success(
@@ -206,5 +210,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         )
 
     def _get_macaroon(self):
-        token = self.macaroon_generator.generate_short_term_login_token("user_a", 5000)
+        token = self.macaroon_generator.generate_short_term_login_token(
+            "user_a", "", 5000
+        )
         return pymacaroons.Macaroon.deserialize(token)

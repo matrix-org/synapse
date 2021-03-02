@@ -206,7 +206,7 @@ class ModuleApi:
         self,
         user_id: str,
         duration_in_ms: int = (2 * 60 * 1000),
-        auth_provider_id: Optional[str] = None,
+        auth_provider_id: str = "",
     ) -> str:
         """Generate a login token suitable for m.login.token authentication
 
@@ -221,8 +221,8 @@ class ModuleApi:
         """
         return self._hs.get_macaroon_generator().generate_short_term_login_token(
             user_id,
+            auth_provider_id,
             duration_in_ms,
-            auth_provider_id=auth_provider_id,
         )
 
     @defer.inlineCallbacks
