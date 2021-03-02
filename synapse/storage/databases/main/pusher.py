@@ -308,7 +308,7 @@ class PusherWorkerStore(SQLBaseStore):
                 LIMIT ?
             """
 
-            txn.execute(sql, (True, last_user, batch_size))
+            txn.execute(sql, (1, last_user, batch_size))
             users = [row[0] for row in txn]
 
             self.db_pool.simple_delete_many_txn(
