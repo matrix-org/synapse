@@ -213,22 +213,20 @@ healthcheck:
 
 Anyone looking to run Synapse workers with docker in production should use one container
 per Synapse process, specifying a different worker config per container.
-However, if for some reason you want to run all Synapse processes in the same
-container, [Dockerfile-workers](Dockerfile-workers) will provide that functionality (the
-team currently use this image for
-[Complement testing](https://github.com/matrix-org/complement), which requires a complete
-homeserver bundled in a single docker image).
+Running all Synapse processes is possible, but is currently only used for testing 
+purposes. [Dockerfile-workers](Dockerfile-workers) will produce an image bundling
+all necessary components together for a workerised homeserver instance.
 
-The Dockerfile will create a container with any desired Synapse worker processes, as well as
-a nginx to route traffic accordingly, a redis for worker communication and a supervisord
-instance to start up and monitor all processes. You will need to provide your own postgres
-container to connect to. TLS is not handled by the container. A reverse proxy should be 
-placed in front the exposed HTTP port for the purposes of TLS termination.
+This includes any desired Synapse worker processes, a nginx to route traffic accordingly,
+a redis for worker communication and a supervisord instance to start up and monitor all
+processes. You will need to provide your own postgres container to connect to. TLS is not
+handled by the container. A external reverse proxy should be placed in front the exposed
+HTTP port for the purposes of TLS termination.
 
 Note that the worker Dockerfile is based off the main `[Dockerfile](Dockerfile)`. If you
 would like to build from the current checkout, first build the main Synapse docker image
-using the instructions in [Building the image](#building-the-image), then afterwards build the
-worker image:
+using the instructions in [Building the image](#building-the-image), then afterwards build
+the worker image:
 
 ```
 docker build -t matrixdotorg/synapse:workers -f docker/Dockerfile-workers .
@@ -252,7 +250,8 @@ when running the container. All possible worker names are defined by the keys of
 Dockerfile makes use of to generate appropriate worker, nginx and supervisord config files.
 
 Otherwise, `SYNAPSE_WORKERS` can be set to `*` to use all possible workers, or either left
-empty or unset to spawn no workers. The container is configured to use redis-based worker mode.
+empty or unset to spawn no workers (leaving only the main process). The container is
+configured to use redis-based worker mode.
 
 Note that currently only one instance of a worker can be spun up at once, but this may
 improve in the future.
