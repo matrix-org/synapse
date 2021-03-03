@@ -14,8 +14,7 @@
  */
 
 
--- We may not have deleted all pushers for deactivated accounts. Do so now.
---
--- Note: We don't bother updating the `deleted_pushers` table as it's just use
--- to stop pushers on workers, and that will happen when they get next restarted.
-DELETE FROM pushers WHERE user_name IN (SELECT name FROM users WHERE deactivated = 1);
+-- We may not have deleted all pushers for deactivated accounts, so we set up a
+-- background job to delete them.
+INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
+  (5908, 'remove_deactivated_pushers', '{}');

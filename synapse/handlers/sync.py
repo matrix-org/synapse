@@ -277,9 +277,8 @@ class SyncHandler:
         user_id = sync_config.user.to_string()
         await self.auth.check_auth_blocking(requester=requester)
 
-        res = await self.response_cache.wrap_conditional(
+        res = await self.response_cache.wrap(
             sync_config.request_key,
-            lambda result: since_token != result.next_batch,
             self._wait_for_sync_for_user,
             sync_config,
             since_token,
