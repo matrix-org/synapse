@@ -97,14 +97,14 @@ class SynapseRequest(Request):
         return "%s-%i" % (self.get_method(), self.request_seq)
 
     def get_redacted_uri(self) -> str:
-        """Gets the redacted URI associated with the request (or placeholder if not
-        method has yet been received).
+        """Gets the redacted URI associated with the request (or placeholder if the URI
+        has not yet been received).
 
         Note: This is necessary as the placeholder value in twisted is str
         rather than bytes, so we need to sanitise `self.uri`.
 
         Returns:
-            The redacted URI as as string.
+            The redacted URI as a string.
         """
         uri = self.uri  # type: Union[bytes, str]
         if isinstance(uri, bytes):
@@ -112,14 +112,14 @@ class SynapseRequest(Request):
         return redact_uri(uri)
 
     def get_method(self) -> str:
-        """Gets the method associated with the request (or placeholder if not
-        method has yet been received).
+        """Gets the method associated with the request (or placeholder if method
+        has not yet been received).
 
         Note: This is necessary as the placeholder value in twisted is str
         rather than bytes, so we need to sanitise `self.method`.
 
         Returns:
-            The request method as as string.
+            The request method as a string.
         """
         method = self.method  # type: Union[bytes, str]
         if isinstance(method, bytes):
