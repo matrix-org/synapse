@@ -135,6 +135,11 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             self._chain_cover_index,
         )
 
+        self.db_pool.updates.register_background_update_handler(
+            "purged_chain_cover",
+            self._purged_chain_cover_index,
+        )
+
     async def _background_reindex_fields_sender(self, progress, batch_size):
         target_min_stream_id = progress["target_min_stream_id_inclusive"]
         max_stream_id = progress["max_stream_id_exclusive"]
@@ -932,3 +937,83 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             processed_count=count,
             finished_room_map=finished_rooms,
         )
+
+    async def _purged_chain_cover_index(self, progress: dict, batch_size: int) -> int:
+        """
+        A background updates that iterates over the chain cover and deletes the
+        chain cover for events that have been purged.
+
+        This may be due to fully purging a room or via setting a retention policy.
+        """
+        current_event_id = progress.get("current_event_id", "")
+
+        def purged_chain_cover_txn(txn) -> int:
+            sql = (
+                """
+                SELECT event_id, chain_id, sequence_number FROM event_auth_chains
+                WHERE event_id > ? ORDER BY event_id ASC LIMIT ?
+                """
+            )
+            txn.execute(sql, (current_event_id, batch_size))
+
+            rows = txn.fetchall()
+            if not rows:
+                return 0
+
+            # The event IDs and chain IDs / sequence numbers where the event has
+            # been purged.
+            unreferenced_event_ids = []
+            unreferenced_chain_id_tuples = []
+            event_id = ""
+            for row in rows:
+                event_id = row[0]
+
+                txn.execute(
+                    """
+                    SELECT event_id FROM event_json WHERE event_id = ?
+                    """,
+                    (event_id,)
+                )
+                if not txn.fetchone():
+                    unreferenced_event_ids.append(row[0])
+                    unreferenced_chain_id_tuples.append(row[1:2])
+
+            # Delete the unreferenced auth chains from event_auth_chain_links and
+            # event_auth_chains.
+            txn.executemany(
+                """
+                DELETE FROM event_auth_chains WHERE event_id = ?
+                """,
+                unreferenced_event_ids,
+            )
+            txn.executemany(
+                """
+                DELETE FROM event_auth_chain_links WHERE
+                (origin_chain_id = ? AND origin_sequence_number = ?) OR
+                (target_chain_id = ? AND target_sequence_number = ?)
+                """,
+                (
+                    (chain_id, seq_num, chain_id, seq_num)
+                    for (chain_id, seq_num) in unreferenced_chain_id_tuples
+                ),
+            )
+
+            progress = {
+                "current_event_id": event_id,
+            }
+
+            self.db_pool.updates._background_update_progress_txn(
+                txn, "purged_chain_cover", progress
+            )
+
+            return len(rows)
+
+        result = await self.db_pool.runInteraction(
+            "_purged_chain_cover_index",
+            purged_chain_cover_txn,
+        )
+
+        if not result:
+            await self.db_pool.updates._end_background_update("purged_chain_cover")
+
+        return result
