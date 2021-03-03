@@ -33,7 +33,14 @@ if TYPE_CHECKING:
 
 
 class SendServerNoticeServlet(RestServlet):
-    """Servlet which will send a server notice to a given user
+    """This servlet needs some unit tests and updates:
+    The `txn_id` should be passed into `send_notice` method and then passed through
+    into `create_and_send_nonmember_event` (see RoomSendEventRestServlet for the proper
+    way to do this).
+    Also it needs an update to avoid creating duplicate server-notice rooms.
+    https://github.com/matrix-org/synapse/pull/9520#discussion_r586435068
+
+    Servlet which will send a server notice to a given user
 
     POST /_synapse/admin/v1/send_server_notice
     {
@@ -69,7 +76,9 @@ class SendServerNoticeServlet(RestServlet):
             self.__class__.__name__,
         )
 
-    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+    async def on_POST(
+        self, request: SynapseRequest, txn_id: str = None
+    ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ("user_id", "content"))
