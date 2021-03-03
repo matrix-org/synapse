@@ -246,7 +246,9 @@ class KeyUploadServlet(RestServlet):
             # XForwardedForRequest overrides isSecure() to give us the original protocol
             # used by the client, as opposed to the protocol used by our upstream proxy
             # - which is what we want here.
-            headers[b"X-Forwarded-Proto"] = "https" if request.isSecure() else "http"
+            headers[b"X-Forwarded-Proto"] = [
+                b"https" if request.isSecure() else b"http"
+            ]
 
             try:
                 result = await self.http_client.post_json_get_json(
