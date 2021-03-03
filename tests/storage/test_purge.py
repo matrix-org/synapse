@@ -90,3 +90,28 @@ class PurgeTests(HomeserverTestCase):
         self.get_success(self.store.get_event(second["event_id"]))
         self.get_success(self.store.get_event(third["event_id"]))
         self.get_success(self.store.get_event(last["event_id"]))
+
+    def test_purge_room(self):
+        """
+        Purging a room will delete everything about it.
+        """
+        # Send four messages to the room
+        first = self.helper.send(self.room_id, body="test1")
+
+        # Get the current room state.
+        state_handler = self.hs.get_state_handler()
+        create_event = self.get_success(
+            state_handler.get_current_state(self.room_id, "m.room.create", "")
+        )
+        self.assertIsNotNone(create_event)
+        create_context = self.get_success(
+            state_handler.compute_event_context(create_event)
+        )
+
+        # Purge everything before this topological token
+        self.get_success(self.storage.purge_events.purge_room(self.room_id))
+
+        # The events aren't found.
+        self.store._invalidate_get_event_cache(create_event.event_id)
+        self.get_failure(self.store.get_event(create_event.event_id), NotFoundError)
+        self.get_failure(self.store.get_event(first["event_id"]), NotFoundError)
