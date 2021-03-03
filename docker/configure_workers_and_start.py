@@ -181,7 +181,7 @@ def generate_base_homeserver_config():
     """
     # start.py already does this for us, so just call that.
     # note that this script is copied in in the official, monolith dockerfile
-    os.environ["SYNAPSE_PORT"] = "8080"
+    os.environ["SYNAPSE_HTTP_PORT"] = "8080"
     subprocess.check_output(["/usr/local/bin/python", "/start.py", "migrate_config"])
 
 

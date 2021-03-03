@@ -54,6 +54,7 @@ The following environment variables are supported in `generate` mode:
 * `SYNAPSE_SERVER_NAME` (mandatory): the server public hostname.
 * `SYNAPSE_REPORT_STATS` (mandatory, `yes` or `no`): whether to enable
   anonymous statistics reporting.
+* `SYNAPSE_HTTP_PORT`: the port Synapse should start listen for http traffic on.
 * `SYNAPSE_CONFIG_DIR`: where additional config files (such as the log config
   and event signing key) will be stored. Defaults to `/data`.
 * `SYNAPSE_CONFIG_PATH`: path to the file to be generated. Defaults to
@@ -73,6 +74,8 @@ docker run -d --name synapse \
     -p 8008:8008 \
     matrixdotorg/synapse:latest
 ```
+
+assuming 8008 is the port Synapse is listening for traffic on.
 
 You can then check that it has started correctly with:
 
@@ -236,7 +239,7 @@ To start a container, use the following:
 ```
 docker run -d --name synapse \
     --mount type=volume,src=synapse-data,dst=/data \
-    -p 8008:8080 \
+    -p 8008:8008 \
     -e SYNAPSE_SERVER_NAME=my.matrix.host \
     -e SYNAPSE_REPORT_STATS=yes \
     -e SYNAPSE_WORKERS=synchrotron,media_repository,user_dir \
