@@ -139,7 +139,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         start: int,
         limit: int,
         user_id: str,
-        order_by: MediaSortOrder = MediaSortOrder.CREATED_TS.value,
+        order_by: str = MediaSortOrder.CREATED_TS.value,
         direction: str = "f",
     ) -> Tuple[List[Dict[str, Any]], int]:
         """Get a paginated list of metadata for a local piece of media

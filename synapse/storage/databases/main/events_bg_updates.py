@@ -696,7 +696,9 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 )
 
             if not has_event_auth:
-                for auth_id in event.auth_event_ids():
+                # Old, dodgy, events may have duplicate auth events, which we
+                # need to deduplicate as we have a unique constraint.
+                for auth_id in set(event.auth_event_ids()):
                     auth_events.append(
                         {
                             "room_id": event.room_id,
