@@ -81,7 +81,7 @@ class PurgeTests(HomeserverTestCase):
         # Purge everything before this topological token
         f = self.get_failure(
             self.storage.purge_events.purge_history(self.room_id, event, True),
-            SynapseError
+            SynapseError,
         )
         self.assertIn("greater than forward", f.value.args[0])
 
