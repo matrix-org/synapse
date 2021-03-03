@@ -90,10 +90,9 @@ pdu_process_time = Histogram(
     "Time taken to process an event",
 )
 
-
-last_pdu_age_metric = Gauge(
-    "synapse_federation_last_received_pdu_age",
-    "The age (in seconds) of the last PDU successfully received from the given domain",
+last_pdu_ts_metric = Gauge(
+    "synapse_federation_last_received_pdu_time",
+    "The timestamp of the last PDU which was successfully received from the given domain",
     labelnames=("server_name",),
 )
 
@@ -369,8 +368,7 @@ class FederationServer(FederationBase):
         )
 
         if newest_pdu_ts and origin in self._federation_metrics_domains:
-            newest_pdu_age = self._clock.time_msec() - newest_pdu_ts
-            last_pdu_age_metric.labels(server_name=origin).set(newest_pdu_age / 1000)
+            last_pdu_ts_metric.labels(server_name=origin).set(newest_pdu_ts / 1000)
 
         return pdu_results
 
