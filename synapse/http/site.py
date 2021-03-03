@@ -375,9 +375,9 @@ class XForwardedForRequest(SynapseRequest):
         else:
             # this is done largely for backwards-compatibility so that people that
             # haven't set an x-forwarded-proto header don't get a redirect loop.
-            logger.warning(
-                "forwarded request lacks an x-forwarded-proto header: assuming https"
-            )
+            #logger.warning(
+            #    "forwarded request lacks an x-forwarded-proto header: assuming https"
+            #)
             self._forwarded_https = True
 
     def isSecure(self):
