@@ -948,12 +948,10 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         current_event_id = progress.get("current_event_id", "")
 
         def purged_chain_cover_txn(txn) -> int:
-            sql = (
-                """
+            sql = """
                 SELECT event_id, chain_id, sequence_number FROM event_auth_chains
                 WHERE event_id > ? ORDER BY event_id ASC LIMIT ?
                 """
-            )
             txn.execute(sql, (current_event_id, batch_size))
 
             rows = txn.fetchall()
@@ -972,7 +970,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                     """
                     SELECT event_id FROM event_json WHERE event_id = ?
                     """,
-                    (event_id,)
+                    (event_id,),
                 )
                 if not txn.fetchone():
                     unreferenced_event_ids.append(row[0])
