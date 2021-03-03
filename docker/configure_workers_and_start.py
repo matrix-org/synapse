@@ -245,9 +245,6 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     if worker_types is None:
         # No workers, just the main process
         worker_types = []
-    elif worker_types == "*":
-        # Use all known worker types
-        worker_types = list(WORKERS_CONFIG.keys())
     else:
         # Split type names by comma
         worker_types = worker_types.split(",")
