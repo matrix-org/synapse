@@ -31,8 +31,8 @@ from urllib.parse import urlencode
 import attr
 from typing_extensions import NoReturn, Protocol
 
-from twisted.web.http import Request
 from twisted.web.iweb import IRequest
+from twisted.web.server import Request
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, NotFoundError, RedirectException, SynapseError

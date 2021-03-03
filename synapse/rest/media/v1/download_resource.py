@@ -16,7 +16,7 @@
 import logging
 from typing import TYPE_CHECKING
 
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.http.server import DirectServeJsonResource, set_cors_headers
 from synapse.http.servlet import parse_boolean

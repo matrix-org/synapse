@@ -47,6 +47,7 @@ from synapse.storage.databases.main.events_bg_updates import (
 from synapse.storage.databases.main.media_repository import (
     MediaRepositoryBackgroundUpdateStore,
 )
+from synapse.storage.databases.main.pusher import PusherWorkerStore
 from synapse.storage.databases.main.registration import (
     RegistrationBackgroundUpdateStore,
     find_max_generated_user_id_localpart,
@@ -177,6 +178,7 @@ class Store(
     UserDirectoryBackgroundUpdateStore,
     EndToEndKeyBackgroundStore,
     StatsStore,
+    PusherWorkerStore,
 ):
     def execute(self, f, *args, **kwargs):
         return self.db_pool.runInteraction(f.__name__, f, *args, **kwargs)

@@ -274,22 +274,25 @@ class PresenceHandler(BasePresenceHandler):
 
         self.external_sync_linearizer = Linearizer(name="external_sync_linearizer")
 
-        # Start a LoopingCall in 30s that fires every 5s.
-        # The initial delay is to allow disconnected clients a chance to
-        # reconnect before we treat them as offline.
-        def run_timeout_handler():
-            return run_as_background_process(
-                "handle_presence_timeouts", self._handle_timeouts
+        if self._presence_enabled:
+            # Start a LoopingCall in 30s that fires every 5s.
+            # The initial delay is to allow disconnected clients a chance to
+            # reconnect before we treat them as offline.
+            def run_timeout_handler():
+                return run_as_background_process(
+                    "handle_presence_timeouts", self._handle_timeouts
+                )
+
+            self.clock.call_later(
+                30, self.clock.looping_call, run_timeout_handler, 5000
             )
 
-        self.clock.call_later(30, self.clock.looping_call, run_timeout_handler, 5000)
+            def run_persister():
+                return run_as_background_process(
+                    "persist_presence_changes", self._persist_unpersisted_changes
+                )
 
-        def run_persister():
-            return run_as_background_process(
-                "persist_presence_changes", self._persist_unpersisted_changes
-            )
-
-        self.clock.call_later(60, self.clock.looping_call, run_persister, 60 * 1000)
+            self.clock.call_later(60, self.clock.looping_call, run_persister, 60 * 1000)
 
         LaterGauge(
             "synapse_handlers_presence_wheel_timer_size",
@@ -299,7 +302,7 @@ class PresenceHandler(BasePresenceHandler):
         )
 
         # Used to handle sending of presence to newly joined users/servers
-        if hs.config.use_presence:
+        if self._presence_enabled:
             self.notifier.add_replication_callback(self.notify_new_event)
 
         # Presence is best effort and quickly heals itself, so lets just always
