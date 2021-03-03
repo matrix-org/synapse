@@ -1049,14 +1049,14 @@ def check_content_type_is_json(headers: Headers) -> None:
         RequestSendFailed: if the Content-Type header is missing or isn't JSON
 
     """
-    c_type = headers.getRawHeaders(b"Content-Type")
-    if c_type is None:
+    content_type_headers = headers.getRawHeaders(b"Content-Type")
+    if content_type_headers is None:
         raise RequestSendFailed(
             RuntimeError("No Content-Type header received from remote server"),
             can_retry=False,
         )
 
-    c_type = c_type[0].decode("ascii")  # only the first header
+    c_type = content_type_headers[0].decode("ascii")  # only the first header
     val, options = cgi.parse_header(c_type)
     if val != "application/json":
         raise RequestSendFailed(

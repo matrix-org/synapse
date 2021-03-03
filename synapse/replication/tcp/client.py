@@ -108,9 +108,7 @@ class ReplicationDataHandler:
 
         # Map from stream to list of deferreds waiting for the stream to
         # arrive at a particular position. The lists are sorted by stream position.
-        self._streams_to_waiters = (
-            {}
-        )  # type: Dict[str, List[Tuple[int, Deferred[None]]]]
+        self._streams_to_waiters = {}  # type: Dict[str, List[Tuple[int, Deferred]]]
 
     async def on_rdata(
         self, stream_name: str, instance_name: str, token: int, rows: list
