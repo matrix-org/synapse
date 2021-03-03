@@ -104,9 +104,6 @@ class PurgeTests(HomeserverTestCase):
             state_handler.get_current_state(self.room_id, "m.room.create", "")
         )
         self.assertIsNotNone(create_event)
-        create_context = self.get_success(
-            state_handler.compute_event_context(create_event)
-        )
 
         # Purge everything before this topological token
         self.get_success(self.storage.purge_events.purge_room(self.room_id))
