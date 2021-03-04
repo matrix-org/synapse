@@ -1,6 +1,9 @@
 Synapse 1.29.0rc1 (2021-03-04)
 ==============================
 
+Note that synapse now expects an `X-Forwarded-Proto` header when used with a reverse proxy. Please see [UPGRADE.rst](UPGRADE.rst#upgrading-to-v1290) for more details on this change.
+
+
 Features
 --------
 
@@ -50,12 +53,6 @@ Internal Changes
 - Add type hints to device and event report admin API. ([\#9519](https://github.com/matrix-org/synapse/issues/9519))
 - Add type hints to user admin API. ([\#9521](https://github.com/matrix-org/synapse/issues/9521))
 - Bump the versions of mypy and mypy-zope used for static type checking. ([\#9529](https://github.com/matrix-org/synapse/issues/9529))
-
-
-Synapse 1.xx.0
-==============
-
-Note that synapse now expects an `X-Forwarded-Proto` header when used with a reverse proxy. Please see [UPGRADE.rst](UPGRADE.rst#upgrading-to-v1290) for more details on this change.
 
 
 Synapse 1.28.0 (2021-02-25)
