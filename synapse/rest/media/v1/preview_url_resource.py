@@ -29,7 +29,7 @@ from urllib import parse as urlparse
 import attr
 
 from twisted.internet.error import DNSLookupError
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
@@ -149,8 +149,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             treq_args={"browser_like_redirects": True},
             ip_whitelist=hs.config.url_preview_ip_range_whitelist,
             ip_blacklist=hs.config.url_preview_ip_range_blacklist,
-            http_proxy=os.getenvb(b"http_proxy"),
-            https_proxy=os.getenvb(b"HTTPS_PROXY"),
+            use_proxy=True,
         )
         self.media_repo = media_repo
         self.primary_base_path = media_repo.primary_base_path

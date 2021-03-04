@@ -24,7 +24,6 @@
 import abc
 import functools
 import logging
-import os
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -39,6 +38,7 @@ from typing import (
 
 import twisted.internet.base
 import twisted.internet.tcp
+from twisted.internet import defer
 from twisted.mail.smtp import sendmail
 from twisted.web.iweb import IPolicyForHTTPS
 
@@ -370,11 +370,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         """
         An HTTP client that uses configured HTTP(S) proxies.
         """
-        return SimpleHttpClient(
-            self,
-            http_proxy=os.getenvb(b"http_proxy"),
-            https_proxy=os.getenvb(b"HTTPS_PROXY"),
-        )
+        return SimpleHttpClient(self, use_proxy=True)
 
     @cache_in_self
     def get_proxied_blacklisted_http_client(self) -> SimpleHttpClient:
@@ -386,8 +382,7 @@ class HomeServer(metaclass=abc.ABCMeta):
             self,
             ip_whitelist=self.config.ip_range_whitelist,
             ip_blacklist=self.config.ip_range_blacklist,
-            http_proxy=os.getenvb(b"http_proxy"),
-            https_proxy=os.getenvb(b"HTTPS_PROXY"),
+            use_proxy=True,
         )
 
     @cache_in_self
@@ -409,7 +404,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return RoomShutdownHandler(self)
 
     @cache_in_self
-    def get_sendmail(self) -> sendmail:
+    def get_sendmail(self) -> Callable[..., defer.Deferred]:
         return sendmail
 
     @cache_in_self

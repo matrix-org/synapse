@@ -36,7 +36,7 @@ import attr
 import bcrypt
 import pymacaroons
 
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
@@ -481,7 +481,7 @@ class AuthHandler(BaseHandler):
             sid = authdict["session"]
 
         # Convert the URI and method to strings.
-        uri = request.uri.decode("utf-8")
+        uri = request.uri.decode("utf-8")  # type: ignore
         method = request.method.decode("utf-8")
 
         # If there's no session ID, create a new session.
