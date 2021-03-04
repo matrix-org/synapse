@@ -178,7 +178,7 @@ class LoginTokenAttributes:
     user_id = attr.ib(type=str)
 
     # the SSO Identity Provider that the user authenticated with, to get this token
-    auth_provider_id = attr.ib(type=Optional[str])
+    auth_provider_id = attr.ib(type=str)
 
 
 class AuthHandler(BaseHandler):
