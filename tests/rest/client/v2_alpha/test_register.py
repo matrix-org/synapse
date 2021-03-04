@@ -70,9 +70,31 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         det_data = {"user_id": user_id, "home_server": self.hs.hostname}
         self.assertDictContainsSubset(det_data, channel.json_body)
 
+    def test_POST_appservice_registration_no_type(self):
+        as_token = "i_am_an_app_service"
+
+        appservice = ApplicationService(
+            as_token,
+            self.hs.config.server_name,
+            id="1234",
+            namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
+            sender="@as:test",
+        )
+
+        self.hs.get_datastore().services_cache.append(appservice)
+        request_data = json.dumps({"username": "as_user_kermit"})
+
+        channel = self.make_request(
+            b"POST", self.url + b"?access_token=i_am_an_app_service", request_data
+        )
+
+        self.assertEquals(channel.result["code"], b"400", channel.result)
+
     def test_POST_appservice_registration_invalid(self):
         self.appservice = None  # no application service exists
-        request_data = json.dumps({"username": "kermit"})
+        request_data = json.dumps(
+            {"username": "kermit", "type": AppserviceRegistrationType}
+        )
         channel = self.make_request(
             b"POST", self.url + b"?access_token=i_am_an_app_service", request_data
         )
