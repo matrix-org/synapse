@@ -1,1 +1,0 @@
-Fix missing chain cover index due to a schema delta not being applied correctly. Only affected servers that ran development versions.
