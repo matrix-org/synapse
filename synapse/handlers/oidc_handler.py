@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2020 Quentin Gliech
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,13 +15,13 @@
 # limitations under the License.
 import inspect
 import logging
-from typing import TYPE_CHECKING, Dict, Generic, List, Optional, TypeVar
+from typing import TYPE_CHECKING, Dict, Generic, List, Optional, TypeVar, Union
 from urllib.parse import urlencode
 
 import attr
 import pymacaroons
 from authlib.common.security import generate_token
-from authlib.jose import JsonWebToken
+from authlib.jose import JsonWebToken, jwt
 from authlib.oauth2.auth import ClientAuth
 from authlib.oauth2.rfc6749.parameters import prepare_grant_uri
 from authlib.oidc.core import CodeIDToken, ImplicitIDToken, UserInfo
@@ -35,12 +36,15 @@ from typing_extensions import TypedDict
 from twisted.web.client import readBody
 
 from synapse.config import ConfigError
-from synapse.config.oidc_config import OidcProviderConfig
+from synapse.config.oidc_config import (
+    OidcProviderClientSecretJwtKey,
+    OidcProviderConfig,
+)
 from synapse.handlers.sso import MappingException, UserAttributes
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
 from synapse.types import JsonDict, UserID, map_username_to_mxid_localpart
-from synapse.util import json_decoder
+from synapse.util import Clock, json_decoder
 from synapse.util.caches.cached_call import RetryOnExceptionCachedCall
 from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
 
@@ -276,9 +280,21 @@ class OidcProvider:
 
         self._scopes = provider.scopes
         self._user_profile_method = provider.user_profile_method
+
+        client_secret = None  # type: Union[None, str, JwtClientSecret]
+        if provider.client_secret:
+            client_secret = provider.client_secret
+        elif provider.client_secret_jwt_key:
+            client_secret = JwtClientSecret(
+                provider.client_secret_jwt_key,
+                provider.client_id,
+                provider.issuer,
+                hs.get_clock(),
+            )
+
         self._client_auth = ClientAuth(
             provider.client_id,
-            provider.client_secret,
+            client_secret,
             provider.client_auth_method,
         )  # type: ClientAuth
         self._client_auth_method = provider.client_auth_method
@@ -975,6 +991,81 @@ class OidcProvider:
         # Some OIDC providers use integer IDs, but Synapse expects external IDs
         # to be strings.
         return str(remote_user_id)
+
+
+# number of seconds a newly-generated client secret should be valid for
+CLIENT_SECRET_VALIDITY_SECONDS = 3600
+
+# minimum remaining validity on a client secret before we should generate a new one
+CLIENT_SECRET_MIN_VALIDITY_SECONDS = 600
+
+
+class JwtClientSecret:
+    """A class which generates a new client secret on demand, based on a JWK
+
+    This implementation is designed to comply with the requirements for Apple Sign in:
+    https://developer.apple.com/documentation/sign_in_with_apple/generate_and_validate_tokens#3262048
+
+    It looks like those requirements are based on https://tools.ietf.org/html/rfc7523,
+    but it's worth noting that we still put the generated secret in the "client_secret"
+    field (or rather, whereever client_auth_method puts it) rather than in a
+    client_assertion field in the body as that RFC seems to require.
+    """
+
+    def __init__(
+        self,
+        key: OidcProviderClientSecretJwtKey,
+        oauth_client_id: str,
+        oauth_issuer: str,
+        clock: Clock,
+    ):
+        self._key = key
+        self._oauth_client_id = oauth_client_id
+        self._oauth_issuer = oauth_issuer
+        self._clock = clock
+        self._cached_secret = b""
+        self._cached_secret_replacement_time = 0
+
+    def __str__(self):
+        # if client_auth_method is client_secret_basic, then ClientAuth.prepare calls
+        # encode_client_secret_basic, which calls "{}".format(secret), which ends up
+        # here.
+        return self._get_secret().decode("ascii")
+
+    def __bytes__(self):
+        # if client_auth_method is client_secret_post, then ClientAuth.prepare calls
+        # encode_client_secret_post, which ends up here.
+        return self._get_secret()
+
+    def _get_secret(self) -> bytes:
+        now = self._clock.time()
+
+        # if we have enough validity on our existing secret, use it
+        if now < self._cached_secret_replacement_time:
+            return self._cached_secret
+
+        issued_at = int(now)
+        expires_at = issued_at + CLIENT_SECRET_VALIDITY_SECONDS
+
+        # we copy the configured header because jwt.encode modifies it.
+        header = dict(self._key.jwt_header)
+
+        # see https://tools.ietf.org/html/rfc7523#section-3
+        payload = {
+            "sub": self._oauth_client_id,
+            "aud": self._oauth_issuer,
+            "iat": issued_at,
+            "exp": expires_at,
+            **self._key.jwt_payload,
+        }
+        logger.info(
+            "Generating new JWT for %s: %s %s", self._oauth_issuer, header, payload
+        )
+        self._cached_secret = jwt.encode(header, payload, self._key.key)
+        self._cached_secret_replacement_time = (
+            expires_at - CLIENT_SECRET_MIN_VALIDITY_SECONDS
+        )
+        return self._cached_secret
 
 
 class OidcSessionTokenGenerator:

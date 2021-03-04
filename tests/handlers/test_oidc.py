@@ -13,11 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+import os
 from urllib.parse import parse_qs, urlparse
 
 from mock import ANY, Mock, patch
 
 import pymacaroons
+from authlib.jose import jwt
 
 from synapse.handlers.sso import MappingException
 from synapse.server import HomeServer
@@ -116,6 +118,32 @@ async def get_json(url):
         }
     elif url == JWKS_URI:
         return {"keys": []}
+
+
+def _key_file_path() -> str:
+    """path to a file containing the private half of a test key"""
+
+    # this key was generated with:
+    #   openssl ecparam -name prime256v1 -genkey -noout |
+    #       openssl pkcs8 -topk8 -nocrypt -out oidc_test_key.p8
+    #
+    # we use PKCS8 rather than SEC-1 (which is what openssl ecparam spits out), because
+    # that's what Apple use, and we want to be sure that we work with Apple's keys.
+    #
+    # (For the record: both PKCS8 and SEC-1 specify (different) ways of representing
+    # keys using ASN.1. Both are then typically formatted using PEM, which says: use the
+    # base64-encoded DER encoding of ASN.1, with headers and footers. But we don't
+    # really need to care about any of that.)
+    return os.path.join(os.path.dirname(__file__), "oidc_test_key.p8")
+
+
+def _public_key_file_path() -> str:
+    """path to a file containing the public half of a test key"""
+    # this was generated with:
+    #    openssl ec -in oidc_test_key.p8 -pubout -out oidc_test_key.pub.pem
+    #
+    # See above about where oidc_test_key.p8 came from
+    return os.path.join(os.path.dirname(__file__), "oidc_test_key.pub.pem")
 
 
 class OidcHandlerTestCase(HomeserverTestCase):
@@ -608,6 +636,99 @@ class OidcHandlerTestCase(HomeserverTestCase):
         )
         exc = self.get_failure(self.provider._exchange_code(code), OidcError)
         self.assertEqual(exc.value.error, "some_error")
+
+    @override_config(
+        {
+            "oidc_config": {
+                "enabled": True,
+                "client_id": CLIENT_ID,
+                "issuer": ISSUER,
+                "client_auth_method": "client_secret_post",
+                "client_secret_jwt_key": {
+                    "key_file": _key_file_path(),
+                    "jwt_header": {"alg": "ES256", "kid": "ABC789"},
+                    "jwt_payload": {"iss": "DEFGHI"},
+                },
+            }
+        }
+    )
+    def test_exchange_code_jwt_key(self):
+        """Test that code exchange works with a JWK client secret."""
+        token = {"type": "bearer"}
+        self.http_client.request = simple_async_mock(
+            return_value=FakeResponse(
+                code=200, phrase=b"OK", body=json.dumps(token).encode("utf-8")
+            )
+        )
+        code = "code"
+
+        # advance the clock a bit before we start, so we aren't working with zero
+        # timestamps.
+        self.reactor.advance(1000)
+        start_time = self.reactor.seconds()
+        ret = self.get_success(self.provider._exchange_code(code))
+
+        self.assertEqual(ret, token)
+
+        # the request should have hit the token endpoint
+        kwargs = self.http_client.request.call_args[1]
+        self.assertEqual(kwargs["method"], "POST")
+        self.assertEqual(kwargs["uri"], TOKEN_ENDPOINT)
+
+        # the client secret provided to the should be a jwt which can be checked with
+        # the public key
+        args = parse_qs(kwargs["data"].decode("utf-8"))
+        secret = args["client_secret"][0]
+        with open(_public_key_file_path()) as f:
+            key = f.read()
+        claims = jwt.decode(secret, key)
+        self.assertEqual(claims.header["kid"], "ABC789")
+        self.assertEqual(claims["aud"], ISSUER)
+        self.assertEqual(claims["iss"], "DEFGHI")
+        self.assertEqual(claims["sub"], CLIENT_ID)
+        self.assertEqual(claims["iat"], start_time)
+        self.assertGreater(claims["exp"], start_time)
+
+        # check the rest of the POSTed data
+        self.assertEqual(args["grant_type"], ["authorization_code"])
+        self.assertEqual(args["code"], [code])
+        self.assertEqual(args["client_id"], [CLIENT_ID])
+        self.assertEqual(args["redirect_uri"], [CALLBACK_URL])
+
+    @override_config(
+        {
+            "oidc_config": {
+                "enabled": True,
+                "client_id": CLIENT_ID,
+                "issuer": ISSUER,
+                "client_auth_method": "none",
+            }
+        }
+    )
+    def test_exchange_code_no_auth(self):
+        """Test that code exchange works with no client secret."""
+        token = {"type": "bearer"}
+        self.http_client.request = simple_async_mock(
+            return_value=FakeResponse(
+                code=200, phrase=b"OK", body=json.dumps(token).encode("utf-8")
+            )
+        )
+        code = "code"
+        ret = self.get_success(self.provider._exchange_code(code))
+
+        self.assertEqual(ret, token)
+
+        # the request should have hit the token endpoint
+        kwargs = self.http_client.request.call_args[1]
+        self.assertEqual(kwargs["method"], "POST")
+        self.assertEqual(kwargs["uri"], TOKEN_ENDPOINT)
+
+        # check the POSTed data
+        args = parse_qs(kwargs["data"].decode("utf-8"))
+        self.assertEqual(args["grant_type"], ["authorization_code"])
+        self.assertEqual(args["code"], [code])
+        self.assertEqual(args["client_id"], [CLIENT_ID])
+        self.assertEqual(args["redirect_uri"], [CALLBACK_URL])
 
     @override_config(
         {
