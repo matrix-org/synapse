@@ -283,12 +283,10 @@ class LoginRestServlet(RestServlet):
         """
         token = login_submission["token"]
         auth_handler = self.auth_handler
-        user_id = await auth_handler.validate_short_term_login_token_and_get_user_id(
-            token
-        )
+        res = await auth_handler.validate_short_term_login_token(token)
 
         return await self._complete_login(
-            user_id, login_submission, self.auth_handler._sso_login_callback
+            res.user_id, login_submission, self.auth_handler._sso_login_callback
         )
 
     async def _do_jwt_login(self, login_submission: JsonDict) -> Dict[str, str]:
