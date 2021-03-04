@@ -130,6 +130,15 @@ WORKERS_CONFIG = {
         "shared_extra_conf": {},
         "worker_extra_conf": "",
     },
+    "background_worker": {
+        "app": "synapse.app.generic_worker",
+        "listener_resources": DEFAULT_LISTENER_RESOURCES,
+        "endpoint_patterns": [],
+        # This worker cannot be sharded. Therefore there should only ever be one background
+        # worker, and it should be named background_worker1
+        "shared_extra_conf": {"run_background_tasks_on": "background_worker1"},
+        "worker_extra_conf": "",
+    },
 }
 
 
