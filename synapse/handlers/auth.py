@@ -1614,7 +1614,7 @@ class MacaroonGenerator:
         """
         macaroon = pymacaroons.Macaroon.deserialize(token)
         user_id = get_value_from_macaroon(macaroon, "user_id")
-        auth_provider_id = get_value_from_macaroon(macaroon, "auth_provider_id", None)
+        auth_provider_id = get_value_from_macaroon(macaroon, "auth_provider_id")
 
         v = pymacaroons.Verifier()
         v.satisfy_exact("gen = 1")

@@ -16,40 +16,13 @@
 
 """Utilities for manipulating macaroons"""
 
-import enum
-from typing import Callable, Optional, TypeVar, Union, overload
+from typing import Callable, Optional
 
 import pymacaroons
 from pymacaroons.exceptions import MacaroonVerificationFailedException
 
-_TV = TypeVar("_TV")
 
-
-class _Sentinel(enum.Enum):
-    # defining a sentinel in this way allows mypy to correctly handle the typing
-    sentinel = object()
-
-
-_SENTINEL = object()
-
-
-@overload
 def get_value_from_macaroon(macaroon: pymacaroons.Macaroon, key: str) -> str:
-    ...
-
-
-@overload
-def get_value_from_macaroon(
-    macaroon: pymacaroons.Macaroon, key: str, default: _TV
-) -> Union[str, _TV]:
-    ...
-
-
-def get_value_from_macaroon(
-    macaroon: pymacaroons.Macaroon,
-    key: str,
-    default=_SENTINEL,
-):
     """Extracts a caveat value from a macaroon token.
 
     Checks that there is exactly one caveat of the form "key = <val>" in the macaroon,
@@ -60,12 +33,11 @@ def get_value_from_macaroon(
         key: the key of the caveat to extract
 
     Returns:
-        The extracted value, or `default`
+        The extracted value
 
     Raises:
-        KeyError: if `default` was not given, and the caveat was not in the macaroon
         MacaroonVerificationFailedException: if there are conflicting values for the
-             caveat in the macaroon
+             caveat in the macaroon, or if the caveat was not found in the macaroon.
     """
     prefix = key + " = "
     result = None  # type: Optional[str]
@@ -86,9 +58,12 @@ def get_value_from_macaroon(
 
     if result is not None:
         return result
-    if default is _SENTINEL:
-        raise KeyError("No %s caveat in macaroon" % (key,))
-    return default
+
+    # If the caveat is not there, we raise a MacaroonVerificationFailedException.
+    # Note that it is insecure to generate a macaroon without all the caveats you
+    # might need (because there is nothing stopping people from adding extra caveats),
+    # so if the caveat isn't there, something odd must be going on.
+    raise MacaroonVerificationFailedException("No %s caveat in macaroon" % (key,))
 
 
 def satisfy_expiry(v: pymacaroons.Verifier, get_time_ms: Callable[[], int]) -> None:
