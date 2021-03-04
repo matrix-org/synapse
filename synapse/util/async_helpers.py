@@ -80,7 +80,7 @@ class ObservableDeferred:
                 try:
                     observer.callback(r)
                 except Exception as e:
-                    logger.warning(
+                    logger.exception(
                         "%r threw an exception on .callback(%r), ignoring...",
                         observer,
                         r,
@@ -99,7 +99,7 @@ class ObservableDeferred:
                 try:
                     observer.errback(f)
                 except Exception as e:
-                    logger.warning(
+                    logger.exception(
                         "%r threw an exception on .errback(%r), ignoring...",
                         observer,
                         f,
