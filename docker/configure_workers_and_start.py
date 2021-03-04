@@ -38,7 +38,7 @@ WORKERS_CONFIG = {
         "app": "synapse.app.pusher",
         "listener_resources": [],
         "endpoint_patterns": [],
-        "shared_extra_conf": "start_pushers: false",
+        "shared_extra_conf": {"start_pushers": False},
         "worker_extra_conf": "",
     },
     "user_dir": {
@@ -47,7 +47,7 @@ WORKERS_CONFIG = {
         "endpoint_patterns": [
             "^/_matrix/client/(api/v1|r0|unstable)/user_directory/search$"
         ],
-        "shared_extra_conf": "update_user_directory: false",
+        "shared_extra_conf": {"update_user_directory": False},
         "worker_extra_conf": "",
     },
     "media_repository": {
@@ -61,21 +61,21 @@ WORKERS_CONFIG = {
             "^/_synapse/admin/v1/media/.*$",
             "^/_synapse/admin/v1/quarantine_media/.*$",
         ],
-        "shared_extra_conf": "enable_media_repo: false",
+        "shared_extra_conf": {"enable_media_repo": False},
         "worker_extra_conf": "enable_media_repo: true",
     },
     "appservice": {
         "app": "synapse.app.appservice",
         "listener_resources": [],
         "endpoint_patterns": [],
-        "shared_extra_conf": "notify_appservices: false",
+        "shared_extra_conf": {"notify_appservices": False},
         "worker_extra_conf": "",
     },
     "federation_sender": {
         "app": "synapse.app.federation_sender",
         "listener_resources": [],
         "endpoint_patterns": [],
-        "shared_extra_conf": "send_federation: false",
+        "shared_extra_conf": {"send_federation": False},
         "worker_extra_conf": "",
     },
     "synchrotron": {
@@ -87,7 +87,7 @@ WORKERS_CONFIG = {
             "^/_matrix/client/(api/v1|r0)/initialSync$",
             "^/_matrix/client/(api/v1|r0)/rooms/[^/]+/initialSync$",
         ],
-        "shared_extra_conf": "",
+        "shared_extra_conf": {},
         "worker_extra_conf": "",
     },
     "federation_reader": {
@@ -113,14 +113,21 @@ WORKERS_CONFIG = {
             "^/_matrix/federation/(v1|v2)/get_groups_publicised$",
             "^/_matrix/key/v2/query",
         ],
-        "shared_extra_conf": "",
+        "shared_extra_conf": {},
         "worker_extra_conf": "",
     },
     "federation_inbound": {
         "app": "synapse.app.generic_worker",
         "listener_resources": DEFAULT_LISTENER_RESOURCES,
         "endpoint_patterns": ["/_matrix/federation/(v1|v2)/send/"],
-        "shared_extra_conf": "",
+        "shared_extra_conf": {},
+        "worker_extra_conf": "",
+    },
+    "event_persister": {
+        "app": "synapse.app.generic_worker",
+        "listener_resources": DEFAULT_LISTENER_RESOURCES,
+        "endpoint_patterns": [],
+        "shared_extra_conf": {},
         "worker_extra_conf": "",
     },
 }
@@ -173,6 +180,49 @@ def convert(src: str, dst: str, **template_vars):
         outfile.write(rendered)
 
 
+def add_sharding_to_shared_config(
+    shared_config: dict,
+    worker_type: str,
+    worker_name: str,
+    worker_port: int,
+) -> None:
+    """Given a dictionary representing a config file shared across all workers,
+    append sharded worker information to it for the current worker_type instance.
+
+    Args:
+        shared_config: The config dict that all worker instances share (after being converted to YAML)
+        worker_type: The type of worker (one of those defined in WORKERS_CONFIG).
+        worker_name: The name of the worker instance.
+        worker_port: The HTTP replication port that the worker instance is listening on.
+    """
+    # The instance_map config field marks the workers that write to various replication streams
+    instance_map = shared_config.setdefault("instance_map", {})
+
+    # Worker-type specific sharding config
+    if worker_type == "pusher":
+        shared_config.setdefault("pusher_instances", []).append(worker_name)
+
+    elif worker_type == "federation_sender":
+        shared_config.setdefault("federation_sender_instances", []).append(worker_name)
+
+    elif worker_type == "event_persister":
+        shared_config.setdefault("stream_writers", {}).setdefault("events", []).append(worker_name)
+
+        # Event persisters write to the events stream, so we need to update the list of event
+        # stream writers in the instance_map config field
+        instance_map_events = instance_map.setdefault("events", [])
+        instance_map_events.append({
+            worker_name: {
+                "host": "localhost",
+                "port": worker_port,
+            }
+        })
+
+    else:
+        error("Sharding is not supported for worker type '%s'")
+        return
+
+
 def generate_base_homeserver_config():
     """Starts Synapse and generates a basic homeserver config, which will later be
     modified for worker support.
@@ -223,7 +273,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     # base shared worker jinja2 template.
     #
     # This config file will be passed to all workers, included Synapse's main process.
-    shared_config = yaml.dump({"listeners": listeners})
+    shared_config = {"listeners": listeners}
 
     # The supervisord config. The contents of which will be inserted into the
     # base supervisord jinja2 template.
@@ -255,6 +305,11 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     # Start worker ports from this arbitrary port
     worker_port = 18009
 
+    # A counter of worker_type -> int. Used for determining the name for a given
+    # worker type when generating its config file, as each worker's name is just
+    # worker_type + instance #
+    worker_type_counter = {}
+
     # For each worker type specified by the user, create config values
     for worker_type in worker_types:
         worker_type = worker_type.strip()
@@ -266,14 +321,26 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
             log(worker_type + " is an unknown worker type! It will be ignored")
             continue
 
-        # This is not hardcoded as we want to be able to have several workers
-        # of each type ultimately (though not supported for now)
-        worker_name = worker_type
+        new_worker_count = worker_type_counter.setdefault(worker_type, 0) + 1
+        worker_type_counter[worker_type] = new_worker_count
+
+        # Name workers by their type concatenated with an incrementing number
+        # e.g. federation_reader1
+        worker_name = worker_type + str(new_worker_count)
         worker_config.update(
             {"name": worker_name, "port": worker_port, "config_path": config_path}
         )
 
-        shared_config += worker_config["shared_extra_conf"] + "\n"
+        # Update the shared config with any worker-type specific options
+        shared_config.update(worker_config["shared_extra_conf"])
+
+        # Check if more than one instance of this worker type has been specified
+        worker_type_total_count = worker_types.count(worker_type)
+        if worker_type_total_count > 1:
+            # Update the shared config with sharding-related options if necessary
+            add_sharding_to_shared_config(
+                shared_config, worker_type, worker_name, worker_port
+            )
 
         # Enable the worker in supervisord
         supervisord_config += """
@@ -319,7 +386,7 @@ stderr_logfile_maxbytes=0""".format_map(
     convert(
         "/conf/shared.yaml.j2",
         "/conf/workers/shared.yaml",
-        shared_worker_config=shared_config,
+        shared_worker_config=yaml.dump(shared_config),
     )
 
     # Nginx config
