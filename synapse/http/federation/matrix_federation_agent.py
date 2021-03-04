@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 import urllib.parse
-from typing import List, Optional
+from typing import Any, Generator, List, Optional
 
 from netaddr import AddrFormatError, IPAddress, IPSet
 from zope.interface import implementer
@@ -116,7 +116,7 @@ class MatrixFederationAgent:
         uri: bytes,
         headers: Optional[Headers] = None,
         bodyProducer: Optional[IBodyProducer] = None,
-    ) -> defer.Deferred:
+    ) -> Generator[defer.Deferred, Any, defer.Deferred]:
         """
         Args:
             method: HTTP method: GET/POST/etc
@@ -177,17 +177,17 @@ class MatrixFederationAgent:
         # We need to make sure the host header is set to the netloc of the
         # server and that a user-agent is provided.
         if headers is None:
-            headers = Headers()
+            request_headers = Headers()
         else:
-            headers = headers.copy()
+            request_headers = headers.copy()
 
-        if not headers.hasHeader(b"host"):
-            headers.addRawHeader(b"host", parsed_uri.netloc)
-        if not headers.hasHeader(b"user-agent"):
-            headers.addRawHeader(b"user-agent", self.user_agent)
+        if not request_headers.hasHeader(b"host"):
+            request_headers.addRawHeader(b"host", parsed_uri.netloc)
+        if not request_headers.hasHeader(b"user-agent"):
+            request_headers.addRawHeader(b"user-agent", self.user_agent)
 
         res = yield make_deferred_yieldable(
-            self._agent.request(method, uri, headers, bodyProducer)
+            self._agent.request(method, uri, request_headers, bodyProducer)
         )
 
         return res

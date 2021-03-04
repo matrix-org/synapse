@@ -1,1 +1,0 @@
-Fix a bug introduced in v1.25.0 where `/_synapse/admin/join/` would fail when given a room alias.
