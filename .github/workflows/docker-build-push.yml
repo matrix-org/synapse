@@ -43,4 +43,3 @@ jobs:
             ghcr.io/mqsdk/api:${{ github.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
-          context: docker/
