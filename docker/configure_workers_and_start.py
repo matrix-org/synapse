@@ -31,8 +31,6 @@ import sys
 import jinja2
 import yaml
 
-DEFAULT_LISTENER_RESOURCES = ["client", "federation"]
-
 WORKERS_CONFIG = {
     "pusher": {
         "app": "synapse.app.pusher",
@@ -43,7 +41,7 @@ WORKERS_CONFIG = {
     },
     "user_dir": {
         "app": "synapse.app.user_dir",
-        "listener_resources": DEFAULT_LISTENER_RESOURCES,
+        "listener_resources": ["client"],
         "endpoint_patterns": [
             "^/_matrix/client/(api/v1|r0|unstable)/user_directory/search$"
         ],
@@ -80,7 +78,7 @@ WORKERS_CONFIG = {
     },
     "synchrotron": {
         "app": "synapse.app.generic_worker",
-        "listener_resources": DEFAULT_LISTENER_RESOURCES,
+        "listener_resources": ["client"],
         "endpoint_patterns": [
             "^/_matrix/client/(v2_alpha|r0)/sync$",
             "^/_matrix/client/(api/v1|v2_alpha|r0)/events$",
@@ -92,7 +90,7 @@ WORKERS_CONFIG = {
     },
     "federation_reader": {
         "app": "synapse.app.generic_worker",
-        "listener_resources": DEFAULT_LISTENER_RESOURCES,
+        "listener_resources": ["federation"],
         "endpoint_patterns": [
             "^/_matrix/federation/(v1|v2)/event/",
             "^/_matrix/federation/(v1|v2)/state/",
@@ -118,21 +116,21 @@ WORKERS_CONFIG = {
     },
     "federation_inbound": {
         "app": "synapse.app.generic_worker",
-        "listener_resources": DEFAULT_LISTENER_RESOURCES,
+        "listener_resources": ["federation"],
         "endpoint_patterns": ["/_matrix/federation/(v1|v2)/send/"],
         "shared_extra_conf": {},
         "worker_extra_conf": "",
     },
     "event_persister": {
         "app": "synapse.app.generic_worker",
-        "listener_resources": DEFAULT_LISTENER_RESOURCES,
+        "listener_resources": [],
         "endpoint_patterns": [],
         "shared_extra_conf": {},
         "worker_extra_conf": "",
     },
     "background_worker": {
         "app": "synapse.app.generic_worker",
-        "listener_resources": DEFAULT_LISTENER_RESOURCES,
+        "listener_resources": [],
         "endpoint_patterns": [],
         # This worker cannot be sharded. Therefore there should only ever be one background
         # worker, and it should be named background_worker1
@@ -215,24 +213,20 @@ def add_sharding_to_shared_config(
         shared_config.setdefault("federation_sender_instances", []).append(worker_name)
 
     elif worker_type == "event_persister":
+        # Event persisters write to the events stream, so we need to update
+        # the list of event stream writers
         shared_config.setdefault("stream_writers", {}).setdefault("events", []).append(
             worker_name
         )
 
-        # Event persisters write to the events stream, so we need to update the list of event
-        # stream writers in the instance_map config field
-        instance_map_events = instance_map.setdefault("events", [])
-        instance_map_events.append(
-            {
-                worker_name: {
-                    "host": "localhost",
-                    "port": worker_port,
-                }
-            }
-        )
+        # Map of stream writer instance names to host/ports combos
+        instance_map[worker_name] = {
+            "host": "localhost",
+            "port": worker_port,
+        }
 
     else:
-        error("Sharding is not supported for worker type '%s'")
+        error("Sharding is not supported for worker type '%s'" % (worker_type,))
         return
 
 
