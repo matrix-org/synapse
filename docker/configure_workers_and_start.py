@@ -123,7 +123,7 @@ WORKERS_CONFIG = {
     },
     "event_persister": {
         "app": "synapse.app.generic_worker",
-        "listener_resources": [],
+        "listener_resources": ["replication"],
         "endpoint_patterns": [],
         "shared_extra_conf": {},
         "worker_extra_conf": "",
