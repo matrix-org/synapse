@@ -22,8 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class DeleteGroupAdminRestServlet(RestServlet):
-    """Allows deleting of local groups
-    """
+    """Allows deleting of local groups"""
 
     PATTERNS = admin_patterns("/delete_group/(?P<group_id>[^/]*)")
 

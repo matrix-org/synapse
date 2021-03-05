@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import string
+from collections import Counter
 from typing import Iterable, Optional, Tuple, Type
 
 import attr
@@ -23,6 +23,7 @@ from synapse.config._util import validate_config
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.types import Collection, JsonDict
 from synapse.util.module_loader import load_module
+from synapse.util.stringutils import parse_and_validate_mxc_uri
 
 from ._base import Config, ConfigError
 
@@ -42,10 +43,20 @@ class OIDCConfig(Config):
         except DependencyException as e:
             raise ConfigError(e.message) from e
 
+        # check we don't have any duplicate idp_ids now. (The SSO handler will also
+        # check for duplicates when the REST listeners get registered, but that happens
+        # after synapse has forked so doesn't give nice errors.)
+        c = Counter([i.idp_id for i in self.oidc_providers])
+        for idp_id, count in c.items():
+            if count > 1:
+                raise ConfigError(
+                    "Multiple OIDC providers have the idp_id %r." % idp_id
+                )
+
         public_baseurl = self.public_baseurl
         if public_baseurl is None:
             raise ConfigError("oidc_config requires a public_baseurl to be set")
-        self.oidc_callback_url = public_baseurl + "_synapse/oidc/callback"
+        self.oidc_callback_url = public_baseurl + "_synapse/client/oidc/callback"
 
     @property
     def oidc_enabled(self) -> bool:
@@ -67,6 +78,16 @@ class OIDCConfig(Config):
         #
         #   idp_name: A user-facing name for this identity provider, which is used to
         #       offer the user a choice of login mechanisms.
+        #
+        #   idp_icon: An optional icon for this identity provider, which is presented
+        #       by clients and Synapse's own IdP picker page. If given, must be an
+        #       MXC URI of the format mxc://<server-name>/<media-id>. (An easy way to
+        #       obtain such an MXC URI is to upload an image to an (unencrypted) room
+        #       and then copy the "url" from the source of the event.)
+        #
+        #   idp_brand: An optional brand for this identity provider, allowing clients
+        #       to style the login flow according to the identity provider in question.
+        #       See the spec for possible options here.
         #
         #   discover: set to 'false' to disable the use of the OIDC discovery mechanism
         #       to discover endpoints. Defaults to true.
@@ -127,16 +148,20 @@ class OIDCConfig(Config):
         #
         #           For the default provider, the following settings are available:
         #
-        #             sub: name of the claim containing a unique identifier for the
-        #                 user. Defaults to 'sub', which OpenID Connect compliant
-        #                 providers should provide.
+        #             subject_claim: name of the claim containing a unique identifier
+        #                 for the user. Defaults to 'sub', which OpenID Connect
+        #                 compliant providers should provide.
         #
         #             localpart_template: Jinja2 template for the localpart of the MXID.
         #                 If this is not set, the user will be prompted to choose their
-        #                 own username.
+        #                 own username (see 'sso_auth_account_details.html' in the 'sso'
+        #                 section of this file).
         #
         #             display_name_template: Jinja2 template for the display name to set
         #                 on first login. If unset, no displayname will be set.
+        #
+        #             email_template: Jinja2 template for the email address of the user.
+        #                 If unset, no email address will be added to the account.
         #
         #             extra_attributes: a map of Jinja2 templates for extra attributes
         #                 to send back to the client during login.
@@ -152,13 +177,16 @@ class OIDCConfig(Config):
         #
         # For backwards compatibility, it is also possible to configure a single OIDC
         # provider via an 'oidc_config' setting. This is now deprecated and admins are
-        # advised to migrate to the 'oidc_providers' format.
+        # advised to migrate to the 'oidc_providers' format. (When doing that migration,
+        # use 'oidc' for the idp_id to ensure that existing users continue to be
+        # recognised.)
         #
         oidc_providers:
           # Generic example
           #
           #- idp_id: my_idp
           #  idp_name: "My OpenID provider"
+          #  idp_icon: "mxc://example.com/mediaid"
           #  discover: false
           #  issuer: "https://accounts.example.com/"
           #  client_id: "provided-by-your-issuer"
@@ -170,6 +198,12 @@ class OIDCConfig(Config):
           #  userinfo_endpoint: "https://accounts.example.com/userinfo"
           #  jwks_uri: "https://accounts.example.com/.well-known/jwks.json"
           #  skip_verification: true
+          #  user_mapping_provider:
+          #    config:
+          #      subject_claim: "id"
+          #      localpart_template: "{{{{ user.login }}}}"
+          #      display_name_template: "{{{{ user.name }}}}"
+          #      email_template: "{{{{ user.email }}}}"
 
           # For use with Keycloak
           #
@@ -182,8 +216,9 @@ class OIDCConfig(Config):
 
           # For use with Github
           #
-          #- idp_id: google
-          #  idp_name: Google
+          #- idp_id: github
+          #  idp_name: Github
+          #  idp_brand: org.matrix.github
           #  discover: false
           #  issuer: "https://github.com/"
           #  client_id: "your-client-id" # TO BE FILLED
@@ -195,8 +230,8 @@ class OIDCConfig(Config):
           #  user_mapping_provider:
           #    config:
           #      subject_claim: "id"
-          #      localpart_template: "{{ user.login }}"
-          #      display_name_template: "{{ user.name }}"
+          #      localpart_template: "{{{{ user.login }}}}"
+          #      display_name_template: "{{{{ user.name }}}}"
         """.format(
             mapping_provider=DEFAULT_USER_MAPPING_PROVIDER
         )
@@ -207,8 +242,22 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
     "type": "object",
     "required": ["issuer", "client_id", "client_secret"],
     "properties": {
-        "idp_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "idp_id": {
+            "type": "string",
+            "minLength": 1,
+            # MSC2858 allows a maxlen of 255, but we prefix with "oidc-"
+            "maxLength": 250,
+            "pattern": "^[A-Za-z0-9._~-]+$",
+        },
         "idp_name": {"type": "string"},
+        "idp_icon": {"type": "string"},
+        "idp_brand": {
+            "type": "string",
+            # MSC2758-style namespaced identifier
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[a-z][a-z0-9_.-]*$",
+        },
         "discover": {"type": "boolean"},
         "issuer": {"type": "string"},
         "client_id": {"type": "string"},
@@ -306,9 +355,10 @@ def _parse_oidc_config_dict(
     ump_config.setdefault("module", DEFAULT_USER_MAPPING_PROVIDER)
     ump_config.setdefault("config", {})
 
-    (user_mapping_provider_class, user_mapping_provider_config,) = load_module(
-        ump_config, config_path + ("user_mapping_provider",)
-    )
+    (
+        user_mapping_provider_class,
+        user_mapping_provider_config,
+    ) = load_module(ump_config, config_path + ("user_mapping_provider",))
 
     # Ensure loaded user mapping module has defined all necessary methods
     required_methods = [
@@ -323,24 +373,42 @@ def _parse_oidc_config_dict(
     if missing_methods:
         raise ConfigError(
             "Class %s is missing required "
-            "methods: %s" % (user_mapping_provider_class, ", ".join(missing_methods),),
+            "methods: %s"
+            % (
+                user_mapping_provider_class,
+                ", ".join(missing_methods),
+            ),
             config_path + ("user_mapping_provider", "module"),
         )
 
-    # MSC2858 will appy certain limits in what can be used as an IdP id, so let's
-    # enforce those limits now.
     idp_id = oidc_config.get("idp_id", "oidc")
-    valid_idp_chars = set(string.ascii_letters + string.digits + "-._~")
 
-    if any(c not in valid_idp_chars for c in idp_id):
-        raise ConfigError(
-            'idp_id may only contain A-Z, a-z, 0-9, "-", ".", "_", "~"',
-            config_path + ("idp_id",),
-        )
+    # prefix the given IDP with a prefix specific to the SSO mechanism, to avoid
+    # clashes with other mechs (such as SAML, CAS).
+    #
+    # We allow "oidc" as an exception so that people migrating from old-style
+    # "oidc_config" format (which has long used "oidc" as its idp_id) can migrate to
+    # a new-style "oidc_providers" entry without changing the idp_id for their provider
+    # (and thereby invalidating their user_external_ids data).
+
+    if idp_id != "oidc":
+        idp_id = "oidc-" + idp_id
+
+    # MSC2858 also specifies that the idp_icon must be a valid MXC uri
+    idp_icon = oidc_config.get("idp_icon")
+    if idp_icon is not None:
+        try:
+            parse_and_validate_mxc_uri(idp_icon)
+        except ValueError as e:
+            raise ConfigError(
+                "idp_icon must be a valid MXC URI", config_path + ("idp_icon",)
+            ) from e
 
     return OidcProviderConfig(
         idp_id=idp_id,
         idp_name=oidc_config.get("idp_name", "OIDC"),
+        idp_icon=idp_icon,
+        idp_brand=oidc_config.get("idp_brand"),
         discover=oidc_config.get("discover", True),
         issuer=oidc_config["issuer"],
         client_id=oidc_config["client_id"],
@@ -367,6 +435,12 @@ class OidcProviderConfig:
 
     # user-facing name for this identity provider.
     idp_name = attr.ib(type=str)
+
+    # Optional MXC URI for icon for this IdP.
+    idp_icon = attr.ib(type=Optional[str])
+
+    # Optional brand identifier for this IdP.
+    idp_brand = attr.ib(type=Optional[str])
 
     # whether the OIDC discovery mechanism is used to discover endpoints
     discover = attr.ib(type=bool)

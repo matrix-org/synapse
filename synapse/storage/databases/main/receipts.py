@@ -45,7 +45,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             self._receipts_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
-                stream_name="account_data",
+                stream_name="receipts",
                 instance_name=self._instance_name,
                 tables=[("receipts_linearized", "instance_name", "stream_id")],
                 sequence_name="receipts_sequence",
@@ -61,7 +61,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             # `StreamIdGenerator`, otherwise we use `SlavedIdTracker` which gets
             # updated over replication. (Multiple writers are not supported for
             # SQLite).
-            if hs.get_instance_name() in hs.config.worker.writers.events:
+            if hs.get_instance_name() in hs.config.worker.writers.receipts:
                 self._receipts_id_gen = StreamIdGenerator(
                     db_conn, "receipts_linearized", "stream_id"
                 )
@@ -160,7 +160,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         Args:
             room_id: List of room_ids.
-            to_key: Max stream id to fetch receipts upto.
+            to_key: Max stream id to fetch receipts up to.
             from_key: Min stream id to fetch receipts from. None fetches
                 from the start.
 
@@ -189,7 +189,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         Args:
             room_ids: The room id.
-            to_key: Max stream id to fetch receipts upto.
+            to_key: Max stream id to fetch receipts up to.
             from_key: Min stream id to fetch receipts from. None fetches
                 from the start.
 
@@ -208,8 +208,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     async def _get_linearized_receipts_for_room(
         self, room_id: str, to_key: int, from_key: Optional[int] = None
     ) -> List[dict]:
-        """See get_linearized_receipts_for_room
-        """
+        """See get_linearized_receipts_for_room"""
 
         def f(txn):
             if from_key:
@@ -304,7 +303,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
         }
         return results
 
-    @cached(num_args=2,)
+    @cached(
+        num_args=2,
+    )
     async def get_linearized_receipts_for_all_rooms(
         self, to_key: int, from_key: Optional[int] = None
     ) -> Dict[str, JsonDict]:
@@ -312,7 +313,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         to a limit of the latest 100 read receipts.
 
         Args:
-            to_key: Max stream id to fetch receipts upto.
+            to_key: Max stream id to fetch receipts up to.
             from_key: Min stream id to fetch receipts from. None fetches
                 from the start.
 

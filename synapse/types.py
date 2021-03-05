@@ -37,7 +37,7 @@ from signedjson.key import decode_verify_key_bytes
 from unpaddedbase64 import decode_base64
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.http.endpoint import parse_and_validate_server_name
+from synapse.util.stringutils import parse_and_validate_server_name
 
 if TYPE_CHECKING:
     from synapse.appservice.api import ApplicationService
@@ -469,8 +469,7 @@ class RoomStreamToken:
     )
 
     def __attrs_post_init__(self):
-        """Validates that both `topological` and `instance_map` aren't set.
-        """
+        """Validates that both `topological` and `instance_map` aren't set."""
 
         if self.instance_map and self.topological:
             raise ValueError(
@@ -498,7 +497,11 @@ class RoomStreamToken:
                     instance_name = await store.get_name_from_instance_id(instance_id)
                     instance_map[instance_name] = pos
 
-                return cls(topological=None, stream=stream, instance_map=instance_map,)
+                return cls(
+                    topological=None,
+                    stream=stream,
+                    instance_map=instance_map,
+                )
         except Exception:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
@@ -675,7 +678,7 @@ class PersistedEventPosition:
         persisted in the same room after this position will be after the
         returned `RoomStreamToken`.
 
-        Note: no guarentees are made about ordering w.r.t. events in other
+        Note: no guarantees are made about ordering w.r.t. events in other
         rooms.
         """
         # Doing the naive thing satisfies the desired properties described in

@@ -32,7 +32,7 @@ from twisted.internet.endpoints import (
     TCP4ClientEndpoint,
     TCP6ClientEndpoint,
 )
-from twisted.internet.interfaces import IPushProducer, ITransport
+from twisted.internet.interfaces import IPushProducer, IStreamClientEndpoint, ITransport
 from twisted.internet.protocol import Factory, Protocol
 from twisted.python.failure import Failure
 
@@ -121,7 +121,9 @@ class RemoteHandler(logging.Handler):
         try:
             ip = ip_address(self.host)
             if isinstance(ip, IPv4Address):
-                endpoint = TCP4ClientEndpoint(_reactor, self.host, self.port)
+                endpoint = TCP4ClientEndpoint(
+                    _reactor, self.host, self.port
+                )  # type: IStreamClientEndpoint
             elif isinstance(ip, IPv6Address):
                 endpoint = TCP6ClientEndpoint(_reactor, self.host, self.port)
             else:
@@ -174,7 +176,9 @@ class RemoteHandler(logging.Handler):
 
             # Make a new producer and start it.
             self._producer = LogProducer(
-                buffer=self._buffer, transport=result.transport, format=self.format,
+                buffer=self._buffer,
+                transport=result.transport,
+                format=self.format,
             )
             result.transport.registerProducer(self._producer, True)
             self._producer.resumeProducing()

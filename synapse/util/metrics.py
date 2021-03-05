@@ -161,8 +161,7 @@ class Measure:
         return self._logging_context.get_resource_usage()
 
     def _update_in_flight(self, metrics):
-        """Gets called when processing in flight metrics
-        """
+        """Gets called when processing in flight metrics"""
         duration = self.clock.time() - self.start
 
         metrics.real_time_max = max(metrics.real_time_max, duration)

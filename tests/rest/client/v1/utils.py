@@ -166,9 +166,12 @@ class RestHelper:
             json.dumps(data).encode("utf8"),
         )
 
-        assert int(channel.result["code"]) == expect_code, (
-            "Expected: %d, got: %d, resp: %r"
-            % (expect_code, int(channel.result["code"]), channel.result["body"])
+        assert (
+            int(channel.result["code"]) == expect_code
+        ), "Expected: %d, got: %d, resp: %r" % (
+            expect_code,
+            int(channel.result["code"]),
+            channel.result["body"],
         )
 
         self.auth_user_id = temp_id
@@ -201,9 +204,12 @@ class RestHelper:
             json.dumps(content).encode("utf8"),
         )
 
-        assert int(channel.result["code"]) == expect_code, (
-            "Expected: %d, got: %d, resp: %r"
-            % (expect_code, int(channel.result["code"]), channel.result["body"])
+        assert (
+            int(channel.result["code"]) == expect_code
+        ), "Expected: %d, got: %d, resp: %r" % (
+            expect_code,
+            int(channel.result["code"]),
+            channel.result["body"],
         )
 
         return channel.json_body
@@ -251,9 +257,12 @@ class RestHelper:
 
         channel = make_request(self.hs.get_reactor(), self.site, method, path, content)
 
-        assert int(channel.result["code"]) == expect_code, (
-            "Expected: %d, got: %d, resp: %r"
-            % (expect_code, int(channel.result["code"]), channel.result["body"])
+        assert (
+            int(channel.result["code"]) == expect_code
+        ), "Expected: %d, got: %d, resp: %r" % (
+            expect_code,
+            int(channel.result["code"]),
+            channel.result["body"],
         )
 
         return channel.json_body
@@ -447,7 +456,10 @@ class RestHelper:
         return self.complete_oidc_auth(oauth_uri, cookies, user_info_dict)
 
     def complete_oidc_auth(
-        self, oauth_uri: str, cookies: Mapping[str, str], user_info_dict: JsonDict,
+        self,
+        oauth_uri: str,
+        cookies: Mapping[str, str],
+        user_info_dict: JsonDict,
     ) -> FakeChannel:
         """Mock out an OIDC authentication flow
 
@@ -491,7 +503,9 @@ class RestHelper:
             (expected_uri, resp_obj) = expected_requests.pop(0)
             assert uri == expected_uri
             resp = FakeResponse(
-                code=200, phrase=b"OK", body=json.dumps(resp_obj).encode("utf-8"),
+                code=200,
+                phrase=b"OK",
+                body=json.dumps(resp_obj).encode("utf-8"),
             )
             return resp
 
@@ -528,12 +542,29 @@ class RestHelper:
         if client_redirect_url:
             params["redirectUrl"] = client_redirect_url
 
-        # hit the redirect url (which will issue a cookie and state)
+        # hit the redirect url (which should redirect back to the redirect url. This
+        # is the easiest way of figuring out what the Host header ought to be set to
+        # to keep Synapse happy.
         channel = make_request(
             self.hs.get_reactor(),
             self.site,
             "GET",
             "/_matrix/client/r0/login/sso/redirect?" + urllib.parse.urlencode(params),
+        )
+        assert channel.code == 302
+
+        # hit the redirect url again with the right Host header, which should now issue
+        # a cookie and redirect to the SSO provider.
+        location = channel.headers.getRawHeaders("Location")[0]
+        parts = urllib.parse.urlsplit(location)
+        channel = make_request(
+            self.hs.get_reactor(),
+            self.site,
+            "GET",
+            urllib.parse.urlunsplit(("", "") + parts[2:]),
+            custom_headers=[
+                ("Host", parts[1]),
+            ],
         )
 
         assert channel.code == 302

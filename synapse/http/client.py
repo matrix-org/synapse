@@ -56,7 +56,7 @@ from twisted.web.client import (
 )
 from twisted.web.http import PotentialDataLoss
 from twisted.web.http_headers import Headers
-from twisted.web.iweb import IAgent, IBodyProducer, IResponse
+from twisted.web.iweb import UNKNOWN_LENGTH, IAgent, IBodyProducer, IResponse
 
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.http import QuieterFileBodyProducer, RequestTimedOutError, redact_uri
@@ -289,8 +289,7 @@ class SimpleHttpClient:
         treq_args: Dict[str, Any] = {},
         ip_whitelist: Optional[IPSet] = None,
         ip_blacklist: Optional[IPSet] = None,
-        http_proxy: Optional[bytes] = None,
-        https_proxy: Optional[bytes] = None,
+        use_proxy: bool = False,
     ):
         """
         Args:
@@ -300,8 +299,8 @@ class SimpleHttpClient:
                 we may not request.
             ip_whitelist: The whitelisted IP addresses, that we can
                request if it were otherwise caught in a blacklist.
-            http_proxy: proxy server to use for http connections. host[:port]
-            https_proxy: proxy server to use for https connections. host[:port]
+            use_proxy: Whether proxy settings should be discovered and used
+                from conventional environment variables.
         """
         self.hs = hs
 
@@ -345,8 +344,7 @@ class SimpleHttpClient:
             connectTimeout=15,
             contextFactory=self.hs.get_http_client_context_factory(),
             pool=pool,
-            http_proxy=http_proxy,
-            https_proxy=https_proxy,
+            use_proxy=use_proxy,
         )
 
         if self._ip_blacklist:
@@ -398,7 +396,8 @@ class SimpleHttpClient:
                 body_producer = None
                 if data is not None:
                     body_producer = QuieterFileBodyProducer(
-                        BytesIO(data), cooperator=self._cooperator,
+                        BytesIO(data),
+                        cooperator=self._cooperator,
                     )
 
                 request_deferred = treq.request(
@@ -407,13 +406,18 @@ class SimpleHttpClient:
                     agent=self.agent,
                     data=body_producer,
                     headers=headers,
+                    # Avoid buffering the body in treq since we do not reuse
+                    # response bodies.
+                    unbuffered=True,
                     **self._extra_treq_args,
                 )  # type: defer.Deferred
 
                 # we use our own timeout mechanism rather than treq's as a workaround
                 # for https://twistedmatrix.com/trac/ticket/9534.
                 request_deferred = timeout_deferred(
-                    request_deferred, 60, self.hs.get_reactor(),
+                    request_deferred,
+                    60,
+                    self.hs.get_reactor(),
                 )
 
                 # turn timeouts into RequestTimedOutErrors
@@ -699,18 +703,6 @@ class SimpleHttpClient:
 
         resp_headers = dict(response.headers.getAllRawHeaders())
 
-        if (
-            b"Content-Length" in resp_headers
-            and max_size
-            and int(resp_headers[b"Content-Length"][0]) > max_size
-        ):
-            logger.warning("Requested URL is too large > %r bytes" % (max_size,))
-            raise SynapseError(
-                502,
-                "Requested file is too large > %r bytes" % (max_size,),
-                Codes.TOO_LARGE,
-            )
-
         if response.code > 299:
             logger.warning("Got %d when downloading %s" % (response.code, url))
             raise SynapseError(502, "Got error %d" % (response.code,), Codes.UNKNOWN)
@@ -756,7 +748,32 @@ class BodyExceededMaxSize(Exception):
     """The maximum allowed size of the HTTP body was exceeded."""
 
 
+class _DiscardBodyWithMaxSizeProtocol(protocol.Protocol):
+    """A protocol which immediately errors upon receiving data."""
+
+    def __init__(self, deferred: defer.Deferred):
+        self.deferred = deferred
+
+    def _maybe_fail(self):
+        """
+        Report a max size exceed error and disconnect the first time this is called.
+        """
+        if not self.deferred.called:
+            self.deferred.errback(BodyExceededMaxSize())
+            # Close the connection (forcefully) since all the data will get
+            # discarded anyway.
+            self.transport.abortConnection()
+
+    def dataReceived(self, data: bytes) -> None:
+        self._maybe_fail()
+
+    def connectionLost(self, reason: Failure) -> None:
+        self._maybe_fail()
+
+
 class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
+    """A protocol which reads body to a stream, erroring if the body exceeds a maximum size."""
+
     def __init__(
         self, stream: BinaryIO, deferred: defer.Deferred, max_size: Optional[int]
     ):
@@ -777,7 +794,9 @@ class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
         # in the meantime.
         if self.max_size is not None and self.length >= self.max_size:
             self.deferred.errback(BodyExceededMaxSize())
-            self.transport.loseConnection()
+            # Close the connection (forcefully) since all the data will get
+            # discarded anyway.
+            self.transport.abortConnection()
 
     def connectionLost(self, reason: Failure) -> None:
         # If the maximum size was already exceeded, there's nothing to do.
@@ -811,8 +830,15 @@ def read_body_with_max_size(
     Returns:
         A Deferred which resolves to the length of the read body.
     """
-
     d = defer.Deferred()
+
+    # If the Content-Length header gives a size larger than the maximum allowed
+    # size, do not bother downloading the body.
+    if max_size is not None and response.length != UNKNOWN_LENGTH:
+        if response.length > max_size:
+            response.deliverBody(_DiscardBodyWithMaxSizeProtocol(d))
+            return d
+
     response.deliverBody(_ReadBodyWithMaxSizeProtocol(stream, d, max_size))
     return d
 

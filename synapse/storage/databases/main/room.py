@@ -16,7 +16,6 @@
 
 import collections
 import logging
-import re
 from abc import abstractmethod
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
@@ -30,6 +29,7 @@ from synapse.storage.databases.main.search import SearchStore
 from synapse.types import JsonDict, ThirdPartyInstanceID
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
+from synapse.util.stringutils import MXC_REGEX
 
 logger = logging.getLogger(__name__)
 
@@ -193,8 +193,7 @@ class RoomWorkerStore(SQLBaseStore):
         )
 
     async def get_room_count(self) -> int:
-        """Retrieve the total number of rooms.
-        """
+        """Retrieve the total number of rooms."""
 
         def f(txn):
             sql = "SELECT count(*)  FROM rooms"
@@ -517,7 +516,8 @@ class RoomWorkerStore(SQLBaseStore):
             return rooms, room_count[0]
 
         return await self.db_pool.runInteraction(
-            "get_rooms_paginate", _get_rooms_paginate_txn,
+            "get_rooms_paginate",
+            _get_rooms_paginate_txn,
         )
 
     @cached(max_entries=10000)
@@ -578,7 +578,8 @@ class RoomWorkerStore(SQLBaseStore):
             return self.db_pool.cursor_to_dict(txn)
 
         ret = await self.db_pool.runInteraction(
-            "get_retention_policy_for_room", get_retention_policy_for_room_txn,
+            "get_retention_policy_for_room",
+            get_retention_policy_for_room_txn,
         )
 
         # If we don't know this room ID, ret will be None, in this case return the default
@@ -660,8 +661,6 @@ class RoomWorkerStore(SQLBaseStore):
             The local and remote media as a lists of tuples where the key is
             the hostname and the value is the media ID.
         """
-        mxc_re = re.compile("^mxc://([^/]+)/([^/#?]+)")
-
         sql = """
             SELECT stream_ordering, json FROM events
             JOIN event_json USING (room_id, event_id)
@@ -688,7 +687,7 @@ class RoomWorkerStore(SQLBaseStore):
                 for url in (content_url, thumbnail_url):
                     if not url:
                         continue
-                    matches = mxc_re.match(url)
+                    matches = MXC_REGEX.match(url)
                     if matches:
                         hostname = matches.group(1)
                         media_id = matches.group(2)
@@ -709,7 +708,10 @@ class RoomWorkerStore(SQLBaseStore):
         return local_media_mxcs, remote_media_mxcs
 
     async def quarantine_media_by_id(
-        self, server_name: str, media_id: str, quarantined_by: str,
+        self,
+        server_name: str,
+        media_id: str,
+        quarantined_by: str,
     ) -> int:
         """quarantines a single local or remote media id
 
@@ -963,7 +965,8 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
         self.config = hs.config
 
         self.db_pool.updates.register_background_update_handler(
-            "insert_room_retention", self._background_insert_retention,
+            "insert_room_retention",
+            self._background_insert_retention,
         )
 
         self.db_pool.updates.register_background_update_handler(
@@ -1035,7 +1038,8 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
                 return False
 
         end = await self.db_pool.runInteraction(
-            "insert_room_retention", _background_insert_retention_txn,
+            "insert_room_retention",
+            _background_insert_retention_txn,
         )
 
         if end:
@@ -1046,7 +1050,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
     async def _background_add_rooms_room_version_column(
         self, progress: dict, batch_size: int
     ):
-        """Background update to go and add room version inforamtion to `rooms`
+        """Background update to go and add room version information to `rooms`
         table from `current_state_events` table.
         """
 
@@ -1590,7 +1594,8 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                 LIMIT ?
                 OFFSET ?
             """.format(
-                where_clause=where_clause, order=order,
+                where_clause=where_clause,
+                order=order,
             )
 
             args += [limit, start]

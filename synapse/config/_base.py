@@ -18,17 +18,17 @@
 import argparse
 import errno
 import os
-import time
-import urllib.parse
 from collections import OrderedDict
 from hashlib import sha256
 from textwrap import dedent
-from typing import Any, Callable, Iterable, List, MutableMapping, Optional
+from typing import Any, Iterable, List, MutableMapping, Optional, Union
 
 import attr
 import jinja2
 import pkg_resources
 import yaml
+
+from synapse.util.templates import _create_mxc_to_http_filter, _format_ts_filter
 
 
 class ConfigError(Exception):
@@ -147,7 +147,20 @@ class Config:
         return int(value) * size
 
     @staticmethod
-    def parse_duration(value):
+    def parse_duration(value: Union[str, int]) -> int:
+        """Convert a duration as a string or integer to a number of milliseconds.
+
+        If an integer is provided it is treated as milliseconds and is unchanged.
+
+        String durations can have a suffix of 's', 'm', 'h', 'd', 'w', or 'y'.
+        No suffix is treated as milliseconds.
+
+        Args:
+            value: The duration to parse.
+
+        Returns:
+            The number of milliseconds in the duration.
+        """
         if isinstance(value, int):
             return value
         second = 1000
@@ -203,11 +216,30 @@ class Config:
         with open(file_path) as file_stream:
             return file_stream.read()
 
+    def read_template(self, filename: str) -> jinja2.Template:
+        """Load a template file from disk.
+
+        This function will attempt to load the given template from the default Synapse
+        template directory.
+
+        Files read are treated as Jinja templates. The templates is not rendered yet
+        and has autoescape enabled.
+
+        Args:
+            filename: A template filename to read.
+
+        Raises:
+            ConfigError: if the file's path is incorrect or otherwise cannot be read.
+
+        Returns:
+            A jinja2 template.
+        """
+        return self.read_templates([filename])[0]
+
     def read_templates(
         self,
         filenames: List[str],
         custom_template_directory: Optional[str] = None,
-        autoescape: bool = False,
     ) -> List[jinja2.Template]:
         """Load a list of template files from disk using the given variables.
 
@@ -215,7 +247,8 @@ class Config:
         template directory. If `custom_template_directory` is supplied, that directory
         is tried first.
 
-        Files read are treated as Jinja templates. These templates are not rendered yet.
+        Files read are treated as Jinja templates. The templates are not rendered yet
+        and have autoescape enabled.
 
         Args:
             filenames: A list of template filenames to read.
@@ -223,16 +256,12 @@ class Config:
             custom_template_directory: A directory to try to look for the templates
                 before using the default Synapse template directory instead.
 
-            autoescape: Whether to autoescape variables before inserting them into the
-                template.
-
         Raises:
             ConfigError: if the file's path is incorrect or otherwise cannot be read.
 
         Returns:
             A list of jinja2 templates.
         """
-        templates = []
         search_directories = [self.default_template_dir]
 
         # The loader will first look in the custom template directory (if specified) for the
@@ -248,54 +277,23 @@ class Config:
             # Search the custom template directory as well
             search_directories.insert(0, custom_template_directory)
 
+        # TODO: switch to synapse.util.templates.build_jinja_env
         loader = jinja2.FileSystemLoader(search_directories)
-        env = jinja2.Environment(loader=loader, autoescape=autoescape)
-
-        # Update the environment with our custom filters
-        env.filters.update({"format_ts": _format_ts_filter})
-        if self.public_baseurl:
-            env.filters.update(
-                {"mxc_to_http": _create_mxc_to_http_filter(self.public_baseurl)}
-            )
-
-        for filename in filenames:
-            # Load the template
-            template = env.get_template(filename)
-            templates.append(template)
-
-        return templates
-
-
-def _format_ts_filter(value: int, format: str):
-    return time.strftime(format, time.localtime(value / 1000))
-
-
-def _create_mxc_to_http_filter(public_baseurl: str) -> Callable:
-    """Create and return a jinja2 filter that converts MXC urls to HTTP
-
-    Args:
-        public_baseurl: The public, accessible base URL of the homeserver
-    """
-
-    def mxc_to_http_filter(value, width, height, resize_method="crop"):
-        if value[0:6] != "mxc://":
-            return ""
-
-        server_and_media_id = value[6:]
-        fragment = None
-        if "#" in server_and_media_id:
-            server_and_media_id, fragment = server_and_media_id.split("#", 1)
-            fragment = "#" + fragment
-
-        params = {"width": width, "height": height, "method": resize_method}
-        return "%s_matrix/media/v1/thumbnail/%s?%s%s" % (
-            public_baseurl,
-            server_and_media_id,
-            urllib.parse.urlencode(params),
-            fragment or "",
+        env = jinja2.Environment(
+            loader=loader,
+            autoescape=jinja2.select_autoescape(),
         )
 
-    return mxc_to_http_filter
+        # Update the environment with our custom filters
+        env.filters.update(
+            {
+                "format_ts": _format_ts_filter,
+                "mxc_to_http": _create_mxc_to_http_filter(self.public_baseurl),
+            }
+        )
+
+        # Load the templates
+        return [env.get_template(filename) for filename in filenames]
 
 
 class RootConfig:
@@ -845,24 +843,24 @@ class ShardedWorkerHandlingConfig:
     instances = attr.ib(type=List[str])
 
     def should_handle(self, instance_name: str, key: str) -> bool:
-        """Whether this instance is responsible for handling the given key.
-        """
-        # If multiple instances are not defined we always return true
-        if not self.instances or len(self.instances) == 1:
-            return True
+        """Whether this instance is responsible for handling the given key."""
+        # If no instances are defined we assume some other worker is handling
+        # this.
+        if not self.instances:
+            return False
 
-        return self.get_instance(key) == instance_name
+        return self._get_instance(key) == instance_name
 
-    def get_instance(self, key: str) -> str:
+    def _get_instance(self, key: str) -> str:
         """Get the instance responsible for handling the given key.
 
-        Note: For things like federation sending the config for which instance
-        is sending is known only to the sender instance if there is only one.
-        Therefore `should_handle` should be used where possible.
+        Note: For federation sending and pushers the config for which instance
+        is sending is known only to the sender instance, so we don't expose this
+        method by default.
         """
 
         if not self.instances:
-            return "master"
+            raise Exception("Unknown worker")
 
         if len(self.instances) == 1:
             return self.instances[0]
@@ -877,6 +875,23 @@ class ShardedWorkerHandlingConfig:
         dest_int = int.from_bytes(dest_hash, byteorder="little")
         remainder = dest_int % (len(self.instances))
         return self.instances[remainder]
+
+
+@attr.s
+class RoutableShardedWorkerHandlingConfig(ShardedWorkerHandlingConfig):
+    """A version of `ShardedWorkerHandlingConfig` that is used for config
+    options where all instances know which instances are responsible for the
+    sharded work.
+    """
+
+    def __attrs_post_init__(self):
+        # We require that `self.instances` is non-empty.
+        if not self.instances:
+            raise Exception("Got empty list of instances for shard config")
+
+    def get_instance(self, key: str) -> str:
+        """Get the instance responsible for handling the given key."""
+        return self._get_instance(key)
 
 
 __all__ = ["Config", "RootConfig", "ShardedWorkerHandlingConfig"]

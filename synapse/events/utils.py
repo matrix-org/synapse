@@ -34,7 +34,7 @@ SPLIT_FIELD_REGEX = re.compile(r"(?<!\\)\.")
 
 
 def prune_event(event: EventBase) -> EventBase:
-    """ Returns a pruned version of the given event, which removes all keys we
+    """Returns a pruned version of the given event, which removes all keys we
     don't know about or think could potentially be dodgy.
 
     This is used when we "redact" an event. We want to remove all fields that

@@ -48,8 +48,7 @@ class _GetStateGroupDelta(
 
 
 class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
-    """A data store for fetching/storing state groups.
-    """
+    """A data store for fetching/storing state groups."""
 
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
@@ -89,7 +88,8 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             50000,
         )
         self._state_group_members_cache = DictionaryCache(
-            "*stateGroupMembersCache*", 500000,
+            "*stateGroupMembersCache*",
+            500000,
         )
 
         def get_max_state_group_txn(txn: Cursor):
@@ -97,10 +97,12 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             return txn.fetchone()[0]
 
         self._state_group_seq_gen = build_sequence_generator(
-            self.database_engine, get_max_state_group_txn, "state_group_id_seq"
-        )
-        self._state_group_seq_gen.check_consistency(
-            db_conn, table="state_groups", id_column="id"
+            db_conn,
+            self.database_engine,
+            get_max_state_group_txn,
+            "state_group_id_seq",
+            table="state_groups",
+            id_column="id",
         )
 
     @cached(max_entries=10000, iterable=True)
@@ -565,11 +567,11 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             )
 
         logger.info("[purge] removing redundant state groups")
-        txn.executemany(
+        txn.execute_batch(
             "DELETE FROM state_groups_state WHERE state_group = ?",
             ((sg,) for sg in state_groups_to_delete),
         )
-        txn.executemany(
+        txn.execute_batch(
             "DELETE FROM state_groups WHERE id = ?",
             ((sg,) for sg in state_groups_to_delete),
         )

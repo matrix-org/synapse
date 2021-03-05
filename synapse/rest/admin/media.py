@@ -17,7 +17,7 @@
 import logging
 from typing import TYPE_CHECKING, Tuple
 
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer
@@ -119,8 +119,7 @@ class QuarantineMediaByID(RestServlet):
 
 
 class ProtectMediaByID(RestServlet):
-    """Protect local media from being quarantined.
-    """
+    """Protect local media from being quarantined."""
 
     PATTERNS = admin_patterns("/media/protect/(?P<media_id>[^/]+)")
 
@@ -141,8 +140,7 @@ class ProtectMediaByID(RestServlet):
 
 
 class ListMediaInRoom(RestServlet):
-    """Lists all of the media in a given room.
-    """
+    """Lists all of the media in a given room."""
 
     PATTERNS = admin_patterns("/room/(?P<room_id>[^/]+)/media")
 
@@ -180,8 +178,7 @@ class PurgeMediaCacheRestServlet(RestServlet):
 
 
 class DeleteMediaByID(RestServlet):
-    """Delete local media by a given ID. Removes it from this server.
-    """
+    """Delete local media by a given ID. Removes it from this server."""
 
     PATTERNS = admin_patterns("/media/(?P<server_name>[^/]+)/(?P<media_id>[^/]+)")
 

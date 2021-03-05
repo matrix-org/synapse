@@ -86,8 +86,12 @@ REQUIREMENTS = [
 
 CONDITIONAL_REQUIREMENTS = {
     "matrix-synapse-ldap3": ["matrix-synapse-ldap3>=0.1"],
-    # we use execute_batch, which arrived in psycopg 2.7.
-    "postgres": ["psycopg2>=2.7"],
+    "postgres": [
+        # we use execute_values with the fetch param, which arrived in psycopg 2.8.
+        "psycopg2>=2.8 ; platform_python_implementation != 'PyPy'",
+        "psycopg2cffi>=2.8 ; platform_python_implementation == 'PyPy'",
+        "psycopg2cffi-compat==1.1 ; platform_python_implementation == 'PyPy'",
+    ],
     # ACME support is required to provision TLS certificates from authorities
     # that use the protocol, such as Let's Encrypt.
     "acme": [
@@ -102,6 +106,9 @@ CONDITIONAL_REQUIREMENTS = {
         "pysaml2>=4.5.0;python_version>='3.6'",
     ],
     "oidc": ["authlib>=0.14.0"],
+    # systemd-python is necessary for logging to the systemd journal via
+    # `systemd.journal.JournalHandler`, as is documented in
+    # `contrib/systemd/log_config.yaml`.
     "systemd": ["systemd-python>=231"],
     "url_preview": ["lxml>=3.5.0"],
     "sentry": ["sentry-sdk>=0.7.2"],

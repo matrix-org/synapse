@@ -215,7 +215,12 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                 ],
             )
 
-        self.get_success(self.store.db_pool.runInteraction("insert", insert_event,))
+        self.get_success(
+            self.store.db_pool.runInteraction(
+                "insert",
+                insert_event,
+            )
+        )
 
         # Now actually test that various combinations give the right result:
 
@@ -370,7 +375,8 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
             )
 
             self.hs.datastores.persist_events._persist_event_auth_chain_txn(
-                txn, [FakeEvent("b", room_id, auth_graph["b"])],
+                txn,
+                [FakeEvent("b", room_id, auth_graph["b"])],
             )
 
             self.store.db_pool.simple_update_txn(
@@ -380,7 +386,12 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                 updatevalues={"has_auth_chain_index": True},
             )
 
-        self.get_success(self.store.db_pool.runInteraction("insert", insert_event,))
+        self.get_success(
+            self.store.db_pool.runInteraction(
+                "insert",
+                insert_event,
+            )
+        )
 
         # Now actually test that various combinations give the right result:
 

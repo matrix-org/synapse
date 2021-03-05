@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 @attr.s(slots=True)
 class Edu(JsonEncodedObject):
-    """ An Edu represents a piece of data sent from one homeserver to another.
+    """An Edu represents a piece of data sent from one homeserver to another.
 
     In comparison to Pdus, Edus are not persisted for a long time on disk, are
     not meaningful beyond a given pair of homeservers, and don't have an
@@ -63,7 +63,7 @@ class Edu(JsonEncodedObject):
 
 
 class Transaction(JsonEncodedObject):
-    """ A transaction is a list of Pdus and Edus to be sent to a remote home
+    """A transaction is a list of Pdus and Edus to be sent to a remote home
     server with some extra metadata.
 
     Example transaction::
@@ -99,7 +99,7 @@ class Transaction(JsonEncodedObject):
     ]
 
     def __init__(self, transaction_id=None, pdus=[], **kwargs):
-        """ If we include a list of pdus then we decode then as PDU's
+        """If we include a list of pdus then we decode then as PDU's
         automatically.
         """
 
@@ -111,7 +111,7 @@ class Transaction(JsonEncodedObject):
 
     @staticmethod
     def create_new(pdus, **kwargs):
-        """ Used to create a new transaction. Will auto fill out
+        """Used to create a new transaction. Will auto fill out
         transaction_id and origin_server_ts keys.
         """
         if "origin_server_ts" not in kwargs:

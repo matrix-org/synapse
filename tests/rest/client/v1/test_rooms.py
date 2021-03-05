@@ -46,7 +46,9 @@ class RoomBase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         self.hs = self.setup_test_homeserver(
-            "red", federation_http_client=None, federation_client=Mock(),
+            "red",
+            federation_http_client=None,
+            federation_client=Mock(),
         )
 
         self.hs.get_federation_handler = Mock()
@@ -614,6 +616,41 @@ class RoomMemberStateTestCase(RoomBase):
         channel = self.make_request("GET", path, None)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
         self.assertEquals(json.loads(content), channel.json_body)
+
+
+class RoomInviteRatelimitTestCase(RoomBase):
+    user_id = "@sid1:red"
+
+    servlets = [
+        admin.register_servlets,
+        profile.register_servlets,
+        room.register_servlets,
+    ]
+
+    @unittest.override_config(
+        {"rc_invites": {"per_room": {"per_second": 0.5, "burst_count": 3}}}
+    )
+    def test_invites_by_rooms_ratelimit(self):
+        """Tests that invites in a room are actually rate-limited."""
+        room_id = self.helper.create_room_as(self.user_id)
+
+        for i in range(3):
+            self.helper.invite(room_id, self.user_id, "@user-%s:red" % (i,))
+
+        self.helper.invite(room_id, self.user_id, "@user-4:red", expect_code=429)
+
+    @unittest.override_config(
+        {"rc_invites": {"per_user": {"per_second": 0.5, "burst_count": 3}}}
+    )
+    def test_invites_by_users_ratelimit(self):
+        """Tests that invites to a specific user are actually rate-limited."""
+
+        for i in range(3):
+            room_id = self.helper.create_room_as(self.user_id)
+            self.helper.invite(room_id, self.user_id, "@other-users:red")
+
+        room_id = self.helper.create_room_as(self.user_id)
+        self.helper.invite(room_id, self.user_id, "@other-users:red", expect_code=429)
 
 
 class RoomJoinRatelimitTestCase(RoomBase):
@@ -1445,7 +1482,9 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         results = channel.json_body["search_categories"]["room_events"]["results"]
 
         self.assertEqual(
-            len(results), 2, [result["result"]["content"] for result in results],
+            len(results),
+            2,
+            [result["result"]["content"] for result in results],
         )
         self.assertEqual(
             results[0]["result"]["content"]["body"],
@@ -1480,7 +1519,9 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         results = channel.json_body["search_categories"]["room_events"]["results"]
 
         self.assertEqual(
-            len(results), 4, [result["result"]["content"] for result in results],
+            len(results),
+            4,
+            [result["result"]["content"] for result in results],
         )
         self.assertEqual(
             results[0]["result"]["content"]["body"],
@@ -1527,7 +1568,9 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         results = channel.json_body["search_categories"]["room_events"]["results"]
 
         self.assertEqual(
-            len(results), 1, [result["result"]["content"] for result in results],
+            len(results),
+            1,
+            [result["result"]["content"] for result in results],
         )
         self.assertEqual(
             results[0]["result"]["content"]["body"],

@@ -14,6 +14,7 @@
 # limitations under the License.
 import logging
 import re
+from urllib.request import getproxies_environment, proxy_bypass_environment
 
 from zope.interface import implementer
 
@@ -58,6 +59,9 @@ class ProxyAgent(_AgentBase):
 
         pool (HTTPConnectionPool|None): connection pool to be used. If None, a
             non-persistent pool instance will be created.
+
+        use_proxy (bool): Whether proxy settings should be discovered and used
+            from conventional environment variables.
     """
 
     def __init__(
@@ -68,8 +72,7 @@ class ProxyAgent(_AgentBase):
         connectTimeout=None,
         bindAddress=None,
         pool=None,
-        http_proxy=None,
-        https_proxy=None,
+        use_proxy=False,
     ):
         _AgentBase.__init__(self, reactor, pool)
 
@@ -84,6 +87,15 @@ class ProxyAgent(_AgentBase):
         if bindAddress is not None:
             self._endpoint_kwargs["bindAddress"] = bindAddress
 
+        http_proxy = None
+        https_proxy = None
+        no_proxy = None
+        if use_proxy:
+            proxies = getproxies_environment()
+            http_proxy = proxies["http"].encode() if "http" in proxies else None
+            https_proxy = proxies["https"].encode() if "https" in proxies else None
+            no_proxy = proxies["no"] if "no" in proxies else None
+
         self.http_proxy_endpoint = _http_proxy_endpoint(
             http_proxy, self.proxy_reactor, **self._endpoint_kwargs
         )
@@ -91,6 +103,8 @@ class ProxyAgent(_AgentBase):
         self.https_proxy_endpoint = _http_proxy_endpoint(
             https_proxy, self.proxy_reactor, **self._endpoint_kwargs
         )
+
+        self.no_proxy = no_proxy
 
         self._policy_for_https = contextFactory
         self._reactor = reactor
@@ -139,13 +153,28 @@ class ProxyAgent(_AgentBase):
         pool_key = (parsed_uri.scheme, parsed_uri.host, parsed_uri.port)
         request_path = parsed_uri.originForm
 
-        if parsed_uri.scheme == b"http" and self.http_proxy_endpoint:
+        should_skip_proxy = False
+        if self.no_proxy is not None:
+            should_skip_proxy = proxy_bypass_environment(
+                parsed_uri.host.decode(),
+                proxies={"no": self.no_proxy},
+            )
+
+        if (
+            parsed_uri.scheme == b"http"
+            and self.http_proxy_endpoint
+            and not should_skip_proxy
+        ):
             # Cache *all* connections under the same key, since we are only
             # connecting to a single destination, the proxy:
             pool_key = ("http-proxy", self.http_proxy_endpoint)
             endpoint = self.http_proxy_endpoint
             request_path = uri
-        elif parsed_uri.scheme == b"https" and self.https_proxy_endpoint:
+        elif (
+            parsed_uri.scheme == b"https"
+            and self.https_proxy_endpoint
+            and not should_skip_proxy
+        ):
             endpoint = HTTPConnectProxyEndpoint(
                 self.proxy_reactor,
                 self.https_proxy_endpoint,

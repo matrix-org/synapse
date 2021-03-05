@@ -62,7 +62,8 @@ def chunk_seq(iseq: ISeq, maxlen: int) -> Iterable[ISeq]:
 
 
 def sorted_topologically(
-    nodes: Iterable[T], graph: Mapping[T, Collection[T]],
+    nodes: Iterable[T],
+    graph: Mapping[T, Collection[T]],
 ) -> Generator[T, None, None]:
     """Given a set of nodes and a graph, yield the nodes in toplogical order.
 
@@ -78,7 +79,7 @@ def sorted_topologically(
         if node not in degree_map:
             continue
 
-        for edge in edges:
+        for edge in set(edges):
             if edge in degree_map:
                 degree_map[node] += 1
 

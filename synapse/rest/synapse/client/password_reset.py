@@ -15,7 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, Tuple
 
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.api.errors import ThreepidValidationError
 from synapse.config.emailconfig import ThreepidBehaviour

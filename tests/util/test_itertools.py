@@ -24,28 +24,32 @@ class ChunkSeqTests(TestCase):
         parts = chunk_seq("123", 8)
 
         self.assertEqual(
-            list(parts), ["123"],
+            list(parts),
+            ["123"],
         )
 
     def test_long_seq(self):
         parts = chunk_seq("abcdefghijklmnop", 8)
 
         self.assertEqual(
-            list(parts), ["abcdefgh", "ijklmnop"],
+            list(parts),
+            ["abcdefgh", "ijklmnop"],
         )
 
     def test_uneven_parts(self):
         parts = chunk_seq("abcdefghijklmnop", 5)
 
         self.assertEqual(
-            list(parts), ["abcde", "fghij", "klmno", "p"],
+            list(parts),
+            ["abcde", "fghij", "klmno", "p"],
         )
 
     def test_empty_input(self):
         parts = chunk_seq([], 5)
 
         self.assertEqual(
-            list(parts), [],
+            list(parts),
+            [],
         )
 
 
@@ -91,4 +95,16 @@ class SortTopologically(TestCase):
 
         # Valid orderings are `[1, 3, 2, 4]` or `[1, 2, 3, 4]`, but we should
         # always get the same one.
+        self.assertEqual(list(sorted_topologically([4, 3, 2, 1], graph)), [1, 2, 3, 4])
+
+    def test_duplicates(self):
+        "Test that a graph with duplicate edges work"
+        graph = {1: [], 2: [1, 1], 3: [2, 2], 4: [3]}  # type: Dict[int, List[int]]
+
+        self.assertEqual(list(sorted_topologically([4, 3, 2, 1], graph)), [1, 2, 3, 4])
+
+    def test_multiple_paths(self):
+        "Test that a graph with multiple paths between two nodes work"
+        graph = {1: [], 2: [1], 3: [2], 4: [3, 2, 1]}  # type: Dict[int, List[int]]
+
         self.assertEqual(list(sorted_topologically([4, 3, 2, 1], graph)), [1, 2, 3, 4])

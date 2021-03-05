@@ -14,8 +14,11 @@
 # limitations under the License.
 
 """Contains functions for registering clients."""
+
 import logging
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
+
+from prometheus_client import Counter
 
 from synapse import types
 from synapse.api.constants import MAX_USERID_LENGTH, EventTypes, JoinRules, LoginType
@@ -40,6 +43,19 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+registration_counter = Counter(
+    "synapse_user_registrations_total",
+    "Number of new users registered (since restart)",
+    ["guest", "shadow_banned", "auth_provider"],
+)
+
+login_counter = Counter(
+    "synapse_user_logins_total",
+    "Number of user logins (since restart)",
+    ["guest", "auth_provider"],
+)
+
+
 class RegistrationHandler(BaseHandler):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
@@ -61,8 +77,8 @@ class RegistrationHandler(BaseHandler):
             self._register_device_client = RegisterDeviceReplicationServlet.make_client(
                 hs
             )
-            self._post_registration_client = ReplicationPostRegisterActionsServlet.make_client(
-                hs
+            self._post_registration_client = (
+                ReplicationPostRegisterActionsServlet.make_client(hs)
             )
         else:
             self.device_handler = hs.get_device_handler()
@@ -152,9 +168,10 @@ class RegistrationHandler(BaseHandler):
         user_type: Optional[str] = None,
         default_display_name: Optional[str] = None,
         address: Optional[str] = None,
-        bind_emails: List[str] = [],
+        bind_emails: Iterable[str] = [],
         by_admin: bool = False,
         user_agent_ips: Optional[List[Tuple[str, str]]] = None,
+        auth_provider_id: Optional[str] = None,
     ) -> str:
         """Registers a new client on the server.
 
@@ -180,20 +197,25 @@ class RegistrationHandler(BaseHandler):
               admin api, otherwise False.
             user_agent_ips: Tuples of IP addresses and user-agents used
                 during the registration process.
+            auth_provider_id: The SSO IdP the user used, if any (just used for the
+                prometheus metrics).
         Returns:
-            The registere user_id.
+            The registered user_id.
         Raises:
             SynapseError if there was a problem registering.
         """
         self.check_registration_ratelimit(address)
 
         result = await self.spam_checker.check_registration_for_spam(
-            threepid, localpart, user_agent_ips or [],
+            threepid,
+            localpart,
+            user_agent_ips or [],
         )
 
         if result == RegistrationBehaviour.DENY:
             logger.info(
-                "Blocked registration of %r", localpart,
+                "Blocked registration of %r",
+                localpart,
             )
             # We return a 429 to make it not obvious that they've been
             # denied.
@@ -202,7 +224,8 @@ class RegistrationHandler(BaseHandler):
         shadow_banned = result == RegistrationBehaviour.SHADOW_BAN
         if shadow_banned:
             logger.info(
-                "Shadow banning registration of %r", localpart,
+                "Shadow banning registration of %r",
+                localpart,
             )
 
         # do not check_auth_blocking if the call is coming through the Admin API
@@ -274,6 +297,12 @@ class RegistrationHandler(BaseHandler):
                 except SynapseError:
                     # if user id is taken, just generate another
                     fail_count += 1
+
+        registration_counter.labels(
+            guest=make_guest,
+            shadow_banned=shadow_banned,
+            auth_provider=(auth_provider_id or ""),
+        ).inc()
 
         if not self.hs.config.user_consent_at_registration:
             if not self.hs.config.auto_join_rooms_for_guests and make_guest:
@@ -368,7 +397,9 @@ class RegistrationHandler(BaseHandler):
                     config["room_alias_name"] = room_alias.localpart
 
                     info, _ = await room_creation_handler.create_room(
-                        fake_requester, config=config, ratelimit=False,
+                        fake_requester,
+                        config=config,
+                        ratelimit=False,
                     )
 
                     # If the room does not require an invite, but another user
@@ -631,6 +662,7 @@ class RegistrationHandler(BaseHandler):
         initial_display_name: Optional[str],
         is_guest: bool = False,
         is_appservice_ghost: bool = False,
+        auth_provider_id: Optional[str] = None,
     ) -> Tuple[str, str]:
         """Register a device for a user and generate an access token.
 
@@ -641,7 +673,8 @@ class RegistrationHandler(BaseHandler):
             device_id: The device ID to check, or None to generate a new one.
             initial_display_name: An optional display name for the device.
             is_guest: Whether this is a guest account
-
+            auth_provider_id: The SSO IdP the user used, if any (just used for the
+                prometheus metrics).
         Returns:
             Tuple of device ID and access token
         """
@@ -680,6 +713,11 @@ class RegistrationHandler(BaseHandler):
                 is_appservice_ghost=is_appservice_ghost,
             )
 
+        login_counter.labels(
+            guest=is_guest,
+            auth_provider=(auth_provider_id or ""),
+        ).inc()
+
         return (registered_device_id, access_token)
 
     async def post_registration_actions(
@@ -693,6 +731,8 @@ class RegistrationHandler(BaseHandler):
             access_token: The access token of the newly logged in device, or
                 None if `inhibit_login` enabled.
         """
+        # TODO: 3pid registration can actually happen on the workers. Consider
+        # refactoring it.
         if self.hs.config.worker_app:
             await self._post_registration_client(
                 user_id=user_id, auth_result=auth_result, access_token=access_token
@@ -750,7 +790,10 @@ class RegistrationHandler(BaseHandler):
             return
 
         await self._auth_handler.add_threepid(
-            user_id, threepid["medium"], threepid["address"], threepid["validated_at"],
+            user_id,
+            threepid["medium"],
+            threepid["address"],
+            threepid["validated_at"],
         )
 
         # And we add an email pusher for them by default, but only
@@ -802,5 +845,8 @@ class RegistrationHandler(BaseHandler):
             raise
 
         await self._auth_handler.add_threepid(
-            user_id, threepid["medium"], threepid["address"], threepid["validated_at"],
+            user_id,
+            threepid["medium"],
+            threepid["address"],
+            threepid["validated_at"],
         )

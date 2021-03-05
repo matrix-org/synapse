@@ -340,8 +340,7 @@ class StateFilter:
 
 
 class StateGroupStorage:
-    """High level interface to fetching state for event.
-    """
+    """High level interface to fetching state for event."""
 
     def __init__(self, hs: "HomeServer", stores: "Databases"):
         self.stores = stores
@@ -400,7 +399,7 @@ class StateGroupStorage:
     async def get_state_groups(
         self, room_id: str, event_ids: Iterable[str]
     ) -> Dict[int, List[EventBase]]:
-        """ Get the state groups for the given list of event_ids
+        """Get the state groups for the given list of event_ids
 
         Args:
             room_id: ID of the room for these events.

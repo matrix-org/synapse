@@ -15,13 +15,14 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING
+from typing import IO, TYPE_CHECKING
 
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import DirectServeJsonResource, respond_with_json
 from synapse.http.servlet import parse_string
+from synapse.rest.media.v1.media_storage import SpamMediaException
 
 if TYPE_CHECKING:
     from synapse.app.homeserver import HomeServer
@@ -78,7 +79,9 @@ class UploadResource(DirectServeJsonResource):
         headers = request.requestHeaders
 
         if headers.hasHeader(b"Content-Type"):
-            media_type = headers.getRawHeaders(b"Content-Type")[0].decode("ascii")
+            content_type_headers = headers.getRawHeaders(b"Content-Type")
+            assert content_type_headers  # for mypy
+            media_type = content_type_headers[0].decode("ascii")
         else:
             raise SynapseError(msg="Upload request missing 'Content-Type'", code=400)
 
@@ -86,9 +89,15 @@ class UploadResource(DirectServeJsonResource):
         #     disposition = headers.getRawHeaders(b"Content-Disposition")[0]
         # TODO(markjh): parse content-dispostion
 
-        content_uri = await self.media_repo.create_content(
-            media_type, upload_name, request.content, content_length, requester.user
-        )
+        try:
+            content = request.content  # type: IO  # type: ignore
+            content_uri = await self.media_repo.create_content(
+                media_type, upload_name, content, content_length, requester.user
+            )
+        except SpamMediaException:
+            # For uploading of media we want to respond with a 400, instead of
+            # the default 404, as that would just be confusing.
+            raise SynapseError(400, "Bad content")
 
         logger.info("Uploaded content with URI %r", content_uri)
 

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2019-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from synapse.api.constants import PresenceState
 from synapse.config.homeserver import HomeServerConfig
@@ -27,7 +27,7 @@ from synapse.storage.util.id_generators import (
     MultiWriterIdGenerator,
     StreamIdGenerator,
 )
-from synapse.types import get_domain_from_id
+from synapse.types import JsonDict, get_domain_from_id
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from .account_data import AccountDataStore
@@ -43,6 +43,7 @@ from .end_to_end_keys import EndToEndKeyStore
 from .event_federation import EventFederationStore
 from .event_push_actions import EventPushActionsStore
 from .events_bg_updates import EventsBackgroundUpdatesStore
+from .events_forward_extremities import EventForwardExtremitiesStore
 from .filtering import FilteringStore
 from .group_server import GroupServerStore
 from .keys import KeyStore
@@ -118,6 +119,7 @@ class DataStore(
     UIAuthStore,
     CacheInvalidationWorkerStore,
     ServerMetricsStore,
+    EventForwardExtremitiesStore,
 ):
     def __init__(self, database: DatabasePool, db_conn, hs):
         self.hs = hs
@@ -262,7 +264,7 @@ class DataStore(
 
         return [UserPresenceState(**row) for row in rows]
 
-    async def get_users(self) -> List[Dict[str, Any]]:
+    async def get_users(self) -> List[JsonDict]:
         """Function to retrieve a list of users in users table.
 
         Returns:
@@ -290,7 +292,7 @@ class DataStore(
         name: Optional[str] = None,
         guests: bool = True,
         deactivated: bool = False,
-    ) -> Tuple[List[Dict[str, Any]], int]:
+    ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of users from
         users list. This will return a json list of users and the
         total number of users matching the filter criteria.
@@ -338,7 +340,7 @@ class DataStore(
             count = txn.fetchone()[0]
 
             sql = (
-                "SELECT name, user_type, is_guest, admin, deactivated, displayname, avatar_url "
+                "SELECT name, user_type, is_guest, admin, deactivated, shadow_banned, displayname, avatar_url "
                 + sql_base
                 + " ORDER BY u.name LIMIT ? OFFSET ?"
             )
@@ -351,7 +353,7 @@ class DataStore(
             "get_users_paginate_txn", get_users_paginate_txn
         )
 
-    async def search_users(self, term: str) -> Optional[List[Dict[str, Any]]]:
+    async def search_users(self, term: str) -> Optional[List[JsonDict]]:
         """Function to search users list for one or more users with
         the matched term.
 

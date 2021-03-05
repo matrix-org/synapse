@@ -19,7 +19,9 @@ from typing import TYPE_CHECKING, Awaitable, Callable, Dict, Optional
 from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.appservice import ApplicationService
-from synapse.http.server import finish_request
+from synapse.handlers.sso import SsoIdentityProvider
+from synapse.http import get_request_uri
+from synapse.http.server import HttpServer, finish_request
 from synapse.http.servlet import (
     RestServlet,
     parse_json_object_from_request,
@@ -60,11 +62,14 @@ class LoginRestServlet(RestServlet):
         self.saml2_enabled = hs.config.saml2_enabled
         self.cas_enabled = hs.config.cas_enabled
         self.oidc_enabled = hs.config.oidc_enabled
+        self._msc2858_enabled = hs.config.experimental.msc2858_enabled
 
         self.auth = hs.get_auth()
 
         self.auth_handler = self.hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
+        self._sso_handler = hs.get_sso_handler()
+
         self._well_known_builder = WellKnownBuilder(hs)
         self._address_ratelimiter = Ratelimiter(
             clock=hs.get_clock(),
@@ -89,8 +94,17 @@ class LoginRestServlet(RestServlet):
             flows.append({"type": LoginRestServlet.CAS_TYPE})
 
         if self.cas_enabled or self.saml2_enabled or self.oidc_enabled:
-            flows.append({"type": LoginRestServlet.SSO_TYPE})
-            # While its valid for us to advertise this login type generally,
+            sso_flow = {"type": LoginRestServlet.SSO_TYPE}  # type: JsonDict
+
+            if self._msc2858_enabled:
+                sso_flow["org.matrix.msc2858.identity_providers"] = [
+                    _get_auth_flow_dict_for_idp(idp)
+                    for idp in self._sso_handler.get_identity_providers().values()
+                ]
+
+            flows.append(sso_flow)
+
+            # While it's valid for us to advertise this login type generally,
             # synapse currently only gives out these tokens as part of the
             # SSO login flow.
             # Generally we don't want to advertise login flows that clients
@@ -205,6 +219,7 @@ class LoginRestServlet(RestServlet):
         callback: Optional[Callable[[Dict[str, str]], Awaitable[None]]] = None,
         create_non_existent_users: bool = False,
         ratelimit: bool = True,
+        auth_provider_id: Optional[str] = None,
     ) -> Dict[str, str]:
         """Called when we've successfully authed the user and now need to
         actually login them in (e.g. create devices). This gets called on
@@ -220,6 +235,8 @@ class LoginRestServlet(RestServlet):
             create_non_existent_users: Whether to create the user if they don't
                 exist. Defaults to False.
             ratelimit: Whether to ratelimit the login request.
+            auth_provider_id: The SSO IdP the user used, if any (just used for the
+                prometheus metrics).
 
         Returns:
             result: Dictionary of account information after successful login.
@@ -242,7 +259,7 @@ class LoginRestServlet(RestServlet):
         device_id = login_submission.get("device_id")
         initial_display_name = login_submission.get("initial_device_display_name")
         device_id, access_token = await self.registration_handler.register_device(
-            user_id, device_id, initial_display_name
+            user_id, device_id, initial_display_name, auth_provider_id=auth_provider_id
         )
 
         result = {
@@ -269,12 +286,13 @@ class LoginRestServlet(RestServlet):
         """
         token = login_submission["token"]
         auth_handler = self.auth_handler
-        user_id = await auth_handler.validate_short_term_login_token_and_get_user_id(
-            token
-        )
+        res = await auth_handler.validate_short_term_login_token(token)
 
         return await self._complete_login(
-            user_id, login_submission, self.auth_handler._sso_login_callback
+            res.user_id,
+            login_submission,
+            self.auth_handler._sso_login_callback,
+            auth_provider_id=res.auth_provider_id,
         )
 
     async def _do_jwt_login(self, login_submission: JsonDict) -> Dict[str, str]:
@@ -297,7 +315,9 @@ class LoginRestServlet(RestServlet):
         except jwt.PyJWTError as e:
             # A JWT error occurred, return some info back to the client.
             raise LoginError(
-                403, "JWT validation failed: %s" % (str(e),), errcode=Codes.FORBIDDEN,
+                403,
+                "JWT validation failed: %s" % (str(e),),
+                errcode=Codes.FORBIDDEN,
             )
 
         user = payload.get("sub", None)
@@ -311,8 +331,22 @@ class LoginRestServlet(RestServlet):
         return result
 
 
+def _get_auth_flow_dict_for_idp(idp: SsoIdentityProvider) -> JsonDict:
+    """Return an entry for the login flow dict
+
+    Returns an entry suitable for inclusion in "identity_providers" in the
+    response to GET /_matrix/client/r0/login
+    """
+    e = {"id": idp.idp_id, "name": idp.idp_name}  # type: JsonDict
+    if idp.idp_icon:
+        e["icon"] = idp.idp_icon
+    if idp.idp_brand:
+        e["brand"] = idp.idp_brand
+    return e
+
+
 class SsoRedirectServlet(RestServlet):
-    PATTERNS = client_patterns("/login/(cas|sso)/redirect", v1=True)
+    PATTERNS = client_patterns("/login/(cas|sso)/redirect$", v1=True)
 
     def __init__(self, hs: "HomeServer"):
         # make sure that the relevant handlers are instantiated, so that they
@@ -324,13 +358,60 @@ class SsoRedirectServlet(RestServlet):
         if hs.config.oidc_enabled:
             hs.get_oidc_handler()
         self._sso_handler = hs.get_sso_handler()
+        self._msc2858_enabled = hs.config.experimental.msc2858_enabled
+        self._public_baseurl = hs.config.public_baseurl
 
-    async def on_GET(self, request: SynapseRequest):
+    def register(self, http_server: HttpServer) -> None:
+        super().register(http_server)
+        if self._msc2858_enabled:
+            # expose additional endpoint for MSC2858 support
+            http_server.register_paths(
+                "GET",
+                client_patterns(
+                    "/org.matrix.msc2858/login/sso/redirect/(?P<idp_id>[A-Za-z0-9_.~-]+)$",
+                    releases=(),
+                    unstable=True,
+                ),
+                self.on_GET,
+                self.__class__.__name__,
+            )
+
+    async def on_GET(
+        self, request: SynapseRequest, idp_id: Optional[str] = None
+    ) -> None:
+        if not self._public_baseurl:
+            raise SynapseError(400, "SSO requires a valid public_baseurl")
+
+        # if this isn't the expected hostname, redirect to the right one, so that we
+        # get our cookies back.
+        requested_uri = get_request_uri(request)
+        baseurl_bytes = self._public_baseurl.encode("utf-8")
+        if not requested_uri.startswith(baseurl_bytes):
+            # swap out the incorrect base URL for the right one.
+            #
+            # The idea here is to redirect from
+            #    https://foo.bar/whatever/_matrix/...
+            # to
+            #    https://public.baseurl/_matrix/...
+            #
+            i = requested_uri.index(b"/_matrix")
+            new_uri = baseurl_bytes[:-1] + requested_uri[i:]
+            logger.info(
+                "Requested URI %s is not canonical: redirecting to %s",
+                requested_uri.decode("utf-8", errors="replace"),
+                new_uri.decode("utf-8", errors="replace"),
+            )
+            request.redirect(new_uri)
+            finish_request(request)
+            return
+
         client_redirect_url = parse_string(
             request, "redirectUrl", required=True, encoding=None
         )
         sso_url = await self._sso_handler.handle_redirect_request(
-            request, client_redirect_url
+            request,
+            client_redirect_url,
+            idp_id,
         )
         logger.info("Redirecting to %s", sso_url)
         request.redirect(sso_url)

@@ -1,0 +1,129 @@
+body, input, select, textarea {
+  font-family: "Inter", "Helvetica", "Arial", sans-serif;
+  font-size: 14px;
+  color: #17191C;
+}
+
+header, footer {
+  max-width: 480px;
+  width: 100%;
+  margin: 24px auto;
+  text-align: center;
+}
+
+@media screen and (min-width: 800px) {
+  header {
+    margin-top: 90px;
+  }
+}
+
+header {
+  min-height: 60px;
+}
+
+header p {
+  color: #737D8C;
+  line-height: 24px;
+}
+
+h1 {
+  font-size: 24px;
+}
+
+a {
+  color: #418DED;
+}
+
+.error_page h1 {
+  color: #FE2928;
+}
+
+h2 {
+  font-size: 14px;
+}
+
+h2 img {
+  vertical-align: middle;
+  margin-right: 8px;
+  width: 24px;
+  height: 24px;
+}
+
+label {
+  cursor: pointer;
+}
+
+main {
+  max-width: 360px;
+  width: 100%;
+  margin: 24px auto;
+}
+
+.primary-button {
+  border: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  text-decoration: none;
+  padding: 12px;
+  color: white;
+  background-color: #418DED;
+  font-weight: bold;
+  display: block;
+  border-radius: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 16px 0;
+  cursor: pointer;
+  text-align: center;
+}
+
+.profile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 24px;
+  padding: 13px;
+  border: 1px solid #E9ECF1;
+  border-radius: 4px;
+}
+
+.profile.with-avatar {
+  margin-top: 42px; /* (36px / 2) + 24px*/
+}
+
+.profile .avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 100%;
+  display: block;
+  margin-top: -32px;
+  margin-bottom: 8px;
+}
+
+.profile .display-name {
+  font-weight: bold;
+  margin-bottom: 4px;
+  font-size: 15px;
+  line-height: 18px;
+}
+.profile .user-id {
+  color: #737D8C;
+  font-size: 12px;
+  line-height: 12px;
+}
+
+footer {
+  margin-top: 80px;
+}
+
+footer svg {
+  display: block;
+  width: 46px;
+  margin: 0px auto 12px auto;
+}
+
+footer p {
+  color: #737D8C;
+}

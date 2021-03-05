@@ -24,11 +24,21 @@
 import abc
 import functools
 import logging
-import os
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, TypeVar, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    TypeVar,
+    Union,
+    cast,
+)
 
 import twisted.internet.base
 import twisted.internet.tcp
+from twisted.internet import defer
 from twisted.mail.smtp import sendmail
 from twisted.web.iweb import IPolicyForHTTPS
 
@@ -103,6 +113,7 @@ from synapse.notifier import Notifier
 from synapse.push.action_generator import ActionGenerator
 from synapse.push.pusherpool import PusherPool
 from synapse.replication.tcp.client import ReplicationDataHandler
+from synapse.replication.tcp.external_cache import ExternalCache
 from synapse.replication.tcp.handler import ReplicationCommandHandler
 from synapse.replication.tcp.resource import ReplicationStreamer
 from synapse.replication.tcp.streams import STREAMS_MAP, Stream
@@ -128,6 +139,8 @@ from synapse.util.stringutils import random_string
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from txredisapi import RedisProtocol
+
     from synapse.handlers.oidc_handler import OidcHandler
     from synapse.handlers.saml_handler import SamlHandler
 
@@ -235,7 +248,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         self.start_time = None  # type: Optional[int]
 
         self._instance_id = random_string(5)
-        self._instance_name = config.worker_name or "master"
+        self._instance_name = config.worker.instance_name
 
         self.version_string = version_string
 
@@ -357,11 +370,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         """
         An HTTP client that uses configured HTTP(S) proxies.
         """
-        return SimpleHttpClient(
-            self,
-            http_proxy=os.getenvb(b"http_proxy"),
-            https_proxy=os.getenvb(b"HTTPS_PROXY"),
-        )
+        return SimpleHttpClient(self, use_proxy=True)
 
     @cache_in_self
     def get_proxied_blacklisted_http_client(self) -> SimpleHttpClient:
@@ -373,8 +382,7 @@ class HomeServer(metaclass=abc.ABCMeta):
             self,
             ip_whitelist=self.config.ip_range_whitelist,
             ip_blacklist=self.config.ip_range_blacklist,
-            http_proxy=os.getenvb(b"http_proxy"),
-            https_proxy=os.getenvb(b"HTTPS_PROXY"),
+            use_proxy=True,
         )
 
     @cache_in_self
@@ -396,7 +404,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return RoomShutdownHandler(self)
 
     @cache_in_self
-    def get_sendmail(self) -> sendmail:
+    def get_sendmail(self) -> Callable[..., defer.Deferred]:
         return sendmail
 
     @cache_in_self
@@ -585,7 +593,9 @@ class HomeServer(metaclass=abc.ABCMeta):
         return UserDirectoryHandler(self)
 
     @cache_in_self
-    def get_groups_local_handler(self):
+    def get_groups_local_handler(
+        self,
+    ) -> Union[GroupsLocalWorkerHandler, GroupsLocalHandler]:
         if self.config.worker_app:
             return GroupsLocalWorkerHandler(self)
         else:
@@ -716,12 +726,33 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_account_data_handler(self) -> AccountDataHandler:
         return AccountDataHandler(self)
 
-    async def remove_pusher(self, app_id: str, push_key: str, user_id: str):
-        return await self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
+    @cache_in_self
+    def get_external_cache(self) -> ExternalCache:
+        return ExternalCache(self)
+
+    @cache_in_self
+    def get_outbound_redis_connection(self) -> Optional["RedisProtocol"]:
+        if not self.config.redis.redis_enabled:
+            return None
+
+        # We only want to import redis module if we're using it, as we have
+        # `txredisapi` as an optional dependency.
+        from synapse.replication.tcp.redis import lazyConnection
+
+        logger.info(
+            "Connecting to redis (host=%r port=%r) for external cache",
+            self.config.redis_host,
+            self.config.redis_port,
+        )
+
+        return lazyConnection(
+            hs=self,
+            host=self.config.redis_host,
+            port=self.config.redis_port,
+            password=self.config.redis.redis_password,
+            reconnect=True,
+        )
 
     def should_send_federation(self) -> bool:
         "Should this server be sending federation traffic directly?"
-        return self.config.send_federation and (
-            not self.config.worker_app
-            or self.config.worker_app == "synapse.app.federation_sender"
-        )
+        return self.config.send_federation
