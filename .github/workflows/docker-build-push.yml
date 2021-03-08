@@ -39,8 +39,16 @@ jobs:
         with:
           push: true
           tags: |
-            ghcr.io/mqsdk/api:latest
-            ghcr.io/mqsdk/api:${{ github.sha }}
+            ghcr.io/mqsdk/synapse:latest
+            ghcr.io/mqsdk/synapse:${{ github.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
           file: docker/Dockerfile
+
+    - name: Signal successful build and push
+      uses: peter-evans/repository-dispatch@v1
+      with:
+        token: ${{ secrets.CR_PAT }}
+        repository: mqsdk/api
+        event-type: synapse-build-successful
+        # client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
