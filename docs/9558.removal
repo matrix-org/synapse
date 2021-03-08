@@ -1,0 +1,1 @@
+Support for calling /register without a type of `m.login.application_service` when trying to register an AS user will be dropped in an upcoming release.
