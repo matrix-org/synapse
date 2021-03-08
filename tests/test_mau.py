@@ -17,7 +17,7 @@
 
 import json
 
-from synapse.api.constants import AppserviceRegistrationType, LoginType
+from synapse.api.constants import APP_SERVICE_REGISTRATION_TYPE, LoginType
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.appservice import ApplicationService
 from synapse.rest.client.v2_alpha import register, sync
@@ -240,7 +240,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
         }
 
         if appservice:
-            request_data["type"] = AppserviceRegistrationType
+            request_data["type"] = APP_SERVICE_REGISTRATION_TYPE
 
         channel = self.make_request(
             "POST",

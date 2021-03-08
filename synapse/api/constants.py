@@ -72,7 +72,7 @@ class LoginType:
 
 # This is not a login type as we cannot login with it, however
 # the spec says that this is a valid registration type for appservices.
-AppserviceRegistrationType = "m.login.application_service"
+APP_SERVICE_REGISTRATION_TYPE = "m.login.application_service"
 
 
 class EventTypes:

@@ -21,7 +21,7 @@ import os
 import pkg_resources
 
 import synapse.rest.admin
-from synapse.api.constants import AppserviceRegistrationType, LoginType
+from synapse.api.constants import APP_SERVICE_REGISTRATION_TYPE, LoginType
 from synapse.api.errors import Codes
 from synapse.appservice import ApplicationService
 from synapse.rest.client.v1 import login, logout
@@ -59,7 +59,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         self.hs.get_datastore().services_cache.append(appservice)
         request_data = json.dumps(
-            {"username": "as_user_kermit", "type": AppserviceRegistrationType}
+            {"username": "as_user_kermit", "type": APP_SERVICE_REGISTRATION_TYPE}
         )
 
         channel = self.make_request(
@@ -93,7 +93,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
     def test_POST_appservice_registration_invalid(self):
         self.appservice = None  # no application service exists
         request_data = json.dumps(
-            {"username": "kermit", "type": AppserviceRegistrationType}
+            {"username": "kermit", "type": APP_SERVICE_REGISTRATION_TYPE}
         )
         channel = self.make_request(
             b"POST", self.url + b"?access_token=i_am_an_app_service", request_data

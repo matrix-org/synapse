@@ -21,7 +21,7 @@ from typing import List, Union
 import synapse
 import synapse.api.auth
 import synapse.types
-from synapse.api.constants import AppserviceRegistrationType, LoginType
+from synapse.api.constants import APP_SERVICE_REGISTRATION_TYPE, LoginType
 from synapse.api.errors import (
     Codes,
     InteractiveAuthIncompleteError,
@@ -431,7 +431,7 @@ class RegisterRestServlet(RestServlet):
         # different registration flows to normal users
 
         # == Application Service Registration ==
-        if body.get("type") == AppserviceRegistrationType:
+        if body.get("type") == APP_SERVICE_REGISTRATION_TYPE:
             if not self.auth.has_access_token(request):
                 raise SynapseError(
                     400,
