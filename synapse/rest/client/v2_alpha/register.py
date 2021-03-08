@@ -461,7 +461,7 @@ class RegisterRestServlet(RestServlet):
             )
 
             return 200, result
-        else if self.auth.has_access_token(request):
+        elif self.auth.has_access_token(request):
             raise SynapseError(
                 400,
                 "A type of m.login.application_service must be provided when registering as an appservice",
