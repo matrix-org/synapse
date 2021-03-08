@@ -4,6 +4,9 @@ Synapse 1.29.0 (2021-03-08)
 Note that synapse now expects an `X-Forwarded-Proto` header when used with a reverse proxy. Please see [UPGRADE.rst](UPGRADE.rst#upgrading-to-v1290) for more details on this change.
 
 
+No significant changes.
+
+
 Synapse 1.29.0rc1 (2021-03-04)
 ==============================
 
