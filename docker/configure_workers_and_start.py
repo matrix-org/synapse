@@ -31,6 +31,8 @@ import sys
 import jinja2
 import yaml
 
+MAIN_PROCESS_HTTP_LISTENER_PORT = 8080
+
 WORKERS_CONFIG = {
     "pusher": {
         "app": "synapse.app.pusher",
@@ -137,6 +139,31 @@ WORKERS_CONFIG = {
         "shared_extra_conf": {"run_background_tasks_on": "background_worker1"},
         "worker_extra_conf": "",
     },
+    "event_creator": {
+        "app": "synapse.app.generic_worker",
+        "listener_resources": ["client"],
+        "endpoint_patterns": [
+            "^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/redact",
+            "^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/send",
+            "^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$",
+            "^/_matrix/client/(api/v1|r0|unstable)/join/",
+            "^/_matrix/client/(api/v1|r0|unstable)/profile/",
+        ],
+        "shared_extra_conf": {},
+        "worker_extra_conf": "",
+    },
+    "frontend_proxy": {
+        "app": "synapse.app.frontend_proxy",
+        "listener_resources": ["client", "replication"],
+        "endpoint_patterns": [
+            "^/_matrix/client/(api/v1|r0|unstable)/keys/upload",
+        ],
+        "shared_extra_conf": {},
+        "worker_extra_conf": (
+            "worker_main_http_uri: http://127.0.0.1:%d"
+            % (MAIN_PROCESS_HTTP_LISTENER_PORT,),
+        ),
+    },
 }
 
 
@@ -238,7 +265,7 @@ def generate_base_homeserver_config():
     """
     # start.py already does this for us, so just call that.
     # note that this script is copied in in the official, monolith dockerfile
-    os.environ["SYNAPSE_HTTP_PORT"] = "8080"
+    os.environ["SYNAPSE_HTTP_PORT"] = str(MAIN_PROCESS_HTTP_LISTENER_PORT)
     subprocess.check_output(["/usr/local/bin/python", "/start.py", "migrate_config"])
 
 
