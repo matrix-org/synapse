@@ -527,7 +527,7 @@ class ReactorLastSeenMetric:
 REGISTRY.register(ReactorLastSeenMetric())
 
 
-def runUntilCurrentTimer(func):
+def runUntilCurrentTimer(reactor, func):
     @functools.wraps(func)
     def f(*args, **kwargs):
         now = reactor.seconds()
@@ -590,13 +590,14 @@ def runUntilCurrentTimer(func):
 
 try:
     # Ensure the reactor has all the attributes we expect
-    reactor.runUntilCurrent
-    reactor._newTimedCalls
-    reactor.threadCallQueue
+    reactor.seconds  # type: ignore
+    reactor.runUntilCurrent  # type: ignore
+    reactor._newTimedCalls  # type: ignore
+    reactor.threadCallQueue  # type: ignore
 
     # runUntilCurrent is called when we have pending calls. It is called once
     # per iteratation after fd polling.
-    reactor.runUntilCurrent = runUntilCurrentTimer(reactor.runUntilCurrent)
+    reactor.runUntilCurrent = runUntilCurrentTimer(reactor, reactor.runUntilCurrent)  # type: ignore
 
     # We manually run the GC each reactor tick so that we can get some metrics
     # about time spent doing GC,

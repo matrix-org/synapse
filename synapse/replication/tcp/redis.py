@@ -328,6 +328,6 @@ def lazyConnection(
     factory.continueTrying = reconnect
 
     reactor = hs.get_reactor()
-    reactor.connectTCP(host, port, factory, 30)
+    reactor.connectTCP(host, port, factory, timeout=30, bindAddress=None)
 
     return factory.handler

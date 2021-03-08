@@ -18,6 +18,8 @@
 import logging
 from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 
+from prometheus_client import Counter
+
 from synapse import types
 from synapse.api.constants import MAX_USERID_LENGTH, EventTypes, JoinRules, LoginType
 from synapse.api.errors import AuthError, Codes, ConsentNotGivenError, SynapseError
@@ -39,6 +41,19 @@ if TYPE_CHECKING:
     from synapse.app.homeserver import HomeServer
 
 logger = logging.getLogger(__name__)
+
+
+registration_counter = Counter(
+    "synapse_user_registrations_total",
+    "Number of new users registered (since restart)",
+    ["guest", "shadow_banned", "auth_provider"],
+)
+
+login_counter = Counter(
+    "synapse_user_logins_total",
+    "Number of user logins (since restart)",
+    ["guest", "auth_provider"],
+)
 
 
 class RegistrationHandler(BaseHandler):
@@ -156,6 +171,7 @@ class RegistrationHandler(BaseHandler):
         bind_emails: Iterable[str] = [],
         by_admin: bool = False,
         user_agent_ips: Optional[List[Tuple[str, str]]] = None,
+        auth_provider_id: Optional[str] = None,
     ) -> str:
         """Registers a new client on the server.
 
@@ -181,8 +197,10 @@ class RegistrationHandler(BaseHandler):
               admin api, otherwise False.
             user_agent_ips: Tuples of IP addresses and user-agents used
                 during the registration process.
+            auth_provider_id: The SSO IdP the user used, if any (just used for the
+                prometheus metrics).
         Returns:
-            The registere user_id.
+            The registered user_id.
         Raises:
             SynapseError if there was a problem registering.
         """
@@ -279,6 +297,12 @@ class RegistrationHandler(BaseHandler):
                 except SynapseError:
                     # if user id is taken, just generate another
                     fail_count += 1
+
+        registration_counter.labels(
+            guest=make_guest,
+            shadow_banned=shadow_banned,
+            auth_provider=(auth_provider_id or ""),
+        ).inc()
 
         if not self.hs.config.user_consent_at_registration:
             if not self.hs.config.auto_join_rooms_for_guests and make_guest:
@@ -638,6 +662,7 @@ class RegistrationHandler(BaseHandler):
         initial_display_name: Optional[str],
         is_guest: bool = False,
         is_appservice_ghost: bool = False,
+        auth_provider_id: Optional[str] = None,
     ) -> Tuple[str, str]:
         """Register a device for a user and generate an access token.
 
@@ -648,7 +673,8 @@ class RegistrationHandler(BaseHandler):
             device_id: The device ID to check, or None to generate a new one.
             initial_display_name: An optional display name for the device.
             is_guest: Whether this is a guest account
-
+            auth_provider_id: The SSO IdP the user used, if any (just used for the
+                prometheus metrics).
         Returns:
             Tuple of device ID and access token
         """
@@ -686,6 +712,11 @@ class RegistrationHandler(BaseHandler):
                 valid_until_ms=valid_until_ms,
                 is_appservice_ghost=is_appservice_ghost,
             )
+
+        login_counter.labels(
+            guest=is_guest,
+            auth_provider=(auth_provider_id or ""),
+        ).inc()
 
         return (registered_device_id, access_token)
 

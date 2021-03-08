@@ -522,7 +522,9 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
             shorthand=False,
         )
         self.assertEqual(channel.code, 302, channel.result)
-        cas_uri = channel.headers.getRawHeaders("Location")[0]
+        location_headers = channel.headers.getRawHeaders("Location")
+        assert location_headers
+        cas_uri = location_headers[0]
         cas_uri_path, cas_uri_query = cas_uri.split("?", 1)
 
         # it should redirect us to the login page of the cas server
@@ -545,7 +547,9 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
             + "&idp=saml",
         )
         self.assertEqual(channel.code, 302, channel.result)
-        saml_uri = channel.headers.getRawHeaders("Location")[0]
+        location_headers = channel.headers.getRawHeaders("Location")
+        assert location_headers
+        saml_uri = location_headers[0]
         saml_uri_path, saml_uri_query = saml_uri.split("?", 1)
 
         # it should redirect us to the login page of the SAML server
@@ -567,17 +571,21 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
             + "&idp=oidc",
         )
         self.assertEqual(channel.code, 302, channel.result)
-        oidc_uri = channel.headers.getRawHeaders("Location")[0]
+        location_headers = channel.headers.getRawHeaders("Location")
+        assert location_headers
+        oidc_uri = location_headers[0]
         oidc_uri_path, oidc_uri_query = oidc_uri.split("?", 1)
 
         # it should redirect us to the auth page of the OIDC server
         self.assertEqual(oidc_uri_path, TEST_OIDC_AUTH_ENDPOINT)
 
         # ... and should have set a cookie including the redirect url
-        cookies = dict(
-            h.split(";")[0].split("=", maxsplit=1)
-            for h in channel.headers.getRawHeaders("Set-Cookie")
-        )
+        cookie_headers = channel.headers.getRawHeaders("Set-Cookie")
+        assert cookie_headers
+        cookies = {}  # type: Dict[str, str]
+        for h in cookie_headers:
+            key, value = h.split(";")[0].split("=", maxsplit=1)
+            cookies[key] = value
 
         oidc_session_cookie = cookies["oidc_session"]
         macaroon = pymacaroons.Macaroon.deserialize(oidc_session_cookie)
@@ -590,9 +598,9 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
 
         # that should serve a confirmation page
         self.assertEqual(channel.code, 200, channel.result)
-        self.assertTrue(
-            channel.headers.getRawHeaders("Content-Type")[-1].startswith("text/html")
-        )
+        content_type_headers = channel.headers.getRawHeaders("Content-Type")
+        assert content_type_headers
+        self.assertTrue(content_type_headers[-1].startswith("text/html"))
         p = TestHtmlParser()
         p.feed(channel.text_body)
         p.close()
@@ -806,6 +814,7 @@ class CASTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 302)
         location_headers = channel.headers.getRawHeaders("Location")
+        assert location_headers
         self.assertEqual(location_headers[0][: len(redirect_url)], redirect_url)
 
     @override_config({"sso": {"client_whitelist": ["https://legit-site.com/"]}})
@@ -1248,7 +1257,9 @@ class UsernamePickerTestCase(HomeserverTestCase):
 
         # that should redirect to the username picker
         self.assertEqual(channel.code, 302, channel.result)
-        picker_url = channel.headers.getRawHeaders("Location")[0]
+        location_headers = channel.headers.getRawHeaders("Location")
+        assert location_headers
+        picker_url = location_headers[0]
         self.assertEqual(picker_url, "/_synapse/client/pick_username/account_details")
 
         # ... with a username_mapping_session cookie
@@ -1291,6 +1302,7 @@ class UsernamePickerTestCase(HomeserverTestCase):
         )
         self.assertEqual(chan.code, 302, chan.result)
         location_headers = chan.headers.getRawHeaders("Location")
+        assert location_headers
 
         # send a request to the completion page, which should 302 to the client redirectUrl
         chan = self.make_request(
@@ -1300,6 +1312,7 @@ class UsernamePickerTestCase(HomeserverTestCase):
         )
         self.assertEqual(chan.code, 302, chan.result)
         location_headers = chan.headers.getRawHeaders("Location")
+        assert location_headers
 
         # ensure that the returned location matches the requested redirect URL
         path, query = location_headers[0].split("?", 1)
