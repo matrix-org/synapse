@@ -36,9 +36,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-last_pdu_age_metric = Gauge(
-    "synapse_federation_last_sent_pdu_age",
-    "The age (in seconds) of the last PDU successfully sent to the given domain",
+last_pdu_ts_metric = Gauge(
+    "synapse_federation_last_sent_pdu_time",
+    "The timestamp of the last PDU which was successfully sent to the given domain",
     labelnames=("server_name",),
 )
 
@@ -187,9 +187,8 @@ class TransactionManager:
 
             if success and pdus and destination in self._federation_metrics_domains:
                 last_pdu = pdus[-1]
-                last_pdu_age = self.clock.time_msec() - last_pdu.origin_server_ts
-                last_pdu_age_metric.labels(server_name=destination).set(
-                    last_pdu_age / 1000
+                last_pdu_ts_metric.labels(server_name=destination).set(
+                    last_pdu.origin_server_ts / 1000
                 )
 
             set_tag(tags.ERROR, not success)

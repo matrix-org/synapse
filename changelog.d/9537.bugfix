@@ -1,1 +1,0 @@
-Fix rare edge case that caused a background update to fail if the server had rejected an event that had duplicate auth events.
