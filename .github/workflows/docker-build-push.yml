@@ -49,6 +49,6 @@ jobs:
         uses: peter-evans/repository-dispatch@v1
         with:
           token: ${{ secrets.CR_PAT }}
-          repository: mqsdk/api
+          repository: mqsdk/synapse-kubernetes
           event-type: synapse-build-successful
           # client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
