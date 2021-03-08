@@ -151,12 +151,10 @@ class _IPBlacklistingResolver:
     def resolveHostName(
         self, recv: IResolutionReceiver, hostname: str, portNumber: int = 0
     ) -> IResolutionReceiver:
-
-        r = recv()
         addresses = []  # type: List[IAddress]
 
         def _callback() -> None:
-            r.resolutionBegan(None)
+            recv.resolutionBegan(None)
 
             has_bad_ip = False
             for i in addresses:
@@ -176,8 +174,8 @@ class _IPBlacklistingResolver:
             # valid results.
             if not has_bad_ip:
                 for i in addresses:
-                    r.addressResolved(i)
-            r.resolutionComplete()
+                    recv.addressResolved(i)
+            recv.resolutionComplete()
 
         @provider(IResolutionReceiver)
         class EndpointReceiver:
@@ -197,7 +195,7 @@ class _IPBlacklistingResolver:
             EndpointReceiver, hostname, portNumber=portNumber
         )
 
-        return r
+        return recv
 
 
 @implementer(ISynapseReactor)
