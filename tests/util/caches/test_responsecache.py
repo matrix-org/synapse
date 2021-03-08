@@ -1,4 +1,4 @@
-# Copyright 2021 Vector Creations Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,33 +12,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet.task import Clock
-
-from synapse.util import Clock as SynapseClock
 from synapse.util.caches.response_cache import ResponseCache
 
+from tests.server import get_clock
 from tests.unittest import TestCase
-
-# few notes about test naming here:
-# 'wait': denotes tests that have an element of "waiting" before its wrapped result becomes available
-# 'expire': denotes tests that test expiry after assured existence
 
 
 class DeferredCacheTestCase(TestCase):
+    """
+    A TestCase class for ResponseCache.
+
+    The test-case function naming has some logic to it in it's parts, here's some notes about it:
+        wait: Denotes tests that have an element of "waiting" before its wrapped result becomes available
+              (Generally these just use .delayed_return instead of .instant_return in it's wrapped call.)
+        expire: Denotes tests that test expiry after assured existence.
+                (These have cache with a short timeout_ms=, shorter than will be tested through advancing the clock)
+    """
+
     def setUp(self):
-        self.reactor = Clock()
-        self.synapse_clock = SynapseClock(self.reactor)
+        self.reactor, self.clock = get_clock()
+
+    def with_cache(self, name: str, ms: int = 0) -> ResponseCache:
+        return ResponseCache(self.clock, name, timeout_ms=ms)
 
     @staticmethod
     async def instant_return(o: str) -> str:
         return o
 
     async def delayed_return(self, o: str) -> str:
-        await self.synapse_clock.sleep(1)
+        await self.clock.sleep(1)
         return o
 
     def test_cache_hit(self):
-        cache = ResponseCache(self.synapse_clock, "keeping_cache", timeout_ms=9001)
+        cache = self.with_cache("keeping_cache", ms=9001)
 
         expected_result = "howdy"
 
@@ -56,7 +62,7 @@ class DeferredCacheTestCase(TestCase):
         )
 
     def test_cache_miss(self):
-        cache = ResponseCache(self.synapse_clock, "trashing_cache", timeout_ms=0)
+        cache = self.with_cache("trashing_cache", ms=0)
 
         expected_result = "howdy"
 
@@ -70,7 +76,7 @@ class DeferredCacheTestCase(TestCase):
         self.assertIsNone(cache.get(0), "cache should not have the result now")
 
     def test_cache_expire(self):
-        cache = ResponseCache(self.synapse_clock, "short_cache", timeout_ms=1000)
+        cache = self.with_cache("short_cache", ms=1000)
 
         expected_result = "howdy"
 
@@ -89,7 +95,7 @@ class DeferredCacheTestCase(TestCase):
         self.assertIsNone(cache.get(0), "cache should not have the result now")
 
     def test_cache_wait_hit(self):
-        cache = ResponseCache(self.synapse_clock, "neutral_cache")
+        cache = self.with_cache("neutral_cache")
 
         expected_result = "howdy"
 
@@ -102,7 +108,7 @@ class DeferredCacheTestCase(TestCase):
         self.assertEqual(expected_result, self.successResultOf(wrap_d))
 
     def test_cache_wait_expire(self):
-        cache = ResponseCache(self.synapse_clock, "short_cache", timeout_ms=3000)
+        cache = self.with_cache("medium_cache", ms=3000)
 
         expected_result = "howdy"
 
