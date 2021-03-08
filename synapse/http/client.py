@@ -348,7 +348,7 @@ class SimpleHttpClient:
             contextFactory=self.hs.get_http_client_context_factory(),
             pool=pool,
             use_proxy=use_proxy,
-        )
+        )  # type: IAgent
 
         if self._ip_blacklist:
             # If we have an IP blacklist, we then install the blacklisting Agent
