@@ -35,6 +35,14 @@ from typing import (
 import attr
 from signedjson.key import decode_verify_key_bytes
 from unpaddedbase64 import decode_base64
+from zope.interface import Interface
+
+from twisted.internet.interfaces import (
+    IReactorCore,
+    IReactorPluggableNameResolver,
+    IReactorTCP,
+    IReactorTime,
+)
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.util.stringutils import parse_and_validate_server_name
@@ -65,6 +73,14 @@ MutableStateMap = MutableMapping[StateKey, T]
 # the type of a JSON-serialisable dict. This could be made stronger, but it will
 # do for now.
 JsonDict = Dict[str, Any]
+
+
+# Note that this seems to require inheriting *directly* from Interface in order
+# for mypy-zope to realize it is an interface.
+class ISynapseReactor(
+    IReactorTCP, IReactorPluggableNameResolver, IReactorTime, IReactorCore, Interface
+):
+    """The interfaces necessary for Synapse to function."""
 
 
 class Requester(
