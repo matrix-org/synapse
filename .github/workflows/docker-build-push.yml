@@ -5,7 +5,7 @@ on:
   # but only for the master branch
   push:
     branches:
-      - feature/jwt-auth
+      - feature/jwt-deploy
   pull_request:
     branches:
       - master
