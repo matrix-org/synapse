@@ -1,3 +1,10 @@
+Removal warning
+---------------
+
+Note that this release deprecates the ability for appservices to call `POST /_matrix/client/r0/register`  without the body parameter `type`. Appservice developers should use a `type` value of `m.login.application_service` as per the spec. In future releases, calling this endpoint with an access token but
+without a valid type will fail.
+
+
 Synapse 1.29.0rc1 (2021-03-04)
 ==============================
 
