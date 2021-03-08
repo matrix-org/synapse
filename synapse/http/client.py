@@ -39,6 +39,7 @@ from zope.interface import implementer, provider
 from OpenSSL import SSL
 from OpenSSL.SSL import VERIFY_NONE
 from twisted.internet import defer, error as twisted_error, protocol, ssl
+from twisted.internet.address import IPv4Address, IPv6Address
 from twisted.internet.interfaces import (
     IAddress,
     IHostResolution,
@@ -157,8 +158,13 @@ class _IPBlacklistingResolver:
             recv.resolutionBegan(None)
 
             has_bad_ip = False
-            for i in addresses:
-                ip_address = IPAddress(i.host)
+            for address in addresses:
+                # We only expect IPv4 and IPv6 addresses since only A/AAAA lookups
+                # should go through this path.
+                if not isinstance(address, (IPv4Address, IPv6Address)):
+                    continue
+
+                ip_address = IPAddress(address.host)
 
                 if check_against_blacklist(
                     ip_address, self._ip_whitelist, self._ip_blacklist
@@ -173,8 +179,8 @@ class _IPBlacklistingResolver:
             # request, but all we can really do from here is claim that there were no
             # valid results.
             if not has_bad_ip:
-                for i in addresses:
-                    recv.addressResolved(i)
+                for address in addresses:
+                    recv.addressResolved(address)
             recv.resolutionComplete()
 
         @provider(IResolutionReceiver)
