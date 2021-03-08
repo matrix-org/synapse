@@ -164,17 +164,10 @@ class _TestImage:
                 ),
                 b"image/png",
                 b".png",
-                unhexlify(
-                    b"89504e470d0a1a0a0000000d49484452000000200000002008060"
-                    b"00000737a7af40000002f49444154789cedce3101000008c3b081"
-                    b"7fcf43064f6aa099b6cd63fb39070000000000000000000000000"
-                    b"0004892034d88043c4abd9d150000000049454e44ae426082",
-                ),
-                unhexlify(
-                    b"89504e470d0a1a0a0000000d49484452000000010000000108060"
-                    b"000001f15c4890000000d49444154789c63f8ffffff7f0009fb03"
-                    b"fd2a86e38a0000000049454e44ae426082"
-                ),
+                # Note that we don't check the output since it varies across
+                # different versions of Pillow.
+                None,
+                None,
             ),
         ),
         # small lossless webp
