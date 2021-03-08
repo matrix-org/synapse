@@ -252,10 +252,6 @@ def add_sharding_to_shared_config(
             "port": worker_port,
         }
 
-    else:
-        error("Sharding is not supported for worker type '%s'" % (worker_type,))
-        return
-
 
 def generate_base_homeserver_config():
     """Starts Synapse and generates a basic homeserver config, which will later be
