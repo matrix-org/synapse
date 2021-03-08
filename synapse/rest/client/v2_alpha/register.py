@@ -461,6 +461,11 @@ class RegisterRestServlet(RestServlet):
             )
 
             return 200, result
+        elif self.auth.has_access_token(request):
+            raise SynapseError(
+                400,
+                "A type of m.login.application_service must be provided when registering as an appservice",
+            )
 
         # == Normal User Registration == (everyone else)
         if not self._registration_enabled:
