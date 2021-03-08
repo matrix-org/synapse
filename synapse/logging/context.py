@@ -697,8 +697,10 @@ def run_in_background(f, *args, **kwargs) -> defer.Deferred:
     if isinstance(res, types.CoroutineType):
         res = defer.ensureDeferred(res)
 
+    # At this point we should have a Deferred, if not then f was a synchronous
+    # function, wrap it in a Deferred for consistency.
     if not isinstance(res, defer.Deferred):
-        return res
+        return defer.succeed(res)
 
     if res.called and not res.paused:
         # The function should have maintained the logcontext, so we can
