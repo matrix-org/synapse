@@ -954,7 +954,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 SELECT event_id, chain_id, sequence_number, e.event_id
                 FROM event_auth_chains
                 LEFT JOIN events AS e USING (event_id)
-                WHERE event_id > ? ORDER BY event_id ASC LIMIT ?
+                WHERE event_id > ? ORDER BY event_auth_chains.event_id ASC LIMIT ?
             """
             txn.execute(sql, (current_event_id, batch_size))
 
