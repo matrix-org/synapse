@@ -155,8 +155,6 @@ class _IPBlacklistingResolver:
         addresses = []  # type: List[IAddress]
 
         def _callback() -> None:
-            recv.resolutionBegan(None)
-
             has_bad_ip = False
             for address in addresses:
                 # We only expect IPv4 and IPv6 addresses since only A/AAAA lookups
@@ -187,7 +185,7 @@ class _IPBlacklistingResolver:
         class EndpointReceiver:
             @staticmethod
             def resolutionBegan(resolutionInProgress: IHostResolution) -> None:
-                pass
+                recv.resolutionBegan(resolutionInProgress)
 
             @staticmethod
             def addressResolved(address: IAddress) -> None:
