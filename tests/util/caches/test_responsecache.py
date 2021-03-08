@@ -125,7 +125,7 @@ class DeferredCacheTestCase(TestCase):
             "cache should still have the result",
         )
 
-        # (1 + 1 + 2) < 3.0, cache eviction timer is handled
+        # (1 + 1 + 2) > 3.0, cache eviction timer is handled
         self.reactor.pump((2,))
 
         self.assertIsNone(cache.get(0), "cache should not have the result now")
