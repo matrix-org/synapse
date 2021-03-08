@@ -58,10 +58,10 @@ trap "rm -r $tmpdir" EXIT
 cp -r tests "$tmpdir"
 
 PYTHONPATH="$tmpdir" \
-    "${TARGET_PYTHON}" -B -m twisted.trial --reporter=text -j2 tests
+    "${TARGET_PYTHON}" -m twisted.trial --reporter=text -j2 tests
 
 # build the config file
-"${TARGET_PYTHON}" -B "${VIRTUALENV_DIR}/bin/generate_config" \
+"${TARGET_PYTHON}" "${VIRTUALENV_DIR}/bin/generate_config" \
         --config-dir="/etc/matrix-synapse" \
         --data-dir="/var/lib/matrix-synapse" |
     perl -pe '
@@ -87,7 +87,7 @@ PYTHONPATH="$tmpdir" \
 ' > "${PACKAGE_BUILD_DIR}/etc/matrix-synapse/homeserver.yaml"
 
 # build the log config file
-"${TARGET_PYTHON}" -B "${VIRTUALENV_DIR}/bin/generate_log_config" \
+"${TARGET_PYTHON}" "${VIRTUALENV_DIR}/bin/generate_log_config" \
         --output-file="${PACKAGE_BUILD_DIR}/etc/matrix-synapse/log.yaml"
 
 # add a dependency on the right version of python to substvars.

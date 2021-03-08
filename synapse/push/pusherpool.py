@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Dict, Iterable, Optional
 
 from prometheus_client import Gauge
 
+from synapse.api.errors import Codes, SynapseError
 from synapse.metrics.background_process_metrics import (
     run_as_background_process,
     wrap_as_background_process,
@@ -59,7 +60,6 @@ class PusherPool:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.pusher_factory = PusherFactory(hs)
-        self._should_start_pushers = hs.config.start_pushers
         self.store = self.hs.get_datastore()
         self.clock = self.hs.get_clock()
 
@@ -68,6 +68,9 @@ class PusherPool:
         # We shard the handling of push notifications by user ID.
         self._pusher_shard_config = hs.config.push.pusher_shard_config
         self._instance_name = hs.get_instance_name()
+        self._should_start_pushers = (
+            self._instance_name in self._pusher_shard_config.instances
+        )
 
         # We can only delete pushers on master.
         self._remove_pusher_client = None
@@ -110,6 +113,11 @@ class PusherPool:
         Returns:
             The newly created pusher.
         """
+
+        if kind == "email":
+            email_owner = await self.store.get_user_id_by_threepid("email", pushkey)
+            if email_owner != user_id:
+                raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
 
         time_now_msec = self.clock.time_msec()
 

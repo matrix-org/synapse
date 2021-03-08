@@ -41,7 +41,7 @@ process.
 
 Configuration file may be generated as follows:
 
-    $ python -B -m synapse.app.homeserver -c config.yaml --generate-config --server-name=<server name>
+    $ python -m synapse.app.homeserver -c config.yaml --generate-config --server-name=<server name>
 
 ## ENVIRONMENT
 

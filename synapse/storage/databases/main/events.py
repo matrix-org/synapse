@@ -44,6 +44,7 @@ from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.search import SearchEntry
 from synapse.storage.types import Connection
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
+from synapse.storage.util.sequence import SequenceGenerator
 from synapse.types import StateMap, get_domain_from_id
 from synapse.util import json_encoder
 from synapse.util.iterutils import batch_iter, sorted_topologically
@@ -113,12 +114,6 @@ class PersistEventsStore:
             self.store._backfill_id_gen
         )  # type: MultiWriterIdGenerator
         self._stream_id_gen = self.store._stream_id_gen  # type: MultiWriterIdGenerator
-
-        # The consistency of this cannot be checked when the ID generator is
-        # created since the database might not yet be up-to-date.
-        self.db_pool.event_chain_id_gen.check_consistency(
-            db_conn, "event_auth_chains", "chain_id"  # type: ignore
-        )
 
         # This should only exist on instances that are configured to write
         assert (
@@ -485,6 +480,7 @@ class PersistEventsStore:
         self._add_chain_cover_index(
             txn,
             self.db_pool,
+            self.store.event_chain_id_gen,
             event_to_room_id,
             event_to_types,
             event_to_auth_chain,
@@ -495,6 +491,7 @@ class PersistEventsStore:
         cls,
         txn,
         db_pool: DatabasePool,
+        event_chain_id_gen: SequenceGenerator,
         event_to_room_id: Dict[str, str],
         event_to_types: Dict[str, Tuple[str, str]],
         event_to_auth_chain: Dict[str, List[str]],
@@ -641,6 +638,7 @@ class PersistEventsStore:
         new_chain_tuples = cls._allocate_chain_ids(
             txn,
             db_pool,
+            event_chain_id_gen,
             event_to_room_id,
             event_to_types,
             event_to_auth_chain,
@@ -779,6 +777,7 @@ class PersistEventsStore:
     def _allocate_chain_ids(
         txn,
         db_pool: DatabasePool,
+        event_chain_id_gen: SequenceGenerator,
         event_to_room_id: Dict[str, str],
         event_to_types: Dict[str, Tuple[str, str]],
         event_to_auth_chain: Dict[str, List[str]],
@@ -891,7 +890,7 @@ class PersistEventsStore:
             chain_to_max_seq_no[new_chain_tuple[0]] = new_chain_tuple[1]
 
         # Generate new chain IDs for all unallocated chain IDs.
-        newly_allocated_chain_ids = db_pool.event_chain_id_gen.get_next_mult_txn(
+        newly_allocated_chain_ids = event_chain_id_gen.get_next_mult_txn(
             txn, len(unallocated_chain_ids)
         )
 

@@ -63,6 +63,7 @@ from synapse.http import QuieterFileBodyProducer, RequestTimedOutError, redact_u
 from synapse.http.proxyagent import ProxyAgent
 from synapse.logging.context import make_deferred_yieldable
 from synapse.logging.opentracing import set_tag, start_active_span, tags
+from synapse.types import ISynapseReactor
 from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
 
@@ -199,7 +200,7 @@ class _IPBlacklistingResolver:
         return r
 
 
-@implementer(IReactorPluggableNameResolver)
+@implementer(ISynapseReactor)
 class BlacklistingReactorWrapper:
     """
     A Reactor wrapper which will prevent DNS resolution to blacklisted IP
@@ -289,8 +290,7 @@ class SimpleHttpClient:
         treq_args: Dict[str, Any] = {},
         ip_whitelist: Optional[IPSet] = None,
         ip_blacklist: Optional[IPSet] = None,
-        http_proxy: Optional[bytes] = None,
-        https_proxy: Optional[bytes] = None,
+        use_proxy: bool = False,
     ):
         """
         Args:
@@ -300,8 +300,8 @@ class SimpleHttpClient:
                 we may not request.
             ip_whitelist: The whitelisted IP addresses, that we can
                request if it were otherwise caught in a blacklist.
-            http_proxy: proxy server to use for http connections. host[:port]
-            https_proxy: proxy server to use for https connections. host[:port]
+            use_proxy: Whether proxy settings should be discovered and used
+                from conventional environment variables.
         """
         self.hs = hs
 
@@ -325,7 +325,7 @@ class SimpleHttpClient:
             # filters out blacklisted IP addresses, to prevent DNS rebinding.
             self.reactor = BlacklistingReactorWrapper(
                 hs.get_reactor(), self._ip_whitelist, self._ip_blacklist
-            )
+            )  # type: ISynapseReactor
         else:
             self.reactor = hs.get_reactor()
 
@@ -345,8 +345,7 @@ class SimpleHttpClient:
             connectTimeout=15,
             contextFactory=self.hs.get_http_client_context_factory(),
             pool=pool,
-            http_proxy=http_proxy,
-            https_proxy=https_proxy,
+            use_proxy=use_proxy,
         )
 
         if self._ip_blacklist:
@@ -750,7 +749,32 @@ class BodyExceededMaxSize(Exception):
     """The maximum allowed size of the HTTP body was exceeded."""
 
 
+class _DiscardBodyWithMaxSizeProtocol(protocol.Protocol):
+    """A protocol which immediately errors upon receiving data."""
+
+    def __init__(self, deferred: defer.Deferred):
+        self.deferred = deferred
+
+    def _maybe_fail(self):
+        """
+        Report a max size exceed error and disconnect the first time this is called.
+        """
+        if not self.deferred.called:
+            self.deferred.errback(BodyExceededMaxSize())
+            # Close the connection (forcefully) since all the data will get
+            # discarded anyway.
+            self.transport.abortConnection()
+
+    def dataReceived(self, data: bytes) -> None:
+        self._maybe_fail()
+
+    def connectionLost(self, reason: Failure) -> None:
+        self._maybe_fail()
+
+
 class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
+    """A protocol which reads body to a stream, erroring if the body exceeds a maximum size."""
+
     def __init__(
         self, stream: BinaryIO, deferred: defer.Deferred, max_size: Optional[int]
     ):
@@ -807,13 +831,15 @@ def read_body_with_max_size(
     Returns:
         A Deferred which resolves to the length of the read body.
     """
+    d = defer.Deferred()
+
     # If the Content-Length header gives a size larger than the maximum allowed
     # size, do not bother downloading the body.
     if max_size is not None and response.length != UNKNOWN_LENGTH:
         if response.length > max_size:
-            return defer.fail(BodyExceededMaxSize())
+            response.deliverBody(_DiscardBodyWithMaxSizeProtocol(d))
+            return d
 
-    d = defer.Deferred()
     response.deliverBody(_ReadBodyWithMaxSizeProtocol(stream, d, max_size))
     return d
 

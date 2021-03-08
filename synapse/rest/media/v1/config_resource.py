@@ -17,7 +17,7 @@
 
 from typing import TYPE_CHECKING
 
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.http.server import DirectServeJsonResource, respond_with_json
 

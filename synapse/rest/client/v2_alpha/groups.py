@@ -18,7 +18,7 @@ import logging
 from functools import wraps
 from typing import TYPE_CHECKING, Optional, Tuple
 
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.api.constants import (
     MAX_GROUP_CATEGORYID_LENGTH,
