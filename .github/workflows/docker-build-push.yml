@@ -45,10 +45,10 @@ jobs:
           cache-to: type=local,dest=/tmp/.buildx-cache
           file: docker/Dockerfile
 
-    - name: Signal successful build and push
-      uses: peter-evans/repository-dispatch@v1
-      with:
-        token: ${{ secrets.CR_PAT }}
-        repository: mqsdk/api
-        event-type: synapse-build-successful
-        # client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
+      - name: Signal successful build and push
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.CR_PAT }}
+          repository: mqsdk/api
+          event-type: synapse-build-successful
+          # client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
