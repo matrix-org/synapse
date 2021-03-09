@@ -19,7 +19,6 @@ from urllib.parse import parse_qs, urlparse
 from mock import ANY, Mock, patch
 
 import pymacaroons
-from authlib.jose import jwt
 
 from synapse.handlers.sso import MappingException
 from synapse.server import HomeServer
@@ -654,6 +653,8 @@ class OidcHandlerTestCase(HomeserverTestCase):
     )
     def test_exchange_code_jwt_key(self):
         """Test that code exchange works with a JWK client secret."""
+        from authlib.jose import jwt
+
         token = {"type": "bearer"}
         self.http_client.request = simple_async_mock(
             return_value=FakeResponse(
