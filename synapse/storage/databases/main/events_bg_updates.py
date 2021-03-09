@@ -987,7 +987,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             txn.executemany(
                 """
                 DELETE FROM event_auth_chain_links WHERE
-                (origin_chain_id = ? AND origin_sequence_number = ?)
+                origin_chain_id = ? AND origin_sequence_number = ?
                 """,
                 unreferenced_chain_id_tuples,
             )
