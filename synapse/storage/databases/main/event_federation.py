@@ -125,8 +125,8 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         # All the events that we've found that are reachable from the events.
         seen_events = set()  # type: Set[str]
 
-        # A map from chain ID to max sequence number reachable from any event ID.
-        chains = {}  # type: Dict[int, int]
+        # A map from chain ID to max sequence number of the given events.
+        event_chains = {}  # type: Dict[int, int]
 
         sql = """
             SELECT event_id, chain_id, sequence_number
@@ -141,7 +141,9 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
             for event_id, chain_id, sequence_number in txn:
                 seen_events.add(event_id)
-                chains[chain_id] = max(sequence_number, chains.get(chain_id, 0))
+                event_chains[chain_id] = max(
+                    sequence_number, event_chains.get(chain_id, 0)
+                )
 
         # Check that we actually have a chain ID for all the events.
         events_missing_chain_info = initial_events.difference(seen_events)
@@ -165,8 +167,12 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             WHERE %s
         """
 
-        # (We need to take a copy of `chains` as we want to mutate it in the loop)
-        for batch in batch_iter(set(chains), 1000):
+        # A map from chain ID to max sequence number *reachable* from any event ID.
+        chains = dict(event_chains)
+
+        # We need to take a copy of `event_chains` as we need to separate chain
+        # IDs / seq nos from the given events vs. reachable ones.
+        for batch in batch_iter(event_chains, 1000):
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "origin_chain_id", batch
             )
@@ -183,6 +189,20 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                         target_sequence_number,
                         chains.get(target_chain_id, 0),
                     )
+
+                    # The chain ID / seq no of a given event is reachable from
+                    # a different event, discard that chain from the given events.
+                    if (
+                        target_chain_id in event_chains
+                        and target_sequence_number >= event_chains[target_chain_id]
+                    ):
+                        event_chains.pop(target_chain_id)
+
+        # Don't include the given events (since we're finding the auth chain of
+        # those events).
+        for chain_id in event_chains:
+            if event_chains[chain_id] == chains[chain_id]:
+                chains[chain_id] -= 1
 
         # Now for each chain we figure out the maximum sequence number reachable
         # from *any* event ID. Events with a sequence less than that are in the
