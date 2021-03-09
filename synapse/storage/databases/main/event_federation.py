@@ -117,8 +117,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
     ) -> List[str]:
         """Calculates the auth chain IDs using the chain index."""
 
-        # First we look up the chain ID/sequence numbers for all the events, and
-        # work out the chain/sequence numbers reachable from each state set.
+        # First we look up the chain ID/sequence numbers for the given events.
 
         initial_events = set(event_ids)
 
@@ -158,7 +157,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             raise _NoChainCoverIndex(room_id)
 
         # Now we look up all links for the chains we have, adding chains that
-        # are reachable from each set.
+        # are reachable from any event.
         sql = """
             SELECT
                 origin_chain_id, origin_sequence_number,
