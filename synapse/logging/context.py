@@ -669,7 +669,7 @@ def preserve_fn(f):
     return g
 
 
-def run_in_background(f, *args, **kwargs):
+def run_in_background(f, *args, **kwargs) -> defer.Deferred:
     """Calls a function, ensuring that the current context is restored after
     return from the function, and that the sentinel context is set once the
     deferred returned by the function completes.
@@ -697,8 +697,10 @@ def run_in_background(f, *args, **kwargs):
     if isinstance(res, types.CoroutineType):
         res = defer.ensureDeferred(res)
 
+    # At this point we should have a Deferred, if not then f was a synchronous
+    # function, wrap it in a Deferred for consistency.
     if not isinstance(res, defer.Deferred):
-        return res
+        return defer.succeed(res)
 
     if res.called and not res.paused:
         # The function should have maintained the logcontext, so we can
