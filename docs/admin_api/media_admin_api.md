@@ -1,5 +1,7 @@
 # Contents
-- [List all media in a room](#list-all-media-in-a-room)
+- [Querying media](#querying-media)
+  * [List all media in a room](#list-all-media-in-a-room)
+  * [List all media uploaded by a user](#list-all-media-uploaded-by-a-user)
 - [Quarantine media](#quarantine-media)
   * [Quarantining media by ID](#quarantining-media-by-id)
   * [Quarantining media in a room](#quarantining-media-in-a-room)
