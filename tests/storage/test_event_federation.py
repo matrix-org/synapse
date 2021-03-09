@@ -223,8 +223,9 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         return room_id
 
+    @parameterized.expand([(True,), (False,)])
     def test_auth_chain_ids(self, use_chain_cover_index: bool):
-        room_id = self._setup_auth_chain(False)
+        room_id = self._setup_auth_chain(use_chain_cover_index)
 
         # a and b have the same auth chain.
         auth_chain_ids = self.get_success(self.store.get_auth_chain_ids(room_id, ["a"]))
