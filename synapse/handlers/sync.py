@@ -245,7 +245,7 @@ class SyncHandler:
         self.event_sources = hs.get_event_sources()
         self.clock = hs.get_clock()
         self.response_cache = ResponseCache(
-            hs, "sync", timeout_ms=SYNC_RESPONSE_CACHE_MS
+            hs.get_clock(), "sync", timeout_ms=SYNC_RESPONSE_CACHE_MS
         )  # type: ResponseCache[Tuple[Any, ...]]
         self.state = hs.get_state_handler()
         self.auth = hs.get_auth()
