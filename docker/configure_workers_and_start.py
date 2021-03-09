@@ -401,11 +401,20 @@ stderr_logfile_maxbytes=0""".format_map(
                 worker_port,
             )
 
-        # Write out a Synapse worker config file via a jinja2 template
+        # Write out the worker's logging config file
+        log_config_filepath = "/conf/workers/{name}.log.config".format(name=worker_name)
+        convert(
+            "/conf/log.config",
+            log_config_filepath,
+            worker_name=worker_name,
+        )
+
+        # Then a worker config file
         convert(
             "/conf/worker.yaml.j2",
             "/conf/workers/{name}.yaml".format(name=worker_name),
             **worker_config,
+            worker_log_config_filepath=log_config_filepath,
         )
 
         worker_port += 1

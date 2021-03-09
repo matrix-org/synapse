@@ -21,4 +21,6 @@ worker_listeners:
 {%- endfor %}
 {% endif %}
 
+worker_log_config: {{ worker_log_config_filepath }}
+
 {{ worker_extra_conf }}
