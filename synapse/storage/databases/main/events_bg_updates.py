@@ -951,7 +951,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             # The event ID from events will be null if the chain ID / sequence
             # number points to a purged event.
             sql = """
-                SELECT event_id, chain_id, sequence_number, e.event_id
+                SELECT event_id, chain_id, sequence_number, e.event_id IS NOT NULL
                 FROM event_auth_chains
                 LEFT JOIN events AS e USING (event_id)
                 WHERE event_id > ? ORDER BY event_auth_chains.event_id ASC LIMIT ?
@@ -967,8 +967,8 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             unreferenced_event_ids = []
             unreferenced_chain_id_tuples = []
             event_id = ""
-            for event_id, chain_id, sequence_number, events_event_id in rows:
-                if not events_event_id:
+            for event_id, chain_id, sequence_number, has_event in rows:
+                if not has_event:
                     unreferenced_event_ids.append(event_id)
                     unreferenced_chain_id_tuples.append((chain_id, sequence_number))
 
@@ -980,16 +980,16 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 """,
                 unreferenced_event_ids,
             )
+            # We should also delete matching target_*, but there is no index on
+            # target_chain_id. Hopefully any purged events are due to a room
+            # being fully purged and they will be removed from the origin_*
+            # searches.
             txn.executemany(
                 """
                 DELETE FROM event_auth_chain_links WHERE
-                (origin_chain_id = ? AND origin_sequence_number = ?) OR
-                (target_chain_id = ? AND target_sequence_number = ?)
+                (origin_chain_id = ? AND origin_sequence_number = ?)
                 """,
-                (
-                    (chain_id, seq_num, chain_id, seq_num)
-                    for (chain_id, seq_num) in unreferenced_chain_id_tuples
-                ),
+                unreferenced_chain_id_tuples,
             )
 
             progress = {
