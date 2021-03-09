@@ -54,11 +54,12 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         )  # type: LruCache[str, List[Tuple[str, int]]]
 
     async def get_auth_chain(
-        self, event_ids: Collection[str], include_given: bool = False
+        self, room_id: str, event_ids: Collection[str], include_given: bool = False
     ) -> List[EventBase]:
         """Get auth events for given event_ids. The events *must* be state events.
 
         Args:
+            room_id: The room the event is in.
             event_ids: state events
             include_given: include the given events in result
 
@@ -66,23 +67,25 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             list of events
         """
         event_ids = await self.get_auth_chain_ids(
-            event_ids, include_given=include_given
+            room_id, event_ids, include_given=include_given
         )
         return await self.get_events_as_list(event_ids)
 
     async def get_auth_chain_ids(
         self,
+        room_id: str,
         event_ids: Collection[str],
         include_given: bool = False,
     ) -> List[str]:
         """Get auth events for given event_ids. The events *must* be state events.
 
         Args:
+            room_id: The room the event is in.
             event_ids: state events
             include_given: include the given events in result
 
         Returns:
-            An awaitable which resolve to a list of event_ids
+            list of event_ids
         """
         return await self.db_pool.runInteraction(
             "get_auth_chain_ids",

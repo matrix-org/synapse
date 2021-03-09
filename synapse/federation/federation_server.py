@@ -447,7 +447,7 @@ class FederationServer(FederationBase):
 
     async def _on_state_ids_request_compute(self, room_id, event_id):
         state_ids = await self.handler.get_state_ids_for_pdu(room_id, event_id)
-        auth_chain_ids = await self.store.get_auth_chain_ids(state_ids)
+        auth_chain_ids = await self.store.get_auth_chain_ids(room_id, state_ids)
         return {"pdu_ids": state_ids, "auth_chain_ids": auth_chain_ids}
 
     async def _on_context_state_request_compute(
@@ -460,7 +460,9 @@ class FederationServer(FederationBase):
         else:
             pdus = (await self.state.get_current_state(room_id)).values()
 
-        auth_chain = await self.store.get_auth_chain([pdu.event_id for pdu in pdus])
+        auth_chain = await self.store.get_auth_chain(
+            room_id, [pdu.event_id for pdu in pdus]
+        )
 
         return {
             "pdus": [pdu.get_pdu_json() for pdu in pdus],
