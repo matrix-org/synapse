@@ -124,7 +124,11 @@ class FakeChannel:
         return address.IPv4Address("TCP", self._ip, 3423)
 
     def getHost(self):
-        return None
+        # this is called by Request.__init__ to configure Request.host.
+        return address.IPv4Address("TCP", "127.0.0.1", 8888)
+
+    def isSecure(self):
+        return False
 
     @property
     def transport(self):
@@ -184,7 +188,7 @@ class FakeSite:
 
 def make_request(
     reactor,
-    site: Site,
+    site: Union[Site, FakeSite],
     method,
     path,
     content=b"",

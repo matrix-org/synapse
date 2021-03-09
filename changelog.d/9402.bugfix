@@ -1,1 +1,0 @@
-Fix a bug where a lot of unnecessary presence updates were sent when joining a room.

@@ -25,7 +25,7 @@ well as some specific methods:
 * `check_username_for_spam`
 * `check_registration_for_spam`
 
-The details of the each of these methods (as well as their inputs and outputs)
+The details of each of these methods (as well as their inputs and outputs)
 are documented in the `synapse.events.spamcheck.SpamChecker` class.
 
 The `ModuleApi` class provides a way for the custom spam checker class to

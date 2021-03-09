@@ -397,7 +397,6 @@ class ServerConfig(Config):
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != "/":
                 self.public_baseurl += "/"
-        self.start_pushers = config.get("start_pushers", True)
 
         # (undocumented) option for torturing the worker-mode replication a bit,
         # for testing. The value defines the number of milliseconds to pause before
@@ -842,8 +841,7 @@ class ServerConfig(Config):
         # Whether to require authentication to retrieve profile data (avatars,
         # display names) of other users through the client API. Defaults to
         # 'false'. Note that profile data is also available via the federation
-        # API, so this setting is of limited value if federation is enabled on
-        # the server.
+        # API, unless allow_profile_lookup_over_federation is set to false.
         #
         #require_auth_for_profile_requests: true
 

@@ -121,7 +121,7 @@ class RoomCreationHandler(BaseHandler):
         # succession, only process the first attempt and return its result to
         # subsequent requests
         self._upgrade_response_cache = ResponseCache(
-            hs, "room_upgrade", timeout_ms=FIVE_MINUTES_IN_MS
+            hs.get_clock(), "room_upgrade", timeout_ms=FIVE_MINUTES_IN_MS
         )  # type: ResponseCache[Tuple[str, str]]
         self._server_notices_mxid = hs.config.server_notices_mxid
 

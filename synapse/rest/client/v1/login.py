@@ -20,6 +20,7 @@ from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.appservice import ApplicationService
 from synapse.handlers.sso import SsoIdentityProvider
+from synapse.http import get_request_uri
 from synapse.http.server import HttpServer, finish_request
 from synapse.http.servlet import (
     RestServlet,
@@ -221,6 +222,7 @@ class LoginRestServlet(RestServlet):
         callback: Optional[Callable[[Dict[str, str]], Awaitable[None]]] = None,
         create_non_existent_users: bool = False,
         ratelimit: bool = True,
+        auth_provider_id: Optional[str] = None,
     ) -> Dict[str, str]:
         """Called when we've successfully authed the user and now need to
         actually login them in (e.g. create devices). This gets called on
@@ -236,6 +238,8 @@ class LoginRestServlet(RestServlet):
             create_non_existent_users: Whether to create the user if they don't
                 exist. Defaults to False.
             ratelimit: Whether to ratelimit the login request.
+            auth_provider_id: The SSO IdP the user used, if any (just used for the
+                prometheus metrics).
 
         Returns:
             result: Dictionary of account information after successful login.
@@ -258,7 +262,7 @@ class LoginRestServlet(RestServlet):
         device_id = login_submission.get("device_id")
         initial_display_name = login_submission.get("initial_device_display_name")
         device_id, access_token = await self.registration_handler.register_device(
-            user_id, device_id, initial_display_name
+            user_id, device_id, initial_display_name, auth_provider_id=auth_provider_id
         )
 
         result = {
@@ -285,12 +289,13 @@ class LoginRestServlet(RestServlet):
         """
         token = login_submission["token"]
         auth_handler = self.auth_handler
-        user_id = await auth_handler.validate_short_term_login_token_and_get_user_id(
-            token
-        )
+        res = await auth_handler.validate_short_term_login_token(token)
 
         return await self._complete_login(
-            user_id, login_submission, self.auth_handler._sso_login_callback
+            res.user_id,
+            login_submission,
+            self.auth_handler._sso_login_callback,
+            auth_provider_id=res.auth_provider_id,
         )
 
     async def _do_jwt_login(self, login_submission: JsonDict) -> Dict[str, str]:
@@ -369,6 +374,7 @@ class SsoRedirectServlet(RestServlet):
             hs.get_oidc_handler()
         self._sso_handler = hs.get_sso_handler()
         self._msc2858_enabled = hs.config.experimental.msc2858_enabled
+        self._public_baseurl = hs.config.public_baseurl
 
     def register(self, http_server: HttpServer) -> None:
         super().register(http_server)
@@ -388,6 +394,32 @@ class SsoRedirectServlet(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, idp_id: Optional[str] = None
     ) -> None:
+        if not self._public_baseurl:
+            raise SynapseError(400, "SSO requires a valid public_baseurl")
+
+        # if this isn't the expected hostname, redirect to the right one, so that we
+        # get our cookies back.
+        requested_uri = get_request_uri(request)
+        baseurl_bytes = self._public_baseurl.encode("utf-8")
+        if not requested_uri.startswith(baseurl_bytes):
+            # swap out the incorrect base URL for the right one.
+            #
+            # The idea here is to redirect from
+            #    https://foo.bar/whatever/_matrix/...
+            # to
+            #    https://public.baseurl/_matrix/...
+            #
+            i = requested_uri.index(b"/_matrix")
+            new_uri = baseurl_bytes[:-1] + requested_uri[i:]
+            logger.info(
+                "Requested URI %s is not canonical: redirecting to %s",
+                requested_uri.decode("utf-8", errors="replace"),
+                new_uri.decode("utf-8", errors="replace"),
+            )
+            request.redirect(new_uri)
+            finish_request(request)
+            return
+
         client_redirect_url = parse_string(
             request, "redirectUrl", required=True, encoding=None
         )

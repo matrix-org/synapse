@@ -1,0 +1,8 @@
+# Black reformatting (#5482).
+32e7c9e7f20b57dd081023ac42d6931a8da9b3a3
+
+# Target Python 3.5 with black (#8664).
+aff1eb7c671b0a3813407321d2702ec46c71fa56
+
+# Update black to 20.8b1 (#9381).
+0a00b7ff14890987f09112a2ae696c61001e6cf1

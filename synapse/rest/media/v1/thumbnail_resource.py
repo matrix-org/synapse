@@ -18,7 +18,7 @@
 import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.api.errors import SynapseError
 from synapse.http.server import DirectServeJsonResource, set_cors_headers
