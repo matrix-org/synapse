@@ -337,46 +337,42 @@ class PerDestinationQueue:
                 if len(pending_edus) < MAX_EDUS_PER_TRANSACTION:
                     pending_edus.extend(self._get_rr_edus(force_flush=True))
 
-                success = await self._transaction_manager.send_new_transaction(
+                await self._transaction_manager.send_new_transaction(
                     self._destination, pending_pdus, pending_edus
                 )
-                if success:
-                    sent_transactions_counter.inc()
-                    sent_edus_counter.inc(len(pending_edus))
-                    for edu in pending_edus:
-                        sent_edus_by_type.labels(edu.edu_type).inc()
-                    # Remove the acknowledged device messages from the database
-                    # Only bother if we actually sent some device messages
-                    if to_device_edus:
-                        await self._store.delete_device_msgs_for_remote(
-                            self._destination, device_stream_id
-                        )
 
-                    # also mark the device updates as sent
-                    if device_update_edus:
-                        logger.info(
-                            "Marking as sent %r %r", self._destination, dev_list_id
-                        )
-                        await self._store.mark_as_sent_devices_by_remote(
-                            self._destination, dev_list_id
-                        )
+                sent_transactions_counter.inc()
+                sent_edus_counter.inc(len(pending_edus))
+                for edu in pending_edus:
+                    sent_edus_by_type.labels(edu.edu_type).inc()
+                # Remove the acknowledged device messages from the database
+                # Only bother if we actually sent some device messages
+                if to_device_edus:
+                    await self._store.delete_device_msgs_for_remote(
+                        self._destination, device_stream_id
+                    )
 
-                    self._last_device_stream_id = device_stream_id
-                    self._last_device_list_stream_id = dev_list_id
+                # also mark the device updates as sent
+                if device_update_edus:
+                    logger.info("Marking as sent %r %r", self._destination, dev_list_id)
+                    await self._store.mark_as_sent_devices_by_remote(
+                        self._destination, dev_list_id
+                    )
 
-                    if pending_pdus:
-                        # we sent some PDUs and it was successful, so update our
-                        # last_successful_stream_ordering in the destinations table.
-                        final_pdu = pending_pdus[-1]
-                        last_successful_stream_ordering = (
-                            final_pdu.internal_metadata.stream_ordering
-                        )
-                        assert last_successful_stream_ordering
-                        await self._store.set_destination_last_successful_stream_ordering(
-                            self._destination, last_successful_stream_ordering
-                        )
-                else:
-                    break
+                self._last_device_stream_id = device_stream_id
+                self._last_device_list_stream_id = dev_list_id
+
+                if pending_pdus:
+                    # we sent some PDUs and it was successful, so update our
+                    # last_successful_stream_ordering in the destinations table.
+                    final_pdu = pending_pdus[-1]
+                    last_successful_stream_ordering = (
+                        final_pdu.internal_metadata.stream_ordering
+                    )
+                    assert last_successful_stream_ordering
+                    await self._store.set_destination_last_successful_stream_ordering(
+                        self._destination, last_successful_stream_ordering
+                    )
         except NotRetryingDestination as e:
             logger.debug(
                 "TX [%s] not ready for retry yet (next retry at %s) - "
@@ -502,12 +498,9 @@ class PerDestinationQueue:
                 rooms = [p.room_id for p in catchup_pdus]
                 logger.info("Catching up rooms to %s: %r", self._destination, rooms)
 
-            success = await self._transaction_manager.send_new_transaction(
+            await self._transaction_manager.send_new_transaction(
                 self._destination, catchup_pdus, []
             )
-
-            if not success:
-                return
 
             sent_transactions_counter.inc()
             final_pdu = catchup_pdus[-1]
