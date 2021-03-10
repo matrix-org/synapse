@@ -93,6 +93,10 @@ class PerDestinationQueue:
         self._destination = destination
         self.transmission_loop_running = False
 
+        # Flag to signal to any running transmission loop that there is new data
+        # queued up to be sent.
+        self._new_data_to_send = False
+
         # True whilst we are sending events that the remote homeserver missed
         # because it was unreachable. We start in this state so we can perform
         # catch-up at startup.
@@ -208,6 +212,10 @@ class PerDestinationQueue:
         transaction in the background.
         """
 
+        # Mark that we (may) have new things to send, so that any running
+        # transmission loop will recheck whether there is stuff to send.
+        self._new_data_to_send = True
+
         if self.transmission_loop_running:
             # XXX: this can get stuck on by a never-ending
             # request at which point pending_pdus just keeps growing.
@@ -250,6 +258,8 @@ class PerDestinationQueue:
 
             pending_pdus = []
             while True:
+                self._new_data_to_send = False
+
                 # We have to keep 2 free slots for presence and rr_edus
                 limit = MAX_EDUS_PER_TRANSACTION - 2
 
@@ -265,15 +275,6 @@ class PerDestinationQueue:
                 ) = await self._get_to_device_message_edus(limit)
 
                 pending_edus = device_update_edus + to_device_edus
-
-                # BEGIN CRITICAL SECTION
-                #
-                # In order to avoid a race condition, we need to make sure that
-                # the following code (from popping the queues up to the point
-                # where we decide if we actually have any pending messages) is
-                # atomic - otherwise new PDUs or EDUs might arrive in the
-                # meantime, but not get sent because we hold the
-                # transmission_loop_running flag.
 
                 pending_pdus = self._pending_pdus
 
@@ -320,14 +321,21 @@ class PerDestinationQueue:
                 if not pending_pdus and not pending_edus:
                     logger.debug("TX [%s] Nothing to send", self._destination)
                     self._last_device_stream_id = device_stream_id
-                    return
+
+                    # If we've gotten told about new things to send during
+                    # checking for things to send, we try looking again.
+                    # Otherwise new PDUs or EDUs might arrive in the meantime,
+                    # but not get sent because we hold the
+                    # `transmission_loop_running` flag.
+                    if self._new_data_to_send:
+                        continue
+                    else:
+                        return
 
                 # if we've decided to send a transaction anyway, and we have room, we
                 # may as well send any pending RRs
                 if len(pending_edus) < MAX_EDUS_PER_TRANSACTION:
                     pending_edus.extend(self._get_rr_edus(force_flush=True))
-
-                # END CRITICAL SECTION
 
                 success = await self._transaction_manager.send_new_transaction(
                     self._destination, pending_pdus, pending_edus
