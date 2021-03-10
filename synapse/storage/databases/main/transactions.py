@@ -350,11 +350,11 @@ class TransactionStore(TransactionWorkerStore):
 
         self.db_pool.simple_upsert_many_txn(
             txn,
-            "destination_rooms",
-            ["destination", "room_id"],
-            rows,
-            ["stream_ordering"],
-            [(stream_ordering,)] * len(rows),
+            table="destination_rooms",
+            key_names=("destination", "room_id"),
+            key_values=rows,
+            value_names=["stream_ordering"],
+            value_values=[(stream_ordering,)] * len(rows),
         )
 
     async def get_destination_last_successful_stream_ordering(
