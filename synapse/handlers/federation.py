@@ -1317,7 +1317,7 @@ class FederationHandler(BaseHandler):
     async def on_event_auth(self, event_id: str) -> List[EventBase]:
         event = await self.store.get_event(event_id)
         auth = await self.store.get_auth_chain(
-            list(event.auth_event_ids()), include_given=True
+            event.room_id, list(event.auth_event_ids()), include_given=True
         )
         return list(auth)
 
@@ -1580,7 +1580,7 @@ class FederationHandler(BaseHandler):
         prev_state_ids = await context.get_prev_state_ids()
 
         state_ids = list(prev_state_ids.values())
-        auth_chain = await self.store.get_auth_chain(state_ids)
+        auth_chain = await self.store.get_auth_chain(event.room_id, state_ids)
 
         state = await self.store.get_events(list(prev_state_ids.values()))
 
@@ -2219,7 +2219,7 @@ class FederationHandler(BaseHandler):
 
         # Now get the current auth_chain for the event.
         local_auth_chain = await self.store.get_auth_chain(
-            list(event.auth_event_ids()), include_given=True
+            room_id, list(event.auth_event_ids()), include_given=True
         )
 
         # TODO: Check if we would now reject event_id. If so we need to tell
