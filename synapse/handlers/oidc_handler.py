@@ -34,6 +34,7 @@ from pymacaroons.exceptions import (
 from typing_extensions import TypedDict
 
 from twisted.web.client import readBody
+from twisted.web.http_headers import Headers
 
 from synapse.config import ConfigError
 from synapse.config.oidc_config import (
@@ -538,7 +539,7 @@ class OidcProvider:
         """
         metadata = await self.load_metadata()
         token_endpoint = metadata.get("token_endpoint")
-        headers = {
+        raw_headers = {
             "Content-Type": "application/x-www-form-urlencoded",
             "User-Agent": self._http_client.user_agent,
             "Accept": "application/json",
@@ -552,10 +553,10 @@ class OidcProvider:
         body = urlencode(args, True)
 
         # Fill the body/headers with credentials
-        uri, headers, body = self._client_auth.prepare(
-            method="POST", uri=token_endpoint, headers=headers, body=body
+        uri, raw_headers, body = self._client_auth.prepare(
+            method="POST", uri=token_endpoint, headers=raw_headers, body=body
         )
-        headers = {k: [v] for (k, v) in headers.items()}
+        headers = Headers({k: [v] for (k, v) in raw_headers.items()})
 
         # Do the actual request
         # We're not using the SimpleHttpClient util methods as we don't want to
