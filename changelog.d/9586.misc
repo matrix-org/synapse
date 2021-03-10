@@ -1,0 +1,1 @@
+Convert `synapse.types.Requester` to an `attrs` class.
