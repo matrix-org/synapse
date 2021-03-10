@@ -969,7 +969,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             event_id = ""
             for event_id, chain_id, sequence_number, has_event in rows:
                 if not has_event:
-                    unreferenced_event_ids.append(event_id)
+                    unreferenced_event_ids.append((event_id,))
                     unreferenced_chain_id_tuples.append((chain_id, sequence_number))
 
             # Delete the unreferenced auth chains from event_auth_chain_links and
