@@ -1,0 +1,1 @@
+Fix spam checker modules documentation example to clarify parse_config is a required method.

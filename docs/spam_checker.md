@@ -14,6 +14,7 @@ The Python class is instantiated with two objects:
 * An instance of `synapse.module_api.ModuleApi`.
 
 It then implements methods which return a boolean to alter behavior in Synapse.
+All the methods are mandatory to be defined.
 
 There's a generic method for checking every event (`check_event_for_spam`), as
 well as some specific methods:
@@ -31,6 +32,10 @@ are documented in the `synapse.events.spamcheck.SpamChecker` class.
 The `ModuleApi` class provides a way for the custom spam checker class to
 call back into the homeserver internals.
 
+Additionally, a `parse_config` method is mandatory and receives the plugin config
+dictionary. After possible sanitizing, It must return a dictionary which
+will be passed to `__init__` later.
+
 ### Example
 
 ```python
@@ -41,6 +46,10 @@ class ExampleSpamChecker:
         self.config = config
         self.api = api
 
+    @staticmethod
+    def parse_config(config):
+        return config
+        
     async def check_event_for_spam(self, foo):
         return False  # allow all events
 
