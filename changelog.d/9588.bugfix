@@ -1,0 +1,1 @@
+Return `m.change_password` `enabled:false` if local database not used for authentication.
