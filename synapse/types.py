@@ -83,7 +83,7 @@ class ISynapseReactor(
     """The interfaces necessary for Synapse to function."""
 
 
-@attr.s
+@attr.s(frozen=True, slots=True)
 class Requester:
     """
     Represents the user making a request
@@ -161,18 +161,18 @@ def create_requester(
     device_id: Optional[str] = None,
     app_service: Optional["ApplicationService"] = None,
     authenticated_entity: Optional[str] = None,
-):
+) -> Requester:
     """
     Create a new ``Requester`` object
 
     Args:
-        user_id (str|UserID):  id of the user making the request
-        access_token_id (int|None):  *ID* of the access token used for this
+        user_id:  id of the user making the request
+        access_token_id:  *ID* of the access token used for this
             request, or None if it came via the appservice API or similar
-        is_guest (bool):  True if the user making this request is a guest user
-        shadow_banned (bool):  True if the user making this request is shadow-banned.
-        device_id (str|None):  device_id which was set at authentication time
-        app_service (ApplicationService|None):  the AS requesting on behalf of the user
+        is_guest:  True if the user making this request is a guest user
+        shadow_banned:  True if the user making this request is shadow-banned.
+        device_id:  device_id which was set at authentication time
+        app_service:  the AS requesting on behalf of the user
         authenticated_entity: The entity that authenticated when making the request.
             This is different to the user_id when an admin user or the server is
             "puppeting" the user.
