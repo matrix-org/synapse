@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Any, Generator, Iterable, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Generator, Iterable, Optional, Tuple
 
 from twisted.internet import defer
 
@@ -71,6 +71,16 @@ class ModuleApi:
         An instance of synapse.module_api.PublicRoomListManager
         """
         return self._public_room_list_manager
+
+    def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get user by user_id
+
+        Args:
+            user_id: Fully qualified user id.
+        Returns:
+            the user dictionary or None if not found.
+        """
+        return self._store.get_user_by_id(user_id)
 
     def get_user_by_req(self, req, allow_guest=False):
         """Check the access_token provided for a request
