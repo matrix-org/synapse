@@ -1510,7 +1510,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
     async def user_delete_access_tokens(
         self,
         user_id: str,
-        except_token_id: Optional[str] = None,
+        except_token_id: Optional[int] = None,
         device_id: Optional[str] = None,
     ) -> List[Tuple[str, int, Optional[str]]]:
         """
