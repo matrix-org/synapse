@@ -182,6 +182,9 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 target_chain_id,
                 target_sequence_number,
             ) in txn:
+                # chains are only reachable if the origin sequence number of
+                # the link is less than the max sequence number in the
+                # origin chain.
                 if origin_sequence_number <= event_chains.get(origin_chain_id, 0):
                     chains[target_chain_id] = max(
                         target_sequence_number,
