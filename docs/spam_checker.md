@@ -14,7 +14,7 @@ The Python class is instantiated with two objects:
 * An instance of `synapse.module_api.ModuleApi`.
 
 It then implements methods which return a boolean to alter behavior in Synapse.
-All the methods are must be defined.
+All the methods must be defined.
 
 There's a generic method for checking every event (`check_event_for_spam`), as
 well as some specific methods:
