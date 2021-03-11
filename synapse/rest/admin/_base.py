@@ -15,10 +15,9 @@
 
 import re
 
-import twisted.web.server
-
-import synapse.api.auth
+from synapse.api.auth import Auth
 from synapse.api.errors import AuthError
+from synapse.http.site import SynapseRequest
 from synapse.types import UserID
 
 
@@ -37,13 +36,11 @@ def admin_patterns(path_regex: str, version: str = "v1"):
     return patterns
 
 
-async def assert_requester_is_admin(
-    auth: synapse.api.auth.Auth, request: twisted.web.server.Request
-) -> None:
+async def assert_requester_is_admin(auth: Auth, request: SynapseRequest) -> None:
     """Verify that the requester is an admin user
 
     Args:
-        auth: api.auth.Auth singleton
+        auth: Auth singleton
         request: incoming request
 
     Raises:
@@ -53,11 +50,11 @@ async def assert_requester_is_admin(
     await assert_user_is_admin(auth, requester.user)
 
 
-async def assert_user_is_admin(auth: synapse.api.auth.Auth, user_id: UserID) -> None:
+async def assert_user_is_admin(auth: Auth, user_id: UserID) -> None:
     """Verify that the given user is an admin user
 
     Args:
-        auth: api.auth.Auth singleton
+        auth: Auth singleton
         user_id: user to check
 
     Raises:
