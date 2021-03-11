@@ -7,6 +7,7 @@ from synapse.federation.sender import PerDestinationQueue, TransactionManager
 from synapse.federation.units import Edu
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
+from synapse.util.retryutils import NotRetryingDestination
 
 from tests.test_utils import event_injection, make_awaitable
 from tests.unittest import FederatingHomeserverTestCase, override_config
@@ -49,7 +50,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         else:
             data = json_cb()
             self.failed_pdus.extend(data["pdus"])
-            raise IOError("Failed to connect because this is a test!")
+            raise NotRetryingDestination(0, 24 * 60 * 60 * 1000, txn.destination)
 
     def get_destination_room(self, room: str, destination: str = "host2") -> dict:
         """
