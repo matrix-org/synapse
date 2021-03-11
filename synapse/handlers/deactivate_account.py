@@ -123,6 +123,11 @@ class DeactivateAccountHandler(BaseHandler):
 
         await self.store.user_set_password_hash(user_id, None)
 
+        # Most of the pushers will have been deleted when we logged out the
+        # associated devices above, but we still need to delete pushers not
+        # associated with devices, e.g. email pushers.
+        await self.store.delete_all_pushers_for_user(user_id)
+
         # Add the user to a table of users pending deactivation (ie.
         # removal from all the rooms they're a member of)
         await self.store.add_user_pending_deactivation(user_id)

@@ -21,7 +21,7 @@ import os
 from collections import OrderedDict
 from hashlib import sha256
 from textwrap import dedent
-from typing import Any, Iterable, List, MutableMapping, Optional
+from typing import Any, Iterable, List, MutableMapping, Optional, Union
 
 import attr
 import jinja2
@@ -147,7 +147,20 @@ class Config:
         return int(value) * size
 
     @staticmethod
-    def parse_duration(value):
+    def parse_duration(value: Union[str, int]) -> int:
+        """Convert a duration as a string or integer to a number of milliseconds.
+
+        If an integer is provided it is treated as milliseconds and is unchanged.
+
+        String durations can have a suffix of 's', 'm', 'h', 'd', 'w', or 'y'.
+        No suffix is treated as milliseconds.
+
+        Args:
+            value: The duration to parse.
+
+        Returns:
+            The number of milliseconds in the duration.
+        """
         if isinstance(value, int):
             return value
         second = 1000
@@ -199,9 +212,8 @@ class Config:
 
     @classmethod
     def read_file(cls, file_path, config_name):
-        cls.check_file(file_path, config_name)
-        with open(file_path) as file_stream:
-            return file_stream.read()
+        """Deprecated: call read_file directly"""
+        return read_file(file_path, (config_name,))
 
     def read_template(self, filename: str) -> jinja2.Template:
         """Load a template file from disk.
@@ -831,22 +843,23 @@ class ShardedWorkerHandlingConfig:
 
     def should_handle(self, instance_name: str, key: str) -> bool:
         """Whether this instance is responsible for handling the given key."""
-        # If multiple instances are not defined we always return true
-        if not self.instances or len(self.instances) == 1:
-            return True
+        # If no instances are defined we assume some other worker is handling
+        # this.
+        if not self.instances:
+            return False
 
-        return self.get_instance(key) == instance_name
+        return self._get_instance(key) == instance_name
 
-    def get_instance(self, key: str) -> str:
+    def _get_instance(self, key: str) -> str:
         """Get the instance responsible for handling the given key.
 
-        Note: For things like federation sending the config for which instance
-        is sending is known only to the sender instance if there is only one.
-        Therefore `should_handle` should be used where possible.
+        Note: For federation sending and pushers the config for which instance
+        is sending is known only to the sender instance, so we don't expose this
+        method by default.
         """
 
         if not self.instances:
-            return "master"
+            raise Exception("Unknown worker")
 
         if len(self.instances) == 1:
             return self.instances[0]
@@ -863,4 +876,52 @@ class ShardedWorkerHandlingConfig:
         return self.instances[remainder]
 
 
-__all__ = ["Config", "RootConfig", "ShardedWorkerHandlingConfig"]
+@attr.s
+class RoutableShardedWorkerHandlingConfig(ShardedWorkerHandlingConfig):
+    """A version of `ShardedWorkerHandlingConfig` that is used for config
+    options where all instances know which instances are responsible for the
+    sharded work.
+    """
+
+    def __attrs_post_init__(self):
+        # We require that `self.instances` is non-empty.
+        if not self.instances:
+            raise Exception("Got empty list of instances for shard config")
+
+    def get_instance(self, key: str) -> str:
+        """Get the instance responsible for handling the given key."""
+        return self._get_instance(key)
+
+
+def read_file(file_path: Any, config_path: Iterable[str]) -> str:
+    """Check the given file exists, and read it into a string
+
+    If it does not, emit an error indicating the problem
+
+    Args:
+        file_path: the file to be read
+        config_path: where in the configuration file_path came from, so that a useful
+           error can be emitted if it does not exist.
+    Returns:
+        content of the file.
+    Raises:
+        ConfigError if there is a problem reading the file.
+    """
+    if not isinstance(file_path, str):
+        raise ConfigError("%r is not a string", config_path)
+
+    try:
+        os.stat(file_path)
+        with open(file_path) as file_stream:
+            return file_stream.read()
+    except OSError as e:
+        raise ConfigError("Error accessing file %r" % (file_path,), config_path) from e
+
+
+__all__ = [
+    "Config",
+    "RootConfig",
+    "ShardedWorkerHandlingConfig",
+    "RoutableShardedWorkerHandlingConfig",
+    "read_file",
+]

@@ -11,7 +11,6 @@ The image also does *not* provide a TURN server.
 By default, the image expects a single volume, located at ``/data``, that will hold:
 
 * configuration files;
-* temporary files during uploads;
 * uploaded media and thumbnails;
 * the SQLite database if you do not configure postgres;
 * the appservices configuration.

@@ -97,10 +97,12 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             return txn.fetchone()[0]
 
         self._state_group_seq_gen = build_sequence_generator(
-            self.database_engine, get_max_state_group_txn, "state_group_id_seq"
-        )
-        self._state_group_seq_gen.check_consistency(
-            db_conn, table="state_groups", id_column="id"
+            db_conn,
+            self.database_engine,
+            get_max_state_group_txn,
+            "state_group_id_seq",
+            table="state_groups",
+            id_column="id",
         )
 
     @cached(max_entries=10000, iterable=True)

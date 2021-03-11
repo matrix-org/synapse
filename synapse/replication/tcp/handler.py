@@ -45,7 +45,6 @@ from synapse.replication.tcp.commands import (
     PositionCommand,
     RdataCommand,
     RemoteServerUpCommand,
-    RemovePusherCommand,
     ReplicateCommand,
     UserIpCommand,
     UserSyncCommand,
@@ -376,23 +375,6 @@ class ReplicationCommandHandler:
         if self._federation_sender:
             self._federation_sender.federation_ack(cmd.instance_name, cmd.token)
 
-    def on_REMOVE_PUSHER(
-        self, conn: AbstractConnection, cmd: RemovePusherCommand
-    ) -> Optional[Awaitable[None]]:
-        remove_pusher_counter.inc()
-
-        if self._is_master:
-            return self._handle_remove_pusher(cmd)
-        else:
-            return None
-
-    async def _handle_remove_pusher(self, cmd: RemovePusherCommand):
-        await self._store.delete_pusher_by_app_id_pushkey_user_id(
-            app_id=cmd.app_id, pushkey=cmd.push_key, user_id=cmd.user_id
-        )
-
-        self._notifier.on_new_replication_data()
-
     def on_USER_IP(
         self, conn: AbstractConnection, cmd: UserIpCommand
     ) -> Optional[Awaitable[None]]:
@@ -686,11 +668,6 @@ class ReplicationCommandHandler:
         self.send_command(
             UserSyncCommand(instance_id, user_id, is_syncing, last_sync_ms)
         )
-
-    def send_remove_pusher(self, app_id: str, push_key: str, user_id: str):
-        """Poke the master to remove a pusher for a user"""
-        cmd = RemovePusherCommand(app_id, push_key, user_id)
-        self.send_command(cmd)
 
     def send_user_ip(
         self,

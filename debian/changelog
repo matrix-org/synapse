@@ -1,3 +1,19 @@
+matrix-synapse-py3 (1.29.0) stable; urgency=medium
+
+  [ Jonathan de Jong ]
+  * Remove the python -B flag (don't generate bytecode) in scripts and documentation.
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.29.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Mon, 08 Mar 2021 13:51:50 +0000
+
+matrix-synapse-py3 (1.28.0) stable; urgency=medium
+
+  * New synapse release 1.28.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 25 Feb 2021 10:21:57 +0000
+
 matrix-synapse-py3 (1.27.0) stable; urgency=medium
 
   [ Dan Callahan ]

@@ -22,6 +22,7 @@ from typing import (
     Awaitable,
     Callable,
     Dict,
+    Iterable,
     List,
     Optional,
     Tuple,
@@ -34,7 +35,7 @@ from twisted.internet import defer
 from twisted.internet.abstract import isIPAddress
 from twisted.python import failure
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EduTypes, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -44,6 +45,7 @@ from synapse.api.errors import (
     SynapseError,
     UnsupportedRoomVersionError,
 )
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
@@ -89,16 +91,15 @@ pdu_process_time = Histogram(
     "Time taken to process an event",
 )
 
-
-last_pdu_age_metric = Gauge(
-    "synapse_federation_last_received_pdu_age",
-    "The age (in seconds) of the last PDU successfully received from the given domain",
+last_pdu_ts_metric = Gauge(
+    "synapse_federation_last_received_pdu_time",
+    "The timestamp of the last PDU which was successfully received from the given domain",
     labelnames=("server_name",),
 )
 
 
 class FederationServer(FederationBase):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
         self.auth = hs.get_auth()
@@ -118,7 +119,7 @@ class FederationServer(FederationBase):
 
         # We cache results for transaction with the same ID
         self._transaction_resp_cache = ResponseCache(
-            hs, "fed_txn_handler", timeout_ms=30000
+            hs.get_clock(), "fed_txn_handler", timeout_ms=30000
         )  # type: ResponseCache[Tuple[str, str]]
 
         self.transaction_actions = TransactionActions(self.store)
@@ -128,10 +129,10 @@ class FederationServer(FederationBase):
         # We cache responses to state queries, as they take a while and often
         # come in waves.
         self._state_resp_cache = ResponseCache(
-            hs, "state_resp", timeout_ms=30000
+            hs.get_clock(), "state_resp", timeout_ms=30000
         )  # type: ResponseCache[Tuple[str, str]]
         self._state_ids_resp_cache = ResponseCache(
-            hs, "state_ids_resp", timeout_ms=30000
+            hs.get_clock(), "state_ids_resp", timeout_ms=30000
         )  # type: ResponseCache[Tuple[str, str]]
 
         self._federation_metrics_domains = (
@@ -360,7 +361,7 @@ class FederationServer(FederationBase):
                             logger.error(
                                 "Failed to handle PDU %s",
                                 event_id,
-                                exc_info=(f.type, f.value, f.getTracebackObject()),
+                                exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
                             )
 
         await concurrently_execute(
@@ -368,8 +369,7 @@ class FederationServer(FederationBase):
         )
 
         if newest_pdu_ts and origin in self._federation_metrics_domains:
-            newest_pdu_age = self._clock.time_msec() - newest_pdu_ts
-            last_pdu_age_metric.labels(server_name=origin).set(newest_pdu_age / 1000)
+            last_pdu_ts_metric.labels(server_name=origin).set(newest_pdu_ts / 1000)
 
         return pdu_results
 
@@ -447,18 +447,22 @@ class FederationServer(FederationBase):
 
     async def _on_state_ids_request_compute(self, room_id, event_id):
         state_ids = await self.handler.get_state_ids_for_pdu(room_id, event_id)
-        auth_chain_ids = await self.store.get_auth_chain_ids(state_ids)
+        auth_chain_ids = await self.store.get_auth_chain_ids(room_id, state_ids)
         return {"pdu_ids": state_ids, "auth_chain_ids": auth_chain_ids}
 
     async def _on_context_state_request_compute(
         self, room_id: str, event_id: str
     ) -> Dict[str, list]:
         if event_id:
-            pdus = await self.handler.get_state_for_pdu(room_id, event_id)
+            pdus = await self.handler.get_state_for_pdu(
+                room_id, event_id
+            )  # type: Iterable[EventBase]
         else:
             pdus = (await self.state.get_current_state(room_id)).values()
 
-        auth_chain = await self.store.get_auth_chain([pdu.event_id for pdu in pdus])
+        auth_chain = await self.store.get_auth_chain(
+            room_id, [pdu.event_id for pdu in pdus]
+        )
 
         return {
             "pdus": [pdu.get_pdu_json() for pdu in pdus],
@@ -869,6 +873,13 @@ class FederationHandlerRegistry:
         # EDU received.
         self._edu_type_to_instance = {}  # type: Dict[str, List[str]]
 
+        # A rate limiter for incoming room key requests per origin.
+        self._room_key_request_rate_limiter = Ratelimiter(
+            clock=self.clock,
+            rate_hz=self.config.rc_key_requests.per_second,
+            burst_count=self.config.rc_key_requests.burst_count,
+        )
+
     def register_edu_handler(
         self, edu_type: str, handler: Callable[[str, JsonDict], Awaitable[None]]
     ):
@@ -917,7 +928,15 @@ class FederationHandlerRegistry:
         self._edu_type_to_instance[edu_type] = instance_names
 
     async def on_edu(self, edu_type: str, origin: str, content: dict):
-        if not self.config.use_presence and edu_type == "m.presence":
+        if not self.config.use_presence and edu_type == EduTypes.Presence:
+            return
+
+        # If the incoming room key requests from a particular origin are over
+        # the limit, drop them.
+        if (
+            edu_type == EduTypes.RoomKeyRequest
+            and not self._room_key_request_rate_limiter.can_do_action(origin)
+        ):
             return
 
         # Check if we have a handler on this instance

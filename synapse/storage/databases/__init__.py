@@ -79,7 +79,7 @@ class Databases:
                     # If we're on a process that can persist events also
                     # instantiate a `PersistEventsStore`
                     if hs.get_instance_name() in hs.config.worker.writers.events:
-                        persist_events = PersistEventsStore(hs, database, main)
+                        persist_events = PersistEventsStore(hs, database, main, db_conn)
 
                 if "state" in database_config.databases:
                     logger.info(
