@@ -1245,13 +1245,21 @@ class EventCreationHandler:
             if prev_state_ids:
                 raise AuthError(403, "Changing the room create event is forbidden")
 
+        backfilled = False
+        if event.content.get("m.historical", None):
+            backfilled = True
+
+        logger.info("backfilled %s", backfilled)
+
         # Note that this returns the event that was persisted, which may not be
         # the same as we passed in if it was deduplicated due transaction IDs.
         (
             event,
             event_pos,
             max_stream_token,
-        ) = await self.storage.persistence.persist_event(event, context=context)
+        ) = await self.storage.persistence.persist_event(
+            event, context=context, backfilled=backfilled
+        )
 
         if self._ephemeral_events_enabled:
             # If there's an expiry timestamp on the event, schedule its expiry.

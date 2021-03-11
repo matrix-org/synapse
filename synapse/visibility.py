@@ -50,7 +50,8 @@ MEMBERSHIP_PRIORITY = (
 
 def filter_historical_events(events: Iterable[EventBase]) -> List[EventBase]:
     """Return a new list with historical events removed from the input."""
-    return [e for e in events if not e.content.get("m.historical", None)]
+    # return [e for e in events if not e.content.get("m.historical", None)]
+    return events
 
 
 async def filter_events_for_client(
