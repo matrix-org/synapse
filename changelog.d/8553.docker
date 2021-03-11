@@ -1,1 +1,1 @@
-Install jemalloc deb in docker image.
+Use jemalloc if available in docker.
