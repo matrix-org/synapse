@@ -20,6 +20,10 @@ from typing import TYPE_CHECKING, Generic, Optional, Type, TypeVar, cast
 import attr
 import txredisapi
 
+from twisted.internet.address import IPv4Address, IPv6Address
+from twisted.internet.interfaces import IAddress, IConnector
+from twisted.python.failure import Failure
+
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.metrics.background_process_metrics import (
     BackgroundProcessLoggingContext,
@@ -252,6 +256,37 @@ class SynapseRedisFactory(txredisapi.RedisFactory):
                 await make_deferred_yieldable(connection.ping())
             except Exception:
                 logger.warning("Failed to send ping to a redis connection")
+
+    # ReconnectingClientFactory has some logging (if you enable `self.noisy`), but
+    # it's rubbish. We add our own here.
+
+    def startedConnecting(self, connector: IConnector):
+        logger.info(
+            "Connecting to redis server %s", format_address(connector.getDestination())
+        )
+        super().startedConnecting(connector)
+
+    def clientConnectionFailed(self, connector: IConnector, reason: Failure):
+        logger.info(
+            "Connection to redis server %s failed: %s",
+            format_address(connector.getDestination()),
+            reason.value,
+        )
+        super().clientConnectionFailed(connector, reason)
+
+    def clientConnectionLost(self, connector: IConnector, reason: Failure):
+        logger.info(
+            "Connection to redis server %s lost: %s",
+            format_address(connector.getDestination()),
+            reason.value,
+        )
+        super().clientConnectionLost(connector, reason)
+
+
+def format_address(address: IAddress) -> str:
+    if isinstance(address, (IPv4Address, IPv6Address)):
+        return "%s:%i" % (address.host, address.port)
+    return str(address)
 
 
 class RedisDirectTcpReplicationClientFactory(SynapseRedisFactory):
