@@ -17,6 +17,8 @@
 """
 from typing import Any, List, Optional, Type, Union
 
+from twisted.internet import protocol
+
 class RedisProtocol:
     def publish(self, channel: str, message: bytes): ...
     async def ping(self) -> None: ...
@@ -52,7 +54,7 @@ def lazyConnection(
 
 class ConnectionHandler: ...
 
-class RedisFactory:
+class RedisFactory(protocol.ReconnectingClientFactory):
     continueTrying: bool
     handler: RedisProtocol
     pool: List[RedisProtocol]
