@@ -207,11 +207,5 @@ healthcheck:
 
 ## Using jemalloc
 
-Jemalloc is embedded in the image and can be used instead of the default allocator
-(cf main README for more infos).
-
-To do so you can add this to your `docker run` commands:
-
-```
--e LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
-```
+Jemalloc is embedded in the image and will be used instead of the default allocator.
+You can read about jemalloc by reading the Synapse [README](../README.md)
