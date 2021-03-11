@@ -264,7 +264,7 @@ class SynapseRedisFactory(txredisapi.RedisFactory):
         logger.info(
             "Connecting to redis server %s", format_address(connector.getDestination())
         )
-        super().startedConnecting(connector)
+        super().startedConnecting(connector)  # type: ignore  # mypy is confused
 
     def clientConnectionFailed(self, connector: IConnector, reason: Failure):
         logger.info(
@@ -272,7 +272,7 @@ class SynapseRedisFactory(txredisapi.RedisFactory):
             format_address(connector.getDestination()),
             reason.value,
         )
-        super().clientConnectionFailed(connector, reason)
+        super().clientConnectionFailed(connector, reason)  # type: ignore  # mypy is confused
 
     def clientConnectionLost(self, connector: IConnector, reason: Failure):
         logger.info(
@@ -280,7 +280,7 @@ class SynapseRedisFactory(txredisapi.RedisFactory):
             format_address(connector.getDestination()),
             reason.value,
         )
-        super().clientConnectionLost(connector, reason)
+        super().clientConnectionLost(connector, reason)  # type: ignore  # mypy is confused
 
 
 def format_address(address: IAddress) -> str:
