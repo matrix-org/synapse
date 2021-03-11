@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017 New Vector Ltd
+# Copyright 2019-2021 The Matrix.org Foundation C.I.C
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,11 +16,12 @@
 import gc
 import logging
 import os
+import platform
 import signal
 import socket
 import sys
 import traceback
-from typing import Iterable
+from typing import Awaitable, Callable, Iterable
 
 from typing_extensions import NoReturn
 
@@ -32,6 +34,7 @@ from synapse.app.phone_stats_home import start_phone_stats_home
 from synapse.config.server import ListenerConfig
 from synapse.crypto import context_factory
 from synapse.logging.context import PreserveLoggingContext
+from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.util.async_helpers import Linearizer
 from synapse.util.daemonize import daemonize_process
 from synapse.util.rlimit import change_resource_limit
@@ -49,14 +52,13 @@ def register_sighup(func, *args, **kwargs):
 
     Args:
         func (function): Function to be called when sent a SIGHUP signal.
-            Will be called with a single default argument, the homeserver.
         *args, **kwargs: args and kwargs to be passed to the target function.
     """
     _sighup_callbacks.append((func, args, kwargs))
 
 
 def start_worker_reactor(appname, config, run_command=reactor.run):
-    """ Run the reactor in the main process
+    """Run the reactor in the main process
 
     Daemonizes if necessary, and then configures some resources, before starting
     the reactor. Pulls configuration from the 'worker' settings in 'config'.
@@ -91,7 +93,7 @@ def start_reactor(
     logger,
     run_command=reactor.run,
 ):
-    """ Run the reactor in the main process
+    """Run the reactor in the main process
 
     Daemonizes if necessary, and then configures some resources, before starting
     the reactor
@@ -141,6 +143,45 @@ def quit_with_error(error_string: str) -> NoReturn:
         sys.stderr.write(" %s\n" % (line.rstrip(),))
     sys.stderr.write("*" * line_length + "\n")
     sys.exit(1)
+
+
+def register_start(cb: Callable[..., Awaitable], *args, **kwargs) -> None:
+    """Register a callback with the reactor, to be called once it is running
+
+    This can be used to initialise parts of the system which require an asynchronous
+    setup.
+
+    Any exception raised by the callback will be printed and logged, and the process
+    will exit.
+    """
+
+    async def wrapper():
+        try:
+            await cb(*args, **kwargs)
+        except Exception:
+            # previously, we used Failure().printTraceback() here, in the hope that
+            # would give better tracebacks than traceback.print_exc(). However, that
+            # doesn't handle chained exceptions (with a __cause__ or __context__) well,
+            # and I *think* the need for Failure() is reduced now that we mostly use
+            # async/await.
+
+            # Write the exception to both the logs *and* the unredirected stderr,
+            # because people tend to get confused if it only goes to one or the other.
+            #
+            # One problem with this is that if people are using a logging config that
+            # logs to the console (as is common eg under docker), they will get two
+            # copies of the exception. We could maybe try to detect that, but it's
+            # probably a cost we can bear.
+            logger.fatal("Error during startup", exc_info=True)
+            print("Error during startup:", file=sys.__stderr__)
+            traceback.print_exc(file=sys.__stderr__)
+
+            # it's no use calling sys.exit here, since that just raises a SystemExit
+            # exception which is then caught by the reactor, and everything carries
+            # on as normal.
+            os._exit(1)
+
+    reactor.callWhenRunning(lambda: defer.ensureDeferred(wrapper()))
 
 
 def listen_metrics(bind_addresses, port):
@@ -227,7 +268,7 @@ def refresh_certificate(hs):
         logger.info("Context factories updated.")
 
 
-def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerConfig]):
+async def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerConfig]):
     """
     Start a Synapse server or worker.
 
@@ -241,64 +282,65 @@ def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerConfig]):
         hs: homeserver instance
         listeners: Listener configuration ('listeners' in homeserver.yaml)
     """
-    try:
-        # Set up the SIGHUP machinery.
-        if hasattr(signal, "SIGHUP"):
-
-            def handle_sighup(*args, **kwargs):
-                # Tell systemd our state, if we're using it. This will silently fail if
-                # we're not using systemd.
-                sdnotify(b"RELOADING=1")
-
-                for i, args, kwargs in _sighup_callbacks:
-                    i(hs, *args, **kwargs)
-
-                sdnotify(b"READY=1")
-
-            signal.signal(signal.SIGHUP, handle_sighup)
-
-            register_sighup(refresh_certificate)
-
-        # Load the certificate from disk.
-        refresh_certificate(hs)
-
-        # Start the tracer
-        synapse.logging.opentracing.init_tracer(  # type: ignore[attr-defined] # noqa
-            hs
-        )
-
-        # It is now safe to start your Synapse.
-        hs.start_listening(listeners)
-        hs.get_datastore().db_pool.start_profiling()
-        hs.get_pusherpool().start()
-
-        # Log when we start the shut down process.
-        hs.get_reactor().addSystemEventTrigger(
-            "before", "shutdown", logger.info, "Shutting down..."
-        )
-
-        setup_sentry(hs)
-        setup_sdnotify(hs)
-
-        # If background tasks are running on the main process, start collecting the
-        # phone home stats.
-        if hs.config.run_background_tasks:
-            start_phone_stats_home(hs)
-
-        # We now freeze all allocated objects in the hopes that (almost)
-        # everything currently allocated are things that will be used for the
-        # rest of time. Doing so means less work each GC (hopefully).
-        #
-        # This only works on Python 3.7
-        if sys.version_info >= (3, 7):
-            gc.collect()
-            gc.freeze()
-    except Exception:
-        traceback.print_exc(file=sys.stderr)
+    # Set up the SIGHUP machinery.
+    if hasattr(signal, "SIGHUP"):
         reactor = hs.get_reactor()
-        if reactor.running:
-            reactor.stop()
-        sys.exit(1)
+
+        @wrap_as_background_process("sighup")
+        def handle_sighup(*args, **kwargs):
+            # Tell systemd our state, if we're using it. This will silently fail if
+            # we're not using systemd.
+            sdnotify(b"RELOADING=1")
+
+            for i, args, kwargs in _sighup_callbacks:
+                i(*args, **kwargs)
+
+            sdnotify(b"READY=1")
+
+        # We defer running the sighup handlers until next reactor tick. This
+        # is so that we're in a sane state, e.g. flushing the logs may fail
+        # if the sighup happens in the middle of writing a log entry.
+        def run_sighup(*args, **kwargs):
+            # `callFromThread` should be "signal safe" as well as thread
+            # safe.
+            reactor.callFromThread(handle_sighup, *args, **kwargs)
+
+        signal.signal(signal.SIGHUP, run_sighup)
+
+        register_sighup(refresh_certificate, hs)
+
+    # Load the certificate from disk.
+    refresh_certificate(hs)
+
+    # Start the tracer
+    synapse.logging.opentracing.init_tracer(hs)  # type: ignore[attr-defined] # noqa
+
+    # It is now safe to start your Synapse.
+    hs.start_listening(listeners)
+    hs.get_datastore().db_pool.start_profiling()
+    hs.get_pusherpool().start()
+
+    # Log when we start the shut down process.
+    hs.get_reactor().addSystemEventTrigger(
+        "before", "shutdown", logger.info, "Shutting down..."
+    )
+
+    setup_sentry(hs)
+    setup_sdnotify(hs)
+
+    # If background tasks are running on the main process, start collecting the
+    # phone home stats.
+    if hs.config.run_background_tasks:
+        start_phone_stats_home(hs)
+
+    # We now freeze all allocated objects in the hopes that (almost)
+    # everything currently allocated are things that will be used for the
+    # rest of time. Doing so means less work each GC (hopefully).
+    #
+    # This only works on Python 3.7
+    if platform.python_implementation() == "CPython" and sys.version_info >= (3, 7):
+        gc.collect()
+        gc.freeze()
 
 
 def setup_sentry(hs):
@@ -326,8 +368,7 @@ def setup_sentry(hs):
 
 
 def setup_sdnotify(hs):
-    """Adds process state hooks to tell systemd what we are up to.
-    """
+    """Adds process state hooks to tell systemd what we are up to."""
 
     # Tell systemd our state, if we're using it. This will silently fail if
     # we're not using systemd.
@@ -361,8 +402,7 @@ def install_dns_limiter(reactor, max_dns_requests_in_flight=100):
 
 
 class _LimitedHostnameResolver:
-    """Wraps a IHostnameResolver, limiting the number of in-flight DNS lookups.
-    """
+    """Wraps a IHostnameResolver, limiting the number of in-flight DNS lookups."""
 
     def __init__(self, resolver, max_dns_requests_in_flight):
         self._resolver = resolver

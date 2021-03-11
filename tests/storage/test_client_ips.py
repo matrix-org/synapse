@@ -21,6 +21,7 @@ from synapse.http.site import XForwardedForRequest
 from synapse.rest.client.v1 import login
 
 from tests import unittest
+from tests.server import make_request
 from tests.test_utils import make_awaitable
 from tests.unittest import override_config
 
@@ -40,7 +41,13 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         device_id = "MY_DEVICE"
 
         # Insert a user IP
-        self.get_success(self.store.store_device(user_id, device_id, "display name",))
+        self.get_success(
+            self.store.store_device(
+                user_id,
+                device_id,
+                "display name",
+            )
+        )
         self.get_success(
             self.store.insert_client_ip(
                 user_id, "access_token", "ip", "user_agent", device_id
@@ -213,7 +220,13 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         device_id = "MY_DEVICE"
 
         # Insert a user IP
-        self.get_success(self.store.store_device(user_id, device_id, "display name",))
+        self.get_success(
+            self.store.store_device(
+                user_id,
+                device_id,
+                "display name",
+            )
+        )
         self.get_success(
             self.store.insert_client_ip(
                 user_id, "access_token", "ip", "user_agent", device_id
@@ -302,7 +315,13 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         device_id = "MY_DEVICE"
 
         # Insert a user IP
-        self.get_success(self.store.store_device(user_id, device_id, "display name",))
+        self.get_success(
+            self.store.store_device(
+                user_id,
+                device_id,
+                "display name",
+            )
+        )
         self.get_success(
             self.store.insert_client_ip(
                 user_id, "access_token", "ip", "user_agent", device_id
@@ -408,18 +427,18 @@ class ClientIpAuthTestCase(unittest.HomeserverTestCase):
         # Advance to a known time
         self.reactor.advance(123456 - self.reactor.seconds())
 
-        request, channel = self.make_request(
-            "GET",
-            "/_matrix/client/r0/admin/users/" + self.user_id,
-            access_token=access_token,
-            **make_request_args
-        )
-        request.requestHeaders.addRawHeader(b"User-Agent", b"Mozzila pizza")
+        headers1 = {b"User-Agent": b"Mozzila pizza"}
+        headers1.update(headers)
 
-        # Add the optional headers
-        for h, v in headers.items():
-            request.requestHeaders.addRawHeader(h, v)
-        self.render(request)
+        make_request(
+            self.reactor,
+            self.site,
+            "GET",
+            "/_synapse/admin/v1/users/" + self.user_id,
+            access_token=access_token,
+            custom_headers=headers1.items(),
+            **make_request_args,
+        )
 
         # Advance so the save loop occurs
         self.reactor.advance(100)

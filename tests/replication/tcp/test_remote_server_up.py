@@ -28,8 +28,7 @@ class RemoteServerUpTestCase(HomeserverTestCase):
         self.factory = ReplicationStreamProtocolFactory(hs)
 
     def _make_client(self) -> Tuple[IProtocol, StringTransport]:
-        """Create a new direct TCP replication connection
-        """
+        """Create a new direct TCP replication connection"""
 
         proto = self.factory.buildProtocol(("127.0.0.1", 0))
         transport = StringTransport()

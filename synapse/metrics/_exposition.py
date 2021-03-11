@@ -216,7 +216,7 @@ class MetricsHandler(BaseHTTPRequestHandler):
     @classmethod
     def factory(cls, registry):
         """Returns a dynamic MetricsHandler class tied
-           to the passed registry.
+        to the passed registry.
         """
         # This implementation relies on MetricsHandler.registry
         #  (defined above and defaulted to REGISTRY).

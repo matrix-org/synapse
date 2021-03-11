@@ -18,6 +18,7 @@ import logging
 import re
 
 import attr
+from frozendict import frozendict
 
 from twisted.internet import defer, task
 
@@ -31,9 +32,26 @@ def _reject_invalid_json(val):
     raise ValueError("Invalid JSON value: '%s'" % val)
 
 
-# Create a custom encoder to reduce the whitespace produced by JSON encoding and
-# ensure that valid JSON is produced.
-json_encoder = json.JSONEncoder(allow_nan=False, separators=(",", ":"))
+def _handle_frozendict(obj):
+    """Helper for json_encoder. Makes frozendicts serializable by returning
+    the underlying dict
+    """
+    if type(obj) is frozendict:
+        # fishing the protected dict out of the object is a bit nasty,
+        # but we don't really want the overhead of copying the dict.
+        return obj._dict
+    raise TypeError(
+        "Object of type %s is not JSON serializable" % obj.__class__.__name__
+    )
+
+
+# A custom JSON encoder which:
+#   * handles frozendicts
+#   * produces valid JSON (no NaNs etc)
+#   * reduces redundant whitespace
+json_encoder = json.JSONEncoder(
+    allow_nan=False, separators=(",", ":"), default=_handle_frozendict
+)
 
 # Create a custom decoder to reject Python extensions to JSON.
 json_decoder = json.JSONDecoder(parse_constant=_reject_invalid_json)

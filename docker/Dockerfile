@@ -11,7 +11,7 @@
 #    docker build -f docker/Dockerfile --build-arg PYTHON_VERSION=3.6 .
 #
 
-ARG PYTHON_VERSION=3.7
+ARG PYTHON_VERSION=3.8
 
 ###
 ### Stage 0: builder
@@ -28,15 +28,18 @@ RUN apt-get update && apt-get install -y \
     libwebp-dev \
     libxml++2.6-dev \
     libxslt1-dev \
+    rustc \
     zlib1g-dev \
  && rm -rf /var/lib/apt/lists/*
 
 # Build dependencies that are not available as wheels, to speed up rebuilds
 RUN pip install --prefix="/install" --no-warn-script-location \
+        cryptography \
         frozendict \
         jaeger-client \
         opentracing \
-        prometheus-client \
+        # Match the version constraints of Synapse
+        "prometheus_client>=0.4.0" \
         psycopg2 \
         pycparser \
         pyrsistent \

@@ -244,7 +244,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         service = Mock(id=self.as_list[0]["id"])
         events = [Mock(event_id="e1"), Mock(event_id="e2")]
         txn = yield defer.ensureDeferred(
-            self.store.create_appservice_txn(service, events)
+            self.store.create_appservice_txn(service, events, [])
         )
         self.assertEquals(txn.id, 1)
         self.assertEquals(txn.events, events)
@@ -258,7 +258,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         yield self._insert_txn(service.id, 9644, events)
         yield self._insert_txn(service.id, 9645, events)
         txn = yield defer.ensureDeferred(
-            self.store.create_appservice_txn(service, events)
+            self.store.create_appservice_txn(service, events, [])
         )
         self.assertEquals(txn.id, 9646)
         self.assertEquals(txn.events, events)
@@ -270,7 +270,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         events = [Mock(event_id="e1"), Mock(event_id="e2")]
         yield self._set_last_txn(service.id, 9643)
         txn = yield defer.ensureDeferred(
-            self.store.create_appservice_txn(service, events)
+            self.store.create_appservice_txn(service, events, [])
         )
         self.assertEquals(txn.id, 9644)
         self.assertEquals(txn.events, events)
@@ -293,7 +293,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         yield self._insert_txn(self.as_list[3]["id"], 9643, events)
 
         txn = yield defer.ensureDeferred(
-            self.store.create_appservice_txn(service, events)
+            self.store.create_appservice_txn(service, events, [])
         )
         self.assertEquals(txn.id, 9644)
         self.assertEquals(txn.events, events)
@@ -407,6 +407,62 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self.assertEquals(
             {self.as_list[2]["id"], self.as_list[0]["id"]},
             {services[0].id, services[1].id},
+        )
+
+
+class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
+    def make_homeserver(self, reactor, clock):
+        hs = self.setup_test_homeserver()
+        return hs
+
+    def prepare(self, hs, reactor, clock):
+        self.service = Mock(id="foo")
+        self.store = self.hs.get_datastore()
+        self.get_success(self.store.set_appservice_state(self.service, "up"))
+
+    def test_get_type_stream_id_for_appservice_no_value(self):
+        value = self.get_success(
+            self.store.get_type_stream_id_for_appservice(self.service, "read_receipt")
+        )
+        self.assertEquals(value, 0)
+
+        value = self.get_success(
+            self.store.get_type_stream_id_for_appservice(self.service, "presence")
+        )
+        self.assertEquals(value, 0)
+
+    def test_get_type_stream_id_for_appservice_invalid_type(self):
+        self.get_failure(
+            self.store.get_type_stream_id_for_appservice(self.service, "foobar"),
+            ValueError,
+        )
+
+    def test_set_type_stream_id_for_appservice(self):
+        read_receipt_value = 1024
+        self.get_success(
+            self.store.set_type_stream_id_for_appservice(
+                self.service, "read_receipt", read_receipt_value
+            )
+        )
+        result = self.get_success(
+            self.store.get_type_stream_id_for_appservice(self.service, "read_receipt")
+        )
+        self.assertEqual(result, read_receipt_value)
+
+        self.get_success(
+            self.store.set_type_stream_id_for_appservice(
+                self.service, "presence", read_receipt_value
+            )
+        )
+        result = self.get_success(
+            self.store.get_type_stream_id_for_appservice(self.service, "presence")
+        )
+        self.assertEqual(result, read_receipt_value)
+
+    def test_set_type_stream_id_for_appservice_invalid_type(self):
+        self.get_failure(
+            self.store.set_type_stream_id_for_appservice(self.service, "foobar", 1024),
+            ValueError,
         )
 
 

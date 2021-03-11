@@ -22,7 +22,7 @@ import synapse.rest.admin
 from synapse.api.constants import EventTypes
 from synapse.rest.client.v1 import login, room
 from synapse.storage import prepare_database
-from synapse.types import Requester, UserID
+from synapse.types import UserID, create_requester
 
 from tests.unittest import HomeserverTestCase
 
@@ -38,13 +38,12 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
 
         # Create a test user and room
         self.user = UserID("alice", "test")
-        self.requester = Requester(self.user, None, False, False, None, None)
+        self.requester = create_requester(self.user)
         info, _ = self.get_success(self.room_creator.create_room(self.requester, {}))
         self.room_id = info["room_id"]
 
     def run_background_update(self):
-        """Re run the background update to clean up the extremities.
-        """
+        """Re run the background update to clean up the extremities."""
         # Make sure we don't clash with in progress updates.
         self.assertTrue(
             self.store.db_pool.updates._all_done, "Background updates are still ongoing"
@@ -260,7 +259,7 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         # Create a test user and room
         self.user = UserID.from_string(self.register_user("user1", "password"))
         self.token1 = self.login("user1", "password")
-        self.requester = Requester(self.user, None, False, False, None, None)
+        self.requester = create_requester(self.user)
         info, _ = self.get_success(self.room_creator.create_room(self.requester, {}))
         self.room_id = info["room_id"]
         self.event_creator = homeserver.get_event_creation_handler()
@@ -302,36 +301,6 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         user2 = self.register_user("user2", "password")
         token2 = self.login("user2", "password")
         self.helper.join(self.room_id, user2, tok=token2)
-        self.pump(10 * 60)
-
-        latest_event_ids = self.get_success(
-            self.store.get_latest_event_ids_in_room(self.room_id)
-        )
-        self.assertTrue(len(latest_event_ids) < 10, len(latest_event_ids))
-
-    @patch("synapse.handlers.message._DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY", new=0)
-    def test_send_dummy_event_without_consent(self):
-        self._create_extremity_rich_graph()
-        self._enable_consent_checking()
-
-        # Pump the reactor repeatedly so that the background updates have a
-        # chance to run. Attempt to add dummy event with user that has not consented
-        # Check that dummy event send fails.
-        self.pump(10 * 60)
-        latest_event_ids = self.get_success(
-            self.store.get_latest_event_ids_in_room(self.room_id)
-        )
-        self.assertTrue(len(latest_event_ids) == self.EXTREMITIES_COUNT)
-
-        # Create new user, and add consent
-        user2 = self.register_user("user2", "password")
-        token2 = self.login("user2", "password")
-        self.get_success(
-            self.store.user_set_consent_version(user2, self.CONSENT_VERSION)
-        )
-        self.helper.join(self.room_id, user2, tok=token2)
-
-        # Background updates should now cause a dummy event to be added to the graph
         self.pump(10 * 60)
 
         latest_event_ids = self.get_success(

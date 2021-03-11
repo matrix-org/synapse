@@ -29,8 +29,14 @@ It returns a JSON body like the following:
             }
         ],
         "avatar_url": "<avatar_url>",
-        "admin": false,
-        "deactivated": false
+        "admin": 0,
+        "deactivated": 0,
+        "shadow_banned": 0,
+        "password_hash": "$2b$12$p9B4GkqYdRTPGD",
+        "creation_ts": 1560432506,
+        "appservice_id": null,
+        "consent_server_notice_sent": null,
+        "consent_version": null
     }
 
 URL parameters:
@@ -93,6 +99,8 @@ Body parameters:
 
 - ``deactivated``, optional. If unspecified, deactivation state will be left
   unchanged on existing accounts and set to ``false`` for new accounts.
+  A user cannot be erased by deactivating with this API. For details on deactivating users see
+  `Deactivate Account <#deactivate-account>`_.
 
 If the user already exists then optional parameters default to the current value.
 
@@ -139,20 +147,20 @@ A JSON body is returned with the following shape:
         "users": [
             {
                 "name": "<user_id1>",
-                "password_hash": "<password_hash1>",
                 "is_guest": 0,
                 "admin": 0,
                 "user_type": null,
                 "deactivated": 0,
+                "shadow_banned": 0,
                 "displayname": "<User One>",
                 "avatar_url": null
             }, {
                 "name": "<user_id2>",
-                "password_hash": "<password_hash2>",
                 "is_guest": 0,
                 "admin": 1,
                 "user_type": null,
                 "deactivated": 0,
+                "shadow_banned": 0,
                 "displayname": "<User Two>",
                 "avatar_url": "<avatar_url>"
             }
@@ -175,6 +183,13 @@ This API returns information about the active sessions for a specific user.
 The api is::
 
     GET /_synapse/admin/v1/whois/<user_id>
+
+and::
+
+    GET /_matrix/client/r0/admin/whois/<userId>
+
+See also: `Client Server API Whois
+<https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-admin-whois-userid>`_
 
 To use it, you will need to authenticate by providing an ``access_token`` for a
 server admin: see `README.rst <README.rst>`_.
@@ -238,6 +253,25 @@ server admin: see `README.rst <README.rst>`_.
 The erase parameter is optional and defaults to ``false``.
 An empty body may be passed for backwards compatibility.
 
+The following actions are performed when deactivating an user:
+
+- Try to unpind 3PIDs from the identity server
+- Remove all 3PIDs from the homeserver
+- Delete all devices and E2EE keys
+- Delete all access tokens
+- Delete the password hash
+- Removal from all rooms the user is a member of
+- Remove the user from the user directory
+- Reject all pending invites
+- Remove all account validity information related to the user
+
+The following additional actions are performed during deactivation if ``erase``
+is set to ``true``:
+
+- Remove the user's display name
+- Remove the user's avatar URL
+- Mark the user as erased
+
 
 Reset password
 ==============
@@ -254,7 +288,7 @@ with a body of:
 
    {
        "new_password": "<secret>",
-       "logout_devices": true,
+       "logout_devices": true
    }
 
 To use it, you will need to authenticate by providing an ``access_token`` for a
@@ -327,6 +361,10 @@ A response body like the following is returned:
         "total": 2
     }
 
+The server returns the list of rooms of which the user and the server
+are member. If the user is local, all the rooms of which the user is
+member are returned.
+
 **Parameters**
 
 The following parameters should be set in the URL:
@@ -339,6 +377,154 @@ The following fields are returned in the JSON response body:
 
 - ``joined_rooms`` - An array of ``room_id``.
 - ``total`` - Number of rooms.
+
+
+List media of a user
+====================
+Gets a list of all local media that a specific ``user_id`` has created.
+By default, the response is ordered by descending creation date and ascending media ID.
+The newest media is on top. You can change the order with parameters
+``order_by`` and ``dir``.
+
+The API is::
+
+  GET /_synapse/admin/v1/users/<user_id>/media
+
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
+
+A response body like the following is returned:
+
+.. code:: json
+
+    {
+      "media": [
+        {
+          "created_ts": 100400,
+          "last_access_ts": null,
+          "media_id": "qXhyRzulkwLsNHTbpHreuEgo",
+          "media_length": 67,
+          "media_type": "image/png",
+          "quarantined_by": null,
+          "safe_from_quarantine": false,
+          "upload_name": "test1.png"
+        },
+        {
+          "created_ts": 200400,
+          "last_access_ts": null,
+          "media_id": "FHfiSnzoINDatrXHQIXBtahw",
+          "media_length": 67,
+          "media_type": "image/png",
+          "quarantined_by": null,
+          "safe_from_quarantine": false,
+          "upload_name": "test2.png"
+        }
+      ],
+      "next_token": 3,
+      "total": 2
+    }
+
+To paginate, check for ``next_token`` and if present, call the endpoint again
+with ``from`` set to the value of ``next_token``. This will return a new page.
+
+If the endpoint does not return a ``next_token`` then there are no more
+reports to paginate through.
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- ``user_id`` - string - fully qualified: for example, ``@user:server.com``.
+- ``limit``: string representing a positive integer - Is optional but is used for pagination,
+  denoting the maximum number of items to return in this call. Defaults to ``100``.
+- ``from``: string representing a positive integer - Is optional but used for pagination,
+  denoting the offset in the returned results. This should be treated as an opaque value and
+  not explicitly set to anything other than the return value of ``next_token`` from a previous call.
+  Defaults to ``0``.
+- ``order_by`` - The method by which to sort the returned list of media.
+  If the ordered field has duplicates, the second order is always by ascending ``media_id``,
+  which guarantees a stable ordering. Valid values are:
+
+  - ``media_id`` - Media are ordered alphabetically by ``media_id``.
+  - ``upload_name`` - Media are ordered alphabetically by name the media was uploaded with.
+  - ``created_ts`` - Media are ordered by when the content was uploaded in ms.
+    Smallest to largest. This is the default.
+  - ``last_access_ts`` - Media are ordered by when the content was last accessed in ms.
+    Smallest to largest.
+  - ``media_length`` - Media are ordered by length of the media in bytes.
+    Smallest to largest.
+  - ``media_type`` - Media are ordered alphabetically by MIME-type.
+  - ``quarantined_by`` - Media are ordered alphabetically by the user ID that
+    initiated the quarantine request for this media.
+  - ``safe_from_quarantine`` - Media are ordered by the status if this media is safe
+    from quarantining.
+
+- ``dir`` - Direction of media order. Either ``f`` for forwards or ``b`` for backwards.
+  Setting this value to ``b`` will reverse the above sort order. Defaults to ``f``.
+
+If neither ``order_by`` nor ``dir`` is set, the default order is newest media on top
+(corresponds to ``order_by`` = ``created_ts`` and ``dir`` = ``b``).
+
+Caution. The database only has indexes on the columns ``media_id``,
+``user_id`` and ``created_ts``. This means that if a different sort order is used
+(``upload_name``, ``last_access_ts``, ``media_length``, ``media_type``,
+``quarantined_by`` or ``safe_from_quarantine``), this can cause a large load on the
+database, especially for large environments.
+
+**Response**
+
+The following fields are returned in the JSON response body:
+
+- ``media`` - An array of objects, each containing information about a media.
+  Media objects contain the following fields:
+
+  - ``created_ts`` - integer - Timestamp when the content was uploaded in ms.
+  - ``last_access_ts`` - integer - Timestamp when the content was last accessed in ms.
+  - ``media_id`` - string - The id used to refer to the media.
+  - ``media_length`` - integer - Length of the media in bytes.
+  - ``media_type`` - string - The MIME-type of the media.
+  - ``quarantined_by`` - string - The user ID that initiated the quarantine request
+    for this media.
+
+  - ``safe_from_quarantine`` - bool - Status if this media is safe from quarantining.
+  - ``upload_name`` - string - The name the media was uploaded with.
+
+- ``next_token``: integer - Indication for pagination. See above.
+- ``total`` - integer - Total number of media.
+
+Login as a user
+===============
+
+Get an access token that can be used to authenticate as that user. Useful for
+when admins wish to do actions on behalf of a user.
+
+The API is::
+
+    POST /_synapse/admin/v1/users/<user_id>/login
+    {}
+
+An optional ``valid_until_ms`` field can be specified in the request body as an
+integer timestamp that specifies when the token should expire. By default tokens
+do not expire.
+
+A response body like the following is returned:
+
+.. code:: json
+
+    {
+        "access_token": "<opaque_access_token_string>"
+    }
+
+
+This API does *not* generate a new device for the user, and so will not appear
+their ``/devices`` list, and in general the target user should not be able to
+tell they have been logged in as.
+
+To expire the token call the standard ``/logout`` API with the token.
+
+Note: The token will expire if the *admin* user calls ``/logout/all`` from any
+of their devices, but the token will *not* expire if the target user does the
+same.
 
 
 User devices
@@ -375,7 +561,8 @@ A response body like the following is returned:
           "last_seen_ts": 1474491775025,
           "user_id": "<user_id>"
         }
-      ]
+      ],
+      "total": 2
     }
 
 **Parameters**
@@ -399,6 +586,8 @@ The following fields are returned in the JSON response body:
   - ``last_seen_ts`` - The timestamp (in milliseconds since the unix epoch) when this
     devices was last seen. (May be a few minutes out of date, for efficiency reasons).
   - ``user_id`` - Owner of  device.
+
+- ``total`` - Total number of user's devices.
 
 Delete multiple devices
 ------------------
@@ -525,3 +714,112 @@ The following parameters should be set in the URL:
 
 - ``user_id`` - fully qualified: for example, ``@user:server.com``.
 - ``device_id`` - The device to delete.
+
+List all pushers
+================
+Gets information about all pushers for a specific ``user_id``.
+
+The API is::
+
+  GET /_synapse/admin/v1/users/<user_id>/pushers
+
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
+
+A response body like the following is returned:
+
+.. code:: json
+
+    {
+      "pushers": [
+        {
+          "app_display_name":"HTTP Push Notifications",
+          "app_id":"m.http",
+          "data": {
+            "url":"example.com"
+          },
+          "device_display_name":"pushy push",
+          "kind":"http",
+          "lang":"None",
+          "profile_tag":"",
+          "pushkey":"a@example.com"
+        }
+      ],
+      "total": 1
+    }
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- ``user_id`` - fully qualified: for example, ``@user:server.com``.
+
+**Response**
+
+The following fields are returned in the JSON response body:
+
+- ``pushers`` - An array containing the current pushers for the user
+
+  - ``app_display_name`` - string - A string that will allow the user to identify
+    what application owns this pusher.
+
+  - ``app_id`` - string - This is a reverse-DNS style identifier for the application.
+    Max length, 64 chars.
+
+  - ``data`` - A dictionary of information for the pusher implementation itself.
+
+    - ``url`` - string - Required if ``kind`` is ``http``. The URL to use to send
+      notifications to.
+
+    - ``format`` - string - The format to use when sending notifications to the
+      Push Gateway.
+
+  - ``device_display_name`` - string -  A string that will allow the user to identify
+    what device owns this pusher.
+
+  - ``profile_tag`` - string - This string determines which set of device specific rules
+    this pusher executes.
+
+  - ``kind`` - string -  The kind of pusher. "http" is a pusher that sends HTTP pokes.
+  - ``lang`` - string - The preferred language for receiving notifications
+    (e.g. 'en' or 'en-US')
+
+  - ``profile_tag`` - string - This string determines which set of device specific rules
+    this pusher executes.
+
+  - ``pushkey`` - string - This is a unique identifier for this pusher.
+    Max length, 512 bytes.
+
+- ``total`` - integer - Number of pushers.
+
+See also `Client-Server API Spec <https://matrix.org/docs/spec/client_server/latest#get-matrix-client-r0-pushers>`_
+
+Shadow-banning users
+====================
+
+Shadow-banning is a useful tool for moderating malicious or egregiously abusive users.
+A shadow-banned users receives successful responses to their client-server API requests,
+but the events are not propagated into rooms. This can be an effective tool as it
+(hopefully) takes longer for the user to realise they are being moderated before
+pivoting to another account.
+
+Shadow-banning a user should be used as a tool of last resort and may lead to confusing
+or broken behaviour for the client. A shadow-banned user will not receive any
+notification and it is generally more appropriate to ban or kick abusive users.
+A shadow-banned user will be unable to contact anyone on the server.
+
+The API is::
+
+  POST /_synapse/admin/v1/users/<user_id>/shadow_ban
+
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
+
+An empty JSON dict is returned.
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- ``user_id`` - The fully qualified MXID: for example, ``@user:server.com``. The user must
+  be local.

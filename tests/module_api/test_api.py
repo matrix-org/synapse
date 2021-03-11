@@ -94,9 +94,13 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.assertFalse(hasattr(event, "state_key"))
         self.assertDictEqual(event.content, content)
 
+        expected_requester = create_requester(
+            user_id, authenticated_entity=self.hs.hostname
+        )
+
         # Check that the event was sent
         self.event_creation_handler.create_and_send_nonmember_event.assert_called_with(
-            create_requester(user_id),
+            expected_requester,
             event_dict,
             ratelimit=False,
             ignore_shadow_ban=True,
@@ -128,7 +132,7 @@ class ModuleApiTestCase(HomeserverTestCase):
 
         # Check that the event was sent
         self.event_creation_handler.create_and_send_nonmember_event.assert_called_with(
-            create_requester(user_id),
+            expected_requester,
             {
                 "type": "m.room.power_levels",
                 "content": content,

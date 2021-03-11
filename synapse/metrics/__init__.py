@@ -155,8 +155,7 @@ class InFlightGauge:
             self._registrations.setdefault(key, set()).add(callback)
 
     def unregister(self, key, callback):
-        """Registers that we've exited a block with labels `key`.
-        """
+        """Registers that we've exited a block with labels `key`."""
 
         with self._lock:
             self._registrations.setdefault(key, set()).discard(callback)
@@ -402,7 +401,9 @@ class PyPyGCStats:
         #     Total time spent in GC:  0.073                  # s.total_gc_time
 
         pypy_gc_time = CounterMetricFamily(
-            "pypy_gc_time_seconds_total", "Total time spent in PyPy GC", labels=[],
+            "pypy_gc_time_seconds_total",
+            "Total time spent in PyPy GC",
+            labels=[],
         )
         pypy_gc_time.add_metric([], s.total_gc_time / 1000)
         yield pypy_gc_time
@@ -502,6 +503,16 @@ build_info.labels(
 
 last_ticked = time.time()
 
+# 3PID send info
+threepid_send_requests = Histogram(
+    "synapse_threepid_send_requests_with_tries",
+    documentation="Number of requests for a 3pid token by try count. Note if"
+    " there is a request with try count of 4, then there would have been one"
+    " each for 1, 2 and 3",
+    buckets=(1, 2, 3, 4, 5, 10),
+    labelnames=("type", "reason"),
+)
+
 
 class ReactorLastSeenMetric:
     def collect(self):
@@ -516,7 +527,7 @@ class ReactorLastSeenMetric:
 REGISTRY.register(ReactorLastSeenMetric())
 
 
-def runUntilCurrentTimer(func):
+def runUntilCurrentTimer(reactor, func):
     @functools.wraps(func)
     def f(*args, **kwargs):
         now = reactor.seconds()
@@ -579,13 +590,14 @@ def runUntilCurrentTimer(func):
 
 try:
     # Ensure the reactor has all the attributes we expect
-    reactor.runUntilCurrent
-    reactor._newTimedCalls
-    reactor.threadCallQueue
+    reactor.seconds  # type: ignore
+    reactor.runUntilCurrent  # type: ignore
+    reactor._newTimedCalls  # type: ignore
+    reactor.threadCallQueue  # type: ignore
 
     # runUntilCurrent is called when we have pending calls. It is called once
     # per iteratation after fd polling.
-    reactor.runUntilCurrent = runUntilCurrentTimer(reactor.runUntilCurrent)
+    reactor.runUntilCurrent = runUntilCurrentTimer(reactor, reactor.runUntilCurrent)  # type: ignore
 
     # We manually run the GC each reactor tick so that we can get some metrics
     # about time spent doing GC,

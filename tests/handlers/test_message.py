@@ -44,9 +44,11 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         self.room_id = self.helper.create_room_as(self.user_id, tok=self.access_token)
 
         self.info = self.get_success(
-            self.hs.get_datastore().get_user_by_access_token(self.access_token,)
+            self.hs.get_datastore().get_user_by_access_token(
+                self.access_token,
+            )
         )
-        self.token_id = self.info["token_id"]
+        self.token_id = self.info.token_id
 
         self.requester = create_requester(self.user_id, access_token_id=self.token_id)
 
@@ -66,7 +68,6 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
                     "sender": self.requester.user.to_string(),
                     "content": {"msgtype": "m.text", "body": random_string(5)},
                 },
-                token_id=self.token_id,
                 txn_id=txn_id,
             )
         )
@@ -155,3 +156,56 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         # Check that we've deduplicated the events.
         self.assertEqual(len(events), 2)
         self.assertEqual(events[0].event_id, events[1].event_id)
+
+
+class ServerAclValidationTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        admin.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.user_id = self.register_user("tester", "foobar")
+        self.access_token = self.login("tester", "foobar")
+        self.room_id = self.helper.create_room_as(self.user_id, tok=self.access_token)
+
+    def test_allow_server_acl(self):
+        """Test that sending an ACL that blocks everyone but ourselves works."""
+
+        self.helper.send_state(
+            self.room_id,
+            EventTypes.ServerACL,
+            body={"allow": [self.hs.hostname]},
+            tok=self.access_token,
+            expect_code=200,
+        )
+
+    def test_deny_server_acl_block_outselves(self):
+        """Test that sending an ACL that blocks ourselves does not work."""
+        self.helper.send_state(
+            self.room_id,
+            EventTypes.ServerACL,
+            body={},
+            tok=self.access_token,
+            expect_code=400,
+        )
+
+    def test_deny_redact_server_acl(self):
+        """Test that attempting to redact an ACL is blocked."""
+
+        body = self.helper.send_state(
+            self.room_id,
+            EventTypes.ServerACL,
+            body={"allow": [self.hs.hostname]},
+            tok=self.access_token,
+            expect_code=200,
+        )
+        event_id = body["event_id"]
+
+        # Redaction of event should fail.
+        path = "/_matrix/client/r0/rooms/%s/redact/%s" % (self.room_id, event_id)
+        channel = self.make_request(
+            "POST", path, content={}, access_token=self.access_token
+        )
+        self.assertEqual(int(channel.result["code"]), 403)

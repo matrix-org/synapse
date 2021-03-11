@@ -15,13 +15,22 @@
 
 from synapse.rest.media.v1.preview_url_resource import (
     decode_and_calc_og,
+    get_html_media_encoding,
     summarize_paragraphs,
 )
 
 from . import unittest
 
+try:
+    import lxml
+except ImportError:
+    lxml = None
 
-class PreviewTestCase(unittest.TestCase):
+
+class SummarizeTestCase(unittest.TestCase):
+    if not lxml:
+        skip = "url preview feature requires lxml"
+
     def test_long_summarize(self):
         example_paras = [
             """Tromsø (Norwegian pronunciation: [ˈtrʊmsœ] ( listen); Northern Sami:
@@ -56,7 +65,7 @@ class PreviewTestCase(unittest.TestCase):
 
         desc = summarize_paragraphs(example_paras, min_size=200, max_size=500)
 
-        self.assertEquals(
+        self.assertEqual(
             desc,
             "Tromsø (Norwegian pronunciation: [ˈtrʊmsœ] ( listen); Northern Sami:"
             " Romsa; Finnish: Tromssa[2] Kven: Tromssa) is a city and municipality in"
@@ -69,7 +78,7 @@ class PreviewTestCase(unittest.TestCase):
 
         desc = summarize_paragraphs(example_paras[1:], min_size=200, max_size=500)
 
-        self.assertEquals(
+        self.assertEqual(
             desc,
             "Tromsø lies in Northern Norway. The municipality has a population of"
             " (2015) 72,066, but with an annual influx of students it has over 75,000"
@@ -96,7 +105,7 @@ class PreviewTestCase(unittest.TestCase):
 
         desc = summarize_paragraphs(example_paras, min_size=200, max_size=500)
 
-        self.assertEquals(
+        self.assertEqual(
             desc,
             "Tromsø (Norwegian pronunciation: [ˈtrʊmsœ] ( listen); Northern Sami:"
             " Romsa; Finnish: Tromssa[2] Kven: Tromssa) is a city and municipality in"
@@ -122,7 +131,7 @@ class PreviewTestCase(unittest.TestCase):
         ]
 
         desc = summarize_paragraphs(example_paras, min_size=200, max_size=500)
-        self.assertEquals(
+        self.assertEqual(
             desc,
             "Tromsø (Norwegian pronunciation: [ˈtrʊmsœ] ( listen); Northern Sami:"
             " Romsa; Finnish: Tromssa[2] Kven: Tromssa) is a city and municipality in"
@@ -136,9 +145,12 @@ class PreviewTestCase(unittest.TestCase):
         )
 
 
-class PreviewUrlTestCase(unittest.TestCase):
+class CalcOgTestCase(unittest.TestCase):
+    if not lxml:
+        skip = "url preview feature requires lxml"
+
     def test_simple(self):
-        html = """
+        html = b"""
         <html>
         <head><title>Foo</title></head>
         <body>
@@ -149,10 +161,10 @@ class PreviewUrlTestCase(unittest.TestCase):
 
         og = decode_and_calc_og(html, "http://example.com/test.html")
 
-        self.assertEquals(og, {"og:title": "Foo", "og:description": "Some text."})
+        self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
 
     def test_comment(self):
-        html = """
+        html = b"""
         <html>
         <head><title>Foo</title></head>
         <body>
@@ -164,10 +176,10 @@ class PreviewUrlTestCase(unittest.TestCase):
 
         og = decode_and_calc_og(html, "http://example.com/test.html")
 
-        self.assertEquals(og, {"og:title": "Foo", "og:description": "Some text."})
+        self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
 
     def test_comment2(self):
-        html = """
+        html = b"""
         <html>
         <head><title>Foo</title></head>
         <body>
@@ -182,7 +194,7 @@ class PreviewUrlTestCase(unittest.TestCase):
 
         og = decode_and_calc_og(html, "http://example.com/test.html")
 
-        self.assertEquals(
+        self.assertEqual(
             og,
             {
                 "og:title": "Foo",
@@ -191,7 +203,7 @@ class PreviewUrlTestCase(unittest.TestCase):
         )
 
     def test_script(self):
-        html = """
+        html = b"""
         <html>
         <head><title>Foo</title></head>
         <body>
@@ -203,10 +215,10 @@ class PreviewUrlTestCase(unittest.TestCase):
 
         og = decode_and_calc_og(html, "http://example.com/test.html")
 
-        self.assertEquals(og, {"og:title": "Foo", "og:description": "Some text."})
+        self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
 
     def test_missing_title(self):
-        html = """
+        html = b"""
         <html>
         <body>
         Some text.
@@ -216,10 +228,10 @@ class PreviewUrlTestCase(unittest.TestCase):
 
         og = decode_and_calc_og(html, "http://example.com/test.html")
 
-        self.assertEquals(og, {"og:title": None, "og:description": "Some text."})
+        self.assertEqual(og, {"og:title": None, "og:description": "Some text."})
 
     def test_h1_as_title(self):
-        html = """
+        html = b"""
         <html>
         <meta property="og:description" content="Some text."/>
         <body>
@@ -230,10 +242,10 @@ class PreviewUrlTestCase(unittest.TestCase):
 
         og = decode_and_calc_og(html, "http://example.com/test.html")
 
-        self.assertEquals(og, {"og:title": "Title", "og:description": "Some text."})
+        self.assertEqual(og, {"og:title": "Title", "og:description": "Some text."})
 
     def test_missing_title_and_broken_h1(self):
-        html = """
+        html = b"""
         <html>
         <body>
         <h1><a href="foo"/></h1>
@@ -244,4 +256,118 @@ class PreviewUrlTestCase(unittest.TestCase):
 
         og = decode_and_calc_og(html, "http://example.com/test.html")
 
-        self.assertEquals(og, {"og:title": None, "og:description": "Some text."})
+        self.assertEqual(og, {"og:title": None, "og:description": "Some text."})
+
+    def test_empty(self):
+        """Test a body with no data in it."""
+        html = b""
+        og = decode_and_calc_og(html, "http://example.com/test.html")
+        self.assertEqual(og, {})
+
+    def test_no_tree(self):
+        """A valid body with no tree in it."""
+        html = b"\x00"
+        og = decode_and_calc_og(html, "http://example.com/test.html")
+        self.assertEqual(og, {})
+
+    def test_invalid_encoding(self):
+        """An invalid character encoding should be ignored and treated as UTF-8, if possible."""
+        html = b"""
+        <html>
+        <head><title>Foo</title></head>
+        <body>
+        Some text.
+        </body>
+        </html>
+        """
+        og = decode_and_calc_og(
+            html, "http://example.com/test.html", "invalid-encoding"
+        )
+        self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
+
+    def test_invalid_encoding2(self):
+        """A body which doesn't match the sent character encoding."""
+        # Note that this contains an invalid UTF-8 sequence in the title.
+        html = b"""
+        <html>
+        <head><title>\xff\xff Foo</title></head>
+        <body>
+        Some text.
+        </body>
+        </html>
+        """
+        og = decode_and_calc_og(html, "http://example.com/test.html")
+        self.assertEqual(og, {"og:title": "ÿÿ Foo", "og:description": "Some text."})
+
+
+class MediaEncodingTestCase(unittest.TestCase):
+    def test_meta_charset(self):
+        """A character encoding is found via the meta tag."""
+        encoding = get_html_media_encoding(
+            b"""
+        <html>
+        <head><meta charset="ascii">
+        </head>
+        </html>
+        """,
+            "text/html",
+        )
+        self.assertEqual(encoding, "ascii")
+
+        # A less well-formed version.
+        encoding = get_html_media_encoding(
+            b"""
+        <html>
+        <head>< meta charset = ascii>
+        </head>
+        </html>
+        """,
+            "text/html",
+        )
+        self.assertEqual(encoding, "ascii")
+
+    def test_xml_encoding(self):
+        """A character encoding is found via the meta tag."""
+        encoding = get_html_media_encoding(
+            b"""
+        <?xml version="1.0" encoding="ascii"?>
+        <html>
+        </html>
+        """,
+            "text/html",
+        )
+        self.assertEqual(encoding, "ascii")
+
+    def test_meta_xml_encoding(self):
+        """Meta tags take precedence over XML encoding."""
+        encoding = get_html_media_encoding(
+            b"""
+        <?xml version="1.0" encoding="ascii"?>
+        <html>
+        <head><meta charset="UTF-16">
+        </head>
+        </html>
+        """,
+            "text/html",
+        )
+        self.assertEqual(encoding, "UTF-16")
+
+    def test_content_type(self):
+        """A character encoding is found via the Content-Type header."""
+        # Test a few variations of the header.
+        headers = (
+            'text/html; charset="ascii";',
+            "text/html;charset=ascii;",
+            'text/html;  charset="ascii"',
+            "text/html; charset=ascii",
+            'text/html; charset="ascii;',
+            'text/html; charset=ascii";',
+        )
+        for header in headers:
+            encoding = get_html_media_encoding(b"", header)
+            self.assertEqual(encoding, "ascii")
+
+    def test_fallback(self):
+        """A character encoding cannot be found in the body or header."""
+        encoding = get_html_media_encoding(b"", "text/html")
+        self.assertEqual(encoding, "utf-8")

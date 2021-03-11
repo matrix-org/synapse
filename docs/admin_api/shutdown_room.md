@@ -1,4 +1,7 @@
-# Shutdown room API
+# Deprecated: Shutdown room API
+
+**The old Shutdown room API is deprecated and will be removed in a future release.
+See the new [Delete Room API](rooms.md#delete-room-api) for more details.**
 
 Shuts down a room, preventing new joins and moves local users and room aliases automatically
 to a new room. The new room will be created with the user specified by the
@@ -9,8 +12,6 @@ disallow any further invites or joins.
 
 The local server will only have the power to move local user and room aliases to
 the new room. Users on other servers will be unaffected.
-
-See also: [Delete Room API](rooms.md#delete-room-api)
 
 ## API
 

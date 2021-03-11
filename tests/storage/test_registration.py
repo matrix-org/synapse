@@ -52,6 +52,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
                 "creation_ts": 1000,
                 "user_type": None,
                 "deactivated": 0,
+                "shadow_banned": 0,
             },
             (yield defer.ensureDeferred(self.store.get_user_by_id(self.user_id))),
         )
@@ -69,11 +70,9 @@ class RegistrationStoreTestCase(unittest.TestCase):
             self.store.get_user_by_access_token(self.tokens[1])
         )
 
-        self.assertDictContainsSubset(
-            {"name": self.user_id, "device_id": self.device_id}, result
-        )
-
-        self.assertTrue("token_id" in result)
+        self.assertEqual(result.user_id, self.user_id)
+        self.assertEqual(result.device_id, self.device_id)
+        self.assertIsNotNone(result.token_id)
 
     @defer.inlineCallbacks
     def test_user_delete_access_tokens(self):
@@ -105,7 +104,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
         user = yield defer.ensureDeferred(
             self.store.get_user_by_access_token(self.tokens[0])
         )
-        self.assertEqual(self.user_id, user["name"])
+        self.assertEqual(self.user_id, user.user_id)
 
         # now delete the rest
         yield defer.ensureDeferred(self.store.user_delete_access_tokens(self.user_id))
@@ -147,7 +146,10 @@ class RegistrationStoreTestCase(unittest.TestCase):
         try:
             yield defer.ensureDeferred(
                 self.store.validate_threepid_session(
-                    "fake_sid", "fake_client_secret", "fake_token", 0,
+                    "fake_sid",
+                    "fake_client_secret",
+                    "fake_token",
+                    0,
                 )
             )
         except ThreepidValidationError as e:
@@ -160,7 +162,10 @@ class RegistrationStoreTestCase(unittest.TestCase):
         try:
             yield defer.ensureDeferred(
                 self.store.validate_threepid_session(
-                    "fake_sid", "fake_client_secret", "fake_token", 0,
+                    "fake_sid",
+                    "fake_client_secret",
+                    "fake_token",
+                    0,
                 )
             )
         except ThreepidValidationError as e:

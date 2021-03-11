@@ -27,11 +27,11 @@ class FederationAckTestCase(HomeserverTestCase):
     def default_config(self) -> dict:
         config = super().default_config()
         config["worker_app"] = "synapse.app.federation_sender"
-        config["send_federation"] = True
+        config["send_federation"] = False
         return config
 
     def make_homeserver(self, reactor, clock):
-        hs = self.setup_test_homeserver(homeserverToUse=GenericWorkerServer)
+        hs = self.setup_test_homeserver(homeserver_to_use=GenericWorkerServer)
 
         return hs
 

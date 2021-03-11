@@ -2,7 +2,7 @@ import json
 import logging
 from collections import deque
 from io import SEEK_END, BytesIO
-from typing import Callable
+from typing import Callable, Iterable, MutableMapping, Optional, Tuple, Union
 
 import attr
 from typing_extensions import Deque
@@ -19,8 +19,8 @@ from twisted.internet.interfaces import (
 )
 from twisted.python.failure import Failure
 from twisted.test.proto_helpers import AccumulatingProtocol, MemoryReactorClock
-from twisted.web.http import unquote
 from twisted.web.http_headers import Headers
+from twisted.web.resource import IResource
 from twisted.web.server import Site
 
 from synapse.http.site import SynapseRequest
@@ -46,14 +46,27 @@ class FakeChannel:
 
     site = attr.ib(type=Site)
     _reactor = attr.ib()
-    result = attr.ib(default=attr.Factory(dict))
+    result = attr.ib(type=dict, default=attr.Factory(dict))
+    _ip = attr.ib(type=str, default="127.0.0.1")
     _producer = None
 
     @property
     def json_body(self):
-        if not self.result:
-            raise Exception("No result yet.")
-        return json.loads(self.result["body"].decode("utf8"))
+        return json.loads(self.text_body)
+
+    @property
+    def text_body(self) -> str:
+        """The body of the result, utf-8-decoded.
+
+        Raises an exception if the request has not yet completed.
+        """
+        if not self.is_finished:
+            raise Exception("Request not yet completed")
+        return self.result["body"].decode("utf8")
+
+    def is_finished(self) -> bool:
+        """check if the response has been completely received"""
+        return self.result.get("done", False)
 
     @property
     def code(self):
@@ -62,7 +75,7 @@ class FakeChannel:
         return int(self.result["code"])
 
     @property
-    def headers(self):
+    def headers(self) -> Headers:
         if not self.result:
             raise Exception("No result yet.")
         h = Headers()
@@ -108,14 +121,47 @@ class FakeChannel:
     def getPeer(self):
         # We give an address so that getClientIP returns a non null entry,
         # causing us to record the MAU
-        return address.IPv4Address("TCP", "127.0.0.1", 3423)
+        return address.IPv4Address("TCP", self._ip, 3423)
 
     def getHost(self):
-        return None
+        # this is called by Request.__init__ to configure Request.host.
+        return address.IPv4Address("TCP", "127.0.0.1", 8888)
+
+    def isSecure(self):
+        return False
 
     @property
     def transport(self):
         return self
+
+    def await_result(self, timeout: int = 100) -> None:
+        """
+        Wait until the request is finished.
+        """
+        self._reactor.run()
+        x = 0
+
+        while not self.is_finished():
+            # If there's a producer, tell it to resume producing so we get content
+            if self._producer:
+                self._producer.resumeProducing()
+
+            x += 1
+
+            if x > timeout:
+                raise TimedOutException("Timed out waiting for request to finish.")
+
+            self._reactor.advance(0.1)
+
+    def extract_cookies(self, cookies: MutableMapping[str, str]) -> None:
+        """Process the contents of any Set-Cookie headers in the response
+
+        Any cookines found are added to the given dict
+        """
+        for h in self.headers.getRawHeaders("Set-Cookie"):
+            parts = h.split(";")
+            k, v = parts[0].split("=", maxsplit=1)
+            cookies[k] = v
 
 
 class FakeSite:
@@ -128,9 +174,21 @@ class FakeSite:
     site_tag = "test"
     access_logger = logging.getLogger("synapse.access.http.fake")
 
+    def __init__(self, resource: IResource):
+        """
+
+        Args:
+            resource: the resource to be used for rendering all requests
+        """
+        self._resource = resource
+
+    def getResourceFor(self, request):
+        return self._resource
+
 
 def make_request(
     reactor,
+    site: Union[Site, FakeSite],
     method,
     path,
     content=b"",
@@ -139,12 +197,20 @@ def make_request(
     shorthand=True,
     federation_auth_origin=None,
     content_is_form=False,
-):
+    await_result: bool = True,
+    custom_headers: Optional[
+        Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
+    ] = None,
+    client_ip: str = "127.0.0.1",
+) -> FakeChannel:
     """
-    Make a web request using the given method and path, feed it the
-    content, and return the Request and the Channel underneath.
+    Make a web request using the given method, path and content, and render it
+
+    Returns the fake Channel object which records the response to the request.
 
     Args:
+        site: The twisted Site to use to render the request
+
         method (bytes/unicode): The HTTP request method ("verb").
         path (bytes/unicode): The HTTP path, suitably URL encoded (e.g.
         escaped UTF-8 & spaces and such).
@@ -157,8 +223,17 @@ def make_request(
         content_is_form: Whether the content is URL encoded form data. Adds the
             'Content-Type': 'application/x-www-form-urlencoded' header.
 
+        custom_headers: (name, value) pairs to add as request headers
+
+        await_result: whether to wait for the request to complete rendering. If true,
+             will pump the reactor until the the renderer tells the channel the request
+             is finished.
+
+        client_ip: The IP to use as the requesting IP. Useful for testing
+            ratelimiting.
+
     Returns:
-        Tuple[synapse.http.site.SynapseRequest, channel]
+        channel
     """
     if not isinstance(method, bytes):
         method = method.encode("ascii")
@@ -172,24 +247,24 @@ def make_request(
         and not path.startswith(b"/_matrix")
         and not path.startswith(b"/_synapse")
     ):
+        if path.startswith(b"/"):
+            path = path[1:]
         path = b"/_matrix/client/r0/" + path
-        path = path.replace(b"//", b"/")
 
     if not path.startswith(b"/"):
         path = b"/" + path
 
+    if isinstance(content, dict):
+        content = json.dumps(content).encode("utf8")
     if isinstance(content, str):
         content = content.encode("utf8")
 
-    site = FakeSite()
-    channel = FakeChannel(site, reactor)
+    channel = FakeChannel(site, reactor, ip=client_ip)
 
     req = request(channel)
-    req.process = lambda: b""
     req.content = BytesIO(content)
     # Twisted expects to be at the end of the content when parsing the request.
     req.content.seek(SEEK_END)
-    req.postpath = list(map(unquote, path[1:].split(b"/")))
 
     if access_token:
         req.requestHeaders.addRawHeader(
@@ -211,35 +286,17 @@ def make_request(
             # Assume the body is JSON
             req.requestHeaders.addRawHeader(b"Content-Type", b"application/json")
 
+    if custom_headers:
+        for k, v in custom_headers:
+            req.requestHeaders.addRawHeader(k, v)
+
+    req.parseCookies()
     req.requestReceived(method, path, b"1.1")
 
-    return req, channel
+    if await_result:
+        channel.await_result()
 
-
-def wait_until_result(clock, request, timeout=100):
-    """
-    Wait until the request is finished.
-    """
-    clock.run()
-    x = 0
-
-    while not request.finished:
-
-        # If there's a producer, tell it to resume producing so we get content
-        if request._channel._producer:
-            request._channel._producer.resumeProducing()
-
-        x += 1
-
-        if x > timeout:
-            raise TimedOutException("Timed out waiting for request to finish.")
-
-        clock.advance(0.1)
-
-
-def render(request, resource, clock):
-    request.render(resource)
-    wait_until_result(clock, request)
+    return channel
 
 
 @implementer(IReactorPluggableNameResolver)
@@ -294,8 +351,7 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         self._tcp_callbacks[(host, port)] = callback
 
     def connectTCP(self, host, port, factory, timeout=30, bindAddress=None):
-        """Fake L{IReactorTCP.connectTCP}.
-        """
+        """Fake L{IReactorTCP.connectTCP}."""
 
         conn = super().connectTCP(
             host, port, factory, timeout=timeout, bindAddress=None
@@ -380,7 +436,7 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
                 pool._runWithConnection,
                 func,
                 *args,
-                **kwargs
+                **kwargs,
             )
 
         def runInteraction(interaction, *args, **kwargs):
@@ -390,7 +446,7 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
                 pool._runInteraction,
                 interaction,
                 *args,
-                **kwargs
+                **kwargs,
             )
 
         pool.runWithConnection = runWithConnection
@@ -571,12 +627,10 @@ def connect_client(reactor: IReactorTCP, client_id: int) -> AccumulatingProtocol
         reactor
         factory: The connecting factory to build.
     """
-    factory = reactor.tcpClients[client_id][2]
+    factory = reactor.tcpClients.pop(client_id)[2]
     client = factory.buildProtocol(None)
     server = AccumulatingProtocol()
     server.makeConnection(FakeTransport(client, reactor))
     client.makeConnection(FakeTransport(server, reactor))
-
-    reactor.tcpClients.pop(client_id)
 
     return client, server

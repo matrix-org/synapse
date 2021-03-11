@@ -18,7 +18,7 @@
 
 import logging
 import re
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from urllib import parse as urlparse
 
 from synapse.api.constants import EventTypes, Membership
@@ -46,10 +46,9 @@ from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
 from synapse.util import json_decoder
-from synapse.util.stringutils import random_string
+from synapse.util.stringutils import parse_and_validate_server_name, random_string
 
-MYPY = False
-if MYPY:
+if TYPE_CHECKING:
     import synapse.server
 
 logger = logging.getLogger(__name__)
@@ -72,20 +71,6 @@ class RoomCreateRestServlet(TransactionRestServlet):
     def register(self, http_server):
         PATTERNS = "/createRoom"
         register_txn_path(self, PATTERNS, http_server)
-        # define CORS for all of /rooms in RoomCreateRestServlet for simplicity
-        http_server.register_paths(
-            "OPTIONS",
-            client_patterns("/rooms(?:/.*)?$", v1=True),
-            self.on_OPTIONS,
-            self.__class__.__name__,
-        )
-        # define CORS for /createRoom[/txnid]
-        http_server.register_paths(
-            "OPTIONS",
-            client_patterns("/createRoom(?:/.*)?$", v1=True),
-            self.on_OPTIONS,
-            self.__class__.__name__,
-        )
 
     def on_PUT(self, request, txn_id):
         set_tag("txn_id", txn_id)
@@ -103,9 +88,6 @@ class RoomCreateRestServlet(TransactionRestServlet):
     def get_room_config(self, request):
         user_supplied_config = parse_json_object_from_request(request)
         return user_supplied_config
-
-    def on_OPTIONS(self, request):
-        return 200, {}
 
 
 # TODO: Needs unit testing for generic events
@@ -365,8 +347,6 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             # provided.
             if server:
                 raise e
-            else:
-                pass
 
         limit = parse_integer(request, "limit", 0)
         since_token = parse_string(request, "since", None)
@@ -377,6 +357,16 @@ class PublicRoomListRestServlet(TransactionRestServlet):
 
         handler = self.hs.get_room_list_handler()
         if server and server != self.hs.config.server_name:
+            # Ensure the server is valid.
+            try:
+                parse_and_validate_server_name(server)
+            except ValueError:
+                raise SynapseError(
+                    400,
+                    "Invalid server name: %s" % (server,),
+                    Codes.INVALID_PARAM,
+                )
+
             try:
                 data = await handler.get_remote_public_room_list(
                     server, limit=limit, since_token=since_token
@@ -420,6 +410,16 @@ class PublicRoomListRestServlet(TransactionRestServlet):
 
         handler = self.hs.get_room_list_handler()
         if server and server != self.hs.config.server_name:
+            # Ensure the server is valid.
+            try:
+                parse_and_validate_server_name(server)
+            except ValueError:
+                raise SynapseError(
+                    400,
+                    "Invalid server name: %s" % (server,),
+                    Codes.INVALID_PARAM,
+                )
+
             try:
                 data = await handler.get_remote_public_room_list(
                     server,
@@ -654,7 +654,7 @@ class RoomEventContextServlet(RestServlet):
             event_filter = None
 
         results = await self.room_context_handler.get_event_context(
-            requester.user, room_id, event_id, limit, event_filter
+            requester, room_id, event_id, limit, event_filter
         )
 
         if not results:
@@ -981,25 +981,28 @@ def register_txn_path(servlet, regex_string, http_server, with_get=False):
         )
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs, http_server, is_worker=False):
     RoomStateEventRestServlet(hs).register(http_server)
-    RoomCreateRestServlet(hs).register(http_server)
     RoomMemberListRestServlet(hs).register(http_server)
     JoinedRoomMemberListRestServlet(hs).register(http_server)
     RoomMessageListRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
-    RoomForgetRestServlet(hs).register(http_server)
     RoomMembershipRestServlet(hs).register(http_server)
     RoomSendEventRestServlet(hs).register(http_server)
     PublicRoomListRestServlet(hs).register(http_server)
     RoomStateRestServlet(hs).register(http_server)
     RoomRedactEventRestServlet(hs).register(http_server)
     RoomTypingRestServlet(hs).register(http_server)
-    SearchRestServlet(hs).register(http_server)
-    JoinedRoomsRestServlet(hs).register(http_server)
-    RoomEventServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
-    RoomAliasListServlet(hs).register(http_server)
+
+    # Some servlets only get registered for the main process.
+    if not is_worker:
+        RoomCreateRestServlet(hs).register(http_server)
+        RoomForgetRestServlet(hs).register(http_server)
+        SearchRestServlet(hs).register(http_server)
+        JoinedRoomsRestServlet(hs).register(http_server)
+        RoomEventServlet(hs).register(http_server)
+        RoomAliasListServlet(hs).register(http_server)
 
 
 def register_deprecated_servlets(hs, http_server):

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018-2019 New Vector Ltd
+# Copyright 2020, 2021 The Matrix.org Foundation C.I.C.
+
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,40 +23,48 @@ import synapse
 from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.server import JsonResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
-from synapse.rest.admin._base import (
-    admin_patterns,
-    assert_requester_is_admin,
-    historical_admin_path_patterns,
-)
+from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
 from synapse.rest.admin.devices import (
     DeleteDevicesRestServlet,
     DeviceRestServlet,
     DevicesRestServlet,
 )
-from synapse.rest.admin.event_reports import EventReportsRestServlet
+from synapse.rest.admin.event_reports import (
+    EventReportDetailRestServlet,
+    EventReportsRestServlet,
+)
 from synapse.rest.admin.groups import DeleteGroupAdminRestServlet
 from synapse.rest.admin.media import ListMediaInRoom, register_servlets_for_media_repo
 from synapse.rest.admin.purge_room_servlet import PurgeRoomServlet
 from synapse.rest.admin.rooms import (
     DeleteRoomRestServlet,
+    ForwardExtremitiesRestServlet,
     JoinRoomAliasServlet,
     ListRoomRestServlet,
+    MakeRoomAdminRestServlet,
+    RoomEventContextServlet,
     RoomMembersRestServlet,
     RoomRestServlet,
+    RoomStateRestServlet,
     ShutdownRoomRestServlet,
 )
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
+from synapse.rest.admin.statistics import UserMediaStatisticsRestServlet
 from synapse.rest.admin.users import (
     AccountValidityRenewServlet,
     DeactivateAccountRestServlet,
+    PushersRestServlet,
     ResetPasswordRestServlet,
     SearchUsersRestServlet,
+    ShadowBanRestServlet,
     UserAdminServlet,
+    UserMediaRestServlet,
     UserMembershipRestServlet,
     UserRegisterServlet,
     UserRestServletV2,
     UsersRestServlet,
     UsersRestServletV2,
+    UserTokenRestServlet,
     WhoisRestServlet,
 )
 from synapse.types import RoomStreamToken
@@ -77,7 +87,7 @@ class VersionServlet(RestServlet):
 
 
 class PurgeHistoryRestServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns(
+    PATTERNS = admin_patterns(
         "/purge_history/(?P<room_id>[^/]*)(/(?P<event_id>[^/]+))?"
     )
 
@@ -162,9 +172,7 @@ class PurgeHistoryRestServlet(RestServlet):
 
 
 class PurgeHistoryStatusRestServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns(
-        "/purge_history_status/(?P<purge_id>[^/]+)"
-    )
+    PATTERNS = admin_patterns("/purge_history_status/(?P<purge_id>[^/]+)")
 
     def __init__(self, hs):
         """
@@ -207,6 +215,7 @@ def register_servlets(hs, http_server):
     """
     register_servlets_for_client_rest_resource(hs, http_server)
     ListRoomRestServlet(hs).register(http_server)
+    RoomStateRestServlet(hs).register(http_server)
     RoomRestServlet(hs).register(http_server)
     RoomMembersRestServlet(hs).register(http_server)
     DeleteRoomRestServlet(hs).register(http_server)
@@ -215,13 +224,22 @@ def register_servlets(hs, http_server):
     SendServerNoticeServlet(hs).register(http_server)
     VersionServlet(hs).register(http_server)
     UserAdminServlet(hs).register(http_server)
+    UserMediaRestServlet(hs).register(http_server)
     UserMembershipRestServlet(hs).register(http_server)
+    UserTokenRestServlet(hs).register(http_server)
     UserRestServletV2(hs).register(http_server)
     UsersRestServletV2(hs).register(http_server)
     DeviceRestServlet(hs).register(http_server)
     DevicesRestServlet(hs).register(http_server)
     DeleteDevicesRestServlet(hs).register(http_server)
+    UserMediaStatisticsRestServlet(hs).register(http_server)
+    EventReportDetailRestServlet(hs).register(http_server)
     EventReportsRestServlet(hs).register(http_server)
+    PushersRestServlet(hs).register(http_server)
+    MakeRoomAdminRestServlet(hs).register(http_server)
+    ShadowBanRestServlet(hs).register(http_server)
+    ForwardExtremitiesRestServlet(hs).register(http_server)
+    RoomEventContextServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(hs, http_server):

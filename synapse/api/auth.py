@@ -23,7 +23,7 @@ from twisted.web.server import Request
 import synapse.types
 from synapse import event_auth
 from synapse.api.auth_blocking import AuthBlocking
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -31,11 +31,15 @@ from synapse.api.errors import (
     MissingClientTokenError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.appservice import ApplicationService
 from synapse.events import EventBase
+from synapse.http import get_request_user_agent
+from synapse.http.site import SynapseRequest
 from synapse.logging import opentracing as opentracing
+from synapse.storage.databases.main.registration import TokenLookupResult
 from synapse.types import StateMap, UserID
-from synapse.util.caches import register_cache
 from synapse.util.caches.lrucache import LruCache
+from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
@@ -70,8 +74,9 @@ class Auth:
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
 
-        self.token_cache = LruCache(10000)
-        register_cache("cache", "token_cache", self.token_cache)
+        self.token_cache = LruCache(
+            10000, "token_cache"
+        )  # type: LruCache[str, Tuple[str, bool]]
 
         self._auth_blocking = AuthBlocking(self.hs)
 
@@ -164,7 +169,7 @@ class Auth:
         rights: str = "access",
         allow_expired: bool = False,
     ) -> synapse.types.Requester:
-        """ Get a registered user's ID.
+        """Get a registered user's ID.
 
         Args:
             request: An HTTP request with an access_token query parameter.
@@ -183,19 +188,13 @@ class Auth:
             AuthError if access is denied for the user in the access token
         """
         try:
-            ip_addr = self.hs.get_ip_from_request(request)
-            user_agent = request.requestHeaders.getRawHeaders(
-                b"User-Agent", default=[b""]
-            )[0].decode("ascii", "surrogateescape")
+            ip_addr = request.getClientIP()
+            user_agent = get_request_user_agent(request)
 
             access_token = self.get_access_token_from_request(request)
 
             user_id, app_service = await self._get_appservice_user_id(request)
             if user_id:
-                request.authenticated_entity = user_id
-                opentracing.set_tag("authenticated_entity", user_id)
-                opentracing.set_tag("appservice_id", app_service.id)
-
                 if ip_addr and self._track_appservice_user_ips:
                     await self.store.insert_client_ip(
                         user_id=user_id,
@@ -205,31 +204,38 @@ class Auth:
                         device_id="dummy-device",  # stubbed
                     )
 
-                return synapse.types.create_requester(user_id, app_service=app_service)
+                requester = synapse.types.create_requester(
+                    user_id, app_service=app_service
+                )
+
+                request.requester = user_id
+                opentracing.set_tag("authenticated_entity", user_id)
+                opentracing.set_tag("user_id", user_id)
+                opentracing.set_tag("appservice_id", app_service.id)
+
+                return requester
 
             user_info = await self.get_user_by_access_token(
                 access_token, rights, allow_expired=allow_expired
             )
-            user = user_info["user"]
-            token_id = user_info["token_id"]
-            is_guest = user_info["is_guest"]
-            shadow_banned = user_info["shadow_banned"]
+            token_id = user_info.token_id
+            is_guest = user_info.is_guest
+            shadow_banned = user_info.shadow_banned
 
             # Deny the request if the user account has expired.
             if self._account_validity.enabled and not allow_expired:
-                user_id = user.to_string()
-                if await self.store.is_account_expired(user_id, self.clock.time_msec()):
+                if await self.store.is_account_expired(
+                    user_info.user_id, self.clock.time_msec()
+                ):
                     raise AuthError(
                         403, "User account has expired", errcode=Codes.EXPIRED_ACCOUNT
                     )
 
-            # device_id may not be present if get_user_by_access_token has been
-            # stubbed out.
-            device_id = user_info.get("device_id")
+            device_id = user_info.device_id
 
-            if user and access_token and ip_addr:
+            if access_token and ip_addr:
                 await self.store.insert_client_ip(
-                    user_id=user.to_string(),
+                    user_id=user_info.token_owner,
                     access_token=access_token,
                     ip=ip_addr,
                     user_agent=user_agent,
@@ -243,19 +249,23 @@ class Auth:
                     errcode=Codes.GUEST_ACCESS_FORBIDDEN,
                 )
 
-            request.authenticated_entity = user.to_string()
-            opentracing.set_tag("authenticated_entity", user.to_string())
-            if device_id:
-                opentracing.set_tag("device_id", device_id)
-
-            return synapse.types.create_requester(
-                user,
+            requester = synapse.types.create_requester(
+                user_info.user_id,
                 token_id,
                 is_guest,
                 shadow_banned,
                 device_id,
                 app_service=app_service,
+                authenticated_entity=user_info.token_owner,
             )
+
+            request.requester = requester
+            opentracing.set_tag("authenticated_entity", user_info.token_owner)
+            opentracing.set_tag("user_id", user_info.user_id)
+            if device_id:
+                opentracing.set_tag("device_id", device_id)
+
+            return requester
         except KeyError:
             raise MissingClientTokenError()
 
@@ -267,7 +277,7 @@ class Auth:
             return None, None
 
         if app_service.ip_range_whitelist:
-            ip_address = IPAddress(self.hs.get_ip_from_request(request))
+            ip_address = IPAddress(request.getClientIP())
             if ip_address not in app_service.ip_range_whitelist:
                 return None, None
 
@@ -285,9 +295,12 @@ class Auth:
         return user_id, app_service
 
     async def get_user_by_access_token(
-        self, token: str, rights: str = "access", allow_expired: bool = False,
-    ) -> dict:
-        """ Validate access token and get user_id from it
+        self,
+        token: str,
+        rights: str = "access",
+        allow_expired: bool = False,
+    ) -> TokenLookupResult:
+        """Validate access token and get user_id from it
 
         Args:
             token: The access token to get the user by
@@ -295,13 +308,7 @@ class Auth:
                 allow this
             allow_expired: If False, raises an InvalidClientTokenError
                 if the token is expired
-        Returns:
-            dict that includes:
-               `user` (UserID)
-               `is_guest` (bool)
-               `shadow_banned` (bool)
-               `token_id` (int|None): access token id. May be None if guest
-               `device_id` (str|None): device corresponding to access token
+
         Raises:
             InvalidClientTokenError if a user by that token exists, but the token is
                 expired
@@ -311,9 +318,9 @@ class Auth:
 
         if rights == "access":
             # first look in the database
-            r = await self._look_up_user_by_access_token(token)
+            r = await self.store.get_user_by_access_token(token)
             if r:
-                valid_until_ms = r["valid_until_ms"]
+                valid_until_ms = r.valid_until_ms
                 if (
                     not allow_expired
                     and valid_until_ms is not None
@@ -330,7 +337,6 @@ class Auth:
         # otherwise it needs to be a valid macaroon
         try:
             user_id, guest = self._parse_and_validate_macaroon(token, rights)
-            user = UserID.from_string(user_id)
 
             if rights == "access":
                 if not guest:
@@ -356,23 +362,17 @@ class Auth:
                     raise InvalidClientTokenError(
                         "Guest access token used for regular user"
                     )
-                ret = {
-                    "user": user,
-                    "is_guest": True,
-                    "shadow_banned": False,
-                    "token_id": None,
+
+                ret = TokenLookupResult(
+                    user_id=user_id,
+                    is_guest=True,
                     # all guests get the same device id
-                    "device_id": GUEST_DEVICE_ID,
-                }
+                    device_id=GUEST_DEVICE_ID,
+                )
             elif rights == "delete_pusher":
                 # We don't store these tokens in the database
-                ret = {
-                    "user": user,
-                    "is_guest": False,
-                    "shadow_banned": False,
-                    "token_id": None,
-                    "device_id": None,
-                }
+
+                ret = TokenLookupResult(user_id=user_id, is_guest=False)
             else:
                 raise RuntimeError("Unknown rights setting %s", rights)
             return ret
@@ -409,7 +409,7 @@ class Auth:
             raise _InvalidMacaroonException()
 
         try:
-            user_id = self.get_user_id_from_macaroon(macaroon)
+            user_id = get_value_from_macaroon(macaroon, "user_id")
 
             guest = False
             for caveat in macaroon.caveats:
@@ -417,34 +417,18 @@ class Auth:
                     guest = True
 
             self.validate_macaroon(macaroon, rights, user_id=user_id)
-        except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
+        except (
+            pymacaroons.exceptions.MacaroonException,
+            KeyError,
+            TypeError,
+            ValueError,
+        ):
             raise InvalidClientTokenError("Invalid macaroon passed.")
 
         if rights == "access":
             self.token_cache[token] = (user_id, guest)
 
         return user_id, guest
-
-    def get_user_id_from_macaroon(self, macaroon):
-        """Retrieve the user_id given by the caveats on the macaroon.
-
-        Does *not* validate the macaroon.
-
-        Args:
-            macaroon (pymacaroons.Macaroon): The macaroon to validate
-
-        Returns:
-            (str) user id
-
-        Raises:
-            InvalidClientCredentialsError if there is no user_id caveat in the
-                macaroon
-        """
-        user_prefix = "user_id = "
-        for caveat in macaroon.caveats:
-            if caveat.caveat_id.startswith(user_prefix):
-                return caveat.caveat_id[len(user_prefix) :]
-        raise InvalidClientTokenError("No user caveat in macaroon")
 
     def validate_macaroon(self, macaroon, type_string, user_id):
         """
@@ -466,50 +450,26 @@ class Auth:
         v.satisfy_exact("type = " + type_string)
         v.satisfy_exact("user_id = %s" % user_id)
         v.satisfy_exact("guest = true")
-        v.satisfy_general(self._verify_expiry)
+        satisfy_expiry(v, self.clock.time_msec)
 
         # access_tokens include a nonce for uniqueness: any value is acceptable
         v.satisfy_general(lambda c: c.startswith("nonce = "))
 
         v.verify(macaroon, self._macaroon_secret_key)
 
-    def _verify_expiry(self, caveat):
-        prefix = "time < "
-        if not caveat.startswith(prefix):
-            return False
-        expiry = int(caveat[len(prefix) :])
-        now = self.hs.get_clock().time_msec()
-        return now < expiry
-
-    async def _look_up_user_by_access_token(self, token):
-        ret = await self.store.get_user_by_access_token(token)
-        if not ret:
-            return None
-
-        # we use ret.get() below because *lots* of unit tests stub out
-        # get_user_by_access_token in a way where it only returns a couple of
-        # the fields.
-        user_info = {
-            "user": UserID.from_string(ret.get("name")),
-            "token_id": ret.get("token_id", None),
-            "is_guest": False,
-            "shadow_banned": ret.get("shadow_banned"),
-            "device_id": ret.get("device_id"),
-            "valid_until_ms": ret.get("valid_until_ms"),
-        }
-        return user_info
-
-    def get_appservice_by_req(self, request):
+    def get_appservice_by_req(self, request: SynapseRequest) -> ApplicationService:
         token = self.get_access_token_from_request(request)
         service = self.store.get_app_service_by_token(token)
         if not service:
             logger.warning("Unrecognised appservice access token.")
             raise InvalidClientTokenError()
-        request.authenticated_entity = service.sender
+        request.requester = synapse.types.create_requester(
+            service.sender, app_service=service
+        )
         return service
 
     async def is_server_admin(self, user: UserID) -> bool:
-        """ Check if the given user is a local server admin.
+        """Check if the given user is a local server admin.
 
         Args:
             user: user to check
@@ -520,7 +480,10 @@ class Auth:
         return await self.store.is_server_admin(user)
 
     def compute_auth_events(
-        self, event, current_state_ids: StateMap[str], for_verification: bool = False,
+        self,
+        event,
+        current_state_ids: StateMap[str],
+        for_verification: bool = False,
     ) -> List[str]:
         """Given an event and current state return the list of event IDs used
         to auth an event.
@@ -669,7 +632,8 @@ class Auth:
             )
             if (
                 visibility
-                and visibility.content["history_visibility"] == "world_readable"
+                and visibility.content.get("history_visibility")
+                == HistoryVisibility.WORLD_READABLE
             ):
                 return Membership.JOIN, None
             raise AuthError(

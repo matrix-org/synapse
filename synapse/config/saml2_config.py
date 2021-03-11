@@ -17,8 +17,7 @@
 import logging
 from typing import Any, List
 
-import attr
-
+from synapse.config.sso import SsoAttributeRequirement
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module, load_python_module
 
@@ -90,6 +89,8 @@ class SAML2Config(Config):
             "grandfathered_mxid_source_attribute", "uid"
         )
 
+        self.saml2_idp_entityid = saml2_config.get("idp_entityid", None)
+
         # user_mapping_provider may be None if the key is present but has no value
         ump_dict = saml2_config.get("user_mapping_provider") or {}
 
@@ -123,7 +124,7 @@ class SAML2Config(Config):
         (
             self.saml2_user_mapping_provider_class,
             self.saml2_user_mapping_provider_config,
-        ) = load_module(ump_dict)
+        ) = load_module(ump_dict, ("saml2_config", "user_mapping_provider"))
 
         # Ensure loaded user mapping module has defined all necessary methods
         # Note parse_config() is already checked during the call to load_module
@@ -194,8 +195,8 @@ class SAML2Config(Config):
             optional_attributes.add(self.saml2_grandfathered_mxid_source_attribute)
         optional_attributes -= required_attributes
 
-        metadata_url = public_baseurl + "_matrix/saml2/metadata.xml"
-        response_url = public_baseurl + "_matrix/saml2/authn_response"
+        metadata_url = public_baseurl + "_synapse/client/saml2/metadata.xml"
+        response_url = public_baseurl + "_synapse/client/saml2/authn_response"
         return {
             "entityid": metadata_url,
             "service": {
@@ -216,10 +217,8 @@ class SAML2Config(Config):
         return """\
         ## Single sign-on integration ##
 
-        # Enable SAML2 for registration and login. Uses pysaml2.
-        #
-        # At least one of `sp_config` or `config_path` must be set in this section to
-        # enable SAML login.
+        # The following settings can be used to make Synapse use a single sign-on
+        # provider for authentication, instead of its internal password database.
         #
         # You will probably also want to set the following options to `false` to
         # disable the regular login/registration flows:
@@ -228,12 +227,17 @@ class SAML2Config(Config):
         #
         # You will also want to investigate the settings under the "sso" configuration
         # section below.
+
+        # Enable SAML2 for registration and login. Uses pysaml2.
+        #
+        # At least one of `sp_config` or `config_path` must be set in this section to
+        # enable SAML login.
         #
         # Once SAML support is enabled, a metadata file will be exposed at
-        # https://<server>:<port>/_matrix/saml2/metadata.xml, which you may be able to
+        # https://<server>:<port>/_synapse/client/saml2/metadata.xml, which you may be able to
         # use to configure your SAML IdP with. Alternatively, you can manually configure
         # the IdP to use an ACS location of
-        # https://<server>:<port>/_matrix/saml2/authn_response.
+        # https://<server>:<port>/_synapse/client/saml2/authn_response.
         #
         saml2_config:
           # `sp_config` is the configuration for the pysaml2 Service Provider.
@@ -243,40 +247,70 @@ class SAML2Config(Config):
           # so it is not normally necessary to specify them unless you need to
           # override them.
           #
-          #sp_config:
-          #  # point this to the IdP's metadata. You can use either a local file or
-          #  # (preferably) a URL.
-          #  metadata:
-          #    #local: ["saml2/idp.xml"]
-          #    remote:
-          #      - url: https://our_idp/metadata.xml
-          #
-          #  # By default, the user has to go to our login page first. If you'd like
-          #  # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
-          #  # 'service.sp' section:
-          #  #
-          #  #service:
-          #  #  sp:
-          #  #    allow_unsolicited: true
-          #
-          #  # The examples below are just used to generate our metadata xml, and you
-          #  # may well not need them, depending on your setup. Alternatively you
-          #  # may need a whole lot more detail - see the pysaml2 docs!
-          #
-          #  description: ["My awesome SP", "en"]
-          #  name: ["Test SP", "en"]
-          #
-          #  organization:
-          #    name: Example com
-          #    display_name:
-          #      - ["Example co", "en"]
-          #    url: "http://example.com"
-          #
-          #  contact_person:
-          #    - given_name: Bob
-          #      sur_name: "the Sysadmin"
-          #      email_address": ["admin@example.com"]
-          #      contact_type": technical
+          sp_config:
+            # Point this to the IdP's metadata. You must provide either a local
+            # file via the `local` attribute or (preferably) a URL via the
+            # `remote` attribute.
+            #
+            #metadata:
+            #  local: ["saml2/idp.xml"]
+            #  remote:
+            #    - url: https://our_idp/metadata.xml
+
+            # Allowed clock difference in seconds between the homeserver and IdP.
+            #
+            # Uncomment the below to increase the accepted time difference from 0 to 3 seconds.
+            #
+            #accepted_time_diff: 3
+
+            # By default, the user has to go to our login page first. If you'd like
+            # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
+            # 'service.sp' section:
+            #
+            #service:
+            #  sp:
+            #    allow_unsolicited: true
+
+            # The examples below are just used to generate our metadata xml, and you
+            # may well not need them, depending on your setup. Alternatively you
+            # may need a whole lot more detail - see the pysaml2 docs!
+
+            #description: ["My awesome SP", "en"]
+            #name: ["Test SP", "en"]
+
+            #ui_info:
+            #  display_name:
+            #    - lang: en
+            #      text: "Display Name is the descriptive name of your service."
+            #  description:
+            #    - lang: en
+            #      text: "Description should be a short paragraph explaining the purpose of the service."
+            #  information_url:
+            #    - lang: en
+            #      text: "https://example.com/terms-of-service"
+            #  privacy_statement_url:
+            #    - lang: en
+            #      text: "https://example.com/privacy-policy"
+            #  keywords:
+            #    - lang: en
+            #      text: ["Matrix", "Element"]
+            #  logo:
+            #    - lang: en
+            #      text: "https://example.com/logo.svg"
+            #      width: "200"
+            #      height: "80"
+
+            #organization:
+            #  name: Example com
+            #  display_name:
+            #    - ["Example co", "en"]
+            #  url: "http://example.com"
+
+            #contact_person:
+            #  - given_name: Bob
+            #    sur_name: "the Sysadmin"
+            #    email_address": ["admin@example.com"]
+            #    contact_type": technical
 
           # Instead of putting the config inline as above, you can specify a
           # separate pysaml2 configuration file:
@@ -350,37 +384,31 @@ class SAML2Config(Config):
           #    value: "staff"
           #  - attribute: department
           #    value: "sales"
+
+          # If the metadata XML contains multiple IdP entities then the `idp_entityid`
+          # option must be set to the entity to redirect users to.
+          #
+          # Most deployments only have a single IdP entity and so should omit this
+          # option.
+          #
+          #idp_entityid: 'https://our_idp/entityid'
         """ % {
             "config_dir_path": config_dir_path
         }
 
 
-@attr.s(frozen=True)
-class SamlAttributeRequirement:
-    """Object describing a single requirement for SAML attributes."""
-
-    attribute = attr.ib(type=str)
-    value = attr.ib(type=str)
-
-    JSON_SCHEMA = {
-        "type": "object",
-        "properties": {"attribute": {"type": "string"}, "value": {"type": "string"}},
-        "required": ["attribute", "value"],
-    }
-
-
 ATTRIBUTE_REQUIREMENTS_SCHEMA = {
     "type": "array",
-    "items": SamlAttributeRequirement.JSON_SCHEMA,
+    "items": SsoAttributeRequirement.JSON_SCHEMA,
 }
 
 
 def _parse_attribute_requirements_def(
     attribute_requirements: Any,
-) -> List[SamlAttributeRequirement]:
+) -> List[SsoAttributeRequirement]:
     validate_config(
         ATTRIBUTE_REQUIREMENTS_SCHEMA,
         attribute_requirements,
-        config_path=["saml2_config", "attribute_requirements"],
+        config_path=("saml2_config", "attribute_requirements"),
     )
-    return [SamlAttributeRequirement(**x) for x in attribute_requirements]
+    return [SsoAttributeRequirement(**x) for x in attribute_requirements]

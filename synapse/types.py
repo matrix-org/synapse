@@ -29,15 +29,26 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
+    Union,
 )
 
 import attr
 from signedjson.key import decode_verify_key_bytes
 from unpaddedbase64 import decode_base64
+from zope.interface import Interface
+
+from twisted.internet.interfaces import (
+    IReactorCore,
+    IReactorPluggableNameResolver,
+    IReactorTCP,
+    IReactorTime,
+)
 
 from synapse.api.errors import Codes, SynapseError
+from synapse.util.stringutils import parse_and_validate_server_name
 
 if TYPE_CHECKING:
+    from synapse.appservice.api import ApplicationService
     from synapse.storage.databases.main import DataStore
 
 # define a version of typing.Collection that works on python 3.5
@@ -64,31 +75,39 @@ MutableStateMap = MutableMapping[StateKey, T]
 JsonDict = Dict[str, Any]
 
 
-class Requester(
-    namedtuple(
-        "Requester",
-        [
-            "user",
-            "access_token_id",
-            "is_guest",
-            "shadow_banned",
-            "device_id",
-            "app_service",
-        ],
-    )
+# Note that this seems to require inheriting *directly* from Interface in order
+# for mypy-zope to realize it is an interface.
+class ISynapseReactor(
+    IReactorTCP, IReactorPluggableNameResolver, IReactorTime, IReactorCore, Interface
 ):
+    """The interfaces necessary for Synapse to function."""
+
+
+@attr.s(frozen=True, slots=True)
+class Requester:
     """
     Represents the user making a request
 
     Attributes:
-        user (UserID):  id of the user making the request
-        access_token_id (int|None):  *ID* of the access token used for this
+        user:  id of the user making the request
+        access_token_id:  *ID* of the access token used for this
             request, or None if it came via the appservice API or similar
-        is_guest (bool):  True if the user making this request is a guest user
-        shadow_banned (bool):  True if the user making this request has been shadow-banned.
-        device_id (str|None):  device_id which was set at authentication time
-        app_service (ApplicationService|None):  the AS requesting on behalf of the user
+        is_guest:  True if the user making this request is a guest user
+        shadow_banned:  True if the user making this request has been shadow-banned.
+        device_id:  device_id which was set at authentication time
+        app_service:  the AS requesting on behalf of the user
+        authenticated_entity: The entity that authenticated when making the request.
+            This is different to the user_id when an admin user or the server is
+            "puppeting" the user.
     """
+
+    user = attr.ib(type="UserID")
+    access_token_id = attr.ib(type=Optional[int])
+    is_guest = attr.ib(type=bool)
+    shadow_banned = attr.ib(type=bool)
+    device_id = attr.ib(type=Optional[str])
+    app_service = attr.ib(type=Optional["ApplicationService"])
+    authenticated_entity = attr.ib(type=str)
 
     def serialize(self):
         """Converts self to a type that can be serialized as JSON, and then
@@ -104,6 +123,7 @@ class Requester(
             "shadow_banned": self.shadow_banned,
             "device_id": self.device_id,
             "app_server_id": self.app_service.id if self.app_service else None,
+            "authenticated_entity": self.authenticated_entity,
         }
 
     @staticmethod
@@ -129,36 +149,51 @@ class Requester(
             shadow_banned=input["shadow_banned"],
             device_id=input["device_id"],
             app_service=appservice,
+            authenticated_entity=input["authenticated_entity"],
         )
 
 
 def create_requester(
-    user_id,
-    access_token_id=None,
-    is_guest=False,
-    shadow_banned=False,
-    device_id=None,
-    app_service=None,
-):
+    user_id: Union[str, "UserID"],
+    access_token_id: Optional[int] = None,
+    is_guest: bool = False,
+    shadow_banned: bool = False,
+    device_id: Optional[str] = None,
+    app_service: Optional["ApplicationService"] = None,
+    authenticated_entity: Optional[str] = None,
+) -> Requester:
     """
     Create a new ``Requester`` object
 
     Args:
-        user_id (str|UserID):  id of the user making the request
-        access_token_id (int|None):  *ID* of the access token used for this
+        user_id:  id of the user making the request
+        access_token_id:  *ID* of the access token used for this
             request, or None if it came via the appservice API or similar
-        is_guest (bool):  True if the user making this request is a guest user
-        shadow_banned (bool):  True if the user making this request is shadow-banned.
-        device_id (str|None):  device_id which was set at authentication time
-        app_service (ApplicationService|None):  the AS requesting on behalf of the user
+        is_guest:  True if the user making this request is a guest user
+        shadow_banned:  True if the user making this request is shadow-banned.
+        device_id:  device_id which was set at authentication time
+        app_service:  the AS requesting on behalf of the user
+        authenticated_entity: The entity that authenticated when making the request.
+            This is different to the user_id when an admin user or the server is
+            "puppeting" the user.
 
     Returns:
         Requester
     """
     if not isinstance(user_id, UserID):
         user_id = UserID.from_string(user_id)
+
+    if authenticated_entity is None:
+        authenticated_entity = user_id.to_string()
+
     return Requester(
-        user_id, access_token_id, is_guest, shadow_banned, device_id, app_service
+        user_id,
+        access_token_id,
+        is_guest,
+        shadow_banned,
+        device_id,
+        app_service,
+        authenticated_entity,
     )
 
 
@@ -238,8 +273,13 @@ class DomainSpecificString(
 
     @classmethod
     def is_valid(cls: Type[DS], s: str) -> bool:
+        """Parses the input string and attempts to ensure it is valid."""
         try:
-            cls.from_string(s)
+            obj = cls.from_string(s)
+            # Apply additional validation to the domain. This is only done
+            # during  is_valid (and not part of from_string) since it is
+            # possible for invalid data to exist in room-state, etc.
+            parse_and_validate_server_name(obj.domain)
             return True
         except Exception:
             return False
@@ -298,14 +338,14 @@ mxid_localpart_allowed_characters = set(
 )
 
 
-def contains_invalid_mxid_characters(localpart):
+def contains_invalid_mxid_characters(localpart: str) -> bool:
     """Check for characters not allowed in an mxid or groupid localpart
 
     Args:
-        localpart (basestring): the localpart to be checked
+        localpart: the localpart to be checked
 
     Returns:
-        bool: True if there are any naughty characters
+        True if there are any naughty characters
     """
     return any(c not in mxid_localpart_allowed_characters for c in localpart)
 
@@ -330,15 +370,17 @@ NON_MXID_CHARACTER_PATTERN = re.compile(
 )
 
 
-def map_username_to_mxid_localpart(username, case_sensitive=False):
+def map_username_to_mxid_localpart(
+    username: Union[str, bytes], case_sensitive: bool = False
+) -> str:
     """Map a username onto a string suitable for a MXID
 
     This follows the algorithm laid out at
     https://matrix.org/docs/spec/appendices.html#mapping-from-other-character-sets.
 
     Args:
-        username (unicode|bytes): username to be mapped
-        case_sensitive (bool): true if TEST and test should be mapped
+        username: username to be mapped
+        case_sensitive: true if TEST and test should be mapped
             onto different mxids
 
     Returns:
@@ -442,8 +484,7 @@ class RoomStreamToken:
     )
 
     def __attrs_post_init__(self):
-        """Validates that both `topological` and `instance_map` aren't set.
-        """
+        """Validates that both `topological` and `instance_map` aren't set."""
 
         if self.instance_map and self.topological:
             raise ValueError(
@@ -471,7 +512,11 @@ class RoomStreamToken:
                     instance_name = await store.get_name_from_instance_id(instance_id)
                     instance_map[instance_name] = pos
 
-                return cls(topological=None, stream=stream, instance_map=instance_map,)
+                return cls(
+                    topological=None,
+                    stream=stream,
+                    instance_map=instance_map,
+                )
         except Exception:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
@@ -648,7 +693,7 @@ class PersistedEventPosition:
         persisted in the same room after this position will be after the
         returned `RoomStreamToken`.
 
-        Note: no guarentees are made about ordering w.r.t. events in other
+        Note: no guarantees are made about ordering w.r.t. events in other
         rooms.
         """
         # Doing the naive thing satisfies the desired properties described in

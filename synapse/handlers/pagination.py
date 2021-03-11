@@ -197,7 +197,8 @@ class PaginationHandler:
             stream_ordering = await self.store.find_first_stream_ordering_after_ts(ts)
 
             r = await self.store.get_room_event_before_stream_ordering(
-                room_id, stream_ordering,
+                room_id,
+                stream_ordering,
             )
             if not r:
                 logger.warning(
@@ -223,7 +224,12 @@ class PaginationHandler:
             # the background so that it's not blocking any other operation apart from
             # other purges in the same room.
             run_as_background_process(
-                "_purge_history", self._purge_history, purge_id, room_id, token, True,
+                "_purge_history",
+                self._purge_history,
+                purge_id,
+                room_id,
+                token,
+                True,
             )
 
     def start_purge_history(
@@ -279,7 +285,7 @@ class PaginationHandler:
         except Exception:
             f = Failure()
             logger.error(
-                "[purge] failed", exc_info=(f.type, f.value, f.getTracebackObject())
+                "[purge] failed", exc_info=(f.type, f.value, f.getTracebackObject())  # type: ignore
             )
             self._purges_by_id[purge_id].status = PurgeStatus.STATUS_FAILED
         finally:
@@ -299,17 +305,22 @@ class PaginationHandler:
         """
         return self._purges_by_id.get(purge_id)
 
-    async def purge_room(self, room_id: str) -> None:
-        """Purge the given room from the database"""
+    async def purge_room(self, room_id: str, force: bool = False) -> None:
+        """Purge the given room from the database.
+
+        Args:
+            room_id: room to be purged
+            force: set true to skip checking for joined users.
+        """
         with await self.pagination_lock.write(room_id):
             # check we know about the room
             await self.store.get_room_version_id(room_id)
 
             # first check that we have no users in this room
-            joined = await self.store.is_host_joined(room_id, self._server_name)
-
-            if joined:
-                raise SynapseError(400, "Users are still joined to this room")
+            if not force:
+                joined = await self.store.is_host_joined(room_id, self._server_name)
+                if joined:
+                    raise SynapseError(400, "Users are still joined to this room")
 
             await self.storage.purge_events.purge_room(room_id)
 
@@ -384,7 +395,9 @@ class PaginationHandler:
                         )
 
                 await self.hs.get_federation_handler().maybe_backfill(
-                    room_id, curr_topo, limit=pagin_config.limit,
+                    room_id,
+                    curr_topo,
+                    limit=pagin_config.limit,
                 )
 
             to_room_key = None

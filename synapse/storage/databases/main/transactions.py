@@ -64,8 +64,7 @@ class TransactionWorkerStore(SQLBaseStore):
 
 
 class TransactionStore(TransactionWorkerStore):
-    """A collection of queries for handling PDUs.
-    """
+    """A collection of queries for handling PDUs."""
 
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
@@ -198,7 +197,7 @@ class TransactionStore(TransactionWorkerStore):
         retry_interval: int,
     ) -> None:
         """Sets the current retry timings for a given destination.
-        Both timings should be zero if retrying is no longer occuring.
+        Both timings should be zero if retrying is no longer occurring.
 
         Args:
             destination
@@ -299,7 +298,10 @@ class TransactionStore(TransactionWorkerStore):
             )
 
     async def store_destination_rooms_entries(
-        self, destinations: Iterable[str], room_id: str, stream_ordering: int,
+        self,
+        destinations: Iterable[str],
+        room_id: str,
+        stream_ordering: int,
     ) -> None:
         """
         Updates or creates `destination_rooms` entries in batch for a single event.
@@ -394,7 +396,9 @@ class TransactionStore(TransactionWorkerStore):
         )
 
     async def get_catch_up_room_event_ids(
-        self, destination: str, last_successful_stream_ordering: int,
+        self,
+        destination: str,
+        last_successful_stream_ordering: int,
     ) -> List[str]:
         """
         Returns at most 50 event IDs and their corresponding stream_orderings
@@ -418,7 +422,9 @@ class TransactionStore(TransactionWorkerStore):
 
     @staticmethod
     def _get_catch_up_room_event_ids_txn(
-        txn: LoggingTransaction, destination: str, last_successful_stream_ordering: int,
+        txn: LoggingTransaction,
+        destination: str,
+        last_successful_stream_ordering: int,
     ) -> List[str]:
         q = """
                 SELECT event_id FROM destination_rooms
@@ -429,7 +435,8 @@ class TransactionStore(TransactionWorkerStore):
                 LIMIT 50
             """
         txn.execute(
-            q, (destination, last_successful_stream_ordering),
+            q,
+            (destination, last_successful_stream_ordering),
         )
         event_ids = [row[0] for row in txn]
         return event_ids
@@ -464,19 +471,17 @@ class TransactionStore(TransactionWorkerStore):
         txn: LoggingTransaction, now_time_ms: int, after_destination: Optional[str]
     ) -> List[str]:
         q = """
-            SELECT destination FROM destinations
-                WHERE destination IN (
-                    SELECT destination FROM destination_rooms
-                        WHERE destination_rooms.stream_ordering >
-                            destinations.last_successful_stream_ordering
-                )
-                AND destination > ?
-                AND (
-                    retry_last_ts IS NULL OR
-                    retry_last_ts + retry_interval < ?
-                )
-                ORDER BY destination
-                LIMIT 25
+            SELECT DISTINCT destination FROM destinations
+            INNER JOIN destination_rooms USING (destination)
+                WHERE
+                    stream_ordering > last_successful_stream_ordering
+                    AND destination > ?
+                    AND (
+                        retry_last_ts IS NULL OR
+                        retry_last_ts + retry_interval < ?
+                    )
+                    ORDER BY destination
+                    LIMIT 25
         """
         txn.execute(
             q,

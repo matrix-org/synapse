@@ -14,13 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Dict, FrozenSet, Iterable, List, Optional, Set
+from typing import TYPE_CHECKING, Dict, FrozenSet, Iterable, List, Optional, Set, Tuple
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.metrics import LaterGauge
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.metrics.background_process_metrics import (
+    run_as_background_process,
+    wrap_as_background_process,
+)
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
@@ -67,15 +70,11 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         ):
             self._known_servers_count = 1
             self.hs.get_clock().looping_call(
-                run_as_background_process,
-                60 * 1000,
-                "_count_known_servers",
                 self._count_known_servers,
+                60 * 1000,
             )
             self.hs.get_clock().call_later(
                 1000,
-                run_as_background_process,
-                "_count_known_servers",
                 self._count_known_servers,
             )
             LaterGauge(
@@ -85,6 +84,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 lambda: self._known_servers_count,
             )
 
+    @wrap_as_background_process("_count_known_servers")
     async def _count_known_servers(self):
         """
         Count the servers that this server knows about.
@@ -176,7 +176,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     @cached(max_entries=100000)
     async def get_room_summary(self, room_id: str) -> Dict[str, MemberSummary]:
-        """ Get the details of a room roughly suitable for use by the room
+        """Get the details of a room roughly suitable for use by the room
         summary extension to /sync. Useful when lazy loading room members.
         Args:
             room_id: The room ID to query
@@ -352,6 +352,38 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         return results
 
+    async def get_local_current_membership_for_user_in_room(
+        self, user_id: str, room_id: str
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Retrieve the current local membership state and event ID for a user in a room.
+
+        Args:
+            user_id: The ID of the user.
+            room_id: The ID of the room.
+
+        Returns:
+            A tuple of (membership_type, event_id). Both will be None if a
+                room_id/user_id pair is not found.
+        """
+        # Paranoia check.
+        if not self.hs.is_mine_id(user_id):
+            raise Exception(
+                "Cannot call 'get_local_current_membership_for_user_in_room' on "
+                "non-local user %s" % (user_id,),
+            )
+
+        results_dict = await self.db_pool.simple_select_one(
+            "local_current_membership",
+            {"room_id": room_id, "user_id": user_id},
+            ("membership", "event_id"),
+            allow_none=True,
+            desc="get_local_current_membership_for_user_in_room",
+        )
+        if not results_dict:
+            return None, None
+
+        return results_dict.get("membership"), results_dict.get("event_id")
+
     @cached(max_entries=500000, iterable=True)
     async def get_rooms_for_user_with_stream_ordering(
         self, user_id: str
@@ -458,8 +490,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     async def get_users_who_share_room_with_user(
         self, user_id: str, cache_context: _CacheContext
     ) -> Set[str]:
-        """Returns the set of users who share a room with `user_id`
-        """
+        """Returns the set of users who share a room with `user_id`"""
         room_ids = await self.get_rooms_for_user(
             user_id, on_invalidate=cache_context.invalidate
         )
@@ -531,7 +562,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             # If we do then we can reuse that result and simply update it with
             # any membership changes in `delta_ids`
             if context.prev_group and context.delta_ids:
-                prev_res = self._get_joined_users_from_context.cache.get(
+                prev_res = self._get_joined_users_from_context.cache.get_immediate(
                     (room_id, context.prev_group), None
                 )
                 if prev_res and isinstance(prev_res, dict):
@@ -588,7 +619,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         raise NotImplementedError()
 
     @cachedList(
-        cached_method_name="_get_joined_profile_from_event_id", list_name="event_ids",
+        cached_method_name="_get_joined_profile_from_event_id",
+        list_name="event_ids",
     )
     async def _get_joined_profiles_from_event_ids(self, event_ids: Iterable[str]):
         """For given set of member event_ids check if they point to a join
@@ -772,8 +804,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     async def get_membership_from_event_ids(
         self, member_event_ids: Iterable[str]
     ) -> List[dict]:
-        """Get user_id and membership of a set of event IDs.
-        """
+        """Get user_id and membership of a set of event IDs."""
 
         return await self.db_pool.simple_select_many_batch(
             table="room_memberships",
@@ -843,8 +874,6 @@ class RoomMemberBackgroundUpdateStore(SQLBaseStore):
             "max_stream_id_exclusive", self._stream_order_on_start + 1
         )
 
-        INSERT_CLUMP_SIZE = 1000
-
         def add_membership_profile_txn(txn):
             sql = """
                 SELECT stream_ordering, event_id, events.room_id, event_json.json
@@ -885,9 +914,7 @@ class RoomMemberBackgroundUpdateStore(SQLBaseStore):
                 UPDATE room_memberships SET display_name = ?, avatar_url = ?
                 WHERE event_id = ? AND room_id = ?
             """
-            for index in range(0, len(to_update), INSERT_CLUMP_SIZE):
-                clump = to_update[index : index + INSERT_CLUMP_SIZE]
-                txn.executemany(to_update_sql, clump)
+            txn.execute_batch(to_update_sql, to_update)
 
             progress = {
                 "target_min_stream_id_inclusive": target_min_stream_id,

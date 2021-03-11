@@ -31,16 +31,16 @@ There is no need for a separate configuration file for the master process.
 1. Adjust synapse configuration files as above.
 1. Copy the `*.service` and `*.target` files in [system](system) to
 `/etc/systemd/system`.
-1. Run `systemctl deamon-reload` to tell systemd to load the new unit files.
+1. Run `systemctl daemon-reload` to tell systemd to load the new unit files.
 1. Run `systemctl enable matrix-synapse.service`. This will configure the
 synapse master process to be started as part of the `matrix-synapse.target`
 target.
 1. For each worker process to be enabled, run `systemctl enable
 matrix-synapse-worker@<worker_name>.service`. For each `<worker_name>`, there
-should be a corresponding configuration file
+should be a corresponding configuration file.
 `/etc/matrix-synapse/workers/<worker_name>.yaml`.
 1. Start all the synapse processes with `systemctl start matrix-synapse.target`.
-1. Tell systemd to start synapse on boot with `systemctl enable matrix-synapse.target`/
+1. Tell systemd to start synapse on boot with `systemctl enable matrix-synapse.target`.
 
 ## Usage
 

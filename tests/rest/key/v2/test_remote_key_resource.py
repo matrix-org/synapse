@@ -32,16 +32,16 @@ from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.stringutils import random_string
 
 from tests import unittest
-from tests.server import FakeChannel, wait_until_result
+from tests.server import FakeChannel
 from tests.utils import default_config
 
 
 class BaseRemoteKeyResourceTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         self.http_client = Mock()
-        return self.setup_test_homeserver(http_client=self.http_client)
+        return self.setup_test_homeserver(federation_http_client=self.http_client)
 
-    def create_test_json_resource(self):
+    def create_test_resource(self):
         return create_resource_tree(
             {"/_matrix/key/v2": KeyApiV2Resource(self.hs)}, root_resource=NoResource()
         )
@@ -94,7 +94,7 @@ class RemoteKeyResourceTestCase(BaseRemoteKeyResourceTestCase):
             % (server_name.encode("utf-8"), key_id.encode("utf-8")),
             b"1.1",
         )
-        wait_until_result(self.reactor, req)
+        channel.await_result()
         self.assertEqual(channel.code, 200)
         resp = channel.json_body
         return resp
@@ -172,7 +172,7 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
             }
         ]
         self.hs2 = self.setup_test_homeserver(
-            http_client=self.http_client2, config=config
+            federation_http_client=self.http_client2, config=config
         )
 
         # wire up outbound POST /key/v2/query requests from hs2 so that they
@@ -180,7 +180,8 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
         async def post_json(destination, path, data):
             self.assertEqual(destination, self.hs.hostname)
             self.assertEqual(
-                path, "/_matrix/key/v2/query",
+                path,
+                "/_matrix/key/v2/query",
             )
 
             channel = FakeChannel(self.site, self.reactor)
@@ -188,9 +189,11 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
             req.content = BytesIO(encode_canonical_json(data))
 
             req.requestReceived(
-                b"POST", path.encode("utf-8"), b"1.1",
+                b"POST",
+                path.encode("utf-8"),
+                b"1.1",
             )
-            wait_until_result(self.reactor, req)
+            channel.await_result()
             self.assertEqual(channel.code, 200)
             resp = channel.json_body
             return resp

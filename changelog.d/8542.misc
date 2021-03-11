@@ -1,1 +1,0 @@
-Improve database performance by executing more queries without starting transactions.

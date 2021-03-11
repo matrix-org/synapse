@@ -34,7 +34,7 @@ SPLIT_FIELD_REGEX = re.compile(r"(?<!\\)\.")
 
 
 def prune_event(event: EventBase) -> EventBase:
-    """ Returns a pruned version of the given event, which removes all keys we
+    """Returns a pruned version of the given event, which removes all keys we
     don't know about or think could potentially be dodgy.
 
     This is used when we "redact" an event. We want to remove all fields that
@@ -79,12 +79,14 @@ def prune_event_dict(room_version: RoomVersion, event_dict: dict) -> dict:
         "state_key",
         "depth",
         "prev_events",
-        "prev_state",
         "auth_events",
         "origin",
         "origin_server_ts",
-        "membership",
     ]
+
+    # Room versions from before MSC2176 had additional allowed keys.
+    if not room_version.msc2176_redaction_rules:
+        allowed_keys.extend(["prev_state", "membership"])
 
     event_type = event_dict["type"]
 
@@ -98,6 +100,10 @@ def prune_event_dict(room_version: RoomVersion, event_dict: dict) -> dict:
     if event_type == EventTypes.Member:
         add_fields("membership")
     elif event_type == EventTypes.Create:
+        # MSC2176 rules state that create events cannot be redacted.
+        if room_version.msc2176_redaction_rules:
+            return event_dict
+
         add_fields("creator")
     elif event_type == EventTypes.JoinRules:
         add_fields("join_rule")
@@ -112,10 +118,16 @@ def prune_event_dict(room_version: RoomVersion, event_dict: dict) -> dict:
             "kick",
             "redact",
         )
+
+        if room_version.msc2176_redaction_rules:
+            add_fields("invite")
+
     elif event_type == EventTypes.Aliases and room_version.special_case_aliases_auth:
         add_fields("aliases")
     elif event_type == EventTypes.RoomHistoryVisibility:
         add_fields("history_visibility")
+    elif event_type == EventTypes.Redaction and room_version.msc2176_redaction_rules:
+        add_fields("redacts")
 
     allowed_fields = {k: v for k, v in event_dict.items() if k in allowed_keys}
 
@@ -180,7 +192,7 @@ def only_fields(dictionary, fields):
     in 'fields'.
 
     If there are no event fields specified then all fields are included.
-    The entries may include '.' charaters to indicate sub-fields.
+    The entries may include '.' characters to indicate sub-fields.
     So ['content.body'] will include the 'body' field of the 'content' object.
     A literal '.' character in a field name may be escaped using a '\'.
 

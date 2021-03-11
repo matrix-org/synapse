@@ -16,11 +16,10 @@
 
 import logging
 import re
-from typing import Any, Dict, List, Optional, Pattern, Union
+from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
 
 from synapse.events import EventBase
 from synapse.types import UserID
-from synapse.util.caches import register_cache
 from synapse.util.caches.lrucache import LruCache
 
 logger = logging.getLogger(__name__)
@@ -31,22 +30,30 @@ IS_GLOB = re.compile(r"[\?\*\[\]]")
 INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
 
 
-def _room_member_count(ev, condition, room_member_count):
+def _room_member_count(
+    ev: EventBase, condition: Dict[str, Any], room_member_count: int
+) -> bool:
     return _test_ineq_condition(condition, room_member_count)
 
 
-def _sender_notification_permission(ev, condition, sender_power_level, power_levels):
+def _sender_notification_permission(
+    ev: EventBase,
+    condition: Dict[str, Any],
+    sender_power_level: int,
+    power_levels: Dict[str, Union[int, Dict[str, int]]],
+) -> bool:
     notif_level_key = condition.get("key")
     if notif_level_key is None:
         return False
 
     notif_levels = power_levels.get("notifications", {})
+    assert isinstance(notif_levels, dict)
     room_notif_level = notif_levels.get(notif_level_key, 50)
 
     return sender_power_level >= room_notif_level
 
 
-def _test_ineq_condition(condition, number):
+def _test_ineq_condition(condition: Dict[str, Any], number: int) -> bool:
     if "is" not in condition:
         return False
     m = INEQUALITY_EXPR.match(condition["is"])
@@ -111,7 +118,7 @@ class PushRuleEvaluatorForEvent:
         event: EventBase,
         room_member_count: int,
         sender_power_level: int,
-        power_levels: dict,
+        power_levels: Dict[str, Union[int, Dict[str, int]]],
     ):
         self._event = event
         self._room_member_count = room_member_count
@@ -121,7 +128,9 @@ class PushRuleEvaluatorForEvent:
         # Maps strings of e.g. 'content.body' -> event["content"]["body"]
         self._value_cache = _flatten_dict(event)
 
-    def matches(self, condition: dict, user_id: str, display_name: str) -> bool:
+    def matches(
+        self, condition: Dict[str, Any], user_id: str, display_name: str
+    ) -> bool:
         if condition["kind"] == "event_match":
             return self._event_match(condition, user_id)
         elif condition["kind"] == "contains_display_name":
@@ -174,20 +183,21 @@ class PushRuleEvaluatorForEvent:
         # Similar to _glob_matches, but do not treat display_name as a glob.
         r = regex_cache.get((display_name, False, True), None)
         if not r:
-            r = re.escape(display_name)
-            r = _re_word_boundary(r)
-            r = re.compile(r, flags=re.IGNORECASE)
+            r1 = re.escape(display_name)
+            r1 = _re_word_boundary(r1)
+            r = re.compile(r1, flags=re.IGNORECASE)
             regex_cache[(display_name, False, True)] = r
 
-        return r.search(body)
+        return bool(r.search(body))
 
     def _get_value(self, dotted_key: str) -> Optional[str]:
         return self._value_cache.get(dotted_key, None)
 
 
 # Caches (string, is_glob, word_boundary) -> regex for push. See _glob_matches
-regex_cache = LruCache(50000)
-register_cache("cache", "regex_push_cache", regex_cache)
+regex_cache = LruCache(
+    50000, "regex_push_cache"
+)  # type: LruCache[Tuple[str, bool, bool], Pattern]
 
 
 def _glob_matches(glob: str, value: str, word_boundary: bool = False) -> bool:
@@ -205,7 +215,7 @@ def _glob_matches(glob: str, value: str, word_boundary: bool = False) -> bool:
         if not r:
             r = _glob_to_re(glob, word_boundary)
             regex_cache[(glob, True, word_boundary)] = r
-        return r.search(value)
+        return bool(r.search(value))
     except re.error:
         logger.warning("Failed to parse glob to regex: %r", glob)
         return False
@@ -261,7 +271,13 @@ def _re_word_boundary(r: str) -> str:
     return r"(^|\W)%s(\W|$)" % (r,)
 
 
-def _flatten_dict(d, prefix=[], result=None):
+def _flatten_dict(
+    d: Union[EventBase, dict],
+    prefix: Optional[List[str]] = None,
+    result: Optional[Dict[str, str]] = None,
+) -> Dict[str, str]:
+    if prefix is None:
+        prefix = []
     if result is None:
         result = {}
     for key, value in d.items():

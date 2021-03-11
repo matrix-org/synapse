@@ -27,7 +27,7 @@ MAX_STATE_DELTA_HOPS = 100
 
 
 class StateGroupBackgroundUpdateStore(SQLBaseStore):
-    """Defines functions related to state groups needed to run the state backgroud
+    """Defines functions related to state groups needed to run the state background
     updates.
     """
 

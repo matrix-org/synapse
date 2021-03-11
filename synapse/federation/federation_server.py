@@ -15,12 +15,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import random
 from typing import (
     TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
     Dict,
+    Iterable,
     List,
     Optional,
     Tuple,
@@ -33,7 +35,7 @@ from twisted.internet import defer
 from twisted.internet.abstract import isIPAddress
 from twisted.python import failure
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EduTypes, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -43,12 +45,13 @@ from synapse.api.errors import (
     SynapseError,
     UnsupportedRoomVersionError,
 )
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
-from synapse.http.endpoint import parse_server_name
+from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import (
     make_deferred_yieldable,
     nested_logging_context,
@@ -64,6 +67,7 @@ from synapse.types import JsonDict, get_domain_from_id
 from synapse.util import glob_to_regex, json_decoder, unwrapFirstError
 from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.caches.response_cache import ResponseCache
+from synapse.util.stringutils import parse_server_name
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -83,19 +87,19 @@ received_queries_counter = Counter(
 )
 
 pdu_process_time = Histogram(
-    "synapse_federation_server_pdu_process_time", "Time taken to process an event",
+    "synapse_federation_server_pdu_process_time",
+    "Time taken to process an event",
 )
 
-
-last_pdu_age_metric = Gauge(
-    "synapse_federation_last_received_pdu_age",
-    "The age (in seconds) of the last PDU successfully received from the given domain",
+last_pdu_ts_metric = Gauge(
+    "synapse_federation_last_received_pdu_time",
+    "The timestamp of the last PDU which was successfully received from the given domain",
     labelnames=("server_name",),
 )
 
 
 class FederationServer(FederationBase):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
         self.auth = hs.get_auth()
@@ -115,7 +119,7 @@ class FederationServer(FederationBase):
 
         # We cache results for transaction with the same ID
         self._transaction_resp_cache = ResponseCache(
-            hs, "fed_txn_handler", timeout_ms=30000
+            hs.get_clock(), "fed_txn_handler", timeout_ms=30000
         )  # type: ResponseCache[Tuple[str, str]]
 
         self.transaction_actions = TransactionActions(self.store)
@@ -125,10 +129,10 @@ class FederationServer(FederationBase):
         # We cache responses to state queries, as they take a while and often
         # come in waves.
         self._state_resp_cache = ResponseCache(
-            hs, "state_resp", timeout_ms=30000
+            hs.get_clock(), "state_resp", timeout_ms=30000
         )  # type: ResponseCache[Tuple[str, str]]
         self._state_ids_resp_cache = ResponseCache(
-            hs, "state_ids_resp", timeout_ms=30000
+            hs.get_clock(), "state_ids_resp", timeout_ms=30000
         )  # type: ResponseCache[Tuple[str, str]]
 
         self._federation_metrics_domains = (
@@ -202,7 +206,7 @@ class FederationServer(FederationBase):
     async def _handle_incoming_transaction(
         self, origin: str, transaction: Transaction, request_time: int
     ) -> Tuple[int, Dict[str, Any]]:
-        """ Process an incoming transaction and return the HTTP response
+        """Process an incoming transaction and return the HTTP response
 
         Args:
             origin: the server making the request
@@ -357,7 +361,7 @@ class FederationServer(FederationBase):
                             logger.error(
                                 "Failed to handle PDU %s",
                                 event_id,
-                                exc_info=(f.type, f.value, f.getTracebackObject()),
+                                exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
                             )
 
         await concurrently_execute(
@@ -365,14 +369,12 @@ class FederationServer(FederationBase):
         )
 
         if newest_pdu_ts and origin in self._federation_metrics_domains:
-            newest_pdu_age = self._clock.time_msec() - newest_pdu_ts
-            last_pdu_age_metric.labels(server_name=origin).set(newest_pdu_age / 1000)
+            last_pdu_ts_metric.labels(server_name=origin).set(newest_pdu_ts / 1000)
 
         return pdu_results
 
     async def _handle_edus_in_txn(self, origin: str, transaction: Transaction):
-        """Process the EDUs in a received transaction.
-        """
+        """Process the EDUs in a received transaction."""
 
         async def _process_edu(edu_dict):
             received_edus_counter.inc()
@@ -391,7 +393,7 @@ class FederationServer(FederationBase):
             TRANSACTION_CONCURRENCY_LIMIT,
         )
 
-    async def on_context_state_request(
+    async def on_room_state_request(
         self, origin: str, room_id: str, event_id: str
     ) -> Tuple[int, Dict[str, Any]]:
         origin_host, _ = parse_server_name(origin)
@@ -435,25 +437,32 @@ class FederationServer(FederationBase):
             raise AuthError(403, "Host not in room.")
 
         resp = await self._state_ids_resp_cache.wrap(
-            (room_id, event_id), self._on_state_ids_request_compute, room_id, event_id,
+            (room_id, event_id),
+            self._on_state_ids_request_compute,
+            room_id,
+            event_id,
         )
 
         return 200, resp
 
     async def _on_state_ids_request_compute(self, room_id, event_id):
         state_ids = await self.handler.get_state_ids_for_pdu(room_id, event_id)
-        auth_chain_ids = await self.store.get_auth_chain_ids(state_ids)
+        auth_chain_ids = await self.store.get_auth_chain_ids(room_id, state_ids)
         return {"pdu_ids": state_ids, "auth_chain_ids": auth_chain_ids}
 
     async def _on_context_state_request_compute(
         self, room_id: str, event_id: str
     ) -> Dict[str, list]:
         if event_id:
-            pdus = await self.handler.get_state_for_pdu(room_id, event_id)
+            pdus = await self.handler.get_state_for_pdu(
+                room_id, event_id
+            )  # type: Iterable[EventBase]
         else:
             pdus = (await self.state.get_current_state(room_id)).values()
 
-        auth_chain = await self.store.get_auth_chain([pdu.event_id for pdu in pdus])
+        auth_chain = await self.store.get_auth_chain(
+            room_id, [pdu.event_id for pdu in pdus]
+        )
 
         return {
             "pdus": [pdu.get_pdu_json() for pdu in pdus],
@@ -514,11 +523,12 @@ class FederationServer(FederationBase):
         return {"event": ret_pdu.get_pdu_json(time_now)}
 
     async def on_send_join_request(
-        self, origin: str, content: JsonDict, room_id: str
+        self, origin: str, content: JsonDict
     ) -> Dict[str, Any]:
         logger.debug("on_send_join_request: content: %s", content)
 
-        room_version = await self.store.get_room_version(room_id)
+        assert_params_in_dict(content, ["room_id"])
+        room_version = await self.store.get_room_version(content["room_id"])
         pdu = event_from_pdu_json(content, room_version)
 
         origin_host, _ = parse_server_name(origin)
@@ -547,12 +557,11 @@ class FederationServer(FederationBase):
         time_now = self._clock.time_msec()
         return {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
 
-    async def on_send_leave_request(
-        self, origin: str, content: JsonDict, room_id: str
-    ) -> dict:
+    async def on_send_leave_request(self, origin: str, content: JsonDict) -> dict:
         logger.debug("on_send_leave_request: content: %s", content)
 
-        room_version = await self.store.get_room_version(room_id)
+        assert_params_in_dict(content, ["room_id"])
+        room_version = await self.store.get_room_version(content["room_id"])
         pdu = event_from_pdu_json(content, room_version)
 
         origin_host, _ = parse_server_name(origin)
@@ -677,7 +686,7 @@ class FederationServer(FederationBase):
         )
 
     async def _handle_received_pdu(self, origin: str, pdu: EventBase) -> None:
-        """ Process a PDU received in a federation /send/ transaction.
+        """Process a PDU received in a federation /send/ transaction.
 
         If the event is invalid, then this method throws a FederationError.
         (The error will then be logged and sent back to the sender (which
@@ -748,12 +757,8 @@ class FederationServer(FederationBase):
         )
         return ret
 
-    async def on_exchange_third_party_invite_request(
-        self, room_id: str, event_dict: Dict
-    ):
-        ret = await self.handler.on_exchange_third_party_invite_request(
-            room_id, event_dict
-        )
+    async def on_exchange_third_party_invite_request(self, event_dict: Dict):
+        ret = await self.handler.on_exchange_third_party_invite_request(event_dict)
         return ret
 
     async def check_server_matches_acl(self, server_name: str, room_id: str):
@@ -848,7 +853,6 @@ class FederationHandlerRegistry:
 
     def __init__(self, hs: "HomeServer"):
         self.config = hs.config
-        self.http_client = hs.get_simple_http_client()
         self.clock = hs.get_clock()
         self._instance_name = hs.get_instance_name()
 
@@ -864,8 +868,17 @@ class FederationHandlerRegistry:
         )  # type: Dict[str, Callable[[str, dict], Awaitable[None]]]
         self.query_handlers = {}  # type: Dict[str, Callable[[dict], Awaitable[None]]]
 
-        # Map from type to instance name that we should route EDU handling to.
-        self._edu_type_to_instance = {}  # type: Dict[str, str]
+        # Map from type to instance names that we should route EDU handling to.
+        # We randomly choose one instance from the list to route to for each new
+        # EDU received.
+        self._edu_type_to_instance = {}  # type: Dict[str, List[str]]
+
+        # A rate limiter for incoming room key requests per origin.
+        self._room_key_request_rate_limiter = Ratelimiter(
+            clock=self.clock,
+            rate_hz=self.config.rc_key_requests.per_second,
+            burst_count=self.config.rc_key_requests.burst_count,
+        )
 
     def register_edu_handler(
         self, edu_type: str, handler: Callable[[str, JsonDict], Awaitable[None]]
@@ -907,12 +920,23 @@ class FederationHandlerRegistry:
         self.query_handlers[query_type] = handler
 
     def register_instance_for_edu(self, edu_type: str, instance_name: str):
-        """Register that the EDU handler is on a different instance than master.
-        """
-        self._edu_type_to_instance[edu_type] = instance_name
+        """Register that the EDU handler is on a different instance than master."""
+        self._edu_type_to_instance[edu_type] = [instance_name]
+
+    def register_instances_for_edu(self, edu_type: str, instance_names: List[str]):
+        """Register that the EDU handler is on multiple instances."""
+        self._edu_type_to_instance[edu_type] = instance_names
 
     async def on_edu(self, edu_type: str, origin: str, content: dict):
-        if not self.config.use_presence and edu_type == "m.presence":
+        if not self.config.use_presence and edu_type == EduTypes.Presence:
+            return
+
+        # If the incoming room key requests from a particular origin are over
+        # the limit, drop them.
+        if (
+            edu_type == EduTypes.RoomKeyRequest
+            and not self._room_key_request_rate_limiter.can_do_action(origin)
+        ):
             return
 
         # Check if we have a handler on this instance
@@ -928,8 +952,11 @@ class FederationHandlerRegistry:
             return
 
         # Check if we can route it somewhere else that isn't us
-        route_to = self._edu_type_to_instance.get(edu_type, "master")
-        if route_to != self._instance_name:
+        instances = self._edu_type_to_instance.get(edu_type, ["master"])
+        if self._instance_name not in instances:
+            # Pick an instance randomly so that we don't overload one.
+            route_to = random.choice(instances)
+
             try:
                 await self._send_edu(
                     instance_name=route_to,

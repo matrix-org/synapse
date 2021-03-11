@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import itertools
 import logging
 from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional, Set, Tuple
@@ -32,6 +31,7 @@ from synapse.types import (
     Collection,
     JsonDict,
     MutableStateMap,
+    Requester,
     RoomStreamToken,
     StateMap,
     StreamToken,
@@ -244,7 +244,7 @@ class SyncHandler:
         self.event_sources = hs.get_event_sources()
         self.clock = hs.get_clock()
         self.response_cache = ResponseCache(
-            hs, "sync"
+            hs.get_clock(), "sync"
         )  # type: ResponseCache[Tuple[Any, ...]]
         self.state = hs.get_state_handler()
         self.auth = hs.get_auth()
@@ -261,6 +261,7 @@ class SyncHandler:
 
     async def wait_for_sync_for_user(
         self,
+        requester: Requester,
         sync_config: SyncConfig,
         since_token: Optional[StreamToken] = None,
         timeout: int = 0,
@@ -274,7 +275,7 @@ class SyncHandler:
         # not been exceeded (if not part of the group by this point, almost certain
         # auth_blocking will occur)
         user_id = sync_config.user.to_string()
-        await self.auth.check_auth_blocking(user_id)
+        await self.auth.check_auth_blocking(requester=requester)
 
         res = await self.response_cache.wrap(
             sync_config.request_key,
@@ -338,8 +339,7 @@ class SyncHandler:
         since_token: Optional[StreamToken] = None,
         full_state: bool = False,
     ) -> SyncResult:
-        """Get the sync for client needed to match what the server has now.
-        """
+        """Get the sync for client needed to match what the server has now."""
         return await self.generate_sync_result(sync_config, since_token, full_state)
 
     async def push_rules_for_user(self, user: UserID) -> JsonDict:
@@ -553,7 +553,7 @@ class SyncHandler:
             event.event_id, state_filter=state_filter
         )
         if event.is_state():
-            state_ids = state_ids.copy()
+            state_ids = dict(state_ids)
             state_ids[(event.type, event.state_key)] = event.event_id
         return state_ids
 
@@ -563,7 +563,7 @@ class SyncHandler:
         stream_position: StreamToken,
         state_filter: StateFilter = StateFilter.all(),
     ) -> StateMap[str]:
-        """ Get the room state at a particular stream position
+        """Get the room state at a particular stream position
 
         Args:
             room_id: room for which to get state
@@ -597,7 +597,7 @@ class SyncHandler:
         state: MutableStateMap[EventBase],
         now_token: StreamToken,
     ) -> Optional[JsonDict]:
-        """ Works out a room summary block for this room, summarising the number
+        """Works out a room summary block for this room, summarising the number
         of joined members in the room, and providing the 'hero' members if the
         room has no name so clients can consistently name rooms.  Also adds
         state events to 'state' if needed to describe the heroes.
@@ -742,7 +742,7 @@ class SyncHandler:
         now_token: StreamToken,
         full_state: bool,
     ) -> MutableStateMap[EventBase]:
-        """ Works out the difference in state between the start of the timeline
+        """Works out the difference in state between the start of the timeline
         and the previous sync.
 
         Args:
@@ -755,7 +755,7 @@ class SyncHandler:
         """
         # TODO(mjark) Check if the state events were received by the server
         # after the previous sync, since we need to include those state
-        # updates even if they occured logically before the previous event.
+        # updates even if they occurred logically before the previous event.
         # TODO(mjark) Check for new redactions in the state events.
 
         with Measure(self.clock, "compute_state_delta"):
@@ -819,8 +819,10 @@ class SyncHandler:
                 )
             elif batch.limited:
                 if batch:
-                    state_at_timeline_start = await self.state_store.get_state_ids_for_event(
-                        batch.events[0].event_id, state_filter=state_filter
+                    state_at_timeline_start = (
+                        await self.state_store.get_state_ids_for_event(
+                            batch.events[0].event_id, state_filter=state_filter
+                        )
                     )
                 else:
                     # We can get here if the user has ignored the senders of all
@@ -954,8 +956,7 @@ class SyncHandler:
         since_token: Optional[StreamToken] = None,
         full_state: bool = False,
     ) -> SyncResult:
-        """Generates a sync result.
-        """
+        """Generates a sync result."""
         # NB: The now_token gets changed by some of the generate_sync_* methods,
         # this is due to some of the underlying streams not supporting the ability
         # to query up to a given point.
@@ -1029,8 +1030,8 @@ class SyncHandler:
             one_time_key_counts = await self.store.count_e2e_one_time_keys(
                 user_id, device_id
             )
-            unused_fallback_key_types = await self.store.get_e2e_unused_fallback_key_types(
-                user_id, device_id
+            unused_fallback_key_types = (
+                await self.store.get_e2e_unused_fallback_key_types(user_id, device_id)
             )
 
         logger.debug("Fetching group data")
@@ -1175,8 +1176,10 @@ class SyncHandler:
             # weren't in the previous sync *or* they left and rejoined.
             users_that_have_changed.update(newly_joined_or_invited_users)
 
-            user_signatures_changed = await self.store.get_users_whose_signatures_changed(
-                user_id, since_token.device_list_key
+            user_signatures_changed = (
+                await self.store.get_users_whose_signatures_changed(
+                    user_id, since_token.device_list_key
+                )
             )
             users_that_have_changed.update(user_signatures_changed)
 
@@ -1392,8 +1395,10 @@ class SyncHandler:
                         logger.debug("no-oping sync")
                         return set(), set(), set(), set()
 
-        ignored_account_data = await self.store.get_global_account_data_by_type_for_user(
-            AccountDataTypes.IGNORED_USER_LIST, user_id=user_id
+        ignored_account_data = (
+            await self.store.get_global_account_data_by_type_for_user(
+                AccountDataTypes.IGNORED_USER_LIST, user_id=user_id
+            )
         )
 
         # If there is ignored users account data and it matches the proper type,
@@ -1498,8 +1503,7 @@ class SyncHandler:
     async def _get_rooms_changed(
         self, sync_result_builder: "SyncResultBuilder", ignored_users: FrozenSet[str]
     ) -> _RoomChanges:
-        """Gets the the changes that have happened since the last sync.
-        """
+        """Gets the the changes that have happened since the last sync."""
         user_id = sync_result_builder.sync_config.user.to_string()
         since_token = sync_result_builder.since_token
         now_token = sync_result_builder.now_token
@@ -1883,7 +1887,7 @@ class SyncHandler:
         # members (as the client otherwise doesn't have enough info to form
         # the name itself).
         if sync_config.filter_collection.lazy_load_members() and (
-            # we recalulate the summary:
+            # we recalculate the summary:
             #   if there are membership changes in the timeline, or
             #   if membership has changed during a gappy sync, or
             #   if this is an initial sync.

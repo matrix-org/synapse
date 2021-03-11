@@ -27,7 +27,7 @@ user2 = "@theresa:bbb"
 
 class DeviceTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
-        hs = self.setup_test_homeserver("server", http_client=None)
+        hs = self.setup_test_homeserver("server", federation_http_client=None)
         self.handler = hs.get_device_handler()
         self.store = hs.get_datastore()
         return hs
@@ -229,7 +229,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
 
 class DehydrationTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
-        hs = self.setup_test_homeserver("server", http_client=None)
+        hs = self.setup_test_homeserver("server", federation_http_client=None)
         self.handler = hs.get_device_handler()
         self.registration = hs.get_registration_handler()
         self.auth = hs.get_auth()
@@ -260,7 +260,9 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         # Create a new login for the user and dehydrated the device
         device_id, access_token = self.get_success(
             self.registration.register_device(
-                user_id=user_id, device_id=None, initial_display_name="new device",
+                user_id=user_id,
+                device_id=None,
+                initial_display_name="new device",
             )
         )
 
@@ -289,7 +291,7 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         # make sure that our device ID has changed
         user_info = self.get_success(self.auth.get_user_by_access_token(access_token))
 
-        self.assertEqual(user_info["device_id"], retrieved_device_id)
+        self.assertEqual(user_info.device_id, retrieved_device_id)
 
         # make sure the device has the display name that was set from the login
         res = self.get_success(self.handler.get_device(user_id, retrieved_device_id))

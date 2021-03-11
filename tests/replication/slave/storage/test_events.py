@@ -66,7 +66,10 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
 
         self.get_success(
             self.master_store.store_room(
-                ROOM_ID, USER_ID, is_public=False, room_version=RoomVersions.V1,
+                ROOM_ID,
+                USER_ID,
+                is_public=False,
+                room_version=RoomVersions.V1,
             )
         )
 

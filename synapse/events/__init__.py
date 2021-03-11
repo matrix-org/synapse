@@ -17,7 +17,6 @@
 
 import abc
 import os
-from distutils.util import strtobool
 from typing import Dict, Optional, Tuple, Type
 
 from unpaddedbase64 import encode_base64
@@ -26,6 +25,7 @@ from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVers
 from synapse.types import JsonDict, RoomStreamToken
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
+from synapse.util.stringutils import strtobool
 
 # Whether we should use frozen_dict in FrozenEvent. Using frozen_dicts prevents
 # bugs where we accidentally share e.g. signature dicts. However, converting a
@@ -34,6 +34,7 @@ from synapse.util.frozenutils import freeze
 # NOTE: This is overridden by the configuration by the Synapse worker apps, but
 # for the sake of tests, it is set here while it cannot be configured on the
 # homeserver object itself.
+
 USE_FROZEN_DICTS = strtobool(os.environ.get("SYNAPSE_USE_FROZEN_DICTS", "0"))
 
 
@@ -59,7 +60,7 @@ class DictProperty:
             #
             # To exclude the KeyError from the traceback, we explicitly
             # 'raise from e1.__context__' (which is better than 'raise from None',
-            # becuase that would omit any *earlier* exceptions).
+            # because that would omit any *earlier* exceptions).
             #
             raise AttributeError(
                 "'%s' has no '%s' property" % (type(instance), self.key)
@@ -312,6 +313,12 @@ class EventBase(metaclass=abc.ABCMeta):
         """
         return [e for e, _ in self.auth_events]
 
+    def freeze(self):
+        """'Freeze' the event dict, so it cannot be modified by accident"""
+
+        # this will be a no-op if the event dict is already frozen.
+        self._dict = freeze(self._dict)
+
 
 class FrozenEvent(EventBase):
     format_version = EventFormatVersions.V1  # All events of this type are V1
@@ -362,7 +369,7 @@ class FrozenEvent(EventBase):
         return self.__repr__()
 
     def __repr__(self):
-        return "<FrozenEvent event_id='%s', type='%s', state_key='%s'>" % (
+        return "<FrozenEvent event_id=%r, type=%r, state_key=%r>" % (
             self.get("event_id", None),
             self.get("type", None),
             self.get("state_key", None),
@@ -445,7 +452,7 @@ class FrozenEventV2(EventBase):
         return self.__repr__()
 
     def __repr__(self):
-        return "<%s event_id='%s', type='%s', state_key='%s'>" % (
+        return "<%s event_id=%r, type=%r, state_key=%r>" % (
             self.__class__.__name__,
             self.event_id,
             self.get("type", None),

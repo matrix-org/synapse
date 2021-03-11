@@ -183,8 +183,9 @@ Using a reverse proxy with Synapse
 It is recommended to put a reverse proxy such as
 `nginx <https://nginx.org/en/docs/http/ngx_http_proxy_module.html>`_,
 `Apache <https://httpd.apache.org/docs/current/mod/mod_proxy_http.html>`_,
-`Caddy <https://caddyserver.com/docs/quick-starts/reverse-proxy>`_ or
-`HAProxy <https://www.haproxy.org/>`_ in front of Synapse. One advantage of
+`Caddy <https://caddyserver.com/docs/quick-starts/reverse-proxy>`_,
+`HAProxy <https://www.haproxy.org/>`_ or
+`relayd <https://man.openbsd.org/relayd.8>`_ in front of Synapse. One advantage of
 doing so is that it means that you can expose the default https port (443) to
 Matrix clients without needing to run Synapse with root privileges.
 
@@ -243,6 +244,8 @@ Then update the ``users`` table in the database::
 Synapse Development
 ===================
 
+Join our developer community on Matrix: `#synapse-dev:matrix.org <https://matrix.to/#/#synapse-dev:matrix.org>`_
+
 Before setting up a development environment for synapse, make sure you have the
 system dependencies (such as the python header files) installed - see
 `Installing from source <INSTALL.md#installing-from-source>`_.
@@ -256,23 +259,48 @@ directory of your choice::
 Synapse has a number of external dependencies, that are easiest
 to install using pip and a virtualenv::
 
-    virtualenv -p python3 env
-    source env/bin/activate
-    python -m pip install --no-use-pep517 -e ".[all]"
+    python3 -m venv ./env
+    source ./env/bin/activate
+    pip install -e ".[all,test]"
 
 This will run a process of downloading and installing all the needed
-dependencies into a virtual env.
+dependencies into a virtual env. If any dependencies fail to install,
+try installing the failing modules individually::
 
-Once this is done, you may wish to run Synapse's unit tests, to
-check that everything is installed as it should be::
+    pip install -e "module-name"
+
+Once this is done, you may wish to run Synapse's unit tests to
+check that everything is installed correctly::
 
     python -m twisted.trial tests
 
-This should end with a 'PASSED' result::
+This should end with a 'PASSED' result (note that exact numbers will
+differ)::
 
-    Ran 143 tests in 0.601s
+    Ran 1337 tests in 716.064s
 
-    PASSED (successes=143)
+    PASSED (skips=15, successes=1322)
+
+We recommend using the demo which starts 3 federated instances running on ports `8080` - `8082`
+
+    ./demo/start.sh
+
+(to stop, you can use `./demo/stop.sh`)
+
+If you just want to start a single instance of the app and run it directly::
+
+    # Create the homeserver.yaml config once
+    python -m synapse.app.homeserver \
+      --server-name my.domain.name \
+      --config-path homeserver.yaml \
+      --generate-config \
+      --report-stats=[yes|no]
+
+    # Start the app
+    python -m synapse.app.homeserver --config-path homeserver.yaml
+
+
+
 
 Running the Integration Tests
 =============================

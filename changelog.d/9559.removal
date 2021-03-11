@@ -1,0 +1,1 @@
+Registering an Application Service user without using the `m.login.application_service` login type will be unsupported in an upcoming Synapse release.

@@ -14,10 +14,16 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.servlet import RestServlet, parse_integer, parse_string
+from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
+from synapse.types import JsonDict
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -45,12 +51,12 @@ class EventReportsRestServlet(RestServlet):
 
     PATTERNS = admin_patterns("/event_reports$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
 
-    async def on_GET(self, request):
+    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
         start = parse_integer(request, "from", default=0)
@@ -84,5 +90,51 @@ class EventReportsRestServlet(RestServlet):
         ret = {"event_reports": event_reports, "total": total}
         if (start + limit) < total:
             ret["next_token"] = start + len(event_reports)
+
+        return 200, ret
+
+
+class EventReportDetailRestServlet(RestServlet):
+    """
+    Get a specific reported event that is known to the homeserver. Results are returned
+    in a dictionary containing report information.
+    The requester must have administrator access in Synapse.
+
+    GET /_synapse/admin/v1/event_reports/<report_id>
+    returns:
+        200 OK with details report if success otherwise an error.
+
+    Args:
+        The parameter `report_id` is the ID of the event report in the database.
+    Returns:
+        JSON blob of information about the event report
+    """
+
+    PATTERNS = admin_patterns("/event_reports/(?P<report_id>[^/]*)$")
+
+    def __init__(self, hs: "HomeServer"):
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+
+    async def on_GET(
+        self, request: SynapseRequest, report_id: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self.auth, request)
+
+        message = (
+            "The report_id parameter must be a string representing a positive integer."
+        )
+        try:
+            resolved_report_id = int(report_id)
+        except ValueError:
+            raise SynapseError(400, message, errcode=Codes.INVALID_PARAM)
+
+        if resolved_report_id < 0:
+            raise SynapseError(400, message, errcode=Codes.INVALID_PARAM)
+
+        ret = await self.store.get_event_report(resolved_report_id)
+        if not ret:
+            raise NotFoundError("Event report not found")
 
         return 200, ret

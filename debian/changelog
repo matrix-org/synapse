@@ -1,3 +1,87 @@
+matrix-synapse-py3 (1.29.0) stable; urgency=medium
+
+  [ Jonathan de Jong ]
+  * Remove the python -B flag (don't generate bytecode) in scripts and documentation.
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.29.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Mon, 08 Mar 2021 13:51:50 +0000
+
+matrix-synapse-py3 (1.28.0) stable; urgency=medium
+
+  * New synapse release 1.28.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 25 Feb 2021 10:21:57 +0000
+
+matrix-synapse-py3 (1.27.0) stable; urgency=medium
+
+  [ Dan Callahan ]
+  * Fix build on Ubuntu 16.04 LTS (Xenial).
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.27.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 16 Feb 2021 13:11:28 +0000
+
+matrix-synapse-py3 (1.26.0) stable; urgency=medium
+
+  [ Richard van der Hoff ]
+  * Remove dependency on `python3-distutils`.
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.26.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 27 Jan 2021 12:43:35 -0500
+
+matrix-synapse-py3 (1.25.0) stable; urgency=medium
+
+  [ Dan Callahan ]
+  * Update dependencies to account for the removal of the transitional
+    dh-systemd package from Debian Bullseye.
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.25.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 13 Jan 2021 10:14:55 +0000
+
+matrix-synapse-py3 (1.24.0) stable; urgency=medium
+
+  * New synapse release 1.24.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 09 Dec 2020 10:14:30 +0000
+
+matrix-synapse-py3 (1.23.1) stable; urgency=medium
+
+  * New synapse release 1.23.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 09 Dec 2020 10:40:39 +0000
+
+matrix-synapse-py3 (1.23.0) stable; urgency=medium
+
+  * New synapse release 1.23.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 18 Nov 2020 11:41:28 +0000
+
+matrix-synapse-py3 (1.22.1) stable; urgency=medium
+
+  * New synapse release 1.22.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 30 Oct 2020 15:25:37 +0000
+
+matrix-synapse-py3 (1.22.0) stable; urgency=medium
+
+  * New synapse release 1.22.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 27 Oct 2020 12:07:12 +0000
+
+matrix-synapse-py3 (1.21.2) stable; urgency=medium
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.21.2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 15 Oct 2020 09:23:27 -0400
+
 matrix-synapse-py3 (1.21.1) stable; urgency=medium
 
   [ Synapse Packaging team ]

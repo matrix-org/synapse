@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Optional, Tuple
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EduTypes, EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.events.validator import EventValidator
 from synapse.handlers.presence import format_user_presence_state
@@ -48,7 +48,7 @@ class InitialSyncHandler(BaseHandler):
         self.clock = hs.get_clock()
         self.validator = EventValidator()
         self.snapshot_cache = ResponseCache(
-            hs, "initial_sync_cache"
+            hs.get_clock(), "initial_sync_cache"
         )  # type: ResponseCache[Tuple[str, Optional[StreamToken], Optional[StreamToken], str, Optional[int], bool, bool]]
         self._event_serializer = hs.get_event_client_serializer()
         self.storage = hs.get_storage()
@@ -124,7 +124,8 @@ class InitialSyncHandler(BaseHandler):
 
         joined_rooms = [r.room_id for r in room_list if r.membership == Membership.JOIN]
         receipt = await self.store.get_linearized_receipts_for_rooms(
-            joined_rooms, to_key=int(now_token.receipt_key),
+            joined_rooms,
+            to_key=int(now_token.receipt_key),
         )
 
         tags_by_room = await self.store.get_tags_for_user(user_id)
@@ -169,7 +170,10 @@ class InitialSyncHandler(BaseHandler):
                         self.state_handler.get_current_state, event.room_id
                     )
                 elif event.membership == Membership.LEAVE:
-                    room_end_token = RoomStreamToken(None, event.stream_ordering,)
+                    room_end_token = RoomStreamToken(
+                        None,
+                        event.stream_ordering,
+                    )
                     deferred_room_state = run_in_background(
                         self.state_store.get_state_for_events, [event.event_id]
                     )
@@ -284,7 +288,9 @@ class InitialSyncHandler(BaseHandler):
             membership,
             member_event_id,
         ) = await self.auth.check_user_in_room_or_world_readable(
-            room_id, user_id, allow_departed_users=True,
+            room_id,
+            user_id,
+            allow_departed_users=True,
         )
         is_peeking = member_event_id is None
 
@@ -293,6 +299,10 @@ class InitialSyncHandler(BaseHandler):
                 user_id, room_id, pagin_config, membership, is_peeking
             )
         elif membership == Membership.LEAVE:
+            # The member_event_id will always be available if membership is set
+            # to leave.
+            assert member_event_id
+
             result = await self._room_initial_sync_parted(
                 user_id, room_id, pagin_config, membership, member_event_id, is_peeking
             )
@@ -315,13 +325,11 @@ class InitialSyncHandler(BaseHandler):
         user_id: str,
         room_id: str,
         pagin_config: PaginationConfig,
-        membership: Membership,
+        membership: str,
         member_event_id: str,
         is_peeking: bool,
     ) -> JsonDict:
-        room_state = await self.state_store.get_state_for_events([member_event_id])
-
-        room_state = room_state[member_event_id]
+        room_state = await self.state_store.get_state_for_event(member_event_id)
 
         limit = pagin_config.limit if pagin_config else None
         if limit is None:
@@ -367,7 +375,7 @@ class InitialSyncHandler(BaseHandler):
         user_id: str,
         room_id: str,
         pagin_config: PaginationConfig,
-        membership: Membership,
+        membership: str,
         is_peeking: bool,
     ) -> JsonDict:
         current_state = await self.state.get_current_state(room_id=room_id)
@@ -404,7 +412,7 @@ class InitialSyncHandler(BaseHandler):
 
             return [
                 {
-                    "type": EventTypes.Presence,
+                    "type": EduTypes.Presence,
                     "content": format_user_presence_state(s, time_now),
                 }
                 for s in states

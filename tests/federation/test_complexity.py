@@ -48,10 +48,9 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         )
 
         # Get the room complexity
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/_matrix/federation/unstable/rooms/%s/complexity" % (room_1,)
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
         complexity = channel.json_body["v1"]
         self.assertTrue(complexity > 0, complexity)
@@ -61,10 +60,9 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         store.get_current_state_event_counts = lambda x: make_awaitable(500 * 1.23)
 
         # Get the room complexity again -- make sure it's our artificial value
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/_matrix/federation/unstable/rooms/%s/complexity" % (room_1,)
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
         complexity = channel.json_body["v1"]
         self.assertEqual(complexity, 1.23)
@@ -152,8 +150,8 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         )
 
         # Artificially raise the complexity
-        self.hs.get_datastore().get_current_state_event_counts = lambda x: make_awaitable(
-            600
+        self.hs.get_datastore().get_current_state_event_counts = (
+            lambda x: make_awaitable(600)
         )
 
         d = handler._remote_join(

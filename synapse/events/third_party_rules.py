@@ -12,7 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Callable
+
+from typing import Callable, Union
 
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
@@ -39,20 +40,26 @@ class ThirdPartyEventRules:
 
         if module is not None:
             self.third_party_rules = module(
-                config=config, module_api=hs.get_module_api(),
+                config=config,
+                module_api=hs.get_module_api(),
             )
 
     async def check_event_allowed(
         self, event: EventBase, context: EventContext
-    ) -> bool:
+    ) -> Union[bool, dict]:
         """Check if a provided event should be allowed in the given context.
+
+        The module can return:
+            * True: the event is allowed.
+            * False: the event is not allowed, and should be rejected with M_FORBIDDEN.
+            * a dict: replacement event data.
 
         Args:
             event: The event to be checked.
             context: The context of the event.
 
         Returns:
-            True if the event should be allowed, False if not.
+            The result from the ThirdPartyRules module, as above
         """
         if self.third_party_rules is None:
             return True
@@ -63,9 +70,10 @@ class ThirdPartyEventRules:
         events = await self.store.get_events(prev_state_ids.values())
         state_events = {(ev.type, ev.state_key): ev for ev in events.values()}
 
-        # The module can modify the event slightly if it wants, but caution should be
-        # exercised, and it's likely to go very wrong if applied to events received over
-        # federation.
+        # Ensure that the event is frozen, to make sure that the module is not tempted
+        # to try to modify it. Any attempt to modify it at this point will invalidate
+        # the hashes and signatures.
+        event.freeze()
 
         return await self.third_party_rules.check_event_allowed(event, state_events)
 

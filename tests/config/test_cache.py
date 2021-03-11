@@ -127,8 +127,7 @@ class CacheConfigTests(TestCase):
         self.assertEqual(cache.max_size, 150)
 
     def test_cache_with_asterisk_in_name(self):
-        """Some caches have asterisks in their name, test that they are set correctly.
-        """
+        """Some caches have asterisks in their name, test that they are set correctly."""
 
         config = {
             "caches": {
@@ -164,7 +163,8 @@ class CacheConfigTests(TestCase):
         t.read_config(config, config_dir_path="", data_dir_path="")
 
         cache = LruCache(
-            max_size=t.caches.event_cache_size, apply_cache_factor_from_config=False,
+            max_size=t.caches.event_cache_size,
+            apply_cache_factor_from_config=False,
         )
         add_resizable_cache("event_cache", cache_resize_callback=cache.set_cache_factor)
 
