@@ -168,11 +168,12 @@ class EventBuilder:
             )
             logger.info("sucessor_event_ids %s", sucessor_event_ids)
 
-            # If we can't find any successor events, this should only happen when
-            # you're inserting onto a forward extremity so I guess we should just
-            # progress the depth as normal.
+            # If we can't find any successor events, then it's a forward extremity of
+            # historical messages nd we can just inherit from the previous historical
+            # event which we can already assume has the correct depth where we want
+            # to insert into.
             if not sucessor_event_ids:
-                depth = most_recent_prev_event_depth + 1
+                depth = most_recent_prev_event_depth
             else:
                 (
                     _,
@@ -185,6 +186,8 @@ class EventBuilder:
         # Otherwise, progress the depth as normal
         else:
             depth = most_recent_prev_event_depth + 1
+
+        logger.info("depth %s", depth)
 
         # we cap depth of generated events, to ensure that they are not
         # rejected by other servers (and so that they can be persisted in
