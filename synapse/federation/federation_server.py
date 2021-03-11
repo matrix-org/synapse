@@ -206,7 +206,7 @@ class FederationServer(FederationBase):
         # CRITICAL SECTION: the first thing we must do (before awaiting) is
         # add an entry to _active_transactions.
         assert origin not in self._active_transactions
-        self._active_transactions[origin] = transaction.transaction_id
+        self._active_transactions[origin] = transaction.transaction_id  # type: ignore
 
         try:
             result = await self._handle_incoming_transaction(
