@@ -269,7 +269,10 @@ class UserRestServletV2(RestServlet):
                         target_user.to_string(), False, requester, by_admin=True
                     )
                 elif not deactivate and user["deactivated"]:
-                    if "password" not in body:
+                    if (
+                        "password" not in body
+                        and self.hs.config.password_localdb_enabled
+                    ):
                         raise SynapseError(
                             400, "Must provide a password to re-activate an account."
                         )

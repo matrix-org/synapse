@@ -39,6 +39,7 @@ from zope.interface import implementer, provider
 from OpenSSL import SSL
 from OpenSSL.SSL import VERIFY_NONE
 from twisted.internet import defer, error as twisted_error, protocol, ssl
+from twisted.internet.address import IPv4Address, IPv6Address
 from twisted.internet.interfaces import (
     IAddress,
     IHostResolution,
@@ -157,16 +158,17 @@ class _IPBlacklistingResolver:
     def resolveHostName(
         self, recv: IResolutionReceiver, hostname: str, portNumber: int = 0
     ) -> IResolutionReceiver:
-
-        r = recv()
         addresses = []  # type: List[IAddress]
 
         def _callback() -> None:
-            r.resolutionBegan(None)
-
             has_bad_ip = False
-            for i in addresses:
-                ip_address = IPAddress(i.host)
+            for address in addresses:
+                # We only expect IPv4 and IPv6 addresses since only A/AAAA lookups
+                # should go through this path.
+                if not isinstance(address, (IPv4Address, IPv6Address)):
+                    continue
+
+                ip_address = IPAddress(address.host)
 
                 if check_against_blacklist(
                     ip_address, self._ip_whitelist, self._ip_blacklist
@@ -181,15 +183,15 @@ class _IPBlacklistingResolver:
             # request, but all we can really do from here is claim that there were no
             # valid results.
             if not has_bad_ip:
-                for i in addresses:
-                    r.addressResolved(i)
-            r.resolutionComplete()
+                for address in addresses:
+                    recv.addressResolved(address)
+            recv.resolutionComplete()
 
         @provider(IResolutionReceiver)
         class EndpointReceiver:
             @staticmethod
             def resolutionBegan(resolutionInProgress: IHostResolution) -> None:
-                pass
+                recv.resolutionBegan(resolutionInProgress)
 
             @staticmethod
             def addressResolved(address: IAddress) -> None:
@@ -203,7 +205,7 @@ class _IPBlacklistingResolver:
             EndpointReceiver, hostname, portNumber=portNumber
         )
 
-        return r
+        return recv
 
 
 @implementer(ISynapseReactor)
@@ -352,7 +354,7 @@ class SimpleHttpClient:
             contextFactory=self.hs.get_http_client_context_factory(),
             pool=pool,
             use_proxy=use_proxy,
-        )
+        )  # type: IAgent
 
         if self._ip_blacklist:
             # If we have an IP blacklist, we then install the blacklisting Agent
