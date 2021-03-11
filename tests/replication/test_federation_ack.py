@@ -51,8 +51,10 @@ class FederationAckTestCase(HomeserverTestCase):
         """
         rch = self.hs.get_tcp_replication()
 
-        # wire up the ReplicationCommandHandler to a mock connection
-        mock_connection = mock.Mock(spec=IReplicationConnection)
+        # wire up the ReplicationCommandHandler to a mock connection, which needs
+        # to implement IReplicationConnection. (Note that Mock doesn't understand
+        # interfaces, but casing an interface to a list gives the attributes.)
+        mock_connection = mock.Mock(spec=list(IReplicationConnection))
         rch.new_connection(mock_connection)
 
         # tell it it received an RDATA row
