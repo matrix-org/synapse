@@ -6,6 +6,7 @@ import os
 import platform
 import subprocess
 import sys
+
 import jinja2
 
 
@@ -213,11 +214,10 @@ def main(args, environ):
     if "-m" not in args:
         args = ["-m", synapse_worker] + args
 
-
     jemallocpath = f"/usr/lib/{platform.machine()}-linux-gnu/libjemalloc.so.2"
 
     if os.path.isfile(jemallocpath):
-        environ['LD_PRELOAD'] = jemallocpath
+        environ["LD_PRELOAD"] = jemallocpath
     else:
         log(f"Could not find {jemallocpath}, will not use")
 
