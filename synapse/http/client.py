@@ -47,6 +47,7 @@ from twisted.internet.interfaces import (
     IResolutionReceiver,
     ITCPTransport,
 )
+from twisted.internet.protocol import connectionDone
 from twisted.internet.task import Cooperator
 from twisted.python.failure import Failure
 from twisted.web._newclient import ResponseDone
@@ -780,7 +781,7 @@ class _DiscardBodyWithMaxSizeProtocol(protocol.Protocol):
     def dataReceived(self, data: bytes) -> None:
         self._maybe_fail()
 
-    def connectionLost(self, reason: Failure) -> None:
+    def connectionLost(self, reason: Failure = connectionDone) -> None:
         self._maybe_fail()
 
 
@@ -814,7 +815,7 @@ class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
             assert self.transport is not None
             self.transport.abortConnection()
 
-    def connectionLost(self, reason: Failure) -> None:
+    def connectionLost(self, reason: Failure = connectionDone) -> None:
         # If the maximum size was already exceeded, there's nothing to do.
         if self.deferred.called:
             return
