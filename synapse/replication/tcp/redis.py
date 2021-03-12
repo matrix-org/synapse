@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Generic, Optional, Type, TypeVar, cast
 
 import attr
 import txredisapi
+from zope.interface import implementer
 
 from twisted.internet.address import IPv4Address, IPv6Address
 from twisted.internet.interfaces import IAddress, IConnector
@@ -36,7 +37,7 @@ from synapse.replication.tcp.commands import (
     parse_command_from_line,
 )
 from synapse.replication.tcp.protocol import (
-    AbstractConnection,
+    IReplicationConnection,
     tcp_inbound_commands_counter,
     tcp_outbound_commands_counter,
 )
@@ -66,7 +67,8 @@ class ConstantProperty(Generic[T, V]):
         pass
 
 
-class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
+@implementer(IReplicationConnection)
+class RedisSubscriber(txredisapi.SubscriberProtocol):
     """Connection to redis subscribed to replication stream.
 
     This class fulfils two functions:
@@ -75,7 +77,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
     connection, parsing *incoming* messages into replication commands, and passing them
     to `ReplicationCommandHandler`
 
-    (b) it implements the AbstractConnection API, where it sends *outgoing* commands
+    (b) it implements the IReplicationConnection API, where it sends *outgoing* commands
     onto outbound_redis_connection.
 
     Due to the vagaries of `txredisapi` we don't want to have a custom

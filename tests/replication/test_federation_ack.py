@@ -17,7 +17,7 @@ import mock
 
 from synapse.app.generic_worker import GenericWorkerServer
 from synapse.replication.tcp.commands import FederationAckCommand
-from synapse.replication.tcp.protocol import AbstractConnection
+from synapse.replication.tcp.protocol import IReplicationConnection
 from synapse.replication.tcp.streams.federation import FederationStream
 
 from tests.unittest import HomeserverTestCase
@@ -51,8 +51,10 @@ class FederationAckTestCase(HomeserverTestCase):
         """
         rch = self.hs.get_tcp_replication()
 
-        # wire up the ReplicationCommandHandler to a mock connection
-        mock_connection = mock.Mock(spec=AbstractConnection)
+        # wire up the ReplicationCommandHandler to a mock connection, which needs
+        # to implement IReplicationConnection. (Note that Mock doesn't understand
+        # interfaces, but casing an interface to a list gives the attributes.)
+        mock_connection = mock.Mock(spec=list(IReplicationConnection))
         rch.new_connection(mock_connection)
 
         # tell it it received an RDATA row

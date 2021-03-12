@@ -57,7 +57,13 @@ from twisted.web.client import (
 )
 from twisted.web.http import PotentialDataLoss
 from twisted.web.http_headers import Headers
-from twisted.web.iweb import UNKNOWN_LENGTH, IAgent, IBodyProducer, IResponse
+from twisted.web.iweb import (
+    UNKNOWN_LENGTH,
+    IAgent,
+    IBodyProducer,
+    IPolicyForHTTPS,
+    IResponse,
+)
 
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.http import QuieterFileBodyProducer, RequestTimedOutError, redact_uri
@@ -870,6 +876,7 @@ def encode_query_args(args: Optional[Mapping[str, Union[str, List[str]]]]) -> by
     return query_str.encode("utf8")
 
 
+@implementer(IPolicyForHTTPS)
 class InsecureInterceptableContextFactory(ssl.ContextFactory):
     """
     Factory for PyOpenSSL SSL contexts which accepts any certificate for any domain.

@@ -880,7 +880,9 @@ class FederationHandlerRegistry:
         self.edu_handlers = (
             {}
         )  # type: Dict[str, Callable[[str, dict], Awaitable[None]]]
-        self.query_handlers = {}  # type: Dict[str, Callable[[dict], Awaitable[None]]]
+        self.query_handlers = (
+            {}
+        )  # type: Dict[str, Callable[[dict], Awaitable[JsonDict]]]
 
         # Map from type to instance names that we should route EDU handling to.
         # We randomly choose one instance from the list to route to for each new
@@ -914,7 +916,7 @@ class FederationHandlerRegistry:
         self.edu_handlers[edu_type] = handler
 
     def register_query_handler(
-        self, query_type: str, handler: Callable[[dict], defer.Deferred]
+        self, query_type: str, handler: Callable[[dict], Awaitable[JsonDict]]
     ):
         """Sets the handler callable that will be used to handle an incoming
         federation query of the given type.
@@ -987,7 +989,7 @@ class FederationHandlerRegistry:
         # Oh well, let's just log and move on.
         logger.warning("No handler registered for EDU type %s", edu_type)
 
-    async def on_query(self, query_type: str, args: dict):
+    async def on_query(self, query_type: str, args: dict) -> JsonDict:
         handler = self.query_handlers.get(query_type)
         if handler:
             return await handler(args)
