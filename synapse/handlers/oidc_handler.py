@@ -278,6 +278,7 @@ class OidcProvider:
         self._config = provider
         self._callback_url = hs.config.oidc_callback_url  # type: str
 
+        self._oidc_attribute_requirements = provider.attribute_requirements  # type: List[SsoAttributeRequirement]
         self._scopes = provider.scopes
         self._user_profile_method = provider.user_profile_method
 
@@ -854,6 +855,15 @@ class OidcProvider:
             )
 
         # otherwise, it's a login
+        logger.debug(f"Userinfo for OIDC login: {userinfo}")
+
+        # Ensure that the attributes of the logged in user meet the required
+        # attributes
+        # With OIDC, we check userinfo against attribute_requirements
+        if not self._sso_handler.check_required_attributes(
+            request, userinfo, self._oidc_attribute_requirements
+        ):
+            return
 
         # Call the mapper to register/login the user
         try:
