@@ -989,6 +989,42 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         self.assertRenderedError("mapping_error", "localpart is invalid: ")
 
+    @override_config(
+        {
+            "oidc_config": {
+                **DEFAULT_CONFIG,
+                "attribute_requirements": [
+                    {"attribute": "test", "value": "foobar"}
+                ]
+            }
+        }
+    )
+    def test_attribute_requirements(self):
+        """The required attributes must be met from the OIDC userinfo response."""
+        auth_handler = self.hs.get_auth_handler()
+        auth_handler.complete_sso_login = simple_async_mock()
+
+        # userinfo lacking "test": "foobar" attribute should fail.
+        userinfo = {
+            "sub": "tester",
+            "username": "tester",
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+        auth_handler.complete_sso_login.assert_not_called()
+
+        # userinfo with "test": "foobar" attribute should succeed.
+        userinfo = {
+            "sub": "tester",
+            "username": "tester",
+            "test": "foobar",
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+
+        # check that the auth handler got called as expected
+        auth_handler.complete_sso_login.assert_called_once_with(
+            "@tester:test", "oidc", ANY, ANY, None, new_user=True
+        )
+
     def _generate_oidc_session_token(
         self,
         state: str,
