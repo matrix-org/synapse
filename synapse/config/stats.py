@@ -37,12 +37,18 @@ class StatsConfig(Config):
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """
-        # Local statistics collection. Used in populating the room directory.
+        # Settings for local room and user statistics collection. See
+        # docs/room_and_user_statistics.md.
         #
-        # 'bucket_size' controls how large each statistics timeslice is. It can
-        # be defined in a human readable short form -- e.g. "1d", "1y".
-        #
-        #stats:
-        #   enabled: true
-        #   bucket_size: 1d
+        stats:
+          # Uncomment the following to disable room and user statistics. Note that doing
+          # so may cause certain features (such as the room directory) not to work
+          # correctly.
+          #
+          #enabled: false
+
+          # The size of each timeslice in the room_stats_historical and
+          # user_stats_historical tables, as a time period. Defaults to "1d".
+          #
+          #bucket_size: 1h
         """
