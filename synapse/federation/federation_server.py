@@ -170,6 +170,13 @@ class FederationServer(FederationBase):
 
         logger.debug("[%s] Got transaction", transaction_id)
 
+        # Reject malformed transactions early: reject if too many PDUs/EDUs
+        if len(transaction.pdus) > 50 or (  # type: ignore
+            hasattr(transaction, "edus") and len(transaction.edus) > 100  # type: ignore
+        ):
+            logger.info("Transaction PDU or EDU count too large. Returning 400")
+            return 400, {}
+
         # we only process one transaction from each origin at a time. We need to do
         # this check here, rather than in _on_incoming_transaction_inner so that we
         # don't cache the rejection in _transaction_resp_cache (so that if the txn
@@ -239,19 +246,6 @@ class FederationServer(FederationBase):
             return response
 
         logger.debug("[%s] Transaction is new", transaction.transaction_id)  # type: ignore
-
-        # Reject if PDU count > 50 or EDU count > 100
-        if len(transaction.pdus) > 50 or (  # type: ignore
-            hasattr(transaction, "edus") and len(transaction.edus) > 100  # type: ignore
-        ):
-
-            logger.info("Transaction PDU or EDU count too large. Returning 400")
-
-            response = {}
-            await self.transaction_actions.set_response(
-                origin, transaction, 400, response
-            )
-            return 400, response
 
         # We process PDUs and EDUs in parallel. This is important as we don't
         # want to block things like to device messages from reaching clients
