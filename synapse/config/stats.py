@@ -17,6 +17,18 @@ import logging
 
 from ._base import Config
 
+ROOM_STATS_DISABLED_WARN = """\
+WARNING: room/user statistics have been disabled via the stats.enabled
+configuration setting. This means that certain features (such as the room
+directory) will not operate correctly. Future versions of Synapse may ignore
+this setting.
+
+To fix this warning, remove the stats.enabled setting from your configuration
+file.
+--------------------------------------------------------------------------------"""
+
+logger = logging.getLogger(__name__)
+
 
 class StatsConfig(Config):
     """Stats Configuration
@@ -34,6 +46,8 @@ class StatsConfig(Config):
             self.stats_bucket_size = self.parse_duration(
                 stats_config.get("bucket_size", "1d")
             )
+        if not self.stats_enabled:
+            logger.warning(ROOM_STATS_DISABLED_WARN)
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """
