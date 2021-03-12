@@ -64,7 +64,6 @@ class SpaceSummaryHandler:
         room_queue = deque((room_id,))
 
         processed_rooms = set()  # type: Set[str]
-        returned_edges = set()  # type: Set[str]
 
         rooms_result = []  # type: List[JsonDict]
         events_result = []  # type: List[JsonDict]
@@ -99,7 +98,6 @@ class SpaceSummaryHandler:
                     EventContentFields.MSC1772_ROOM_TYPE
                 )
 
-            # TODO: include num_refs?
             entry = {
                 "room_id": stats["room_id"],
                 "name": stats["name"],
@@ -118,20 +116,21 @@ class SpaceSummaryHandler:
             room_entry = {k: v for k, v in entry.items() if v is not None}
             rooms_result.append(room_entry)
 
-            # TODO: get reverse links?
+            if room_type != "org.matrix.msc1772.space":
+                continue
+
+            # look for child rooms/spaces.
+            # TODO: add a param so that the client can request parent spaces instead
 
             edge_event_types = ()  # type: Tuple[str, ...]
             if self._msc1772:
-                edge_event_types += (
-                    EventTypes.MSC1772_SPACE_CHILD,
-                    EventTypes.MSC1772_SPACE_PARENT,
-                )
+                edge_event_types += (EventTypes.MSC1772_SPACE_CHILD,)
 
             events = await self._store.get_events_as_list(
                 [
                     event_id
                     for key, event_id in current_state_ids.items()
-                    if key[0] in edge_event_types and event_id not in returned_edges
+                    if key[0] in edge_event_types
                 ]
             )
 
@@ -149,7 +148,6 @@ class SpaceSummaryHandler:
                             event_format=format_event_for_client_v2,
                         )
                     )
-                    returned_edges.add(edge_event.event_id)
                     events_for_this_room += 1
 
                 # if we haven't yet visited the target of this link, add it to the
