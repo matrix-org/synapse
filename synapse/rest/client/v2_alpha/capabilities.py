@@ -15,7 +15,6 @@
 import logging
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.constants import LoginType
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
@@ -42,14 +41,8 @@ class CapabilitiesRestServlet(RestServlet):
         self.auth_handler = hs.get_auth_handler()
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        supported_ui_auth_types = await self.auth_handler._get_available_ui_auth_types(
-            requester.user
-        )
-        if LoginType.PASSWORD in supported_ui_auth_types:
-            change_password = True
-        else:
-            change_password = False
+        await self.auth.get_user_by_req(request, allow_guest=True)
+        change_password = self.auth_handler.get_allow_change_password()
 
         response = {
             "capabilities": {

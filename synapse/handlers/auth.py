@@ -215,6 +215,10 @@ class AuthHandler(BaseHandler):
         self._password_enabled = hs.config.password_enabled
         self._password_localdb_enabled = hs.config.password_localdb_enabled
 
+        self._change_password = (
+            self._password_enabled and self._password_localdb_enabled
+        )
+
         # start out by assuming PASSWORD is enabled; we will remove it later if not.
         login_types = set()
         if self._password_localdb_enabled:
@@ -884,6 +888,18 @@ class AuthHandler(BaseHandler):
                 user_infos.keys(),
             )
         return result
+
+    def get_allow_change_password(self) -> bool:
+        """Get status if users on this server are allowed to change or set a password.
+        Both `config.password_enabled` and `config.password_localdb_enabled`
+        must be true.
+        It is allowed that people add a password to their account even if they created
+        that account with SSO if it is not explicitly prohibited.
+
+        Returns:
+            Whether users on this server are allowed to change or set a password
+        """
+        return self._change_password
 
     def get_supported_login_types(self) -> Iterable[str]:
         """Get a the login types supported for the /login API
