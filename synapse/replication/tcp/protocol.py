@@ -56,6 +56,7 @@ from prometheus_client import Counter
 from zope.interface import Interface, implementer
 
 from twisted.internet import task
+from twisted.internet.tcp import Connection
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.python.failure import Failure
 
@@ -145,6 +146,10 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
     (if they send a `PING` command)
     """
 
+    # The transport is going to be an ITCPTransport, but that doesn't have the
+    # (un)registerProducer methods, those are only on the implementation.
+    transport = None  # type: Connection
+
     delimiter = b"\n"
 
     # Valid commands we expect to receive
@@ -189,6 +194,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
 
         connected_connections.append(self)  # Register connection for metrics
 
+        assert self.transport is not None
         self.transport.registerProducer(self, True)  # For the *Producing callbacks
 
         self._send_pending_commands()
@@ -213,6 +219,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
                 logger.info(
                     "[%s] Failed to close connection gracefully, aborting", self.id()
                 )
+                assert self.transport is not None
                 self.transport.abortConnection()
         else:
             if now - self.last_sent_command >= PING_TIME:
@@ -302,6 +309,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
     def close(self):
         logger.warning("[%s] Closing connection", self.id())
         self.time_we_closed = self.clock.time_msec()
+        assert self.transport is not None
         self.transport.loseConnection()
         self.on_connection_closed()
 

@@ -45,6 +45,7 @@ from twisted.internet.interfaces import (
     IHostResolution,
     IReactorPluggableNameResolver,
     IResolutionReceiver,
+    ITCPTransport,
 )
 from twisted.internet.task import Cooperator
 from twisted.python.failure import Failure
@@ -760,6 +761,8 @@ class BodyExceededMaxSize(Exception):
 class _DiscardBodyWithMaxSizeProtocol(protocol.Protocol):
     """A protocol which immediately errors upon receiving data."""
 
+    transport = None  # type: Optional[ITCPTransport]
+
     def __init__(self, deferred: defer.Deferred):
         self.deferred = deferred
 
@@ -771,6 +774,7 @@ class _DiscardBodyWithMaxSizeProtocol(protocol.Protocol):
             self.deferred.errback(BodyExceededMaxSize())
             # Close the connection (forcefully) since all the data will get
             # discarded anyway.
+            assert self.transport is not None
             self.transport.abortConnection()
 
     def dataReceived(self, data: bytes) -> None:
@@ -782,6 +786,8 @@ class _DiscardBodyWithMaxSizeProtocol(protocol.Protocol):
 
 class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
     """A protocol which reads body to a stream, erroring if the body exceeds a maximum size."""
+
+    transport = None  # type: Optional[ITCPTransport]
 
     def __init__(
         self, stream: BinaryIO, deferred: defer.Deferred, max_size: Optional[int]
@@ -805,6 +811,7 @@ class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
             self.deferred.errback(BodyExceededMaxSize())
             # Close the connection (forcefully) since all the data will get
             # discarded anyway.
+            assert self.transport is not None
             self.transport.abortConnection()
 
     def connectionLost(self, reason: Failure) -> None:
