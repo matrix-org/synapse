@@ -407,6 +407,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
     def connectionLost(self, reason):
         logger.info("[%s] Replication connection closed: %r", self.id(), reason)
         if isinstance(reason, Failure):
+            assert reason.type is not None
             connection_close_counter.labels(reason.type.__name__).inc()
         else:
             connection_close_counter.labels(reason.__class__.__name__).inc()
