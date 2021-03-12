@@ -21,6 +21,9 @@ import re
 from typing import TYPE_CHECKING, List, Optional
 from urllib import parse as urlparse
 
+from twisted.web.iweb import IRequest
+from twisted.web.server import Request
+
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
@@ -981,7 +984,35 @@ def register_txn_path(servlet, regex_string, http_server, with_get=False):
         )
 
 
-def register_servlets(hs, http_server, is_worker=False):
+class RoomSpaceSummaryRestServlet(RestServlet):
+    PATTERNS = (
+        re.compile(
+            "^/_matrix/client/unstable/org.matrix.msc2946"
+            "/rooms/(?P<room_id>[^/]*)/spaces$"
+        ),
+    )
+
+    def __init__(self, hs: "synapse.server.HomeServer"):
+        super().__init__()
+        self._auth = hs.get_auth()
+        self._space_summary_handler = hs.get_space_summary_handler()
+
+    async def on_POST(self, request: Request, room_id: str):
+        requester = await self._auth.get_user_by_req(request, allow_guest=True)
+
+        # first of all, check that the user is in the room in question (or it's
+        # world-readable)
+        await self._auth.check_user_in_room_or_world_readable(
+            room_id, requester.user.to_string()
+        )
+
+        data = await self._space_summary_handler.get_space_summary(
+            requester.user.to_string(), room_id
+        )
+        return 200, data
+
+
+def register_servlets(hs: "synapse.server.HomeServer", http_server, is_worker=False):
     RoomStateEventRestServlet(hs).register(http_server)
     RoomMemberListRestServlet(hs).register(http_server)
     JoinedRoomMemberListRestServlet(hs).register(http_server)
@@ -994,6 +1025,9 @@ def register_servlets(hs, http_server, is_worker=False):
     RoomRedactEventRestServlet(hs).register(http_server)
     RoomTypingRestServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
+
+    if hs.config.experimental.msc2946_enabled:
+        RoomSpaceSummaryRestServlet(hs).register(http_server)
 
     # Some servlets only get registered for the main process.
     if not is_worker:

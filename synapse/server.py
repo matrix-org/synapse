@@ -100,6 +100,7 @@ from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.search import SearchHandler
 from synapse.handlers.set_password import SetPasswordHandler
+from synapse.handlers.space_summary import SpaceSummaryHandler
 from synapse.handlers.sso import SsoHandler
 from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
@@ -724,6 +725,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_account_data_handler(self) -> AccountDataHandler:
         return AccountDataHandler(self)
+
+    @cache_in_self
+    def get_space_summary_handler(self) -> SpaceSummaryHandler:
+        return SpaceSummaryHandler(self)
 
     @cache_in_self
     def get_external_cache(self) -> ExternalCache:
