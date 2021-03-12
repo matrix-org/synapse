@@ -40,6 +40,7 @@ from synapse.config.oidc_config import (
     OidcProviderClientSecretJwtKey,
     OidcProviderConfig,
 )
+from synapse.config.sso import SsoAttributeRequirement
 from synapse.handlers.sso import MappingException, UserAttributes
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
@@ -278,7 +279,9 @@ class OidcProvider:
         self._config = provider
         self._callback_url = hs.config.oidc_callback_url  # type: str
 
-        self._oidc_attribute_requirements = provider.attribute_requirements  # type: List[SsoAttributeRequirement]
+        self._oidc_attribute_requirements = (
+            provider.attribute_requirements  
+        )  # type: List[SsoAttributeRequirement]
         self._scopes = provider.scopes
         self._user_profile_method = provider.user_profile_method
 

@@ -345,8 +345,8 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
         "allow_existing_users": {"type": "boolean"},
         "user_mapping_provider": {"type": ["object", "null"]},
         "attribute_requirements": {
-            "type": "array", 
-            "items": SsoAttributeRequirement.JSON_SCHEMA
+            "type": "array",
+            "items": SsoAttributeRequirement.JSON_SCHEMA,
         },
     },
 }
@@ -485,7 +485,10 @@ def _parse_oidc_config_dict(
             jwt_payload=client_secret_jwt_key_config.get("jwt_payload", {}),
         )
     # parse attribute_requirements from config (list of dicts) into a list of SsoAttributeRequirement
-    attribute_requirements = [SsoAttributeRequirement(**x) for x in oidc_config.get("attribute_requirements", [])]
+    attribute_requirements = [
+        SsoAttributeRequirement(**x)
+        for x in oidc_config.get("attribute_requirements", [])
+    ]
 
     return OidcProviderConfig(
         idp_id=idp_id,

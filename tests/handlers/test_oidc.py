@@ -993,9 +993,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         {
             "oidc_config": {
                 **DEFAULT_CONFIG,
-                "attribute_requirements": [
-                    {"attribute": "test", "value": "foobar"}
-                ]
+                "attribute_requirements": [{"attribute": "test", "value": "foobar"}],
             }
         }
     )
