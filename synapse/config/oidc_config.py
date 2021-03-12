@@ -15,7 +15,7 @@
 # limitations under the License.
 
 from collections import Counter
-from typing import Any, Iterable, List, Mapping, Optional, Tuple, Type
+from typing import Iterable, Mapping, Optional, Tuple, Type
 
 import attr
 
@@ -600,4 +600,4 @@ class OidcProviderConfig:
     user_mapping_provider_config = attr.ib()
 
     # required attributes to require in userinfo to allow login/registration
-    attribute_requirements = attr.ib(type=Optional[list])
+    attribute_requirements = attr.ib(type=Iterable[SsoAttributeRequirement])

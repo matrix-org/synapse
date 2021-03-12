@@ -15,7 +15,16 @@
 # limitations under the License.
 import inspect
 import logging
-from typing import TYPE_CHECKING, Dict, Generic, List, Optional, TypeVar, Union
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    Generic,
+    Iterable,
+    List,
+    Optional,
+    TypeVar,
+    Union,
+)
 from urllib.parse import urlencode
 
 import attr
@@ -280,8 +289,8 @@ class OidcProvider:
         self._callback_url = hs.config.oidc_callback_url  # type: str
 
         self._oidc_attribute_requirements = (
-            provider.attribute_requirements  
-        )  # type: List[SsoAttributeRequirement]
+            provider.attribute_requirements
+        )  # type: Iterable[SsoAttributeRequirement]
         self._scopes = provider.scopes
         self._user_profile_method = provider.user_profile_method
 
