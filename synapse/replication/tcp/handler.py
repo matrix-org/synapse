@@ -302,7 +302,7 @@ class ReplicationCommandHandler:
                 hs, outbound_redis_connection
             )
             hs.get_reactor().connectTCP(
-                hs.config.redis.redis_host,
+                hs.config.redis.redis_host.encode(),
                 hs.config.redis.redis_port,
                 self._factory,
             )
@@ -311,7 +311,7 @@ class ReplicationCommandHandler:
             self._factory = DirectTcpReplicationClientFactory(hs, client_name, self)
             host = hs.config.worker_replication_host
             port = hs.config.worker_replication_port
-            hs.get_reactor().connectTCP(host, port, self._factory)
+            hs.get_reactor().connectTCP(host.encode(), port, self._factory)
 
     def get_streams(self) -> Dict[str, Stream]:
         """Get a map from stream name to all streams."""

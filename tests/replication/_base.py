@@ -233,7 +233,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         if self.hs.config.redis.redis_enabled:
             # Handle attempts to connect to fake redis server.
             self.reactor.add_tcp_client_callback(
-                "localhost",
+                b"localhost",
                 6379,
                 self.connect_any_redis_attempts,
             )
@@ -415,7 +415,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         clients = self.reactor.tcpClients
         while clients:
             (host, port, client_factory, _timeout, _bindAddress) = clients.pop(0)
-            self.assertEqual(host, "localhost")
+            self.assertEqual(host, b"localhost")
             self.assertEqual(port, 6379)
 
             client_protocol = client_factory.buildProtocol(None)
