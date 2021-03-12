@@ -867,7 +867,7 @@ class OidcProvider:
             )
 
         # otherwise, it's a login
-        logger.debug(f"Userinfo for OIDC login: {userinfo}")
+        logger.debug("Userinfo for OIDC login: %s", userinfo)
 
         # Ensure that the attributes of the logged in user meet the required
         # attributes
