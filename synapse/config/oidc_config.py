@@ -19,8 +19,8 @@ from typing import Any, Iterable, List, Mapping, Optional, Tuple, Type
 
 import attr
 
-from synapse.config.sso import SsoAttributeRequirement
 from synapse.config._util import validate_config
+from synapse.config.sso import SsoAttributeRequirement
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.types import Collection, JsonDict
 from synapse.util.module_loader import load_module
