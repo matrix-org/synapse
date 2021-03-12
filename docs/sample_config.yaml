@@ -2650,14 +2650,9 @@ user_directory:
 # 'bucket_size' controls how large each statistics timeslice is. It can
 # be defined in a human readable short form -- e.g. "1d", "1y".
 #
-# 'retention' controls how long historical statistics will be kept for.
-# It can be defined in a human readable short form -- e.g. "1d", "1y".
-#
-#
 #stats:
 #   enabled: true
 #   bucket_size: 1d
-#   retention: 1y
 
 
 # Server Notices room configuration
