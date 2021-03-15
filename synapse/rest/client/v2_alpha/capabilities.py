@@ -42,7 +42,7 @@ class CapabilitiesRestServlet(RestServlet):
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await self.auth.get_user_by_req(request, allow_guest=True)
-        change_password = self.auth_handler.get_allow_change_password()
+        change_password = self.auth_handler.can_change_password()
 
         response = {
             "capabilities": {
