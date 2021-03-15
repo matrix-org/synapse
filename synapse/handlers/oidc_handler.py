@@ -15,16 +15,7 @@
 # limitations under the License.
 import inspect
 import logging
-from typing import (
-    TYPE_CHECKING,
-    Dict,
-    Generic,
-    Iterable,
-    List,
-    Optional,
-    TypeVar,
-    Union,
-)
+from typing import TYPE_CHECKING, Dict, Generic, List, Optional, TypeVar, Union
 from urllib.parse import urlencode
 
 import attr
@@ -49,7 +40,6 @@ from synapse.config.oidc_config import (
     OidcProviderClientSecretJwtKey,
     OidcProviderConfig,
 )
-from synapse.config.sso import SsoAttributeRequirement
 from synapse.handlers.sso import MappingException, UserAttributes
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
@@ -288,9 +278,7 @@ class OidcProvider:
         self._config = provider
         self._callback_url = hs.config.oidc_callback_url  # type: str
 
-        self._oidc_attribute_requirements = (
-            provider.attribute_requirements
-        )  # type: Iterable[SsoAttributeRequirement]
+        self._oidc_attribute_requirements = provider.attribute_requirements
         self._scopes = provider.scopes
         self._user_profile_method = provider.user_profile_method
 
@@ -870,8 +858,7 @@ class OidcProvider:
         logger.debug("Userinfo for OIDC login: %s", userinfo)
 
         # Ensure that the attributes of the logged in user meet the required
-        # attributes
-        # With OIDC, we check userinfo against attribute_requirements
+        # attributes by checking the userinfo against attribute_requirements
         if not self._sso_handler.check_required_attributes(
             request, userinfo, self._oidc_attribute_requirements
         ):
