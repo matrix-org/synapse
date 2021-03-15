@@ -437,14 +437,16 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("GET", "/_matrix/client/r0/login")
         self.assertEqual(channel.code, 200, channel.result)
 
-        expected_flows = [
-            {"type": "m.login.cas"},
-            {"type": "m.login.sso"},
-            {"type": "m.login.token"},
-            {"type": "m.login.password"},
-        ] + ADDITIONAL_LOGIN_FLOWS
+        expected_flow_types = [
+            "m.login.cas",
+            "m.login.sso",
+            "m.login.token",
+            "m.login.password",
+        ] + [f["type"] for f in ADDITIONAL_LOGIN_FLOWS]
 
-        self.assertCountEqual(channel.json_body["flows"], expected_flows)
+        self.assertCountEqual(
+            [f["type"] for f in channel.json_body["flows"]], expected_flow_types
+        )
 
     @override_config({"experimental_features": {"msc2858_enabled": True}})
     def test_get_msc2858_login_flows(self):

@@ -1919,7 +1919,7 @@ oidc_providers:
   #
   #- idp_id: github
   #  idp_name: Github
-  #  idp_brand: org.matrix.github
+  #  idp_brand: github
   #  discover: false
   #  issuer: "https://github.com/"
   #  client_id: "your-client-id" # TO BE FILLED

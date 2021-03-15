@@ -81,6 +81,7 @@ class SamlHandler(BaseHandler):
         # the SsoIdentityProvider protocol type.
         self.idp_icon = None
         self.idp_brand = None
+        self.unstable_idp_brand = None
 
         # a map from saml session id to Saml2SessionData object
         self._outstanding_requests_dict = {}  # type: Dict[str, Saml2SessionData]

@@ -98,6 +98,11 @@ class SsoIdentityProvider(Protocol):
         """Optional branding identifier"""
         return None
 
+    @property
+    def unstable_idp_brand(self) -> Optional[str]:
+        """# Optional brand identifier for the unstable API (see MSC2858)."""
+        return None
+
     @abc.abstractmethod
     async def handle_redirect_request(
         self,
