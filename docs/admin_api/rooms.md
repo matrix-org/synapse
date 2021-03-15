@@ -606,6 +606,8 @@ GET /_synapse/admin/v1/rooms/<room_id>/context/<event_id>
 
 This API mimmicks [GET /_matrix/client/r0/rooms/{roomId}/context/{eventId}](https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-rooms-roomid-context-eventid). Please refer to the link for all details on parameters and reseponse.
 
+The main difference is that this call does NOT return state events, for performance reasons.
+
 Example response:
 
 ```json
@@ -673,43 +675,5 @@ Example response:
     }
   ],
   "start": "t27-54_2_0_2",
-  "state": [
-    {
-      "content": {
-        "creator": "@example:example.org",
-        "room_version": "1",
-        "m.federate": true,
-        "predecessor": {
-          "event_id": "$something:example.org",
-          "room_id": "!oldroom:example.org"
-        }
-      },
-      "type": "m.room.create",
-      "event_id": "$143273582443PhrSn:example.org",
-      "room_id": "!636q39766251:example.com",
-      "sender": "@example:example.org",
-      "origin_server_ts": 1432735824653,
-      "unsigned": {
-        "age": 1234
-      },
-      "state_key": ""
-    },
-    {
-      "content": {
-        "membership": "join",
-        "avatar_url": "mxc://example.org/SEsfnsuifSDFSSEF",
-        "displayname": "Alice Margatroid"
-      },
-      "type": "m.room.member",
-      "event_id": "$143273582443PhrSn:example.org",
-      "room_id": "!636q39766251:example.com",
-      "sender": "@example:example.org",
-      "origin_server_ts": 1432735824653,
-      "unsigned": {
-        "age": 1234
-      },
-      "state_key": "@alice:example.org"
-    }
-  ]
 }
 ```

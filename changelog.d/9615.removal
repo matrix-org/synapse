@@ -1,0 +1,1 @@
+Remove state events from /_synapse/admin/v1/rooms/<room_id>/context/<event_id> for performance reasons.
