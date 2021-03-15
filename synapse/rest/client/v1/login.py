@@ -14,10 +14,12 @@
 # limitations under the License.
 
 import logging
+import re
 from typing import TYPE_CHECKING, Awaitable, Callable, Dict, Optional
 
 from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
+from synapse.api.urls import CLIENT_API_PREFIX
 from synapse.appservice import ApplicationService
 from synapse.handlers.sso import SsoIdentityProvider
 from synapse.http import get_request_uri
@@ -366,7 +368,13 @@ def _get_auth_flow_dict_for_idp(
 
 
 class SsoRedirectServlet(RestServlet):
-    PATTERNS = client_patterns("/login/(cas|sso)/redirect$", v1=True)
+    PATTERNS = list(client_patterns("/login/(cas|sso)/redirect$", v1=True)) + [
+        re.compile(
+            "^"
+            + CLIENT_API_PREFIX
+            + "/r0/login/sso/redirect/(?P<idp_id>[A-Za-z0-9_.~-]+)$"
+        )
+    ]
 
     def __init__(self, hs: "HomeServer"):
         # make sure that the relevant handlers are instantiated, so that they
@@ -384,7 +392,8 @@ class SsoRedirectServlet(RestServlet):
     def register(self, http_server: HttpServer) -> None:
         super().register(http_server)
         if self._msc2858_enabled:
-            # expose additional endpoint for MSC2858 support
+            # expose additional endpoint for MSC2858 support: backwards-compat support
+            # for clients which don't yet support the stable endpoints.
             http_server.register_paths(
                 "GET",
                 client_patterns(
