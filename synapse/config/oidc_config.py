@@ -15,7 +15,7 @@
 # limitations under the License.
 
 from collections import Counter
-from typing import Iterable, Mapping, Optional, Tuple, Type
+from typing import Iterable, List, Mapping, Optional, Tuple, Type
 
 import attr
 
@@ -191,13 +191,13 @@ class OIDCConfig(Config):
         #           When rendering, the Jinja2 templates are given a 'user' variable,
         #           which is set to the claims returned by the UserInfo Endpoint and/or
         #           in the ID Token.
+        #
         #   It is possible to configure Synapse to only allow logins if certain attributes
         #   match particular values in the OIDC userinfo. The requirements can be listed under
         #   `attribute_requirements` as shown below. All of the listed attributes must
-        #   match for the login to be permitted. Note that fields listed may need to be added
-        #   to the userinfo return in the OIDC provider, by extending or adding a scope.
-        #   If the attributes listed are not part of the default scopes, these scopes may
-        #   also need to be added to the `scopes` section of the OIDC config.
+        #   match for the login to be permitted. Additional attributes can be added to
+        #   userinfo by expanding the `scopes` section of the OIDC config to retrieve
+        #   additional information from the OIDC provider.
         #
         #   attribute_requirements:
         #     - attribute: family_name
@@ -600,4 +600,4 @@ class OidcProviderConfig:
     user_mapping_provider_config = attr.ib()
 
     # required attributes to require in userinfo to allow login/registration
-    attribute_requirements = attr.ib(type=Iterable[SsoAttributeRequirement])
+    attribute_requirements = attr.ib(type=List[SsoAttributeRequirement])
