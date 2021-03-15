@@ -1023,6 +1023,104 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "@tester:test", "oidc", ANY, ANY, None, new_user=True
         )
 
+    @override_config(
+        {
+            "oidc_config": {
+                **DEFAULT_CONFIG,
+                "attribute_requirements": [{"attribute": "test", "value": "foobar"}],
+            }
+        }
+    )
+    def test_attribute_requirements_contains(self):
+        """Test that auth succeeds if userinfo attribute CONTAINS required value"""
+        auth_handler = self.hs.get_auth_handler()
+        auth_handler.complete_sso_login = simple_async_mock()
+        # userinfo with "test": ["foobar", "foo", "bar"] attribute should succeed.
+        userinfo = {
+            "sub": "tester",
+            "username": "tester",
+            "test": ["foobar", "foo", "bar"],
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+
+        # check that the auth handler got called as expected
+        auth_handler.complete_sso_login.assert_called_once_with(
+            "@tester:test", "oidc", ANY, ANY, None, new_user=True
+        )
+
+    @override_config(
+        {
+            "oidc_config": {
+                **DEFAULT_CONFIG,
+                "attribute_requirements": [{"attribute": "test", "value": "foobar"}],
+            }
+        }
+    )
+    def test_attribute_requirements_mismatch(self):
+        """
+        Test that auth fails if attributes exist but don't match,
+        or are non-string values.
+        """
+        auth_handler = self.hs.get_auth_handler()
+        auth_handler.complete_sso_login = simple_async_mock()
+        # userinfo with "test": "not_foobar" attribute should fail
+        userinfo = {
+            "sub": "tester",
+            "username": "tester",
+            "test": "not_foobar",
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+        auth_handler.complete_sso_login.assert_not_called()
+
+        # userinfo with "test": ["foo", "bar"] attribute should fail
+        userinfo = {
+            "sub": "tester",
+            "username": "tester",
+            "test": ["foo", "bar"],
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+        auth_handler.complete_sso_login.assert_not_called()
+
+        # userinfo with "test": False attribute should fail
+        # this is largely just to ensure we don't crash here
+        userinfo = {
+            "sub": "tester",
+            "username": "tester",
+            "test": False,
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+        auth_handler.complete_sso_login.assert_not_called()
+
+        # userinfo with "test": None attribute should fail
+        # a value of None breaks the OIDC spec, but it's important to not crash here
+        userinfo = {
+            "sub": "tester",
+            "username": "tester",
+            "test": None,
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+        auth_handler.complete_sso_login.assert_not_called()
+
+        # userinfo with "test": 1 attribute should fail
+        # this is largely just to ensure we don't crash here
+        userinfo = {
+            "sub": "tester",
+            "username": "tester",
+            "test": 1,
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+        auth_handler.complete_sso_login.assert_not_called()
+
+        # userinfo with "test": 3.14 attribute should fail
+        # this is largely just to ensure we don't crash here
+        userinfo = {
+            "sub": "tester",
+            "username": "tester",
+            "test": 3.14,
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+        auth_handler.complete_sso_login.assert_not_called()
+
     def _generate_oidc_session_token(
         self,
         state: str,
