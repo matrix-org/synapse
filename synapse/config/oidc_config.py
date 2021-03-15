@@ -199,6 +199,14 @@ class OIDCConfig(Config):
         #   userinfo by expanding the `scopes` section of the OIDC config to retrieve
         #   additional information from the OIDC provider.
         #
+        #   An important thing to note here, is that OIDC claims which exist in the userinfo
+        #   as a string will be strictly matched - the attribute matches only if the userinfo
+        #   value exactly matches the configured value in `attribute_requirements`.
+        #   However, if the claim exists in the userinfo as a list, the attribute matches
+        #   if the list contains the value configured in `attribute_requirements`.
+        #   i.e. `family_name` in the userinfo MUST be "Stephensson" in the example below
+        #   i.e. `groups` in the userinfo MUST contain "admin" in the example below
+        #
         #   attribute_requirements:
         #     - attribute: family_name
         #       value: "Stephensson"

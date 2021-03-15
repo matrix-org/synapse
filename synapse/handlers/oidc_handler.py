@@ -859,8 +859,12 @@ class OidcProvider:
 
         # Ensure that the attributes of the logged in user meet the required
         # attributes by checking the userinfo against attribute_requirements
+        # In order to deal with the fact that OIDC userinfo can contain many
+        # types of data, we wrap non-list values in lists.
         if not self._sso_handler.check_required_attributes(
-            request, userinfo, self._oidc_attribute_requirements
+            request,
+            {k: v if isinstance(v, list) else [v] for k, v in userinfo.items()},
+            self._oidc_attribute_requirements,
         ):
             return
 
