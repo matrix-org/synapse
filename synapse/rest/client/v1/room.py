@@ -38,6 +38,7 @@ from synapse.events.utils import format_event_for_client_v2
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
+    parse_boolean,
     parse_integer,
     parse_json_object_from_request,
     parse_string,
@@ -47,7 +48,14 @@ from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
-from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
+from synapse.types import (
+    Requester,
+    RoomAlias,
+    RoomID,
+    StreamToken,
+    ThirdPartyInstanceID,
+    UserID,
+)
 from synapse.util import json_decoder
 from synapse.util.stringutils import parse_and_validate_server_name, random_string
 
@@ -997,19 +1005,38 @@ class RoomSpaceSummaryRestServlet(RestServlet):
         self._auth = hs.get_auth()
         self._space_summary_handler = hs.get_space_summary_handler()
 
-    async def on_POST(self, request: Request, room_id: str):
+    async def on_GET(self, request: Request, room_id: str):
         requester = await self._auth.get_user_by_req(request, allow_guest=True)
 
-        # first of all, check that the user is in the room in question (or it's
-        # world-readable)
-        await self._auth.check_user_in_room_or_world_readable(
-            room_id, requester.user.to_string()
+        return 200, await self._space_summary_handler.get_space_summary(
+            requester.user.to_string(),
+            room_id,
+            suggested_only=parse_boolean(request, "suggested_only", default=False),
+            max_rooms_per_space=parse_integer(request, "max_rooms_per_space"),
         )
 
-        data = await self._space_summary_handler.get_space_summary(
-            requester.user.to_string(), room_id
+    async def on_POST(self, request: Request, room_id: str):
+        requester = await self._auth.get_user_by_req(request, allow_guest=True)
+        content = parse_json_object_from_request(request)
+
+        suggested_only = content.get("suggested_only", False)
+        if not isinstance(suggested_only, bool):
+            raise SynapseError(
+                400, "'suggested_only' must be a boolean", Codes.BAD_JSON
+            )
+
+        max_rooms_per_space = content.get("max_rooms_per_space")
+        if max_rooms_per_space is not None and not isinstance(max_rooms_per_space, int):
+            raise SynapseError(
+                400, "'max_rooms_per_space' must be an integer", Codes.BAD_JSON
+            )
+
+        return 200, await self._space_summary_handler.get_space_summary(
+            requester.user.to_string(),
+            room_id,
+            suggested_only=suggested_only,
+            max_rooms_per_space=max_rooms_per_space,
         )
-        return 200, data
 
 
 def register_servlets(hs: "synapse.server.HomeServer", http_server, is_worker=False):
