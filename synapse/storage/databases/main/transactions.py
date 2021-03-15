@@ -428,7 +428,8 @@ class TransactionStore(TransactionWorkerStore):
     ) -> List[str]:
         q = """
                 SELECT event_id FROM destination_rooms
-                 JOIN events USING (stream_ordering)
+                 INNER JOIN events USING (stream_ordering)
+                 INNER JOIN event_forward_extremities USING (event_id)
                 WHERE destination = ?
                   AND stream_ordering > ?
                 ORDER BY stream_ordering
