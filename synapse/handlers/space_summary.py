@@ -31,12 +31,10 @@ logger = logging.getLogger(__name__)
 
 # number of rooms to return. We'll stop once we hit this limit.
 # TODO: allow clients to reduce this with a request param.
-# TODO: increase it, probably. It's deliberately low to start with so that
-#    we can think about whether we need pagination.
-ROOMS_LIMIT = 5
+ROOMS_LIMIT = 50
 
 # max number of events to return per room.
-ROOMS_PER_SPACE_LIMIT = 5
+ROOMS_PER_SPACE_LIMIT = 50
 
 
 class SpaceSummaryHandler:
@@ -116,7 +114,7 @@ class SpaceSummaryHandler:
                 child_events = filter(_is_suggested_child_event, child_events)
 
             # if this is not the first room, and the client has specified a limit,
-            # apply it
+            # apply it (the client limit does not apply to the root room)
             if max_rooms_per_space is not None and len(processed_rooms) > 1:
                 max_rooms = min(ROOMS_PER_SPACE_LIMIT, max_rooms_per_space)
             else:
