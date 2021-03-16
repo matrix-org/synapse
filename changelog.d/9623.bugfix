@@ -1,0 +1,1 @@
+Fix Internal Server Error on `GET /_synapse/client/saml2/authn_response` request.
