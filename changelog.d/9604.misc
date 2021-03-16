@@ -1,0 +1,1 @@
+Remove unused `stats.retention` setting, and emit a warning if stats are disabled.
