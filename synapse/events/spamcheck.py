@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import inspect
+import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 from synapse.rest.media.v1._base import FileInfo
@@ -26,6 +27,8 @@ from synapse.util.async_helpers import maybe_awaitable
 if TYPE_CHECKING:
     import synapse.events
     import synapse.server
+
+logger = logging.getLogger(__name__)
 
 
 class SpamChecker:
@@ -212,21 +215,25 @@ class SpamChecker:
             # spam checker
             checker = getattr(spam_checker, "check_registration_for_spam", None)
             if checker:
-                checker_args = inspect.getfullargspec(checker)
                 # Provide auth_provider_id if the function supports it
-                if "auth_provider_id" in checker_args.args:
-                    behaviour = await maybe_awaitable(
-                        checker(
-                            email_threepid,
-                            username,
-                            request_info,
-                            auth_provider_id,
-                        )
+                checker_args = inspect.signature(checker)
+                if len(checker_args.parameters) == 4:
+                    d = checker(
+                        email_threepid,
+                        username,
+                        request_info,
+                        auth_provider_id,
                     )
+                elif len(checker_args.parameters) == 3:
+                    d = checker(email_threepid, username, request_info)
                 else:
-                    behaviour = await maybe_awaitable(
-                        checker(email_threepid, username, request_info)
+                    logger.error(
+                        "Invalid signature for %s.check_registration_for_spam. Denying registration",
+                        spam_checker.__module__,
                     )
+                    return RegistrationBehaviour.DENY
+
+                behaviour = await maybe_awaitable(d)
                 assert isinstance(behaviour, RegistrationBehaviour)
                 if behaviour != RegistrationBehaviour.ALLOW:
                     return behaviour
