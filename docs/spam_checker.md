@@ -69,7 +69,13 @@ class ExampleSpamChecker:
     async def check_username_for_spam(self, user_profile):
         return False  # allow all usernames
 
-    async def check_registration_for_spam(self, email_threepid, username, request_info):
+    async def check_registration_for_spam(
+        self,
+        email_threepid,
+        username,
+        request_info,
+        auth_provider_id,
+    ):
         return RegistrationBehaviour.ALLOW  # allow all registrations
 
     async def check_media_file_for_spam(self, file_wrapper, file_info):
