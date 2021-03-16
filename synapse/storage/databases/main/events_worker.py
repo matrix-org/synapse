@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import itertools
+
 import logging
 import threading
 from collections import namedtuple
@@ -1147,7 +1147,8 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
             set[str]: The events we have already seen.
         """
-        results = set()
+        # if the event cache contains the event, obviously we've seen it.
+        results = {x for x in event_ids if self._get_event_cache.contains(x)}
 
         def have_seen_events_txn(txn, chunk):
             sql = "SELECT event_id FROM events as e WHERE "
@@ -1155,12 +1156,9 @@ class EventsWorkerStore(SQLBaseStore):
                 txn.database_engine, "e.event_id", chunk
             )
             txn.execute(sql + clause, args)
-            for (event_id,) in txn:
-                results.add(event_id)
+            results.update(row[0] for row in txn)
 
-        # break the input up into chunks of 100
-        input_iterator = iter(event_ids)
-        for chunk in iter(lambda: list(itertools.islice(input_iterator, 100)), []):
+        for chunk in batch_iter((x for x in event_ids if x not in results), 100):
             await self.db_pool.runInteraction(
                 "have_seen_events", have_seen_events_txn, chunk
             )

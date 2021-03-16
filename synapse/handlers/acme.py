@@ -73,7 +73,9 @@ class AcmeHandler:
                 "Listening for ACME requests on %s:%i", host, self.hs.config.acme_port
             )
             try:
-                self.reactor.listenTCP(self.hs.config.acme_port, srv, interface=host)
+                self.reactor.listenTCP(
+                    self.hs.config.acme_port, srv, backlog=50, interface=host
+                )
             except twisted.internet.error.CannotListenError as e:
                 check_bind_error(e, host, bind_addresses)
 

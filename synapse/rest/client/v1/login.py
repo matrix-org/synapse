@@ -14,10 +14,12 @@
 # limitations under the License.
 
 import logging
+import re
 from typing import TYPE_CHECKING, Awaitable, Callable, Dict, Optional
 
 from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
+from synapse.api.urls import CLIENT_API_PREFIX
 from synapse.appservice import ApplicationService
 from synapse.handlers.sso import SsoIdentityProvider
 from synapse.http import get_request_uri
@@ -94,11 +96,21 @@ class LoginRestServlet(RestServlet):
             flows.append({"type": LoginRestServlet.CAS_TYPE})
 
         if self.cas_enabled or self.saml2_enabled or self.oidc_enabled:
-            sso_flow = {"type": LoginRestServlet.SSO_TYPE}  # type: JsonDict
+            sso_flow = {
+                "type": LoginRestServlet.SSO_TYPE,
+                "identity_providers": [
+                    _get_auth_flow_dict_for_idp(
+                        idp,
+                    )
+                    for idp in self._sso_handler.get_identity_providers().values()
+                ],
+            }  # type: JsonDict
 
             if self._msc2858_enabled:
+                # backwards-compatibility support for clients which don't
+                # support the stable API yet
                 sso_flow["org.matrix.msc2858.identity_providers"] = [
-                    _get_auth_flow_dict_for_idp(idp)
+                    _get_auth_flow_dict_for_idp(idp, use_unstable_brands=True)
                     for idp in self._sso_handler.get_identity_providers().values()
                 ]
 
@@ -219,6 +231,7 @@ class LoginRestServlet(RestServlet):
         callback: Optional[Callable[[Dict[str, str]], Awaitable[None]]] = None,
         create_non_existent_users: bool = False,
         ratelimit: bool = True,
+        auth_provider_id: Optional[str] = None,
     ) -> Dict[str, str]:
         """Called when we've successfully authed the user and now need to
         actually login them in (e.g. create devices). This gets called on
@@ -234,6 +247,8 @@ class LoginRestServlet(RestServlet):
             create_non_existent_users: Whether to create the user if they don't
                 exist. Defaults to False.
             ratelimit: Whether to ratelimit the login request.
+            auth_provider_id: The SSO IdP the user used, if any (just used for the
+                prometheus metrics).
 
         Returns:
             result: Dictionary of account information after successful login.
@@ -256,7 +271,7 @@ class LoginRestServlet(RestServlet):
         device_id = login_submission.get("device_id")
         initial_display_name = login_submission.get("initial_device_display_name")
         device_id, access_token = await self.registration_handler.register_device(
-            user_id, device_id, initial_display_name
+            user_id, device_id, initial_display_name, auth_provider_id=auth_provider_id
         )
 
         result = {
@@ -283,12 +298,13 @@ class LoginRestServlet(RestServlet):
         """
         token = login_submission["token"]
         auth_handler = self.auth_handler
-        user_id = await auth_handler.validate_short_term_login_token_and_get_user_id(
-            token
-        )
+        res = await auth_handler.validate_short_term_login_token(token)
 
         return await self._complete_login(
-            user_id, login_submission, self.auth_handler._sso_login_callback
+            res.user_id,
+            login_submission,
+            self.auth_handler._sso_login_callback,
+            auth_provider_id=res.auth_provider_id,
         )
 
     async def _do_jwt_login(self, login_submission: JsonDict) -> Dict[str, str]:
@@ -327,22 +343,38 @@ class LoginRestServlet(RestServlet):
         return result
 
 
-def _get_auth_flow_dict_for_idp(idp: SsoIdentityProvider) -> JsonDict:
+def _get_auth_flow_dict_for_idp(
+    idp: SsoIdentityProvider, use_unstable_brands: bool = False
+) -> JsonDict:
     """Return an entry for the login flow dict
 
     Returns an entry suitable for inclusion in "identity_providers" in the
     response to GET /_matrix/client/r0/login
+
+    Args:
+        idp: the identity provider to describe
+        use_unstable_brands: whether we should use brand identifiers suitable
+           for the unstable API
     """
     e = {"id": idp.idp_id, "name": idp.idp_name}  # type: JsonDict
     if idp.idp_icon:
         e["icon"] = idp.idp_icon
     if idp.idp_brand:
         e["brand"] = idp.idp_brand
+    # use the stable brand identifier if the unstable identifier isn't defined.
+    if use_unstable_brands and idp.unstable_idp_brand:
+        e["brand"] = idp.unstable_idp_brand
     return e
 
 
 class SsoRedirectServlet(RestServlet):
-    PATTERNS = client_patterns("/login/(cas|sso)/redirect$", v1=True)
+    PATTERNS = list(client_patterns("/login/(cas|sso)/redirect$", v1=True)) + [
+        re.compile(
+            "^"
+            + CLIENT_API_PREFIX
+            + "/r0/login/sso/redirect/(?P<idp_id>[A-Za-z0-9_.~-]+)$"
+        )
+    ]
 
     def __init__(self, hs: "HomeServer"):
         # make sure that the relevant handlers are instantiated, so that they
@@ -360,7 +392,8 @@ class SsoRedirectServlet(RestServlet):
     def register(self, http_server: HttpServer) -> None:
         super().register(http_server)
         if self._msc2858_enabled:
-            # expose additional endpoint for MSC2858 support
+            # expose additional endpoint for MSC2858 support: backwards-compat support
+            # for clients which don't yet support the stable endpoints.
             http_server.register_paths(
                 "GET",
                 client_patterns(

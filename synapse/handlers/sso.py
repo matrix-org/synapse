@@ -98,6 +98,11 @@ class SsoIdentityProvider(Protocol):
         """Optional branding identifier"""
         return None
 
+    @property
+    def unstable_idp_brand(self) -> Optional[str]:
+        """Optional brand identifier for the unstable API (see MSC2858)."""
+        return None
+
     @abc.abstractmethod
     async def handle_redirect_request(
         self,
@@ -456,6 +461,7 @@ class SsoHandler:
 
         await self._auth_handler.complete_sso_login(
             user_id,
+            auth_provider_id,
             request,
             client_redirect_url,
             extra_login_attributes,
@@ -605,6 +611,7 @@ class SsoHandler:
             default_display_name=attributes.display_name,
             bind_emails=attributes.emails,
             user_agent_ips=[(user_agent, ip_address)],
+            auth_provider_id=auth_provider_id,
         )
 
         await self._store.record_user_external_id(
@@ -886,6 +893,7 @@ class SsoHandler:
 
         await self._auth_handler.complete_sso_login(
             user_id,
+            session.auth_provider_id,
             request,
             session.client_redirect_url,
             session.extra_login_attributes,

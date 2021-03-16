@@ -18,7 +18,7 @@ import logging
 import re
 import urllib
 from inspect import signature
-from typing import Dict, List, Tuple
+from typing import TYPE_CHECKING, Dict, List, Tuple
 
 from prometheus_client import Counter, Gauge
 
@@ -27,6 +27,9 @@ from synapse.http import RequestTimedOutError
 from synapse.logging.opentracing import inject_active_span_byte_dict, trace
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import random_string
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -88,10 +91,10 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
     CACHE = True
     RETRY_ON_TIMEOUT = True
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         if self.CACHE:
             self.response_cache = ResponseCache(
-                hs, "repl." + self.NAME, timeout_ms=30 * 60 * 1000
+                hs.get_clock(), "repl." + self.NAME, timeout_ms=30 * 60 * 1000
             )  # type: ResponseCache[str]
 
         # We reserve `instance_name` as a parameter to sending requests, so we

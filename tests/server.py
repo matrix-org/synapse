@@ -16,6 +16,7 @@ from twisted.internet.interfaces import (
     IReactorPluggableNameResolver,
     IReactorTCP,
     IResolverSimple,
+    ITransport,
 )
 from twisted.python.failure import Failure
 from twisted.test.proto_helpers import AccumulatingProtocol, MemoryReactorClock
@@ -188,7 +189,7 @@ class FakeSite:
 
 def make_request(
     reactor,
-    site: Site,
+    site: Union[Site, FakeSite],
     method,
     path,
     content=b"",
@@ -467,6 +468,7 @@ def get_clock():
     return clock, hs_clock
 
 
+@implementer(ITransport)
 @attr.s(cmp=False)
 class FakeTransport:
     """
