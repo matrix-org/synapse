@@ -1738,6 +1738,13 @@ saml2_config:
   #  - attribute: department
   #    value: "sales"
 
+  # It is possible to disable creation of new users through SAML logins, meaning
+  # that only existing matrix users on this homeserver are allowed to login through
+  # SAML. By setting `allow_new_users` to False, no new users will be generated.
+  # Defaults to True.
+  #
+  # allow_new_users: True
+
   # If the metadata XML contains multiple IdP entities then the `idp_entityid`
   # option must be set to the entity to redirect users to.
   #
@@ -1834,6 +1841,10 @@ saml2_config:
 #       match a pre-existing account instead of failing. This could be used if
 #       switching from password logins to OIDC. Defaults to false.
 #
+#   allow_new_users: set to 'false' to disable new user creation through SSO login
+#       This means SSO logins are only possible for existing matrix users, through
+#       the above `allow_existing_users` setting. Default to true.
+#
 #   user_mapping_provider: Configuration for how attributes returned from a OIDC
 #       provider are mapped onto a matrix user. This setting has the following
 #       sub-properties:
@@ -1873,27 +1884,6 @@ saml2_config:
 #           which is set to the claims returned by the UserInfo Endpoint and/or
 #           in the ID Token.
 #
-#   It is possible to configure Synapse to only allow logins if certain attributes
-#   match particular values in the OIDC userinfo. The requirements can be listed under
-#   `attribute_requirements` as shown below. All of the listed attributes must
-#   match for the login to be permitted. Additional attributes can be added to
-#   userinfo by expanding the `scopes` section of the OIDC config to retrieve
-#   additional information from the OIDC provider.
-#
-#   An important thing to note here, is that OIDC claims which exist in the userinfo
-#   as a string will be strictly matched - the attribute matches only if the userinfo
-#   value exactly matches the configured value in `attribute_requirements`.
-#   However, if the claim exists in the userinfo as a list, the attribute matches
-#   if the list contains the value configured in `attribute_requirements`.
-#   i.e. `family_name` in the userinfo MUST be "Stephensson" in the example below
-#   i.e. `groups` in the userinfo MUST contain "admin" in the example below
-#
-#   attribute_requirements:
-#     - attribute: family_name
-#       value: "Stephensson"
-#     - attribute: groups
-#       value: "admin"
-#
 # See https://github.com/matrix-org/synapse/blob/master/docs/openid.md
 # for information on how to configure these options.
 #
@@ -1926,9 +1916,6 @@ oidc_providers:
   #      localpart_template: "{{ user.login }}"
   #      display_name_template: "{{ user.name }}"
   #      email_template: "{{ user.email }}"
-  #  attribute_requirements:
-  #    - attribute: userGroup
-  #      value: "synapseUsers"
 
   # For use with Keycloak
   #
@@ -1938,9 +1925,6 @@ oidc_providers:
   #  client_id: "synapse"
   #  client_secret: "copy secret generated in Keycloak UI"
   #  scopes: ["openid", "profile"]
-  #  attribute_requirements:
-  #    - attribute: groups
-  #      value: "admin"
 
   # For use with Github
   #
@@ -1989,6 +1973,13 @@ cas_config:
   #required_attributes:
   #  userGroup: "staff"
   #  department: None
+
+  # It is possible to disable creation of new users through CAS login, meaning
+  # that only existing matrix users on this homeserver are allowed to login through
+  # CAS. By setting `allow_new_users` to False, no new users will be generated.
+  # Defaults to True.
+  #
+  # allow_new_users: True
 
 
 # Additional settings to use with single-sign on systems such as OpenID Connect,
