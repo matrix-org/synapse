@@ -190,6 +190,7 @@ class SpamChecker:
         email_threepid: Optional[dict],
         username: Optional[str],
         request_info: Collection[Tuple[str, str]],
+        auth_provider_id: Optional[str] = None,
     ) -> RegistrationBehaviour:
         """Checks if we should allow the given registration request.
 
@@ -198,6 +199,9 @@ class SpamChecker:
             username: The request user name, if any
             request_info: List of tuples of user agent and IP that
                 were used during the registration process.
+            auth_provider_id: The SSO IdP the user used, e.g "oidc", "saml",
+                "cas". If any. Note this does not include users registered
+                via a password provider.
 
         Returns:
             Enum for how the request should be handled
@@ -209,7 +213,12 @@ class SpamChecker:
             checker = getattr(spam_checker, "check_registration_for_spam", None)
             if checker:
                 behaviour = await maybe_awaitable(
-                    checker(email_threepid, username, request_info)
+                    checker(
+                        email_threepid,
+                        username,
+                        request_info,
+                        auth_provider_id=auth_provider_id,
+                    )
                 )
                 assert isinstance(behaviour, RegistrationBehaviour)
                 if behaviour != RegistrationBehaviour.ALLOW:
