@@ -929,7 +929,7 @@ class DeviceListUpdater:
             ignore_devices = True
         else:
             cached_devices = await self.store.get_cached_devices_for_user(user_id)
-            if cached_devices == {d["device_id"]:d for d in devices}:
+            if cached_devices == {d["device_id"]: d for d in devices}:
                 devices = []
                 ignore_devices = True
 
@@ -942,7 +942,9 @@ class DeviceListUpdater:
             )
 
         if not ignore_devices:
-            await self.store.update_remote_device_list_cache(user_id, devices, stream_id)
+            await self.store.update_remote_device_list_cache(
+                user_id, devices, stream_id
+            )
         device_ids = [device["device_id"] for device in devices]
 
         # Handle cross-signing keys.
