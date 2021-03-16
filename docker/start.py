@@ -214,12 +214,12 @@ def main(args, environ):
     if "-m" not in args:
         args = ["-m", synapse_worker] + args
 
-    jemallocpath = f"/usr/lib/{platform.machine()}-linux-gnu/libjemalloc.so.2"
+    jemallocpath = "/usr/lib/%s-linux-gnu/libjemalloc.so.2" % (platform.machine(),)
 
     if os.path.isfile(jemallocpath):
         environ["LD_PRELOAD"] = jemallocpath
     else:
-        log(f"Could not find {jemallocpath}, will not use")
+        log("Could not find %s, will not use" % (jemallocpath,))
 
     # if there are no config files passed to synapse, try adding the default file
     if not any(p.startswith("--config-path") or p.startswith("-c") for p in args):
