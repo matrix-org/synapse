@@ -42,7 +42,9 @@ class OIDCConfig(Config):
         try:
             check_requirements("oidc")
         except DependencyException as e:
-            raise ConfigError(e.message) from e
+            raise ConfigError(
+                e.message  # noqa: B306, DependencyException.message is a property
+            ) from e
 
         # check we don't have any duplicate idp_ids now. (The SSO handler will also
         # check for duplicates when the REST listeners get registered, but that happens
