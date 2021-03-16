@@ -212,14 +212,21 @@ class SpamChecker:
             # spam checker
             checker = getattr(spam_checker, "check_registration_for_spam", None)
             if checker:
-                behaviour = await maybe_awaitable(
-                    checker(
-                        email_threepid,
-                        username,
-                        request_info,
-                        auth_provider_id=auth_provider_id,
+                checker_args = inspect.getfullargspec(checker)
+                # Provide auth_provider_id if the function supports it
+                if "auth_provider_id" in checker_args.args:
+                    behaviour = await maybe_awaitable(
+                        checker(
+                            email_threepid,
+                            username,
+                            request_info,
+                            auth_provider_id,
+                        )
                     )
-                )
+                else:
+                    behaviour = await maybe_awaitable(
+                        checker(email_threepid, username, request_info)
+                    )
                 assert isinstance(behaviour, RegistrationBehaviour)
                 if behaviour != RegistrationBehaviour.ALLOW:
                     return behaviour
