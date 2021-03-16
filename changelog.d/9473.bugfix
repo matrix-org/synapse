@@ -1,1 +1,0 @@
-Fix long-standing bug when generating thumbnails for some images with transparency: `TypeError: cannot unpack non-iterable int object`.
