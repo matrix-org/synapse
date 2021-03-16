@@ -34,7 +34,7 @@ Bugfixes
 Updates to the Docker image
 ---------------------------
 
-- Use jemalloc if available in docker. ([\#8553](https://github.com/matrix-org/synapse/issues/8553))
+- Make use of an improved malloc implementation (`jemalloc`) in the docker image. ([\#8553](https://github.com/matrix-org/synapse/issues/8553))
 
 
 Improved Documentation
