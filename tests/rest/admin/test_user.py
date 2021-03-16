@@ -1003,12 +1003,23 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
+        self.auth_handler = hs.get_auth_handler()
 
+        # create users and get access tokens
+        # regardless of whether password login or SSO is allowed
         self.admin_user = self.register_user("admin", "pass", admin=True)
-        self.admin_user_tok = self.login("admin", "pass")
+        self.admin_user_tok = self.get_success(
+            self.auth_handler.get_access_token_for_user_id(
+                self.admin_user, device_id=None, valid_until_ms=None
+            )
+        )
 
         self.other_user = self.register_user("user", "pass", displayname="User")
-        self.other_user_token = self.login("user", "pass")
+        self.other_user_token = self.get_success(
+            self.auth_handler.get_access_token_for_user_id(
+                self.other_user, device_id=None, valid_until_ms=None
+            )
+        )
         self.url_other_user = "/_synapse/admin/v2/users/%s" % urllib.parse.quote(
             self.other_user
         )
@@ -1081,7 +1092,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("Bob's name", channel.json_body["displayname"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
-        self.assertEqual(True, channel.json_body["admin"])
+        self.assertTrue(channel.json_body["admin"])
         self.assertEqual("mxc://fibble/wibble", channel.json_body["avatar_url"])
 
         # Get user
@@ -1096,9 +1107,9 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("Bob's name", channel.json_body["displayname"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
-        self.assertEqual(True, channel.json_body["admin"])
-        self.assertEqual(False, channel.json_body["is_guest"])
-        self.assertEqual(False, channel.json_body["deactivated"])
+        self.assertTrue(channel.json_body["admin"])
+        self.assertFalse(channel.json_body["is_guest"])
+        self.assertFalse(channel.json_body["deactivated"])
         self.assertEqual("mxc://fibble/wibble", channel.json_body["avatar_url"])
 
     def test_create_user(self):
@@ -1130,7 +1141,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("Bob's name", channel.json_body["displayname"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
-        self.assertEqual(False, channel.json_body["admin"])
+        self.assertFalse(channel.json_body["admin"])
         self.assertEqual("mxc://fibble/wibble", channel.json_body["avatar_url"])
 
         # Get user
@@ -1145,10 +1156,10 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("Bob's name", channel.json_body["displayname"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
-        self.assertEqual(False, channel.json_body["admin"])
-        self.assertEqual(False, channel.json_body["is_guest"])
-        self.assertEqual(False, channel.json_body["deactivated"])
-        self.assertEqual(False, channel.json_body["shadow_banned"])
+        self.assertFalse(channel.json_body["admin"])
+        self.assertFalse(channel.json_body["is_guest"])
+        self.assertFalse(channel.json_body["deactivated"])
+        self.assertFalse(channel.json_body["shadow_banned"])
         self.assertEqual("mxc://fibble/wibble", channel.json_body["avatar_url"])
 
     @override_config(
@@ -1197,7 +1208,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@bob:test", channel.json_body["name"])
-        self.assertEqual(False, channel.json_body["admin"])
+        self.assertFalse(channel.json_body["admin"])
 
     @override_config(
         {"limit_usage_by_mau": True, "max_mau_value": 2, "mau_trial_days": 0}
@@ -1237,7 +1248,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         # Admin user is not blocked by mau anymore
         self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@bob:test", channel.json_body["name"])
-        self.assertEqual(False, channel.json_body["admin"])
+        self.assertFalse(channel.json_body["admin"])
 
     @override_config(
         {
@@ -1429,7 +1440,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@user:test", channel.json_body["name"])
-        self.assertEqual(False, channel.json_body["deactivated"])
+        self.assertFalse(channel.json_body["deactivated"])
         self.assertEqual("foo@bar.com", channel.json_body["threepids"][0]["address"])
         self.assertEqual("mxc://servername/mediaid", channel.json_body["avatar_url"])
         self.assertEqual("User", channel.json_body["displayname"])
@@ -1446,7 +1457,8 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@user:test", channel.json_body["name"])
-        self.assertEqual(True, channel.json_body["deactivated"])
+        self.assertTrue(channel.json_body["deactivated"])
+        self.assertIsNone(channel.json_body["password_hash"])
         self.assertEqual(0, len(channel.json_body["threepids"]))
         self.assertEqual("mxc://servername/mediaid", channel.json_body["avatar_url"])
         self.assertEqual("User", channel.json_body["displayname"])
@@ -1461,7 +1473,8 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@user:test", channel.json_body["name"])
-        self.assertEqual(True, channel.json_body["deactivated"])
+        self.assertTrue(channel.json_body["deactivated"])
+        self.assertIsNone(channel.json_body["password_hash"])
         self.assertEqual(0, len(channel.json_body["threepids"]))
         self.assertEqual("mxc://servername/mediaid", channel.json_body["avatar_url"])
         self.assertEqual("User", channel.json_body["displayname"])
@@ -1489,11 +1502,11 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@user:test", channel.json_body["name"])
-        self.assertEqual(True, channel.json_body["deactivated"])
+        self.assertTrue(channel.json_body["deactivated"])
 
         # is not in user directory
         profile = self.get_success(self.store.get_user_in_directory(self.other_user))
-        self.assertTrue(profile is None)
+        self.assertIsNone(profile)
 
         # Set new displayname user
         body = json.dumps({"displayname": "Foobar"})
@@ -1507,12 +1520,12 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@user:test", channel.json_body["name"])
-        self.assertEqual(True, channel.json_body["deactivated"])
+        self.assertTrue(channel.json_body["deactivated"])
         self.assertEqual("Foobar", channel.json_body["displayname"])
 
         # is not in user directory
         profile = self.get_success(self.store.get_user_in_directory(self.other_user))
-        self.assertTrue(profile is None)
+        self.assertIsNone(profile)
 
     def test_reactivate_user(self):
         """
@@ -1520,17 +1533,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
 
         # Deactivate the user.
-        channel = self.make_request(
-            "PUT",
-            self.url_other_user,
-            access_token=self.admin_user_tok,
-            content=json.dumps({"deactivated": True}).encode(encoding="utf_8"),
-        )
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self._is_erased("@user:test", False)
-        d = self.store.mark_user_erased("@user:test")
-        self.assertIsNone(self.get_success(d))
-        self._is_erased("@user:test", True)
+        self._deactivate_user("@user:test")
 
         # Attempt to reactivate the user (without a password).
         channel = self.make_request(
@@ -1551,17 +1554,77 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             ),
         )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertFalse(channel.json_body["deactivated"])
+        self.assertIsNotNone(channel.json_body["password_hash"])
+        self._is_erased("@user:test", False)
 
-        # Get user
+    @override_config({"password_config": {"localdb_enabled": False}})
+    def test_reactivate_user_localdb_disabled(self):
+        """
+        Test reactivating another user when using SSO/SAML
+        """
+
+        # Deactivate the user.
+        self._deactivate_user("@user:test")
+
+        # Reactivate the user with a password
         channel = self.make_request(
-            "GET",
+            "PUT",
             self.url_other_user,
             access_token=self.admin_user_tok,
+            content=json.dumps({"deactivated": False, "password": "foo"}).encode(
+                encoding="utf_8"
+            ),
         )
+        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
+        # Reactivate the user without a password.
+        channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content=json.dumps({"deactivated": False}).encode(encoding="utf_8"),
+        )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@user:test", channel.json_body["name"])
-        self.assertEqual(False, channel.json_body["deactivated"])
+        self.assertFalse(channel.json_body["deactivated"])
+        self.assertIsNone(channel.json_body["password_hash"])
+        self._is_erased("@user:test", False)
+
+    @override_config({"password_config": {"enabled": False}})
+    def test_reactivate_user_password_disabled(self):
+        """
+        Test reactivating another user when using SSO/SAML
+        """
+
+        # Deactivate the user.
+        self._deactivate_user("@user:test")
+
+        # Reactivate the user with a password
+        channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content=json.dumps({"deactivated": False, "password": "foo"}).encode(
+                encoding="utf_8"
+            ),
+        )
+        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
+        # Reactivate the user without a password.
+        channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content=json.dumps({"deactivated": False}).encode(encoding="utf_8"),
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertFalse(channel.json_body["deactivated"])
+        self.assertIsNone(channel.json_body["password_hash"])
         self._is_erased("@user:test", False)
 
     def test_set_user_as_admin(self):
@@ -1581,7 +1644,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@user:test", channel.json_body["name"])
-        self.assertEqual(True, channel.json_body["admin"])
+        self.assertTrue(channel.json_body["admin"])
 
         # Get user
         channel = self.make_request(
@@ -1592,7 +1655,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@user:test", channel.json_body["name"])
-        self.assertEqual(True, channel.json_body["admin"])
+        self.assertTrue(channel.json_body["admin"])
 
     def test_accidental_deactivation_prevention(self):
         """
@@ -1653,13 +1716,31 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         # Ensure they're still alive
         self.assertEqual(0, channel.json_body["deactivated"])
 
-    def _is_erased(self, user_id, expect):
+    def _is_erased(self, user_id: str, expect: bool) -> None:
         """Assert that the user is erased or not"""
         d = self.store.is_user_erased(user_id)
         if expect:
             self.assertTrue(self.get_success(d))
         else:
             self.assertFalse(self.get_success(d))
+
+    def _deactivate_user(self, user_id: str) -> None:
+        """Deactivate user and set as erased"""
+
+        # Deactivate the user.
+        channel = self.make_request(
+            "PUT",
+            "/_synapse/admin/v2/users/%s" % urllib.parse.quote(user_id),
+            access_token=self.admin_user_tok,
+            content=json.dumps({"deactivated": True}).encode(encoding="utf_8"),
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertTrue(channel.json_body["deactivated"])
+        self.assertIsNone(channel.json_body["password_hash"])
+        self._is_erased(user_id, False)
+        d = self.store.mark_user_erased(user_id)
+        self.assertIsNone(self.get_success(d))
+        self._is_erased(user_id, True)
 
 
 class UserMembershipRestTestCase(unittest.HomeserverTestCase):
