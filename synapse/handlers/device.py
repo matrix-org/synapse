@@ -973,14 +973,17 @@ class DeviceListUpdater:
         """
         device_ids = []
 
-        if master_key:
+        current_keys = await self.store.get_e2e_cross_signing_keys_bulk([user_id])
+        current_keys = current_keys.get(user_id)
+
+        if master_key and master_key != current_keys.get("master"):
             await self.store.set_e2e_cross_signing_key(user_id, "master", master_key)
             _, verify_key = get_verify_key_from_cross_signing_key(master_key)
             # verify_key is a VerifyKey from signedjson, which uses
             # .version to denote the portion of the key ID after the
             # algorithm and colon, which is the device ID
             device_ids.append(verify_key.version)
-        if self_signing_key:
+        if self_signing_key and self_signing_key != current_keys.get("self_signing"):
             await self.store.set_e2e_cross_signing_key(
                 user_id, "self_signing", self_signing_key
             )
