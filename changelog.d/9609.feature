@@ -1,1 +1,1 @@
-Added SsoAttributeRequirements to OpenID Connect-based SSO providers. Contributed by Hubbe King.
+Logins using OpenID Connect can require attributes on the `userinfo` response in order to login. Contributed by Hubbe King.
