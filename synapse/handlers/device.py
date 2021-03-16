@@ -973,8 +973,8 @@ class DeviceListUpdater:
         """
         device_ids = []
 
-        current_keys = await self.store.get_e2e_cross_signing_keys_bulk([user_id])
-        current_keys = current_keys.get(user_id)
+        current_keys_map = await self.store.get_e2e_cross_signing_keys_bulk([user_id])
+        current_keys = current_keys_map.get(user_id) or {}
 
         if master_key and master_key != current_keys.get("master"):
             await self.store.set_e2e_cross_signing_key(user_id, "master", master_key)
