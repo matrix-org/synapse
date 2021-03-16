@@ -1,0 +1,1 @@
+Increase the threshold before which outbound federation to a server goes into "catch up" mode, which is expensive for the remote server to handle.

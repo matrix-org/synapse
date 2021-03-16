@@ -337,7 +337,8 @@ class AuthHandler(BaseHandler):
                 user is too high to proceed
 
         """
-
+        if not requester.access_token_id:
+            raise ValueError("Cannot validate a user without an access token")
         if self._ui_auth_session_timeout:
             last_validated = await self.store.get_access_token_last_validated(
                 requester.access_token_id
@@ -1213,7 +1214,7 @@ class AuthHandler(BaseHandler):
     async def delete_access_tokens_for_user(
         self,
         user_id: str,
-        except_token_id: Optional[str] = None,
+        except_token_id: Optional[int] = None,
         device_id: Optional[str] = None,
     ):
         """Invalidate access tokens belonging to a user

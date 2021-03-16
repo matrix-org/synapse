@@ -351,11 +351,9 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_http_client_context_factory(self) -> IPolicyForHTTPS:
-        return (
-            InsecureInterceptableContextFactory()
-            if self.config.use_insecure_ssl_client_just_for_testing_do_not_use
-            else RegularPolicyForHTTPS()
-        )
+        if self.config.use_insecure_ssl_client_just_for_testing_do_not_use:
+            return InsecureInterceptableContextFactory()
+        return RegularPolicyForHTTPS()
 
     @cache_in_self
     def get_simple_http_client(self) -> SimpleHttpClient:

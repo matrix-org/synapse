@@ -1,0 +1,1 @@
+Purge chain cover indexes for events that were purged prior to Synapse v1.29.0.
