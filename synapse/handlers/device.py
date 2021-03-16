@@ -907,6 +907,7 @@ class DeviceListUpdater:
         master_key = result.get("master_key")
         self_signing_key = result.get("self_signing_key")
 
+        ignore_devices = False
         # If the remote server has more than ~1000 devices for this user
         # we assume that something is going horribly wrong (e.g. a bot
         # that logs in and creates a new device every time it tries to
@@ -925,6 +926,12 @@ class DeviceListUpdater:
                 len(devices),
             )
             devices = []
+            ignore_devices = True
+        else:
+            cached_devices = await self.store.get_cached_devices_for_user(user_id)
+            if cached_devices == {d["device_id"]:d for d in devices}:
+                devices = []
+                ignore_devices = True
 
         for device in devices:
             logger.debug(
@@ -934,7 +941,8 @@ class DeviceListUpdater:
                 stream_id,
             )
 
-        await self.store.update_remote_device_list_cache(user_id, devices, stream_id)
+        if not ignore_devices:
+            await self.store.update_remote_device_list_cache(user_id, devices, stream_id)
         device_ids = [device["device_id"] for device in devices]
 
         # Handle cross-signing keys.
@@ -945,7 +953,8 @@ class DeviceListUpdater:
         )
         device_ids = device_ids + cross_signing_device_ids
 
-        await self.device_handler.notify_device_update(user_id, device_ids)
+        if device_ids:
+            await self.device_handler.notify_device_update(user_id, device_ids)
 
         # We clobber the seen updates since we've re-synced from a given
         # point.
