@@ -417,9 +417,18 @@ class HomeServer(metaclass=abc.ABCMeta):
         return PresenceHandler(self)
 
     @cache_in_self
-    def get_typing_handler(self):
+    def get_typing_writer_handler(self) -> TypingWriterHandler:
         if self.config.worker.writers.typing == self.get_instance_name():
             return TypingWriterHandler(self)
+        else:
+            raise Exception("Workers cannot write typing")
+
+    @cache_in_self
+    def get_typing_handler(self) -> FollowerTypingHandler:
+        if self.config.worker.writers.typing == self.get_instance_name():
+            # Use get_typing_writer_handler to ensure that we use the same
+            # cached version.
+            return self.get_typing_writer_handler()
         else:
             return FollowerTypingHandler(self)
 
