@@ -32,6 +32,7 @@ from twisted.python.threadpool import ThreadPool
 from twisted.trial import unittest
 from twisted.web.resource import Resource
 
+from synapse import events
 from synapse.api.constants import EventTypes, Membership
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.ratelimiting import FederationRateLimitConfig
@@ -229,6 +230,11 @@ class HomeserverTestCase(TestCase):
         self._hs_args = {"clock": self.clock, "reactor": self.reactor}
         self.hs = self.make_homeserver(self.reactor, self.clock)
 
+        # Honour the `use_frozen_dicts` config option. We have to do this
+        # manually because this is taken care of in the app `start` code, which
+        # we don't run. Plus we want to reset it on tearDown.
+        events.USE_FROZEN_DICTS = self.hs.config.use_frozen_dicts
+
         if self.hs is None:
             raise Exception("No homeserver returned from make_homeserver.")
 
@@ -291,6 +297,10 @@ class HomeserverTestCase(TestCase):
 
         if hasattr(self, "prepare"):
             self.prepare(self.reactor, self.clock, self.hs)
+
+    def tearDown(self):
+        # Reset to not use frozen dicts.
+        events.USE_FROZEN_DICTS = False
 
     def wait_on_thread(self, deferred, timeout=10):
         """
