@@ -1,2 +1,1 @@
-Only save remote cross-signing and device keys if they're different from the
-current ones.
+Only save remote cross-signing and device keys if they're different from the current ones.
