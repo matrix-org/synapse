@@ -54,6 +54,8 @@ def prune_event(event: EventBase) -> EventBase:
         event.internal_metadata.stream_ordering
     )
 
+    pruned_event.internal_metadata.outlier = event.internal_metadata.outlier
+
     # Mark the event as redacted
     pruned_event.internal_metadata.redacted = True
 
