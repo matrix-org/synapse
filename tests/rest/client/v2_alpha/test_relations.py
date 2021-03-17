@@ -17,7 +17,6 @@ import itertools
 import json
 import urllib
 
-from synapse import events
 from synapse.api.constants import EventTypes, RelationTypes
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
@@ -37,13 +36,14 @@ class RelationsTestCase(unittest.HomeserverTestCase):
     hijack_auth = False
 
     def make_homeserver(self, reactor, clock):
-        # We enable frozen dicts as relations/edits change event contents, so we
-        # want to test that we don't modify the events in the caches.
-        events.USE_FROZEN_DICTS = True
-
         # We need to enable msc1849 support for aggregations
         config = self.default_config()
         config["experimental_msc1849_support_enabled"] = True
+
+        # We enable frozen dicts as relations/edits change event contents, so we
+        # want to test that we don't modify the events in the caches.
+        config["use_frozen_dicts"] = True
+
         return self.setup_test_homeserver(config=config)
 
     def prepare(self, reactor, clock, hs):
