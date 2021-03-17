@@ -26,6 +26,14 @@ from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import JsonDict
 from synapse.util.caches.expiringcache import ExpiringCache
 
+try:
+    from psycopg2.errors import SerializationFailure
+except ImportError:
+    # No postgres, no harm in making it a dummy class.
+    class SerializationFailure(Exception):
+        ...
+
+
 db_binary_type = memoryview
 
 logger = logging.getLogger(__name__)
@@ -312,13 +320,26 @@ class TransactionStore(TransactionWorkerStore):
             stream_ordering: the stream_ordering of the event
         """
 
-        return await self.db_pool.runInteraction(
-            "store_destination_rooms_entries",
-            self._store_destination_rooms_entries_txn,
-            destinations,
-            room_id,
-            stream_ordering,
-        )
+        while True:
+            try:
+                return await self.db_pool.runInteraction(
+                    "store_destination_rooms_entries",
+                    self._store_destination_rooms_entries_txn,
+                    destinations,
+                    room_id,
+                    stream_ordering,
+                )
+            except SerializationFailure as e:
+                logger.debug(
+                    "Could not finish _store_destination_rooms_entries_txn due to SerializationFailure, retrying...",
+                    exc_info=e,
+                )
+
+                # This is fine, as SerializationFailure cannot be caused by anything else than postgres rolling back
+                # the transaction because another transaction (concurrently) has updated the view of the table,
+                # there "can be only one" transaction that wins, in that regard, and so we try again (because the other
+                # transaction has succeeded).
+                continue
 
     def _store_destination_rooms_entries_txn(
         self,

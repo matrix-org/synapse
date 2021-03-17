@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, Hashable, Iterable, List, Optional, Set, Tuple
+from typing import Dict, Hashable, Iterable, List, Optional, Sequence, Set, Tuple
 
 from prometheus_client import Counter
 
@@ -189,7 +189,9 @@ class FederationSender:
                 if not events and next_token >= self._last_poked_id:
                     break
 
-                async def handle_event(event: EventBase) -> None:
+                async def handle_event(
+                    event: EventBase, flush_destination_rooms: bool = True
+                ) -> None:
                     # Only send events for this server.
                     send_on_behalf_of = event.internal_metadata.get_send_on_behalf_of()
                     is_mine = self.is_mine_id(event.sender)
@@ -251,7 +253,9 @@ class FederationSender:
                     logger.debug("Sending %s to %r", event, destinations)
 
                     if destinations:
-                        await self._send_pdu(event, destinations)
+                        await self._send_pdu(
+                            event, destinations, flush_destination_rooms
+                        )
 
                         now = self.clock.time_msec()
                         ts = await self.store.get_received_ts(event.event_id)
@@ -260,10 +264,11 @@ class FederationSender:
                             "federation_sender"
                         ).observe((now - ts) / 1000)
 
-                async def handle_room_events(events: Iterable[EventBase]) -> None:
+                async def handle_room_events(events: Sequence[EventBase]) -> None:
                     with Measure(self.clock, "handle_room_events"):
-                        for event in events:
-                            await handle_event(event)
+                        evs_len = len(events)
+                        for pos, event in enumerate(events, start=1):
+                            await handle_event(event, pos == evs_len)
 
                 events_by_room = {}  # type: Dict[str, List[EventBase]]
                 for event in events:
@@ -307,7 +312,12 @@ class FederationSender:
         finally:
             self._is_processing = False
 
-    async def _send_pdu(self, pdu: EventBase, destinations: Iterable[str]) -> None:
+    async def _send_pdu(
+        self,
+        pdu: EventBase,
+        destinations: Iterable[str],
+        flush_destination_rooms: bool = True,
+    ) -> None:
         # We loop through all destinations to see whether we already have
         # a transaction in progress. If we do, stick it in the pending_pdus
         # table and we'll get back to it later.
@@ -324,14 +334,15 @@ class FederationSender:
 
         assert pdu.internal_metadata.stream_ordering
 
-        # track the fact that we have a PDU for these destinations,
-        # to allow us to perform catch-up later on if the remote is unreachable
-        # for a while.
-        await self.store.store_destination_rooms_entries(
-            destinations,
-            pdu.room_id,
-            pdu.internal_metadata.stream_ordering,
-        )
+        if flush_destination_rooms:
+            # track the fact that we have a PDU for these destinations,
+            # to allow us to perform catch-up later on if the remote is unreachable
+            # for a while.
+            await self.store.store_destination_rooms_entries(
+                destinations,
+                pdu.room_id,
+                pdu.internal_metadata.stream_ordering,
+            )
 
         for destination in destinations:
             self._get_per_destination_queue(destination).send_pdu(pdu)
