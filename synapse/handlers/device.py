@@ -166,7 +166,7 @@ class DeviceWorkerHandler(BaseHandler):
 
             # Fetch the current state at the time.
             try:
-                event_ids = await self.store.get_forward_extremeties_for_room(
+                event_ids = await self.store.get_forward_extremities_for_room_at_stream_ordering(
                     room_id, stream_ordering=stream_ordering
                 )
             except errors.StoreError:

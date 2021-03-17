@@ -1979,8 +1979,10 @@ class SyncHandler:
 
             logger.info("User joined room after current token: %s", room_id)
 
-            extrems = await self.store.get_forward_extremeties_for_room(
-                room_id, event_pos.stream
+            extrems = (
+                await self.store.get_forward_extremities_for_room_at_stream_ordering(
+                    room_id, event_pos.stream
+                )
             )
             users_in_room = await self.state.get_current_users_in_room(room_id, extrems)
             if user_id in users_in_room:
