@@ -524,7 +524,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         )
 
     def test_edit_reply(self):
-        """Test that a editing a reply works."""
+        """Test that editing a reply works."""
 
         # Create a reply to edit.
         channel = self._send_relation(
