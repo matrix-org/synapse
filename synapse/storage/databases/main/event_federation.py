@@ -823,14 +823,10 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         if last_change > self.stream_ordering_month_ago:
             stream_ordering = min(last_change, stream_ordering)
 
-        return await self._get_forward_extremities_for_room_at_stream_ordering(
-            room_id, stream_ordering
-        )
+        return await self._get_forward_extremeties_for_room(room_id, stream_ordering)
 
     @cached(max_entries=5000, num_args=2)
-    async def _get_forward_extremities_for_room_at_stream_ordering(
-        self, room_id, stream_ordering
-    ):
+    async def _get_forward_extremeties_for_room(self, room_id, stream_ordering):
         """For a given room_id and stream_ordering, return the forward
         extremeties of the room at that point in "time".
 
@@ -851,13 +847,12 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 WHERE room_id = ?
         """
 
-        def get_forward_extremities_for_room_at_stream_ordering_txn(txn):
+        def get_forward_extremeties_for_room_txn(txn):
             txn.execute(sql, (stream_ordering, room_id))
             return [event_id for event_id, in txn]
 
         return await self.db_pool.runInteraction(
-            "get_forward_extremities_for_room_at_stream_ordering",
-            get_forward_extremities_for_room_at_stream_ordering_txn,
+            "get_forward_extremeties_for_room", get_forward_extremeties_for_room_txn
         )
 
     async def get_backfill_events(self, room_id: str, event_list: list, limit: int):
