@@ -421,6 +421,8 @@ class PerDestinationQueue:
             # take some time. It's better to give it small amounts of work
             # rather than risk the request timing out and repeatedly being
             # retried, and not making any progress.
+            #
+            # Note: `catchup_pdus` will have exactly one PDU per room.
             for pdu in catchup_pdus:
                 # The PDU from the DB will be the last PDU in the room from
                 # *this server* that wasn't sent to the remote. However, other
