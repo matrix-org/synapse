@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, Hashable, Iterable, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Set, Tuple
 
 from prometheus_client import Counter
 
@@ -43,6 +43,9 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import ReadReceipt, RoomStreamToken
 from synapse.util.metrics import Measure, measure_func
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
 sent_pdus_destination_dist_count = Counter(
@@ -66,7 +69,7 @@ CATCH_UP_STARTUP_INTERVAL_SEC = 5
 
 
 class FederationSender:
-    def __init__(self, hs: "synapse.server.HomeServer"):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.server_name = hs.hostname
 
@@ -76,6 +79,7 @@ class FederationSender:
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
 
+        self._presence_router = hs.get_presence_router()
         self._transaction_manager = TransactionManager(hs)
 
         self._instance_name = hs.get_instance_name()
@@ -498,7 +502,9 @@ class FederationSender:
         """Given a list of states populate self.pending_presence_by_dest and
         poke to send a new transaction to each destination
         """
-        hosts_and_states = await get_interested_remotes(self.store, states, self.state)
+        hosts_and_states = await get_interested_remotes(
+            self.store, self._presence_router, states, self.state
+        )
 
         for destinations, states in hosts_and_states:
             for destination in destinations:
