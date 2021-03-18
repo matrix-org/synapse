@@ -21,7 +21,6 @@ import re
 from typing import TYPE_CHECKING, List, Optional
 from urllib import parse as urlparse
 
-from twisted.web.iweb import IRequest
 from twisted.web.server import Request
 
 from synapse.api.constants import EventTypes, Membership
@@ -48,14 +47,7 @@ from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
-from synapse.types import (
-    Requester,
-    RoomAlias,
-    RoomID,
-    StreamToken,
-    ThirdPartyInstanceID,
-    UserID,
-)
+from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
 from synapse.util import json_decoder
 from synapse.util.stringutils import parse_and_validate_server_name, random_string
 

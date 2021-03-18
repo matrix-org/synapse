@@ -51,8 +51,8 @@ class SpaceSummaryHandler:
         self,
         requester: str,
         room_id: str,
-        suggested_only: False,
-        max_rooms_per_space: Optional[int],
+        suggested_only: bool = False,
+        max_rooms_per_space: Optional[int] = None,
     ) -> JsonDict:
         """
         Implementation of the space summary API
