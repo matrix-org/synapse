@@ -223,7 +223,7 @@ def main():
     parser.add_argument("--body", help="Data to send as the body of the HTTP request")
 
     parser.add_argument(
-        "path", help="request path. We will add '/_matrix/federation/v1/' to this."
+        "path", help="request path, including the '/_matrix/federation/...' prefix."
     )
 
     args = parser.parse_args()
@@ -239,7 +239,7 @@ def main():
         args.server_name,
         key,
         args.destination,
-        "/_matrix/federation/v1/" + args.path,
+        args.path,
         content=args.body,
     )
 
