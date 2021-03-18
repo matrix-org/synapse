@@ -15,7 +15,6 @@
 from typing import Dict, Iterable, List, Optional, Set, Union
 
 import attr
-from typing_extensions import Literal
 
 from synapse.handlers.presence import UserPresenceState
 from synapse.module_api import ModuleApi
@@ -47,10 +46,7 @@ class PresenceRouterTestModule:
         }
         return users_to_state
 
-    async def get_interested_users(
-        self, user_id: str
-    ) -> Union[Set[str], Literal["ALL"]]:
-        print()
+    async def get_interested_users(self, user_id: str) -> Union[Set[str], str]:
         if user_id in self._config.users_who_should_receive_all_presence:
             return "ALL"
 

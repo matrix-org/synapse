@@ -38,7 +38,7 @@ from typing import (
 )
 
 from prometheus_client import Counter
-from typing_extensions import ContextManager, Literal
+from typing_extensions import ContextManager
 
 import synapse.metrics
 from synapse.api.constants import EventTypes, Membership, PresenceState
@@ -1142,6 +1142,8 @@ class PresenceEventSource:
 
                     return list(users_to_state.values()), max_token
 
+            assert not isinstance(users_interested_in, str)
+
             # The set of users that we're interested in and that have had a presence update.
             # We'll actually pull the presence updates for these users at the end.
             interested_and_updated_users = (
@@ -1265,7 +1267,7 @@ class PresenceEventSource:
         user: UserID,
         explicit_room_id: Optional[str] = None,
         cache_context: Optional[_CacheContext] = None,
-    ) -> Union[Set[str], Literal["ALL"]]:
+    ) -> Union[Set[str], str]:
         """Returns the set of users that the given user should see presence
         updates for.
 

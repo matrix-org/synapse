@@ -15,8 +15,6 @@
 
 from typing import TYPE_CHECKING, Dict, Iterable, Set, Union
 
-from typing_extensions import Literal
-
 from synapse.api.presence import UserPresenceState
 
 if TYPE_CHECKING:
@@ -66,9 +64,7 @@ class PresenceRouter:
         # Don't include any extra destinations for presence updates
         return {}
 
-    async def get_interested_users(
-        self, user_id: str
-    ) -> Union[Set[str], Literal["ALL"]]:
+    async def get_interested_users(self, user_id: str) -> Union[Set[str], str]:
         """
         Retrieve a list of users that the provided user is interested in receiving the presence
         of. Optionally, the str "ALL" can be returned to mean that this user should receive all
