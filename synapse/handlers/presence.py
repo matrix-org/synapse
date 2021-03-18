@@ -730,6 +730,7 @@ class PresenceHandler(BasePresenceHandler):
             PresenceState.ONLINE,
             PresenceState.UNAVAILABLE,
             PresenceState.OFFLINE,
+            PresenceState.BUSY,
         )
         if presence not in valid_presence:
             raise SynapseError(400, "Invalid presence state")
@@ -744,7 +745,7 @@ class PresenceHandler(BasePresenceHandler):
             msg = status_msg if presence != PresenceState.OFFLINE else None
             new_fields["status_msg"] = msg
 
-        if presence == PresenceState.ONLINE:
+        if presence == PresenceState.ONLINE or presence == PresenceState.BUSY:
             new_fields["last_active_ts"] = self.clock.time_msec()
 
         await self._update_states([prev_state.copy_and_replace(**new_fields)])

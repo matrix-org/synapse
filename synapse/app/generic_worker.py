@@ -439,6 +439,7 @@ class GenericWorkerPresence(BasePresenceHandler):
             PresenceState.ONLINE,
             PresenceState.UNAVAILABLE,
             PresenceState.OFFLINE,
+            PresenceState.BUSY,
         )
         if presence not in valid_presence:
             raise SynapseError(400, "Invalid presence state")

@@ -51,6 +51,7 @@ class PresenceState:
     OFFLINE = "offline"
     UNAVAILABLE = "unavailable"
     ONLINE = "online"
+    BUSY = "org.matrix.msc3026.busy"
 
 
 class JoinRules:
