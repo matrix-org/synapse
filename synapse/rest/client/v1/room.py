@@ -18,7 +18,7 @@
 
 import logging
 import re
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, Tuple
 from urllib import parse as urlparse
 
 from twisted.web.server import Request
@@ -47,7 +47,14 @@ from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
-from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
+from synapse.types import (
+    JsonDict,
+    RoomAlias,
+    RoomID,
+    StreamToken,
+    ThirdPartyInstanceID,
+    UserID,
+)
 from synapse.util import json_decoder
 from synapse.util.stringutils import parse_and_validate_server_name, random_string
 
@@ -1007,7 +1014,7 @@ class RoomSpaceSummaryRestServlet(RestServlet):
             max_rooms_per_space=parse_integer(request, "max_rooms_per_space"),
         )
 
-    async def on_POST(self, request: Request, room_id: str):
+    async def on_POST(self, request: Request, room_id: str) -> Tuple[int, JsonDict]:
         requester = await self._auth.get_user_by_req(request, allow_guest=True)
         content = parse_json_object_from_request(request)
 
