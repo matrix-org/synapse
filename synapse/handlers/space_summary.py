@@ -16,7 +16,7 @@
 import itertools
 import logging
 from collections import deque
-from typing import TYPE_CHECKING, Iterable, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Iterable, List, Optional, Set
 
 from synapse.api.constants import EventContentFields, EventTypes, HistoryVisibility
 from synapse.api.errors import AuthError
