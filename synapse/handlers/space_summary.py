@@ -31,10 +31,10 @@ logger = logging.getLogger(__name__)
 
 # number of rooms to return. We'll stop once we hit this limit.
 # TODO: allow clients to reduce this with a request param.
-ROOMS_LIMIT = 50
+MAX_ROOMS = 50
 
 # max number of events to return per room.
-ROOMS_PER_SPACE_LIMIT = 50
+MAX_ROOMS_PER_SPACE = 50
 
 
 class SpaceSummaryHandler:
@@ -86,7 +86,7 @@ class SpaceSummaryHandler:
 
         now = self._clock.time_msec()
 
-        while room_queue and len(rooms_result) < ROOMS_LIMIT:
+        while room_queue and len(rooms_result) < MAX_ROOMS:
             room_id = room_queue.popleft()
             logger.debug("Processing room %s", room_id)
             processed_rooms.add(room_id)
@@ -113,12 +113,14 @@ class SpaceSummaryHandler:
                 # we only care about suggested children
                 child_events = filter(_is_suggested_child_event, child_events)
 
-            # if this is not the first room, and the client has specified a limit,
-            # apply it (the client limit does not apply to the root room)
+            # The client-specified max_rooms_per_space limit doesn't apply to the
+            # room_id specified in the request, so we ignore it if this is the
+            # first room we are processing. Otherwise, apply any client-specified
+            # limit, capping to our built-in limit.
             if max_rooms_per_space is not None and len(processed_rooms) > 1:
-                max_rooms = min(ROOMS_PER_SPACE_LIMIT, max_rooms_per_space)
+                max_rooms = min(MAX_ROOMS_PER_SPACE, max_rooms_per_space)
             else:
-                max_rooms = ROOMS_PER_SPACE_LIMIT
+                max_rooms = MAX_ROOMS_PER_SPACE
 
             for edge_event in itertools.islice(child_events, max_rooms):
                 edge_room_id = edge_event.state_key
