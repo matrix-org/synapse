@@ -290,7 +290,7 @@ class HttpPusher(Pusher):
         if rejected is False:
             return False
 
-        if isinstance(rejected, list) or isinstance(rejected, tuple):
+        if isinstance(rejected, (list, tuple)):
             for pk in rejected:
                 if pk != self.pushkey:
                     # for sanity, we only remove the pushkey if it
