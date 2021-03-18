@@ -147,6 +147,18 @@ class RoomVersions:
         msc2176_redaction_rules=False,
         allow_knocking=False,
     )
+    V7 = RoomVersion(
+        "7",
+        RoomDisposition.UNSTABLE,
+        EventFormatVersions.V3,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=False,
+        strict_canonicaljson=True,
+        limit_notifications_power_levels=True,
+        msc2176_redaction_rules=False,
+        allow_knocking=True,
+    )
     MSC2176 = RoomVersion(
         "org.matrix.msc2176",
         RoomDisposition.UNSTABLE,
@@ -159,18 +171,6 @@ class RoomVersions:
         msc2176_redaction_rules=True,
         allow_knocking=False,
     )
-    MSC2403_DEV = RoomVersion(
-        "xyz.amorgan.knock",
-        RoomDisposition.UNSTABLE,
-        EventFormatVersions.V3,
-        StateResolutionVersions.V2,
-        enforce_key_validity=True,
-        special_case_aliases_auth=False,
-        strict_canonicaljson=True,
-        limit_notifications_power_levels=True,
-        msc2176_redaction_rules=False,
-        allow_knocking=True,
-    )
 
 
 KNOWN_ROOM_VERSIONS = {
@@ -182,5 +182,6 @@ KNOWN_ROOM_VERSIONS = {
         RoomVersions.V4,
         RoomVersions.V5,
         RoomVersions.V6,
+        RoomVersions.V7,
     )
 }  # type: Dict[str, RoomVersion]

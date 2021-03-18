@@ -504,7 +504,7 @@ steps:
       - "docker build -t matrixdotorg/synapse:latest -f docker/Dockerfile ."
       # We use the complement:latest image to provide Complement's dependencies, but want
       # to actually run against the latest version of Complement, so download it here.
-      - "wget https://github.com/matrix-org/complement/archive/master.tar.gz"
+      - "wget https://github.com/matrix-org/complement/archive/anoa/knock_room_v7.tar.gz"
       - "tar -xzf master.tar.gz"
       # Build a second docker image on top of the above image. This one sets up Synapse with a generated config file,
       # signing and SSL keys so Synapse can run and federate

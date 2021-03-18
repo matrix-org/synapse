@@ -17,6 +17,7 @@ import json
 
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
+from synapse.api.room_versions import RoomVersions
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import knock, read_marker, sync
 
@@ -342,7 +343,7 @@ class SyncKnockTestCase(
         self.room_id = self.helper.create_room_as(
             self.user_id,
             is_public=False,
-            room_version="xyz.amorgan.knock",
+            room_version=RoomVersions.V7.identifier,
             tok=self.tok,
         )
 
