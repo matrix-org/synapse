@@ -44,7 +44,6 @@ class SpaceSummaryHandler:
         self._room_list_handler = hs.get_room_list_handler()
         self._state_handler = hs.get_state_handler()
         self._store = hs.get_datastore()
-        self._msc1772 = hs.config.experimental.msc1772_enabled
         self._event_serializer = hs.get_event_client_serializer()
 
     async def get_space_summary(
@@ -153,9 +152,8 @@ class SpaceSummaryHandler:
             current_state_ids[(EventTypes.Create, "")]
         )
 
-        room_type = None
-        if self._msc1772:
-            room_type = create_event.content.get(EventContentFields.MSC1772_ROOM_TYPE)
+        # TODO: update once MSC1772 lands
+        room_type = create_event.content.get(EventContentFields.MSC1772_ROOM_TYPE)
 
         entry = {
             "room_id": stats["room_id"],
@@ -180,15 +178,12 @@ class SpaceSummaryHandler:
         # look for child rooms/spaces.
         current_state_ids = await self._store.get_current_state_ids(room_id)
 
-        edge_event_types = ()  # type: Tuple[str, ...]
-        if self._msc1772:
-            edge_event_types += (EventTypes.MSC1772_SPACE_CHILD,)
-
         events = await self._store.get_events_as_list(
             [
                 event_id
                 for key, event_id in current_state_ids.items()
-                if key[0] in edge_event_types
+                # TODO: update once MSC1772 lands
+                if key[0] == EventTypes.MSC1772_SPACE_CHILD
             ]
         )
 

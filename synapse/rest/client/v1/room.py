@@ -1052,7 +1052,7 @@ def register_servlets(hs: "synapse.server.HomeServer", http_server, is_worker=Fa
     RoomTypingRestServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
 
-    if hs.config.experimental.msc2946_enabled:
+    if hs.config.experimental.spaces_enabled:
         RoomSpaceSummaryRestServlet(hs).register(http_server)
 
     # Some servlets only get registered for the main process.

@@ -28,8 +28,5 @@ class ExperimentalConfig(Config):
         # MSC2858 (multiple SSO identity providers)
         self.msc2858_enabled = experimental.get("msc2858_enabled", False)  # type: bool
 
-        # MSC2946 (space summaries)
-        self.msc2946_enabled = experimental.get("msc2946_enabled", False)  # type: bool
-
-        # MSC1772 (spaces)
-        self.msc1772_enabled = experimental.get("msc1772_enabled", False)  # type: bool
+        # Spaces (MSC1772, MSC2946, etc)
+        self.spaces_enabled = experimental.get("spaces_enabled", False)  # type: bool
