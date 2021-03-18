@@ -3024,7 +3024,7 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(
-            "Only local users can be rate-limited", channel.json_body["error"]
+            "Only local users can be ratelimited", channel.json_body["error"]
         )
 
         channel = self.make_request(
@@ -3035,7 +3035,7 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(
-            "Only local users can be rate-limited", channel.json_body["error"]
+            "Only local users can be ratelimited", channel.json_body["error"]
         )
 
     def test_invalid_parameter(self):
