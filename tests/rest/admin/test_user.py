@@ -1446,13 +1446,11 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("User", channel.json_body["displayname"])
 
         # Deactivate user
-        body = json.dumps({"deactivated": True})
-
         channel = self.make_request(
             "PUT",
             self.url_other_user,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content={"deactivated": True},
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -1491,13 +1489,11 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertTrue(profile["display_name"] == "User")
 
         # Deactivate user
-        body = json.dumps({"deactivated": True})
-
         channel = self.make_request(
             "PUT",
             self.url_other_user,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content={"deactivated": True},
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -1509,13 +1505,11 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertIsNone(profile)
 
         # Set new displayname user
-        body = json.dumps({"displayname": "Foobar"})
-
         channel = self.make_request(
             "PUT",
             self.url_other_user,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content={"displayname": "Foobar"},
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -1540,7 +1534,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             "PUT",
             self.url_other_user,
             access_token=self.admin_user_tok,
-            content=json.dumps({"deactivated": False}).encode(encoding="utf_8"),
+            content={"deactivated": False},
         )
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
 
@@ -1549,9 +1543,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             "PUT",
             self.url_other_user,
             access_token=self.admin_user_tok,
-            content=json.dumps({"deactivated": False, "password": "foo"}).encode(
-                encoding="utf_8"
-            ),
+            content={"deactivated": False, "password": "foo"},
         )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@user:test", channel.json_body["name"])
@@ -1562,7 +1554,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
     @override_config({"password_config": {"localdb_enabled": False}})
     def test_reactivate_user_localdb_disabled(self):
         """
-        Test reactivating another user when using SSO/SAML
+        Test reactivating another user when using SSO.
         """
 
         # Deactivate the user.
@@ -1573,9 +1565,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             "PUT",
             self.url_other_user,
             access_token=self.admin_user_tok,
-            content=json.dumps({"deactivated": False, "password": "foo"}).encode(
-                encoding="utf_8"
-            ),
+            content={"deactivated": False, "password": "foo"},
         )
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
@@ -1585,7 +1575,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             "PUT",
             self.url_other_user,
             access_token=self.admin_user_tok,
-            content=json.dumps({"deactivated": False}).encode(encoding="utf_8"),
+            content={"deactivated": False},
         )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@user:test", channel.json_body["name"])
@@ -1596,7 +1586,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
     @override_config({"password_config": {"enabled": False}})
     def test_reactivate_user_password_disabled(self):
         """
-        Test reactivating another user when using SSO/SAML
+        Test reactivating another user when using SSO.
         """
 
         # Deactivate the user.
@@ -1607,9 +1597,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             "PUT",
             self.url_other_user,
             access_token=self.admin_user_tok,
-            content=json.dumps({"deactivated": False, "password": "foo"}).encode(
-                encoding="utf_8"
-            ),
+            content={"deactivated": False, "password": "foo"},
         )
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
@@ -1619,7 +1607,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             "PUT",
             self.url_other_user,
             access_token=self.admin_user_tok,
-            content=json.dumps({"deactivated": False}).encode(encoding="utf_8"),
+            content={"deactivated": False},
         )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@user:test", channel.json_body["name"])
@@ -1633,13 +1621,11 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
 
         # Set a user as an admin
-        body = json.dumps({"admin": True})
-
         channel = self.make_request(
             "PUT",
             self.url_other_user,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content={"admin": True},
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -1665,13 +1651,11 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v2/users/@bob:test"
 
         # Create user
-        body = json.dumps({"password": "abc123"})
-
         channel = self.make_request(
             "PUT",
             url,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content={"password": "abc123"},
         )
 
         self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
@@ -1691,13 +1675,11 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(0, channel.json_body["deactivated"])
 
         # Change password (and use a str for deactivate instead of a bool)
-        body = json.dumps({"password": "abc123", "deactivated": "false"})  # oops!
-
         channel = self.make_request(
             "PUT",
             url,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content={"password": "abc123", "deactivated": "false"},
         )
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
@@ -1732,7 +1714,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             "PUT",
             "/_synapse/admin/v2/users/%s" % urllib.parse.quote(user_id),
             access_token=self.admin_user_tok,
-            content=json.dumps({"deactivated": True}).encode(encoding="utf_8"),
+            content={"deactivated": True},
         )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertTrue(channel.json_body["deactivated"])
