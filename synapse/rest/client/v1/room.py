@@ -997,7 +997,7 @@ class RoomSpaceSummaryRestServlet(RestServlet):
         self._auth = hs.get_auth()
         self._space_summary_handler = hs.get_space_summary_handler()
 
-    async def on_GET(self, request: Request, room_id: str):
+    async def on_GET(self, request: Request, room_id: str) -> Tuple[int, JsonDict]:
         requester = await self._auth.get_user_by_req(request, allow_guest=True)
 
         return 200, await self._space_summary_handler.get_space_summary(
