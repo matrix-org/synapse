@@ -1005,7 +1005,7 @@ class RoomSpaceSummaryRestServlet(RestServlet):
         ),
     )
 
-    def __init__(self, hs: "synapse.server.HomeServer"):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self._auth = hs.get_auth()
         self._space_summary_handler = hs.get_space_summary_handler()
@@ -1044,7 +1044,7 @@ class RoomSpaceSummaryRestServlet(RestServlet):
         )
 
 
-def register_servlets(hs: "synapse.server.HomeServer", http_server, is_worker=False):
+def register_servlets(hs: "HomeServer", http_server, is_worker=False):
     RoomStateEventRestServlet(hs).register(http_server)
     RoomMemberListRestServlet(hs).register(http_server)
     JoinedRoomMemberListRestServlet(hs).register(http_server)
