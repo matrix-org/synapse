@@ -982,3 +982,112 @@ class ShadowBanRestServlet(RestServlet):
         await self.store.set_shadow_banned(UserID.from_string(user_id), True)
 
         return 200, {}
+
+
+class RateLimitRestServlet(RestServlet):
+    """An admin API to override ratelimiting for an user.
+
+    Example:
+        POST /_synapse/admin/v1/users/@test:example.com/override_ratelimit
+        {
+          "messages_per_second": 0,
+          "burst_count": 0
+        }
+        200 OK
+        {
+          "messages_per_second": 0,
+          "burst_count": 0
+        }
+    """
+
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/override_ratelimit")
+
+    def __init__(self, hs: "HomeServer"):
+        self.hs = hs
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self.auth, request)
+
+        if not self.hs.is_mine_id(user_id):
+            raise SynapseError(400, "Can only lookup local users")
+
+        if not await self.store.get_user_by_id(user_id):
+            raise NotFoundError("User not found")
+
+        ratelimit = await self.store.get_ratelimit_for_user(user_id)
+
+        if ratelimit:
+            messages_per_second = ratelimit.messages_per_second
+            burst_count = ratelimit.burst_count
+        else:
+            messages_per_second = None
+            burst_count = None
+
+        ret = {
+            "messages_per_second": messages_per_second,
+            "burst_count": burst_count,
+        }
+
+        return 200, ret
+
+    async def on_POST(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self.auth, request)
+
+        if not self.hs.is_mine_id(user_id):
+            raise SynapseError(400, "Only local users can be ratelimited")
+
+        if not await self.store.get_user_by_id(user_id):
+            raise NotFoundError("User not found")
+
+        body = parse_json_object_from_request(request, allow_empty_body=True)
+
+        messages_per_second = body.get("messages_per_second", 0)
+        burst_count = body.get("burst_count", 0)
+
+        if not isinstance(messages_per_second, int) or messages_per_second < 0:
+            raise SynapseError(
+                400,
+                "%r parameter must be a positive int" % (messages_per_second,),
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        if not isinstance(burst_count, int) or burst_count < 0:
+            raise SynapseError(
+                400,
+                "%r parameter must be a positive int" % (burst_count,),
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        await self.store.set_ratelimit_for_user(
+            user_id, messages_per_second, burst_count
+        )
+        ratelimit = await self.store.get_ratelimit_for_user(user_id)
+        assert ratelimit is not None
+
+        ret = {
+            "messages_per_second": ratelimit.messages_per_second,
+            "burst_count": ratelimit.burst_count,
+        }
+
+        return 200, ret
+
+    async def on_DELETE(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self.auth, request)
+
+        if not self.hs.is_mine_id(user_id):
+            raise SynapseError(400, "Only local users can be ratelimited")
+
+        if not await self.store.get_user_by_id(user_id):
+            raise NotFoundError("User not found")
+
+        await self.store.delete_ratelimit_for_user(user_id)
+
+        return 200, {}
