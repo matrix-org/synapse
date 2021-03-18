@@ -15,11 +15,17 @@
 from mock import Mock
 
 from synapse.events import EventBase
+from synapse.handlers.presence import UserPresenceState
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client.v1 import login, presence, room
 from synapse.types import create_requester
 
-from tests.unittest import HomeserverTestCase
+from tests.events.test_presence_router import (
+    PresenceRouterTestModule,
+    send_presence_update,
+    sync_presence,
+)
+from tests.unittest import HomeserverTestCase, override_config
 
 
 class ModuleApiTestCase(HomeserverTestCase):
@@ -27,6 +33,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         admin.register_servlets,
         login.register_servlets,
         room.register_servlets,
+        presence.register_servlets,
     ]
 
     def prepare(self, reactor, clock, homeserver):
@@ -205,3 +212,95 @@ class ModuleApiTestCase(HomeserverTestCase):
             )
         )
         self.assertFalse(is_in_public_rooms)
+
+    @override_config(
+        {
+            "presence": {
+                "presence_router": {
+                    "module": "%s.%s"
+                    % (
+                        PresenceRouterTestModule.__module__,
+                        PresenceRouterTestModule.__name__,
+                    ),
+                    "config": {
+                        "users_who_should_receive_all_presence": [
+                            "@presence_gobbler1:test",
+                            "@presence_gobbler2:test",
+                        ]
+                    },
+                }
+            }
+        }
+    )
+    def test_send_local_online_presence_to(self):
+        """Tests that send_local_presence_to_users sends local online presence to a set
+        of specified local and remote users.
+        """
+        self.sync_handler = self.hs.get_sync_handler()
+
+        # Create a user who will send presence updates
+        self.other_user_id = self.register_user("other_user", "monkey")
+        self.other_user_tok = self.login("other_user", "monkey")
+
+        # And another two users that will also send out presence updates, as well as receive
+        # theirs and everyone else's
+        self.presence_receiving_user_one_id = self.register_user(
+            "presence_gobbler1", "monkey"
+        )
+        self.presence_receiving_user_one_tok = self.login("presence_gobbler1", "monkey")
+        self.presence_receiving_user_two_id = self.register_user(
+            "presence_gobbler2", "monkey"
+        )
+        self.presence_receiving_user_two_tok = self.login("presence_gobbler2", "monkey")
+
+        # Have all three users send some presence updates
+        send_presence_update(
+            self,
+            self.other_user_id,
+            self.other_user_tok,
+            "online",
+            "I'm online!",
+        )
+        send_presence_update(
+            self,
+            self.presence_receiving_user_one_id,
+            self.presence_receiving_user_one_tok,
+            "online",
+            "I'm also online!",
+        )
+        send_presence_update(
+            self,
+            self.presence_receiving_user_two_id,
+            self.presence_receiving_user_two_tok,
+            "unavailable",
+            "I'm in a meeting!",
+        )
+
+        # Mark each presence-receiving user for receiving all user presence
+        self.get_success(
+            self.module_api.send_local_online_presence_to(
+                [
+                    self.presence_receiving_user_one_id,
+                    self.presence_receiving_user_two_id,
+                ]
+            )
+        )
+
+        # Perform a sync for each user
+
+        # The other user should only receive their own presence
+        presence_updates = sync_presence(self, self.other_user_id)
+        self.assertEqual(len(presence_updates), 1)
+
+        presence_update = presence_updates[0]  # type: UserPresenceState
+        self.assertEqual(presence_update.user_id, self.other_user_id)
+        self.assertEqual(presence_update.state, "online")
+        self.assertEqual(presence_update.status_msg, "I'm online!")
+
+        # Whereas both presence receiving users should receive everyone's presence updates
+        presence_updates = sync_presence(self, self.presence_receiving_user_one_id)
+        self.assertEqual(len(presence_updates), 3)
+        presence_updates = sync_presence(self, self.presence_receiving_user_two_id)
+        self.assertEqual(len(presence_updates), 3)
+
+        # TODO: Test sending to federated users
