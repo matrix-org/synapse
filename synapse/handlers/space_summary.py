@@ -18,6 +18,8 @@ import logging
 from collections import deque
 from typing import TYPE_CHECKING, Iterable, List, Optional, Set
 
+import attr
+
 from synapse.api.constants import EventContentFields, EventTypes, HistoryVisibility
 from synapse.api.errors import AuthError
 from synapse.events import EventBase
@@ -66,7 +68,7 @@ class SpaceSummaryHandler:
 
             max_rooms_per_space: an optional limit on the number of child rooms we will
                 return. This does not apply to the root room (ie, room_id), and
-                is overridden by ROOMS_PER_SPACE_LIMIT.
+                is overridden by MAX_ROOMS_PER_SPACE.
 
         Returns:
             summary dict to return
@@ -76,7 +78,7 @@ class SpaceSummaryHandler:
         await self._auth.check_user_in_room_or_world_readable(room_id, requester)
 
         # the queue of rooms to process
-        room_queue = deque((room_id,))
+        room_queue = deque((_RoomQueueEntry(room_id),))
 
         processed_rooms = set()  # type: Set[str]
 
@@ -86,7 +88,8 @@ class SpaceSummaryHandler:
         now = self._clock.time_msec()
 
         while room_queue and len(rooms_result) < MAX_ROOMS:
-            room_id = room_queue.popleft()
+            queue_entry = room_queue.popleft()
+            room_id = queue_entry.room_id
             logger.debug("Processing room %s", room_id)
             processed_rooms.add(room_id)
 
@@ -189,6 +192,11 @@ class SpaceSummaryHandler:
 
         # filter out any events without a "via" (which implies it has been redacted)
         return (e for e in events if e.content.get("via"))
+
+
+@attr.s(frozen=True, slots=True)
+class _RoomQueueEntry:
+    room_id = attr.ib(type=str)
 
 
 def _is_suggested_child_event(edge_event: EventBase) -> bool:
