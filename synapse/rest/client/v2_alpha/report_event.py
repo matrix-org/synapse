@@ -14,8 +14,12 @@
 # limitations under the License.
 import logging
 from http import HTTPStatus
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TYPE_CHECKING
 
+if TYPE_CHECKING:
+    # Don't import HomeServer directly, otherwise we'll create a
+    # circular dependency.
+    from synapse.server import HomeServer
 from synapse.api.auth import Auth
 from synapse.api.constants import EventTypes
 from synapse.api.errors import Codes, SynapseError
@@ -25,7 +29,7 @@ from synapse.http.servlet import (
     assert_params_in_dict,
     parse_json_object_from_request,
 )
-from synapse.server import HomeServer
+
 from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.state import StateHandler
 from synapse.storage import DataStore, Storage
@@ -40,7 +44,9 @@ logger = logging.getLogger(__name__)
 class ReportEventRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/report/(?P<event_id>[^/]*)$")
 
-    hs: HomeServer
+    # As we cannot import HomeServer without creating a circular dependency,
+    # use a forward reference.
+    hs: 'HomeServer'
     auth: Auth
     federation_sender: Optional[FederationSender]
     server_notices: ServerNoticesManager
