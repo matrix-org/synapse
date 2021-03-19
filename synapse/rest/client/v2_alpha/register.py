@@ -500,7 +500,6 @@ class RegisterRestServlet(RestServlet):
         # Check if the user-interactive authentication flows are complete, if
         # not this will raise a user-interactive auth error.
         try:
-            print("Trying")
             auth_result, params, session_id = await self.auth_handler.check_ui_auth(
                 self._registration_flows,
                 request,
