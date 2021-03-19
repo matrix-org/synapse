@@ -751,7 +751,7 @@ class PresenceHandler(BasePresenceHandler):
             new_fields["status_msg"] = msg
 
         if presence == PresenceState.ONLINE or (
-            self._busy_presence_enabled and presence == PresenceState.BUSY
+            presence == PresenceState.BUSY and self._busy_presence_enabled
         ):
             new_fields["last_active_ts"] = self.clock.time_msec()
 
