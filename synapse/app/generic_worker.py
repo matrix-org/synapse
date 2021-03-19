@@ -441,12 +441,12 @@ class GenericWorkerPresence(BasePresenceHandler):
             PresenceState.ONLINE,
             PresenceState.UNAVAILABLE,
             PresenceState.OFFLINE,
+            PresenceState.BUSY,
         )
 
-        if self._busy_presence_enabled:
-            valid_presence += (PresenceState.BUSY,)
-
-        if presence not in valid_presence:
+        if presence not in valid_presence or (
+            presence == PresenceState.BUSY and not self._busy_presence_enabled
+        ):
             raise SynapseError(400, "Invalid presence state")
 
         user_id = target_user.to_string()

@@ -732,12 +732,12 @@ class PresenceHandler(BasePresenceHandler):
             PresenceState.ONLINE,
             PresenceState.UNAVAILABLE,
             PresenceState.OFFLINE,
+            PresenceState.BUSY,
         )
 
-        if self._busy_presence_enabled:
-            valid_presence += (PresenceState.BUSY,)
-
-        if presence not in valid_presence:
+        if presence not in valid_presence or (
+            presence == PresenceState.BUSY and not self._busy_presence_enabled
+        ):
             raise SynapseError(400, "Invalid presence state")
 
         user_id = target_user.to_string()
@@ -750,9 +750,8 @@ class PresenceHandler(BasePresenceHandler):
             msg = status_msg if presence != PresenceState.OFFLINE else None
             new_fields["status_msg"] = msg
 
-        if (
-            presence == PresenceState.ONLINE or
-            (self._busy_presence_enabled and presence == PresenceState.BUSY)
+        if presence == PresenceState.ONLINE or (
+            self._busy_presence_enabled and presence == PresenceState.BUSY
         ):
             new_fields["last_active_ts"] = self.clock.time_msec()
 
