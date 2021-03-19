@@ -56,7 +56,7 @@ class SpaceSummaryHandler:
         max_rooms_per_space: Optional[int] = None,
     ) -> JsonDict:
         """
-        Implementation of the space summary API
+        Implementation of the space summary C-S API
 
         Args:
             requester:  user id of the user making this request
@@ -110,9 +110,65 @@ class SpaceSummaryHandler:
 
         return {"rooms": rooms_result, "events": events_result}
 
+    async def federation_space_summary(
+        self,
+        room_id: str,
+        suggested_only: bool,
+        max_rooms_per_space: Optional[int],
+        exclude_rooms: Iterable[str],
+    ) -> JsonDict:
+        """
+        Implementation of the space summary Federation API
+
+        Args:
+            room_id: room id to start the summary at
+
+            suggested_only: whether we should only return children with the "suggested"
+                flag set.
+
+            max_rooms_per_space: an optional limit on the number of child rooms we will
+                return. Unlike the C-S API, this applies to the root room (room_id).
+                It is clipped to MAX_ROOMS_PER_SPACE.
+
+            exclude_rooms: a list of rooms to skip over (presumably because the
+                calling server has already seen them).
+
+        Returns:
+            summary dict to return
+        """
+        # the queue of rooms to process
+        room_queue = deque((room_id,))
+
+        # the set of rooms that we should not walk further. Initialise it with the
+        # excluded-rooms list; we will add other rooms as we process them so that
+        # we do not loop.
+        processed_rooms = set(exclude_rooms)  # type: Set[str]
+
+        rooms_result = []  # type: List[JsonDict]
+        events_result = []  # type: List[JsonDict]
+
+        while room_queue and len(rooms_result) < MAX_ROOMS:
+            room_id = room_queue.popleft()
+            logger.debug("Processing room %s", room_id)
+            processed_rooms.add(room_id)
+
+            rooms, events = await self._summarize_local_room(
+                None, room_id, suggested_only, max_rooms_per_space
+            )
+
+            rooms_result.extend(rooms)
+            events_result.extend(events)
+
+            # add any children that we haven't already processed to the queue
+            for edge_event in events:
+                if edge_event["state_key"] not in processed_rooms:
+                    room_queue.append(edge_event["state_key"])
+
+        return {"rooms": rooms_result, "events": events_result}
+
     async def _summarize_local_room(
         self,
-        requester: str,
+        requester: Optional[str],
         room_id: str,
         suggested_only: bool,
         max_children: Optional[int],
@@ -144,12 +200,25 @@ class SpaceSummaryHandler:
             )
         return (room_entry,), events_result
 
-    async def _is_room_accessible(self, room_id: str, requester: str) -> bool:
-        try:
-            await self._auth.check_user_in_room_or_world_readable(room_id, requester)
+    async def _is_room_accessible(self, room_id: str, requester: Optional[str]) -> bool:
+        # if we have an authenticated requesting user, first check if they are in the
+        # room
+        if requester:
+            try:
+                await self._auth.check_user_in_room(room_id, requester)
+                return True
+            except AuthError:
+                pass
+
+        # otherwise, check if the room is peekable
+        hist_vis = ""
+        hist_vis_ev = await self._state_handler.get_current_state(
+            room_id, EventTypes.RoomHistoryVisibility, ""
+        )
+        if hist_vis_ev:
+            hist_vis = hist_vis_ev.content.get("history_visibility")
+        if hist_vis == HistoryVisibility.WORLD_READABLE:
             return True
-        except AuthError:
-            pass
 
         logger.info(
             "room %s is unpeekable and user %s is not a member, omitting from summary",
