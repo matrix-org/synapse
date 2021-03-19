@@ -93,16 +93,7 @@ class SpaceSummaryHandler:
             logger.debug("Processing room %s", room_id)
             processed_rooms.add(room_id)
 
-            try:
-                await self._auth.check_user_in_room_or_world_readable(
-                    room_id, requester
-                )
-            except AuthError:
-                logger.info(
-                    "user %s cannot view room %s, omitting from summary",
-                    requester,
-                    room_id,
-                )
+            if not await self._is_room_accessible(room_id, requester):
                 continue
 
             room_entry = await self._build_room_entry(room_id)
@@ -140,6 +131,20 @@ class SpaceSummaryHandler:
                     room_queue.append(edge_room_id)
 
         return {"rooms": rooms_result, "events": events_result}
+
+    async def _is_room_accessible(self, room_id: str, requester: str) -> bool:
+        try:
+            await self._auth.check_user_in_room_or_world_readable(room_id, requester)
+            return True
+        except AuthError:
+            pass
+
+        logger.info(
+            "room %s is unpeekable and user %s is not a member, omitting from summary",
+            room_id,
+            requester,
+        )
+        return False
 
     async def _build_room_entry(self, room_id: str) -> JsonDict:
         """Generate en entry suitable for the 'rooms' list in the summary response"""
