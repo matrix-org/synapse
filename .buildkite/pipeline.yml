@@ -505,12 +505,12 @@ steps:
       # We use the complement:latest image to provide Complement's dependencies, but want
       # to actually run against the latest version of Complement, so download it here.
       - "wget https://github.com/matrix-org/complement/archive/anoa/knock_room_v7.tar.gz"
-      - "tar -xzf master.tar.gz"
+      - "tar -xzf knock_room_v7.tar.gz"
       # Build a second docker image on top of the above image. This one sets up Synapse with a generated config file,
       # signing and SSL keys so Synapse can run and federate
-      - "docker build -t complement-synapse -f complement-master/dockerfiles/Synapse.Dockerfile complement-master/dockerfiles"
+      - "docker build -t complement-synapse -f complement-anoa-knock_room_v7/dockerfiles/Synapse.Dockerfile complement-anoa-knock_room_v7/dockerfiles"
       # Finally, compile and run the tests.
-      - "cd complement-master"
+      - "cd complement-anoa-knock_room_v7"
       - "COMPLEMENT_BASE_IMAGE=complement-synapse:latest go test -v -tags synapse_blacklist,msc2403 ./tests"
     label: "\U0001F9EA Complement"
     agents:
