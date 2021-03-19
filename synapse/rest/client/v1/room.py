@@ -18,7 +18,7 @@
 
 import logging
 import re
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, Tuple
 from urllib import parse as urlparse
 
 from synapse.api.constants import EventTypes, Membership
@@ -35,16 +35,25 @@ from synapse.events.utils import format_event_for_client_v2
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
+    parse_boolean,
     parse_integer,
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import set_tag
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
-from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
+from synapse.types import (
+    JsonDict,
+    RoomAlias,
+    RoomID,
+    StreamToken,
+    ThirdPartyInstanceID,
+    UserID,
+)
 from synapse.util import json_decoder
 from synapse.util.stringutils import parse_and_validate_server_name, random_string
 
@@ -987,7 +996,58 @@ def register_txn_path(servlet, regex_string, http_server, with_get=False):
         )
 
 
-def register_servlets(hs, http_server, is_worker=False):
+class RoomSpaceSummaryRestServlet(RestServlet):
+    PATTERNS = (
+        re.compile(
+            "^/_matrix/client/unstable/org.matrix.msc2946"
+            "/rooms/(?P<room_id>[^/]*)/spaces$"
+        ),
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self._auth = hs.get_auth()
+        self._space_summary_handler = hs.get_space_summary_handler()
+
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self._auth.get_user_by_req(request, allow_guest=True)
+
+        return 200, await self._space_summary_handler.get_space_summary(
+            requester.user.to_string(),
+            room_id,
+            suggested_only=parse_boolean(request, "suggested_only", default=False),
+            max_rooms_per_space=parse_integer(request, "max_rooms_per_space"),
+        )
+
+    async def on_POST(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self._auth.get_user_by_req(request, allow_guest=True)
+        content = parse_json_object_from_request(request)
+
+        suggested_only = content.get("suggested_only", False)
+        if not isinstance(suggested_only, bool):
+            raise SynapseError(
+                400, "'suggested_only' must be a boolean", Codes.BAD_JSON
+            )
+
+        max_rooms_per_space = content.get("max_rooms_per_space")
+        if max_rooms_per_space is not None and not isinstance(max_rooms_per_space, int):
+            raise SynapseError(
+                400, "'max_rooms_per_space' must be an integer", Codes.BAD_JSON
+            )
+
+        return 200, await self._space_summary_handler.get_space_summary(
+            requester.user.to_string(),
+            room_id,
+            suggested_only=suggested_only,
+            max_rooms_per_space=max_rooms_per_space,
+        )
+
+
+def register_servlets(hs: "HomeServer", http_server, is_worker=False):
     RoomStateEventRestServlet(hs).register(http_server)
     RoomMemberListRestServlet(hs).register(http_server)
     JoinedRoomMemberListRestServlet(hs).register(http_server)
@@ -1000,6 +1060,9 @@ def register_servlets(hs, http_server, is_worker=False):
     RoomRedactEventRestServlet(hs).register(http_server)
     RoomTypingRestServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
+
+    if hs.config.experimental.spaces_enabled:
+        RoomSpaceSummaryRestServlet(hs).register(http_server)
 
     # Some servlets only get registered for the main process.
     if not is_worker:
