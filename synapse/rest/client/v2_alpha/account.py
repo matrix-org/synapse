@@ -883,7 +883,6 @@ class WhoamiRestServlet(RestServlet):
 
         return 200, {
             "user_id": requester.user.to_string(),
-
             # MSC: https://github.com/matrix-org/matrix-doc/pull/3069
             "org.matrix.msc3069.is_guest": bool(requester.is_guest),
         }
