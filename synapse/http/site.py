@@ -132,7 +132,7 @@ class SynapseRequest(Request):
 
         # create a LogContext for this request
         request_id = self.get_request_id()
-        self.logcontext = LoggingContext(request_id, request_id=request_id)
+        self.logcontext = LoggingContext(request_id, request=self)
 
         # override the Server header which is set by twisted
         self.setHeader("Server", self.site.server_version_string)
@@ -333,6 +333,9 @@ class SynapseRequest(Request):
             self.request_metrics.stop(self.finish_time, self.code, self.sentLength)
         except Exception as e:
             logger.warning("Failed to stop metrics: %r", e)
+
+        # Break the cycle between SynapseRequest and LoggingContext.
+        self.logcontext = None
 
     def _should_log_request(self) -> bool:
         """Whether we should log at INFO that we processed the request."""

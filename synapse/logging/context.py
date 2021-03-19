@@ -22,7 +22,6 @@ them.
 
 See doc/log_contexts.rst for details on how this works.
 """
-
 import inspect
 import logging
 import threading
@@ -35,6 +34,7 @@ from typing_extensions import Literal
 from twisted.internet import defer, threads
 
 if TYPE_CHECKING:
+    from synapse.http.site import SynapseRequest
     from synapse.logging.scopecontextmanager import _LogContextScope
 
 logger = logging.getLogger(__name__)
@@ -187,13 +187,13 @@ LoggingContextOrSentinel = Union["LoggingContext", "_Sentinel"]
 class _Sentinel:
     """Sentinel to represent the root context"""
 
-    __slots__ = ["previous_context", "finished", "request_id", "scope", "tag"]
+    __slots__ = ["previous_context", "finished", "request", "scope", "tag"]
 
     def __init__(self) -> None:
         # Minimal set for compatibility with LoggingContext
         self.previous_context = None
         self.finished = False
-        self.request_id = None
+        self.request = None
         self.scope = None
         self.tag = None
 
@@ -247,7 +247,7 @@ class LoggingContext:
         "usage_start",
         "main_thread",
         "finished",
-        "request_id",
+        "request",
         "tag",
         "scope",
     ]
@@ -256,7 +256,7 @@ class LoggingContext:
         self,
         name: Optional[str] = None,
         parent_context: "Optional[LoggingContext]" = None,
-        request_id: Optional[str] = None,
+        request: "Optional[SynapseRequest]" = None,
     ) -> None:
         self.previous_context = current_context()
         self.name = name
@@ -269,7 +269,7 @@ class LoggingContext:
         self.usage_start = None  # type: Optional[resource._RUsage]
 
         self.main_thread = get_thread_id()
-        self.request_id = None
+        self.request = None
         self.tag = ""
         self.scope = None  # type: Optional[_LogContextScope]
 
@@ -282,18 +282,18 @@ class LoggingContext:
 
         if self.parent_context is not None:
             # we track the current request_id
-            self.request_id = self.parent_context.request_id
+            self.request = self.parent_context.request
 
             # we also track the current scope:
             self.scope = self.parent_context.scope
 
-        if request_id is not None:
+        if request is not None:
             # the request_id param overrides the request_id from the parent context
-            self.request_id = request_id
+            self.request = request
 
     def __str__(self) -> str:
-        if self.request_id:
-            return self.request_id
+        if self.request:
+            return self.request.get_request_id()
         return "%s@%x" % (self.name, id(self))
 
     @classmethod
@@ -562,7 +562,7 @@ class LoggingContextFilter(logging.Filter):
         if context is not None:
             # Logging is interested in the request ID. Note that for backwards
             # compatibility this is stored as the "request" on the record.
-            record.request = context.request_id  # type: ignore
+            record.request = str(context)  # type: ignore
 
         return True
 
@@ -658,11 +658,17 @@ def nested_logging_context(suffix: str) -> LoggingContext:
         )
         parent_context = None
         prefix = ""
+        request = None
     else:
         assert isinstance(curr_context, LoggingContext)
         parent_context = curr_context
-        prefix = str(parent_context.request_id)
-    return LoggingContext(parent_context=parent_context, request_id=prefix + "-" + suffix)
+        prefix = str(parent_context.name)
+        request = parent_context.request
+    return LoggingContext(
+        prefix + "-" + suffix,
+        parent_context=parent_context,
+        request=request,
+    )
 
 
 def preserve_fn(f):

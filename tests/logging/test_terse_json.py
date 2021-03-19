@@ -15,12 +15,16 @@
 
 import json
 import logging
-from io import StringIO
+from io import BytesIO, StringIO
 
+from mock import Mock
+
+from synapse.http.site import SynapseRequest
 from synapse.logging._terse_json import JsonFormatter, TerseJsonFormatter
 from synapse.logging.context import LoggingContext, LoggingContextFilter
 
 from tests.logging import LoggerCleanupMixin
+from tests.server import FakeChannel
 from tests.unittest import TestCase
 
 
@@ -120,7 +124,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         handler.addFilter(LoggingContextFilter())
         logger = self.get_logger(handler)
 
-        with LoggingContext(request_id="test"):
+        with LoggingContext("name"):
             logger.info("Hello there, %s!", "wally")
 
         log = self.get_log_line()
@@ -134,4 +138,38 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         ]
         self.assertCountEqual(log.keys(), expected_log_keys)
         self.assertEqual(log["log"], "Hello there, wally!")
-        self.assertEqual(log["request"], "test")
+        self.assertTrue(log["request"].startswith("name@"))
+
+    def test_with_request_context(self):
+        """
+        Information from the logging context request should be added to the JSON response.
+        """
+        handler = logging.StreamHandler(self.output)
+        handler.setFormatter(JsonFormatter())
+        handler.addFilter(LoggingContextFilter())
+        logger = self.get_logger(handler)
+
+        # A full request isn't needed here.
+        site = Mock(spec=["site_tag"])
+        site.site_tag = "test-site"
+        request = SynapseRequest(FakeChannel(site, None))
+        # Call requestReceived to finish instantiating the object.
+        request.content = BytesIO()
+        request.process = Mock()
+        request.requestReceived(b"POST", b"/_matrix/client/versions", b"1.1")
+
+        with LoggingContext(request=request):
+            logger.info("Hello there, %s!", "wally")
+
+        log = self.get_log_line()
+
+        # The terse logger should give us these keys.
+        expected_log_keys = [
+            "log",
+            "level",
+            "namespace",
+            "request",
+        ]
+        self.assertCountEqual(log.keys(), expected_log_keys)
+        self.assertEqual(log["log"], "Hello there, wally!")
+        self.assertTrue(log["request"].startswith("POST-"))

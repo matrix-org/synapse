@@ -471,7 +471,7 @@ class HomeserverTestCase(TestCase):
         kwargs["config"] = config_obj
 
         async def run_bg_updates():
-            with LoggingContext("run_bg_updates", request_id="run_bg_updates-1"):
+            with LoggingContext("run_bg_updates"):
                 while not await stor.db_pool.updates.has_completed_background_updates():
                     await stor.db_pool.updates.do_next_background_update(1)
 
