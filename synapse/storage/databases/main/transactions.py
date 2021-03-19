@@ -320,62 +320,23 @@ class TransactionStore(TransactionWorkerStore):
             stream_ordering: the stream_ordering of the event
         """
 
-        while True:
-            try:
-                return await self.db_pool.runInteraction(
-                    "store_destination_rooms_entries",
-                    self._store_destination_rooms_entries_txn,
-                    destinations,
-                    room_id,
-                    stream_ordering,
-                )
-            except SerializationFailure as e:
-                logger.debug(
-                    "Could not finish _store_destination_rooms_entries_txn due to SerializationFailure, retrying...",
-                    exc_info=e,
-                )
-
-                # This is fine, as SerializationFailure cannot be caused by anything else than postgres rolling back
-                # the transaction because another transaction (concurrently) has updated the view of the table,
-                # there "can be only one" transaction that wins, in that regard, and so we try again (because the other
-                # transaction has succeeded).
-                continue
-
-    def _store_destination_rooms_entries_txn(
-        self,
-        txn: LoggingTransaction,
-        destinations: Iterable[str],
-        room_id: str,
-        stream_ordering: int,
-    ) -> None:
-
-        # ensure we have a `destinations` row for this destination, as there is
-        # a foreign key constraint.
-        if isinstance(self.database_engine, PostgresEngine):
-            q = """
-                INSERT INTO destinations (destination)
-                    VALUES (?)
-                    ON CONFLICT DO NOTHING;
-            """
-        elif isinstance(self.database_engine, Sqlite3Engine):
-            q = """
-                INSERT OR IGNORE INTO destinations (destination)
-                    VALUES (?);
-            """
-        else:
-            raise RuntimeError("Unknown database engine")
-
-        txn.execute_batch(q, ((destination,) for destination in destinations))
+        await self.db_pool.simple_upsert_many(
+            table="destinations",
+            key_names=("destination",),
+            key_values=[(d,) for d in destinations],
+            value_names=[],
+            value_values=[],
+            desc="store_destination_rooms_entries_dests",
+        )
 
         rows = [(destination, room_id) for destination in destinations]
-
-        self.db_pool.simple_upsert_many_txn(
-            txn,
+        await self.db_pool.simple_upsert_many(
             table="destination_rooms",
             key_names=("destination", "room_id"),
             key_values=rows,
             value_names=["stream_ordering"],
             value_values=[(stream_ordering,)] * len(rows),
+            desc="store_destination_rooms_entries_rooms",
         )
 
     async def get_destination_last_successful_stream_ordering(
