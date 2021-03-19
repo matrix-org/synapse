@@ -425,7 +425,7 @@ def _can_send_event(event: EventBase, auth_events: StateMap[EventBase]) -> bool:
     if user_level < send_level:
         raise AuthError(
             403,
-            "You don't have permission to post that to the room. "
+            ("You don't have permission to post that %s to the room. " % event.type)
             + "user_level (%d) < send_level (%d)" % (user_level, send_level),
         )
 

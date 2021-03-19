@@ -12,15 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import json
+import random
+import uuid
+from typing import Dict, List, Tuple
 
 import synapse.rest.admin
 from synapse.api.errors import Codes
 from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import report_event
+from synapse.rest.client.v2_alpha import report_event, sync
+from synapse.server_notices.server_notices_manager import ServerNoticesManager
 
 from tests import unittest
+from tests.unittest import override_config
 
 
 class EventReportsTestCase(unittest.HomeserverTestCase):
@@ -374,7 +377,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST",
             "rooms/%s/report/%s" % (room_id, event_id),
-            json.dumps({"score": -100, "reason": "this makes me sad"}),
+            {"score": -100, "reason": "this makes me sad"},
             access_token=user_tok,
         )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -525,11 +528,12 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         """Create and report events"""
         resp = self.helper.send(room_id, tok=user_tok)
         event_id = resp["event_id"]
+        print("_create_event_and_report: %s" % resp)
 
         channel = self.make_request(
             "POST",
             "rooms/%s/report/%s" % (room_id, event_id),
-            json.dumps({"score": -100, "reason": "this makes me sad"}),
+            {"score": -100, "reason": "this makes me sad"},
             access_token=user_tok,
         )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -552,3 +556,324 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         self.assertIn("room_id", content["event_json"])
         self.assertIn("sender", content["event_json"])
         self.assertIn("content", content["event_json"])
+
+
+class ReportToModeratorTestCase(unittest.HomeserverTestCase):
+    """
+    Test for MSC 2938: Reporting content to moderator instead of system
+    administrator.
+    """
+
+    servlets = [
+        sync.register_servlets,
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+        report_event.register_servlets,
+    ]
+
+    class TestUser:
+        """
+        Trivial container for users along with their role.
+        """
+
+        role: str
+        mxid: str
+        tok: str
+
+        def __init__(self, mxid, tok, role):
+            self.role = role
+            self.mxid = mxid
+            self.tok = tok
+
+    class TestRoom:
+        """
+        Trivial container for rooms along with their config.
+        """
+
+        role: str
+        is_public: bool
+        is_encrypted: bool
+        events: List
+
+        def __init__(self, mxid, is_public, is_encrypted):
+            self.mxid = mxid
+            self.is_public = is_public
+            self.events = []
+
+    users: Dict[str, TestUser]
+    rooms: List[TestRoom]
+    url: str
+    server_notices: ServerNoticesManager
+
+    def prepare(self, reactor, clock, hs):
+        print("hs %s" % hs)
+
+        # Prepare a bunch of users.
+        self.users = {}
+        for role in ["admin", "creator", "moderator", "author", "reporter", "exterior"]:
+            self.users[role] = self.TestUser(
+                role=role,
+                mxid=self.register_user(
+                    "user_%s" % role, "pass", admin=(role == "admin")
+                ),
+                tok=self.login("user_%s" % role, "pass"),
+            )
+
+        # Prepare a handful of rooms with distinct configurations.
+        self.rooms = []
+        user_creator = self.users["creator"]
+        user_moderator = self.users["moderator"]
+        for is_public in [False, True]:
+            for is_encrypted in [False, True]:
+                # Create the room.
+                room_id = self.helper.create_room_as(
+                    user_creator.mxid, tok=user_creator.tok, is_public=is_public
+                )
+                room = self.TestRoom(
+                    is_public=is_public, is_encrypted=is_encrypted, mxid=room_id
+                )
+                self.rooms.append(room)
+
+                # Join the room.
+                for user in self.users.values():
+                    if user.role != "exterior" and user.role != "creator":
+                        self.helper.invite(
+                            room_id,
+                            src=user_creator.mxid,
+                            targ=user.mxid,
+                            tok=user_creator.tok,
+                        )
+                        self.helper.join(room_id, user=user.mxid, tok=user.tok)
+
+                # Encrypt the room if necessary
+                if is_encrypted:
+                    self.helper.send_state(
+                        room_id,
+                        "m.room.encryption",
+                        {"algorithm": "m.megolm.v1.aes-sha2"},
+                        tok=user_creator.tok,
+                        expect_code=200,
+                    )
+
+                # Mod the room.
+                room_power_levels = self.helper.get_state(
+                    room_id, "m.room.power_levels", tok=user_creator.tok,
+                )
+                room_power_levels["users"].update(
+                    {user_moderator.mxid: 50, user_creator.mxid: 0}
+                )
+                self.helper.send_state(
+                    room_id,
+                    "m.room.power_levels",
+                    room_power_levels,
+                    tok=user_creator.tok,
+                )
+
+                # Populate the room with messages
+                for i in range(0, 2):
+                    for user in self.users.values():
+                        if user.role != "exterior":
+                            body = uuid.uuid4().hex
+                            resp = self.helper.send(room_id, body=body, tok=user.tok)
+                            room.events.append((resp["event_id"], body, room_id))
+
+        self.url = "/_synapse/admin/v1/event_reports"
+        self.server_notices = self.hs.get_server_notices_manager()
+
+    def _get_notice_messages(self, user: TestUser):
+        print("_get_notice_messages for %s %s" % (user.role, user.tok))
+        # Initial sync, to get any invite
+        channel = self.make_request(
+            "GET", "/_matrix/client/r0/sync", access_token=user.tok
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        # Get the Room ID to join
+        invites = channel.json_body["rooms"]["invite"]
+        if len(invites) == 0:
+            return None
+        # The moderator MUST been invited.
+        room_id = list(invites.keys())[0]
+
+        # Join the room
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/rooms/" + room_id + "/join",
+            access_token=user.tok,
+        )
+        self.assertEqual(channel.code, 200)
+
+        # Sync again, to get the latest message in the room
+        channel = self.make_request(
+            "GET", "/_matrix/client/r0/sync", access_token=user.tok
+        )
+        self.assertEqual(channel.code, 200)
+
+        # Get the messages
+        room = channel.json_body["rooms"]["join"][room_id]
+        print("Events in room %s" % room["timeline"]["events"])
+        messages = [
+            x for x in room["timeline"]["events"] if x["type"] == "m.room.message"
+        ]
+        prev_batch = room["timeline"]["prev_batch"]
+        while prev_batch is not None:
+            response = self.make_request(
+                "GET",
+                "/_matrix/client/r0/rooms/%(room_id)s/messages?from=%(from)s&dir=%(dir)s&limit=%(limit)s"
+                % {"room_id": room_id, "from": prev_batch, "dir": "b", "limit": 100},
+                access_token=user.tok,
+            )
+            prev_batch = response.json_body.get("end", None)
+            chunk = response.json_body.get("chunk", [])
+            if len(chunk) == 0:
+                # No more messages to read
+                break
+            for event in chunk:
+                if event["type"] == "m.room.message":
+                    messages.append(event)
+
+        return messages
+
+    @override_config({"server_notices": {"system_mxid_localpart": "server-notices"}})
+    def test_good_report(self):
+        """
+        A user who is member of the room reports an event in that room.
+
+        The report should be accepted and received by the moderator as
+        a server notice.
+        """
+        sent_reports_by_id: Dict[
+            str, Dict[str, Tuple[ReportToModeratorTestCase.TestRoom, int, str]]
+        ] = {}
+        for current_room in self.rooms:
+            for user in self.users.values():
+                [partial_event_id, _, room_id] = current_room.events[
+                    len(current_room.events) // 2
+                ]
+                event_id = "%s:%s" % (partial_event_id, self.hs.hostname)
+
+                # Post report
+                reason = uuid.uuid4().hex
+                score = random.randrange(-100, 0)
+                channel = self.make_request(
+                    "POST",
+                    "/_matrix/client/r0/rooms/%s/report/%s" % (room_id, event_id),
+                    {
+                        "score": score,
+                        "reason": reason,
+                        "org.matrix.msc2938.target": "room-moderators",
+                    },
+                    access_token=user.tok,
+                )
+
+                if user.role == "exterior":
+                    # The exterior cannot post the report because they can't witness the event.
+                    self.assertEqual(
+                        400, int(channel.result["code"]), msg=channel.result["body"]
+                    )
+                else:
+                    # Everybody else can post the report
+                    reports_for_id = sent_reports_by_id.get(event_id, None)
+                    if reports_for_id is None:
+                        reports_for_id = {}
+                        sent_reports_by_id[event_id] = reports_for_id
+                    reports_for_id[user.mxid] = (current_room, score, reason)
+                    self.assertEqual(
+                        200, int(channel.result["code"]), msg=channel.result["body"]
+                    )
+
+        for user in self.users.values():
+            messages = self._get_notice_messages(user)
+            if user.role != "moderator":
+                # Only the moderator should receive messages.
+                self.assertEquals(
+                    messages, None, "We shouldn't receive messages %s" % messages
+                )
+            else:
+                # The moderator should receive all the messages.
+                for message in messages:
+                    reported_event_id = message["content"]["eventId"]
+                    reporter_user_id = message["content"]["userId"]
+
+                    sent_reports_for_event_id = sent_reports_by_id[reported_event_id]
+                    print("Keys %s" % sent_reports_for_event_id.keys())
+                    sent_report = sent_reports_for_event_id[reporter_user_id]
+
+                    self.assertEqual(sent_report[0].mxid, message["content"]["roomId"])
+                    self.assertEqual(sent_report[1], int(message["content"]["score"]))
+                    self.assertEqual(sent_report[2], message["content"]["reason"])
+
+                    # Progressively clean up sent_reports_by_id, it should
+                    # be empty by the time we're done.
+                    del sent_reports_for_event_id[reporter_user_id]
+                    if len(sent_reports_for_event_id) == 0:
+                        del sent_reports_by_id[reported_event_id]
+
+        self.assertEquals(
+            len(sent_reports_by_id),
+            0,
+            "We should have received all the messages %s" % sent_reports_by_id,
+        )
+
+    @override_config({"server_notices": {"system_mxid_localpart": "reporter"}})
+    def test_bad_report(self):
+        """
+        Sending a report with an event id that is ill-formed will trigger an error.
+        """
+        for user in self.users.values():
+            channel = self.make_request(
+                "POST",
+                "/_matrix/client/r0/rooms/%s/report/%s"
+                % (
+                    self.rooms[0].mxid,
+                    "if-you-look-closely-you-will-realize-that-this-event-id-is-somewhat-fishy",
+                ),
+                {
+                    "score": -100,
+                    "reason": "some reason",
+                    "org.matrix.msc2938.target": "room-moderators",
+                },
+                access_token=user.tok,
+            )
+            self.assertEqual(
+                400, int(channel.result["code"]), msg=channel.result["body"]
+            )
+
+    @override_config({"server_notices": None})
+    def test_no_notices(self):
+        """
+        Sending a report with user notices doesn't cause an error.
+        """
+        for current_room in self.rooms:
+            for user in self.users.values():
+                [partial_event_id, _, room_id] = current_room.events[
+                    len(current_room.events) // 2
+                ]
+                event_id = "%s:%s" % (partial_event_id, self.hs.hostname)
+
+                # Post report
+                reason = uuid.uuid4().hex
+                score = random.randrange(-100, 0)
+                channel = self.make_request(
+                    "POST",
+                    "/_matrix/client/r0/rooms/%s/report/%s" % (room_id, event_id),
+                    {
+                        "score": score,
+                        "reason": reason,
+                        "org.matrix.msc2938.target": "room-moderators",
+                    },
+                    access_token=user.tok,
+                )
+
+                if user.role == "exterior":
+                    # The exterior cannot post the report because they can't witness the event.
+                    self.assertEqual(
+                        400, int(channel.result["code"]), msg=channel.result["body"]
+                    )
+                else:
+                    # Everybody else can post the report (although it will be ignored
+                    # in this case).
+                    self.assertEqual(
+                        200, int(channel.result["code"]), msg=channel.result["body"]
+                    )
