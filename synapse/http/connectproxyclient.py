@@ -22,6 +22,7 @@ from twisted.internet.error import ConnectError
 from twisted.internet.interfaces import IStreamClientEndpoint
 from twisted.internet.protocol import connectionDone
 from twisted.web import http
+from twisted.web.http_headers import Headers
 
 logger = logging.getLogger(__name__)
 
@@ -47,19 +48,23 @@ class HTTPConnectProxyEndpoint:
             proxy
         host (bytes): hostname that we want to CONNECT to
         port (int): port that we want to connect to
+        headers: Extra HTTP headers to include in the CONNECT request
     """
 
-    def __init__(self, reactor, proxy_endpoint, host, port):
+    def __init__(self, reactor, proxy_endpoint, host, port, headers):
         self._reactor = reactor
         self._proxy_endpoint = proxy_endpoint
         self._host = host
         self._port = port
+        self._headers = headers
 
     def __repr__(self):
         return "<HTTPConnectProxyEndpoint %s>" % (self._proxy_endpoint,)
 
     def connect(self, protocolFactory):
-        f = HTTPProxiedClientFactory(self._host, self._port, protocolFactory)
+        f = HTTPProxiedClientFactory(
+            self._host, self._port, protocolFactory, self._headers
+        )
         d = self._proxy_endpoint.connect(f)
         # once the tcp socket connects successfully, we need to wait for the
         # CONNECT to complete.
@@ -77,12 +82,14 @@ class HTTPProxiedClientFactory(protocol.ClientFactory):
         dst_host (bytes): hostname that we want to CONNECT to
         dst_port (int): port that we want to connect to
         wrapped_factory (protocol.ClientFactory): The original Factory
+        headers: Extra HTTP headers to include in the CONNECT request
     """
 
-    def __init__(self, dst_host, dst_port, wrapped_factory):
+    def __init__(self, dst_host, dst_port, wrapped_factory, headers):
         self.dst_host = dst_host
         self.dst_port = dst_port
         self.wrapped_factory = wrapped_factory
+        self.headers = headers
         self.on_connection = defer.Deferred()
 
     def startedConnecting(self, connector):
@@ -92,7 +99,11 @@ class HTTPProxiedClientFactory(protocol.ClientFactory):
         wrapped_protocol = self.wrapped_factory.buildProtocol(addr)
 
         return HTTPConnectProtocol(
-            self.dst_host, self.dst_port, wrapped_protocol, self.on_connection
+            self.dst_host,
+            self.dst_port,
+            wrapped_protocol,
+            self.on_connection,
+            self.headers,
         )
 
     def clientConnectionFailed(self, connector, reason):
@@ -122,14 +133,22 @@ class HTTPConnectProtocol(protocol.Protocol):
 
         connected_deferred (Deferred): a Deferred which will be callbacked with
             wrapped_protocol when the CONNECT completes
+
+        headers: Extra HTTP headers to include in the CONNECT request
     """
 
-    def __init__(self, host, port, wrapped_protocol, connected_deferred):
+    def __init__(
+        self, host, port, wrapped_protocol, connected_deferred, headers: Headers
+    ):
         self.host = host
         self.port = port
         self.wrapped_protocol = wrapped_protocol
         self.connected_deferred = connected_deferred
-        self.http_setup_client = HTTPConnectSetupClient(self.host, self.port)
+        self.headers = headers
+
+        self.http_setup_client = HTTPConnectSetupClient(
+            self.host, self.port, self.headers
+        )
         self.http_setup_client.on_connected.addCallback(self.proxyConnected)
 
     def connectionMade(self):
@@ -170,16 +189,24 @@ class HTTPConnectSetupClient(http.HTTPClient):
     Args:
         host (bytes): The hostname to send in the CONNECT message
         port (int): The port to send in the CONNECT message
+        headers: Extra headers to send with the CONNECT message
     """
 
-    def __init__(self, host, port):
+    def __init__(self, host, port, headers: Headers):
         self.host = host
         self.port = port
+        self.headers = headers
         self.on_connected = defer.Deferred()
 
     def connectionMade(self):
         logger.debug("Connected to proxy, sending CONNECT")
         self.sendCommand(b"CONNECT", b"%s:%d" % (self.host, self.port))
+
+        # Send any additional specified headers
+        for name, values in self.headers.getAllRawHeaders():
+            for value in values:
+                self.sendHeader(name, value)
+
         self.endHeaders()
 
     def handleStatus(self, version, status, message):
