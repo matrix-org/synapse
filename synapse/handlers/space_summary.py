@@ -16,7 +16,7 @@
 import itertools
 import logging
 from collections import deque
-from typing import TYPE_CHECKING, Iterable, List, Optional, Set
+from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence, Set, Tuple
 
 import attr
 
@@ -85,52 +85,64 @@ class SpaceSummaryHandler:
         rooms_result = []  # type: List[JsonDict]
         events_result = []  # type: List[JsonDict]
 
-        now = self._clock.time_msec()
-
         while room_queue and len(rooms_result) < MAX_ROOMS:
             queue_entry = room_queue.popleft()
             room_id = queue_entry.room_id
             logger.debug("Processing room %s", room_id)
             processed_rooms.add(room_id)
 
-            if not await self._is_room_accessible(room_id, requester):
-                continue
-
-            room_entry = await self._build_room_entry(room_id)
-            rooms_result.append(room_entry)
-
-            # look for child rooms/spaces.
-            child_events = await self._get_child_events(room_id)
-
-            if suggested_only:
-                # we only care about suggested children
-                child_events = filter(_is_suggested_child_event, child_events)
-
             # The client-specified max_rooms_per_space limit doesn't apply to the
             # room_id specified in the request, so we ignore it if this is the
-            # first room we are processing. Otherwise, apply any client-specified
-            # limit, capping to our built-in limit.
-            if max_rooms_per_space is not None and len(processed_rooms) > 1:
-                max_rooms = min(MAX_ROOMS_PER_SPACE, max_rooms_per_space)
-            else:
-                max_rooms = MAX_ROOMS_PER_SPACE
+            # first room we are processing.
+            max_children = max_rooms_per_space if processed_rooms else None
 
-            for edge_event in itertools.islice(child_events, max_rooms):
-                edge_room_id = edge_event.state_key
+            rooms, events = await self._summarize_local_room(
+                requester, room_id, suggested_only, max_children
+            )
 
-                events_result.append(
-                    await self._event_serializer.serialize_event(
-                        edge_event,
-                        time_now=now,
-                        event_format=format_event_for_client_v2,
-                    )
-                )
+            rooms_result.extend(rooms)
+            events_result.extend(events)
 
-                # if we haven't yet visited the target of this link, add it to the queue
-                if edge_room_id not in processed_rooms:
-                    room_queue.append(edge_room_id)
+            # add any children that we haven't already processed to the queue
+            for edge_event in events:
+                if edge_event["state_key"] not in processed_rooms:
+                    room_queue.append(_RoomQueueEntry(edge_event["state_key"]))
 
         return {"rooms": rooms_result, "events": events_result}
+
+    async def _summarize_local_room(
+        self,
+        requester: str,
+        room_id: str,
+        suggested_only: bool,
+        max_children: Optional[int],
+    ) -> Tuple[Sequence[JsonDict], Sequence[JsonDict]]:
+        if not await self._is_room_accessible(room_id, requester):
+            return (), ()
+
+        room_entry = await self._build_room_entry(room_id)
+
+        # look for child rooms/spaces.
+        child_events = await self._get_child_events(room_id)
+
+        if suggested_only:
+            # we only care about suggested children
+            child_events = filter(_is_suggested_child_event, child_events)
+
+        if max_children is None or max_children > MAX_ROOMS_PER_SPACE:
+            max_children = MAX_ROOMS_PER_SPACE
+
+        now = self._clock.time_msec()
+        events_result = []  # type: List[JsonDict]
+        for edge_event in itertools.islice(child_events, max_children):
+            events_result.append(
+                await self._event_serializer.serialize_event(
+                    edge_event,
+                    time_now=now,
+                    event_format=format_event_for_client_v2,
+                )
+            )
+        return (room_entry,), events_result
 
     async def _is_room_accessible(self, room_id: str, requester: str) -> bool:
         try:
