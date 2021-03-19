@@ -21,8 +21,6 @@ import re
 from typing import TYPE_CHECKING, List, Optional, Tuple
 from urllib import parse as urlparse
 
-from twisted.web.server import Request
-
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
@@ -42,6 +40,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import set_tag
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.rest.client.v2_alpha._base import client_patterns
@@ -1010,7 +1009,9 @@ class RoomSpaceSummaryRestServlet(RestServlet):
         self._auth = hs.get_auth()
         self._space_summary_handler = hs.get_space_summary_handler()
 
-    async def on_GET(self, request: Request, room_id: str) -> Tuple[int, JsonDict]:
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self._auth.get_user_by_req(request, allow_guest=True)
 
         return 200, await self._space_summary_handler.get_space_summary(
@@ -1020,7 +1021,9 @@ class RoomSpaceSummaryRestServlet(RestServlet):
             max_rooms_per_space=parse_integer(request, "max_rooms_per_space"),
         )
 
-    async def on_POST(self, request: Request, room_id: str) -> Tuple[int, JsonDict]:
+    async def on_POST(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self._auth.get_user_by_req(request, allow_guest=True)
         content = parse_json_object_from_request(request)
 
