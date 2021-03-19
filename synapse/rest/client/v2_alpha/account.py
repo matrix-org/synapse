@@ -879,9 +879,14 @@ class WhoamiRestServlet(RestServlet):
         self.auth = hs.get_auth()
 
     async def on_GET(self, request):
-        requester = await self.auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
-        return 200, {"user_id": requester.user.to_string()}
+        return 200, {
+            "user_id": requester.user.to_string(),
+
+            # MSC: https://github.com/matrix-org/matrix-doc/pull/3069
+            "org.matrix.msc3069.is_guest": bool(requester.is_guest),
+        }
 
 
 def register_servlets(hs, http_server):
