@@ -25,14 +25,6 @@ from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.types import JsonDict
 from synapse.util.caches.expiringcache import ExpiringCache
 
-try:
-    from psycopg2.errors import SerializationFailure
-except ImportError:
-    # No postgres, no harm in making it a dummy class.
-    class SerializationFailure(Exception):
-        ...
-
-
 db_binary_type = memoryview
 
 logger = logging.getLogger(__name__)
