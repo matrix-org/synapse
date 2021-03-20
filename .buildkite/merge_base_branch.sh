@@ -2,6 +2,9 @@
 
 set -e
 
+echo "we made it to complement, things are good!"
+exit 1
+
 if [[ "$BUILDKITE_BRANCH" =~ ^(develop|master|dinsic|shhs|release-.*)$ ]]; then
     echo "Not merging forward, as this is a release branch"
     exit 0
