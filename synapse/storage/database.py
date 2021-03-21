@@ -670,10 +670,10 @@ class DatabasePool:
 
             for after_callback, after_args, after_kwargs in after_callbacks:
                 after_callback(*after_args, **after_kwargs)
-        except:  # noqa: E722, as we reraise the exception this is fine.
+        except Exception as e:
             for after_callback, after_args, after_kwargs in exception_callbacks:
                 after_callback(*after_args, **after_kwargs)
-            raise
+            raise e
 
         return cast(R, result)
 

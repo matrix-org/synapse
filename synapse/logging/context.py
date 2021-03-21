@@ -689,10 +689,10 @@ def run_in_background(f, *args, **kwargs) -> defer.Deferred:
     current = current_context()
     try:
         res = f(*args, **kwargs)
-    except:  # noqa: E722
+    except Exception as e:
         # the assumption here is that the caller doesn't want to be disturbed
         # by synchronous exceptions, so let's turn them into Failures.
-        return defer.fail()
+        return defer.fail(e)
 
     if isinstance(res, types.CoroutineType):
         res = defer.ensureDeferred(res)
