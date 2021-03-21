@@ -593,7 +593,7 @@ class FakeTransport:
         if self.disconnected:
             return
 
-        if hasattr(self.other, "transport"):
+        if not hasattr(self.other, "transport"):
             # the other has no transport yet; reschedule
             if self.autoflush:
                 self._reactor.callLater(0.0, self.flush)
