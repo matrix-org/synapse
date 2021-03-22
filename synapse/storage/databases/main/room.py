@@ -521,9 +521,7 @@ class RoomWorkerStore(SQLBaseStore):
         )
 
     @cached(max_entries=10000)
-    async def get_ratelimit_for_user(
-        self, user_id: str
-    ) -> Optional[RatelimitOverride]:
+    async def get_ratelimit_for_user(self, user_id: str) -> Optional[RatelimitOverride]:
         """Check if there are any overrides for ratelimiting for the given user
 
         Args:
@@ -577,7 +575,7 @@ class RoomWorkerStore(SQLBaseStore):
         await self.db_pool.runInteraction("set_ratelimit", set_ratelimit_txn)
 
     async def delete_ratelimit_for_user(self, user_id: str) -> None:
-        """Delete an overridden ratelimit for a user. 
+        """Delete an overridden ratelimit for a user.
         Args:
             user_id: user ID of the user
         """
