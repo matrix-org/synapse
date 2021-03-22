@@ -15,6 +15,7 @@
 import base64
 import logging
 import os
+from typing import Optional
 from unittest.mock import patch
 
 import treq
@@ -241,11 +242,23 @@ class MatrixFederationAgentTests(TestCase):
         body = self.successResultOf(treq.content(resp))
         self.assertEqual(body, b"result")
 
+    @patch.dict(os.environ, {"https_proxy": "proxy.com", "no_proxy": "unused.com"})
+    def test_https_request_via_proxy(self):
+        """Tests that TLS-encrypted requests can be made through a proxy"""
+        self._do_https_request_via_proxy(auth_credentials=None)
+
     @patch.dict(
         os.environ,
         {"https_proxy": "bob:pinkponies@proxy.com", "no_proxy": "unused.com"},
     )
-    def test_https_request_via_proxy(self):
+    def test_https_request_via_proxy_with_auth(self):
+        """Tests that authenticated, TLS-encrypted requests can be made through a proxy"""
+        self._do_https_request_via_proxy(auth_credentials="bob:pinkponies")
+
+    def _do_https_request_via_proxy(
+        self,
+        auth_credentials: Optional[str] = None,
+    ):
         agent = ProxyAgent(
             self.reactor,
             contextFactory=get_test_https_policy(),
@@ -282,15 +295,21 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual(request.method, b"CONNECT")
         self.assertEqual(request.path, b"test.com:443")
 
-        # Check that credentials have been supplied for the proxy
+        # Check whether auth credentials have been supplied to the proxy
         proxy_auth_header_values = request.requestHeaders.getRawHeaders(
             b"Proxy-Authorization"
         )
 
-        # Compute the correct header value for Proxy-Authorization
-        encoded_credentials = base64.b64encode(b"bob:pinkponies")
-        expected_header_value = b"Basic " + encoded_credentials
-        self.assertIn(expected_header_value, proxy_auth_header_values)
+        if auth_credentials is not None:
+            # Compute the correct header value for Proxy-Authorization
+            encoded_credentials = base64.b64encode(b"bob:pinkponies")
+            expected_header_value = b"Basic " + encoded_credentials
+
+            # Validate the header's value
+            self.assertIn(expected_header_value, proxy_auth_header_values)
+        else:
+            # Check that the Proxy-Authorization header has not been supplied to the proxy
+            self.assertIsNone(proxy_auth_header_values)
 
         # tell the proxy server not to close the connection
         proxy_server.persistent = True
