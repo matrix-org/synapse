@@ -1130,9 +1130,10 @@ class PresenceEventSource:
                 if from_key:
                     # We need to return all new presence updates to this user, regardless of whether
                     # they share a room with that user
-                    return await self._filter_all_presence_updates_for_user(
-                        user_id, max_token, from_key, include_offline
+                    presence_updates = await self._filter_all_presence_updates_for_user(
+                        user_id, from_key, include_offline
                     )
+                    return presence_updates, max_token
                 else:
                     # This user should receive all user presence, and hasn't provided a from_key.
                     # Send all currently known user presence states.
@@ -1201,10 +1202,24 @@ class PresenceEventSource:
     async def _filter_all_presence_updates_for_user(
         self,
         user_id: str,
-        max_token: int,
         from_key: int,
         include_offline: bool,
-    ) -> Tuple[List[UserPresenceState], int]:
+    ) -> List[UserPresenceState]:
+        """
+        Computes the presence updates a user should receive.
+
+        First pulls presence updates from the database. Then consults presence_router
+        for whether updates should be excluded by user ID.
+
+        Args:
+            user_id: The User ID of the user to compute presence updates for.
+            from_key: The minimum stream ID of updates to pull from the database
+                before filtering.
+            include_offline: Whether to include offline presence states from the results.
+
+        Returns:
+            A list of presence states for the given user to receive.
+        """
         # Only return updates since the last sync
         updated_users = self.store.presence_stream_cache.get_all_entities_changed(
             from_key
@@ -1238,7 +1253,7 @@ class PresenceEventSource:
             presence_updates = self._filter_offline_presence_state(presence_updates)
 
         # Return presence updates for all users since the last sync
-        return presence_updates, max_token
+        return presence_updates
 
     def _filter_offline_presence_state(
         self, presence_updates: Iterable[UserPresenceState]
