@@ -176,7 +176,9 @@ class ContentRepositoryConfig(Config):
                 check_requirements("url_preview")
 
             except DependencyException as e:
-                raise ConfigError(e.message)
+                raise ConfigError(
+                    e.message  # noqa: B306, DependencyException.message is a property
+                )
 
             if "url_preview_ip_range_blacklist" not in config:
                 raise ConfigError(

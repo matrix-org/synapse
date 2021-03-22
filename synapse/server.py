@@ -96,10 +96,11 @@ from synapse.handlers.room import (
     RoomShutdownHandler,
 )
 from synapse.handlers.room_list import RoomListHandler
-from synapse.handlers.room_member import RoomMemberMasterHandler
+from synapse.handlers.room_member import RoomMemberHandler, RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.search import SearchHandler
 from synapse.handlers.set_password import SetPasswordHandler
+from synapse.handlers.space_summary import SpaceSummaryHandler
 from synapse.handlers.sso import SsoHandler
 from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
@@ -417,9 +418,18 @@ class HomeServer(metaclass=abc.ABCMeta):
         return PresenceHandler(self)
 
     @cache_in_self
-    def get_typing_handler(self):
+    def get_typing_writer_handler(self) -> TypingWriterHandler:
         if self.config.worker.writers.typing == self.get_instance_name():
             return TypingWriterHandler(self)
+        else:
+            raise Exception("Workers cannot write typing")
+
+    @cache_in_self
+    def get_typing_handler(self) -> FollowerTypingHandler:
+        if self.config.worker.writers.typing == self.get_instance_name():
+            # Use get_typing_writer_handler to ensure that we use the same
+            # cached version.
+            return self.get_typing_writer_handler()
         else:
             return FollowerTypingHandler(self)
 
@@ -630,7 +640,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return ThirdPartyEventRules(self)
 
     @cache_in_self
-    def get_room_member_handler(self):
+    def get_room_member_handler(self) -> RoomMemberHandler:
         if self.config.worker_app:
             return RoomMemberWorkerHandler(self)
         return RoomMemberMasterHandler(self)
@@ -722,6 +732,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_account_data_handler(self) -> AccountDataHandler:
         return AccountDataHandler(self)
+
+    @cache_in_self
+    def get_space_summary_handler(self) -> SpaceSummaryHandler:
+        return SpaceSummaryHandler(self)
 
     @cache_in_self
     def get_external_cache(self) -> ExternalCache:

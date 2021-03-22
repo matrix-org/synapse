@@ -15,11 +15,12 @@
 # limitations under the License.
 
 from collections import Counter
-from typing import Iterable, Mapping, Optional, Tuple, Type
+from typing import Iterable, List, Mapping, Optional, Tuple, Type
 
 import attr
 
 from synapse.config._util import validate_config
+from synapse.config.sso import SsoAttributeRequirement
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.types import Collection, JsonDict
 from synapse.util.module_loader import load_module
@@ -41,7 +42,9 @@ class OIDCConfig(Config):
         try:
             check_requirements("oidc")
         except DependencyException as e:
-            raise ConfigError(e.message) from e
+            raise ConfigError(
+                e.message  # noqa: B306, DependencyException.message is a property
+            ) from e
 
         # check we don't have any duplicate idp_ids now. (The SSO handler will also
         # check for duplicates when the REST listeners get registered, but that happens
@@ -191,6 +194,24 @@ class OIDCConfig(Config):
         #           which is set to the claims returned by the UserInfo Endpoint and/or
         #           in the ID Token.
         #
+        #   It is possible to configure Synapse to only allow logins if certain attributes
+        #   match particular values in the OIDC userinfo. The requirements can be listed under
+        #   `attribute_requirements` as shown below. All of the listed attributes must
+        #   match for the login to be permitted. Additional attributes can be added to
+        #   userinfo by expanding the `scopes` section of the OIDC config to retrieve
+        #   additional information from the OIDC provider.
+        #
+        #   If the OIDC claim is a list, then the attribute must match any value in the list.
+        #   Otherwise, it must exactly match the value of the claim. Using the example
+        #   below, the `family_name` claim MUST be "Stephensson", but the `groups`
+        #   claim MUST contain "admin".
+        #
+        #   attribute_requirements:
+        #     - attribute: family_name
+        #       value: "Stephensson"
+        #     - attribute: groups
+        #       value: "admin"
+        #
         # See https://github.com/matrix-org/synapse/blob/master/docs/openid.md
         # for information on how to configure these options.
         #
@@ -223,6 +244,9 @@ class OIDCConfig(Config):
           #      localpart_template: "{{{{ user.login }}}}"
           #      display_name_template: "{{{{ user.name }}}}"
           #      email_template: "{{{{ user.email }}}}"
+          #  attribute_requirements:
+          #    - attribute: userGroup
+          #      value: "synapseUsers"
 
           # For use with Keycloak
           #
@@ -232,6 +256,9 @@ class OIDCConfig(Config):
           #  client_id: "synapse"
           #  client_secret: "copy secret generated in Keycloak UI"
           #  scopes: ["openid", "profile"]
+          #  attribute_requirements:
+          #    - attribute: groups
+          #      value: "admin"
 
           # For use with Github
           #
@@ -329,6 +356,10 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
         },
         "allow_existing_users": {"type": "boolean"},
         "user_mapping_provider": {"type": ["object", "null"]},
+        "attribute_requirements": {
+            "type": "array",
+            "items": SsoAttributeRequirement.JSON_SCHEMA,
+        },
     },
 }
 
@@ -465,6 +496,11 @@ def _parse_oidc_config_dict(
             jwt_header=client_secret_jwt_key_config["jwt_header"],
             jwt_payload=client_secret_jwt_key_config.get("jwt_payload", {}),
         )
+    # parse attribute_requirements from config (list of dicts) into a list of SsoAttributeRequirement
+    attribute_requirements = [
+        SsoAttributeRequirement(**x)
+        for x in oidc_config.get("attribute_requirements", [])
+    ]
 
     return OidcProviderConfig(
         idp_id=idp_id,
@@ -488,6 +524,7 @@ def _parse_oidc_config_dict(
         allow_existing_users=oidc_config.get("allow_existing_users", False),
         user_mapping_provider_class=user_mapping_provider_class,
         user_mapping_provider_config=user_mapping_provider_config,
+        attribute_requirements=attribute_requirements,
     )
 
 
@@ -577,3 +614,6 @@ class OidcProviderConfig:
 
     # the config of the user mapping provider
     user_mapping_provider_config = attr.ib()
+
+    # required attributes to require in userinfo to allow login/registration
+    attribute_requirements = attr.ib(type=List[SsoAttributeRequirement])

@@ -1880,6 +1880,24 @@ saml2_config:
 #           which is set to the claims returned by the UserInfo Endpoint and/or
 #           in the ID Token.
 #
+#   It is possible to configure Synapse to only allow logins if certain attributes
+#   match particular values in the OIDC userinfo. The requirements can be listed under
+#   `attribute_requirements` as shown below. All of the listed attributes must
+#   match for the login to be permitted. Additional attributes can be added to
+#   userinfo by expanding the `scopes` section of the OIDC config to retrieve
+#   additional information from the OIDC provider.
+#
+#   If the OIDC claim is a list, then the attribute must match any value in the list.
+#   Otherwise, it must exactly match the value of the claim. Using the example
+#   below, the `family_name` claim MUST be "Stephensson", but the `groups`
+#   claim MUST contain "admin".
+#
+#   attribute_requirements:
+#     - attribute: family_name
+#       value: "Stephensson"
+#     - attribute: groups
+#       value: "admin"
+#
 # See https://github.com/matrix-org/synapse/blob/master/docs/openid.md
 # for information on how to configure these options.
 #
@@ -1912,6 +1930,9 @@ oidc_providers:
   #      localpart_template: "{{ user.login }}"
   #      display_name_template: "{{ user.name }}"
   #      email_template: "{{ user.email }}"
+  #  attribute_requirements:
+  #    - attribute: userGroup
+  #      value: "synapseUsers"
 
   # For use with Keycloak
   #
@@ -1921,6 +1942,9 @@ oidc_providers:
   #  client_id: "synapse"
   #  client_secret: "copy secret generated in Keycloak UI"
   #  scopes: ["openid", "profile"]
+  #  attribute_requirements:
+  #    - attribute: groups
+  #      value: "admin"
 
   # For use with Github
   #
