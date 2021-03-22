@@ -36,7 +36,7 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(
-            resource_for_federation=Mock(), http_client=None
+            resource_for_federation=Mock(), federation_http_client=None
         )
         return hs
 

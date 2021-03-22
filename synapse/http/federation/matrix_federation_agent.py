@@ -16,7 +16,7 @@ import logging
 import urllib.parse
 from typing import List, Optional
 
-from netaddr import AddrFormatError, IPAddress
+from netaddr import AddrFormatError, IPAddress, IPSet
 from zope.interface import implementer
 
 from twisted.internet import defer
@@ -31,6 +31,7 @@ from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent, IAgentEndpointFactory, IBodyProducer
 
 from synapse.crypto.context_factory import FederationPolicyForHTTPS
+from synapse.http.client import BlacklistingAgentWrapper
 from synapse.http.federation.srv_resolver import Server, SrvResolver
 from synapse.http.federation.well_known_resolver import WellKnownResolver
 from synapse.logging.context import make_deferred_yieldable, run_in_background
@@ -70,6 +71,7 @@ class MatrixFederationAgent:
         reactor: IReactorCore,
         tls_client_options_factory: Optional[FederationPolicyForHTTPS],
         user_agent: bytes,
+        ip_blacklist: IPSet,
         _srv_resolver: Optional[SrvResolver] = None,
         _well_known_resolver: Optional[WellKnownResolver] = None,
     ):
@@ -90,12 +92,18 @@ class MatrixFederationAgent:
         self.user_agent = user_agent
 
         if _well_known_resolver is None:
+            # Note that the name resolver has already been wrapped in a
+            # IPBlacklistingResolver by MatrixFederationHttpClient.
             _well_known_resolver = WellKnownResolver(
                 self._reactor,
-                agent=Agent(
+                agent=BlacklistingAgentWrapper(
+                    Agent(
+                        self._reactor,
+                        pool=self._pool,
+                        contextFactory=tls_client_options_factory,
+                    ),
                     self._reactor,
-                    pool=self._pool,
-                    contextFactory=tls_client_options_factory,
+                    ip_blacklist=ip_blacklist,
                 ),
                 user_agent=self.user_agent,
             )
