@@ -21,10 +21,10 @@ from synapse.api.errors import SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.logging.context import run_in_background
 from synapse.logging.opentracing import (
+    SynapseTags,
     get_active_span_text_map,
     log_kv,
     set_tag,
-    start_active_span,
 )
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.types import JsonDict, Requester, UserID, get_domain_from_id
@@ -183,9 +183,9 @@ class DeviceMessageHandler:
         sender_user_id = requester.user.to_string()
 
         message_id = random_string(16)
-        set_tag("message_id", message_id)
+        set_tag(SynapseTags.TO_DEVICE_MESSAGE_ID, message_id)
 
-        set_tag("number_of_messages", len(messages))
+        log_kv({"number_of_to_device_messages": len(messages)})
         set_tag("sender", sender_user_id)
         local_messages = {}
         remote_messages = {}  # type: Dict[str, Dict[str, Dict[str, JsonDict]]]
@@ -213,6 +213,12 @@ class DeviceMessageHandler:
                 }
                 if messages_by_device:
                     local_messages[user_id] = messages_by_device
+                    log_kv(
+                        {
+                            "user_id": user_id,
+                            "device_id": list(messages_by_device),
+                        }
+                    )
             else:
                 destination = get_domain_from_id(user_id)
                 remote_messages.setdefault(destination, {})[user_id] = by_device
@@ -221,17 +227,15 @@ class DeviceMessageHandler:
 
         remote_edu_contents = {}
         for destination, messages in remote_messages.items():
-            with start_active_span("to_device_for_user"):
-                set_tag("destination", destination)
-                remote_edu_contents[destination] = {
-                    "messages": messages,
-                    "sender": sender_user_id,
-                    "type": message_type,
-                    "message_id": message_id,
-                    "org.matrix.opentracing_context": json_encoder.encode(context),
-                }
+            log_kv({"destination": destination})
+            remote_edu_contents[destination] = {
+                "messages": messages,
+                "sender": sender_user_id,
+                "type": message_type,
+                "message_id": message_id,
+                "org.matrix.opentracing_context": json_encoder.encode(context),
+            }
 
-        log_kv({"local_messages": local_messages})
         stream_id = await self.store.add_messages_to_device_inbox(
             local_messages, remote_edu_contents
         )
@@ -240,7 +244,6 @@ class DeviceMessageHandler:
             "to_device_key", stream_id, users=local_messages.keys()
         )
 
-        log_kv({"remote_messages": remote_messages})
         if self.federation_sender:
             for destination in remote_messages.keys():
                 # Enqueue a new federation transaction to send the new

@@ -24,6 +24,7 @@ from synapse.api.constants import AccountDataTypes, EventTypes, Membership
 from synapse.api.filtering import FilterCollection
 from synapse.events import EventBase
 from synapse.logging.context import current_context
+from synapse.logging.opentracing import SynapseTags, log_kv, set_tag, start_active_span
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.storage.roommember import MemberSummary
 from synapse.storage.state import StateFilter
@@ -340,7 +341,14 @@ class SyncHandler:
         full_state: bool = False,
     ) -> SyncResult:
         """Get the sync for client needed to match what the server has now."""
-        return await self.generate_sync_result(sync_config, since_token, full_state)
+        with start_active_span("current_sync_for_user"):
+            log_kv({"since_token": since_token})
+            sync_result = await self.generate_sync_result(
+                sync_config, since_token, full_state
+            )
+
+            set_tag(SynapseTags.SYNC_RESULT, bool(sync_result))
+            return sync_result
 
     async def push_rules_for_user(self, user: UserID) -> JsonDict:
         user_id = user.to_string()
@@ -964,6 +972,7 @@ class SyncHandler:
         # to query up to a given point.
         # Always use the `now_token` in `SyncResultBuilder`
         now_token = self.event_sources.get_current_token()
+        log_kv({"now_token": now_token})
 
         logger.debug(
             "Calculating sync response for %r between %s and %s",
@@ -1224,6 +1233,11 @@ class SyncHandler:
             messages, stream_id = await self.store.get_new_messages_for_device(
                 user_id, device_id, since_stream_id, now_token.to_device_key
             )
+
+            for message in messages:
+                message_id = message.get("message_id", None)
+                if message_id:
+                    set_tag(SynapseTags.TO_DEVICE_MESSAGE_ID, message_id)
 
             logger.debug(
                 "Returning %d to-device messages between %d and %d (current token: %d)",
