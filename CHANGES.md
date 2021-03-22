@@ -1,5 +1,5 @@
-Synapse 1.30.0rc1 (2021-03-16)
-==============================
+Synapse 1.30.0 (2021-03-22)
+===========================
 
 Note that this release deprecates the ability for appservices to
 call `POST /_matrix/client/r0/register`  without the body parameter `type`. Appservice
@@ -7,6 +7,13 @@ developers should use a `type` value of `m.login.application_service` as
 per [the spec](https://matrix.org/docs/spec/application_service/r0.1.2#server-admin-style-permissions).
 In future releases, calling this endpoint with an access token - but without a `m.login.application_service`
 type - will fail.
+
+
+No significant changes.
+
+
+Synapse 1.30.0rc1 (2021-03-16)
+==============================
 
 Features
 --------
