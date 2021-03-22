@@ -457,6 +457,7 @@ class FederationClient(FederationBase):
         description: str,
         destinations: Iterable[str],
         callback: Callable[[str], Awaitable[T]],
+        failover_on_unknown_endpoint: bool = False,
     ) -> T:
         """Try an operation on a series of servers, until it succeeds
 
@@ -475,6 +476,10 @@ class FederationClient(FederationBase):
                 Otherwise, if the callback raises an Exception the error is logged and the
                 next server tried. Normally the stacktrace is logged but this is
                 suppressed if the exception is an InvalidResponseError.
+
+            failover_on_unknown_endpoint: if True, we will try other servers if it looks
+                like a server doesn't support the endpoint. This is typically useful
+                if the endpoint in question is new or experimental.
 
         Returns:
             The result of callback, if it succeeds
@@ -495,16 +500,31 @@ class FederationClient(FederationBase):
             except UnsupportedRoomVersionError:
                 raise
             except HttpResponseException as e:
-                if not 500 <= e.code < 600:
-                    raise e.to_synapse_error()
-                else:
-                    logger.warning(
-                        "Failed to %s via %s: %i %s",
-                        description,
-                        destination,
-                        e.code,
-                        e.args[0],
-                    )
+                synapse_error = e.to_synapse_error()
+                failover = False
+
+                if 500 <= e.code < 600:
+                    failover = True
+
+                elif failover_on_unknown_endpoint:
+                    # there is no good way to detect an "unknown" endpoint. Dendrite
+                    # returns a 404 (with no body); synapse returns a 400
+                    # with M_UNRECOGNISED.
+                    if e.code == 404 or (
+                        e.code == 400 and synapse_error.errcode == Codes.UNRECOGNIZED
+                    ):
+                        failover = True
+
+                if not failover:
+                    raise synapse_error from e
+
+                logger.warning(
+                    "Failed to %s via %s: %i %s",
+                    description,
+                    destination,
+                    e.code,
+                    e.args[0],
+                )
             except Exception:
                 logger.warning(
                     "Failed to %s via %s", description, destination, exc_info=True
@@ -1068,7 +1088,10 @@ class FederationClient(FederationBase):
                 raise InvalidResponseError(str(e))
 
         return await self._try_destination_list(
-            "fetch space summary", destinations, send_request
+            "fetch space summary",
+            destinations,
+            send_request,
+            failover_on_unknown_endpoint=True,
         )
 
 
