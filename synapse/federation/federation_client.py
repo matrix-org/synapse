@@ -27,11 +27,13 @@ from typing import (
     List,
     Mapping,
     Optional,
+    Sequence,
     Tuple,
     TypeVar,
     Union,
 )
 
+import attr
 from prometheus_client import Counter
 
 from twisted.internet import defer
@@ -1042,3 +1044,86 @@ class FederationClient(FederationBase):
         # If we don't manage to find it, return None. It's not an error if a
         # server doesn't give it to us.
         return None
+
+    async def get_space_summary(
+        self,
+        destinations: Iterable[str],
+        room_id: str,
+        suggested_only: bool,
+        max_rooms_per_space: Optional[int],
+        exclude_rooms: List[str],
+    ) -> "FederationSpaceSummaryResult":
+        async def send_request(destination: str) -> FederationSpaceSummaryResult:
+            res = await self.transport_layer.get_space_summary(
+                destination=destination,
+                room_id=room_id,
+                suggested_only=suggested_only,
+                max_rooms_per_space=max_rooms_per_space,
+                exclude_rooms=exclude_rooms,
+            )
+
+            try:
+                return FederationSpaceSummaryResult.from_json_dict(res)
+            except ValueError as e:
+                raise InvalidResponseError(str(e))
+
+        return await self._try_destination_list(
+            "fetch space summary", destinations, send_request
+        )
+
+
+@attr.s(frozen=True, slots=True)
+class FederationSpaceSummaryEventResult:
+    event_type = attr.ib(type=str)
+    state_key = attr.ib(type=str)
+    via = attr.ib(type=Sequence[str])
+
+    # the raw data, including the above keys
+    data = attr.ib(type=JsonDict)
+
+    @classmethod
+    def from_json_dict(cls, d: JsonDict):
+        event_type = d.get("type")
+        if not isinstance(event_type, str):
+            raise ValueError("Invalid event: 'event_type' must be a str")
+
+        state_key = d.get("state_key")
+        if not isinstance(state_key, str):
+            raise ValueError("Invalid event: 'state_key' must be a str")
+
+        content = d.get("content")
+        if not isinstance(content, dict):
+            raise ValueError("Invalid event: 'content' must be a dict")
+
+        via = content.get("via")
+        if not isinstance(via, Sequence):
+            raise ValueError("Invalid event: 'via' must be a list")
+        if any(not isinstance(v, str) for v in via):
+            raise ValueError("Invalid event: 'via' must be a list of strings")
+
+        return cls(event_type, state_key, via, d)
+
+
+@attr.s(frozen=True, slots=True)
+class FederationSpaceSummaryResult:
+    rooms = attr.ib(type=Sequence[JsonDict])
+    events = attr.ib(type=Sequence[FederationSpaceSummaryEventResult])
+
+    @classmethod
+    def from_json_dict(cls, d: JsonDict):
+        rooms = d.get("rooms")
+        if not isinstance(rooms, Sequence):
+            raise ValueError("'rooms' must be a list")
+        if any(not isinstance(r, dict) for r in rooms):
+            raise ValueError("Invalid room in 'rooms' list")
+
+        events = d.get("events")
+        if not isinstance(events, Sequence):
+            raise ValueError("'events' must be a list")
+        if any(not isinstance(e, dict) for e in events):
+            raise ValueError("Invalid event in 'events' list")
+        parsed_events = [
+            FederationSpaceSummaryEventResult.from_json_dict(e) for e in events
+        ]
+
+        return cls(rooms, parsed_events)
