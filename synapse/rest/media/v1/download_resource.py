@@ -24,7 +24,7 @@ from synapse.http.servlet import parse_boolean
 from ._base import parse_media_id, respond_404
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
     from synapse.rest.media.v1.media_repository import MediaRepository
 
 logger = logging.getLogger(__name__)

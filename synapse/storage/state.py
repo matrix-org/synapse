@@ -32,7 +32,7 @@ from synapse.events import EventBase
 from synapse.types import MutableStateMap, StateMap
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
     from synapse.storage.databases import Databases
 
 logger = logging.getLogger(__name__)

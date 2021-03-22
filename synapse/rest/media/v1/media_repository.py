@@ -58,7 +58,7 @@ from .thumbnailer import Thumbnailer, ThumbnailError
 from .upload_resource import UploadResource
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
