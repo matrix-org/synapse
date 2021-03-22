@@ -34,8 +34,8 @@ from ._base import (
 )
 
 if TYPE_CHECKING:
-    from synapse.server import HomeServer
     from synapse.rest.media.v1.media_repository import MediaRepository
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
