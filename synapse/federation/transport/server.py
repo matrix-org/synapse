@@ -49,9 +49,6 @@ from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import parse_and_validate_server_name
 from synapse.util.versionstring import get_version_string
 
-if TYPE_CHECKING:
-    import synapse.server
-
 logger = logging.getLogger(__name__)
 
 
@@ -1513,7 +1510,7 @@ DEFAULT_SERVLET_GROUPS = (
 
 
 def register_servlets(
-    hs: "synapse.server.HomeServer",
+    hs: HomeServer,
     resource: HttpServer,
     authenticator: Authenticator,
     ratelimiter: FederationRateLimiter,

@@ -211,14 +211,13 @@ class SpaceSummaryHandler:
                 pass
 
         # otherwise, check if the room is peekable
-        hist_vis = ""
         hist_vis_ev = await self._state_handler.get_current_state(
             room_id, EventTypes.RoomHistoryVisibility, ""
         )
         if hist_vis_ev:
             hist_vis = hist_vis_ev.content.get("history_visibility")
-        if hist_vis == HistoryVisibility.WORLD_READABLE:
-            return True
+            if hist_vis == HistoryVisibility.WORLD_READABLE:
+                return True
 
         logger.info(
             "room %s is unpeekable and user %s is not a member, omitting from summary",
