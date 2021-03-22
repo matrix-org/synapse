@@ -18,7 +18,7 @@
 import functools
 import logging
 import re
-from typing import TYPE_CHECKING, Container, Mapping, Optional, Sequence, Tuple, Type
+from typing import Container, Mapping, Optional, Sequence, Tuple, Type
 
 import synapse
 from synapse.api.constants import MAX_GROUP_CATEGORYID_LENGTH, MAX_GROUP_ROLEID_LENGTH
