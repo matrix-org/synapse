@@ -302,6 +302,8 @@ class GenericWorkerPresence(BasePresenceHandler):
             self.send_stop_syncing, UPDATE_SYNCING_USERS_MS
         )
 
+        self._busy_presence_enabled = hs.config.experimental.msc3026_enabled
+
         hs.get_reactor().addSystemEventTrigger(
             "before",
             "shutdown",
@@ -439,8 +441,12 @@ class GenericWorkerPresence(BasePresenceHandler):
             PresenceState.ONLINE,
             PresenceState.UNAVAILABLE,
             PresenceState.OFFLINE,
+            PresenceState.BUSY,
         )
-        if presence not in valid_presence:
+
+        if presence not in valid_presence or (
+            presence == PresenceState.BUSY and not self._busy_presence_enabled
+        ):
             raise SynapseError(400, "Invalid presence state")
 
         user_id = target_user.to_string()
