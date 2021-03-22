@@ -173,6 +173,7 @@ jobs:
         BLACKLIST: ${{ matrix.workers && 'synapse-blacklist-with-workers' }}
 
     strategy:
+      fail-fast: false
       matrix:
         include:
           - sytest-tag: py35
@@ -201,7 +202,6 @@ jobs:
     - name: Prepare test blacklist
       run: cat sytest-blacklist .buildkite/worker-blacklist > synapse-blacklist-with-workers
     - name: Run SyTest
-      continue-on-error: true  # FIXME
       run: /bootstrap.sh synapse
       working-directory: /src
 
