@@ -1073,6 +1073,32 @@ class FederationClient(FederationBase):
         max_rooms_per_space: Optional[int],
         exclude_rooms: List[str],
     ) -> "FederationSpaceSummaryResult":
+        """
+        Call other servers to get a summary of the given space
+
+
+        Args:
+            destinations: The remote servers. We will try them in turn, omitting any
+                that have been blacklisted.
+
+            room_id: ID of the space to be queried
+
+            suggested_only:  If true, ask the remote server to only return children
+                with the "suggested" flag set
+
+            max_rooms_per_space: A limit on the number of children to return for each
+                space
+
+            exclude_rooms: A list of room IDs to tell the remote server to skip
+
+        Returns:
+            a parsed FederationSpaceSummaryResult
+
+        Raises:
+            SynapseError if we were unable to get a valid summary from any of the
+               remote servers
+        """
+
         async def send_request(destination: str) -> FederationSpaceSummaryResult:
             res = await self.transport_layer.get_space_summary(
                 destination=destination,
@@ -1097,6 +1123,13 @@ class FederationClient(FederationBase):
 
 @attr.s(frozen=True, slots=True)
 class FederationSpaceSummaryEventResult:
+    """Represents a single event in the result of a successful get_space_summary call.
+
+    It's essentially just a serialised event object, but we do a bit of parsing and
+    validation in `from_json_dict` and store some of the validated properties in
+    object attributes.
+    """
+
     event_type = attr.ib(type=str)
     state_key = attr.ib(type=str)
     via = attr.ib(type=Sequence[str])
@@ -1105,7 +1138,16 @@ class FederationSpaceSummaryEventResult:
     data = attr.ib(type=JsonDict)
 
     @classmethod
-    def from_json_dict(cls, d: JsonDict):
+    def from_json_dict(cls, d: JsonDict) -> "FederationSpaceSummaryEventResult":
+        """Parse an event within the result of a /spaces/ request
+
+        Args:
+            d: json object to be parsed
+
+        Raises:
+            ValueError if d is not a valid event
+        """
+
         event_type = d.get("type")
         if not isinstance(event_type, str):
             raise ValueError("Invalid event: 'event_type' must be a str")
@@ -1129,11 +1171,21 @@ class FederationSpaceSummaryEventResult:
 
 @attr.s(frozen=True, slots=True)
 class FederationSpaceSummaryResult:
+    """Represents the data returned by a successful get_space_summary call."""
+
     rooms = attr.ib(type=Sequence[JsonDict])
     events = attr.ib(type=Sequence[FederationSpaceSummaryEventResult])
 
     @classmethod
-    def from_json_dict(cls, d: JsonDict):
+    def from_json_dict(cls, d: JsonDict) -> "FederationSpaceSummaryResult":
+        """Parse the result of a /spaces/ request
+
+        Args:
+            d: json object to be parsed
+
+        Raises:
+            ValueError if d is not a valid /spaces/ response
+        """
         rooms = d.get("rooms")
         if not isinstance(rooms, Sequence):
             raise ValueError("'rooms' must be a list")
