@@ -242,12 +242,16 @@ class ProxyAgent(_AgentBase):
         )
 
 
-def _http_proxy_endpoint(proxy, reactor, **kwargs):
+def _http_proxy_endpoint(proxy: Optional[bytes], reactor, **kwargs):
     """Parses an http proxy setting and returns an endpoint for the proxy
 
     Args:
-        proxy (bytes|None):  the proxy setting
+        proxy: the proxy setting in the form: [<username>:<password>@]<host>[:<port>]
+            Note that compared to other apps, this function currently lacks support
+            for specifying a protocol schema (i.e. protocol://...).
+
         reactor: reactor to be used to connect to the proxy
+
         kwargs: other args to be passed to HostnameEndpoint
 
     Returns:
@@ -257,7 +261,7 @@ def _http_proxy_endpoint(proxy, reactor, **kwargs):
     if proxy is None:
         return None
 
-    # Parse the connection string, supporting the form: [<username>:<password>@]<host>[:port]
+    # Parse the connection string
     host, port = parse_host_port(proxy, default_port=1080)
     return HostnameEndpoint(reactor, host, port, **kwargs)
 
