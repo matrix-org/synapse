@@ -521,11 +521,13 @@ class RoomWorkerStore(SQLBaseStore):
         )
 
     @cached(max_entries=10000)
-    async def get_ratelimit_for_user(self, user_id) -> Optional[RatelimitOverride]:
+    async def get_ratelimit_for_user(
+        self, user_id: str
+    ) -> Optional[RatelimitOverride]:
         """Check if there are any overrides for ratelimiting for the given user
 
         Args:
-            user_id
+            user_id: user ID of the user
         Returns:
             RatelimitOverride if there is an override, else None. If the contents
             of RatelimitOverride are None or 0 then ratelimitng has been
@@ -550,11 +552,11 @@ class RoomWorkerStore(SQLBaseStore):
     async def set_ratelimit_for_user(
         self, user_id: str, messages_per_second: int, burst_count: int
     ) -> None:
-        """Sets whether a user shadow-banned.
+        """Sets whether a user is set an overridden ratelimit.
         Args:
-            user: user ID of the user to test
-            messages_per_second:
-            burst_count:
+            user_id: user ID of the user
+            messages_per_second: The number of actions that can be performed in a second.
+            burst_count: How many actions that can be performed before being limited.
         """
 
         def set_ratelimit_txn(txn):
@@ -575,10 +577,9 @@ class RoomWorkerStore(SQLBaseStore):
         await self.db_pool.runInteraction("set_ratelimit", set_ratelimit_txn)
 
     async def delete_ratelimit_for_user(self, user_id: str) -> None:
-        """Sets whether a user shadow-banned.
+        """Delete an overridden ratelimit for a user. 
         Args:
-            user: user ID of the user to test
-            shadow_banned: true iff the user is to be shadow-banned, false otherwise.
+            user_id: user ID of the user
         """
 
         def delete_ratelimit_txn(txn):

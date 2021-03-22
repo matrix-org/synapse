@@ -1021,16 +1021,12 @@ class RateLimitRestServlet(RestServlet):
         ratelimit = await self.store.get_ratelimit_for_user(user_id)
 
         if ratelimit:
-            messages_per_second = ratelimit.messages_per_second
-            burst_count = ratelimit.burst_count
+            ret = {
+                "messages_per_second": ratelimit.messages_per_second,
+                "burst_count": ratelimit.burst_count,
+            }
         else:
-            messages_per_second = None
-            burst_count = None
-
-        ret = {
-            "messages_per_second": messages_per_second,
-            "burst_count": burst_count,
-        }
+            ret = {}
 
         return 200, ret
 

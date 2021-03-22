@@ -2916,7 +2916,7 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
 
     def test_no_auth(self):
         """
-        Try to get information of an user without authentication.
+        Try to get information of a user without authentication.
         """
         channel = self.make_request("GET", self.url, b"{}")
 
@@ -3097,8 +3097,8 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertIsNone(channel.json_body["messages_per_second"])
-        self.assertIsNone(channel.json_body["burst_count"])
+        self.assertNotIn("messages_per_second", channel.json_body)
+        self.assertNotIn("burst_count", channel.json_body)
 
         # set ratelimit
         channel = self.make_request(
@@ -3149,5 +3149,5 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertIsNone(channel.json_body["messages_per_second"])
-        self.assertIsNone(channel.json_body["burst_count"])
+        self.assertNotIn("messages_per_second", channel.json_body)
+        self.assertNotIn("burst_count", channel.json_body)

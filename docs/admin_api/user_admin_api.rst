@@ -827,7 +827,7 @@ The following parameters should be set in the URL:
 Override ratelimiting for users
 ===============================
 
-This API allows to override or disable rate limiting for a specific user.
+This API allows to override or disable ratelimiting for a specific user.
 There are specific APIs to set, get and delete a ratelimit.
 
 Get status of ratelimit
@@ -861,11 +861,16 @@ The following parameters should be set in the URL:
 The following fields are returned in the JSON response body:
 
 - ``messages_per_second`` - integer - The number of actions that can
-  be performed in a second.
+  be performed in a second. `0` or `null` mean that ratelimiting is disabled
+  for this user.
 - ``burst_count`` - integer - How many actions that can be performed
   before being limited.
 
-If **no** custom ratelimit is set, the values are ``null``.
+If **no** custom ratelimit is set, an empty JSON dict is returned.
+
+.. code:: json
+
+    {}
 
 Set ratelimit
 -------------
