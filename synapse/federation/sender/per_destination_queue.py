@@ -481,7 +481,7 @@ class PerDestinationQueue:
                     if new_pdus:
                         room_catchup_pdus = new_pdus
                     else:
-                        room_catchup_pdus[pdu]
+                        room_catchup_pdus = [pdu]
 
                 logger.info(
                     "Catching up rooms to %s: %r", self._destination, pdu.room_id
