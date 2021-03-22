@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright 2020 The Matrix.org Foundation C.I.C.
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import yaml
 
 MAIN_PROCESS_HTTP_LISTENER_PORT = 8080
 
+
 WORKERS_CONFIG = {
     "pusher": {
         "app": "synapse.app.pusher",
@@ -54,7 +55,7 @@ WORKERS_CONFIG = {
         "app": "synapse.app.media_repository",
         "listener_resources": ["media"],
         "endpoint_patterns": [
-            "/_matrix/media/",
+            "^/_matrix/media/",
             "^/_synapse/admin/v1/purge_media_cache$",
             "^/_synapse/admin/v1/room/.*/media.*$",
             "^/_synapse/admin/v1/user/.*/media.*$",
@@ -155,9 +156,7 @@ WORKERS_CONFIG = {
     "frontend_proxy": {
         "app": "synapse.app.frontend_proxy",
         "listener_resources": ["client", "replication"],
-        "endpoint_patterns": [
-            "^/_matrix/client/(api/v1|r0|unstable)/keys/upload",
-        ],
+        "endpoint_patterns": ["^/_matrix/client/(api/v1|r0|unstable)/keys/upload"],
         "shared_extra_conf": {},
         "worker_extra_conf": (
             "worker_main_http_uri: http://127.0.0.1:%d"
@@ -252,6 +251,10 @@ def add_sharding_to_shared_config(
             "port": worker_port,
         }
 
+    elif worker_type == "media_repository":
+        # The first configured media worker will run the media background jobs
+        shared_config.setdefault("media_instance_running_background_jobs", worker_name)
+
 
 def generate_base_homeserver_config():
     """Starts Synapse and generates a basic homeserver config, which will later be
@@ -313,12 +316,22 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     # services that are necessary to run.
     supervisord_config = ""
 
-    # The nginx config. The contents of which will be inserted into the base nginx
-    # jinja2 template.
+    # Upstreams for load-balancing purposes. This dict takes the form of a worker type to the
+    # ports of each worker. For example:
+    # {
+    #   worker_type: {1234, 1235, ...}}
+    # }
+    # and will be used to construct 'upstream' nginx directives.
+    nginx_upstreams = {}
+
+    # A map of: {"endpoint": "upstream"}, where "upstream" is a str representing what will be
+    # placed after the proxy_pass directive. The main benefit to representing this data as a
+    # dict over a str is that we can easily deduplicate endpoints across multiple instances
+    # of the same worker.
     #
     # An nginx site config that will be amended to depending on the workers that are
-    # spun up. To be placed in /etc/nginx/conf.d
-    nginx_config = ""
+    # spun up. To be placed in /etc/nginx/conf.d.
+    nginx_locations = {}
 
     # Read the desired worker configuration from the environment
     worker_types = environ.get("SYNAPSE_WORKERS")
@@ -385,21 +398,25 @@ exitcodes=0
 stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0""".format_map(
+stderr_logfile_maxbytes=0
+""".format_map(
             worker_config
         )
 
-        # Add nginx rules for this worker's endpoints (if any)
+        # Add nginx location blocks for this worker's endpoints (if any are defined)
         for pattern in worker_config["endpoint_patterns"]:
-            nginx_config += """
-    location ~* %s {
-        proxy_pass http://localhost:%s;
-        proxy_set_header X-Forwarded-For $remote_addr;
-    }
-""" % (
-                pattern,
-                worker_port,
-            )
+            # Determine whether we need to load-balance this worker
+            if worker_type_total_count > 1:
+                # Create or add to a load-balanced upstream for this worker
+                nginx_upstreams.setdefault(worker_type, set()).add(worker_port)
+
+                # Upstreams are named after the worker_type
+                upstream = "http://" + worker_type
+            else:
+                upstream = "http://localhost:%d" % (worker_port,)
+
+            # Note that this endpoint should proxy to this upstream
+            nginx_locations[pattern] = upstream
 
         # Write out the worker's logging config file
         log_config_filepath = "/conf/workers/{name}.log.config".format(name=worker_name)
@@ -419,6 +436,38 @@ stderr_logfile_maxbytes=0""".format_map(
 
         worker_port += 1
 
+    # Build the nginx location config blocks
+    nginx_location_config = ""
+    for endpoint, upstream in nginx_locations.items():
+        nginx_location_config += """
+    location ~* %s {
+        proxy_pass %s;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host $host;
+    }
+""" % (
+            endpoint,
+            upstream,
+        )
+
+    # Determine the load-balancing upstreams to configure
+    nginx_upstream_config = ""
+    for upstream_worker_type, upstream_worker_ports in nginx_upstreams.items():
+        body = ""
+        for port in upstream_worker_ports:
+            body += "    server localhost:%d;\n" % (port,)
+
+        # Add to the list of configured upstreams
+        nginx_upstream_config += """
+upstream %s {
+%s
+}
+""" % (
+            upstream_worker_type,
+            body,
+        )
+
     # Finally, we'll write out the config files.
 
     # Shared homeserver config
@@ -432,7 +481,8 @@ stderr_logfile_maxbytes=0""".format_map(
     convert(
         "/conf/nginx.conf.j2",
         "/etc/nginx/conf.d/matrix-synapse.conf",
-        worker_locations=nginx_config,
+        worker_locations=nginx_location_config,
+        upstream_directives=nginx_upstream_config,
     )
 
     # Supervisord config
