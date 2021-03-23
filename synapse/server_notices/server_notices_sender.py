@@ -23,7 +23,7 @@ from synapse.server_notices.worker_server_notices_sender import (
 )
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 
 class ServerNoticesSender(WorkerServerNoticesSender):

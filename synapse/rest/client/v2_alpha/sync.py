@@ -34,7 +34,7 @@ from synapse.util import json_decoder
 from ._base import client_patterns, set_timeline_upper_limit
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
