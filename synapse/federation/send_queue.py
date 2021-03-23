@@ -31,14 +31,22 @@ Events are replicated via a separate events stream.
 
 import logging
 from collections import namedtuple
-from typing import TYPE_CHECKING, Dict, List, Optional, Sized, Tuple, Type
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    Hashable,
+    Iterable,
+    List,
+    Optional,
+    Sized,
+    Tuple,
+    Type,
+)
 
 from sortedcontainers import SortedDict
 
-from twisted.internet import defer
-
 from synapse.api.presence import UserPresenceState
-from synapse.federation.sender import FederationSender
+from synapse.federation.sender import AbstractFederationSender, FederationSender
 from synapse.metrics import LaterGauge
 from synapse.replication.tcp.streams.federation import FederationStream
 from synapse.types import JsonDict, ReadReceipt
@@ -52,7 +60,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class FederationRemoteSendQueue:
+class FederationRemoteSendQueue(AbstractFederationSender):
     """A drop in replacement for FederationSender"""
 
     def __init__(self, hs: "HomeServer"):
@@ -77,7 +85,7 @@ class FederationRemoteSendQueue:
         # Stream position -> (user_id, destinations)
         self.presence_destinations = (
             SortedDict()
-        )  # type: SortedDict[int, Tuple[str, List[str]]]
+        )  # type: SortedDict[int, Tuple[str, Iterable[str]]]
 
         # (destination, key) -> EDU
         self.keyed_edu = {}  # type: Dict[Tuple[str, tuple], Edu]
@@ -204,7 +212,7 @@ class FederationRemoteSendQueue:
         destination: str,
         edu_type: str,
         content: JsonDict,
-        key: Optional[tuple] = None,
+        key: Optional[Hashable] = None,
     ) -> None:
         """As per FederationSender"""
         if destination == self.server_name:
@@ -229,14 +237,13 @@ class FederationRemoteSendQueue:
 
         self.notifier.on_new_replication_data()
 
-    def send_read_receipt(self, receipt: ReadReceipt) -> defer.Deferred:
+    async def send_read_receipt(self, receipt: ReadReceipt) -> None:
         """As per FederationSender
 
         Args:
             receipt:
         """
         # nothing to do here: the replication listener will handle it.
-        return defer.succeed(None)
 
     def send_presence(self, states: List[UserPresenceState]) -> None:
         """As per FederationSender
@@ -256,7 +263,7 @@ class FederationRemoteSendQueue:
         self.notifier.on_new_replication_data()
 
     def send_presence_to_destinations(
-        self, states: List[UserPresenceState], destinations: List[str]
+        self, states: Iterable[UserPresenceState], destinations: Iterable[str]
     ) -> None:
         """As per FederationSender
 
@@ -275,6 +282,9 @@ class FederationRemoteSendQueue:
         """As per FederationSender"""
         # We don't need to replicate this as it gets sent down a different
         # stream.
+
+    def wake_destination(self, server: str) -> None:
+        pass
 
     def get_current_token(self) -> int:
         return self.pos - 1
