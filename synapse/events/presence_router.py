@@ -38,6 +38,18 @@ class PresenceRouter:
                 config=hs.config.presence_router_config, module_api=hs.get_module_api()
             )
 
+            # Ensure the module has implemented the required methods
+            required_methods = ["get_users_for_states", "get_interested_users"]
+            for method_name in required_methods:
+                if not hasattr(self.custom_presence_router, method_name):
+                    raise Exception(
+                        "PresenceRouter module '%s' must implement all required methods: %s"
+                        % (
+                            hs.config.presence_router_module_class.__name__,
+                            ", ".join(required_methods),
+                        )
+                    )
+
     async def get_users_for_states(
         self,
         state_updates: Iterable[UserPresenceState],
@@ -53,9 +65,7 @@ class PresenceRouter:
           A dictionary of user_id -> set of UserPresenceState, indicating which
           presence updates each user should receive.
         """
-        if self.custom_presence_router is not None and hasattr(
-            self.custom_presence_router, "get_users_for_states"
-        ):
+        if self.custom_presence_router is not None:
             # Ask the custom module
             return await self.custom_presence_router.get_users_for_states(
                 state_updates=state_updates
@@ -79,14 +89,12 @@ class PresenceRouter:
             A set of user IDs to return presence updates for, or "ALL" to return all
             known updates.
         """
-        if self.custom_presence_router is not None and hasattr(
-            self.custom_presence_router, "get_interested_users"
-        ):
+        if self.custom_presence_router is not None:
             # Ask the custom module for interested users
             return await self.custom_presence_router.get_interested_users(
                 user_id=user_id
             )
 
-        # A custom presence router is not defined, or doesn't implement any relevant function.
-        # Don't report any additional interested users.
+        # A custom presence router is not defined.
+        # Don't report any additional interested users
         return set()

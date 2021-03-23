@@ -49,11 +49,11 @@ async def get_users_for_states(
 ) -> Dict[str, Set[UserPresenceState]]:
 ```
 
-An asynchronous class method that is passed an iterable of user presence state. This
-method can determine whether a given presence update should be sent to certain users.
-It does this by returning a dictionary with keys representing local or remote Matrix
-User IDs, and values being a python Set of `synapse.handlers.presence.
-UserPresenceState` instances.
+**Required.** An asynchronous class method that is passed an iterable of user presence
+state. This method can determine whether a given presence update should be sent to certain
+users. It does this by returning a dictionary with keys representing local or remote
+Matrix User IDs, and values being a python Set
+of `synapse.handlers.presence. UserPresenceState` instances.
 
 Synapse will then attempt to send the specified presence updates to each user when
 possible.
@@ -64,11 +64,11 @@ possible.
 async def get_interested_users(self, user_id: str) -> Union[Set[str], str]
 ```
 
-An asynchronous class method that is passed a single Matrix User ID. This method is
-expected to return the users that the passed in user may be interested in the presence of.
-This may be local or remote users. It does so by returning a python Set of Matrix User
-IDs, or the string `"ALL"` to mean that the passed user should receive presence
-information for *all* known users.
+**Required.** An asynchronous class method that is passed a single Matrix User ID. This
+method is expected to return the users that the passed in user may be interested in the
+presence of. This may be local or remote users. It does so by returning a python Set of
+Matrix User IDs, or the string `"ALL"` to mean that the passed user should receive
+presence information for *all* known users.
 
 For clarity, if the user `@alice:example.org` is passed to this method, and the Set
 `{"@bob:example.com", "@charlie:somewhere.org"}` is returned, this signifies that Alice
@@ -191,12 +191,11 @@ or local users, and is used to either direct local presence to remote users, or 
 wake up the sync streams of local users to collect remote presence.
 
 In contrast, `get_interested_users` is used to determine the users that presence should
-be fetched for when a local user is syncing. This presence in then retrieved, before
+be fetched for when a local user is syncing. This presence is then retrieved, before
 being fed through `get_users_for_states` once again, with only the syncing user's
 routing information pulled from the resulting dictionary.
 
-Thus, if one method is implemented, the other should be as well. Their routing logic 
-should line up as well, else you may run into unintended behaviour.
+Their routing logic should thus line up, else you may run into unintended behaviour.
 
 ## Configuration
 
