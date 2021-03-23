@@ -31,7 +31,7 @@ from synapse.push import Pusher, PusherConfig, PusherConfigException
 from . import push_rule_evaluator, push_tools
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 

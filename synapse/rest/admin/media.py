@@ -28,7 +28,7 @@ from synapse.rest.admin._base import (
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 

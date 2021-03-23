@@ -45,7 +45,7 @@ from synapse.util.threepids import canonicalise_email, check_3pid_allowed
 from ._base import client_patterns, interactive_auth_handler
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 
 logger = logging.getLogger(__name__)

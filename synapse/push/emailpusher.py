@@ -24,7 +24,7 @@ from synapse.push import Pusher, PusherConfig, ThrottleParams
 from synapse.push.mailer import Mailer
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
