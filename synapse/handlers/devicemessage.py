@@ -182,6 +182,9 @@ class DeviceMessageHandler:
     ) -> None:
         sender_user_id = requester.user.to_string()
 
+        message_id = random_string(16)
+        set_tag("message_id", message_id)
+
         set_tag("number_of_messages", len(messages))
         set_tag("sender", sender_user_id)
         local_messages = {}
@@ -204,6 +207,7 @@ class DeviceMessageHandler:
                         "content": message_content,
                         "type": message_type,
                         "sender": sender_user_id,
+                        "message_id": message_id,
                     }
                     for device_id, message_content in by_device.items()
                 }
@@ -212,8 +216,6 @@ class DeviceMessageHandler:
             else:
                 destination = get_domain_from_id(user_id)
                 remote_messages.setdefault(destination, {})[user_id] = by_device
-
-        message_id = random_string(16)
 
         context = get_active_span_text_map()
 
