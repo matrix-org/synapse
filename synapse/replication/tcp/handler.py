@@ -34,6 +34,7 @@ from typing_extensions import Deque
 
 from twisted.internet.protocol import ReconnectingClientFactory
 
+from synapse.federation.send_queue import FederationRemoteSendQueue
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.tcp.client import DirectTcpReplicationClientFactory
@@ -213,7 +214,9 @@ class ReplicationCommandHandler:
 
         self._federation_sender = None
         if self._is_master and not hs.config.send_federation:
-            self._federation_sender = hs.get_federation_sender()
+            federation_sender = hs.get_federation_sender()
+            assert isinstance(federation_sender, FederationRemoteSendQueue)
+            self._federation_sender = federation_sender
 
         self._server_notices_sender = None
         if self._is_master:

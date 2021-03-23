@@ -14,12 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from collections import namedtuple
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, List, Tuple
 
+from synapse.federation.sender import FederationSender
 from synapse.replication.tcp.streams._base import (
     Stream,
     current_token_without_instance,
     make_http_update_function,
 )
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 
 class FederationStream(Stream):
@@ -38,17 +43,20 @@ class FederationStream(Stream):
     NAME = "federation"
     ROW_TYPE = FederationStreamRow
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         if hs.config.worker_app is None:
             # master process: get updates from the FederationRemoteSendQueue.
             # (if the master is configured to send federation itself, federation_sender
             # will be a real FederationSender, which has stubs for current_token and
             # get_replication_rows.)
             federation_sender = hs.get_federation_sender()
+            assert isinstance(federation_sender, FederationSender)
             current_token = current_token_without_instance(
                 federation_sender.get_current_token
             )
-            update_function = federation_sender.get_replication_rows
+            update_function = (
+                federation_sender.get_replication_rows
+            )  # type: Callable[[str, int, int, int], Awaitable[Tuple[List[Tuple[int, Any]], int, bool]]]
 
         elif hs.should_send_federation():
             # federation sender: Query master process
@@ -69,5 +77,7 @@ class FederationStream(Stream):
         return 0
 
     @staticmethod
-    async def _stub_update_function(instance_name, from_token, upto_token, limit):
+    async def _stub_update_function(
+        instance_name: str, from_token: int, upto_token: int, limit: int
+    ) -> Tuple[list, int, bool]:
         return [], upto_token, False
