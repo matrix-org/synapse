@@ -14,7 +14,7 @@
 import contextlib
 import logging
 import time
-from typing import Optional, Type, Union
+from typing import Optional, Tuple, Type, Union
 
 import attr
 from zope.interface import implementer
@@ -126,27 +126,38 @@ class SynapseRequest(Request):
             return self.method.decode("ascii")
         return method
 
-    def get_authenticated_entity(self) -> Optional[str]:
+    def get_authenticated_entity(self) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Get the "authenticated" entity of the request, which might be the user
+        performing the action, or a user being puppeted by a server admin.
+
+        Returns:
+            A tuple:
+                The first item is a string representing the user making the request.
+
+                The second item is a string or None representing the user who
+                authenticated when making this request. See
+                Requester.authenticated_entity.
+        """
         # Convert the requester into a string that we can log
         if isinstance(self.requester, str):
-            return self.requester
+            return self.requester, None
         elif isinstance(self.requester, Requester):
+            requester = self.requester.user.to_string()
             authenticated_entity = self.requester.authenticated_entity
 
             # If this is a request where the target user doesn't match the user who
-            # authenticated (e.g. and admin is puppetting a user) then we log both.
+            # authenticated (e.g. and admin is puppetting a user) then we return both.
             if self.requester.user.to_string() != authenticated_entity:
-                return "{},{}".format(
-                    authenticated_entity,
-                    self.requester.user.to_string(),
-                )
-            return authenticated_entity
+                return requester, authenticated_entity
+
+            return requester, None
         elif self.requester is not None:
             # This shouldn't happen, but we log it so we don't lose information
             # and can see that we're doing something wrong.
-            return repr(self.requester)  # type: ignore[unreachable]
+            return repr(self.requester), None  # type: ignore[unreachable]
 
-        return None
+        return None, None
 
     def render(self, resrc):
         # this is called once a Resource has been found to serve the request; in our
@@ -299,25 +310,6 @@ class SynapseRequest(Request):
         # to the client (nb may be negative)
         response_send_time = self.finish_time - self._processing_finished_time
 
-        # Convert the requester into a string that we can log
-        authenticated_entity = None
-        if isinstance(self.requester, str):
-            authenticated_entity = self.requester
-        elif isinstance(self.requester, Requester):
-            authenticated_entity = self.requester.authenticated_entity
-
-            # If this is a request where the target user doesn't match the user who
-            # authenticated (e.g. and admin is puppetting a user) then we log both.
-            if self.requester.user.to_string() != authenticated_entity:
-                authenticated_entity = "{},{}".format(
-                    authenticated_entity,
-                    self.requester.user.to_string(),
-                )
-        elif self.requester is not None:
-            # This shouldn't happen, but we log it so we don't lose information
-            # and can see that we're doing something wrong.
-            authenticated_entity = repr(self.requester)  # type: ignore[unreachable]
-
         user_agent = get_request_user_agent(self, "-")
 
         code = str(self.code)
@@ -327,6 +319,13 @@ class SynapseRequest(Request):
             code += "!"
 
         log_level = logging.INFO if self._should_log_request() else logging.DEBUG
+
+        # If this is a request where the target user doesn't match the user who
+        # authenticated (e.g. and admin is puppetting a user) then we log both.
+        requester, authenticated_entity = self.get_authenticated_entity()
+        if authenticated_entity:
+            requester = "{}.{}".format(authenticated_entity, requester)
+
         self.site.access_logger.log(
             log_level,
             "%s - %s - {%s}"
@@ -334,7 +333,7 @@ class SynapseRequest(Request):
             ' %sB %s "%s %s %s" "%s" [%d dbevts]',
             self.getClientIP(),
             self.site.site_tag,
-            self.get_authenticated_entity(),
+            requester,
             processing_time,
             response_send_time,
             usage.ru_utime,

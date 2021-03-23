@@ -170,6 +170,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
             "request",
             "ip_address",
             "site_tag",
+            "requester",
             "authenticated_entity",
             "method",
             "url",
@@ -181,6 +182,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         self.assertTrue(log["request"].startswith("POST-"))
         self.assertEqual(log["ip_address"], "127.0.0.1")
         self.assertEqual(log["site_tag"], "test-site")
+        self.assertIsNone(log["requester"])
         self.assertIsNone(log["authenticated_entity"])
         self.assertEqual(log["method"], "POST")
         self.assertEqual(log["url"], "/_matrix/client/versions")

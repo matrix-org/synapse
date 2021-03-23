@@ -574,7 +574,7 @@ class LoggingContextFilter(logging.Filter):
 
             record.ip_address = request.getClientIP()  # type: ignore
             record.site_tag = request.site.site_tag  # type: ignore
-            record.authenticated_entity = request.get_authenticated_entity()  # type: ignore
+            record.requester, record.authenticated_entity = request.get_authenticated_entity()  # type: ignore
             record.method = request.get_method()  # type: ignore
             record.url = request.get_redacted_uri()  # type: ignore
             record.protocol = request.clientproto.decode("ascii", errors="replace")  # type: ignore
