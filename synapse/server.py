@@ -650,7 +650,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return FederationHandlerRegistry(self)
 
     @cache_in_self
-    def get_server_notices_manager(self):
+    def get_server_notices_manager(self) -> ServerNoticesManager:
         if self.config.worker_app:
             raise Exception("Workers cannot send server notices")
         return ServerNoticesManager(self)
