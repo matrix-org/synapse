@@ -192,6 +192,7 @@ class ContextRequest:
     * Be a single variable that can be passed from parent LoggingContexts to
       their children.
     """
+
     request_id = attr.ib(type=str)
     ip_address = attr.ib(type=str)
     site_tag = attr.ib(type=str)
