@@ -684,8 +684,8 @@ def set_current_context(context: LoggingContextOrSentinel) -> LoggingContextOrSe
 def nested_logging_context(suffix: str) -> LoggingContext:
     """Creates a new logging context as a child of another.
 
-    The nested logging context will have a 'request_id' made up of the parent context's
-    request_id, plus the given suffix.
+    The nested logging context will have a 'name' made up of the parent context's
+    name, plus the given suffix.
 
     CPU/db usage stats will be added to the parent context's on exit.
 
@@ -695,7 +695,7 @@ def nested_logging_context(suffix: str) -> LoggingContext:
             # ... do stuff
 
     Args:
-        suffix: suffix to add to the parent context's 'request_id'.
+        suffix: suffix to add to the parent context's 'name'.
 
     Returns:
         LoggingContext: new logging context.
