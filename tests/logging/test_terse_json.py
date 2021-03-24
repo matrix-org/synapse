@@ -16,7 +16,9 @@ import json
 import logging
 from io import BytesIO, StringIO
 
-from mock import Mock
+from twisted.web.server import Request
+
+from mock import Mock, patch
 
 from synapse.http.site import SynapseRequest
 from synapse.logging._terse_json import JsonFormatter, TerseJsonFormatter
@@ -149,15 +151,22 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         logger = self.get_logger(handler)
 
         # A full request isn't needed here.
-        site = Mock(spec=["site_tag"])
+        site = Mock(spec=["site_tag", "server_version_string", "getResourceFor"])
         site.site_tag = "test-site"
+        site.server_version_string = "Server v1"
         request = SynapseRequest(FakeChannel(site, None))
         # Call requestReceived to finish instantiating the object.
         request.content = BytesIO()
-        request.process = Mock()
-        request.requestReceived(b"POST", b"/_matrix/client/versions", b"1.1")
+        # Partially skip some of the internal processing of SynapseRequest.
+        request._started_processing = Mock()
+        request.request_metrics = Mock(spec=["name"])
+        with patch.object(Request, "render"):
+            request.requestReceived(b"POST", b"/_matrix/client/versions", b"1.1")
 
-        with LoggingContext(request=request):
+        # Also set the requester to ensure the processing works.
+        request.requester = "@foo:test"
+
+        with LoggingContext(parent_context=request.logcontext):
             logger.info("Hello there, %s!", "wally")
 
         log = self.get_log_line()
@@ -182,7 +191,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         self.assertTrue(log["request"].startswith("POST-"))
         self.assertEqual(log["ip_address"], "127.0.0.1")
         self.assertEqual(log["site_tag"], "test-site")
-        self.assertIsNone(log["requester"])
+        self.assertEqual(log["requester"], "@foo:test")
         self.assertIsNone(log["authenticated_entity"])
         self.assertEqual(log["method"], "POST")
         self.assertEqual(log["url"], "/_matrix/client/versions")

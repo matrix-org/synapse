@@ -34,7 +34,6 @@ from typing_extensions import Literal
 from twisted.internet import defer, threads
 
 if TYPE_CHECKING:
-    from synapse.http.site import SynapseRequest
     from synapse.logging.scopecontextmanager import _LogContextScope
 
 logger = logging.getLogger(__name__)
@@ -181,6 +180,42 @@ class ContextResourceUsage:
         return res
 
 
+class ContextRequest:
+    __slots__ = [
+        "request_id",
+        "ip_address",
+        "site_tag",
+        "requester",
+        "authenticated_entity",
+        "method",
+        "url",
+        "protocol",
+        "user_agent",
+    ]
+
+    def __init__(
+        self,
+        request_id,
+        ip_address,
+        site_tag,
+        requester,
+        authenticated_entity,
+        method,
+        url,
+        protocol,
+        user_agent,
+    ):
+        self.request_id = request_id
+        self.ip_address = ip_address
+        self.site_tag = site_tag
+        self.requester = requester
+        self.authenticated_entity = authenticated_entity
+        self.method = method
+        self.url = url
+        self.protocol = protocol
+        self.user_agent = user_agent
+
+
 LoggingContextOrSentinel = Union["LoggingContext", "_Sentinel"]
 
 
@@ -256,7 +291,7 @@ class LoggingContext:
         self,
         name: Optional[str] = None,
         parent_context: "Optional[LoggingContext]" = None,
-        request: "Optional[SynapseRequest]" = None,
+        request: Optional[ContextRequest] = None,
     ) -> None:
         self.previous_context = current_context()
         self.name = name
@@ -293,7 +328,7 @@ class LoggingContext:
 
     def __str__(self) -> str:
         if self.request:
-            return self.request.get_request_id()
+            return self.request.request_id
         return "%s@%x" % (self.name, id(self))
 
     @classmethod
@@ -569,16 +604,14 @@ class LoggingContextFilter(logging.Filter):
             if request is None:
                 return True
 
-            # Avoid a circular import.
-            from synapse.http import get_request_user_agent
-
-            record.ip_address = request.getClientIP()  # type: ignore
-            record.site_tag = request.site.site_tag  # type: ignore
-            record.requester, record.authenticated_entity = request.get_authenticated_entity()  # type: ignore
-            record.method = request.get_method()  # type: ignore
-            record.url = request.get_redacted_uri()  # type: ignore
-            record.protocol = request.clientproto.decode("ascii", errors="replace")  # type: ignore
-            record.user_agent = get_request_user_agent(request)  # type: ignore
+            record.ip_address = request.ip_address  # type: ignore
+            record.site_tag = request.site_tag  # type: ignore
+            record.requester = request.requester
+            record.authenticated_entity = request.authenticated_entity  # type: ignore
+            record.method = request.method  # type: ignore
+            record.url = request.url  # type: ignore
+            record.protocol = request.protocol  # type: ignore
+            record.user_agent = request.user_agent  # type: ignore
 
         return True
 

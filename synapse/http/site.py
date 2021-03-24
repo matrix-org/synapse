@@ -26,7 +26,11 @@ from twisted.web.server import Request, Site
 from synapse.config.server import ListenerConfig
 from synapse.http import get_request_user_agent, redact_uri
 from synapse.http.request_metrics import RequestMetrics, requests_counter
-from synapse.logging.context import LoggingContext, PreserveLoggingContext
+from synapse.logging.context import (
+    ContextRequest,
+    LoggingContext,
+    PreserveLoggingContext,
+)
 from synapse.types import Requester
 
 logger = logging.getLogger(__name__)
@@ -63,7 +67,7 @@ class SynapseRequest(Request):
 
         # The requester, if authenticated. For federation requests this is the
         # server name, for client requests this is the Requester object.
-        self.requester = None  # type: Optional[Union[Requester, str]]
+        self._requester = None  # type: Optional[Union[Requester, str]]
 
         # we can't yet create the logcontext, as we don't know the method.
         self.logcontext = None  # type: Optional[LoggingContext]
@@ -92,6 +96,28 @@ class SynapseRequest(Request):
             self.clientproto.decode("ascii", errors="replace"),
             self.site.site_tag,
         )
+
+    @property
+    def requester(self) -> Optional[Union[Requester, str]]:
+        return self._requester
+
+    @requester.setter
+    def requester(self, value: Union[Requester, str]) -> None:
+        # Store the requester, and update some properties based on it.
+
+        # This should only be called once.
+        assert self._requester is None
+
+        self._requester = value
+
+        # A logging context should exist by now (and have a ContextRequest).
+        assert self.logcontext is not None
+        assert self.logcontext.request is not None
+
+        (
+            self.logcontext.request.requester,
+            self.logcontext.request.authenticated_entity,
+        ) = self.get_authenticated_entity()
 
     def get_request_id(self):
         return "%s-%i" % (self.get_method(), self.request_seq)
@@ -140,22 +166,22 @@ class SynapseRequest(Request):
                 Requester.authenticated_entity.
         """
         # Convert the requester into a string that we can log
-        if isinstance(self.requester, str):
-            return self.requester, None
-        elif isinstance(self.requester, Requester):
-            requester = self.requester.user.to_string()
-            authenticated_entity = self.requester.authenticated_entity
+        if isinstance(self._requester, str):
+            return self._requester, None
+        elif isinstance(self._requester, Requester):
+            requester = self._requester.user.to_string()
+            authenticated_entity = self._requester.authenticated_entity
 
             # If this is a request where the target user doesn't match the user who
             # authenticated (e.g. and admin is puppetting a user) then we return both.
-            if self.requester.user.to_string() != authenticated_entity:
+            if self._requester.user.to_string() != authenticated_entity:
                 return requester, authenticated_entity
 
             return requester, None
-        elif self.requester is not None:
+        elif self._requester is not None:
             # This shouldn't happen, but we log it so we don't lose information
             # and can see that we're doing something wrong.
-            return repr(self.requester), None  # type: ignore[unreachable]
+            return repr(self._requester), None  # type: ignore[unreachable]
 
         return None, None
 
@@ -165,7 +191,21 @@ class SynapseRequest(Request):
 
         # create a LogContext for this request
         request_id = self.get_request_id()
-        self.logcontext = LoggingContext(request_id, request=self)
+        self.logcontext = LoggingContext(
+            request_id,
+            request=ContextRequest(
+                self.get_request_id(),
+                self.getClientIP(),
+                self.site.site_tag,
+                # The requester is going to be unknown at this point.
+                None,
+                None,
+                self.get_method(),
+                self.get_redacted_uri(),
+                self.clientproto.decode("ascii", errors="replace"),
+                get_request_user_agent(self),
+            ),
+        )
 
         # override the Server header which is set by twisted
         self.setHeader("Server", self.site.server_version_string)
@@ -354,9 +394,6 @@ class SynapseRequest(Request):
             self.request_metrics.stop(self.finish_time, self.code, self.sentLength)
         except Exception as e:
             logger.warning("Failed to stop metrics: %r", e)
-
-        # Break the cycle between SynapseRequest and LoggingContext.
-        self.logcontext = None
 
     def _should_log_request(self) -> bool:
         """Whether we should log at INFO that we processed the request."""
