@@ -16,7 +16,7 @@
 import itertools
 import logging
 from collections import deque
-from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence, Set, Tuple, cast
 
 import attr
 
@@ -38,6 +38,9 @@ MAX_ROOMS = 50
 # max number of events to return per room.
 MAX_ROOMS_PER_SPACE = 50
 
+# max number of federation servers to hit per room
+MAX_SERVERS_PER_SPACE = 3
+
 
 class SpaceSummaryHandler:
     def __init__(self, hs: "HomeServer"):
@@ -47,6 +50,8 @@ class SpaceSummaryHandler:
         self._state_handler = hs.get_state_handler()
         self._store = hs.get_datastore()
         self._event_serializer = hs.get_event_client_serializer()
+        self._server_name = hs.hostname
+        self._federation_client = hs.get_federation_client()
 
     async def get_space_summary(
         self,
@@ -78,9 +83,14 @@ class SpaceSummaryHandler:
         await self._auth.check_user_in_room_or_world_readable(room_id, requester)
 
         # the queue of rooms to process
-        room_queue = deque((_RoomQueueEntry(room_id),))
+        room_queue = deque((_RoomQueueEntry(room_id, ()),))
 
+        # rooms we have already processed
         processed_rooms = set()  # type: Set[str]
+
+        # events we have already processed. We don't necessarily have their event ids,
+        # so instead we key on (room id, state key)
+        processed_events = set()  # type: Set[Tuple[str, str]]
 
         rooms_result = []  # type: List[JsonDict]
         events_result = []  # type: List[JsonDict]
@@ -88,25 +98,66 @@ class SpaceSummaryHandler:
         while room_queue and len(rooms_result) < MAX_ROOMS:
             queue_entry = room_queue.popleft()
             room_id = queue_entry.room_id
+            if room_id in processed_rooms:
+                # already done this room
+                continue
+
             logger.debug("Processing room %s", room_id)
-            processed_rooms.add(room_id)
+
+            is_in_room = await self._store.is_host_joined(room_id, self._server_name)
 
             # The client-specified max_rooms_per_space limit doesn't apply to the
             # room_id specified in the request, so we ignore it if this is the
             # first room we are processing.
             max_children = max_rooms_per_space if processed_rooms else None
 
-            rooms, events = await self._summarize_local_room(
-                requester, room_id, suggested_only, max_children
+            if is_in_room:
+                rooms, events = await self._summarize_local_room(
+                    requester, room_id, suggested_only, max_children
+                )
+            else:
+                rooms, events = await self._summarize_remote_room(
+                    queue_entry,
+                    suggested_only,
+                    max_children,
+                    exclude_rooms=processed_rooms,
+                )
+
+            logger.debug(
+                "Query of %s returned rooms %s, events %s",
+                queue_entry.room_id,
+                [room.get("room_id") for room in rooms],
+                ["%s->%s" % (ev["room_id"], ev["state_key"]) for ev in events],
             )
 
             rooms_result.extend(rooms)
-            events_result.extend(events)
 
-            # add any children that we haven't already processed to the queue
-            for edge_event in events:
-                if edge_event["state_key"] not in processed_rooms:
-                    room_queue.append(_RoomQueueEntry(edge_event["state_key"]))
+            # any rooms returned don't need visiting again
+            processed_rooms.update(cast(str, room.get("room_id")) for room in rooms)
+
+            # the room we queried may or may not have been returned, but don't process
+            # it again, anyway.
+            processed_rooms.add(room_id)
+
+            # XXX: is it ok that we blindly iterate through any events returned by
+            #   a remote server, whether or not they actually link to any rooms in our
+            #   tree?
+            for ev in events:
+                # remote servers might return events we have already processed
+                # (eg, Dendrite returns inward pointers as well as outward ones), so
+                # we need to filter them out, to avoid returning duplicate links to the
+                # client.
+                ev_key = (ev["room_id"], ev["state_key"])
+                if ev_key in processed_events:
+                    continue
+                events_result.append(ev)
+
+                # add the child to the queue. we have already validated
+                # that the vias are a list of server names.
+                room_queue.append(
+                    _RoomQueueEntry(ev["state_key"], ev["content"]["via"])
+                )
+                processed_events.add(ev_key)
 
         return {"rooms": rooms_result, "events": events_result}
 
@@ -149,20 +200,23 @@ class SpaceSummaryHandler:
 
         while room_queue and len(rooms_result) < MAX_ROOMS:
             room_id = room_queue.popleft()
+            if room_id in processed_rooms:
+                # already done this room
+                continue
+
             logger.debug("Processing room %s", room_id)
-            processed_rooms.add(room_id)
 
             rooms, events = await self._summarize_local_room(
                 None, room_id, suggested_only, max_rooms_per_space
             )
 
+            processed_rooms.add(room_id)
+
             rooms_result.extend(rooms)
             events_result.extend(events)
 
-            # add any children that we haven't already processed to the queue
-            for edge_event in events:
-                if edge_event["state_key"] not in processed_rooms:
-                    room_queue.append(edge_event["state_key"])
+            # add any children to the queue
+            room_queue.extend(edge_event["state_key"] for edge_event in events)
 
         return {"rooms": rooms_result, "events": events_result}
 
@@ -199,6 +253,43 @@ class SpaceSummaryHandler:
                 )
             )
         return (room_entry,), events_result
+
+    async def _summarize_remote_room(
+        self,
+        room: "_RoomQueueEntry",
+        suggested_only: bool,
+        max_children: Optional[int],
+        exclude_rooms: Iterable[str],
+    ) -> Tuple[Sequence[JsonDict], Sequence[JsonDict]]:
+        room_id = room.room_id
+        logger.info("Requesting summary for %s via %s", room_id, room.via)
+
+        # we need to make the exclusion list json-serialisable
+        exclude_rooms = list(exclude_rooms)
+
+        via = itertools.islice(room.via, MAX_SERVERS_PER_SPACE)
+        try:
+            res = await self._federation_client.get_space_summary(
+                via,
+                room_id,
+                suggested_only=suggested_only,
+                max_rooms_per_space=max_children,
+                exclude_rooms=exclude_rooms,
+            )
+        except Exception as e:
+            logger.warning(
+                "Unable to get summary of %s via federation: %s",
+                room_id,
+                e,
+                exc_info=logger.isEnabledFor(logging.DEBUG),
+            )
+            return (), ()
+
+        return res.rooms, tuple(
+            ev.data
+            for ev in res.events
+            if ev.event_type == EventTypes.MSC1772_SPACE_CHILD
+        )
 
     async def _is_room_accessible(self, room_id: str, requester: Optional[str]) -> bool:
         # if we have an authenticated requesting user, first check if they are in the
@@ -276,12 +367,24 @@ class SpaceSummaryHandler:
         )
 
         # filter out any events without a "via" (which implies it has been redacted)
-        return (e for e in events if e.content.get("via"))
+        return (e for e in events if _has_valid_via(e))
 
 
 @attr.s(frozen=True, slots=True)
 class _RoomQueueEntry:
     room_id = attr.ib(type=str)
+    via = attr.ib(type=Sequence[str])
+
+
+def _has_valid_via(e: EventBase) -> bool:
+    via = e.content.get("via")
+    if not via or not isinstance(via, Sequence):
+        return False
+    for v in via:
+        if not isinstance(v, str):
+            logger.debug("Ignoring edge event %s with invalid via entry", e.event_id)
+            return False
+    return True
 
 
 def _is_suggested_child_event(edge_event: EventBase) -> bool:
