@@ -670,10 +670,10 @@ class DatabasePool:
 
             for after_callback, after_args, after_kwargs in after_callbacks:
                 after_callback(*after_args, **after_kwargs)
-        except Exception as e:
+        except Exception:
             for after_callback, after_args, after_kwargs in exception_callbacks:
                 after_callback(*after_args, **after_kwargs)
-            raise e
+            raise
 
         return cast(R, result)
 
