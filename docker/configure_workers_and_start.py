@@ -23,6 +23,10 @@
 #   * SYNAPSE_WORKERS: A comma separated list of worker names as specified in WORKER_CONFIG
 #                      below. Leave empty for no workers, or set to '*' for all possible
 #                      workers.
+#
+# NOTE: According to Complement's ENTRYPOINT expectations for a homeserver image (as defined
+# in the project's README), this script may be run multiple times, and functionality should
+# continue to work if so.
 
 import os
 import subprocess
@@ -521,8 +525,16 @@ def main(args, environ):
         log("Generating base homeserver config")
         generate_base_homeserver_config()
 
-    # Always regenerate all other config files
-    generate_worker_files(environ, config_path, data_dir)
+    # This script may be run multiple times (mostly by Complement, see note at top of file).
+    # Don't re-configure workers in this instance.
+    mark_filepath = "/conf/workers_have_been_configured"
+    if not os.path.exists(mark_filepath):
+        # Always regenerate all other config files
+        generate_worker_files(environ, config_path, data_dir)
+
+        # Mark workers as being configured
+        with open(mark_filepath, "w") as f:
+            f.write("")
 
     # Start supervisord, which will start Synapse, all of the configured worker
     # processes, redis, nginx etc. according to the config we created above.
