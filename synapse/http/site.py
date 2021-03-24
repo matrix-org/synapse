@@ -197,16 +197,16 @@ class SynapseRequest(Request):
         self.logcontext = LoggingContext(
             request_id,
             request=ContextRequest(
-                self.get_request_id(),
-                self.getClientIP(),
-                self.site.site_tag,
+                request_id=request_id,
+                ip_address=self.getClientIP(),
+                site_tag=self.site.site_tag,
                 # The requester is going to be unknown at this point.
-                None,
-                None,
-                self.get_method(),
-                self.get_redacted_uri(),
-                self.clientproto.decode("ascii", errors="replace"),
-                get_request_user_agent(self),
+                requester=None,
+                authenticated_entity=None,
+                method=self.get_method(),
+                url=self.get_redacted_uri(),
+                protocol=self.clientproto.decode("ascii", errors="replace"),
+                user_agent=get_request_user_agent(self),
             ),
         )
 

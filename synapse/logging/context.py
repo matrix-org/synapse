@@ -29,6 +29,7 @@ import types
 import warnings
 from typing import TYPE_CHECKING, Optional, Tuple, TypeVar, Union
 
+import attr
 from typing_extensions import Literal
 
 from twisted.internet import defer, threads
@@ -180,40 +181,17 @@ class ContextResourceUsage:
         return res
 
 
+@attr.s(slots=True)
 class ContextRequest:
-    __slots__ = [
-        "request_id",
-        "ip_address",
-        "site_tag",
-        "requester",
-        "authenticated_entity",
-        "method",
-        "url",
-        "protocol",
-        "user_agent",
-    ]
-
-    def __init__(
-        self,
-        request_id,
-        ip_address,
-        site_tag,
-        requester,
-        authenticated_entity,
-        method,
-        url,
-        protocol,
-        user_agent,
-    ):
-        self.request_id = request_id
-        self.ip_address = ip_address
-        self.site_tag = site_tag
-        self.requester = requester
-        self.authenticated_entity = authenticated_entity
-        self.method = method
-        self.url = url
-        self.protocol = protocol
-        self.user_agent = user_agent
+    request_id = attr.ib(type=str)
+    ip_address = attr.ib(type=str)
+    site_tag = attr.ib(type=str)
+    requester = attr.ib(type=Optional[str])
+    authenticated_entity = attr.ib(type=Optional[str])
+    method = attr.ib(type=str)
+    url = attr.ib(type=str)
+    protocol = attr.ib(type=str)
+    user_agent = attr.ib(type=str)
 
 
 LoggingContextOrSentinel = Union["LoggingContext", "_Sentinel"]
