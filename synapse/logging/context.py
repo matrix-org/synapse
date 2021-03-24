@@ -183,6 +183,15 @@ class ContextResourceUsage:
 
 @attr.s(slots=True)
 class ContextRequest:
+    """
+    A bundle of attributes from the SynapseRequest object.
+
+    This exists to:
+
+    * Avoid a cycle between LoggingContext and SynapseRequest.
+    * Be a single variable that can be passed from parent LoggingContexts to
+      their children.
+    """
     request_id = attr.ib(type=str)
     ip_address = attr.ib(type=str)
     site_tag = attr.ib(type=str)
