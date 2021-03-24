@@ -35,6 +35,14 @@ from typing import (
 import attr
 from signedjson.key import decode_verify_key_bytes
 from unpaddedbase64 import decode_base64
+from zope.interface import Interface
+
+from twisted.internet.interfaces import (
+    IReactorCore,
+    IReactorPluggableNameResolver,
+    IReactorTCP,
+    IReactorTime,
+)
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.util.stringutils import parse_and_validate_server_name
@@ -67,32 +75,39 @@ MutableStateMap = MutableMapping[StateKey, T]
 JsonDict = Dict[str, Any]
 
 
-class Requester(
-    namedtuple(
-        "Requester",
-        [
-            "user",
-            "access_token_id",
-            "is_guest",
-            "shadow_banned",
-            "device_id",
-            "app_service",
-            "authenticated_entity",
-        ],
-    )
+# Note that this seems to require inheriting *directly* from Interface in order
+# for mypy-zope to realize it is an interface.
+class ISynapseReactor(
+    IReactorTCP, IReactorPluggableNameResolver, IReactorTime, IReactorCore, Interface
 ):
+    """The interfaces necessary for Synapse to function."""
+
+
+@attr.s(frozen=True, slots=True)
+class Requester:
     """
     Represents the user making a request
 
     Attributes:
-        user (UserID):  id of the user making the request
-        access_token_id (int|None):  *ID* of the access token used for this
+        user:  id of the user making the request
+        access_token_id:  *ID* of the access token used for this
             request, or None if it came via the appservice API or similar
-        is_guest (bool):  True if the user making this request is a guest user
-        shadow_banned (bool):  True if the user making this request has been shadow-banned.
-        device_id (str|None):  device_id which was set at authentication time
-        app_service (ApplicationService|None):  the AS requesting on behalf of the user
+        is_guest:  True if the user making this request is a guest user
+        shadow_banned:  True if the user making this request has been shadow-banned.
+        device_id:  device_id which was set at authentication time
+        app_service:  the AS requesting on behalf of the user
+        authenticated_entity: The entity that authenticated when making the request.
+            This is different to the user_id when an admin user or the server is
+            "puppeting" the user.
     """
+
+    user = attr.ib(type="UserID")
+    access_token_id = attr.ib(type=Optional[int])
+    is_guest = attr.ib(type=bool)
+    shadow_banned = attr.ib(type=bool)
+    device_id = attr.ib(type=Optional[str])
+    app_service = attr.ib(type=Optional["ApplicationService"])
+    authenticated_entity = attr.ib(type=str)
 
     def serialize(self):
         """Converts self to a type that can be serialized as JSON, and then
@@ -141,23 +156,23 @@ class Requester(
 def create_requester(
     user_id: Union[str, "UserID"],
     access_token_id: Optional[int] = None,
-    is_guest: Optional[bool] = False,
-    shadow_banned: Optional[bool] = False,
+    is_guest: bool = False,
+    shadow_banned: bool = False,
     device_id: Optional[str] = None,
     app_service: Optional["ApplicationService"] = None,
     authenticated_entity: Optional[str] = None,
-):
+) -> Requester:
     """
     Create a new ``Requester`` object
 
     Args:
-        user_id (str|UserID):  id of the user making the request
-        access_token_id (int|None):  *ID* of the access token used for this
+        user_id:  id of the user making the request
+        access_token_id:  *ID* of the access token used for this
             request, or None if it came via the appservice API or similar
-        is_guest (bool):  True if the user making this request is a guest user
-        shadow_banned (bool):  True if the user making this request is shadow-banned.
-        device_id (str|None):  device_id which was set at authentication time
-        app_service (ApplicationService|None):  the AS requesting on behalf of the user
+        is_guest:  True if the user making this request is a guest user
+        shadow_banned:  True if the user making this request is shadow-banned.
+        device_id:  device_id which was set at authentication time
+        app_service:  the AS requesting on behalf of the user
         authenticated_entity: The entity that authenticated when making the request.
             This is different to the user_id when an admin user or the server is
             "puppeting" the user.

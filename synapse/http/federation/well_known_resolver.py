@@ -324,7 +324,8 @@ def _cache_period_from_headers(
 
 def _parse_cache_control(headers: Headers) -> Dict[bytes, Optional[bytes]]:
     cache_controls = {}
-    for hdr in headers.getRawHeaders(b"cache-control", []):
+    cache_control_headers = headers.getRawHeaders(b"cache-control") or []
+    for hdr in cache_control_headers:
         for directive in hdr.split(b","):
             splits = [x.strip() for x in directive.split(b"=", 1)]
             k = splits[0].lower()

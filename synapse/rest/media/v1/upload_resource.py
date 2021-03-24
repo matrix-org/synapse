@@ -15,18 +15,19 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING
+from typing import IO, TYPE_CHECKING
 
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import DirectServeJsonResource, respond_with_json
 from synapse.http.servlet import parse_string
+from synapse.http.site import SynapseRequest
 from synapse.rest.media.v1.media_storage import SpamMediaException
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
     from synapse.rest.media.v1.media_repository import MediaRepository
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ class UploadResource(DirectServeJsonResource):
     async def _async_render_OPTIONS(self, request: Request) -> None:
         respond_with_json(request, 200, {}, send_cors=True)
 
-    async def _async_render_POST(self, request: Request) -> None:
+    async def _async_render_POST(self, request: SynapseRequest) -> None:
         requester = await self.auth.get_user_by_req(request)
         # TODO: The checks here are a bit late. The content will have
         # already been uploaded to a tmp file at this point
@@ -79,7 +80,9 @@ class UploadResource(DirectServeJsonResource):
         headers = request.requestHeaders
 
         if headers.hasHeader(b"Content-Type"):
-            media_type = headers.getRawHeaders(b"Content-Type")[0].decode("ascii")
+            content_type_headers = headers.getRawHeaders(b"Content-Type")
+            assert content_type_headers  # for mypy
+            media_type = content_type_headers[0].decode("ascii")
         else:
             raise SynapseError(msg="Upload request missing 'Content-Type'", code=400)
 
@@ -88,8 +91,9 @@ class UploadResource(DirectServeJsonResource):
         # TODO(markjh): parse content-dispostion
 
         try:
+            content = request.content  # type: IO  # type: ignore
             content_uri = await self.media_repo.create_content(
-                media_type, upload_name, request.content, content_length, requester.user
+                media_type, upload_name, content, content_length, requester.user
             )
         except SpamMediaException:
             # For uploading of media we want to respond with a 400, instead of

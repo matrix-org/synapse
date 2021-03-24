@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from synapse.api.errors import SynapseError
 from synapse.handlers.room_member import RoomMemberHandler
@@ -25,11 +25,14 @@ from synapse.replication.http.membership import (
 )
 from synapse.types import Requester, UserID
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
 
 class RoomMemberWorkerHandler(RoomMemberHandler):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
         self._remote_join_client = ReplRemoteJoin.make_client(hs)
@@ -83,3 +86,6 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         await self._notify_change_client(
             user_id=target.to_string(), room_id=room_id, change="left"
         )
+
+    async def forget(self, target: UserID, room_id: str) -> None:
+        raise RuntimeError("Cannot forget rooms on workers.")

@@ -76,11 +76,16 @@ class ObservableDeferred:
         def callback(r):
             object.__setattr__(self, "_result", (True, r))
             while self._observers:
+                observer = self._observers.pop()
                 try:
-                    # TODO: Handle errors here.
-                    self._observers.pop().callback(r)
-                except Exception:
-                    pass
+                    observer.callback(r)
+                except Exception as e:
+                    logger.exception(
+                        "%r threw an exception on .callback(%r), ignoring...",
+                        observer,
+                        r,
+                        exc_info=e,
+                    )
             return r
 
         def errback(f):
@@ -90,11 +95,16 @@ class ObservableDeferred:
                 # traces when we `await` on one of the observer deferreds.
                 f.value.__failure__ = f
 
+                observer = self._observers.pop()
                 try:
-                    # TODO: Handle errors here.
-                    self._observers.pop().errback(f)
-                except Exception:
-                    pass
+                    observer.errback(f)
+                except Exception as e:
+                    logger.exception(
+                        "%r threw an exception on .errback(%r), ignoring...",
+                        observer,
+                        f,
+                        exc_info=e,
+                    )
 
             if consumeErrors:
                 return None

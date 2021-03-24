@@ -6,13 +6,14 @@
 *.egg
 *.egg-info
 *.lock
-*.pyc
+*.py[cod]
 *.snap
 *.tac
 _trial_temp/
 _trial_temp*/
 /out
 .DS_Store
+__pycache__/
 
 # stuff that is likely to exist when you run a server locally
 /*.db

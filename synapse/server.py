@@ -24,7 +24,6 @@
 import abc
 import functools
 import logging
-import os
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -37,8 +36,8 @@ from typing import (
     cast,
 )
 
-import twisted.internet.base
 import twisted.internet.tcp
+from twisted.internet import defer
 from twisted.mail.smtp import sendmail
 from twisted.web.iweb import IPolicyForHTTPS
 
@@ -97,10 +96,11 @@ from synapse.handlers.room import (
     RoomShutdownHandler,
 )
 from synapse.handlers.room_list import RoomListHandler
-from synapse.handlers.room_member import RoomMemberMasterHandler
+from synapse.handlers.room_member import RoomMemberHandler, RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.search import SearchHandler
 from synapse.handlers.set_password import SetPasswordHandler
+from synapse.handlers.space_summary import SpaceSummaryHandler
 from synapse.handlers.sso import SsoHandler
 from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
@@ -130,7 +130,7 @@ from synapse.server_notices.worker_server_notices_sender import (
 from synapse.state import StateHandler, StateResolutionHandler
 from synapse.storage import Databases, DataStore, Storage
 from synapse.streams.events import EventSources
-from synapse.types import DomainSpecificString
+from synapse.types import DomainSpecificString, ISynapseReactor
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
 from synapse.util.ratelimitutils import FederationRateLimiter
@@ -291,7 +291,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         for i in self.REQUIRED_ON_BACKGROUND_TASK_STARTUP:
             getattr(self, "get_" + i + "_handler")()
 
-    def get_reactor(self) -> twisted.internet.base.ReactorBase:
+    def get_reactor(self) -> ISynapseReactor:
         """
         Fetch the Twisted reactor in use by this HomeServer.
         """
@@ -352,11 +352,9 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_http_client_context_factory(self) -> IPolicyForHTTPS:
-        return (
-            InsecureInterceptableContextFactory()
-            if self.config.use_insecure_ssl_client_just_for_testing_do_not_use
-            else RegularPolicyForHTTPS()
-        )
+        if self.config.use_insecure_ssl_client_just_for_testing_do_not_use:
+            return InsecureInterceptableContextFactory()
+        return RegularPolicyForHTTPS()
 
     @cache_in_self
     def get_simple_http_client(self) -> SimpleHttpClient:
@@ -370,11 +368,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         """
         An HTTP client that uses configured HTTP(S) proxies.
         """
-        return SimpleHttpClient(
-            self,
-            http_proxy=os.getenvb(b"http_proxy"),
-            https_proxy=os.getenvb(b"HTTPS_PROXY"),
-        )
+        return SimpleHttpClient(self, use_proxy=True)
 
     @cache_in_self
     def get_proxied_blacklisted_http_client(self) -> SimpleHttpClient:
@@ -386,8 +380,7 @@ class HomeServer(metaclass=abc.ABCMeta):
             self,
             ip_whitelist=self.config.ip_range_whitelist,
             ip_blacklist=self.config.ip_range_blacklist,
-            http_proxy=os.getenvb(b"http_proxy"),
-            https_proxy=os.getenvb(b"HTTPS_PROXY"),
+            use_proxy=True,
         )
 
     @cache_in_self
@@ -409,7 +402,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return RoomShutdownHandler(self)
 
     @cache_in_self
-    def get_sendmail(self) -> sendmail:
+    def get_sendmail(self) -> Callable[..., defer.Deferred]:
         return sendmail
 
     @cache_in_self
@@ -425,9 +418,18 @@ class HomeServer(metaclass=abc.ABCMeta):
         return PresenceHandler(self)
 
     @cache_in_self
-    def get_typing_handler(self):
+    def get_typing_writer_handler(self) -> TypingWriterHandler:
         if self.config.worker.writers.typing == self.get_instance_name():
             return TypingWriterHandler(self)
+        else:
+            raise Exception("Workers cannot write typing")
+
+    @cache_in_self
+    def get_typing_handler(self) -> FollowerTypingHandler:
+        if self.config.worker.writers.typing == self.get_instance_name():
+            # Use get_typing_writer_handler to ensure that we use the same
+            # cached version.
+            return self.get_typing_writer_handler()
         else:
             return FollowerTypingHandler(self)
 
@@ -638,7 +640,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return ThirdPartyEventRules(self)
 
     @cache_in_self
-    def get_room_member_handler(self):
+    def get_room_member_handler(self) -> RoomMemberHandler:
         if self.config.worker_app:
             return RoomMemberWorkerHandler(self)
         return RoomMemberMasterHandler(self)
@@ -648,13 +650,13 @@ class HomeServer(metaclass=abc.ABCMeta):
         return FederationHandlerRegistry(self)
 
     @cache_in_self
-    def get_server_notices_manager(self):
+    def get_server_notices_manager(self) -> ServerNoticesManager:
         if self.config.worker_app:
             raise Exception("Workers cannot send server notices")
         return ServerNoticesManager(self)
 
     @cache_in_self
-    def get_server_notices_sender(self):
+    def get_server_notices_sender(self) -> WorkerServerNoticesSender:
         if self.config.worker_app:
             return WorkerServerNoticesSender(self)
         return ServerNoticesSender(self)
@@ -730,6 +732,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_account_data_handler(self) -> AccountDataHandler:
         return AccountDataHandler(self)
+
+    @cache_in_self
+    def get_space_summary_handler(self) -> SpaceSummaryHandler:
+        return SpaceSummaryHandler(self)
 
     @cache_in_self
     def get_external_cache(self) -> ExternalCache:

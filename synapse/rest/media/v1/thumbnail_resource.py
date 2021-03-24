@@ -18,7 +18,7 @@
 import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.api.errors import SynapseError
 from synapse.http.server import DirectServeJsonResource, set_cors_headers
@@ -34,8 +34,8 @@ from ._base import (
 )
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
     from synapse.rest.media.v1.media_repository import MediaRepository
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 

@@ -232,7 +232,6 @@ expressions:
     # Registration/login requests
     ^/_matrix/client/(api/v1|r0|unstable)/login$
     ^/_matrix/client/(r0|unstable)/register$
-    ^/_matrix/client/(r0|unstable)/auth/.*/fallback/web$
 
     # Event sending requests
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/redact
@@ -276,7 +275,7 @@ using):
 
 Ensure that all SSO logins go to a single process.
 For multiple workers not handling the SSO endpoints properly, see
-[#7530](https://github.com/matrix-org/synapse/issues/7530) and 
+[#7530](https://github.com/matrix-org/synapse/issues/7530) and
 [#9427](https://github.com/matrix-org/synapse/issues/9427).
 
 Note that a HTTP listener with `client` and `federation` resources must be

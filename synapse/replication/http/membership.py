@@ -15,9 +15,10 @@
 import logging
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.http.servlet import parse_json_object_from_request
+from synapse.http.site import SynapseRequest
 from synapse.replication.http._base import ReplicationEndpoint
 from synapse.types import JsonDict, Requester, UserID
 from synapse.util.distributor import user_left_room
@@ -78,7 +79,7 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
         }
 
     async def _handle_request(  # type: ignore
-        self, request: Request, room_id: str, user_id: str
+        self, request: SynapseRequest, room_id: str, user_id: str
     ) -> Tuple[int, JsonDict]:
         content = parse_json_object_from_request(request)
 
@@ -86,7 +87,6 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
         event_content = content["content"]
 
         requester = Requester.deserialize(self.store, content["requester"])
-
         request.requester = requester
 
         logger.info("remote_join: %s into room: %s", user_id, room_id)
@@ -147,7 +147,7 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
         }
 
     async def _handle_request(  # type: ignore
-        self, request: Request, invite_event_id: str
+        self, request: SynapseRequest, invite_event_id: str
     ) -> Tuple[int, JsonDict]:
         content = parse_json_object_from_request(request)
 
@@ -155,7 +155,6 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
         event_content = content["content"]
 
         requester = Requester.deserialize(self.store, content["requester"])
-
         request.requester = requester
 
         # hopefully we're now on the master, so this won't recurse!

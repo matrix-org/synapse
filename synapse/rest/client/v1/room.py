@@ -18,7 +18,7 @@
 
 import logging
 import re
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, Tuple
 from urllib import parse as urlparse
 
 from synapse.api.constants import EventTypes, Membership
@@ -35,21 +35,30 @@ from synapse.events.utils import format_event_for_client_v2
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
+    parse_boolean,
     parse_integer,
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import set_tag
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
-from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
+from synapse.types import (
+    JsonDict,
+    RoomAlias,
+    RoomID,
+    StreamToken,
+    ThirdPartyInstanceID,
+    UserID,
+)
 from synapse.util import json_decoder
 from synapse.util.stringutils import parse_and_validate_server_name, random_string
 
 if TYPE_CHECKING:
-    import synapse.server
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -671,7 +680,10 @@ class RoomEventContextServlet(RestServlet):
             results["events_after"], time_now
         )
         results["state"] = await self._event_serializer.serialize_events(
-            results["state"], time_now
+            results["state"],
+            time_now,
+            # No need to bundle aggregations for state events
+            bundle_aggregations=False,
         )
 
         return 200, results
@@ -843,10 +855,10 @@ class RoomTypingRestServlet(RestServlet):
         "/rooms/(?P<room_id>[^/]*)/typing/(?P<user_id>[^/]*)$", v1=True
     )
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
+        self.hs = hs
         self.presence_handler = hs.get_presence_handler()
-        self.typing_handler = hs.get_typing_handler()
         self.auth = hs.get_auth()
 
         # If we're not on the typing writer instance we should scream if we get
@@ -871,16 +883,19 @@ class RoomTypingRestServlet(RestServlet):
         # Limit timeout to stop people from setting silly typing timeouts.
         timeout = min(content.get("timeout", 30000), 120000)
 
+        # Defer getting the typing handler since it will raise on workers.
+        typing_handler = self.hs.get_typing_writer_handler()
+
         try:
             if content["typing"]:
-                await self.typing_handler.started_typing(
+                await typing_handler.started_typing(
                     target_user=target_user,
                     requester=requester,
                     room_id=room_id,
                     timeout=timeout,
                 )
             else:
-                await self.typing_handler.stopped_typing(
+                await typing_handler.stopped_typing(
                     target_user=target_user, requester=requester, room_id=room_id
                 )
         except ShadowBanError:
@@ -898,7 +913,7 @@ class RoomAliasListServlet(RestServlet):
         ),
     ]
 
-    def __init__(self, hs: "synapse.server.HomeServer"):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.directory_handler = hs.get_directory_handler()
@@ -981,7 +996,58 @@ def register_txn_path(servlet, regex_string, http_server, with_get=False):
         )
 
 
-def register_servlets(hs, http_server, is_worker=False):
+class RoomSpaceSummaryRestServlet(RestServlet):
+    PATTERNS = (
+        re.compile(
+            "^/_matrix/client/unstable/org.matrix.msc2946"
+            "/rooms/(?P<room_id>[^/]*)/spaces$"
+        ),
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self._auth = hs.get_auth()
+        self._space_summary_handler = hs.get_space_summary_handler()
+
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self._auth.get_user_by_req(request, allow_guest=True)
+
+        return 200, await self._space_summary_handler.get_space_summary(
+            requester.user.to_string(),
+            room_id,
+            suggested_only=parse_boolean(request, "suggested_only", default=False),
+            max_rooms_per_space=parse_integer(request, "max_rooms_per_space"),
+        )
+
+    async def on_POST(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self._auth.get_user_by_req(request, allow_guest=True)
+        content = parse_json_object_from_request(request)
+
+        suggested_only = content.get("suggested_only", False)
+        if not isinstance(suggested_only, bool):
+            raise SynapseError(
+                400, "'suggested_only' must be a boolean", Codes.BAD_JSON
+            )
+
+        max_rooms_per_space = content.get("max_rooms_per_space")
+        if max_rooms_per_space is not None and not isinstance(max_rooms_per_space, int):
+            raise SynapseError(
+                400, "'max_rooms_per_space' must be an integer", Codes.BAD_JSON
+            )
+
+        return 200, await self._space_summary_handler.get_space_summary(
+            requester.user.to_string(),
+            room_id,
+            suggested_only=suggested_only,
+            max_rooms_per_space=max_rooms_per_space,
+        )
+
+
+def register_servlets(hs: "HomeServer", http_server, is_worker=False):
     RoomStateEventRestServlet(hs).register(http_server)
     RoomMemberListRestServlet(hs).register(http_server)
     JoinedRoomMemberListRestServlet(hs).register(http_server)
@@ -994,6 +1060,9 @@ def register_servlets(hs, http_server, is_worker=False):
     RoomRedactEventRestServlet(hs).register(http_server)
     RoomTypingRestServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
+
+    if hs.config.experimental.spaces_enabled:
+        RoomSpaceSummaryRestServlet(hs).register(http_server)
 
     # Some servlets only get registered for the main process.
     if not is_worker:

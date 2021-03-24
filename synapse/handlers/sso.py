@@ -31,8 +31,8 @@ from urllib.parse import urlencode
 import attr
 from typing_extensions import NoReturn, Protocol
 
-from twisted.web.http import Request
 from twisted.web.iweb import IRequest
+from twisted.web.server import Request
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, NotFoundError, RedirectException, SynapseError
@@ -96,6 +96,11 @@ class SsoIdentityProvider(Protocol):
     @property
     def idp_brand(self) -> Optional[str]:
         """Optional branding identifier"""
+        return None
+
+    @property
+    def unstable_idp_brand(self) -> Optional[str]:
+        """Optional brand identifier for the unstable API (see MSC2858)."""
         return None
 
     @abc.abstractmethod
@@ -456,6 +461,7 @@ class SsoHandler:
 
         await self._auth_handler.complete_sso_login(
             user_id,
+            auth_provider_id,
             request,
             client_redirect_url,
             extra_login_attributes,
@@ -605,6 +611,7 @@ class SsoHandler:
             default_display_name=attributes.display_name,
             bind_emails=attributes.emails,
             user_agent_ips=[(user_agent, ip_address)],
+            auth_provider_id=auth_provider_id,
         )
 
         await self._store.record_user_external_id(
@@ -886,6 +893,7 @@ class SsoHandler:
 
         await self._auth_handler.complete_sso_login(
             user_id,
+            session.auth_provider_id,
             request,
             session.client_redirect_url,
             session.extra_login_attributes,

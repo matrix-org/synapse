@@ -1,5 +1,7 @@
 # Contents
-- [List all media in a room](#list-all-media-in-a-room)
+- [Querying media](#querying-media)
+  * [List all media in a room](#list-all-media-in-a-room)
+  * [List all media uploaded by a user](#list-all-media-uploaded-by-a-user)
 - [Quarantine media](#quarantine-media)
   * [Quarantining media by ID](#quarantining-media-by-id)
   * [Quarantining media in a room](#quarantining-media-in-a-room)
@@ -10,7 +12,11 @@
   * [Delete local media by date or size](#delete-local-media-by-date-or-size)
 - [Purge Remote Media API](#purge-remote-media-api)
 
-# List all media in a room
+# Querying media
+
+These APIs allow extracting media information from the homeserver.
+
+## List all media in a room
 
 This API gets a list of known media in a room.
 However, it only shows media from unencrypted events or rooms.
@@ -35,6 +41,12 @@ The API returns a JSON body like the following:
   ]
 }
 ```
+
+## List all media uploaded by a user
+
+Listing all media that has been uploaded by a local user can be achieved through
+the use of the [List media of a user](user_admin_api.rst#list-media-of-a-user)
+Admin API.
 
 # Quarantine media
 

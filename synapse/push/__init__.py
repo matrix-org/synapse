@@ -21,7 +21,7 @@ import attr
 from synapse.types import JsonDict, RoomStreamToken
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 
 @attr.s(slots=True)

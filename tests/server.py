@@ -16,6 +16,7 @@ from twisted.internet.interfaces import (
     IReactorPluggableNameResolver,
     IReactorTCP,
     IResolverSimple,
+    ITransport,
 )
 from twisted.python.failure import Failure
 from twisted.test.proto_helpers import AccumulatingProtocol, MemoryReactorClock
@@ -124,7 +125,11 @@ class FakeChannel:
         return address.IPv4Address("TCP", self._ip, 3423)
 
     def getHost(self):
-        return None
+        # this is called by Request.__init__ to configure Request.host.
+        return address.IPv4Address("TCP", "127.0.0.1", 8888)
+
+    def isSecure(self):
+        return False
 
     @property
     def transport(self):
@@ -184,7 +189,7 @@ class FakeSite:
 
 def make_request(
     reactor,
-    site: Site,
+    site: Union[Site, FakeSite],
     method,
     path,
     content=b"",
@@ -463,6 +468,7 @@ def get_clock():
     return clock, hs_clock
 
 
+@implementer(ITransport)
 @attr.s(cmp=False)
 class FakeTransport:
     """
