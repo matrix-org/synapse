@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import List
 
 from mock import Mock
 
@@ -37,7 +38,7 @@ def create_event(
     state_key=None,
     depth=2,
     event_id=None,
-    prev_events=[],
+    prev_events: List[str] = None,
     **kwargs
 ):
     global _next_event_id
@@ -58,7 +59,7 @@ def create_event(
         "sender": "@user_id:example.com",
         "room_id": "!room_id:example.com",
         "depth": depth,
-        "prev_events": prev_events,
+        "prev_events": prev_events or [],
     }
 
     if state_key is not None:

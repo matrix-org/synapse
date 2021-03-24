@@ -718,7 +718,7 @@ class SynapseCmd(cmd.Cmd):
         method,
         path,
         data=None,
-        query_params={"access_token": None},
+        query_params: dict = None,
         alt_text=None,
     ):
         """Runs an HTTP request and pretty prints the output.
@@ -729,6 +729,8 @@ class SynapseCmd(cmd.Cmd):
             data: Raw JSON data if any
             query_params: dict of query parameters to add to the url
         """
+        query_params = query_params or {"access_token": None}
+
         url = self._url() + path
         if "access_token" in query_params:
             query_params["access_token"] = self._tok()

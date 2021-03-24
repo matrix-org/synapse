@@ -191,11 +191,11 @@ class _TransactionController:
         self,
         service: ApplicationService,
         events: List[EventBase],
-        ephemeral: List[JsonDict] = [],
+        ephemeral: List[JsonDict] = None,
     ):
         try:
             txn = await self.store.create_appservice_txn(
-                service=service, events=events, ephemeral=ephemeral
+                service=service, events=events, ephemeral=ephemeral or []
             )
             service_is_up = await self._is_service_up(service)
             if service_is_up:

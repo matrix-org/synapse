@@ -21,8 +21,10 @@ class RateLimitConfig:
     def __init__(
         self,
         config: Dict[str, float],
-        defaults={"per_second": 0.17, "burst_count": 3.0},
+        defaults: Dict[str, float] = None,
     ):
+        defaults = defaults or {"per_second": 0.17, "burst_count": 3.0}
+
         self.per_second = config.get("per_second", defaults["per_second"])
         self.burst_count = int(config.get("burst_count", defaults["burst_count"]))
 

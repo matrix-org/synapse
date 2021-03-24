@@ -147,9 +147,11 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         return event
 
     @defer.inlineCallbacks
-    def inject_room_member(self, user_id, membership="join", extra_content={}):
+    def inject_room_member(
+        self, user_id, membership="join", extra_content: dict = None
+    ):
         content = {"membership": membership}
-        content.update(extra_content)
+        content.update(extra_content or {})
         builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {

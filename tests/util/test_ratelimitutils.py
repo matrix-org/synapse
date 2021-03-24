@@ -89,9 +89,9 @@ def _await_resolution(reactor, d):
     return (reactor.seconds() - start_time) * 1000
 
 
-def build_rc_config(settings={}):
+def build_rc_config(settings: dict = None):
     config_dict = default_config("test")
-    config_dict.update(settings)
+    config_dict.update(settings or {})
     config = HomeServerConfig()
     config.parse_config_dict(config_dict, "", "")
     return config.rc_federation

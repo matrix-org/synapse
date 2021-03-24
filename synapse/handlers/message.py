@@ -137,7 +137,7 @@ class MessageHandler:
         self,
         user_id: str,
         room_id: str,
-        state_filter: StateFilter = StateFilter.all(),
+        state_filter: StateFilter = None,
         at_token: Optional[StreamToken] = None,
         is_guest: bool = False,
     ) -> List[dict]:
@@ -186,7 +186,7 @@ class MessageHandler:
             event = last_events[0]
             if visible_events:
                 room_state = await self.state_store.get_state_for_events(
-                    [event.event_id], state_filter=state_filter
+                    [event.event_id], state_filter=state_filter or StateFilter.all()
                 )
                 room_state = room_state[event.event_id]
             else:
@@ -874,7 +874,7 @@ class EventCreationHandler:
         event: EventBase,
         context: EventContext,
         ratelimit: bool = True,
-        extra_users: List[UserID] = [],
+        extra_users: List[UserID] = None,
         ignore_shadow_ban: bool = False,
     ) -> EventBase:
         """Processes a new event.
@@ -902,6 +902,7 @@ class EventCreationHandler:
         Raises:
             ShadowBanError if the requester has been shadow-banned.
         """
+        extra_users = extra_users or []
 
         # we don't apply shadow-banning to membership events here. Invites are blocked
         # higher up the stack, and we allow shadow-banned users to send join and leave
@@ -1071,7 +1072,7 @@ class EventCreationHandler:
         event: EventBase,
         context: EventContext,
         ratelimit: bool = True,
-        extra_users: List[UserID] = [],
+        extra_users: List[UserID] = None,
     ) -> EventBase:
         """Called when we have fully built the event, have already
         calculated the push actions for the event, and checked auth.
@@ -1083,6 +1084,8 @@ class EventCreationHandler:
             it was de-duplicated (e.g. because we had already persisted an
             event with the same transaction ID.)
         """
+        extra_users = extra_users or []
+
         assert self.storage.persistence is not None
         assert self._events_shard_config.should_handle(
             self._instance_name, event.room_id
