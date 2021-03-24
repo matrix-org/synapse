@@ -323,7 +323,7 @@ class LoggingContext:
             self.scope = self.parent_context.scope
 
         if request is not None:
-            # the request_id param overrides the request_id from the parent context
+            # the request param overrides the request from the parent context
             self.request = request
 
     def __str__(self) -> str:
