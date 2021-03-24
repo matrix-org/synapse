@@ -606,7 +606,7 @@ class LoggingContextFilter(logging.Filter):
 
             record.ip_address = request.ip_address  # type: ignore
             record.site_tag = request.site_tag  # type: ignore
-            record.requester = request.requester
+            record.requester = request.requester  # type: ignore
             record.authenticated_entity = request.authenticated_entity  # type: ignore
             record.method = request.method  # type: ignore
             record.url = request.url  # type: ignore

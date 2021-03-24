@@ -115,9 +115,12 @@ class SynapseRequest(Request):
         assert self.logcontext.request is not None
 
         (
-            self.logcontext.request.requester,
-            self.logcontext.request.authenticated_entity,
+            requester,
+            authenticated_entity,
         ) = self.get_authenticated_entity()
+        self.logcontext.request.requester = requester
+        # If there's no authenticated entity, it was the requester.
+        self.logcontext.request.authenticated_entity = authenticated_entity or requester
 
     def get_request_id(self):
         return "%s-%i" % (self.get_method(), self.request_seq)

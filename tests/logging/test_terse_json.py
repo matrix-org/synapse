@@ -16,9 +16,9 @@ import json
 import logging
 from io import BytesIO, StringIO
 
-from twisted.web.server import Request
-
 from mock import Mock, patch
+
+from twisted.web.server import Request
 
 from synapse.http.site import SynapseRequest
 from synapse.logging._terse_json import JsonFormatter, TerseJsonFormatter
@@ -192,7 +192,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         self.assertEqual(log["ip_address"], "127.0.0.1")
         self.assertEqual(log["site_tag"], "test-site")
         self.assertEqual(log["requester"], "@foo:test")
-        self.assertIsNone(log["authenticated_entity"])
+        self.assertEqual(log["authenticated_entity"], "@foo:test")
         self.assertEqual(log["method"], "POST")
         self.assertEqual(log["url"], "/_matrix/client/versions")
         self.assertEqual(log["protocol"], "1.1")
