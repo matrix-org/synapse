@@ -70,7 +70,7 @@ from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.threepids import canonicalise_email
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -885,6 +885,19 @@ class AuthHandler(BaseHandler):
                 user_infos.keys(),
             )
         return result
+
+    def can_change_password(self) -> bool:
+        """Get whether users on this server are allowed to change or set a password.
+
+        Both `config.password_enabled` and `config.password_localdb_enabled` must be true.
+
+        Note that any account (even SSO accounts) are allowed to add passwords if the above
+        is true.
+
+        Returns:
+            Whether users on this server are allowed to change or set a password
+        """
+        return self._password_enabled and self._password_localdb_enabled
 
     def get_supported_login_types(self) -> Iterable[str]:
         """Get a the login types supported for the /login API

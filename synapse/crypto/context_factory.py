@@ -219,7 +219,7 @@ class SSLClientConnectionCreator:
         # ... and we also gut-wrench a '_synapse_tls_verifier' attribute into the
         # tls_protocol so that the SSL context's info callback has something to
         # call to do the cert verification.
-        setattr(tls_protocol, "_synapse_tls_verifier", self._verifier)
+        tls_protocol._synapse_tls_verifier = self._verifier
         return connection
 
 

@@ -54,8 +54,8 @@ from ._base import FileInfo
 if TYPE_CHECKING:
     from lxml import etree
 
-    from synapse.app.homeserver import HomeServer
     from synapse.rest.media.v1.media_repository import MediaRepository
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 

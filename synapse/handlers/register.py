@@ -38,7 +38,7 @@ from synapse.types import RoomAlias, UserID, create_requester
 from ._base import BaseHandler
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -437,10 +437,10 @@ class RegistrationHandler(BaseHandler):
 
                 if RoomAlias.is_valid(r):
                     (
-                        room_id,
+                        room,
                         remote_room_hosts,
                     ) = await room_member_handler.lookup_room_alias(room_alias)
-                    room_id = room_id.to_string()
+                    room_id = room.to_string()
                 else:
                     raise SynapseError(
                         400, "%s was not legal room ID or room alias" % (r,)
