@@ -205,9 +205,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
     def notify_new_events(self, max_token: RoomStreamToken) -> None:
         """As per FederationSender"""
         # This should never get called.
-        raise NotImplementedError(
-            "FederationRemoteSendQueue unexpectedly received a call to notify_new_events."
-        )
+        raise NotImplementedError()
 
     def build_and_send_edu(
         self,

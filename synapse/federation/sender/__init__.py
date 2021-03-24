@@ -132,17 +132,17 @@ class AbstractFederationSender(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def get_current_token(self) -> int:
-        # Dummy implementation for case where federation sender isn't offloaded
-        # to a worker.
-        return 0
+        pass
+
+    @abc.abstractmethod
+    def federation_ack(self, instance_name: str, token: int) -> None:
+        pass
 
     @abc.abstractmethod
     async def get_replication_rows(
         self, instance_name: str, from_token: int, to_token: int, target_row_count: int
     ) -> Tuple[List[Tuple[int, Tuple]], int, bool]:
-        # Dummy implementation for case where federation sender isn't offloaded
-        # to a worker.
-        return [], 0, False
+        pass
 
 
 class FederationSender(AbstractFederationSender):
@@ -678,6 +678,10 @@ class FederationSender(AbstractFederationSender):
         # Dummy implementation for case where federation sender isn't offloaded
         # to a worker.
         return 0
+
+    def federation_ack(self, instance_name: str, token: int) -> None:
+        # It is not expected that this gets called on FederationSender.
+        raise NotImplementedError()
 
     @staticmethod
     async def get_replication_rows(

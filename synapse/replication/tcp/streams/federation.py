@@ -16,7 +16,6 @@
 from collections import namedtuple
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, List, Tuple
 
-from synapse.federation.sender import FederationSender
 from synapse.replication.tcp.streams._base import (
     Stream,
     current_token_without_instance,
@@ -50,7 +49,6 @@ class FederationStream(Stream):
             # will be a real FederationSender, which has stubs for current_token and
             # get_replication_rows.)
             federation_sender = hs.get_federation_sender()
-            assert isinstance(federation_sender, FederationSender)
             current_token = current_token_without_instance(
                 federation_sender.get_current_token
             )
