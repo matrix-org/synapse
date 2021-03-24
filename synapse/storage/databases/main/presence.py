@@ -174,7 +174,7 @@ class PresenceStore(SQLBaseStore):
         """
         users_to_state = {}
 
-        exclude_keyvalues = {}
+        exclude_keyvalues = None
         if not include_offline:
             # Exclude offline presence state
             exclude_keyvalues = {"state": "offline"}
@@ -191,7 +191,6 @@ class PresenceStore(SQLBaseStore):
                 orderby="stream_id",
                 start=offset,
                 limit=limit,
-                keyvalues={},
                 exclude_keyvalues=exclude_keyvalues,
                 retcols=(
                     "user_id",
@@ -208,7 +207,7 @@ class PresenceStore(SQLBaseStore):
             for row in rows:
                 users_to_state[row["user_id"]] = UserPresenceState(**row)
 
-            # We've ran out of updates to query
+            # We've run out of updates to query
             if len(rows) < limit:
                 break
 
