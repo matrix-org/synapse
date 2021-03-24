@@ -31,7 +31,7 @@ DKT = TypeVar("DKT")
 
 
 @attr.s(slots=True)
-class DictionaryEntry(Generic[DKT]):
+class DictionaryEntry:
     """Returned when getting an entry from the cache
 
     Attributes:
@@ -44,8 +44,8 @@ class DictionaryEntry(Generic[DKT]):
     """
 
     full = attr.ib(type=bool)
-    known_absent = attr.ib()  # type: Set[DKT]
-    value = attr.ib()  # type: Dict[DKT, Any]
+    known_absent = attr.ib()
+    value = attr.ib()
 
     def __len__(self):
         return len(self.value)
@@ -65,7 +65,7 @@ class DictionaryCache(Generic[KT, DKT]):
     def __init__(self, name: str, max_entries: int = 1000):
         self.cache = LruCache(
             max_size=max_entries, cache_name=name, size_callback=len
-        )  # type: LruCache[KT, DictionaryEntry[DKT]]
+        )  # type: LruCache[KT, DictionaryEntry]
 
         self.name = name
         self.sequence = 0
@@ -83,7 +83,7 @@ class DictionaryCache(Generic[KT, DKT]):
 
     def get(
         self, key: KT, dict_keys: Optional[Iterable[DKT]] = None
-    ) -> DictionaryEntry[DKT]:
+    ) -> DictionaryEntry:
         """Fetch an entry out of the cache
 
         Args:
@@ -157,9 +157,7 @@ class DictionaryCache(Generic[KT, DKT]):
         # We pop and reinsert as we need to tell the cache the size may have
         # changed
 
-        entry = self.cache.pop(
-            key, DictionaryEntry(False, set(), {})
-        )  # type: DictionaryEntry[DKT]
+        entry = self.cache.pop(key, DictionaryEntry(False, set(), {}))
         entry.value.update(value)
         entry.known_absent.update(known_absent)
         self.cache[key] = entry

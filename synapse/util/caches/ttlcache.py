@@ -36,10 +36,10 @@ class TTLCache(Generic[KT, VT]):
 
     def __init__(self, cache_name: str, timer: Callable[[], float] = time.time):
         # map from key to _CacheEntry
-        self._data = {}  # type: Dict[KT, _CacheEntry[KT, VT]]
+        self._data = {}  # type: Dict[KT, _CacheEntry]
 
         # the _CacheEntries, sorted by expiry time
-        self._expiry_list = SortedList()  # type: SortedList[_CacheEntry[KT, VT]]
+        self._expiry_list = SortedList()  # type: SortedList[_CacheEntry]
 
         self._timer = timer
 
@@ -161,11 +161,11 @@ class TTLCache(Generic[KT, VT]):
 
 
 @attr.s(frozen=True, slots=True)
-class _CacheEntry(Generic[KT, VT]):
+class _CacheEntry:
     """TTLCache entry"""
 
     # expiry_time is the first attribute, so that entries are sorted by expiry.
     expiry_time = attr.ib(type=float)
     ttl = attr.ib(type=float)
-    key = attr.ib()  # type: KT
-    value = attr.ib()  # type: VT
+    key = attr.ib()
+    value = attr.ib()
