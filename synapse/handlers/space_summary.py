@@ -271,7 +271,7 @@ class SpaceSummaryHandler:
         try:
             res = await self._federation_client.get_space_summary(
                 via,
-                room.room_id,
+                room_id,
                 suggested_only=suggested_only,
                 max_rooms_per_space=max_children,
                 exclude_rooms=exclude_rooms,
