@@ -792,13 +792,6 @@ class FederationSenderHandler:
 
         self._fed_position_linearizer = Linearizer(name="_fed_position_linearizer")
 
-    def on_start(self):
-        # There may be some events that are persisted but haven't been sent,
-        # so send them now.
-        self.federation_sender.notify_new_events(
-            self.store.get_room_max_stream_ordering()
-        )
-
     def wake_destination(self, server: str):
         self.federation_sender.wake_destination(server)
 

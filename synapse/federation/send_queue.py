@@ -49,7 +49,7 @@ from synapse.api.presence import UserPresenceState
 from synapse.federation.sender import AbstractFederationSender, FederationSender
 from synapse.metrics import LaterGauge
 from synapse.replication.tcp.streams.federation import FederationStream
-from synapse.types import JsonDict, ReadReceipt
+from synapse.types import JsonDict, ReadReceipt, RoomStreamToken
 from synapse.util.metrics import Measure
 
 from .units import Edu
@@ -202,10 +202,12 @@ class FederationRemoteSendQueue(AbstractFederationSender):
             for key in keys[:i]:
                 del self.edus[key]
 
-    def notify_new_events(self, max_token: int) -> None:
+    def notify_new_events(self, max_token: RoomStreamToken) -> None:
         """As per FederationSender"""
-        # We don't need to replicate this as it gets sent down a different
-        # stream.
+        # This should never get called.
+        raise NotImplementedError(
+            "FederationRemoteSendQueue unexpectedly received a call to notify_new_events."
+        )
 
     def build_and_send_edu(
         self,
