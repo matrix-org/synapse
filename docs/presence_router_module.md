@@ -4,6 +4,9 @@ Synapse supports configuring a module that can specify additional users
 (local or remote) to should receive certain presence updates from local
 users.
 
+Note that routing presence via Application Service transactions is not
+currently supported.
+
 The presence routing module is implemented as a Python class, which will be imported by
 the running Synapse.
 
