@@ -1,4 +1,4 @@
-#! /bin/bash -e
+#!/usr/bin/env bash
 # This script is designed for developers who want to test their code
 # against Complement.
 #
@@ -15,6 +15,10 @@
 #
 # ./complement.sh "TestOutboundFederation(Profile|Send)"
 #
+
+# Exit if a line returns a non-zero exit code
+set -e
+
 COMPLEMENT_DIR="${COMPLEMENT_DIR:-$(dirname $0)/../../complement}"
 
 cd "$(dirname $0)/.."
