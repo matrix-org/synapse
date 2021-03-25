@@ -30,10 +30,11 @@ docker build -t complement-synapse -f "$COMPLEMENT_DIR/dockerfiles/Synapse.Docke
 
 cd "$COMPLEMENT_DIR"
 
-# Run the tests on the resulting image!
-if [[ -z $1 ]]; then
-  # No test name regex is set, run all tests
-  COMPLEMENT_BASE_IMAGE=complement-synapse go test -v -tags synapse_blacklist ./tests
-else
-  COMPLEMENT_BASE_IMAGE=complement-synapse go test -v -tags synapse_blacklist -run "$1" ./tests
+EXTRA_COMPLEMENT_ARGS=""
+if [[ -n $1 ]]; then
+  # A test name regex has been set, supply it to Complement
+  EXTRA_COMPLEMENT_ARGS+="-run $1 "
 fi
+
+# Run the tests!
+COMPLEMENT_BASE_IMAGE=complement-synapse go test -v -tags synapse_blacklist $EXTRA_COMPLEMENT_ARGS ./tests
