@@ -789,10 +789,15 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         user1 = self.register_user("user1", "pass1", admin=False, displayname="Name Z")
         user2 = self.register_user("user2", "pass2", admin=False, displayname="Name Y")
 
-        # Modify user1
-        self.get_success(self.store.set_profile_avatar_url("user1", "mxc://url"))
+        # Modify user
         self.get_success(self.store.set_user_deactivated_status(user1, True))
         self.get_success(self.store.set_shadow_banned(UserID.from_string(user1), True))
+
+        # Set avatar URL to all users, that no user has a NULL value to avoid
+        # different sort order between SQlite and PostreSQL
+        self.get_success(self.store.set_profile_avatar_url("user1", "mxc://url3"))
+        self.get_success(self.store.set_profile_avatar_url("user2", "mxc://url2"))
+        self.get_success(self.store.set_profile_avatar_url("admin", "mxc://url1"))
 
         # order by default (name)
         self._order_test([self.admin_user, user1, user2], None)
@@ -839,7 +844,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         # order by avatar_url
         self._order_test([self.admin_user, user2, user1], "avatar_url")
         self._order_test([self.admin_user, user2, user1], "avatar_url", "f")
-        self._order_test([user1, self.admin_user, user2], "avatar_url", "b")
+        self._order_test([user1, user2, self.admin_user], "avatar_url", "b")
 
     def _order_test(
         self,
