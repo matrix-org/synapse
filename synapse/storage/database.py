@@ -1538,6 +1538,7 @@ class DatabasePool:
             batch_size: the number of rows for each select query
         """
         keyvalues = keyvalues or {}
+
         results = []  # type: List[Dict[str, Any]]
 
         if not iterable:

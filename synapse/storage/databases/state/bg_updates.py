@@ -76,6 +76,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
         self, txn, groups, state_filter: StateFilter = None
     ):
         state_filter = state_filter or StateFilter.all()
+
         results = {group: {} for group in groups}
 
         where_clause, where_args = state_filter.make_sql_filter_clause()

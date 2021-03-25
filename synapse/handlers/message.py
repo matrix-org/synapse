@@ -164,6 +164,8 @@ class MessageHandler:
             AuthError (403) if the user doesn't have permission to view
             members of this room.
         """
+        state_filter = state_filter or StateFilter.all()
+
         if at_token:
             # FIXME this claims to get the state at a stream position, but
             # get_recent_events_for_room operates by topo ordering. This therefore
@@ -186,7 +188,7 @@ class MessageHandler:
             event = last_events[0]
             if visible_events:
                 room_state = await self.state_store.get_state_for_events(
-                    [event.event_id], state_filter=state_filter or StateFilter.all()
+                    [event.event_id], state_filter=state_filter
                 )
                 room_state = room_state[event.event_id]
             else:
