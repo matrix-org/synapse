@@ -51,6 +51,18 @@ However, if you really need it, you can find some documentation on how such a
 record should look like and how Synapse will use it in [the Matrix
 specification](https://matrix.org/docs/spec/server_server/latest#resolving-server-names).
 
+## public_baseurl configuration
+
+You will also need to set public_baseurl in homeserver.yaml to the address of your actual
+synapse server (or a reverse proxy that points to synapse).
+
+```yaml
+public_baseurl: https://synapse.example.com/
+```
+
+otherwise certain clients such as element.io will attempt to reach your homeserver via the
+top level via `https://example.com/`.
+
 ## Delegation FAQ
 
 ### When do I need delegation?
