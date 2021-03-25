@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # runs dh_virtualenv to build the virtualenv in the build directory,
 # and then runs the trial tests against the installed synapse.

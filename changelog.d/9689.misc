@@ -1,0 +1,1 @@
+Use interpreter from $PATH instead of absolute paths in various scripts using /usr/bin/env
