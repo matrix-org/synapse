@@ -28,7 +28,7 @@ from synapse.api.errors import Codes, HttpResponseException, ResourceLimitError
 from synapse.api.room_versions import RoomVersions
 from synapse.rest.client.v1 import login, logout, profile, room
 from synapse.rest.client.v2_alpha import devices, sync
-from synapse.types import JsonDict
+from synapse.types import JsonDict, UserID
 
 from tests import unittest
 from tests.server import FakeSite, make_request
@@ -467,6 +467,8 @@ class UsersListTestCase(unittest.HomeserverTestCase):
     url = "/_synapse/admin/v2/users"
 
     def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
+
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
@@ -634,6 +636,26 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
 
+        # unkown order_by
+        channel = self.make_request(
+            "GET",
+            self.url + "?order_by=bar",
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
+
+        # invalid search order
+        channel = self.make_request(
+            "GET",
+            self.url + "?dir=bar",
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
+
     def test_limit(self):
         """
         Testing list of users with limit
@@ -758,6 +780,98 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.json_body["total"], number_users)
         self.assertEqual(len(channel.json_body["users"]), 1)
         self.assertNotIn("next_token", channel.json_body)
+
+    def test_order_by(self):
+        """
+        Testing order list with parameter `order_by`
+        """
+
+        user1 = self.register_user("user1", "pass1", admin=False, displayname="Name Z")
+        user2 = self.register_user("user2", "pass2", admin=False, displayname="Name Y")
+
+        # Modify user1
+        self.get_success(self.store.set_profile_avatar_url("user1", "mxc://url"))
+        self.get_success(self.store.set_user_deactivated_status(user1, True))
+        self.get_success(self.store.set_shadow_banned(UserID.from_string(user1), True))
+
+        # order by default (name)
+        self._order_test([self.admin_user, user1, user2], None)
+        self._order_test([self.admin_user, user1, user2], None, "f")
+        self._order_test([user2, user1, self.admin_user], None, "b")
+
+        # order by name
+        self._order_test([self.admin_user, user1, user2], "name")
+        self._order_test([self.admin_user, user1, user2], "name", "f")
+        self._order_test([user2, user1, self.admin_user], "name", "b")
+
+        # order by displayname
+        self._order_test([user2, user1, self.admin_user], "displayname")
+        self._order_test([user2, user1, self.admin_user], "displayname", "f")
+        self._order_test([self.admin_user, user1, user2], "displayname", "b")
+
+        # order by is_guest
+        # like sort by ascending name, as no guest user here
+        self._order_test([self.admin_user, user1, user2], "is_guest")
+        self._order_test([self.admin_user, user1, user2], "is_guest", "f")
+        self._order_test([self.admin_user, user1, user2], "is_guest", "b")
+
+        # order by admin
+        self._order_test([user1, user2, self.admin_user], "admin")
+        self._order_test([user1, user2, self.admin_user], "admin", "f")
+        self._order_test([self.admin_user, user1, user2], "admin", "b")
+
+        # order by deactivated
+        self._order_test([self.admin_user, user2, user1], "deactivated")
+        self._order_test([self.admin_user, user2, user1], "deactivated", "f")
+        self._order_test([user1, self.admin_user, user2], "deactivated", "b")
+
+        # order by user_type
+        # like sort by ascending name, as no special user type here
+        self._order_test([self.admin_user, user1, user2], "user_type")
+        self._order_test([self.admin_user, user1, user2], "user_type", "f")
+        self._order_test([self.admin_user, user1, user2], "is_guest", "b")
+
+        # order by shadow_banned
+        self._order_test([self.admin_user, user2, user1], "shadow_banned")
+        self._order_test([self.admin_user, user2, user1], "shadow_banned", "f")
+        self._order_test([user1, self.admin_user, user2], "shadow_banned", "b")
+
+        # order by avatar_url
+        self._order_test([self.admin_user, user2, user1], "avatar_url")
+        self._order_test([self.admin_user, user2, user1], "avatar_url", "f")
+        self._order_test([user1, self.admin_user, user2], "avatar_url", "b")
+
+    def _order_test(
+        self,
+        expected_user_list: List[str],
+        order_by: Optional[str],
+        dir: Optional[str] = None,
+    ):
+        """Request the list of users in a certain order. Assert that order is what
+        we expect
+        Args:
+            expected_user_list: The list of user_id in the order we expect to get
+                back from the server
+            order_by: The type of ordering to give the server
+            dir: The direction of ordering to give the server
+        """
+
+        url = self.url + "?deactivated=true&"
+        if order_by is not None:
+            url += "order_by=%s&" % (order_by,)
+        if dir is not None and dir in ("b", "f"):
+            url += "dir=%s" % (dir,)
+        channel = self.make_request(
+            "GET",
+            url.encode("ascii"),
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(channel.json_body["total"], len(expected_user_list))
+
+        returned_order = [row["name"] for row in channel.json_body["users"]]
+        self.assertEqual(expected_user_list, returned_order)
+        self._check_fields(channel.json_body["users"])
 
     def _check_fields(self, content: JsonDict):
         """Checks that the expected user attributes are present in content
