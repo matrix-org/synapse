@@ -73,7 +73,7 @@ After which, you can POST the new user-data together with the ``hmac``::
 
 With a body of:
 
-..code:: json
+.. code:: json
 
     {
         "nonce": "A unique string returned from the GET",
