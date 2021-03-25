@@ -61,7 +61,7 @@ Which will return a JSON structure containing:
     }
 
 After which you can begin to construct the payload for the following ``POST``.
-First, you will need to generate a ```hmac`` that consists of the following structure (pseudo code):
+First, you will need to generate a ``hmac`` that consists of the following structure (pseudo code):
 
 ..code::
 
