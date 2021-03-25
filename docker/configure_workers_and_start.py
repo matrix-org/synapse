@@ -423,11 +423,21 @@ stderr_logfile_maxbytes=0
             nginx_locations[pattern] = upstream
 
         # Write out the worker's logging config file
+
+        # Check whether we should write worker logs to disk, in addition to the console
+        extra_log_template_args = {}
+        if environ.get("SYNAPSE_WORKERS_WRITE_LOGS_TO_DISK"):
+            extra_log_template_args["LOG_FILE_PATH"] = "{dir}/logs/{name}.log".format(
+                dir=data_dir, name=worker_name
+            )
+
+        # Render and write the file
         log_config_filepath = "/conf/workers/{name}.log.config".format(name=worker_name)
         convert(
             "/conf/log.config",
             log_config_filepath,
             worker_name=worker_name,
+            **extra_log_template_args,
         )
 
         # Then a worker config file
