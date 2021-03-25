@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 from synapse.api.presence import UserPresenceState
 from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
@@ -156,6 +156,64 @@ class PresenceStore(SQLBaseStore):
             row["currently_active"] = bool(row["currently_active"])
 
         return {row["user_id"]: UserPresenceState(**row) for row in rows}
+
+    async def get_presence_for_all_users(
+        self,
+        include_offline: bool = True,
+    ) -> Dict[str, UserPresenceState]:
+        """Retrieve the current presence state for all users.
+
+        Note that the presence_stream table is culled frequently, so it should only
+        contain the latest presence state for each user.
+
+        Args:
+            include_offline: Whether to include offline presence states
+
+        Returns:
+            A dict of user IDs to their current UserPresenceState.
+        """
+        users_to_state = {}
+
+        exclude_keyvalues = None
+        if not include_offline:
+            # Exclude offline presence state
+            exclude_keyvalues = {"state": "offline"}
+
+        # This may be a very heavy database query.
+        # We paginate in order to not block a database connection.
+        limit = 100
+        offset = 0
+        while True:
+            rows = await self.db_pool.runInteraction(
+                "get_presence_for_all_users",
+                self.db_pool.simple_select_list_paginate_txn,
+                "presence_stream",
+                orderby="stream_id",
+                start=offset,
+                limit=limit,
+                exclude_keyvalues=exclude_keyvalues,
+                retcols=(
+                    "user_id",
+                    "state",
+                    "last_active_ts",
+                    "last_federation_update_ts",
+                    "last_user_sync_ts",
+                    "status_msg",
+                    "currently_active",
+                ),
+                order_direction="ASC",
+            )
+
+            for row in rows:
+                users_to_state[row["user_id"]] = UserPresenceState(**row)
+
+            # We've run out of updates to query
+            if len(rows) < limit:
+                break
+
+            offset += limit
+
+        return users_to_state
 
     def get_current_presence_token(self):
         return self._presence_id_gen.get_current_token()
