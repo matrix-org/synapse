@@ -1235,7 +1235,9 @@ class SyncHandler:
             )
 
             for message in messages:
-                message_id = message.get("message_id", None)
+                # We pop here as we shouldn't be sending the message ID down
+                # `/sync`
+                message_id = message.pop("message_id", None)
                 if message_id:
                     set_tag(SynapseTags.TO_DEVICE_MESSAGE_ID, message_id)
 
