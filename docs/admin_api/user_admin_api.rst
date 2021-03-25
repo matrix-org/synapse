@@ -43,6 +43,49 @@ URL parameters:
 
 - ``user_id``: fully-qualified user id: for example, ``@user:server.com``.
 
+Register a new account
+======================
+
+This API allows to bypass ``enable_registration: False`` in the home server configuration and register a new user.
+
+First, you will need a ``nonce``::
+
+    GET /_synapse/admin/v1/admin/register
+
+Which will return a JSON structure containing:
+
+.. code:: json
+
+    {
+        "nonce" : "A uinique string"
+    }
+
+After which you can begin to construct the payload for the following ``POST``.
+First, you will need to generate a ```hmac`` that consists of the following structure (pseudo code):
+
+..code::
+
+    hash_hmac("sha1", nonce + "\0" + "new-user-name" + "\0" + "Users password" + "\0" + "notadmin", registration_shared_secret)
+
+After which, you can POST the new user-data together with the ``hmac``::
+
+    POST /_synapse/admin/v1/admin/register
+
+With a body of:
+
+..code:: json
+
+    {
+        "nonce": "A unique string returned from the GET",
+        "username": "new-user-name",
+        "password": "Users password",
+        "mac": hmac,
+        "type": "org.matrix.login.shared_secret",
+        "admin": false
+    }
+
+Modify the ``admin`` flag accordingly both in the hashing of the hmac and the json payload.
+
 Create or modify Account
 ========================
 
