@@ -113,10 +113,13 @@ class BaseHandler:
         if is_admin_redaction and self.admin_redaction_ratelimiter:
             # If we have separate config for admin redactions, use a separate
             # ratelimiter as to not have user_ids clash
-            self.admin_redaction_ratelimiter.ratelimit(user_id, update=update)
+            await self.admin_redaction_ratelimiter.ratelimit(
+                requester, user_id, update=update
+            )
         else:
             # Override rate and burst count per-user
-            self.request_ratelimiter.ratelimit(
+            await self.request_ratelimiter.ratelimit(
+                requester,
                 user_id,
                 rate_hz=messages_per_second,
                 burst_count=burst_count,

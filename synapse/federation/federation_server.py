@@ -930,7 +930,9 @@ class FederationHandlerRegistry:
         # the limit, drop them.
         if (
             edu_type == EduTypes.RoomKeyRequest
-            and not self._room_key_request_rate_limiter.can_do_action(origin)
+            and not await self._room_key_request_rate_limiter.can_do_action(
+                None, origin
+            )
         ):
             return
 

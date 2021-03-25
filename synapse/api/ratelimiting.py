@@ -46,7 +46,7 @@ class Ratelimiter:
             OrderedDict()
         )  # type: OrderedDict[Hashable, Tuple[float, int, float]]
 
-    def can_requester_do_action(
+    async def can_requester_do_action(
         self,
         requester: Requester,
         rate_hz: Optional[float] = None,
@@ -73,17 +73,18 @@ class Ratelimiter:
                 * The reactor timestamp for when the action can be performed next.
                   -1 if rate_hz is less than or equal to zero
         """
-        # Disable rate limiting of users belonging to any AS that is configured
-        # not to be rate limited in its registration file (rate_limited: true|false).
-        if requester.app_service and not requester.app_service.is_rate_limited():
-            return True, -1.0
-
-        return self.can_do_action(
-            requester.user.to_string(), rate_hz, burst_count, update, _time_now_s
+        return await self.can_do_action(
+            requester,
+            requester.user.to_string(),
+            rate_hz,
+            burst_count,
+            update,
+            _time_now_s,
         )
 
-    def can_do_action(
+    async def can_do_action(
         self,
+        requester: Optional[Requester],
         key: Hashable,
         rate_hz: Optional[float] = None,
         burst_count: Optional[int] = None,
@@ -93,6 +94,8 @@ class Ratelimiter:
         """Can the entity (e.g. user or IP address) perform the action?
 
         Args:
+            requester: The requester that is doing the action, if any. Used to check for
+                ratelimit overrides.
             key: The key we should use when rate limiting. Can be a user ID
                 (when sending events), an IP address, etc.
             rate_hz: The long term number of actions that can be performed in a second.
@@ -175,8 +178,9 @@ class Ratelimiter:
             else:
                 del self.actions[key]
 
-    def ratelimit(
+    async def ratelimit(
         self,
+        requester: Optional[Requester],
         key: Hashable,
         rate_hz: Optional[float] = None,
         burst_count: Optional[int] = None,
@@ -186,6 +190,8 @@ class Ratelimiter:
         """Checks if an action can be performed. If not, raises a LimitExceededError
 
         Args:
+            requester: The requester that is doing the action, if any. Used to check for
+                ratelimit overrides.
             key: An arbitrary key used to classify an action
             rate_hz: The long term number of actions that can be performed in a second.
                 Overrides the value set during instantiation if set.
@@ -201,7 +207,8 @@ class Ratelimiter:
         """
         time_now_s = _time_now_s if _time_now_s is not None else self.clock.time()
 
-        allowed, time_allowed = self.can_do_action(
+        allowed, time_allowed = await self.can_do_action(
+            requester,
             key,
             rate_hz=rate_hz,
             burst_count=burst_count,

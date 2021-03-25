@@ -71,7 +71,7 @@ class IdentityHandler(BaseHandler):
             burst_count=hs.config.ratelimiting.rc_3pid_validation.burst_count,
         )
 
-    def ratelimit_request_token_requests(
+    async def ratelimit_request_token_requests(
         self,
         request: SynapseRequest,
         medium: str,
@@ -85,8 +85,12 @@ class IdentityHandler(BaseHandler):
             address: The actual threepid ID, e.g. the phone number or email address
         """
 
-        self._3pid_validation_ratelimiter_ip.ratelimit((medium, request.getClientIP()))
-        self._3pid_validation_ratelimiter_address.ratelimit((medium, address))
+        await self._3pid_validation_ratelimiter_ip.ratelimit(
+            None, (medium, request.getClientIP())
+        )
+        await self._3pid_validation_ratelimiter_address.ratelimit(
+            None, (medium, address)
+        )
 
     async def threepid_from_creds(
         self, id_server: str, creds: Dict[str, str]
