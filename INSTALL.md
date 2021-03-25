@@ -125,7 +125,7 @@ source env/bin/activate
 synctl start
 ```
 
-#### Platform-Specific prerequisites
+#### Platform-specific prerequisites
 
 Synapse is written in Python but some of the libraries it uses are written in
 C. So before we can install Synapse itself we need a working C compiler and the
