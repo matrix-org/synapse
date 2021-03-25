@@ -1,0 +1,1 @@
+In the `federation_client` commandline client, stop automatically adding the URL prefix, so that servlets on other prefixes can be tested.

@@ -80,7 +80,7 @@ class SyncConfig:
     filter_collection = attr.ib(type=FilterCollection)
     is_guest = attr.ib(type=bool)
     request_key = attr.ib(type=Tuple[Any, ...])
-    device_id = attr.ib(type=str)
+    device_id = attr.ib(type=Optional[str])
 
 
 @attr.s(slots=True, frozen=True)
@@ -244,7 +244,7 @@ class SyncHandler:
         self.event_sources = hs.get_event_sources()
         self.clock = hs.get_clock()
         self.response_cache = ResponseCache(
-            hs, "sync"
+            hs.get_clock(), "sync"
         )  # type: ResponseCache[Tuple[Any, ...]]
         self.state = hs.get_state_handler()
         self.auth = hs.get_auth()
@@ -723,7 +723,9 @@ class SyncHandler:
 
         return summary
 
-    def get_lazy_loaded_members_cache(self, cache_key: Tuple[str, str]) -> LruCache:
+    def get_lazy_loaded_members_cache(
+        self, cache_key: Tuple[str, Optional[str]]
+    ) -> LruCache:
         cache = self.lazy_loaded_members_cache.get(cache_key)
         if cache is None:
             logger.debug("creating LruCache for %r", cache_key)
@@ -1979,8 +1981,10 @@ class SyncHandler:
 
             logger.info("User joined room after current token: %s", room_id)
 
-            extrems = await self.store.get_forward_extremeties_for_room(
-                room_id, event_pos.stream
+            extrems = (
+                await self.store.get_forward_extremities_for_room_at_stream_ordering(
+                    room_id, event_pos.stream
+                )
             )
             users_in_room = await self.state.get_current_users_in_room(room_id, extrems)
             if user_id in users_in_room:

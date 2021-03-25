@@ -16,15 +16,15 @@
 import logging
 from typing import TYPE_CHECKING, Dict, List, Optional
 
-from twisted.internet.base import DelayedCall
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
+from twisted.internet.interfaces import IDelayedCall
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import Pusher, PusherConfig, ThrottleParams
 from synapse.push.mailer import Mailer
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ class EmailPusher(Pusher):
 
         self.store = self.hs.get_datastore()
         self.email = pusher_config.pushkey
-        self.timed_call = None  # type: Optional[DelayedCall]
+        self.timed_call = None  # type: Optional[IDelayedCall]
         self.throttle_params = {}  # type: Dict[str, ThrottleParams]
         self._inited = False
 

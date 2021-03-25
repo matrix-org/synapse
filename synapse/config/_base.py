@@ -212,9 +212,8 @@ class Config:
 
     @classmethod
     def read_file(cls, file_path, config_name):
-        cls.check_file(file_path, config_name)
-        with open(file_path) as file_stream:
-            return file_stream.read()
+        """Deprecated: call read_file directly"""
+        return read_file(file_path, (config_name,))
 
     def read_template(self, filename: str) -> jinja2.Template:
         """Load a template file from disk.
@@ -894,4 +893,35 @@ class RoutableShardedWorkerHandlingConfig(ShardedWorkerHandlingConfig):
         return self._get_instance(key)
 
 
-__all__ = ["Config", "RootConfig", "ShardedWorkerHandlingConfig"]
+def read_file(file_path: Any, config_path: Iterable[str]) -> str:
+    """Check the given file exists, and read it into a string
+
+    If it does not, emit an error indicating the problem
+
+    Args:
+        file_path: the file to be read
+        config_path: where in the configuration file_path came from, so that a useful
+           error can be emitted if it does not exist.
+    Returns:
+        content of the file.
+    Raises:
+        ConfigError if there is a problem reading the file.
+    """
+    if not isinstance(file_path, str):
+        raise ConfigError("%r is not a string", config_path)
+
+    try:
+        os.stat(file_path)
+        with open(file_path) as file_stream:
+            return file_stream.read()
+    except OSError as e:
+        raise ConfigError("Error accessing file %r" % (file_path,), config_path) from e
+
+
+__all__ = [
+    "Config",
+    "RootConfig",
+    "ShardedWorkerHandlingConfig",
+    "RoutableShardedWorkerHandlingConfig",
+    "read_file",
+]
