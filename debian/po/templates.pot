@@ -1,0 +1,59 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the matrix-synapse-py3 package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: matrix-synapse-py3\n"
+"Report-Msgid-Bugs-To: matrix-synapse-py3@packages.debian.org\n"
+"POT-Creation-Date: 2020-04-06 16:39-0400\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. Type: string
+#. Description
+#: ../templates:1001
+msgid "Name of the server:"
+msgstr ""
+
+#. Type: string
+#. Description
+#: ../templates:1001
+msgid ""
+"The name that this homeserver will appear as, to clients and other servers "
+"via federation. This is normally the public hostname of the server running "
+"synapse, but can be different if you set up delegation. Please refer to the "
+"delegation documentation in this case: https://github.com/matrix-org/synapse/"
+"blob/master/docs/delegate.md."
+msgstr ""
+
+#. Type: boolean
+#. Description
+#: ../templates:2001
+msgid "Report anonymous statistics?"
+msgstr ""
+
+#. Type: boolean
+#. Description
+#: ../templates:2001
+msgid ""
+"Developers of Matrix and Synapse really appreciate helping the project out "
+"by reporting anonymized usage statistics from this homeserver. Only very "
+"basic aggregate data (e.g. number of users) will be reported, but it helps "
+"track the growth of the Matrix community, and helps in making Matrix a "
+"success, as well as to convince other networks that they should peer with "
+"Matrix."
+msgstr ""
+
+#. Type: boolean
+#. Description
+#: ../templates:2001
+msgid "Thank you."
+msgstr ""

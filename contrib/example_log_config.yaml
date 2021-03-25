@@ -1,0 +1,51 @@
+# Example log_config file for synapse. To enable, point `log_config` to it in
+# `homeserver.yaml`, and restart synapse.
+#
+# This configuration will produce similar results to the defaults within
+# synapse, but can be edited to give more flexibility.
+
+version: 1
+
+formatters:
+  fmt:
+    format: '%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s- %(message)s'
+
+filters:
+  context:
+    (): synapse.logging.context.LoggingContextFilter
+    request: ""
+
+handlers:
+  # example output to console
+  console:
+    class: logging.StreamHandler
+    formatter: fmt
+    filters: [context]
+
+  # example output to file - to enable, edit 'root' config below.
+  file:
+    class: logging.handlers.RotatingFileHandler
+    formatter: fmt
+    filename: /var/log/synapse/homeserver.log
+    maxBytes: 100000000
+    backupCount: 3
+    filters: [context]
+    encoding: utf8
+
+root:
+    level: INFO
+    handlers: [console] # to use file handler instead, switch to [file]
+
+loggers:
+    synapse:
+        level: INFO
+
+    synapse.storage.SQL:
+        # beware: increasing this to DEBUG will make synapse log sensitive
+        # information such as access tokens.
+        level: INFO
+
+    # example of enabling debugging for a component:
+    #
+    # synapse.federation.transport.server:
+    #    level: DEBUG

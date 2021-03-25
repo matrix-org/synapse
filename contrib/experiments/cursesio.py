@@ -19,13 +19,13 @@ from curses.ascii import isprint
 from twisted.internet import reactor
 
 
-class CursesStdIO():
+class CursesStdIO:
     def __init__(self, stdscr, callback=None):
         self.statusText = "Synapse test app -"
-        self.searchText = ''
+        self.searchText = ""
         self.stdscr = stdscr
 
-        self.logLine = ''
+        self.logLine = ""
 
         self.callback = callback
 
@@ -63,16 +63,14 @@ class CursesStdIO():
         self.redraw()
 
     def redraw(self):
-        """ method for redisplaying lines
-            based on internal list of lines """
+        """method for redisplaying lines based on internal list of lines"""
 
         self.stdscr.clear()
         self.paintStatus(self.statusText)
         i = 0
         index = len(self.lines) - 1
         while i < (self.rows - 3) and index >= 0:
-            self.stdscr.addstr(self.rows - 3 - i, 0, self.lines[index],
-                               curses.A_NORMAL)
+            self.stdscr.addstr(self.rows - 3 - i, 0, self.lines[index], curses.A_NORMAL)
             i = i + 1
             index = index - 1
 
@@ -85,15 +83,13 @@ class CursesStdIO():
             raise RuntimeError("TextTooLongError")
 
         self.stdscr.addstr(
-            self.rows - 2, 0,
-            text + ' ' * (self.cols - len(text)),
-            curses.A_STANDOUT)
+            self.rows - 2, 0, text + " " * (self.cols - len(text)), curses.A_STANDOUT
+        )
 
     def printLogLine(self, text):
         self.stdscr.addstr(
-            0, 0,
-            text + ' ' * (self.cols - len(text)),
-            curses.A_STANDOUT)
+            0, 0, text + " " * (self.cols - len(text)), curses.A_STANDOUT
+        )
 
     def doRead(self):
         """ Input is ready! """
@@ -105,7 +101,7 @@ class CursesStdIO():
 
         elif c == curses.KEY_ENTER or c == 10:
             text = self.searchText
-            self.searchText = ''
+            self.searchText = ""
 
             self.print_line(">> %s" % text)
 
@@ -122,11 +118,13 @@ class CursesStdIO():
                 return
             self.searchText = self.searchText + chr(c)
 
-        self.stdscr.addstr(self.rows - 1, 0,
-                           self.searchText + (' ' * (
-                           self.cols - len(self.searchText) - 2)))
+        self.stdscr.addstr(
+            self.rows - 1,
+            0,
+            self.searchText + (" " * (self.cols - len(self.searchText) - 2)),
+        )
 
-        self.paintStatus(self.statusText + ' %d' % len(self.searchText))
+        self.paintStatus(self.statusText + " %d" % len(self.searchText))
         self.stdscr.move(self.rows - 1, len(self.searchText))
         self.stdscr.refresh()
 
@@ -142,8 +140,7 @@ class CursesStdIO():
         curses.endwin()
 
 
-class Callback(object):
-
+class Callback:
     def __init__(self, stdio):
         self.stdio = stdio
 
@@ -152,7 +149,7 @@ class Callback(object):
 
 
 def main(stdscr):
-    screen = CursesStdIO(stdscr)   # create Screen object
+    screen = CursesStdIO(stdscr)  # create Screen object
 
     callback = Callback(screen)
 
@@ -164,5 +161,5 @@ def main(stdscr):
     screen.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     curses.wrapper(main)

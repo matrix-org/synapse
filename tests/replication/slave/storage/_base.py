@@ -1,4 +1,5 @@
 # Copyright 2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,45 +13,53 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-from tests import unittest
+from mock import Mock
 
-from mock import Mock, NonCallableMock
-from tests.utils import setup_test_homeserver
-from synapse.replication.resource import ReplicationResource
+from tests.replication._base import BaseStreamTestCase
 
 
-class BaseSlavedStoreTestCase(unittest.TestCase):
-    @defer.inlineCallbacks
-    def setUp(self):
-        self.hs = yield setup_test_homeserver(
-            "blue",
-            http_client=None,
-            replication_layer=Mock(),
-            ratelimiter=NonCallableMock(spec_set=[
-                "send_message",
-            ]),
-        )
-        self.hs.get_ratelimiter().send_message.return_value = (True, 0)
+class BaseSlavedStoreTestCase(BaseStreamTestCase):
+    def make_homeserver(self, reactor, clock):
 
-        self.replication = ReplicationResource(self.hs)
+        hs = self.setup_test_homeserver(federation_client=Mock())
 
-        self.master_store = self.hs.get_datastore()
-        self.slaved_store = self.STORE_TYPE(self.hs.get_db_conn(), self.hs)
-        self.event_id = 0
+        return hs
 
-    @defer.inlineCallbacks
+    def prepare(self, reactor, clock, hs):
+        super().prepare(reactor, clock, hs)
+
+        self.reconnect()
+
+        self.master_store = hs.get_datastore()
+        self.slaved_store = self.worker_hs.get_datastore()
+        self.storage = hs.get_storage()
+
     def replicate(self):
-        streams = self.slaved_store.stream_positions()
-        writer = yield self.replication.replicate(streams, 100)
-        result = writer.finish()
-        yield self.slaved_store.process_replication(result)
+        """Tell the master side of replication that something has happened, and then
+        wait for the replication to occur.
+        """
+        self.streamer.on_notifier_poke()
+        self.pump(0.1)
 
-    @defer.inlineCallbacks
     def check(self, method, args, expected_result=None):
-        master_result = yield getattr(self.master_store, method)(*args)
-        slaved_result = yield getattr(self.slaved_store, method)(*args)
+        master_result = self.get_success(getattr(self.master_store, method)(*args))
+        slaved_result = self.get_success(getattr(self.slaved_store, method)(*args))
         if expected_result is not None:
-            self.assertEqual(master_result, expected_result)
-            self.assertEqual(slaved_result, expected_result)
-        self.assertEqual(master_result, slaved_result)
+            self.assertEqual(
+                master_result,
+                expected_result,
+                "Expected master result to be %r but was %r"
+                % (expected_result, master_result),
+            )
+            self.assertEqual(
+                slaved_result,
+                expected_result,
+                "Expected slave result to be %r but was %r"
+                % (expected_result, slaved_result),
+            )
+        self.assertEqual(
+            master_result,
+            slaved_result,
+            "Slave result %r does not match master result %r"
+            % (slaved_result, master_result),
+        )

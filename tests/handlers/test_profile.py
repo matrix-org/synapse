@@ -13,144 +13,236 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-from tests import unittest
-from twisted.internet import defer
-
-from mock import Mock, NonCallableMock
+from mock import Mock
 
 import synapse.types
-from synapse.api.errors import AuthError
-from synapse.handlers.profile import ProfileHandler
+from synapse.api.errors import AuthError, SynapseError
 from synapse.types import UserID
 
-from tests.utils import setup_test_homeserver
+from tests import unittest
+from tests.test_utils import make_awaitable
 
 
-class ProfileHandlers(object):
-    def __init__(self, hs):
-        self.profile_handler = ProfileHandler(hs)
-
-
-class ProfileTestCase(unittest.TestCase):
+class ProfileTestCase(unittest.HomeserverTestCase):
     """ Tests profile management. """
 
-    @defer.inlineCallbacks
-    def setUp(self):
-        self.mock_federation = Mock(spec=[
-            "make_query",
-            "register_edu_handler",
-        ])
+    def make_homeserver(self, reactor, clock):
+        self.mock_federation = Mock()
+        self.mock_registry = Mock()
 
         self.query_handlers = {}
 
         def register_query_handler(query_type, handler):
             self.query_handlers[query_type] = handler
 
-        self.mock_federation.register_query_handler = register_query_handler
+        self.mock_registry.register_query_handler = register_query_handler
 
-        hs = yield setup_test_homeserver(
-            http_client=None,
-            handlers=None,
-            resource_for_federation=Mock(),
-            replication_layer=self.mock_federation,
-            ratelimiter=NonCallableMock(spec_set=[
-                "send_message",
-            ])
+        hs = self.setup_test_homeserver(
+            federation_client=self.mock_federation,
+            federation_server=Mock(),
+            federation_registry=self.mock_registry,
         )
+        return hs
 
-        self.ratelimiter = hs.get_ratelimiter()
-        self.ratelimiter.send_message.return_value = (True, 0)
-
-        hs.handlers = ProfileHandlers(hs)
-
+    def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
 
         self.frank = UserID.from_string("@1234ABCD:test")
         self.bob = UserID.from_string("@4567:test")
         self.alice = UserID.from_string("@alice:remote")
 
-        yield self.store.create_profile(self.frank.localpart)
+        self.get_success(self.store.create_profile(self.frank.localpart))
 
-        self.handler = hs.get_handlers().profile_handler
+        self.handler = hs.get_profile_handler()
 
-    @defer.inlineCallbacks
     def test_get_my_name(self):
-        yield self.store.set_profile_displayname(
-            self.frank.localpart, "Frank"
+        self.get_success(
+            self.store.set_profile_displayname(self.frank.localpart, "Frank")
         )
 
-        displayname = yield self.handler.get_displayname(self.frank)
+        displayname = self.get_success(self.handler.get_displayname(self.frank))
 
         self.assertEquals("Frank", displayname)
 
-    @defer.inlineCallbacks
     def test_set_my_name(self):
-        yield self.handler.set_displayname(
-            self.frank,
-            synapse.types.create_requester(self.frank),
-            "Frank Jr."
+        self.get_success(
+            self.handler.set_displayname(
+                self.frank, synapse.types.create_requester(self.frank), "Frank Jr."
+            )
         )
 
         self.assertEquals(
-            (yield self.store.get_profile_displayname(self.frank.localpart)),
-            "Frank Jr."
+            (
+                self.get_success(
+                    self.store.get_profile_displayname(self.frank.localpart)
+                )
+            ),
+            "Frank Jr.",
         )
 
-    @defer.inlineCallbacks
+        # Set displayname again
+        self.get_success(
+            self.handler.set_displayname(
+                self.frank, synapse.types.create_requester(self.frank), "Frank"
+            )
+        )
+
+        self.assertEquals(
+            (
+                self.get_success(
+                    self.store.get_profile_displayname(self.frank.localpart)
+                )
+            ),
+            "Frank",
+        )
+
+        # Set displayname to an empty string
+        self.get_success(
+            self.handler.set_displayname(
+                self.frank, synapse.types.create_requester(self.frank), ""
+            )
+        )
+
+        self.assertIsNone(
+            (self.get_success(self.store.get_profile_displayname(self.frank.localpart)))
+        )
+
+    def test_set_my_name_if_disabled(self):
+        self.hs.config.enable_set_displayname = False
+
+        # Setting displayname for the first time is allowed
+        self.get_success(
+            self.store.set_profile_displayname(self.frank.localpart, "Frank")
+        )
+
+        self.assertEquals(
+            (
+                self.get_success(
+                    self.store.get_profile_displayname(self.frank.localpart)
+                )
+            ),
+            "Frank",
+        )
+
+        # Setting displayname a second time is forbidden
+        self.get_failure(
+            self.handler.set_displayname(
+                self.frank, synapse.types.create_requester(self.frank), "Frank Jr."
+            ),
+            SynapseError,
+        )
+
     def test_set_my_name_noauth(self):
-        d = self.handler.set_displayname(
-            self.frank,
-            synapse.types.create_requester(self.bob),
-            "Frank Jr."
+        self.get_failure(
+            self.handler.set_displayname(
+                self.frank, synapse.types.create_requester(self.bob), "Frank Jr."
+            ),
+            AuthError,
         )
 
-        yield self.assertFailure(d, AuthError)
-
-    @defer.inlineCallbacks
     def test_get_other_name(self):
-        self.mock_federation.make_query.return_value = defer.succeed(
+        self.mock_federation.make_query.return_value = make_awaitable(
             {"displayname": "Alice"}
         )
 
-        displayname = yield self.handler.get_displayname(self.alice)
+        displayname = self.get_success(self.handler.get_displayname(self.alice))
 
         self.assertEquals(displayname, "Alice")
         self.mock_federation.make_query.assert_called_with(
             destination="remote",
             query_type="profile",
-            args={"user_id": "@alice:remote", "field": "displayname"}
+            args={"user_id": "@alice:remote", "field": "displayname"},
+            ignore_backoff=True,
         )
 
-    @defer.inlineCallbacks
     def test_incoming_fed_query(self):
-        yield self.store.create_profile("caroline")
-        yield self.store.set_profile_displayname("caroline", "Caroline")
+        self.get_success(self.store.create_profile("caroline"))
+        self.get_success(self.store.set_profile_displayname("caroline", "Caroline"))
 
-        response = yield self.query_handlers["profile"](
-            {"user_id": "@caroline:test", "field": "displayname"}
+        response = self.get_success(
+            self.query_handlers["profile"](
+                {
+                    "user_id": "@caroline:test",
+                    "field": "displayname",
+                    "origin": "servername.tld",
+                }
+            )
         )
 
         self.assertEquals({"displayname": "Caroline"}, response)
 
-    @defer.inlineCallbacks
     def test_get_my_avatar(self):
-        yield self.store.set_profile_avatar_url(
-            self.frank.localpart, "http://my.server/me.png"
+        self.get_success(
+            self.store.set_profile_avatar_url(
+                self.frank.localpart, "http://my.server/me.png"
+            )
         )
-
-        avatar_url = yield self.handler.get_avatar_url(self.frank)
+        avatar_url = self.get_success(self.handler.get_avatar_url(self.frank))
 
         self.assertEquals("http://my.server/me.png", avatar_url)
 
-    @defer.inlineCallbacks
     def test_set_my_avatar(self):
-        yield self.handler.set_avatar_url(
-            self.frank, synapse.types.create_requester(self.frank),
-            "http://my.server/pic.gif"
+        self.get_success(
+            self.handler.set_avatar_url(
+                self.frank,
+                synapse.types.create_requester(self.frank),
+                "http://my.server/pic.gif",
+            )
         )
 
         self.assertEquals(
-            (yield self.store.get_profile_avatar_url(self.frank.localpart)),
-            "http://my.server/pic.gif"
+            (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
+            "http://my.server/pic.gif",
+        )
+
+        # Set avatar again
+        self.get_success(
+            self.handler.set_avatar_url(
+                self.frank,
+                synapse.types.create_requester(self.frank),
+                "http://my.server/me.png",
+            )
+        )
+
+        self.assertEquals(
+            (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
+            "http://my.server/me.png",
+        )
+
+        # Set avatar to an empty string
+        self.get_success(
+            self.handler.set_avatar_url(
+                self.frank,
+                synapse.types.create_requester(self.frank),
+                "",
+            )
+        )
+
+        self.assertIsNone(
+            (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
+        )
+
+    def test_set_my_avatar_if_disabled(self):
+        self.hs.config.enable_set_avatar_url = False
+
+        # Setting displayname for the first time is allowed
+        self.get_success(
+            self.store.set_profile_avatar_url(
+                self.frank.localpart, "http://my.server/me.png"
+            )
+        )
+
+        self.assertEquals(
+            (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
+            "http://my.server/me.png",
+        )
+
+        # Set avatar a second time is forbidden
+        self.get_failure(
+            self.handler.set_avatar_url(
+                self.frank,
+                synapse.types.create_requester(self.frank),
+                "http://my.server/pic.gif",
+            ),
+            SynapseError,
         )

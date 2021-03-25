@@ -13,47 +13,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.replication.tcp.streams import PresenceStream
+from synapse.storage import DataStore
+from synapse.storage.database import DatabasePool
+from synapse.storage.databases.main.presence import PresenceStore
+from synapse.util.caches.stream_change_cache import StreamChangeCache
+
 from ._base import BaseSlavedStore
 from ._slaved_id_tracker import SlavedIdTracker
 
-from synapse.util.caches.stream_change_cache import StreamChangeCache
-from synapse.storage import DataStore
-
 
 class SlavedPresenceStore(BaseSlavedStore):
-    def __init__(self, db_conn, hs):
-        super(SlavedPresenceStore, self).__init__(db_conn, hs)
-        self._presence_id_gen = SlavedIdTracker(
-            db_conn, "presence_stream", "stream_id",
-        )
+    def __init__(self, database: DatabasePool, db_conn, hs):
+        super().__init__(database, db_conn, hs)
+        self._presence_id_gen = SlavedIdTracker(db_conn, "presence_stream", "stream_id")
 
-        self._presence_on_startup = self._get_active_presence(db_conn)
+        self._presence_on_startup = self._get_active_presence(db_conn)  # type: ignore
 
-        self.presence_stream_cache = self.presence_stream_cache = StreamChangeCache(
+        self.presence_stream_cache = StreamChangeCache(
             "PresenceStreamChangeCache", self._presence_id_gen.get_current_token()
         )
 
-    _get_active_presence = DataStore._get_active_presence.__func__
-    take_presence_startup_info = DataStore.take_presence_startup_info.__func__
-    get_presence_for_users = DataStore.get_presence_for_users.__func__
+    _get_active_presence = DataStore._get_active_presence
+    take_presence_startup_info = DataStore.take_presence_startup_info
+    _get_presence_for_user = PresenceStore.__dict__["_get_presence_for_user"]
+    get_presence_for_users = PresenceStore.__dict__["get_presence_for_users"]
 
     def get_current_presence_token(self):
         return self._presence_id_gen.get_current_token()
 
-    def stream_positions(self):
-        result = super(SlavedPresenceStore, self).stream_positions()
-        position = self._presence_id_gen.get_current_token()
-        result["presence"] = position
-        return result
-
-    def process_replication(self, result):
-        stream = result.get("presence")
-        if stream:
-            self._presence_id_gen.advance(int(stream["position"]))
-            for row in stream["rows"]:
-                position, user_id = row[:2]
-                self.presence_stream_cache.entity_has_changed(
-                    user_id, position
-                )
-
-        return super(SlavedPresenceStore, self).process_replication(result)
+    def process_replication_rows(self, stream_name, instance_name, token, rows):
+        if stream_name == PresenceStream.NAME:
+            self._presence_id_gen.advance(instance_name, token)
+            for row in rows:
+                self.presence_stream_cache.entity_has_changed(row.user_id, token)
+                self._get_presence_for_user.invalidate((row.user_id,))
+        return super().process_replication_rows(stream_name, instance_name, token, rows)

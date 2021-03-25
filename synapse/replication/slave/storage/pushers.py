@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,41 +13,33 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import TYPE_CHECKING
+
+from synapse.replication.tcp.streams import PushersStream
+from synapse.storage.database import DatabasePool
+from synapse.storage.databases.main.pusher import PusherWorkerStore
+from synapse.storage.types import Connection
 
 from ._base import BaseSlavedStore
 from ._slaved_id_tracker import SlavedIdTracker
 
-from synapse.storage import DataStore
+if TYPE_CHECKING:
+    from synapse.app.homeserver import HomeServer
 
 
-class SlavedPusherStore(BaseSlavedStore):
-
-    def __init__(self, db_conn, hs):
-        super(SlavedPusherStore, self).__init__(db_conn, hs)
-        self._pushers_id_gen = SlavedIdTracker(
-            db_conn, "pushers", "id",
-            extra_tables=[("deleted_pushers", "stream_id")],
+class SlavedPusherStore(PusherWorkerStore, BaseSlavedStore):
+    def __init__(self, database: DatabasePool, db_conn: Connection, hs: "HomeServer"):
+        super().__init__(database, db_conn, hs)
+        self._pushers_id_gen = SlavedIdTracker(  # type: ignore
+            db_conn, "pushers", "id", extra_tables=[("deleted_pushers", "stream_id")]
         )
 
-    get_all_pushers = DataStore.get_all_pushers.__func__
-    get_pushers_by = DataStore.get_pushers_by.__func__
-    get_pushers_by_app_id_and_pushkey = (
-        DataStore.get_pushers_by_app_id_and_pushkey.__func__
-    )
-    _decode_pushers_rows = DataStore._decode_pushers_rows.__func__
+    def get_pushers_stream_token(self) -> int:
+        return self._pushers_id_gen.get_current_token()
 
-    def stream_positions(self):
-        result = super(SlavedPusherStore, self).stream_positions()
-        result["pushers"] = self._pushers_id_gen.get_current_token()
-        return result
-
-    def process_replication(self, result):
-        stream = result.get("pushers")
-        if stream:
-            self._pushers_id_gen.advance(int(stream["position"]))
-
-        stream = result.get("deleted_pushers")
-        if stream:
-            self._pushers_id_gen.advance(int(stream["position"]))
-
-        return super(SlavedPusherStore, self).process_replication(result)
+    def process_replication_rows(
+        self, stream_name: str, instance_name: str, token, rows
+    ) -> None:
+        if stream_name == PushersStream.NAME:
+            self._pushers_id_gen.advance(instance_name, token)  # type: ignore
+        return super().process_replication_rows(stream_name, instance_name, token, rows)

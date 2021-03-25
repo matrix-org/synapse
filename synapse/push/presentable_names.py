@@ -13,10 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
-import re
 import logging
+import re
+from typing import TYPE_CHECKING, Dict, Iterable, Optional
+
+from synapse.api.constants import EventTypes, Membership
+from synapse.events import EventBase
+from synapse.types import StateMap
+
+if TYPE_CHECKING:
+    from synapse.storage.databases.main import DataStore
 
 logger = logging.getLogger(__name__)
 
@@ -27,97 +33,95 @@ ALIAS_RE = re.compile(r"^#.*:.+$")
 ALL_ALONE = "Empty Room"
 
 
-@defer.inlineCallbacks
-def calculate_room_name(store, room_state_ids, user_id, fallback_to_members=True,
-                        fallback_to_single_member=True):
+async def calculate_room_name(
+    store: "DataStore",
+    room_state_ids: StateMap[str],
+    user_id: str,
+    fallback_to_members: bool = True,
+    fallback_to_single_member: bool = True,
+) -> Optional[str]:
     """
     Works out a user-facing name for the given room as per Matrix
     spec recommendations.
     Does not yet support internationalisation.
     Args:
-        room_state: Dictionary of the room's state
+        store: The data store to query.
+        room_state_ids: Dictionary of the room's state IDs.
         user_id: The ID of the user to whom the room name is being presented
         fallback_to_members: If False, return None instead of generating a name
                              based on the room's members if the room has no
                              title or aliases.
+        fallback_to_single_member: If False, return None instead of generating a
+            name based on the user who invited this user to the room if the room
+            has no title or aliases.
 
     Returns:
-        (string or None) A human readable name for the room.
+        A human readable name for the room, if possible.
     """
     # does it have a name?
-    if ("m.room.name", "") in room_state_ids:
-        m_room_name = yield store.get_event(
-            room_state_ids[("m.room.name", "")], allow_none=True
+    if (EventTypes.Name, "") in room_state_ids:
+        m_room_name = await store.get_event(
+            room_state_ids[(EventTypes.Name, "")], allow_none=True
         )
-        if m_room_name and m_room_name.content and m_room_name.content["name"]:
-            defer.returnValue(m_room_name.content["name"])
+        if m_room_name and m_room_name.content and m_room_name.content.get("name"):
+            return m_room_name.content["name"]
 
     # does it have a canonical alias?
-    if ("m.room.canonical_alias", "") in room_state_ids:
-        canon_alias = yield store.get_event(
-            room_state_ids[("m.room.canonical_alias", "")], allow_none=True
+    if (EventTypes.CanonicalAlias, "") in room_state_ids:
+        canon_alias = await store.get_event(
+            room_state_ids[(EventTypes.CanonicalAlias, "")], allow_none=True
         )
         if (
-            canon_alias and canon_alias.content and canon_alias.content["alias"] and
-            _looks_like_an_alias(canon_alias.content["alias"])
+            canon_alias
+            and canon_alias.content
+            and canon_alias.content.get("alias")
+            and _looks_like_an_alias(canon_alias.content["alias"])
         ):
-            defer.returnValue(canon_alias.content["alias"])
+            return canon_alias.content["alias"]
+
+    if not fallback_to_members:
+        return None
+
+    my_member_event = None
+    if (EventTypes.Member, user_id) in room_state_ids:
+        my_member_event = await store.get_event(
+            room_state_ids[(EventTypes.Member, user_id)], allow_none=True
+        )
+
+    if (
+        my_member_event is not None
+        and my_member_event.content.get("membership") == Membership.INVITE
+    ):
+        if (EventTypes.Member, my_member_event.sender) in room_state_ids:
+            inviter_member_event = await store.get_event(
+                room_state_ids[(EventTypes.Member, my_member_event.sender)],
+                allow_none=True,
+            )
+            if inviter_member_event:
+                if fallback_to_single_member:
+                    return "Invite from %s" % (
+                        name_from_member_event(inviter_member_event),
+                    )
+                else:
+                    return None
+        else:
+            return "Room Invite"
 
     # at this point we're going to need to search the state by all state keys
     # for an event type, so rearrange the data structure
     room_state_bytype_ids = _state_as_two_level_dict(room_state_ids)
 
-    # right then, any aliases at all?
-    if "m.room.aliases" in room_state_bytype_ids:
-        m_room_aliases = room_state_bytype_ids["m.room.aliases"]
-        for alias_id in m_room_aliases.values():
-            alias_event = yield store.get_event(
-                alias_id, allow_none=True
-            )
-            if alias_event and alias_event.content.get("aliases"):
-                the_aliases = alias_event.content["aliases"]
-                if len(the_aliases) > 0 and _looks_like_an_alias(the_aliases[0]):
-                    defer.returnValue(the_aliases[0])
-
-    if not fallback_to_members:
-        defer.returnValue(None)
-
-    my_member_event = None
-    if ("m.room.member", user_id) in room_state_ids:
-        my_member_event = yield store.get_event(
-            room_state_ids[("m.room.member", user_id)], allow_none=True
-        )
-
-    if (
-        my_member_event is not None and
-        my_member_event.content['membership'] == "invite"
-    ):
-        if ("m.room.member", my_member_event.sender) in room_state_ids:
-            inviter_member_event = yield store.get_event(
-                room_state_ids[("m.room.member", my_member_event.sender)],
-                allow_none=True,
-            )
-            if inviter_member_event:
-                if fallback_to_single_member:
-                    defer.returnValue(
-                        "Invite from %s" % (
-                            name_from_member_event(inviter_member_event),
-                        )
-                    )
-                else:
-                    return
-        else:
-            defer.returnValue("Room Invite")
-
     # we're going to have to generate a name based on who's in the room,
     # so find out who is in the room that isn't the user.
-    if "m.room.member" in room_state_bytype_ids:
-        member_events = yield store.get_events(
-            room_state_bytype_ids["m.room.member"].values()
+    if EventTypes.Member in room_state_bytype_ids:
+        member_events = await store.get_events(
+            list(room_state_bytype_ids[EventTypes.Member].values())
         )
         all_members = [
-            ev for ev in member_events.values()
-            if ev.content['membership'] == "join" or ev.content['membership'] == "invite"
+            ev
+            for ev in member_events.values()
+            if ev.content.get("membership") == Membership.JOIN
+            or ev.content.get("membership") == Membership.INVITE
         ]
         # Sort the member events oldest-first so the we name people in the
         # order the joined (it should at least be deterministic rather than
@@ -133,10 +137,10 @@ def calculate_room_name(store, room_state_ids, user_id, fallback_to_members=True
             # self-chat, peeked room with 1 participant,
             # or inbound invite, or outbound 3PID invite.
             if all_members[0].sender == user_id:
-                if "m.room.third_party_invite" in room_state_bytype_ids:
-                    third_party_invites = (
-                        room_state_bytype_ids["m.room.third_party_invite"].values()
-                    )
+                if EventTypes.ThirdPartyInvite in room_state_bytype_ids:
+                    third_party_invites = room_state_bytype_ids[
+                        EventTypes.ThirdPartyInvite
+                    ].values()
 
                     if len(third_party_invites) > 0:
                         # technically third party invite events are not member
@@ -148,20 +152,31 @@ def calculate_room_name(store, room_state_ids, user_id, fallback_to_members=True
                         # return "Inviting %s" % (
                         #     descriptor_from_member_events(third_party_invites)
                         # )
-                        defer.returnValue("Inviting email address")
+                        return "Inviting email address"
                     else:
-                        defer.returnValue(ALL_ALONE)
+                        return ALL_ALONE
             else:
-                defer.returnValue(name_from_member_event(all_members[0]))
+                return name_from_member_event(all_members[0])
         else:
-            defer.returnValue(ALL_ALONE)
+            return ALL_ALONE
     elif len(other_members) == 1 and not fallback_to_single_member:
-        return
-    else:
-        defer.returnValue(descriptor_from_member_events(other_members))
+        return None
+
+    return descriptor_from_member_events(other_members)
 
 
-def descriptor_from_member_events(member_events):
+def descriptor_from_member_events(member_events: Iterable[EventBase]) -> str:
+    """Get a description of the room based on the member events.
+
+    Args:
+        member_events: The events of a room.
+
+    Returns:
+        The room description
+    """
+
+    member_events = list(member_events)
+
     if len(member_events) == 0:
         return "nobody"
     elif len(member_events) == 1:
@@ -178,21 +193,18 @@ def descriptor_from_member_events(member_events):
         )
 
 
-def name_from_member_event(member_event):
-    if (
-        member_event.content and "displayname" in member_event.content and
-        member_event.content["displayname"]
-    ):
+def name_from_member_event(member_event: EventBase) -> str:
+    if member_event.content and member_event.content.get("displayname"):
         return member_event.content["displayname"]
     return member_event.state_key
 
 
-def _state_as_two_level_dict(state):
-    ret = {}
+def _state_as_two_level_dict(state: StateMap[str]) -> Dict[str, Dict[str, str]]:
+    ret = {}  # type: Dict[str, Dict[str, str]]
     for k, v in state.items():
         ret.setdefault(k[0], {})[k[1]] = v
     return ret
 
 
-def _looks_like_an_alias(string):
+def _looks_like_an_alias(string: str) -> bool:
     return ALIAS_RE.match(string) is not None

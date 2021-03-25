@@ -1,0 +1,71 @@
+synctl(1) -- Synapse server control interface
+=============================================
+
+## SYNOPSIS
+  Start, stop or restart synapse server.
+
+`synctl` {start|stop|restart} [configfile] [-w|--worker=<WORKERCONFIG>] [-a|--all-processes=<WORKERCONFIGDIR>]
+
+## DESCRIPTION
+
+**synctl** can be used to start, stop or restart Synapse server.  The
+control operation can be done on all processes or a single worker
+process.
+
+## OPTIONS
+
+  * `action`:
+    The value of action should be one of `start`, `stop` or `restart`.
+
+  * `configfile`:
+    Optional path of the configuration file to use.  Default value is
+    `homeserver.yaml`.  The configuration file must exist for the
+    operation to succeed.
+
+  * `-w`, `--worker`:
+
+    Perform start, stop or restart operations on a single worker.
+    Incompatible with `-a`|`--all-processes`.  Value passed must be a
+    valid worker's configuration file.
+
+  * `-a`, `--all-processes`:
+
+    Perform start, stop or restart operations on all the workers in
+    the given directory and the main synapse process. Incompatible
+    with `-w`|`--worker`.  Value passed must be a directory containing
+    valid work configuration files.  All files ending with `.yaml`
+    extension shall be considered as configuration files and all other
+    files in the directory are ignored.
+
+## CONFIGURATION FILE
+
+Configuration file may be generated as follows:
+
+    $ python -m synapse.app.homeserver -c config.yaml --generate-config --server-name=<server name>
+
+## ENVIRONMENT
+
+  * `SYNAPSE_CACHE_FACTOR`:
+    Synapse's architecture is quite RAM hungry currently - we deliberately
+    cache a lot of recent room data and metadata in RAM in order to speed up
+    common requests. We'll improve this in the future, but for now the easiest
+    way to either reduce the RAM usage (at the risk of slowing things down)
+    is to set the almost-undocumented ``SYNAPSE_CACHE_FACTOR`` environment
+    variable. The default is 0.5, which can be decreased to reduce RAM usage
+    in memory constrained enviroments, or increased if performance starts to
+    degrade.
+
+    However, degraded performance due to a low cache factor, common on
+    machines with slow disks, often leads to explosions in memory use due
+    backlogged requests. In this case, reducing the cache factor will make
+    things worse. Instead, try increasing it drastically. 2.0 is a good
+    starting value.
+
+## COPYRIGHT
+
+This man page was written by Sunil Mohan Adapa <<sunil@medhas.org>> for
+Debian GNU/Linux distribution.
+
+## SEE ALSO
+
+synapse_port_db(1), hash_password(1), register_new_matrix_user(1)

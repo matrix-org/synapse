@@ -17,18 +17,17 @@ from frozendict import frozendict
 
 
 def freeze(o):
-    t = type(o)
-    if t is dict:
+    if isinstance(o, dict):
         return frozendict({k: freeze(v) for k, v in o.items()})
 
-    if t is frozendict:
+    if isinstance(o, frozendict):
         return o
 
-    if t is str or t is unicode:
+    if isinstance(o, (bytes, str)):
         return o
 
     try:
-        return tuple([freeze(i) for i in o])
+        return tuple(freeze(i) for i in o)
     except TypeError:
         pass
 
@@ -36,11 +35,10 @@ def freeze(o):
 
 
 def unfreeze(o):
-    t = type(o)
-    if t is dict or t is frozendict:
+    if isinstance(o, (dict, frozendict)):
         return dict({k: unfreeze(v) for k, v in o.items()})
 
-    if t is str or t is unicode:
+    if isinstance(o, (bytes, str)):
         return o
 
     try:

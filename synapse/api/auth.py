@@ -12,26 +12,45 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
+from typing import List, Optional, Tuple
 
 import pymacaroons
-from twisted.internet import defer
+from netaddr import IPAddress
+
+from twisted.web.server import Request
 
 import synapse.types
 from synapse import event_auth
-from synapse.api.constants import EventTypes, Membership, JoinRules
-from synapse.api.errors import AuthError, Codes
-from synapse.types import UserID
-from synapse.util.logcontext import preserve_context_over_fn
+from synapse.api.auth_blocking import AuthBlocking
+from synapse.api.constants import EventTypes, HistoryVisibility, Membership
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    InvalidClientTokenError,
+    MissingClientTokenError,
+)
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.appservice import ApplicationService
+from synapse.events import EventBase
+from synapse.http import get_request_user_agent
+from synapse.http.site import SynapseRequest
+from synapse.logging import opentracing as opentracing
+from synapse.storage.databases.main.registration import TokenLookupResult
+from synapse.types import StateMap, UserID
+from synapse.util.caches.lrucache import LruCache
+from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
 
 
 AuthEventTypes = (
-    EventTypes.Create, EventTypes.Member, EventTypes.PowerLevels,
-    EventTypes.JoinRules, EventTypes.RoomHistoryVisibility,
+    EventTypes.Create,
+    EventTypes.Member,
+    EventTypes.PowerLevels,
+    EventTypes.JoinRules,
+    EventTypes.RoomHistoryVisibility,
     EventTypes.ThirdPartyInvite,
 )
 
@@ -39,128 +58,101 @@ AuthEventTypes = (
 GUEST_DEVICE_ID = "guest_device"
 
 
-class Auth(object):
+class _InvalidMacaroonException(Exception):
+    pass
+
+
+class Auth:
     """
     FIXME: This class contains a mix of functions for authenticating users
     of our client-server API and authenticating events added to room graphs.
     """
+
     def __init__(self, hs):
         self.hs = hs
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
-        self.TOKEN_NOT_FOUND_HTTP_STATUS = 401
 
-    @defer.inlineCallbacks
-    def check_from_context(self, event, context, do_sig_check=True):
-        auth_events_ids = yield self.compute_auth_events(
-            event, context.prev_state_ids, for_verification=True,
+        self.token_cache = LruCache(
+            10000, "token_cache"
+        )  # type: LruCache[str, Tuple[str, bool]]
+
+        self._auth_blocking = AuthBlocking(self.hs)
+
+        self._account_validity = hs.config.account_validity
+        self._track_appservice_user_ips = hs.config.track_appservice_user_ips
+        self._macaroon_secret_key = hs.config.macaroon_secret_key
+
+    async def check_from_context(
+        self, room_version: str, event, context, do_sig_check=True
+    ):
+        prev_state_ids = await context.get_prev_state_ids()
+        auth_events_ids = self.compute_auth_events(
+            event, prev_state_ids, for_verification=True
         )
-        auth_events = yield self.store.get_events(auth_events_ids)
-        auth_events = {
-            (e.type, e.state_key): e for e in auth_events.values()
-        }
-        self.check(event, auth_events=auth_events, do_sig_check=do_sig_check)
+        auth_events = await self.store.get_events(auth_events_ids)
+        auth_events = {(e.type, e.state_key): e for e in auth_events.values()}
 
-    def check(self, event, auth_events, do_sig_check=True):
-        """ Checks if this event is correctly authed.
+        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+        event_auth.check(
+            room_version_obj, event, auth_events=auth_events, do_sig_check=do_sig_check
+        )
 
+    async def check_user_in_room(
+        self,
+        room_id: str,
+        user_id: str,
+        current_state: Optional[StateMap[EventBase]] = None,
+        allow_departed_users: bool = False,
+    ) -> EventBase:
+        """Check if the user is in the room, or was at some point.
         Args:
-            event: the event being checked.
-            auth_events (dict: event-key -> event): the existing room state.
+            room_id: The room to check.
 
+            user_id: The user to check.
 
-        Returns:
-            True if the auth checks pass.
-        """
-        with Measure(self.clock, "auth.check"):
-            event_auth.check(event, auth_events, do_sig_check=do_sig_check)
-
-    @defer.inlineCallbacks
-    def check_joined_room(self, room_id, user_id, current_state=None):
-        """Check if the user is currently joined in the room
-        Args:
-            room_id(str): The room to check.
-            user_id(str): The user to check.
-            current_state(dict): Optional map of the current state of the room.
+            current_state: Optional map of the current state of the room.
                 If provided then that map is used to check whether they are a
                 member of the room. Otherwise the current membership is
                 loaded from the database.
-        Raises:
-            AuthError if the user is not in the room.
-        Returns:
-            A deferred membership event for the user if the user is in
-            the room.
-        """
-        if current_state:
-            member = current_state.get(
-                (EventTypes.Member, user_id),
-                None
-            )
-        else:
-            member = yield self.state.get_current_state(
-                room_id=room_id,
-                event_type=EventTypes.Member,
-                state_key=user_id
-            )
 
-        self._check_joined_room(member, user_id, room_id)
-        defer.returnValue(member)
+            allow_departed_users: if True, accept users that were previously
+                members but have now departed.
 
-    @defer.inlineCallbacks
-    def check_user_was_in_room(self, room_id, user_id):
-        """Check if the user was in the room at some point.
-        Args:
-            room_id(str): The room to check.
-            user_id(str): The user to check.
         Raises:
-            AuthError if the user was never in the room.
+            AuthError if the user is/was not in the room.
         Returns:
-            A deferred membership event for the user if the user was in the
+            Membership event for the user if the user was in the
             room. This will be the join event if they are currently joined to
             the room. This will be the leave event if they have left the room.
         """
-        member = yield self.state.get_current_state(
-            room_id=room_id,
-            event_type=EventTypes.Member,
-            state_key=user_id
-        )
-        membership = member.membership if member else None
+        if current_state:
+            member = current_state.get((EventTypes.Member, user_id), None)
+        else:
+            member = await self.state.get_current_state(
+                room_id=room_id, event_type=EventTypes.Member, state_key=user_id
+            )
 
-        if membership not in (Membership.JOIN, Membership.LEAVE):
-            raise AuthError(403, "User %s not in room %s" % (
-                user_id, room_id
-            ))
+        if member:
+            membership = member.membership
 
-        if membership == Membership.LEAVE:
-            forgot = yield self.store.did_forget(user_id, room_id)
-            if forgot:
-                raise AuthError(403, "User %s not in room %s" % (
-                    user_id, room_id
-                ))
+            if membership == Membership.JOIN:
+                return member
 
-        defer.returnValue(member)
+            # XXX this looks totally bogus. Why do we not allow users who have been banned,
+            # or those who were members previously and have been re-invited?
+            if allow_departed_users and membership == Membership.LEAVE:
+                forgot = await self.store.did_forget(user_id, room_id)
+                if not forgot:
+                    return member
 
-    @defer.inlineCallbacks
-    def check_host_in_room(self, room_id, host):
+        raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
+
+    async def check_host_in_room(self, room_id, host):
         with Measure(self.clock, "check_host_in_room"):
-            latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
-
-            logger.debug("calling resolve_state_groups from check_host_in_room")
-            entry = yield self.state.resolve_state_groups(
-                room_id, latest_event_ids
-            )
-
-            ret = yield self.store.is_host_joined(
-                room_id, host, entry.state_group, entry.state
-            )
-            defer.returnValue(ret)
-
-    def _check_joined_room(self, member, user_id, room_id):
-        if not member or member.membership != Membership.JOIN:
-            raise AuthError(403, "User %s not in room %s (%s)" % (
-                user_id, room_id, repr(member)
-            ))
+            latest_event_ids = await self.store.is_host_joined(room_id, host)
+            return latest_event_ids
 
     def can_federate(self, event, auth_events):
         creation_event = auth_events.get((EventTypes.Create, ""))
@@ -170,48 +162,80 @@ class Auth(object):
     def get_public_keys(self, invite_event):
         return event_auth.get_public_keys(invite_event)
 
-    @defer.inlineCallbacks
-    def get_user_by_req(self, request, allow_guest=False, rights="access"):
-        """ Get a registered user's ID.
+    async def get_user_by_req(
+        self,
+        request: SynapseRequest,
+        allow_guest: bool = False,
+        rights: str = "access",
+        allow_expired: bool = False,
+    ) -> synapse.types.Requester:
+        """Get a registered user's ID.
 
         Args:
-            request - An HTTP request with an access_token query parameter.
+            request: An HTTP request with an access_token query parameter.
+            allow_guest: If False, will raise an AuthError if the user making the
+                request is a guest.
+            rights: The operation being performed; the access token must allow this
+            allow_expired: If True, allow the request through even if the account
+                is expired, or session token lifetime has ended. Note that
+                /login will deliver access tokens regardless of expiration.
+
         Returns:
-            defer.Deferred: resolves to a ``synapse.types.Requester`` object
+            Resolves to the requester
         Raises:
-            AuthError if no user by that token exists or the token is invalid.
+            InvalidClientCredentialsError if no user by that token exists or the token
+                is invalid.
+            AuthError if access is denied for the user in the access token
         """
-        # Can optionally look elsewhere in the request (e.g. headers)
         try:
-            user_id, app_service = yield self._get_appservice_user_id(request)
+            ip_addr = request.getClientIP()
+            user_agent = get_request_user_agent(request)
+
+            access_token = self.get_access_token_from_request(request)
+
+            user_id, app_service = await self._get_appservice_user_id(request)
             if user_id:
-                request.authenticated_entity = user_id
-                defer.returnValue(
-                    synapse.types.create_requester(user_id, app_service=app_service)
+                if ip_addr and self._track_appservice_user_ips:
+                    await self.store.insert_client_ip(
+                        user_id=user_id,
+                        access_token=access_token,
+                        ip=ip_addr,
+                        user_agent=user_agent,
+                        device_id="dummy-device",  # stubbed
+                    )
+
+                requester = synapse.types.create_requester(
+                    user_id, app_service=app_service
                 )
 
-            access_token = get_access_token_from_request(
-                request, self.TOKEN_NOT_FOUND_HTTP_STATUS
+                request.requester = user_id
+                opentracing.set_tag("authenticated_entity", user_id)
+                opentracing.set_tag("user_id", user_id)
+                opentracing.set_tag("appservice_id", app_service.id)
+
+                return requester
+
+            user_info = await self.get_user_by_access_token(
+                access_token, rights, allow_expired=allow_expired
             )
+            token_id = user_info.token_id
+            is_guest = user_info.is_guest
+            shadow_banned = user_info.shadow_banned
 
-            user_info = yield self.get_user_by_access_token(access_token, rights)
-            user = user_info["user"]
-            token_id = user_info["token_id"]
-            is_guest = user_info["is_guest"]
+            # Deny the request if the user account has expired.
+            if self._account_validity.enabled and not allow_expired:
+                if await self.store.is_account_expired(
+                    user_info.user_id, self.clock.time_msec()
+                ):
+                    raise AuthError(
+                        403, "User account has expired", errcode=Codes.EXPIRED_ACCOUNT
+                    )
 
-            # device_id may not be present if get_user_by_access_token has been
-            # stubbed out.
-            device_id = user_info.get("device_id")
+            device_id = user_info.device_id
 
-            ip_addr = self.hs.get_ip_from_request(request)
-            user_agent = request.requestHeaders.getRawHeaders(
-                "User-Agent",
-                default=[""]
-            )[0]
-            if user and access_token and ip_addr:
-                preserve_context_over_fn(
-                    self.store.insert_client_ip,
-                    user=user,
+            if access_token and ip_addr:
+                await self.store.insert_client_ip(
+                    user_id=user_info.token_owner,
                     access_token=access_token,
                     ip=ip_addr,
                     user_agent=user_agent,
@@ -220,87 +244,106 @@ class Auth(object):
 
             if is_guest and not allow_guest:
                 raise AuthError(
-                    403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
+                    403,
+                    "Guest access not allowed",
+                    errcode=Codes.GUEST_ACCESS_FORBIDDEN,
                 )
 
-            request.authenticated_entity = user.to_string()
-
-            defer.returnValue(synapse.types.create_requester(
-                user, token_id, is_guest, device_id, app_service=app_service)
+            requester = synapse.types.create_requester(
+                user_info.user_id,
+                token_id,
+                is_guest,
+                shadow_banned,
+                device_id,
+                app_service=app_service,
+                authenticated_entity=user_info.token_owner,
             )
+
+            request.requester = requester
+            opentracing.set_tag("authenticated_entity", user_info.token_owner)
+            opentracing.set_tag("user_id", user_info.user_id)
+            if device_id:
+                opentracing.set_tag("device_id", device_id)
+
+            return requester
         except KeyError:
-            raise AuthError(
-                self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token.",
-                errcode=Codes.MISSING_TOKEN
-            )
+            raise MissingClientTokenError()
 
-    @defer.inlineCallbacks
-    def _get_appservice_user_id(self, request):
+    async def _get_appservice_user_id(self, request):
         app_service = self.store.get_app_service_by_token(
-            get_access_token_from_request(
-                request, self.TOKEN_NOT_FOUND_HTTP_STATUS
-            )
+            self.get_access_token_from_request(request)
         )
         if app_service is None:
-            defer.returnValue((None, None))
+            return None, None
 
-        if "user_id" not in request.args:
-            defer.returnValue((app_service.sender, app_service))
+        if app_service.ip_range_whitelist:
+            ip_address = IPAddress(request.getClientIP())
+            if ip_address not in app_service.ip_range_whitelist:
+                return None, None
 
-        user_id = request.args["user_id"][0]
+        if b"user_id" not in request.args:
+            return app_service.sender, app_service
+
+        user_id = request.args[b"user_id"][0].decode("utf8")
         if app_service.sender == user_id:
-            defer.returnValue((app_service.sender, app_service))
+            return app_service.sender, app_service
 
         if not app_service.is_interested_in_user(user_id):
-            raise AuthError(
-                403,
-                "Application service cannot masquerade as this user."
-            )
-        if not (yield self.store.get_user_by_id(user_id)):
-            raise AuthError(
-                403,
-                "Application service has not registered this user"
-            )
-        defer.returnValue((user_id, app_service))
+            raise AuthError(403, "Application service cannot masquerade as this user.")
+        if not (await self.store.get_user_by_id(user_id)):
+            raise AuthError(403, "Application service has not registered this user")
+        return user_id, app_service
 
-    @defer.inlineCallbacks
-    def get_user_by_access_token(self, token, rights="access"):
-        """ Validate access token and get user_id from it
+    async def get_user_by_access_token(
+        self,
+        token: str,
+        rights: str = "access",
+        allow_expired: bool = False,
+    ) -> TokenLookupResult:
+        """Validate access token and get user_id from it
 
         Args:
-            token (str): The access token to get the user by.
-            rights (str): The operation being performed; the access token must
-                allow this.
-        Returns:
-            dict : dict that includes the user and the ID of their access token.
+            token: The access token to get the user by
+            rights: The operation being performed; the access token must
+                allow this
+            allow_expired: If False, raises an InvalidClientTokenError
+                if the token is expired
+
         Raises:
-            AuthError if no user by that token exists or the token is invalid.
+            InvalidClientTokenError if a user by that token exists, but the token is
+                expired
+            InvalidClientCredentialsError if no user by that token exists or the token
+                is invalid
         """
+
+        if rights == "access":
+            # first look in the database
+            r = await self.store.get_user_by_access_token(token)
+            if r:
+                valid_until_ms = r.valid_until_ms
+                if (
+                    not allow_expired
+                    and valid_until_ms is not None
+                    and valid_until_ms < self.clock.time_msec()
+                ):
+                    # there was a valid access token, but it has expired.
+                    # soft-logout the user.
+                    raise InvalidClientTokenError(
+                        msg="Access token has expired", soft_logout=True
+                    )
+
+                return r
+
+        # otherwise it needs to be a valid macaroon
         try:
-            macaroon = pymacaroons.Macaroon.deserialize(token)
-        except Exception:  # deserialize can throw more-or-less anything
-            # doesn't look like a macaroon: treat it as an opaque token which
-            # must be in the database.
-            # TODO: it would be nice to get rid of this, but apparently some
-            # people use access tokens which aren't macaroons
-            r = yield self._look_up_user_by_access_token(token)
-            defer.returnValue(r)
+            user_id, guest = self._parse_and_validate_macaroon(token, rights)
 
-        try:
-            user_id = self.get_user_id_from_macaroon(macaroon)
-            user = UserID.from_string(user_id)
+            if rights == "access":
+                if not guest:
+                    # non-guest access tokens must be in the database
+                    logger.warning("Unrecognised access token - not in store.")
+                    raise InvalidClientTokenError()
 
-            self.validate_macaroon(
-                macaroon, rights, self.hs.config.expire_access_token,
-                user_id=user_id,
-            )
-
-            guest = False
-            for caveat in macaroon.caveats:
-                if caveat.caveat_id == "guest = true":
-                    guest = True
-
-            if guest:
                 # Guest access tokens are not stored in the database (there can
                 # only be one access token per guest, anyway).
                 #
@@ -312,89 +355,82 @@ class Auth(object):
                 # It would of course be much easier to store guest access
                 # tokens in the database as well, but that would break existing
                 # guest tokens.
-                stored_user = yield self.store.get_user_by_id(user_id)
+                stored_user = await self.store.get_user_by_id(user_id)
                 if not stored_user:
-                    raise AuthError(
-                        self.TOKEN_NOT_FOUND_HTTP_STATUS,
-                        "Unknown user_id %s" % user_id,
-                        errcode=Codes.UNKNOWN_TOKEN
-                    )
+                    raise InvalidClientTokenError("Unknown user_id %s" % user_id)
                 if not stored_user["is_guest"]:
-                    raise AuthError(
-                        self.TOKEN_NOT_FOUND_HTTP_STATUS,
-                        "Guest access token used for regular user",
-                        errcode=Codes.UNKNOWN_TOKEN
+                    raise InvalidClientTokenError(
+                        "Guest access token used for regular user"
                     )
-                ret = {
-                    "user": user,
-                    "is_guest": True,
-                    "token_id": None,
+
+                ret = TokenLookupResult(
+                    user_id=user_id,
+                    is_guest=True,
                     # all guests get the same device id
-                    "device_id": GUEST_DEVICE_ID,
-                }
+                    device_id=GUEST_DEVICE_ID,
+                )
             elif rights == "delete_pusher":
                 # We don't store these tokens in the database
-                ret = {
-                    "user": user,
-                    "is_guest": False,
-                    "token_id": None,
-                    "device_id": None,
-                }
+
+                ret = TokenLookupResult(user_id=user_id, is_guest=False)
             else:
-                # This codepath exists for several reasons:
-                #   * so that we can actually return a token ID, which is used
-                #     in some parts of the schema (where we probably ought to
-                #     use device IDs instead)
-                #   * the only way we currently have to invalidate an
-                #     access_token is by removing it from the database, so we
-                #     have to check here that it is still in the db
-                #   * some attributes (notably device_id) aren't stored in the
-                #     macaroon. They probably should be.
-                # TODO: build the dictionary from the macaroon once the
-                # above are fixed
-                ret = yield self._look_up_user_by_access_token(token)
-                if ret["user"] != user:
-                    logger.error(
-                        "Macaroon user (%s) != DB user (%s)",
-                        user,
-                        ret["user"]
-                    )
-                    raise AuthError(
-                        self.TOKEN_NOT_FOUND_HTTP_STATUS,
-                        "User mismatch in macaroon",
-                        errcode=Codes.UNKNOWN_TOKEN
-                    )
-            defer.returnValue(ret)
-        except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
-            raise AuthError(
-                self.TOKEN_NOT_FOUND_HTTP_STATUS, "Invalid macaroon passed.",
-                errcode=Codes.UNKNOWN_TOKEN
-            )
+                raise RuntimeError("Unknown rights setting %s", rights)
+            return ret
+        except (
+            _InvalidMacaroonException,
+            pymacaroons.exceptions.MacaroonException,
+            TypeError,
+            ValueError,
+        ) as e:
+            logger.warning("Invalid macaroon in auth: %s %s", type(e), e)
+            raise InvalidClientTokenError("Invalid macaroon passed.")
 
-    def get_user_id_from_macaroon(self, macaroon):
-        """Retrieve the user_id given by the caveats on the macaroon.
+    def _parse_and_validate_macaroon(self, token, rights="access"):
+        """Takes a macaroon and tries to parse and validate it. This is cached
+        if and only if rights == access and there isn't an expiry.
 
-        Does *not* validate the macaroon.
-
-        Args:
-            macaroon (pymacaroons.Macaroon): The macaroon to validate
+        On invalid macaroon raises _InvalidMacaroonException
 
         Returns:
-            (str) user id
-
-        Raises:
-            AuthError if there is no user_id caveat in the macaroon
+            (user_id, is_guest)
         """
-        user_prefix = "user_id = "
-        for caveat in macaroon.caveats:
-            if caveat.caveat_id.startswith(user_prefix):
-                return caveat.caveat_id[len(user_prefix):]
-        raise AuthError(
-            self.TOKEN_NOT_FOUND_HTTP_STATUS, "No user caveat in macaroon",
-            errcode=Codes.UNKNOWN_TOKEN
-        )
+        if rights == "access":
+            cached = self.token_cache.get(token, None)
+            if cached:
+                return cached
 
-    def validate_macaroon(self, macaroon, type_string, verify_expiry, user_id):
+        try:
+            macaroon = pymacaroons.Macaroon.deserialize(token)
+        except Exception:  # deserialize can throw more-or-less anything
+            # doesn't look like a macaroon: treat it as an opaque token which
+            # must be in the database.
+            # TODO: it would be nice to get rid of this, but apparently some
+            # people use access tokens which aren't macaroons
+            raise _InvalidMacaroonException()
+
+        try:
+            user_id = get_value_from_macaroon(macaroon, "user_id")
+
+            guest = False
+            for caveat in macaroon.caveats:
+                if caveat.caveat_id == "guest = true":
+                    guest = True
+
+            self.validate_macaroon(macaroon, rights, user_id=user_id)
+        except (
+            pymacaroons.exceptions.MacaroonException,
+            KeyError,
+            TypeError,
+            ValueError,
+        ):
+            raise InvalidClientTokenError("Invalid macaroon passed.")
+
+        if rights == "access":
+            self.token_cache[token] = (user_id, guest)
+
+        return user_id, guest
+
+    def validate_macaroon(self, macaroon, type_string, user_id):
         """
         validate that a Macaroon is understood by and was signed by this server.
 
@@ -402,7 +438,6 @@ class Auth(object):
             macaroon(pymacaroons.Macaroon): The macaroon to validate
             type_string(str): The kind of token required (e.g. "access",
                               "delete_pusher")
-            verify_expiry(bool): Whether to verify whether the macaroon has expired.
             user_id (str): The user_id required
         """
         v = pymacaroons.Verifier()
@@ -415,188 +450,93 @@ class Auth(object):
         v.satisfy_exact("type = " + type_string)
         v.satisfy_exact("user_id = %s" % user_id)
         v.satisfy_exact("guest = true")
-
-        # verify_expiry should really always be True, but there exist access
-        # tokens in the wild which expire when they should not, so we can't
-        # enforce expiry yet (so we have to allow any caveat starting with
-        # 'time < ' in access tokens).
-        #
-        # On the other hand, short-term login tokens (as used by CAS login, for
-        # example) have an expiry time which we do want to enforce.
-
-        if verify_expiry:
-            v.satisfy_general(self._verify_expiry)
-        else:
-            v.satisfy_general(lambda c: c.startswith("time < "))
+        satisfy_expiry(v, self.clock.time_msec)
 
         # access_tokens include a nonce for uniqueness: any value is acceptable
         v.satisfy_general(lambda c: c.startswith("nonce = "))
 
-        v.verify(macaroon, self.hs.config.macaroon_secret_key)
+        v.verify(macaroon, self._macaroon_secret_key)
 
-    def _verify_expiry(self, caveat):
-        prefix = "time < "
-        if not caveat.startswith(prefix):
-            return False
-        expiry = int(caveat[len(prefix):])
-        now = self.hs.get_clock().time_msec()
-        return now < expiry
-
-    @defer.inlineCallbacks
-    def _look_up_user_by_access_token(self, token):
-        ret = yield self.store.get_user_by_access_token(token)
-        if not ret:
-            logger.warn("Unrecognised access token - not in store: %s" % (token,))
-            raise AuthError(
-                self.TOKEN_NOT_FOUND_HTTP_STATUS, "Unrecognised access token.",
-                errcode=Codes.UNKNOWN_TOKEN
-            )
-        # we use ret.get() below because *lots* of unit tests stub out
-        # get_user_by_access_token in a way where it only returns a couple of
-        # the fields.
-        user_info = {
-            "user": UserID.from_string(ret.get("name")),
-            "token_id": ret.get("token_id", None),
-            "is_guest": False,
-            "device_id": ret.get("device_id"),
-        }
-        defer.returnValue(user_info)
-
-    def get_appservice_by_req(self, request):
-        try:
-            token = get_access_token_from_request(
-                request, self.TOKEN_NOT_FOUND_HTTP_STATUS
-            )
-            service = self.store.get_app_service_by_token(token)
-            if not service:
-                logger.warn("Unrecognised appservice access token: %s" % (token,))
-                raise AuthError(
-                    self.TOKEN_NOT_FOUND_HTTP_STATUS,
-                    "Unrecognised access token.",
-                    errcode=Codes.UNKNOWN_TOKEN
-                )
-            request.authenticated_entity = service.sender
-            return defer.succeed(service)
-        except KeyError:
-            raise AuthError(
-                self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token."
-            )
-
-    def is_server_admin(self, user):
-        return self.store.is_server_admin(user)
-
-    @defer.inlineCallbacks
-    def add_auth_events(self, builder, context):
-        auth_ids = yield self.compute_auth_events(builder, context.prev_state_ids)
-
-        auth_events_entries = yield self.store.add_event_hashes(
-            auth_ids
+    def get_appservice_by_req(self, request: SynapseRequest) -> ApplicationService:
+        token = self.get_access_token_from_request(request)
+        service = self.store.get_app_service_by_token(token)
+        if not service:
+            logger.warning("Unrecognised appservice access token.")
+            raise InvalidClientTokenError()
+        request.requester = synapse.types.create_requester(
+            service.sender, app_service=service
         )
+        return service
 
-        builder.auth_events = auth_events_entries
+    async def is_server_admin(self, user: UserID) -> bool:
+        """Check if the given user is a local server admin.
 
-    @defer.inlineCallbacks
-    def compute_auth_events(self, event, current_state_ids, for_verification=False):
-        if event.type == EventTypes.Create:
-            defer.returnValue([])
-
-        auth_ids = []
-
-        key = (EventTypes.PowerLevels, "", )
-        power_level_event_id = current_state_ids.get(key)
-
-        if power_level_event_id:
-            auth_ids.append(power_level_event_id)
-
-        key = (EventTypes.JoinRules, "", )
-        join_rule_event_id = current_state_ids.get(key)
-
-        key = (EventTypes.Member, event.user_id, )
-        member_event_id = current_state_ids.get(key)
-
-        key = (EventTypes.Create, "", )
-        create_event_id = current_state_ids.get(key)
-        if create_event_id:
-            auth_ids.append(create_event_id)
-
-        if join_rule_event_id:
-            join_rule_event = yield self.store.get_event(join_rule_event_id)
-            join_rule = join_rule_event.content.get("join_rule")
-            is_public = join_rule == JoinRules.PUBLIC if join_rule else False
-        else:
-            is_public = False
-
-        if event.type == EventTypes.Member:
-            e_type = event.content["membership"]
-            if e_type in [Membership.JOIN, Membership.INVITE]:
-                if join_rule_event_id:
-                    auth_ids.append(join_rule_event_id)
-
-            if e_type == Membership.JOIN:
-                if member_event_id and not is_public:
-                    auth_ids.append(member_event_id)
-            else:
-                if member_event_id:
-                    auth_ids.append(member_event_id)
-
-                if for_verification:
-                    key = (EventTypes.Member, event.state_key, )
-                    existing_event_id = current_state_ids.get(key)
-                    if existing_event_id:
-                        auth_ids.append(existing_event_id)
-
-            if e_type == Membership.INVITE:
-                if "third_party_invite" in event.content:
-                    key = (
-                        EventTypes.ThirdPartyInvite,
-                        event.content["third_party_invite"]["signed"]["token"]
-                    )
-                    third_party_invite_id = current_state_ids.get(key)
-                    if third_party_invite_id:
-                        auth_ids.append(third_party_invite_id)
-        elif member_event_id:
-            member_event = yield self.store.get_event(member_event_id)
-            if member_event.content["membership"] == Membership.JOIN:
-                auth_ids.append(member_event.event_id)
-
-        defer.returnValue(auth_ids)
-
-    def check_redaction(self, event, auth_events):
-        """Check whether the event sender is allowed to redact the target event.
+        Args:
+            user: user to check
 
         Returns:
-            True if the the sender is allowed to redact the target event if the
-            target event was created by them.
-            False if the sender is allowed to redact the target event with no
-            further checks.
-
-        Raises:
-            AuthError if the event sender is definitely not allowed to redact
-            the target event.
+            True if the user is an admin
         """
-        return event_auth.check_redaction(event, auth_events)
+        return await self.store.is_server_admin(user)
 
-    @defer.inlineCallbacks
-    def check_can_change_room_list(self, room_id, user):
-        """Check if the user is allowed to edit the room's entry in the
+    def compute_auth_events(
+        self,
+        event,
+        current_state_ids: StateMap[str],
+        for_verification: bool = False,
+    ) -> List[str]:
+        """Given an event and current state return the list of event IDs used
+        to auth an event.
+
+        If `for_verification` is False then only return auth events that
+        should be added to the event's `auth_events`.
+
+        Returns:
+            List of event IDs.
+        """
+
+        if event.type == EventTypes.Create:
+            return []
+
+        # Currently we ignore the `for_verification` flag even though there are
+        # some situations where we can drop particular auth events when adding
+        # to the event's `auth_events` (e.g. joins pointing to previous joins
+        # when room is publicly joinable). Dropping event IDs has the
+        # advantage that the auth chain for the room grows slower, but we use
+        # the auth chain in state resolution v2 to order events, which means
+        # care must be taken if dropping events to ensure that it doesn't
+        # introduce undesirable "state reset" behaviour.
+        #
+        # All of which sounds a bit tricky so we don't bother for now.
+
+        auth_ids = []
+        for etype, state_key in event_auth.auth_types_for_event(event):
+            auth_ev_id = current_state_ids.get((etype, state_key))
+            if auth_ev_id:
+                auth_ids.append(auth_ev_id)
+
+        return auth_ids
+
+    async def check_can_change_room_list(self, room_id: str, user: UserID):
+        """Determine whether the user is allowed to edit the room's entry in the
         published room list.
 
         Args:
-            room_id (str)
-            user (UserID)
+            room_id
+            user
         """
 
-        is_admin = yield self.is_server_admin(user)
+        is_admin = await self.is_server_admin(user)
         if is_admin:
-            defer.returnValue(True)
+            return True
 
         user_id = user.to_string()
-        yield self.check_joined_room(room_id, user_id)
+        await self.check_user_in_room(room_id, user_id)
 
         # We currently require the user is a "moderator" in the room. We do this
         # by checking if they would (theoretically) be able to change the
-        # m.room.aliases events
-        power_level_event = yield self.state.get_current_state(
+        # m.room.canonical_alias events
+        power_level_event = await self.state.get_current_state(
             room_id, EventTypes.PowerLevels, ""
         )
 
@@ -605,78 +545,102 @@ class Auth(object):
             auth_events[(EventTypes.PowerLevels, "")] = power_level_event
 
         send_level = event_auth.get_send_level(
-            EventTypes.Aliases, "", auth_events
+            EventTypes.CanonicalAlias, "", power_level_event
         )
         user_level = event_auth.get_user_power_level(user_id, auth_events)
 
-        if user_level < send_level:
+        return user_level >= send_level
+
+    @staticmethod
+    def has_access_token(request: Request):
+        """Checks if the request has an access_token.
+
+        Returns:
+            bool: False if no access_token was given, True otherwise.
+        """
+        query_params = request.args.get(b"access_token")
+        auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
+        return bool(query_params) or bool(auth_headers)
+
+    @staticmethod
+    def get_access_token_from_request(request: Request):
+        """Extracts the access_token from the request.
+
+        Args:
+            request: The http request.
+        Returns:
+            unicode: The access_token
+        Raises:
+            MissingClientTokenError: If there isn't a single access_token in the
+                request
+        """
+
+        auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
+        query_params = request.args.get(b"access_token")
+        if auth_headers:
+            # Try the get the access_token from a "Authorization: Bearer"
+            # header
+            if query_params is not None:
+                raise MissingClientTokenError(
+                    "Mixing Authorization headers and access_token query parameters."
+                )
+            if len(auth_headers) > 1:
+                raise MissingClientTokenError("Too many Authorization headers.")
+            parts = auth_headers[0].split(b" ")
+            if parts[0] == b"Bearer" and len(parts) == 2:
+                return parts[1].decode("ascii")
+            else:
+                raise MissingClientTokenError("Invalid Authorization header.")
+        else:
+            # Try to get the access_token from the query params.
+            if not query_params:
+                raise MissingClientTokenError()
+
+            return query_params[0].decode("ascii")
+
+    async def check_user_in_room_or_world_readable(
+        self, room_id: str, user_id: str, allow_departed_users: bool = False
+    ) -> Tuple[str, Optional[str]]:
+        """Checks that the user is or was in the room or the room is world
+        readable. If it isn't then an exception is raised.
+
+        Args:
+            room_id: room to check
+            user_id: user to check
+            allow_departed_users: if True, accept users that were previously
+                members but have now departed
+
+        Returns:
+            Resolves to the current membership of the user in the room and the
+            membership event ID of the user. If the user is not in the room and
+            never has been, then `(Membership.JOIN, None)` is returned.
+        """
+
+        try:
+            # check_user_in_room will return the most recent membership
+            # event for the user if:
+            #  * The user is a non-guest user, and was ever in the room
+            #  * The user is a guest user, and has joined the room
+            # else it will throw.
+            member_event = await self.check_user_in_room(
+                room_id, user_id, allow_departed_users=allow_departed_users
+            )
+            return member_event.membership, member_event.event_id
+        except AuthError:
+            visibility = await self.state.get_current_state(
+                room_id, EventTypes.RoomHistoryVisibility, ""
+            )
+            if (
+                visibility
+                and visibility.content.get("history_visibility")
+                == HistoryVisibility.WORLD_READABLE
+            ):
+                return Membership.JOIN, None
             raise AuthError(
                 403,
-                "This server requires you to be a moderator in the room to"
-                " edit its room list entry"
+                "User %s not in room %s, and room previews are disabled"
+                % (user_id, room_id),
             )
 
-
-def has_access_token(request):
-    """Checks if the request has an access_token.
-
-    Returns:
-        bool: False if no access_token was given, True otherwise.
-    """
-    query_params = request.args.get("access_token")
-    auth_headers = request.requestHeaders.getRawHeaders("Authorization")
-    return bool(query_params) or bool(auth_headers)
-
-
-def get_access_token_from_request(request, token_not_found_http_status=401):
-    """Extracts the access_token from the request.
-
-    Args:
-        request: The http request.
-        token_not_found_http_status(int): The HTTP status code to set in the
-            AuthError if the token isn't found. This is used in some of the
-            legacy APIs to change the status code to 403 from the default of
-            401 since some of the old clients depended on auth errors returning
-            403.
-    Returns:
-        str: The access_token
-    Raises:
-        AuthError: If there isn't an access_token in the request.
-    """
-
-    auth_headers = request.requestHeaders.getRawHeaders("Authorization")
-    query_params = request.args.get("access_token")
-    if auth_headers:
-        # Try the get the access_token from a "Authorization: Bearer"
-        # header
-        if query_params is not None:
-            raise AuthError(
-                token_not_found_http_status,
-                "Mixing Authorization headers and access_token query parameters.",
-                errcode=Codes.MISSING_TOKEN,
-            )
-        if len(auth_headers) > 1:
-            raise AuthError(
-                token_not_found_http_status,
-                "Too many Authorization headers.",
-                errcode=Codes.MISSING_TOKEN,
-            )
-        parts = auth_headers[0].split(" ")
-        if parts[0] == "Bearer" and len(parts) == 2:
-            return parts[1]
-        else:
-            raise AuthError(
-                token_not_found_http_status,
-                "Invalid Authorization header.",
-                errcode=Codes.MISSING_TOKEN,
-            )
-    else:
-        # Try to get the access_token from the query params.
-        if not query_params:
-            raise AuthError(
-                token_not_found_http_status,
-                "Missing access token.",
-                errcode=Codes.MISSING_TOKEN
-            )
-
-        return query_params[0]
+    def check_auth_blocking(self, *args, **kwargs):
+        return self._auth_blocking.check_auth_blocking(*args, **kwargs)

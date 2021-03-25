@@ -13,63 +13,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage._base import SQLBaseStore
-from synapse.storage.engines import PostgresEngine
-from twisted.internet import defer
-
-from ._slaved_id_tracker import SlavedIdTracker
-
 import logging
+from typing import Optional
+
+from synapse.storage.database import DatabasePool
+from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
+from synapse.storage.engines import PostgresEngine
+from synapse.storage.util.id_generators import MultiWriterIdGenerator
 
 logger = logging.getLogger(__name__)
 
 
-class BaseSlavedStore(SQLBaseStore):
-    def __init__(self, db_conn, hs):
-        super(BaseSlavedStore, self).__init__(hs)
+class BaseSlavedStore(CacheInvalidationWorkerStore):
+    def __init__(self, database: DatabasePool, db_conn, hs):
+        super().__init__(database, db_conn, hs)
         if isinstance(self.database_engine, PostgresEngine):
-            self._cache_id_gen = SlavedIdTracker(
-                db_conn, "cache_invalidation_stream", "stream_id",
-            )
+            self._cache_id_gen = MultiWriterIdGenerator(
+                db_conn,
+                database,
+                stream_name="caches",
+                instance_name=hs.get_instance_name(),
+                tables=[
+                    (
+                        "cache_invalidation_stream_by_instance",
+                        "instance_name",
+                        "stream_id",
+                    )
+                ],
+                sequence_name="cache_invalidation_stream_seq",
+                writers=[],
+            )  # type: Optional[MultiWriterIdGenerator]
         else:
             self._cache_id_gen = None
 
-        self.expire_cache_url = hs.config.worker_replication_url + "/expire_cache"
-        self.http_client = hs.get_simple_http_client()
-
-    def stream_positions(self):
-        pos = {}
-        if self._cache_id_gen:
-            pos["caches"] = self._cache_id_gen.get_current_token()
-        return pos
-
-    def process_replication(self, result):
-        stream = result.get("caches")
-        if stream:
-            for row in stream["rows"]:
-                (
-                    position, cache_func, keys, invalidation_ts,
-                ) = row
-
-                try:
-                    getattr(self, cache_func).invalidate(tuple(keys))
-                except AttributeError:
-                    logger.info("Got unexpected cache_func: %r", cache_func)
-            self._cache_id_gen.advance(int(stream["position"]))
-        return defer.succeed(None)
-
-    def _invalidate_cache_and_stream(self, txn, cache_func, keys):
-        txn.call_after(cache_func.invalidate, keys)
-        txn.call_after(self._send_invalidation_poke, cache_func, keys)
-
-    @defer.inlineCallbacks
-    def _send_invalidation_poke(self, cache_func, keys):
-        try:
-            yield self.http_client.post_json_get_json(self.expire_cache_url, {
-                "invalidate": [{
-                    "name": cache_func.__name__,
-                    "keys": list(keys),
-                }]
-            })
-        except:
-            logger.exception("Failed to poke on expire_cache")
+        self.hs = hs

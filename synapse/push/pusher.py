@@ -13,35 +13,69 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from httppusher import HttpPusher
-
 import logging
+from typing import TYPE_CHECKING, Callable, Dict, Optional
+
+from synapse.push import Pusher, PusherConfig
+from synapse.push.emailpusher import EmailPusher
+from synapse.push.httppusher import HttpPusher
+from synapse.push.mailer import Mailer
+
+if TYPE_CHECKING:
+    from synapse.app.homeserver import HomeServer
+
 logger = logging.getLogger(__name__)
 
-# We try importing this if we can (it will fail if we don't
-# have the optional email dependencies installed). We don't
-# yet have the config to know if we need the email pusher,
-# but importing this after daemonizing seems to fail
-# (even though a simple test of importing from a daemonized
-# process works fine)
-try:
-    from synapse.push.emailpusher import EmailPusher
-except:
-    pass
 
+class PusherFactory:
+    def __init__(self, hs: "HomeServer"):
+        self.hs = hs
+        self.config = hs.config
 
-def create_pusher(hs, pusherdict):
-    logger.info("trying to create_pusher for %r", pusherdict)
+        self.pusher_types = {
+            "http": HttpPusher
+        }  # type: Dict[str, Callable[[HomeServer, PusherConfig], Pusher]]
 
-    PUSHER_TYPES = {
-        "http": HttpPusher,
-    }
+        logger.info("email enable notifs: %r", hs.config.email_enable_notifs)
+        if hs.config.email_enable_notifs:
+            self.mailers = {}  # type: Dict[str, Mailer]
 
-    logger.info("email enable notifs: %r", hs.config.email_enable_notifs)
-    if hs.config.email_enable_notifs:
-        PUSHER_TYPES["email"] = EmailPusher
-        logger.info("defined email pusher type")
+            self._notif_template_html = hs.config.email_notif_template_html
+            self._notif_template_text = hs.config.email_notif_template_text
 
-    if pusherdict['kind'] in PUSHER_TYPES:
-        logger.info("found pusher")
-        return PUSHER_TYPES[pusherdict['kind']](hs, pusherdict)
+            self.pusher_types["email"] = self._create_email_pusher
+
+            logger.info("defined email pusher type")
+
+    def create_pusher(self, pusher_config: PusherConfig) -> Optional[Pusher]:
+        kind = pusher_config.kind
+        f = self.pusher_types.get(kind, None)
+        if not f:
+            return None
+        logger.debug("creating %s pusher for %r", kind, pusher_config)
+        return f(self.hs, pusher_config)
+
+    def _create_email_pusher(
+        self, _hs: "HomeServer", pusher_config: PusherConfig
+    ) -> EmailPusher:
+        app_name = self._app_name_from_pusherdict(pusher_config)
+        mailer = self.mailers.get(app_name)
+        if not mailer:
+            mailer = Mailer(
+                hs=self.hs,
+                app_name=app_name,
+                template_html=self._notif_template_html,
+                template_text=self._notif_template_text,
+            )
+            self.mailers[app_name] = mailer
+        return EmailPusher(self.hs, pusher_config, mailer)
+
+    def _app_name_from_pusherdict(self, pusher_config: PusherConfig) -> str:
+        data = pusher_config.data
+
+        if isinstance(data, dict):
+            brand = data.get("brand")
+            if isinstance(brand, str):
+                return brand
+
+        return self.config.email_app_name

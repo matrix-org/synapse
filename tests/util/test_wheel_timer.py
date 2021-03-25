@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .. import unittest
-
 from synapse.util.wheel_timer import WheelTimer
+
+from .. import unittest
 
 
 class WheelTimerTestCase(unittest.TestCase):
@@ -33,7 +33,7 @@ class WheelTimerTestCase(unittest.TestCase):
         self.assertListEqual(wheel.fetch(156), [obj])
         self.assertListEqual(wheel.fetch(170), [])
 
-    def test_mutli_insert(self):
+    def test_multi_insert(self):
         wheel = WheelTimer(bucket_size=5)
 
         obj1 = object()
@@ -58,7 +58,7 @@ class WheelTimerTestCase(unittest.TestCase):
         wheel.insert(100, obj, 50)
         self.assertListEqual(wheel.fetch(120), [obj])
 
-    def test_insert_past_mutli(self):
+    def test_insert_past_multi(self):
         wheel = WheelTimer(bucket_size=5)
 
         obj1 = object()

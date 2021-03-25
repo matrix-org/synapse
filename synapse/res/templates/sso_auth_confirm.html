@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Confirm it's you</title>
+        <meta name="viewport" content="width=device-width, user-scalable=no">
+        <style type="text/css">
+            {% include "sso.css" without context %}
+        </style>
+    </head>
+    <body>
+        <header>
+            <h1>Confirm it's you to continue</h1>
+            <p>
+                A client is trying to {{ description }}. To confirm this action
+                re-authorize your account with single sign-on.
+            </p>
+            <p><strong>
+                If you did not expect this, your account may be compromised.
+            </strong></p>
+        </header>
+        <main>
+            <a href="{{ redirect_url }}" class="primary-button">
+                Continue with {{ idp.idp_name }}
+            </a>
+        </main>
+        {% include "sso_footer.html" without context %}
+    </body>
+</html>

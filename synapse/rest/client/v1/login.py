@@ -13,414 +13,467 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
-from synapse.api.errors import SynapseError, LoginError, Codes
-from synapse.types import UserID
-from synapse.http.server import finish_request
-from synapse.http.servlet import parse_json_object_from_request
-
-from .base import ClientV1RestServlet, client_path_patterns
-
-import simplejson as json
-import urllib
-import urlparse
-
 import logging
-from saml2 import BINDING_HTTP_POST
-from saml2 import config
-from saml2.client import Saml2Client
+import re
+from typing import TYPE_CHECKING, Awaitable, Callable, Dict, Optional
 
-import xml.etree.ElementTree as ET
+from synapse.api.errors import Codes, LoginError, SynapseError
+from synapse.api.ratelimiting import Ratelimiter
+from synapse.api.urls import CLIENT_API_PREFIX
+from synapse.appservice import ApplicationService
+from synapse.handlers.sso import SsoIdentityProvider
+from synapse.http import get_request_uri
+from synapse.http.server import HttpServer, finish_request
+from synapse.http.servlet import (
+    RestServlet,
+    parse_json_object_from_request,
+    parse_string,
+)
+from synapse.http.site import SynapseRequest
+from synapse.rest.client.v2_alpha._base import client_patterns
+from synapse.rest.well_known import WellKnownBuilder
+from synapse.types import JsonDict, UserID
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
-class LoginRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/login$")
-    PASS_TYPE = "m.login.password"
-    SAML2_TYPE = "m.login.saml2"
+class LoginRestServlet(RestServlet):
+    PATTERNS = client_patterns("/login$", v1=True)
     CAS_TYPE = "m.login.cas"
+    SSO_TYPE = "m.login.sso"
     TOKEN_TYPE = "m.login.token"
-    JWT_TYPE = "m.login.jwt"
+    JWT_TYPE = "org.matrix.login.jwt"
+    JWT_TYPE_DEPRECATED = "m.login.jwt"
+    APPSERVICE_TYPE = "uk.half-shot.msc2778.login.application_service"
 
-    def __init__(self, hs):
-        super(LoginRestServlet, self).__init__(hs)
-        self.idp_redirect_url = hs.config.saml2_idp_redirect_url
-        self.password_enabled = hs.config.password_enabled
-        self.saml2_enabled = hs.config.saml2_enabled
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self.hs = hs
+
+        # JWT configuration variables.
         self.jwt_enabled = hs.config.jwt_enabled
         self.jwt_secret = hs.config.jwt_secret
         self.jwt_algorithm = hs.config.jwt_algorithm
-        self.cas_enabled = hs.config.cas_enabled
-        self.auth_handler = self.hs.get_auth_handler()
-        self.device_handler = self.hs.get_device_handler()
-        self.handlers = hs.get_handlers()
+        self.jwt_issuer = hs.config.jwt_issuer
+        self.jwt_audiences = hs.config.jwt_audiences
 
-    def on_GET(self, request):
+        # SSO configuration.
+        self.saml2_enabled = hs.config.saml2_enabled
+        self.cas_enabled = hs.config.cas_enabled
+        self.oidc_enabled = hs.config.oidc_enabled
+        self._msc2858_enabled = hs.config.experimental.msc2858_enabled
+
+        self.auth = hs.get_auth()
+
+        self.auth_handler = self.hs.get_auth_handler()
+        self.registration_handler = hs.get_registration_handler()
+        self._sso_handler = hs.get_sso_handler()
+
+        self._well_known_builder = WellKnownBuilder(hs)
+        self._address_ratelimiter = Ratelimiter(
+            clock=hs.get_clock(),
+            rate_hz=self.hs.config.rc_login_address.per_second,
+            burst_count=self.hs.config.rc_login_address.burst_count,
+        )
+        self._account_ratelimiter = Ratelimiter(
+            clock=hs.get_clock(),
+            rate_hz=self.hs.config.rc_login_account.per_second,
+            burst_count=self.hs.config.rc_login_account.burst_count,
+        )
+
+    def on_GET(self, request: SynapseRequest):
         flows = []
         if self.jwt_enabled:
             flows.append({"type": LoginRestServlet.JWT_TYPE})
-        if self.saml2_enabled:
-            flows.append({"type": LoginRestServlet.SAML2_TYPE})
+            flows.append({"type": LoginRestServlet.JWT_TYPE_DEPRECATED})
+
         if self.cas_enabled:
+            # we advertise CAS for backwards compat, though MSC1721 renamed it
+            # to SSO.
             flows.append({"type": LoginRestServlet.CAS_TYPE})
 
-            # While its valid for us to advertise this login type generally,
+        if self.cas_enabled or self.saml2_enabled or self.oidc_enabled:
+            sso_flow = {
+                "type": LoginRestServlet.SSO_TYPE,
+                "identity_providers": [
+                    _get_auth_flow_dict_for_idp(
+                        idp,
+                    )
+                    for idp in self._sso_handler.get_identity_providers().values()
+                ],
+            }  # type: JsonDict
+
+            if self._msc2858_enabled:
+                # backwards-compatibility support for clients which don't
+                # support the stable API yet
+                sso_flow["org.matrix.msc2858.identity_providers"] = [
+                    _get_auth_flow_dict_for_idp(idp, use_unstable_brands=True)
+                    for idp in self._sso_handler.get_identity_providers().values()
+                ]
+
+            flows.append(sso_flow)
+
+            # While it's valid for us to advertise this login type generally,
             # synapse currently only gives out these tokens as part of the
-            # CAS login flow.
+            # SSO login flow.
             # Generally we don't want to advertise login flows that clients
             # don't know how to implement, since they (currently) will always
             # fall back to the fallback API if they don't understand one of the
             # login flow types returned.
             flows.append({"type": LoginRestServlet.TOKEN_TYPE})
-        if self.password_enabled:
-            flows.append({"type": LoginRestServlet.PASS_TYPE})
 
-        return (200, {"flows": flows})
+        flows.extend(
+            ({"type": t} for t in self.auth_handler.get_supported_login_types())
+        )
 
-    def on_OPTIONS(self, request):
-        return (200, {})
+        flows.append({"type": LoginRestServlet.APPSERVICE_TYPE})
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
+        return 200, {"flows": flows}
+
+    async def on_POST(self, request: SynapseRequest):
         login_submission = parse_json_object_from_request(request)
-        try:
-            if login_submission["type"] == LoginRestServlet.PASS_TYPE:
-                if not self.password_enabled:
-                    raise SynapseError(400, "Password login has been disabled.")
 
-                result = yield self.do_password_login(login_submission)
-                defer.returnValue(result)
-            elif self.saml2_enabled and (login_submission["type"] ==
-                                         LoginRestServlet.SAML2_TYPE):
-                relay_state = ""
-                if "relay_state" in login_submission:
-                    relay_state = "&RelayState=" + urllib.quote(
-                                  login_submission["relay_state"])
-                result = {
-                    "uri": "%s%s" % (self.idp_redirect_url, relay_state)
-                }
-                defer.returnValue((200, result))
-            elif self.jwt_enabled and (login_submission["type"] ==
-                                       LoginRestServlet.JWT_TYPE):
-                result = yield self.do_jwt_login(login_submission)
-                defer.returnValue(result)
+        try:
+            if login_submission["type"] == LoginRestServlet.APPSERVICE_TYPE:
+                appservice = self.auth.get_appservice_by_req(request)
+
+                if appservice.is_rate_limited():
+                    self._address_ratelimiter.ratelimit(request.getClientIP())
+
+                result = await self._do_appservice_login(login_submission, appservice)
+            elif self.jwt_enabled and (
+                login_submission["type"] == LoginRestServlet.JWT_TYPE
+                or login_submission["type"] == LoginRestServlet.JWT_TYPE_DEPRECATED
+            ):
+                self._address_ratelimiter.ratelimit(request.getClientIP())
+                result = await self._do_jwt_login(login_submission)
             elif login_submission["type"] == LoginRestServlet.TOKEN_TYPE:
-                result = yield self.do_token_login(login_submission)
-                defer.returnValue(result)
+                self._address_ratelimiter.ratelimit(request.getClientIP())
+                result = await self._do_token_login(login_submission)
             else:
-                raise SynapseError(400, "Bad login type.")
+                self._address_ratelimiter.ratelimit(request.getClientIP())
+                result = await self._do_other_login(login_submission)
         except KeyError:
             raise SynapseError(400, "Missing JSON keys.")
 
-    @defer.inlineCallbacks
-    def do_password_login(self, login_submission):
-        if 'medium' in login_submission and 'address' in login_submission:
-            address = login_submission['address']
-            if login_submission['medium'] == 'email':
-                # For emails, transform the address to lowercase.
-                # We store all email addreses as lowercase in the DB.
-                # (See add_threepid in synapse/handlers/auth.py)
-                address = address.lower()
-            user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
-                login_submission['medium'], address
+        well_known_data = self._well_known_builder.get_well_known()
+        if well_known_data:
+            result["well_known"] = well_known_data
+        return 200, result
+
+    async def _do_appservice_login(
+        self, login_submission: JsonDict, appservice: ApplicationService
+    ):
+        identifier = login_submission.get("identifier")
+        logger.info("Got appservice login request with identifier: %r", identifier)
+
+        if not isinstance(identifier, dict):
+            raise SynapseError(
+                400, "Invalid identifier in login submission", Codes.INVALID_PARAM
             )
-            if not user_id:
-                raise LoginError(403, "", errcode=Codes.FORBIDDEN)
+
+        # this login flow only supports identifiers of type "m.id.user".
+        if identifier.get("type") != "m.id.user":
+            raise SynapseError(
+                400, "Unknown login identifier type", Codes.INVALID_PARAM
+            )
+
+        user = identifier.get("user")
+        if not isinstance(user, str):
+            raise SynapseError(400, "Invalid user in identifier", Codes.INVALID_PARAM)
+
+        if user.startswith("@"):
+            qualified_user_id = user
         else:
-            user_id = login_submission['user']
+            qualified_user_id = UserID(user, self.hs.hostname).to_string()
 
-        if not user_id.startswith('@'):
-            user_id = UserID.create(
-                user_id, self.hs.hostname
-            ).to_string()
+        if not appservice.is_interested_in_user(qualified_user_id):
+            raise LoginError(403, "Invalid access_token", errcode=Codes.FORBIDDEN)
 
-        auth_handler = self.auth_handler
-        user_id = yield auth_handler.validate_password_login(
-            user_id=user_id,
-            password=login_submission["password"],
+        return await self._complete_login(
+            qualified_user_id, login_submission, ratelimit=appservice.is_rate_limited()
         )
-        device_id = yield self._register_device(user_id, login_submission)
-        access_token = yield auth_handler.get_access_token_for_user_id(
-            user_id, device_id,
-            login_submission.get("initial_device_display_name"),
+
+    async def _do_other_login(self, login_submission: JsonDict) -> Dict[str, str]:
+        """Handle non-token/saml/jwt logins
+
+        Args:
+            login_submission:
+
+        Returns:
+            HTTP response
+        """
+        # Log the request we got, but only certain fields to minimise the chance of
+        # logging someone's password (even if they accidentally put it in the wrong
+        # field)
+        logger.info(
+            "Got login request with identifier: %r, medium: %r, address: %r, user: %r",
+            login_submission.get("identifier"),
+            login_submission.get("medium"),
+            login_submission.get("address"),
+            login_submission.get("user"),
         )
+        canonical_user_id, callback = await self.auth_handler.validate_login(
+            login_submission, ratelimit=True
+        )
+        result = await self._complete_login(
+            canonical_user_id, login_submission, callback
+        )
+        return result
+
+    async def _complete_login(
+        self,
+        user_id: str,
+        login_submission: JsonDict,
+        callback: Optional[Callable[[Dict[str, str]], Awaitable[None]]] = None,
+        create_non_existent_users: bool = False,
+        ratelimit: bool = True,
+        auth_provider_id: Optional[str] = None,
+    ) -> Dict[str, str]:
+        """Called when we've successfully authed the user and now need to
+        actually login them in (e.g. create devices). This gets called on
+        all successful logins.
+
+        Applies the ratelimiting for successful login attempts against an
+        account.
+
+        Args:
+            user_id: ID of the user to register.
+            login_submission: Dictionary of login information.
+            callback: Callback function to run after login.
+            create_non_existent_users: Whether to create the user if they don't
+                exist. Defaults to False.
+            ratelimit: Whether to ratelimit the login request.
+            auth_provider_id: The SSO IdP the user used, if any (just used for the
+                prometheus metrics).
+
+        Returns:
+            result: Dictionary of account information after successful login.
+        """
+
+        # Before we actually log them in we check if they've already logged in
+        # too often. This happens here rather than before as we don't
+        # necessarily know the user before now.
+        if ratelimit:
+            self._account_ratelimiter.ratelimit(user_id.lower())
+
+        if create_non_existent_users:
+            canonical_uid = await self.auth_handler.check_user_exists(user_id)
+            if not canonical_uid:
+                canonical_uid = await self.registration_handler.register_user(
+                    localpart=UserID.from_string(user_id).localpart
+                )
+            user_id = canonical_uid
+
+        device_id = login_submission.get("device_id")
+        initial_display_name = login_submission.get("initial_device_display_name")
+        device_id, access_token = await self.registration_handler.register_device(
+            user_id, device_id, initial_display_name, auth_provider_id=auth_provider_id
+        )
+
         result = {
-            "user_id": user_id,  # may have changed
+            "user_id": user_id,
             "access_token": access_token,
             "home_server": self.hs.hostname,
             "device_id": device_id,
         }
 
-        defer.returnValue((200, result))
+        if callback is not None:
+            await callback(result)
 
-    @defer.inlineCallbacks
-    def do_token_login(self, login_submission):
-        token = login_submission['token']
+        return result
+
+    async def _do_token_login(self, login_submission: JsonDict) -> Dict[str, str]:
+        """
+        Handle the final stage of SSO login.
+
+        Args:
+             login_submission: The JSON request body.
+
+        Returns:
+            The body of the JSON response.
+        """
+        token = login_submission["token"]
         auth_handler = self.auth_handler
-        user_id = (
-            yield auth_handler.validate_short_term_login_token_and_get_user_id(token)
-        )
-        device_id = yield self._register_device(user_id, login_submission)
-        access_token = yield auth_handler.get_access_token_for_user_id(
-            user_id, device_id,
-            login_submission.get("initial_device_display_name"),
-        )
-        result = {
-            "user_id": user_id,  # may have changed
-            "access_token": access_token,
-            "home_server": self.hs.hostname,
-            "device_id": device_id,
-        }
+        res = await auth_handler.validate_short_term_login_token(token)
 
-        defer.returnValue((200, result))
+        return await self._complete_login(
+            res.user_id,
+            login_submission,
+            self.auth_handler._sso_login_callback,
+            auth_provider_id=res.auth_provider_id,
+        )
 
-    @defer.inlineCallbacks
-    def do_jwt_login(self, login_submission):
+    async def _do_jwt_login(self, login_submission: JsonDict) -> Dict[str, str]:
         token = login_submission.get("token", None)
         if token is None:
             raise LoginError(
-                401, "Token field for JWT is missing",
-                errcode=Codes.UNAUTHORIZED
+                403, "Token field for JWT is missing", errcode=Codes.FORBIDDEN
             )
 
         import jwt
-        from jwt.exceptions import InvalidTokenError
 
         try:
-            payload = jwt.decode(token, self.jwt_secret, algorithms=[self.jwt_algorithm])
-        except jwt.ExpiredSignatureError:
-            raise LoginError(401, "JWT expired", errcode=Codes.UNAUTHORIZED)
-        except InvalidTokenError:
-            raise LoginError(401, "Invalid JWT", errcode=Codes.UNAUTHORIZED)
+            payload = jwt.decode(
+                token,
+                self.jwt_secret,
+                algorithms=[self.jwt_algorithm],
+                issuer=self.jwt_issuer,
+                audience=self.jwt_audiences,
+            )
+        except jwt.PyJWTError as e:
+            # A JWT error occurred, return some info back to the client.
+            raise LoginError(
+                403,
+                "JWT validation failed: %s" % (str(e),),
+                errcode=Codes.FORBIDDEN,
+            )
 
         user = payload.get("sub", None)
         if user is None:
-            raise LoginError(401, "Invalid JWT", errcode=Codes.UNAUTHORIZED)
+            raise LoginError(403, "Invalid JWT", errcode=Codes.FORBIDDEN)
 
-        user_id = UserID.create(user, self.hs.hostname).to_string()
-        auth_handler = self.auth_handler
-        registered_user_id = yield auth_handler.check_user_exists(user_id)
-        if registered_user_id:
-            device_id = yield self._register_device(
-                registered_user_id, login_submission
-            )
-            access_token = yield auth_handler.get_access_token_for_user_id(
-                registered_user_id, device_id,
-                login_submission.get("initial_device_display_name"),
-            )
-
-            result = {
-                "user_id": registered_user_id,
-                "access_token": access_token,
-                "home_server": self.hs.hostname,
-            }
-        else:
-            # TODO: we should probably check that the register isn't going
-            # to fonx/change our user_id before registering the device
-            device_id = yield self._register_device(user_id, login_submission)
-            user_id, access_token = (
-                yield self.handlers.registration_handler.register(localpart=user)
-            )
-            result = {
-                "user_id": user_id,  # may have changed
-                "access_token": access_token,
-                "home_server": self.hs.hostname,
-            }
-
-        defer.returnValue((200, result))
-
-    def _register_device(self, user_id, login_submission):
-        """Register a device for a user.
-
-        This is called after the user's credentials have been validated, but
-        before the access token has been issued.
-
-        Args:
-            (str) user_id: full canonical @user:id
-            (object) login_submission: dictionary supplied to /login call, from
-               which we pull device_id and initial_device_name
-        Returns:
-            defer.Deferred: (str) device_id
-        """
-        device_id = login_submission.get("device_id")
-        initial_display_name = login_submission.get(
-            "initial_device_display_name")
-        return self.device_handler.check_device_registered(
-            user_id, device_id, initial_display_name
+        user_id = UserID(user, self.hs.hostname).to_string()
+        result = await self._complete_login(
+            user_id, login_submission, create_non_existent_users=True
         )
+        return result
 
 
-class SAML2RestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/login/saml2", releases=())
+def _get_auth_flow_dict_for_idp(
+    idp: SsoIdentityProvider, use_unstable_brands: bool = False
+) -> JsonDict:
+    """Return an entry for the login flow dict
 
-    def __init__(self, hs):
-        super(SAML2RestServlet, self).__init__(hs)
-        self.sp_config = hs.config.saml2_config_path
-        self.handlers = hs.get_handlers()
+    Returns an entry suitable for inclusion in "identity_providers" in the
+    response to GET /_matrix/client/r0/login
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        saml2_auth = None
-        try:
-            conf = config.SPConfig()
-            conf.load_file(self.sp_config)
-            SP = Saml2Client(conf)
-            saml2_auth = SP.parse_authn_request_response(
-                request.args['SAMLResponse'][0], BINDING_HTTP_POST)
-        except Exception as e:        # Not authenticated
-            logger.exception(e)
-        if saml2_auth and saml2_auth.status_ok() and not saml2_auth.not_signed:
-            username = saml2_auth.name_id.text
-            handler = self.handlers.registration_handler
-            (user_id, token) = yield handler.register_saml2(username)
-            # Forward to the RelayState callback along with ava
-            if 'RelayState' in request.args:
-                request.redirect(urllib.unquote(
-                                 request.args['RelayState'][0]) +
-                                 '?status=authenticated&access_token=' +
-                                 token + '&user_id=' + user_id + '&ava=' +
-                                 urllib.quote(json.dumps(saml2_auth.ava)))
-                finish_request(request)
-                defer.returnValue(None)
-            defer.returnValue((200, {"status": "authenticated",
-                                     "user_id": user_id, "token": token,
-                                     "ava": saml2_auth.ava}))
-        elif 'RelayState' in request.args:
-            request.redirect(urllib.unquote(
-                             request.args['RelayState'][0]) +
-                             '?status=not_authenticated')
+    Args:
+        idp: the identity provider to describe
+        use_unstable_brands: whether we should use brand identifiers suitable
+           for the unstable API
+    """
+    e = {"id": idp.idp_id, "name": idp.idp_name}  # type: JsonDict
+    if idp.idp_icon:
+        e["icon"] = idp.idp_icon
+    if idp.idp_brand:
+        e["brand"] = idp.idp_brand
+    # use the stable brand identifier if the unstable identifier isn't defined.
+    if use_unstable_brands and idp.unstable_idp_brand:
+        e["brand"] = idp.unstable_idp_brand
+    return e
+
+
+class SsoRedirectServlet(RestServlet):
+    PATTERNS = list(client_patterns("/login/(cas|sso)/redirect$", v1=True)) + [
+        re.compile(
+            "^"
+            + CLIENT_API_PREFIX
+            + "/r0/login/sso/redirect/(?P<idp_id>[A-Za-z0-9_.~-]+)$"
+        )
+    ]
+
+    def __init__(self, hs: "HomeServer"):
+        # make sure that the relevant handlers are instantiated, so that they
+        # register themselves with the main SSOHandler.
+        if hs.config.cas_enabled:
+            hs.get_cas_handler()
+        if hs.config.saml2_enabled:
+            hs.get_saml_handler()
+        if hs.config.oidc_enabled:
+            hs.get_oidc_handler()
+        self._sso_handler = hs.get_sso_handler()
+        self._msc2858_enabled = hs.config.experimental.msc2858_enabled
+        self._public_baseurl = hs.config.public_baseurl
+
+    def register(self, http_server: HttpServer) -> None:
+        super().register(http_server)
+        if self._msc2858_enabled:
+            # expose additional endpoint for MSC2858 support: backwards-compat support
+            # for clients which don't yet support the stable endpoints.
+            http_server.register_paths(
+                "GET",
+                client_patterns(
+                    "/org.matrix.msc2858/login/sso/redirect/(?P<idp_id>[A-Za-z0-9_.~-]+)$",
+                    releases=(),
+                    unstable=True,
+                ),
+                self.on_GET,
+                self.__class__.__name__,
+            )
+
+    async def on_GET(
+        self, request: SynapseRequest, idp_id: Optional[str] = None
+    ) -> None:
+        if not self._public_baseurl:
+            raise SynapseError(400, "SSO requires a valid public_baseurl")
+
+        # if this isn't the expected hostname, redirect to the right one, so that we
+        # get our cookies back.
+        requested_uri = get_request_uri(request)
+        baseurl_bytes = self._public_baseurl.encode("utf-8")
+        if not requested_uri.startswith(baseurl_bytes):
+            # swap out the incorrect base URL for the right one.
+            #
+            # The idea here is to redirect from
+            #    https://foo.bar/whatever/_matrix/...
+            # to
+            #    https://public.baseurl/_matrix/...
+            #
+            i = requested_uri.index(b"/_matrix")
+            new_uri = baseurl_bytes[:-1] + requested_uri[i:]
+            logger.info(
+                "Requested URI %s is not canonical: redirecting to %s",
+                requested_uri.decode("utf-8", errors="replace"),
+                new_uri.decode("utf-8", errors="replace"),
+            )
+            request.redirect(new_uri)
             finish_request(request)
-            defer.returnValue(None)
-        defer.returnValue((200, {"status": "not_authenticated"}))
+            return
 
-
-class CasRedirectServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/login/cas/redirect", releases=())
-
-    def __init__(self, hs):
-        super(CasRedirectServlet, self).__init__(hs)
-        self.cas_server_url = hs.config.cas_server_url
-        self.cas_service_url = hs.config.cas_service_url
-
-    def on_GET(self, request):
-        args = request.args
-        if "redirectUrl" not in args:
-            return (400, "Redirect URL not specified for CAS auth")
-        client_redirect_url_param = urllib.urlencode({
-            "redirectUrl": args["redirectUrl"][0]
-        })
-        hs_redirect_url = self.cas_service_url + "/_matrix/client/api/v1/login/cas/ticket"
-        service_param = urllib.urlencode({
-            "service": "%s?%s" % (hs_redirect_url, client_redirect_url_param)
-        })
-        request.redirect("%s/login?%s" % (self.cas_server_url, service_param))
-        finish_request(request)
-
-
-class CasTicketServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/login/cas/ticket", releases=())
-
-    def __init__(self, hs):
-        super(CasTicketServlet, self).__init__(hs)
-        self.cas_server_url = hs.config.cas_server_url
-        self.cas_service_url = hs.config.cas_service_url
-        self.cas_required_attributes = hs.config.cas_required_attributes
-        self.auth_handler = hs.get_auth_handler()
-        self.handlers = hs.get_handlers()
-        self.macaroon_gen = hs.get_macaroon_generator()
-
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        client_redirect_url = request.args["redirectUrl"][0]
-        http_client = self.hs.get_simple_http_client()
-        uri = self.cas_server_url + "/proxyValidate"
-        args = {
-            "ticket": request.args["ticket"],
-            "service": self.cas_service_url
-        }
-        body = yield http_client.get_raw(uri, args)
-        result = yield self.handle_cas_response(request, body, client_redirect_url)
-        defer.returnValue(result)
-
-    @defer.inlineCallbacks
-    def handle_cas_response(self, request, cas_response_body, client_redirect_url):
-        user, attributes = self.parse_cas_response(cas_response_body)
-
-        for required_attribute, required_value in self.cas_required_attributes.items():
-            # If required attribute was not in CAS Response - Forbidden
-            if required_attribute not in attributes:
-                raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
-
-            # Also need to check value
-            if required_value is not None:
-                actual_value = attributes[required_attribute]
-                # If required attribute value does not match expected - Forbidden
-                if required_value != actual_value:
-                    raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
-
-        user_id = UserID.create(user, self.hs.hostname).to_string()
-        auth_handler = self.auth_handler
-        registered_user_id = yield auth_handler.check_user_exists(user_id)
-        if not registered_user_id:
-            registered_user_id, _ = (
-                yield self.handlers.registration_handler.register(localpart=user)
-            )
-
-        login_token = self.macaroon_gen.generate_short_term_login_token(
-            registered_user_id
+        client_redirect_url = parse_string(
+            request, "redirectUrl", required=True, encoding=None
         )
-        redirect_url = self.add_login_token_to_redirect_url(client_redirect_url,
-                                                            login_token)
-        request.redirect(redirect_url)
+        sso_url = await self._sso_handler.handle_redirect_request(
+            request,
+            client_redirect_url,
+            idp_id,
+        )
+        logger.info("Redirecting to %s", sso_url)
+        request.redirect(sso_url)
         finish_request(request)
 
-    def add_login_token_to_redirect_url(self, url, token):
-        url_parts = list(urlparse.urlparse(url))
-        query = dict(urlparse.parse_qsl(url_parts[4]))
-        query.update({"loginToken": token})
-        url_parts[4] = urllib.urlencode(query)
-        return urlparse.urlunparse(url_parts)
 
-    def parse_cas_response(self, cas_response_body):
-        user = None
-        attributes = {}
-        try:
-            root = ET.fromstring(cas_response_body)
-            if not root.tag.endswith("serviceResponse"):
-                raise Exception("root of CAS response is not serviceResponse")
-            success = (root[0].tag.endswith("authenticationSuccess"))
-            for child in root[0]:
-                if child.tag.endswith("user"):
-                    user = child.text
-                if child.tag.endswith("attributes"):
-                    for attribute in child:
-                        # ElementTree library expands the namespace in
-                        # attribute tags to the full URL of the namespace.
-                        # We don't care about namespace here and it will always
-                        # be encased in curly braces, so we remove them.
-                        tag = attribute.tag
-                        if "}" in tag:
-                            tag = tag.split("}")[1]
-                        attributes[tag] = attribute.text
-            if user is None:
-                raise Exception("CAS response does not contain user")
-        except Exception:
-            logger.error("Error parsing CAS response", exc_info=1)
-            raise LoginError(401, "Invalid CAS response",
-                             errcode=Codes.UNAUTHORIZED)
-        if not success:
-            raise LoginError(401, "Unsuccessful CAS response",
-                             errcode=Codes.UNAUTHORIZED)
-        return user, attributes
+class CasTicketServlet(RestServlet):
+    PATTERNS = client_patterns("/login/cas/ticket", v1=True)
+
+    def __init__(self, hs):
+        super().__init__()
+        self._cas_handler = hs.get_cas_handler()
+
+    async def on_GET(self, request: SynapseRequest) -> None:
+        client_redirect_url = parse_string(request, "redirectUrl")
+        ticket = parse_string(request, "ticket", required=True)
+
+        # Maybe get a session ID (if this ticket is from user interactive
+        # authentication).
+        session = parse_string(request, "session")
+
+        # Either client_redirect_url or session must be provided.
+        if not client_redirect_url and not session:
+            message = "Missing string query parameter redirectUrl or session"
+            raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
+
+        await self._cas_handler.handle_ticket(
+            request, ticket, client_redirect_url, session
+        )
 
 
 def register_servlets(hs, http_server):
     LoginRestServlet(hs).register(http_server)
-    if hs.config.saml2_enabled:
-        SAML2RestServlet(hs).register(http_server)
+    SsoRedirectServlet(hs).register(http_server)
     if hs.config.cas_enabled:
-        CasRedirectServlet(hs).register(http_server)
         CasTicketServlet(hs).register(http_server)

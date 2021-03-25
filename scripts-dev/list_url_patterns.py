@@ -1,18 +1,17 @@
 #! /usr/bin/python
 
-import ast
 import argparse
+import ast
 import os
 import sys
+
 import yaml
 
 PATTERNS_V1 = []
 PATTERNS_V2 = []
 
-RESULT = {
-    "v1": PATTERNS_V1,
-    "v2": PATTERNS_V2,
-}
+RESULT = {"v1": PATTERNS_V1, "v2": PATTERNS_V2}
+
 
 class CallVisitor(ast.NodeVisitor):
     def visit_Call(self, node):
@@ -21,10 +20,7 @@ class CallVisitor(ast.NodeVisitor):
         else:
             return
 
-
-        if name == "client_path_patterns":
-            PATTERNS_V1.append(node.args[0].s)
-        elif name == "client_v2_patterns":
+        if name == "client_patterns":
             PATTERNS_V2.append(node.args[0].s)
 
 
@@ -39,11 +35,13 @@ def find_patterns_in_file(filepath):
         find_patterns_in_code(f.read())
 
 
-parser = argparse.ArgumentParser(description='Find url patterns.')
+parser = argparse.ArgumentParser(description="Find url patterns.")
 
 parser.add_argument(
-    "directories", nargs='+', metavar="DIR",
-    help="Directories to search for definitions"
+    "directories",
+    nargs="+",
+    metavar="DIR",
+    help="Directories to search for definitions",
 )
 
 args = parser.parse_args()

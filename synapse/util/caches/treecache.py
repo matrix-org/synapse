@@ -1,15 +1,18 @@
+from typing import Dict
+
 SENTINEL = object()
 
 
-class TreeCache(object):
+class TreeCache:
     """
     Tree-based backing store for LruCache. Allows subtrees of data to be deleted
     efficiently.
     Keys must be tuples.
     """
+
     def __init__(self):
         self.size = 0
-        self.root = {}
+        self.root = {}  # type: Dict
 
     def __setitem__(self, key, value):
         return self.set(key, value)
@@ -49,7 +52,7 @@ class TreeCache(object):
         if popped is SENTINEL:
             return default
 
-        node_and_keys = zip(nodes, key)
+        node_and_keys = list(zip(nodes, key))
         node_and_keys.reverse()
         node_and_keys.append((self.root, None))
 
@@ -76,7 +79,7 @@ def iterate_tree_cache_entry(d):
     can contain dicts.
     """
     if isinstance(d, dict):
-        for value_d in d.itervalues():
+        for value_d in d.values():
             for value in iterate_tree_cache_entry(value_d):
                 yield value
     else:
@@ -86,7 +89,7 @@ def iterate_tree_cache_entry(d):
             yield d
 
 
-class _Entry(object):
+class _Entry:
     __slots__ = ["value"]
 
     def __init__(self, value):

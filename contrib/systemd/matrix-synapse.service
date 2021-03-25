@@ -1,0 +1,39 @@
+# Example systemd configuration file for synapse. Copy into
+#    /etc/systemd/system/, update the paths if necessary, then:
+#
+#    systemctl enable matrix-synapse
+#    systemctl start matrix-synapse
+#
+# This assumes that Synapse has been installed by a user named
+# synapse.
+#
+# This assumes that Synapse has been installed in a virtualenv in
+# the user's home directory: `/home/synapse/synapse/env`.
+#
+# **NOTE:** This is an example service file that may change in the future. If you
+# wish to use this please copy rather than symlink it.
+
+[Unit]
+Description=Synapse Matrix homeserver
+# If you are using postgresql to persist data, uncomment this line to make sure
+# synapse starts after the postgresql service.
+# After=postgresql.service
+
+[Service]
+Type=notify
+NotifyAccess=main
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-abort
+
+User=synapse
+Group=nogroup
+
+WorkingDirectory=/home/synapse/synapse
+ExecStart=/home/synapse/synapse/env/bin/python -m synapse.app.homeserver --config-path=/home/synapse/synapse/homeserver.yaml
+SyslogIdentifier=matrix-synapse
+
+# adjust the cache factor if necessary
+# Environment=SYNAPSE_CACHE_FACTOR=2.0
+
+[Install]
+WantedBy=multi-user.target

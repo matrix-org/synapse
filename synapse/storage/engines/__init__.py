@@ -13,30 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import IncorrectDatabaseSetup
+from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
 from .postgres import PostgresEngine
-from .sqlite3 import Sqlite3Engine
-
-import importlib
+from .sqlite import Sqlite3Engine
 
 
-SUPPORTED_MODULE = {
-    "sqlite3": Sqlite3Engine,
-    "psycopg2": PostgresEngine,
-}
-
-
-def create_engine(database_config):
+def create_engine(database_config) -> BaseDatabaseEngine:
     name = database_config["name"]
-    engine_class = SUPPORTED_MODULE.get(name, None)
 
-    if engine_class:
-        module = importlib.import_module(name)
-        return engine_class(module, database_config)
+    if name == "sqlite3":
+        import sqlite3
 
-    raise RuntimeError(
-        "Unsupported database engine '%s'" % (name,)
-    )
+        return Sqlite3Engine(sqlite3, database_config)
+
+    if name == "psycopg2":
+        # Note that psycopg2cffi-compat provides the psycopg2 module on pypy.
+        import psycopg2  # type: ignore
+
+        return PostgresEngine(psycopg2, database_config)
+
+    raise RuntimeError("Unsupported database engine '%s'" % (name,))
 
 
-__all__ = ["create_engine", "IncorrectDatabaseSetup"]
+__all__ = ["create_engine", "BaseDatabaseEngine", "IncorrectDatabaseSetup"]

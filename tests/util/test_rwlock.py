@@ -13,14 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
+
+from synapse.util.async_helpers import ReadWriteLock
 
 from tests import unittest
 
-from synapse.util.async import ReadWriteLock
-
 
 class ReadWriteLockTestCase(unittest.TestCase):
-
     def _assert_called_before_not_after(self, lst, first_false):
         for i, d in enumerate(lst[:first_false]):
             self.assertTrue(d.called, msg="%d was unexpectedly false" % i)
@@ -36,14 +36,15 @@ class ReadWriteLockTestCase(unittest.TestCase):
         key = object()
 
         ds = [
-            rwlock.read(key),   # 0
-            rwlock.read(key),   # 1
+            rwlock.read(key),  # 0
+            rwlock.read(key),  # 1
             rwlock.write(key),  # 2
             rwlock.write(key),  # 3
-            rwlock.read(key),   # 4
-            rwlock.read(key),   # 5
+            rwlock.read(key),  # 4
+            rwlock.read(key),  # 5
             rwlock.write(key),  # 6
         ]
+        ds = [defer.ensureDeferred(d) for d in ds]
 
         self._assert_called_before_not_after(ds, 2)
 
@@ -74,12 +75,12 @@ class ReadWriteLockTestCase(unittest.TestCase):
         with ds[6].result:
             pass
 
-        d = rwlock.write(key)
+        d = defer.ensureDeferred(rwlock.write(key))
         self.assertTrue(d.called)
         with d.result:
             pass
 
-        d = rwlock.read(key)
+        d = defer.ensureDeferred(rwlock.read(key))
         self.assertTrue(d.called)
         with d.result:
             pass

@@ -14,8 +14,8 @@
 # limitations under the License.
 
 
-class JsonEncodedObject(object):
-    """ A common base class for defining protocol units that are represented
+class JsonEncodedObject:
+    """A common base class for defining protocol units that are represented
     as JSON.
 
     Attributes:
@@ -39,7 +39,7 @@ class JsonEncodedObject(object):
     """
 
     def __init__(self, **kwargs):
-        """ Takes the dict of `kwargs` and loads all keys that are *valid*
+        """Takes the dict of `kwargs` and loads all keys that are *valid*
         (i.e., are included in the `valid_keys` list) into the dictionary`
         instance variable.
 
@@ -61,7 +61,7 @@ class JsonEncodedObject(object):
                 self.unrecognized_keys[k] = v
 
     def get_dict(self):
-        """ Converts this protocol unit into a :py:class:`dict`, ready to be
+        """Converts this protocol unit into a :py:class:`dict`, ready to be
         encoded as JSON.
 
         The keys it encodes are: `valid_keys` - `internal_keys`
@@ -70,7 +70,8 @@ class JsonEncodedObject(object):
             dict
         """
         d = {
-            k: _encode(v) for (k, v) in self.__dict__.items()
+            k: _encode(v)
+            for (k, v) in self.__dict__.items()
             if k in self.valid_keys and k not in self.internal_keys
         }
         d.update(self.unrecognized_keys)
@@ -78,7 +79,8 @@ class JsonEncodedObject(object):
 
     def get_internal_dict(self):
         d = {
-            k: _encode(v, internal=True) for (k, v) in self.__dict__.items()
+            k: _encode(v, internal=True)
+            for (k, v) in self.__dict__.items()
             if k in self.valid_keys
         }
         d.update(self.unrecognized_keys)

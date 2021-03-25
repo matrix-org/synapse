@@ -1,0 +1,1 @@
+debian/manage_debconf.pl /opt/venvs/matrix-synapse/lib/

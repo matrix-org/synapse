@@ -1,8 +1,9 @@
-import requests
 import collections
+import json
 import sys
 import time
-import json
+
+import requests
 
 Entry = collections.namedtuple("Entry", "name position rows")
 
@@ -30,11 +31,11 @@ def parse_response(content):
 
 
 def replicate(server, streams):
-    return parse_response(requests.get(
-        server + "/_synapse/replication",
-        verify=False,
-        params=streams
-    ).content)
+    return parse_response(
+        requests.get(
+            server + "/_synapse/replication", verify=False, params=streams
+        ).content
+    )
 
 
 def main():
@@ -45,16 +46,16 @@ def main():
         try:
             streams = {
                 row.name: row.position
-                for row in replicate(server, {"streams":"-1"})["streams"].rows
+                for row in replicate(server, {"streams": "-1"})["streams"].rows
             }
-        except requests.exceptions.ConnectionError as e:
+        except requests.exceptions.ConnectionError:
             time.sleep(0.1)
 
     while True:
         try:
             results = replicate(server, streams)
-        except:
-            sys.stdout.write("connection_lost("+ repr(streams) + ")\n")
+        except Exception:
+            sys.stdout.write("connection_lost(" + repr(streams) + ")\n")
             break
         for update in results.values():
             for row in update.rows:
@@ -62,6 +63,5 @@ def main():
             streams[update.name] = update.position
 
 
-
-if __name__=='__main__':
+if __name__ == "__main__":
     main()

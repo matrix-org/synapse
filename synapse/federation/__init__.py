@@ -15,11 +15,3 @@
 
 """ This package includes all the federation specific logic.
 """
-
-from .replication import ReplicationLayer
-
-
-def initialize_http_replication(hs):
-    transport = hs.get_federation_transport_client()
-
-    return ReplicationLayer(hs, transport)

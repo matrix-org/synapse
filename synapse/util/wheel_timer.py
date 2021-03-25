@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-class _Entry(object):
+class _Entry:
     __slots__ = ["end_key", "queue"]
 
     def __init__(self, end_key):
@@ -22,7 +22,7 @@ class _Entry(object):
         self.queue = []
 
 
-class WheelTimer(object):
+class WheelTimer:
     """Stores arbitrary objects that will be returned after their timers have
     expired.
     """
@@ -67,9 +67,7 @@ class WheelTimer(object):
 
         # Add empty entries between the end of the current list and when we want
         # to insert. This ensures there are no gaps.
-        self.entries.extend(
-            _Entry(key) for key in xrange(last_key, then_key + 1)
-        )
+        self.entries.extend(_Entry(key) for key in range(last_key, then_key + 1))
 
         self.entries[-1].queue.append(obj)
 
@@ -91,7 +89,4 @@ class WheelTimer(object):
         return ret
 
     def __len__(self):
-        l = 0
-        for entry in self.entries:
-            l += len(entry.queue)
-        return l
+        return sum(len(entry.queue) for entry in self.entries)

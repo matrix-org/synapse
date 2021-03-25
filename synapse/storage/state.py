@@ -12,393 +12,465 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cached, cachedList
-from synapse.util.caches import intern_string
-from synapse.storage.engines import PostgresEngine
-
-from twisted.internet import defer
-
 import logging
+from typing import (
+    TYPE_CHECKING,
+    Awaitable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    TypeVar,
+)
+
+import attr
+
+from synapse.api.constants import EventTypes
+from synapse.events import EventBase
+from synapse.types import MutableStateMap, StateMap
+
+if TYPE_CHECKING:
+    from synapse.app.homeserver import HomeServer
+    from synapse.storage.databases import Databases
 
 logger = logging.getLogger(__name__)
 
+# Used for generic functions below
+T = TypeVar("T")
 
-MAX_STATE_DELTA_HOPS = 100
 
+@attr.s(slots=True)
+class StateFilter:
+    """A filter used when querying for state.
 
-class StateStore(SQLBaseStore):
-    """ Keeps track of the state at a given event.
-
-    This is done by the concept of `state groups`. Every event is a assigned
-    a state group (identified by an arbitrary string), which references a
-    collection of state events. The current state of an event is then the
-    collection of state events referenced by the event's state group.
-
-    Hence, every change in the current state causes a new state group to be
-    generated. However, if no change happens (e.g., if we get a message event
-    with only one parent it inherits the state group from its parent.)
-
-    There are three tables:
-      * `state_groups`: Stores group name, first event with in the group and
-        room id.
-      * `event_to_state_groups`: Maps events to state groups.
-      * `state_groups_state`: Maps state group to state events.
+    Attributes:
+        types: Map from type to set of state keys (or None). This specifies
+            which state_keys for the given type to fetch from the DB. If None
+            then all events with that type are fetched. If the set is empty
+            then no events with that type are fetched.
+        include_others: Whether to fetch events with types that do not
+            appear in `types`.
     """
 
-    STATE_GROUP_DEDUPLICATION_UPDATE_NAME = "state_group_state_deduplication"
-    STATE_GROUP_INDEX_UPDATE_NAME = "state_group_state_type_index"
-    CURRENT_STATE_INDEX_UPDATE_NAME = "current_state_members_idx"
+    types = attr.ib(type=Dict[str, Optional[Set[str]]])
+    include_others = attr.ib(default=False, type=bool)
 
-    def __init__(self, hs):
-        super(StateStore, self).__init__(hs)
-        self.register_background_update_handler(
-            self.STATE_GROUP_DEDUPLICATION_UPDATE_NAME,
-            self._background_deduplicate_state,
-        )
-        self.register_background_update_handler(
-            self.STATE_GROUP_INDEX_UPDATE_NAME,
-            self._background_index_state,
-        )
-        self.register_background_index_update(
-            self.CURRENT_STATE_INDEX_UPDATE_NAME,
-            index_name="current_state_events_member_index",
-            table="current_state_events",
-            columns=["state_key"],
-            where_clause="type='m.room.member'",
-        )
+    def __attrs_post_init__(self):
+        # If `include_others` is set we canonicalise the filter by removing
+        # wildcards from the types dictionary
+        if self.include_others:
+            self.types = {k: v for k, v in self.types.items() if v is not None}
 
-    @defer.inlineCallbacks
-    def get_state_groups_ids(self, room_id, event_ids):
-        if not event_ids:
-            defer.returnValue({})
-
-        event_to_groups = yield self._get_state_group_for_events(
-            event_ids,
-        )
-
-        groups = set(event_to_groups.values())
-        group_to_state = yield self._get_state_for_groups(groups)
-
-        defer.returnValue(group_to_state)
-
-    @defer.inlineCallbacks
-    def get_state_groups(self, room_id, event_ids):
-        """ Get the state groups for the given list of event_ids
-
-        The return value is a dict mapping group names to lists of events.
-        """
-        if not event_ids:
-            defer.returnValue({})
-
-        group_to_ids = yield self.get_state_groups_ids(room_id, event_ids)
-
-        state_event_map = yield self.get_events(
-            [
-                ev_id for group_ids in group_to_ids.values()
-                for ev_id in group_ids.values()
-            ],
-            get_prev_content=False
-        )
-
-        defer.returnValue({
-            group: [
-                state_event_map[v] for v in event_id_map.values() if v in state_event_map
-            ]
-            for group, event_id_map in group_to_ids.items()
-        })
-
-    def _have_persisted_state_group_txn(self, txn, state_group):
-        txn.execute(
-            "SELECT count(*) FROM state_groups WHERE id = ?",
-            (state_group,)
-        )
-        row = txn.fetchone()
-        return row and row[0]
-
-    def _store_mult_state_groups_txn(self, txn, events_and_contexts):
-        state_groups = {}
-        for event, context in events_and_contexts:
-            if event.internal_metadata.is_outlier():
-                continue
-
-            if context.current_state_ids is None:
-                continue
-
-            state_groups[event.event_id] = context.state_group
-
-            if self._have_persisted_state_group_txn(txn, context.state_group):
-                continue
-
-            self._simple_insert_txn(
-                txn,
-                table="state_groups",
-                values={
-                    "id": context.state_group,
-                    "room_id": event.room_id,
-                    "event_id": event.event_id,
-                },
-            )
-
-            # We persist as a delta if we can, while also ensuring the chain
-            # of deltas isn't tooo long, as otherwise read performance degrades.
-            if context.prev_group:
-                potential_hops = self._count_state_group_hops_txn(
-                    txn, context.prev_group
-                )
-            if context.prev_group and potential_hops < MAX_STATE_DELTA_HOPS:
-                self._simple_insert_txn(
-                    txn,
-                    table="state_group_edges",
-                    values={
-                        "state_group": context.state_group,
-                        "prev_state_group": context.prev_group,
-                    },
-                )
-
-                self._simple_insert_many_txn(
-                    txn,
-                    table="state_groups_state",
-                    values=[
-                        {
-                            "state_group": context.state_group,
-                            "room_id": event.room_id,
-                            "type": key[0],
-                            "state_key": key[1],
-                            "event_id": state_id,
-                        }
-                        for key, state_id in context.delta_ids.items()
-                    ],
-                )
-            else:
-                self._simple_insert_many_txn(
-                    txn,
-                    table="state_groups_state",
-                    values=[
-                        {
-                            "state_group": context.state_group,
-                            "room_id": event.room_id,
-                            "type": key[0],
-                            "state_key": key[1],
-                            "event_id": state_id,
-                        }
-                        for key, state_id in context.current_state_ids.items()
-                    ],
-                )
-
-        self._simple_insert_many_txn(
-            txn,
-            table="event_to_state_groups",
-            values=[
-                {
-                    "state_group": state_group_id,
-                    "event_id": event_id,
-                }
-                for event_id, state_group_id in state_groups.items()
-            ],
-        )
-
-    def _count_state_group_hops_txn(self, txn, state_group):
-        """Given a state group, count how many hops there are in the tree.
-
-        This is used to ensure the delta chains don't get too long.
-        """
-        if isinstance(self.database_engine, PostgresEngine):
-            sql = ("""
-                WITH RECURSIVE state(state_group) AS (
-                    VALUES(?::bigint)
-                    UNION ALL
-                    SELECT prev_state_group FROM state_group_edges e, state s
-                    WHERE s.state_group = e.state_group
-                )
-                SELECT count(*) FROM state;
-            """)
-
-            txn.execute(sql, (state_group,))
-            row = txn.fetchone()
-            if row and row[0]:
-                return row[0]
-            else:
-                return 0
-        else:
-            # We don't use WITH RECURSIVE on sqlite3 as there are distributions
-            # that ship with an sqlite3 version that doesn't support it (e.g. wheezy)
-            next_group = state_group
-            count = 0
-
-            while next_group:
-                next_group = self._simple_select_one_onecol_txn(
-                    txn,
-                    table="state_group_edges",
-                    keyvalues={"state_group": next_group},
-                    retcol="prev_state_group",
-                    allow_none=True,
-                )
-                if next_group:
-                    count += 1
-
-            return count
-
-    @cached(num_args=2, max_entries=100000, iterable=True)
-    def _get_state_group_from_group(self, group, types):
-        raise NotImplementedError()
-
-    @cachedList(cached_method_name="_get_state_group_from_group",
-                list_name="groups", num_args=2, inlineCallbacks=True)
-    def _get_state_groups_from_groups(self, groups, types):
-        """Returns dictionary state_group -> (dict of (type, state_key) -> event id)
-        """
-        results = {}
-
-        chunks = [groups[i:i + 100] for i in xrange(0, len(groups), 100)]
-        for chunk in chunks:
-            res = yield self.runInteraction(
-                "_get_state_groups_from_groups",
-                self._get_state_groups_from_groups_txn, chunk, types,
-            )
-            results.update(res)
-
-        defer.returnValue(results)
-
-    def _get_state_groups_from_groups_txn(self, txn, groups, types=None):
-        results = {group: {} for group in groups}
-        if types is not None:
-            types = list(set(types))  # deduplicate types list
-
-        if isinstance(self.database_engine, PostgresEngine):
-            # Temporarily disable sequential scans in this transaction. This is
-            # a temporary hack until we can add the right indices in
-            txn.execute("SET LOCAL enable_seqscan=off")
-
-            # The below query walks the state_group tree so that the "state"
-            # table includes all state_groups in the tree. It then joins
-            # against `state_groups_state` to fetch the latest state.
-            # It assumes that previous state groups are always numerically
-            # lesser.
-            # The PARTITION is used to get the event_id in the greatest state
-            # group for the given type, state_key.
-            # This may return multiple rows per (type, state_key), but last_value
-            # should be the same.
-            sql = ("""
-                WITH RECURSIVE state(state_group) AS (
-                    VALUES(?::bigint)
-                    UNION ALL
-                    SELECT prev_state_group FROM state_group_edges e, state s
-                    WHERE s.state_group = e.state_group
-                )
-                SELECT type, state_key, last_value(event_id) OVER (
-                    PARTITION BY type, state_key ORDER BY state_group ASC
-                    ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
-                ) AS event_id FROM state_groups_state
-                WHERE state_group IN (
-                    SELECT state_group FROM state
-                )
-                %s
-            """)
-
-            # Turns out that postgres doesn't like doing a list of OR's and
-            # is about 1000x slower, so we just issue a query for each specific
-            # type seperately.
-            if types:
-                clause_to_args = [
-                    (
-                        "AND type = ? AND state_key = ?",
-                        (etype, state_key)
-                    )
-                    for etype, state_key in types
-                ]
-            else:
-                # If types is None we fetch all the state, and so just use an
-                # empty where clause with no extra args.
-                clause_to_args = [("", [])]
-
-            for where_clause, where_args in clause_to_args:
-                for group in groups:
-                    args = [group]
-                    args.extend(where_args)
-
-                    txn.execute(sql % (where_clause,), args)
-                    rows = self.cursor_to_dict(txn)
-                    for row in rows:
-                        key = (row["type"], row["state_key"])
-                        results[group][key] = row["event_id"]
-        else:
-            if types is not None:
-                where_clause = "AND (%s)" % (
-                    " OR ".join(["(type = ? AND state_key = ?)"] * len(types)),
-                )
-            else:
-                where_clause = ""
-
-            # We don't use WITH RECURSIVE on sqlite3 as there are distributions
-            # that ship with an sqlite3 version that doesn't support it (e.g. wheezy)
-            for group in groups:
-                next_group = group
-
-                while next_group:
-                    # We did this before by getting the list of group ids, and
-                    # then passing that list to sqlite to get latest event for
-                    # each (type, state_key). However, that was terribly slow
-                    # without the right indices (which we can't add until
-                    # after we finish deduping state, which requires this func)
-                    args = [next_group]
-                    if types:
-                        args.extend(i for typ in types for i in typ)
-
-                    txn.execute(
-                        "SELECT type, state_key, event_id FROM state_groups_state"
-                        " WHERE state_group = ? %s" % (where_clause,),
-                        args
-                    )
-                    rows = txn.fetchall()
-                    results[group].update({
-                        (typ, state_key): event_id
-                        for typ, state_key, event_id in rows
-                        if (typ, state_key) not in results[group]
-                    })
-
-                    # If the lengths match then we must have all the types,
-                    # so no need to go walk further down the tree.
-                    if types is not None and len(results[group]) == len(types):
-                        break
-
-                    next_group = self._simple_select_one_onecol_txn(
-                        txn,
-                        table="state_group_edges",
-                        keyvalues={"state_group": next_group},
-                        retcol="prev_state_group",
-                        allow_none=True,
-                    )
-
-        return results
-
-    @defer.inlineCallbacks
-    def get_state_for_events(self, event_ids, types):
-        """Given a list of event_ids and type tuples, return a list of state
-        dicts for each event. The state dicts will only have the type/state_keys
-        that are in the `types` list.
-
-        Args:
-            event_ids (list)
-            types (list): List of (type, state_key) tuples which are used to
-                filter the state fetched. `state_key` may be None, which matches
-                any `state_key`
+    @staticmethod
+    def all() -> "StateFilter":
+        """Creates a filter that fetches everything.
 
         Returns:
-            deferred: A list of dicts corresponding to the event_ids given.
-            The dicts are mappings from (type, state_key) -> state_events
+            The new state filter.
         """
-        event_to_groups = yield self._get_state_group_for_events(
-            event_ids,
+        return StateFilter(types={}, include_others=True)
+
+    @staticmethod
+    def none() -> "StateFilter":
+        """Creates a filter that fetches nothing.
+
+        Returns:
+            The new state filter.
+        """
+        return StateFilter(types={}, include_others=False)
+
+    @staticmethod
+    def from_types(types: Iterable[Tuple[str, Optional[str]]]) -> "StateFilter":
+        """Creates a filter that only fetches the given types
+
+        Args:
+            types: A list of type and state keys to fetch. A state_key of None
+                fetches everything for that type
+
+        Returns:
+            The new state filter.
+        """
+        type_dict = {}  # type: Dict[str, Optional[Set[str]]]
+        for typ, s in types:
+            if typ in type_dict:
+                if type_dict[typ] is None:
+                    continue
+
+            if s is None:
+                type_dict[typ] = None
+                continue
+
+            type_dict.setdefault(typ, set()).add(s)  # type: ignore
+
+        return StateFilter(types=type_dict)
+
+    @staticmethod
+    def from_lazy_load_member_list(members: Iterable[str]) -> "StateFilter":
+        """Creates a filter that returns all non-member events, plus the member
+        events for the given users
+
+        Args:
+            members: Set of user IDs
+
+        Returns:
+            The new state filter
+        """
+        return StateFilter(types={EventTypes.Member: set(members)}, include_others=True)
+
+    def return_expanded(self) -> "StateFilter":
+        """Creates a new StateFilter where type wild cards have been removed
+        (except for memberships). The returned filter is a superset of the
+        current one, i.e. anything that passes the current filter will pass
+        the returned filter.
+
+        This helps the caching as the DictionaryCache knows if it has *all* the
+        state, but does not know if it has all of the keys of a particular type,
+        which makes wildcard lookups expensive unless we have a complete cache.
+        Hence, if we are doing a wildcard lookup, populate the cache fully so
+        that we can do an efficient lookup next time.
+
+        Note that since we have two caches, one for membership events and one for
+        other events, we can be a bit more clever than simply returning
+        `StateFilter.all()` if `has_wildcards()` is True.
+
+        We return a StateFilter where:
+            1. the list of membership events to return is the same
+            2. if there is a wildcard that matches non-member events we
+               return all non-member events
+
+        Returns:
+            The new state filter.
+        """
+
+        if self.is_full():
+            # If we're going to return everything then there's nothing to do
+            return self
+
+        if not self.has_wildcards():
+            # If there are no wild cards, there's nothing to do
+            return self
+
+        if EventTypes.Member in self.types:
+            get_all_members = self.types[EventTypes.Member] is None
+        else:
+            get_all_members = self.include_others
+
+        has_non_member_wildcard = self.include_others or any(
+            state_keys is None
+            for t, state_keys in self.types.items()
+            if t != EventTypes.Member
         )
 
-        groups = set(event_to_groups.values())
-        group_to_state = yield self._get_state_for_groups(groups, types)
+        if not has_non_member_wildcard:
+            # If there are no non-member wild cards we can just return ourselves
+            return self
 
-        state_event_map = yield self.get_events(
+        if get_all_members:
+            # We want to return everything.
+            return StateFilter.all()
+        else:
+            # We want to return all non-members, but only particular
+            # memberships
+            return StateFilter(
+                types={EventTypes.Member: self.types[EventTypes.Member]},
+                include_others=True,
+            )
+
+    def make_sql_filter_clause(self) -> Tuple[str, List[str]]:
+        """Converts the filter to an SQL clause.
+
+        For example:
+
+            f = StateFilter.from_types([("m.room.create", "")])
+            clause, args = f.make_sql_filter_clause()
+            clause == "(type = ? AND state_key = ?)"
+            args == ['m.room.create', '']
+
+
+        Returns:
+            The SQL string (may be empty) and arguments. An empty SQL string is
+            returned when the filter matches everything (i.e. is "full").
+        """
+
+        where_clause = ""
+        where_args = []  # type: List[str]
+
+        if self.is_full():
+            return where_clause, where_args
+
+        if not self.include_others and not self.types:
+            # i.e. this is an empty filter, so we need to return a clause that
+            # will match nothing
+            return "1 = 2", []
+
+        # First we build up a lost of clauses for each type/state_key combo
+        clauses = []
+        for etype, state_keys in self.types.items():
+            if state_keys is None:
+                clauses.append("(type = ?)")
+                where_args.append(etype)
+                continue
+
+            for state_key in state_keys:
+                clauses.append("(type = ? AND state_key = ?)")
+                where_args.extend((etype, state_key))
+
+        # This will match anything that appears in `self.types`
+        where_clause = " OR ".join(clauses)
+
+        # If we want to include stuff that's not in the types dict then we add
+        # a `OR type NOT IN (...)` clause to the end.
+        if self.include_others:
+            if where_clause:
+                where_clause += " OR "
+
+            where_clause += "type NOT IN (%s)" % (",".join(["?"] * len(self.types)),)
+            where_args.extend(self.types)
+
+        return where_clause, where_args
+
+    def max_entries_returned(self) -> Optional[int]:
+        """Returns the maximum number of entries this filter will return if
+        known, otherwise returns None.
+
+        For example a simple state filter asking for `("m.room.create", "")`
+        will return 1, whereas the default state filter will return None.
+
+        This is used to bail out early if the right number of entries have been
+        fetched.
+        """
+        if self.has_wildcards():
+            return None
+
+        return len(self.concrete_types())
+
+    def filter_state(self, state_dict: StateMap[T]) -> StateMap[T]:
+        """Returns the state filtered with by this StateFilter
+
+        Args:
+            state: The state map to filter
+
+        Returns:
+            The filtered state map
+        """
+        if self.is_full():
+            return dict(state_dict)
+
+        filtered_state = {}
+        for k, v in state_dict.items():
+            typ, state_key = k
+            if typ in self.types:
+                state_keys = self.types[typ]
+                if state_keys is None or state_key in state_keys:
+                    filtered_state[k] = v
+            elif self.include_others:
+                filtered_state[k] = v
+
+        return filtered_state
+
+    def is_full(self) -> bool:
+        """Whether this filter fetches everything or not
+
+        Returns:
+            True if the filter fetches everything.
+        """
+        return self.include_others and not self.types
+
+    def has_wildcards(self) -> bool:
+        """Whether the filter includes wildcards or is attempting to fetch
+        specific state.
+
+        Returns:
+            True if the filter includes wildcards.
+        """
+
+        return self.include_others or any(
+            state_keys is None for state_keys in self.types.values()
+        )
+
+    def concrete_types(self) -> List[Tuple[str, str]]:
+        """Returns a list of concrete type/state_keys (i.e. not None) that
+        will be fetched. This will be a complete list if `has_wildcards`
+        returns False, but otherwise will be a subset (or even empty).
+
+        Returns:
+            A list of type/state_keys tuples.
+        """
+        return [
+            (t, s)
+            for t, state_keys in self.types.items()
+            if state_keys is not None
+            for s in state_keys
+        ]
+
+    def get_member_split(self) -> Tuple["StateFilter", "StateFilter"]:
+        """Return the filter split into two: one which assumes it's exclusively
+        matching against member state, and one which assumes it's matching
+        against non member state.
+
+        This is useful due to the returned filters giving correct results for
+        `is_full()`, `has_wildcards()`, etc, when operating against maps that
+        either exclusively contain member events or only contain non-member
+        events. (Which is the case when dealing with the member vs non-member
+        state caches).
+
+        Returns:
+            The member and non member filters
+        """
+
+        if EventTypes.Member in self.types:
+            state_keys = self.types[EventTypes.Member]
+            if state_keys is None:
+                member_filter = StateFilter.all()
+            else:
+                member_filter = StateFilter({EventTypes.Member: state_keys})
+        elif self.include_others:
+            member_filter = StateFilter.all()
+        else:
+            member_filter = StateFilter.none()
+
+        non_member_filter = StateFilter(
+            types={k: v for k, v in self.types.items() if k != EventTypes.Member},
+            include_others=self.include_others,
+        )
+
+        return member_filter, non_member_filter
+
+
+class StateGroupStorage:
+    """High level interface to fetching state for event."""
+
+    def __init__(self, hs: "HomeServer", stores: "Databases"):
+        self.stores = stores
+
+    async def get_state_group_delta(
+        self, state_group: int
+    ) -> Tuple[Optional[int], Optional[StateMap[str]]]:
+        """Given a state group try to return a previous group and a delta between
+        the old and the new.
+
+        Args:
+            state_group: The state group used to retrieve state deltas.
+
+        Returns:
+            A tuple of the previous group and a state map of the event IDs which
+            make up the delta between the old and new state groups.
+        """
+
+        return await self.stores.state.get_state_group_delta(state_group)
+
+    async def get_state_groups_ids(
+        self, _room_id: str, event_ids: Iterable[str]
+    ) -> Dict[int, MutableStateMap[str]]:
+        """Get the event IDs of all the state for the state groups for the given events
+
+        Args:
+            _room_id: id of the room for these events
+            event_ids: ids of the events
+
+        Returns:
+            dict of state_group_id -> (dict of (type, state_key) -> event id)
+        """
+        if not event_ids:
+            return {}
+
+        event_to_groups = await self.stores.main._get_state_group_for_events(event_ids)
+
+        groups = set(event_to_groups.values())
+        group_to_state = await self.stores.state._get_state_for_groups(groups)
+
+        return group_to_state
+
+    async def get_state_ids_for_group(self, state_group: int) -> StateMap[str]:
+        """Get the event IDs of all the state in the given state group
+
+        Args:
+            state_group: A state group for which we want to get the state IDs.
+
+        Returns:
+            Resolves to a map of (type, state_key) -> event_id
+        """
+        group_to_state = await self._get_state_for_groups((state_group,))
+
+        return group_to_state[state_group]
+
+    async def get_state_groups(
+        self, room_id: str, event_ids: Iterable[str]
+    ) -> Dict[int, List[EventBase]]:
+        """Get the state groups for the given list of event_ids
+
+        Args:
+            room_id: ID of the room for these events.
+            event_ids: The event IDs to retrieve state for.
+
+        Returns:
+            dict of state_group_id -> list of state events.
+        """
+        if not event_ids:
+            return {}
+
+        group_to_ids = await self.get_state_groups_ids(room_id, event_ids)
+
+        state_event_map = await self.stores.main.get_events(
+            [
+                ev_id
+                for group_ids in group_to_ids.values()
+                for ev_id in group_ids.values()
+            ],
+            get_prev_content=False,
+        )
+
+        return {
+            group: [
+                state_event_map[v]
+                for v in event_id_map.values()
+                if v in state_event_map
+            ]
+            for group, event_id_map in group_to_ids.items()
+        }
+
+    def _get_state_groups_from_groups(
+        self, groups: List[int], state_filter: StateFilter
+    ) -> Awaitable[Dict[int, StateMap[str]]]:
+        """Returns the state groups for a given set of groups, filtering on
+        types of state events.
+
+        Args:
+            groups: list of state group IDs to query
+            state_filter: The state filter used to fetch state
+                from the database.
+
+        Returns:
+            Dict of state group to state map.
+        """
+
+        return self.stores.state._get_state_groups_from_groups(groups, state_filter)
+
+    async def get_state_for_events(
+        self, event_ids: List[str], state_filter: StateFilter = StateFilter.all()
+    ) -> Dict[str, StateMap[EventBase]]:
+        """Given a list of event_ids and type tuples, return a list of state
+        dicts for each event.
+
+        Args:
+            event_ids: The events to fetch the state of.
+            state_filter: The state filter used to fetch state.
+
+        Returns:
+            A dict of (event_id) -> (type, state_key) -> [state_events]
+        """
+        event_to_groups = await self.stores.main._get_state_group_for_events(event_ids)
+
+        groups = set(event_to_groups.values())
+        group_to_state = await self.stores.state._get_state_for_groups(
+            groups, state_filter
+        )
+
+        state_event_map = await self.stores.main.get_events(
             [ev_id for sd in group_to_state.values() for ev_id in sd.values()],
-            get_prev_content=False
+            get_prev_content=False,
         )
 
         event_to_state = {
@@ -410,406 +482,107 @@ class StateStore(SQLBaseStore):
             for event_id, group in event_to_groups.items()
         }
 
-        defer.returnValue({event: event_to_state[event] for event in event_ids})
+        return {event: event_to_state[event] for event in event_ids}
 
-    @defer.inlineCallbacks
-    def get_state_ids_for_events(self, event_ids, types):
-        event_to_groups = yield self._get_state_group_for_events(
-            event_ids,
-        )
+    async def get_state_ids_for_events(
+        self, event_ids: List[str], state_filter: StateFilter = StateFilter.all()
+    ) -> Dict[str, StateMap[str]]:
+        """
+        Get the state dicts corresponding to a list of events, containing the event_ids
+        of the state events (as opposed to the events themselves)
+
+        Args:
+            event_ids: events whose state should be returned
+            state_filter: The state filter used to fetch state from the database.
+
+        Returns:
+            A dict from event_id -> (type, state_key) -> event_id
+        """
+        event_to_groups = await self.stores.main._get_state_group_for_events(event_ids)
 
         groups = set(event_to_groups.values())
-        group_to_state = yield self._get_state_for_groups(groups, types)
+        group_to_state = await self.stores.state._get_state_for_groups(
+            groups, state_filter
+        )
 
         event_to_state = {
             event_id: group_to_state[group]
             for event_id, group in event_to_groups.items()
         }
 
-        defer.returnValue({event: event_to_state[event] for event in event_ids})
+        return {event: event_to_state[event] for event in event_ids}
 
-    @defer.inlineCallbacks
-    def get_state_for_event(self, event_id, types=None):
+    async def get_state_for_event(
+        self, event_id: str, state_filter: StateFilter = StateFilter.all()
+    ) -> StateMap[EventBase]:
         """
         Get the state dict corresponding to a particular event
 
         Args:
-            event_id(str): event whose state should be returned
-            types(list[(str, str)]|None): List of (type, state_key) tuples
-                which are used to filter the state fetched. May be None, which
-                matches any key
+            event_id: event whose state should be returned
+            state_filter: The state filter used to fetch state from the database.
 
         Returns:
-            A deferred dict from (type, state_key) -> state_event
+            A dict from (type, state_key) -> state_event
         """
-        state_map = yield self.get_state_for_events([event_id], types)
-        defer.returnValue(state_map[event_id])
+        state_map = await self.get_state_for_events([event_id], state_filter)
+        return state_map[event_id]
 
-    @defer.inlineCallbacks
-    def get_state_ids_for_event(self, event_id, types=None):
+    async def get_state_ids_for_event(
+        self, event_id: str, state_filter: StateFilter = StateFilter.all()
+    ) -> StateMap[str]:
         """
         Get the state dict corresponding to a particular event
 
         Args:
-            event_id(str): event whose state should be returned
-            types(list[(str, str)]|None): List of (type, state_key) tuples
-                which are used to filter the state fetched. May be None, which
-                matches any key
+            event_id: event whose state should be returned
+            state_filter: The state filter used to fetch state from the database.
 
         Returns:
-            A deferred dict from (type, state_key) -> state_event
+            A dict from (type, state_key) -> state_event
         """
-        state_map = yield self.get_state_ids_for_events([event_id], types)
-        defer.returnValue(state_map[event_id])
+        state_map = await self.get_state_ids_for_events([event_id], state_filter)
+        return state_map[event_id]
 
-    @cached(num_args=2, max_entries=10000)
-    def _get_state_group_for_event(self, room_id, event_id):
-        return self._simple_select_one_onecol(
-            table="event_to_state_groups",
-            keyvalues={
-                "event_id": event_id,
-            },
-            retcol="state_group",
-            allow_none=True,
-            desc="_get_state_group_for_event",
-        )
-
-    @cachedList(cached_method_name="_get_state_group_for_event",
-                list_name="event_ids", num_args=1, inlineCallbacks=True)
-    def _get_state_group_for_events(self, event_ids):
-        """Returns mapping event_id -> state_group
-        """
-        rows = yield self._simple_select_many_batch(
-            table="event_to_state_groups",
-            column="event_id",
-            iterable=event_ids,
-            keyvalues={},
-            retcols=("event_id", "state_group",),
-            desc="_get_state_group_for_events",
-        )
-
-        defer.returnValue({row["event_id"]: row["state_group"] for row in rows})
-
-    def _get_some_state_from_cache(self, group, types):
-        """Checks if group is in cache. See `_get_state_for_groups`
-
-        Returns 3-tuple (`state_dict`, `missing_types`, `got_all`).
-        `missing_types` is the list of types that aren't in the cache for that
-        group. `got_all` is a bool indicating if we successfully retrieved all
-        requests state from the cache, if False we need to query the DB for the
-        missing state.
+    def _get_state_for_groups(
+        self, groups: Iterable[int], state_filter: StateFilter = StateFilter.all()
+    ) -> Awaitable[Dict[int, MutableStateMap[str]]]:
+        """Gets the state at each of a list of state groups, optionally
+        filtering by type/state_key
 
         Args:
-            group: The state group to lookup
-            types (list): List of 2-tuples of the form (`type`, `state_key`),
-                where a `state_key` of `None` matches all state_keys for the
-                `type`.
+            groups: list of state groups for which we want to get the state.
+            state_filter: The state filter used to fetch state.
+                from the database.
+
+        Returns:
+            Dict of state group to state map.
         """
-        is_all, state_dict_ids = self._state_group_cache.get(group)
+        return self.stores.state._get_state_for_groups(groups, state_filter)
 
-        type_to_key = {}
-        missing_types = set()
-        for typ, state_key in types:
-            if state_key is None:
-                type_to_key[typ] = None
-                missing_types.add((typ, state_key))
-            else:
-                if type_to_key.get(typ, object()) is not None:
-                    type_to_key.setdefault(typ, set()).add(state_key)
-
-                if (typ, state_key) not in state_dict_ids:
-                    missing_types.add((typ, state_key))
-
-        sentinel = object()
-
-        def include(typ, state_key):
-            valid_state_keys = type_to_key.get(typ, sentinel)
-            if valid_state_keys is sentinel:
-                return False
-            if valid_state_keys is None:
-                return True
-            if state_key in valid_state_keys:
-                return True
-            return False
-
-        got_all = not (missing_types or types is None)
-
-        return {
-            k: v for k, v in state_dict_ids.items()
-            if include(k[0], k[1])
-        }, missing_types, got_all
-
-    def _get_all_state_from_cache(self, group):
-        """Checks if group is in cache. See `_get_state_for_groups`
-
-        Returns 2-tuple (`state_dict`, `got_all`). `got_all` is a bool
-        indicating if we successfully retrieved all requests state from the
-        cache, if False we need to query the DB for the missing state.
+    async def store_state_group(
+        self,
+        event_id: str,
+        room_id: str,
+        prev_group: Optional[int],
+        delta_ids: Optional[dict],
+        current_state_ids: dict,
+    ) -> int:
+        """Store a new set of state, returning a newly assigned state group.
 
         Args:
-            group: The state group to lookup
+            event_id: The event ID for which the state was calculated.
+            room_id: ID of the room for which the state was calculated.
+            prev_group: A previous state group for the room, optional.
+            delta_ids: The delta between state at `prev_group` and
+                `current_state_ids`, if `prev_group` was given. Same format as
+                `current_state_ids`.
+            current_state_ids: The state to store. Map of (type, state_key)
+                to event_id.
+
+        Returns:
+            The state group ID
         """
-        is_all, state_dict_ids = self._state_group_cache.get(group)
-
-        return state_dict_ids, is_all
-
-    @defer.inlineCallbacks
-    def _get_state_for_groups(self, groups, types=None):
-        """Given list of groups returns dict of group -> list of state events
-        with matching types. `types` is a list of `(type, state_key)`, where
-        a `state_key` of None matches all state_keys. If `types` is None then
-        all events are returned.
-        """
-        if types:
-            types = frozenset(types)
-        results = {}
-        missing_groups = []
-        if types is not None:
-            for group in set(groups):
-                state_dict_ids, missing_types, got_all = self._get_some_state_from_cache(
-                    group, types
-                )
-                results[group] = state_dict_ids
-
-                if not got_all:
-                    missing_groups.append(group)
-        else:
-            for group in set(groups):
-                state_dict_ids, got_all = self._get_all_state_from_cache(
-                    group
-                )
-
-                results[group] = state_dict_ids
-
-                if not got_all:
-                    missing_groups.append(group)
-
-        if missing_groups:
-            # Okay, so we have some missing_types, lets fetch them.
-            cache_seq_num = self._state_group_cache.sequence
-
-            group_to_state_dict = yield self._get_state_groups_from_groups(
-                missing_groups, types
-            )
-
-            # Now we want to update the cache with all the things we fetched
-            # from the database.
-            for group, group_state_dict in group_to_state_dict.items():
-                if types:
-                    # We delibrately put key -> None mappings into the cache to
-                    # cache absence of the key, on the assumption that if we've
-                    # explicitly asked for some types then we will probably ask
-                    # for them again.
-                    state_dict = {
-                        (intern_string(etype), intern_string(state_key)): None
-                        for (etype, state_key) in types
-                    }
-                    state_dict.update(results[group])
-                    results[group] = state_dict
-                else:
-                    state_dict = results[group]
-
-                state_dict.update({
-                    (intern_string(k[0]), intern_string(k[1])): v
-                    for k, v in group_state_dict.items()
-                })
-
-                self._state_group_cache.update(
-                    cache_seq_num,
-                    key=group,
-                    value=state_dict,
-                    full=(types is None),
-                )
-
-        # Remove all the entries with None values. The None values were just
-        # used for bookkeeping in the cache.
-        for group, state_dict in results.items():
-            results[group] = {
-                key: event_id
-                for key, event_id in state_dict.items()
-                if event_id
-            }
-
-        defer.returnValue(results)
-
-    def get_next_state_group(self):
-        return self._state_groups_id_gen.get_next()
-
-    @defer.inlineCallbacks
-    def _background_deduplicate_state(self, progress, batch_size):
-        """This background update will slowly deduplicate state by reencoding
-        them as deltas.
-        """
-        last_state_group = progress.get("last_state_group", 0)
-        rows_inserted = progress.get("rows_inserted", 0)
-        max_group = progress.get("max_group", None)
-
-        BATCH_SIZE_SCALE_FACTOR = 100
-
-        batch_size = max(1, int(batch_size / BATCH_SIZE_SCALE_FACTOR))
-
-        if max_group is None:
-            rows = yield self._execute(
-                "_background_deduplicate_state", None,
-                "SELECT coalesce(max(id), 0) FROM state_groups",
-            )
-            max_group = rows[0][0]
-
-        def reindex_txn(txn):
-            new_last_state_group = last_state_group
-            for count in xrange(batch_size):
-                txn.execute(
-                    "SELECT id, room_id FROM state_groups"
-                    " WHERE ? < id AND id <= ?"
-                    " ORDER BY id ASC"
-                    " LIMIT 1",
-                    (new_last_state_group, max_group,)
-                )
-                row = txn.fetchone()
-                if row:
-                    state_group, room_id = row
-
-                if not row or not state_group:
-                    return True, count
-
-                txn.execute(
-                    "SELECT state_group FROM state_group_edges"
-                    " WHERE state_group = ?",
-                    (state_group,)
-                )
-
-                # If we reach a point where we've already started inserting
-                # edges we should stop.
-                if txn.fetchall():
-                    return True, count
-
-                txn.execute(
-                    "SELECT coalesce(max(id), 0) FROM state_groups"
-                    " WHERE id < ? AND room_id = ?",
-                    (state_group, room_id,)
-                )
-                prev_group, = txn.fetchone()
-                new_last_state_group = state_group
-
-                if prev_group:
-                    potential_hops = self._count_state_group_hops_txn(
-                        txn, prev_group
-                    )
-                    if potential_hops >= MAX_STATE_DELTA_HOPS:
-                        # We want to ensure chains are at most this long,#
-                        # otherwise read performance degrades.
-                        continue
-
-                    prev_state = self._get_state_groups_from_groups_txn(
-                        txn, [prev_group], types=None
-                    )
-                    prev_state = prev_state[prev_group]
-
-                    curr_state = self._get_state_groups_from_groups_txn(
-                        txn, [state_group], types=None
-                    )
-                    curr_state = curr_state[state_group]
-
-                    if not set(prev_state.keys()) - set(curr_state.keys()):
-                        # We can only do a delta if the current has a strict super set
-                        # of keys
-
-                        delta_state = {
-                            key: value for key, value in curr_state.items()
-                            if prev_state.get(key, None) != value
-                        }
-
-                        self._simple_delete_txn(
-                            txn,
-                            table="state_group_edges",
-                            keyvalues={
-                                "state_group": state_group,
-                            }
-                        )
-
-                        self._simple_insert_txn(
-                            txn,
-                            table="state_group_edges",
-                            values={
-                                "state_group": state_group,
-                                "prev_state_group": prev_group,
-                            }
-                        )
-
-                        self._simple_delete_txn(
-                            txn,
-                            table="state_groups_state",
-                            keyvalues={
-                                "state_group": state_group,
-                            }
-                        )
-
-                        self._simple_insert_many_txn(
-                            txn,
-                            table="state_groups_state",
-                            values=[
-                                {
-                                    "state_group": state_group,
-                                    "room_id": room_id,
-                                    "type": key[0],
-                                    "state_key": key[1],
-                                    "event_id": state_id,
-                                }
-                                for key, state_id in delta_state.items()
-                            ],
-                        )
-
-            progress = {
-                "last_state_group": state_group,
-                "rows_inserted": rows_inserted + batch_size,
-                "max_group": max_group,
-            }
-
-            self._background_update_progress_txn(
-                txn, self.STATE_GROUP_DEDUPLICATION_UPDATE_NAME, progress
-            )
-
-            return False, batch_size
-
-        finished, result = yield self.runInteraction(
-            self.STATE_GROUP_DEDUPLICATION_UPDATE_NAME, reindex_txn
+        return await self.stores.state.store_state_group(
+            event_id, room_id, prev_group, delta_ids, current_state_ids
         )
-
-        if finished:
-            yield self._end_background_update(self.STATE_GROUP_DEDUPLICATION_UPDATE_NAME)
-
-        defer.returnValue(result * BATCH_SIZE_SCALE_FACTOR)
-
-    @defer.inlineCallbacks
-    def _background_index_state(self, progress, batch_size):
-        def reindex_txn(conn):
-            conn.rollback()
-            if isinstance(self.database_engine, PostgresEngine):
-                # postgres insists on autocommit for the index
-                conn.set_session(autocommit=True)
-                try:
-                    txn = conn.cursor()
-                    txn.execute(
-                        "CREATE INDEX CONCURRENTLY state_groups_state_type_idx"
-                        " ON state_groups_state(state_group, type, state_key)"
-                    )
-                    txn.execute(
-                        "DROP INDEX IF EXISTS state_groups_state_id"
-                    )
-                finally:
-                    conn.set_session(autocommit=False)
-            else:
-                txn = conn.cursor()
-                txn.execute(
-                    "CREATE INDEX state_groups_state_type_idx"
-                    " ON state_groups_state(state_group, type, state_key)"
-                )
-                txn.execute(
-                    "DROP INDEX IF EXISTS state_groups_state_id"
-                )
-
-        yield self.runWithConnection(reindex_txn)
-
-        yield self._end_background_update(self.STATE_GROUP_INDEX_UPDATE_NAME)
-
-        defer.returnValue(1)
