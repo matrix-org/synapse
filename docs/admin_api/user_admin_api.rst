@@ -63,7 +63,7 @@ Which will return a JSON structure containing:
 After which you can begin to construct the payload for the following ``POST``.
 First, you will need to generate a ``hmac`` that consists of the following structure (pseudo code):
 
-..code::
+.. code::
 
     hash_hmac("sha1", nonce + "\0" + "new-user-name" + "\0" + "Users password" + "\0" + "notadmin", registration_shared_secret)
 
