@@ -34,6 +34,11 @@ from synapse.config import cache as cache_config
 from synapse.util.caches import CacheMetric, register_cache
 from synapse.util.caches.treecache import TreeCache
 
+try:
+    from pympler import asizeof
+except ImportError:
+    asizeof = None
+
 # Function type: the type used for invalidation callbacks
 FT = TypeVar("FT", bound=Callable[..., Any])
 
@@ -55,14 +60,20 @@ def enumerate_leaves(node, depth):
 
 
 class _Node:
-    __slots__ = ["prev_node", "next_node", "key", "value", "callbacks"]
+    __slots__ = ["prev_node", "next_node", "key", "value", "callbacks", "memory"]
 
     def __init__(self, prev_node, next_node, key, value, callbacks=set()):
-        self.prev_node = prev_node
-        self.next_node = next_node
         self.key = key
         self.value = value
         self.callbacks = callbacks
+
+        if asizeof:
+            self.memory = asizeof.asizeof(self)
+        else:
+            self.memory = 0
+
+        self.prev_node = prev_node
+        self.next_node = next_node
 
 
 class LruCache(Generic[KT, VT]):
@@ -184,6 +195,9 @@ class LruCache(Generic[KT, VT]):
             next_node.prev_node = node
             cache[key] = node
 
+            if metrics:
+                metrics.memory_usage += node.memory
+
             if size_callback:
                 cached_cache_len[0] += size_callback(node.value)
 
@@ -204,6 +218,9 @@ class LruCache(Generic[KT, VT]):
             next_node = node.next_node
             prev_node.next_node = next_node
             next_node.prev_node = prev_node
+
+            if metrics:
+                metrics.memory_usage -= node.memory
 
             deleted_len = 1
             if size_callback:
