@@ -14,7 +14,9 @@
 # limitations under the License.
 from mock import Mock
 
+from synapse.api.constants import EduTypes
 from synapse.events import EventBase
+from synapse.federation.units import Transaction
 from synapse.handlers.presence import UserPresenceState
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, presence, room
@@ -25,10 +27,10 @@ from tests.events.test_presence_router import (
     send_presence_update,
     sync_presence,
 )
-from tests.unittest import HomeserverTestCase, override_config
+from tests.unittest import FederatingHomeserverTestCase, override_config
 
 
-class ModuleApiTestCase(HomeserverTestCase):
+class ModuleApiTestCase(FederatingHomeserverTestCase):
     servlets = [
         admin.register_servlets,
         login.register_servlets,
@@ -40,6 +42,11 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.store = homeserver.get_datastore()
         self.module_api = homeserver.get_module_api()
         self.event_creation_handler = homeserver.get_event_creation_handler()
+
+    def make_homeserver(self, reactor, clock):
+        return self.setup_test_homeserver(
+            federation_transport_client=Mock(spec=["send_transaction"]),
+        )
 
     def test_can_register_user(self):
         """Tests that an external module can register a user"""
@@ -226,10 +233,12 @@ class ModuleApiTestCase(HomeserverTestCase):
                         "users_who_should_receive_all_presence": [
                             "@presence_gobbler1:test",
                             "@presence_gobbler2:test",
+                            "@far_away_person:island",
                         ]
                     },
                 }
-            }
+            },
+            "send_federation": True,
         }
     )
     def test_send_local_online_presence_to(self):
@@ -302,3 +311,50 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.assertEqual(len(presence_updates), 3)
         presence_updates = sync_presence(self, self.presence_receiving_user_two_id)
         self.assertEqual(len(presence_updates), 3)
+
+        # Test that sending to a remote user works
+        remote_user_id = "@far_away_person:island"
+
+        # Note that due to the remote user being in our module's
+        # users_who_should_receive_all_presence config, they would have
+        # received user presence updates already.
+        #
+        # Thus we reset the mock, and try sending all online local user
+        # presence again
+        self.hs.get_federation_transport_client().send_transaction.reset_mock()
+
+        # Track the outgoing presence on the federation client
+        self.get_success(
+            self.module_api.send_local_online_presence_to([remote_user_id])
+        )
+
+        # Check that the expected presence updates were sent
+        expected_users = [
+            self.other_user_id,
+            self.presence_receiving_user_one_id,
+            self.presence_receiving_user_two_id,
+        ]
+
+        calls = (
+            self.hs.get_federation_transport_client().send_transaction.call_args_list
+        )
+        for call in calls:
+            federation_transaction = call.args[0]  # type: Transaction
+
+            # Get the sent EDUs in this transaction
+            edus = federation_transaction.get_dict()["edus"]
+
+            for edu in edus:
+                # Make sure we're only checking presence-type EDUs
+                if edu["edu_type"] != EduTypes.Presence:
+                    continue
+
+                # EDUs can contain multiple presence updates
+                for presence_update in edu["content"]["push"]:
+                    # Check for presence updates that contain the user IDs we're after
+                    expected_users.remove(presence_update["user_id"])
+
+                    # Ensure that no offline states are being sent out
+                    self.assertNotEqual(presence_update["presence"], "offline")
+
+        self.assertEqual(len(expected_users), 0)
