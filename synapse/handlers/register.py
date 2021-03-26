@@ -16,7 +16,7 @@
 """Contains functions for registering clients."""
 
 import logging
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 
 from prometheus_client import Counter
 from typing_extensions import TypedDict
@@ -61,7 +61,7 @@ LoginDict = TypedDict(
     {
         "device_id": str,
         "access_token": str,
-        "valid_until_ms": int,
+        "valid_until_ms": Optional[int],
         "refresh_token": Optional[str],
     },
 )
@@ -754,7 +754,8 @@ class RegistrationHandler(BaseHandler):
                     refresh_token,
                     refresh_token_id,
                 ) = await self._auth_handler.get_refresh_token_for_user_id(
-                    user_id, device_id=registered_device_id,
+                    user_id,
+                    device_id=registered_device_id,
                 )
                 valid_until_ms = self.clock.time_msec() + 60 * 1000
 

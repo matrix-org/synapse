@@ -456,7 +456,8 @@ class RefreshTokenServlet(RestServlet):
         self._clock = hs.get_clock()
 
     async def on_POST(
-        self, request: SynapseRequest,
+        self,
+        request: SynapseRequest,
     ):
         refresh_submission = parse_json_object_from_request(request)
 

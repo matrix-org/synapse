@@ -71,8 +71,8 @@ from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.threepids import canonicalise_email
 
 if TYPE_CHECKING:
-    from synapse.server import HomeServer
     from synapse.rest.client.v1.login import LoginResponse
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -773,7 +773,9 @@ class AuthHandler(BaseHandler):
         }
 
     async def refresh_token(
-        self, refresh_token: str, valid_until_ms: Optional[int],
+        self,
+        refresh_token: str,
+        valid_until_ms: Optional[int],
     ) -> Tuple[str, str]:
         existing_token = await self.store.lookup_refresh_token(refresh_token)
         if existing_token is None:
@@ -798,11 +800,15 @@ class AuthHandler(BaseHandler):
         return access_token, new_refresh_token
 
     async def get_refresh_token_for_user_id(
-        self, user_id: str, device_id: Optional[str],
+        self,
+        user_id: str,
+        device_id: Optional[str],
     ) -> Tuple[str, int]:
         refresh_token = self.macaroon_gen.generate_refresh_token(user_id)
         refresh_token_id = await self.store.add_refresh_token_to_user(
-            user_id=user_id, token=refresh_token, device_id=device_id,
+            user_id=user_id,
+            token=refresh_token,
+            device_id=device_id,
         )
         return refresh_token, refresh_token_id
 

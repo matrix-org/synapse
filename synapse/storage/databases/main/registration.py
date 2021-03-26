@@ -1311,7 +1311,10 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         return next_id
 
     async def add_refresh_token_to_user(
-        self, user_id: str, token: str, device_id: Optional[str],
+        self,
+        user_id: str,
+        token: str,
+        device_id: Optional[str],
     ) -> int:
         next_id = self._refresh_tokens_id_gen.get_next()
 
