@@ -104,10 +104,11 @@ example.com:8448 {
 ```
 <VirtualHost *:443>
     SSLEngine on
-    ServerName matrix.example.com;
+    ServerName matrix.example.com
 
     RequestHeader set "X-Forwarded-Proto" expr=%{REQUEST_SCHEME}
     AllowEncodedSlashes NoDecode
+    ProxyPreserveHost on
     ProxyPass /_matrix http://127.0.0.1:8008/_matrix nocanon
     ProxyPassReverse /_matrix http://127.0.0.1:8008/_matrix
     ProxyPass /_synapse/client http://127.0.0.1:8008/_synapse/client nocanon
@@ -116,7 +117,7 @@ example.com:8448 {
 
 <VirtualHost *:8448>
     SSLEngine on
-    ServerName example.com;
+    ServerName example.com
 
     RequestHeader set "X-Forwarded-Proto" expr=%{REQUEST_SCHEME}
     AllowEncodedSlashes NoDecode
@@ -134,6 +135,8 @@ example.com:8448 {
     SecRuleEngine off
 </IfModule>
 ```
+
+**NOTE 3**: Missing `ProxyPreserveHost on` can lead to a redirect loop.
 
 ### HAProxy
 
