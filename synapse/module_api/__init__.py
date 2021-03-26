@@ -413,11 +413,13 @@ class ModuleApi:
             else:
                 # Retrieve presence state for currently online users that this user
                 # is considered interested in
-                presence_events = await self._presence_stream.get_new_events(
-                    user, from_key=None, include_offline=False
+                presence_events, _ = await self._presence_stream.get_new_events(
+                    UserID.from_string(user), from_key=None, include_offline=False
                 )
-                await self._federation_sender.send_presence(
-                    [ev.state for ev in presence_events]
+
+                # Send to remote destinations
+                await make_deferred_yieldable(
+                    self._federation_sender.send_presence(presence_events)
                 )
 
 
