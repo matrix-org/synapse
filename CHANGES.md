@@ -1,8 +1,20 @@
 Synapse 1.30.1 (2021-03-26)
 ===========================
 
-This is a security release to ensure that Synapse is running with a
-`cryptography` package built against a patched version of OpenSSL.
+This release is identical to Synapse 1.30.0, with the exception of explicitly
+setting a minimum version of Python's Cryptography library to ensure that users
+of Synapse are protected from the recent [OpenSSL security advisories](https://mta.openssl.org/pipermail/openssl-announce/2021-March/000198.html),
+especially CVE-2021-3449.
+
+Note that Cryptography defaults to bundling its own statically linked copy of
+OpenSSL, which means that you may not be protected by your operating system's
+security updates.
+
+It's also worth noting that Cryptography no longer supports Python 3.5, so
+admins deploying to older environments may not be protected against this or
+future vulnerabilities.
+
+
 
 
 Updates to the Docker image
