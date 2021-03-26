@@ -33,7 +33,8 @@ RUN apt-get update && apt-get install -y \
     libwebp-dev \
     libxml++2.6-dev \
     libxslt1-dev \
-    openssl \rustc \
+    openssl \
+    rustc \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
