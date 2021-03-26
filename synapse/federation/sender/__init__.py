@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import Collection, Dict, Hashable, Iterable, List, Optional, Set, Tuple
+from typing import Dict, Hashable, Iterable, List, Optional, Set, Tuple
 
 from prometheus_client import Counter
 
@@ -40,7 +40,7 @@ from synapse.metrics import (
     events_processed_counter,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import ReadReceipt, RoomStreamToken
+from synapse.types import ReadReceipt, RoomStreamToken, Collection
 from synapse.util.metrics import Measure, measure_func
 
 logger = logging.getLogger(__name__)
