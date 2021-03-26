@@ -353,7 +353,7 @@ class FederationSender:
     def _distribute_pdus(self, destination: str, pdus: List[EventBase]) -> None:
         logger.debug("Sending %d to: %s", len(pdus), destination)
 
-        sent_pdus_destination_dist_total.inc(2)
+        sent_pdus_destination_dist_total.inc(len(pdus))
 
         self._get_per_destination_queue(destination).send_pdu(*pdus)
 
