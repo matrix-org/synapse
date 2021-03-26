@@ -44,6 +44,7 @@ from synapse.types import ReadReceipt, RoomStreamToken
 from synapse.util.metrics import Measure, measure_func
 
 if TYPE_CHECKING:
+    from synapse.events.presence_router import PresenceRouter
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -79,7 +80,7 @@ class FederationSender:
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
 
-        self._presence_router = hs.get_presence_router()
+        self._presence_router = None  # type: Optional[PresenceRouter]
         self._transaction_manager = TransactionManager(hs)
 
         self._instance_name = hs.get_instance_name()
@@ -502,8 +503,21 @@ class FederationSender:
         """Given a list of states populate self.pending_presence_by_dest and
         poke to send a new transaction to each destination
         """
+        # We pull the presence router here instead of __init__
+        # to prevent a dependency cycle:
+        #
+        # AuthHandler -> Notifier -> FederationSender
+        # -> PresenceRouter -> ModuleApi -> AuthHandler
+        if self._presence_router is None:
+            self._presence_router = self.hs.get_presence_router()
+
+        assert self._presence_router is not None
+
         hosts_and_states = await get_interested_remotes(
-            self.store, self._presence_router, states, self.state
+            self.store,
+            self._presence_router,
+            states,
+            self.state,
         )
 
         for destinations, states in hosts_and_states:
