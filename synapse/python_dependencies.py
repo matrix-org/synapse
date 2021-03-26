@@ -84,7 +84,7 @@ REQUIREMENTS = [
     "typing-extensions>=3.7.4",
     # We enforce that we have a `cryptography` version that bundles an `openssl`
     # with the latest security patches.
-    "cryptography>=3.4.7",
+    "cryptography>=3.4.7;python_version>='3.6'",
 ]
 
 CONDITIONAL_REQUIREMENTS = {
