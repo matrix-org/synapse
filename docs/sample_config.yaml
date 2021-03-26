@@ -1451,14 +1451,31 @@ metrics_flags:
 
 ## API Configuration ##
 
-# A list of event types that will be included in the room_invite_state
+# Controls for the state that is shared with users who receive an invite
+# to a room
 #
-#room_invite_state_types:
-#  - "m.room.join_rules"
-#  - "m.room.canonical_alias"
-#  - "m.room.avatar"
-#  - "m.room.encryption"
-#  - "m.room.name"
+room_prejoin_state:
+   # By default, the following state event types are shared with users who
+   # receive invites to the room:
+   #
+   # - m.room.join_rules
+   # - m.room.canonical_alias
+   # - m.room.avatar
+   # - m.room.encryption
+   # - m.room.name
+   #
+   # Uncomment the following to disable these defaults (so that only the event
+   # types listed in 'additional_event_types' are shared). Defaults to 'false'.
+   #
+   #disable_default_event_types: true
+
+   # Additional state event types to share with users when they are invited
+   # to a room.
+   #
+   # By default, this list is empty (so only the default event types are shared)
+   #
+   #additional_event_types:
+   #  - org.example.custom.event.type
 
 
 # A list of application service config files to use
