@@ -1,0 +1,1 @@
+Enforce that `cryptography` dependency is up to date to ensure it has the most recent openssl patches.
