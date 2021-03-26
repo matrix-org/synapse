@@ -19,7 +19,6 @@ from typing import TYPE_CHECKING, Any, Generator, Iterable, Optional, Tuple
 from twisted.internet import defer
 
 from synapse.events import EventBase
-from synapse.federation.sender import FederationSender
 from synapse.http.client import SimpleHttpClient
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
@@ -52,6 +51,7 @@ class ModuleApi:
         self._auth_handler = auth_handler
         self._server_name = hs.hostname
         self._presence_stream = hs.get_event_sources().sources["presence"]
+        self._federation_sender = hs.get_federation_sender()
 
         # We expose these as properties below in order to attach a helpful docstring.
         self._http_client = hs.get_simple_http_client()  # type: SimpleHttpClient
@@ -416,7 +416,7 @@ class ModuleApi:
                 presence_events = await self._presence_stream.get_new_events(
                     user, from_key=None, include_offline=False
                 )
-                await FederationSender.send_presence(
+                await self._federation_sender.send_presence(
                     [ev.state for ev in presence_events]
                 )
 
