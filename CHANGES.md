@@ -12,9 +12,8 @@ security updates.
 
 It's also worth noting that Cryptography no longer supports Python 3.5, so
 admins deploying to older environments may not be protected against this or
-future vulnerabilities.
-
-
+future vulnerabilities. Synapse will be dropping support for Python 3.5 at the
+end of March.
 
 
 Updates to the Docker image
