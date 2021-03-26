@@ -68,7 +68,7 @@ class _Node:
         self.callbacks = callbacks
 
         if asizeof:
-            self.memory = asizeof.asizeof(self)
+            self.memory = asizeof.asizeof(key) + asizeof.asizeof(value)
         else:
             self.memory = 0
 
