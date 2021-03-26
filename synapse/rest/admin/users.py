@@ -271,7 +271,7 @@ class UserRestServletV2(RestServlet):
                 elif not deactivate and user["deactivated"]:
                     if (
                         "password" not in body
-                        and self.hs.config.password_localdb_enabled
+                        and self.auth_handler.can_change_password()
                     ):
                         raise SynapseError(
                             400, "Must provide a password to re-activate an account."
@@ -833,6 +833,9 @@ class UserMediaRestServlet(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
+        # This will always be set by the time Twisted calls us.
+        assert request.args is not None
+
         await assert_requester_is_admin(self.auth, request)
 
         if not self.is_mine(UserID.from_string(user_id)):

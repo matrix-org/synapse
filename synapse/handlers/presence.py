@@ -104,6 +104,8 @@ class BasePresenceHandler(abc.ABC):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
 
+        self._busy_presence_enabled = hs.config.experimental.msc3026_enabled
+
         active_presence = self.store.take_presence_startup_info()
         self.user_to_current_state = {state.user_id: state for state in active_presence}
 
@@ -730,8 +732,12 @@ class PresenceHandler(BasePresenceHandler):
             PresenceState.ONLINE,
             PresenceState.UNAVAILABLE,
             PresenceState.OFFLINE,
+            PresenceState.BUSY,
         )
-        if presence not in valid_presence:
+
+        if presence not in valid_presence or (
+            presence == PresenceState.BUSY and not self._busy_presence_enabled
+        ):
             raise SynapseError(400, "Invalid presence state")
 
         user_id = target_user.to_string()
@@ -744,7 +750,9 @@ class PresenceHandler(BasePresenceHandler):
             msg = status_msg if presence != PresenceState.OFFLINE else None
             new_fields["status_msg"] = msg
 
-        if presence == PresenceState.ONLINE:
+        if presence == PresenceState.ONLINE or (
+            presence == PresenceState.BUSY and self._busy_presence_enabled
+        ):
             new_fields["last_active_ts"] = self.clock.time_msec()
 
         await self._update_states([prev_state.copy_and_replace(**new_fields)])

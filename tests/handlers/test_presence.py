@@ -310,6 +310,26 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         self.assertIsNotNone(new_state)
         self.assertEquals(new_state.state, PresenceState.UNAVAILABLE)
 
+    def test_busy_no_idle(self):
+        """
+        Tests that a user setting their presence to busy but idling doesn't turn their
+        presence state into unavailable.
+        """
+        user_id = "@foo:bar"
+        now = 5000000
+
+        state = UserPresenceState.default(user_id)
+        state = state.copy_and_replace(
+            state=PresenceState.BUSY,
+            last_active_ts=now - IDLE_TIMER - 1,
+            last_user_sync_ts=now,
+        )
+
+        new_state = handle_timeout(state, is_mine=True, syncing_user_ids=set(), now=now)
+
+        self.assertIsNotNone(new_state)
+        self.assertEquals(new_state.state, PresenceState.BUSY)
+
     def test_sync_timeout(self):
         user_id = "@foo:bar"
         now = 5000000

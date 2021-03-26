@@ -29,7 +29,7 @@ from synapse.types import JsonDict
 from synapse.util.async_helpers import Linearizer
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 

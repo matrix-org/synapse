@@ -27,7 +27,7 @@ from synapse.types import Collection, StreamToken, get_domain_from_id
 from synapse.util import json_decoder
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
