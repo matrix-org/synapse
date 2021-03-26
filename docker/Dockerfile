@@ -24,7 +24,6 @@ RUN apt-get update && apt-get install -y \
         libffi-dev \
         libjpeg-dev \
         libpq-dev \
-        libssl \
         libssl-dev \
         libwebp-dev \
         libxml++2.6-dev \
@@ -72,7 +71,6 @@ RUN apt-get update && apt-get install -y \
         libwebp6 \
         xmlsec1 \
         libjemalloc2 \
-        libssl \
         libssl-dev \
         openssl \
         && rm -rf /var/lib/apt/lists/*
