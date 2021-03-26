@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, Hashable, Iterable, List, Optional, Set, Tuple
+from typing import Collection, Dict, Hashable, Iterable, List, Optional, Set, Tuple
 
 from prometheus_client import Counter
 
@@ -189,15 +189,17 @@ class FederationSender:
                 if not events and next_token >= self._last_poked_id:
                     break
 
-                async def handle_event(event: EventBase) -> None:
+                async def handle_event(
+                    event: EventBase,
+                ) -> Optional[Tuple[EventBase, Collection[str]]]:
                     # Only send events for this server.
                     send_on_behalf_of = event.internal_metadata.get_send_on_behalf_of()
                     is_mine = self.is_mine_id(event.sender)
                     if not is_mine and send_on_behalf_of is None:
-                        return
+                        return None
 
                     if not event.internal_metadata.should_proactively_send():
-                        return
+                        return None
 
                     destinations = None  # type: Optional[Set[str]]
                     if not event.prev_event_ids():
@@ -232,7 +234,7 @@ class FederationSender:
                                 "Failed to calculate hosts in room for event: %s",
                                 event.event_id,
                             )
-                            return
+                            return None
 
                     destinations = {
                         d
@@ -250,9 +252,10 @@ class FederationSender:
 
                     logger.debug("Sending %s to %r", event, destinations)
 
-                    if destinations:
-                        await self._send_pdu(event, destinations)
+                    destinations = set(destinations)
+                    destinations.discard(self.server_name)
 
+                    if destinations:
                         now = self.clock.time_msec()
                         ts = await self.store.get_received_ts(event.event_id)
 
@@ -260,24 +263,62 @@ class FederationSender:
                             "federation_sender"
                         ).observe((now - ts) / 1000)
 
-                async def handle_room_events(events: Iterable[EventBase]) -> None:
+                        return event, destinations
+                    return None
+
+                async def handle_room_events(
+                    room_id: str, events: Iterable[EventBase]
+                ) -> Tuple[str, Dict[EventBase, Collection[str]]]:
                     with Measure(self.clock, "handle_room_events"):
+                        event_mapping = {}  # type: Dict[EventBase, Collection[str]]
+
                         for event in events:
-                            await handle_event(event)
+                            ret = await handle_event(event)
+                            if ret is not None:
+                                event_mapping[ret[0]] = ret[1]
+
+                        return room_id, event_mapping
 
                 events_by_room = {}  # type: Dict[str, List[EventBase]]
                 for event in events:
                     events_by_room.setdefault(event.room_id, []).append(event)
 
-                await make_deferred_yieldable(
+                per_room_events_and_dests = await make_deferred_yieldable(
                     defer.gatherResults(
                         [
-                            run_in_background(handle_room_events, evs)
-                            for evs in events_by_room.values()
+                            run_in_background(handle_room_events, rid, evs)
+                            for rid, evs in events_by_room.items()
                         ],
                         consumeErrors=True,
                     )
-                )
+                )  # type: List[Tuple[str, Dict[EventBase, Collection[str]]]]
+
+                room_and_dest_to_max = {}  # type: Dict[Tuple[str, str], int]
+                dest_to_events = {}  # type: Dict[str, List[EventBase]]
+
+                for room_id, event_and_dests in per_room_events_and_dests:
+                    for event, dests in event_and_dests.items():
+
+                        # we got this from the database, it's filled
+                        assert event.internal_metadata.stream_ordering
+
+                        for destination in dests:
+                            if (
+                                room_and_dest_to_max.setdefault(
+                                    (room_id, destination), 0
+                                )
+                                < event.internal_metadata.stream_ordering
+                            ):
+                                room_and_dest_to_max[
+                                    (room_id, destination)
+                                ] = event.internal_metadata.stream_ordering
+
+                            dest_to_events.setdefault(destination, []).append(event)
+
+                for dest, events in dest_to_events.items():
+                    self._distribute_pdus(dest, events)
+
+                await self.store.bulk_store_destination_rooms_entries(room_and_dest_to_max)
 
                 await self.store.update_federation_out_pos("events", next_token)
 
@@ -307,34 +348,12 @@ class FederationSender:
         finally:
             self._is_processing = False
 
-    async def _send_pdu(self, pdu: EventBase, destinations: Iterable[str]) -> None:
-        # We loop through all destinations to see whether we already have
-        # a transaction in progress. If we do, stick it in the pending_pdus
-        # table and we'll get back to it later.
+    def _distribute_pdus(self, destination: str, pdus: List[EventBase]) -> None:
+        logger.debug("Sending %d to: %s", len(pdus), destination)
 
-        destinations = set(destinations)
-        destinations.discard(self.server_name)
-        logger.debug("Sending to: %s", str(destinations))
+        sent_pdus_destination_dist_total.inc(2)
 
-        if not destinations:
-            return
-
-        sent_pdus_destination_dist_total.inc(len(destinations))
-        sent_pdus_destination_dist_count.inc()
-
-        assert pdu.internal_metadata.stream_ordering
-
-        # track the fact that we have a PDU for these destinations,
-        # to allow us to perform catch-up later on if the remote is unreachable
-        # for a while.
-        await self.store.store_destination_rooms_entries(
-            destinations,
-            pdu.room_id,
-            pdu.internal_metadata.stream_ordering,
-        )
-
-        for destination in destinations:
-            self._get_per_destination_queue(destination).send_pdu(pdu)
+        self._get_per_destination_queue(destination).send_pdu(*pdus)
 
     async def send_read_receipt(self, receipt: ReadReceipt) -> None:
         """Send a RR to any other servers in the room
