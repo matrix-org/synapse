@@ -1,0 +1,1 @@
+Use `dmypy run` in lint script for improved performance in type-checking while developing.
