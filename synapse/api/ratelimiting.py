@@ -17,6 +17,7 @@ from collections import OrderedDict
 from typing import Hashable, Optional, Tuple
 
 from synapse.api.errors import LimitExceededError
+from synapse.storage.databases.main import DataStore
 from synapse.types import Requester
 from synapse.util import Clock
 
@@ -31,10 +32,13 @@ class Ratelimiter:
         burst_count: How many actions that can be performed before being limited.
     """
 
-    def __init__(self, clock: Clock, rate_hz: float, burst_count: int):
+    def __init__(
+        self, store: DataStore, clock: Clock, rate_hz: float, burst_count: int
+    ):
         self.clock = clock
         self.rate_hz = rate_hz
         self.burst_count = burst_count
+        self.store = store
 
         # A ordered dictionary keeping track of actions, when they were last
         # performed and how often. Each entry is a mapping from a key of arbitrary type

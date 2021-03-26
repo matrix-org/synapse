@@ -74,11 +74,13 @@ class LoginRestServlet(RestServlet):
 
         self._well_known_builder = WellKnownBuilder(hs)
         self._address_ratelimiter = Ratelimiter(
+            store=hs.get_datastore(),
             clock=hs.get_clock(),
             rate_hz=self.hs.config.rc_login_address.per_second,
             burst_count=self.hs.config.rc_login_address.burst_count,
         )
         self._account_ratelimiter = Ratelimiter(
+            store=hs.get_datastore(),
             clock=hs.get_clock(),
             rate_hz=self.hs.config.rc_login_account.per_second,
             burst_count=self.hs.config.rc_login_account.burst_count,

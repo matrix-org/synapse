@@ -7,7 +7,9 @@ from tests import unittest
 
 class TestRatelimiter(unittest.HomeserverTestCase):
     def test_allowed_via_can_do_action(self):
-        limiter = Ratelimiter(clock=None, rate_hz=0.1, burst_count=1)
+        limiter = Ratelimiter(
+            store=self.hs.get_datastore(), clock=None, rate_hz=0.1, burst_count=1
+        )
         allowed, time_allowed = self.get_success_or_raise(
             limiter.can_do_action(None, key="test_id", _time_now_s=0)
         )
@@ -28,7 +30,9 @@ class TestRatelimiter(unittest.HomeserverTestCase):
 
     def test_allowed_user_via_can_requester_do_action(self):
         user_requester = create_requester("@user:example.com")
-        limiter = Ratelimiter(clock=None, rate_hz=0.1, burst_count=1)
+        limiter = Ratelimiter(
+            store=self.hs.get_datastore(), clock=None, rate_hz=0.1, burst_count=1
+        )
         allowed, time_allowed = self.get_success_or_raise(
             limiter.can_requester_do_action(user_requester, _time_now_s=0)
         )
@@ -57,7 +61,9 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         )
         as_requester = create_requester("@user:example.com", app_service=appservice)
 
-        limiter = Ratelimiter(clock=None, rate_hz=0.1, burst_count=1)
+        limiter = Ratelimiter(
+            store=self.hs.get_datastore(), clock=None, rate_hz=0.1, burst_count=1
+        )
         allowed, time_allowed = self.get_success_or_raise(
             limiter.can_requester_do_action(as_requester, _time_now_s=0)
         )
@@ -86,7 +92,9 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         )
         as_requester = create_requester("@user:example.com", app_service=appservice)
 
-        limiter = Ratelimiter(clock=None, rate_hz=0.1, burst_count=1)
+        limiter = Ratelimiter(
+            store=self.hs.get_datastore(), clock=None, rate_hz=0.1, burst_count=1
+        )
         allowed, time_allowed = self.get_success_or_raise(
             limiter.can_requester_do_action(as_requester, _time_now_s=0)
         )
@@ -106,7 +114,9 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         self.assertEquals(-1, time_allowed)
 
     def test_allowed_via_ratelimit(self):
-        limiter = Ratelimiter(clock=None, rate_hz=0.1, burst_count=1)
+        limiter = Ratelimiter(
+            store=self.hs.get_datastore(), clock=None, rate_hz=0.1, burst_count=1
+        )
 
         # Shouldn't raise
         self.get_success_or_raise(limiter.ratelimit(None, key="test_id", _time_now_s=0))
@@ -128,7 +138,9 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         an action
         """
         # Create a Ratelimiter with a very low allowed rate_hz and burst_count
-        limiter = Ratelimiter(clock=None, rate_hz=0.1, burst_count=1)
+        limiter = Ratelimiter(
+            store=self.hs.get_datastore(), clock=None, rate_hz=0.1, burst_count=1
+        )
 
         # First attempt should be allowed
         allowed, time_allowed = self.get_success_or_raise(
@@ -172,7 +184,9 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         fail an action
         """
         # Create a Ratelimiter with a very low allowed rate_hz and burst_count
-        limiter = Ratelimiter(clock=None, rate_hz=0.1, burst_count=1)
+        limiter = Ratelimiter(
+            store=self.hs.get_datastore(), clock=None, rate_hz=0.1, burst_count=1
+        )
 
         # First attempt should be allowed
         self.get_success_or_raise(
@@ -198,7 +212,9 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         )
 
     def test_pruning(self):
-        limiter = Ratelimiter(clock=None, rate_hz=0.1, burst_count=1)
+        limiter = Ratelimiter(
+            store=self.hs.get_datastore(), clock=None, rate_hz=0.1, burst_count=1
+        )
         self.get_success_or_raise(
             limiter.can_do_action(None, key="test_id_1", _time_now_s=0)
         )

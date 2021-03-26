@@ -870,6 +870,7 @@ class FederationHandlerRegistry:
 
         # A rate limiter for incoming room key requests per origin.
         self._room_key_request_rate_limiter = Ratelimiter(
+            store=hs.get_datastore(),
             clock=self.clock,
             rate_hz=self.config.rc_key_requests.per_second,
             burst_count=self.config.rc_key_requests.burst_count,
