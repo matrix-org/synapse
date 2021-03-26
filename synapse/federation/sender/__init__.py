@@ -318,7 +318,9 @@ class FederationSender:
                 for dest, events in dest_to_events.items():
                     self._distribute_pdus(dest, events)
 
-                await self.store.bulk_store_destination_rooms_entries(room_and_dest_to_max)
+                await self.store.bulk_store_destination_rooms_entries(
+                    room_and_dest_to_max
+                )
 
                 await self.store.update_federation_out_pos("events", next_token)
 

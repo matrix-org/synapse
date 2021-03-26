@@ -15,7 +15,7 @@
 
 import logging
 from collections import namedtuple
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from canonicaljson import encode_canonical_json
 
