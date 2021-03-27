@@ -70,7 +70,9 @@ def parse_thumbnail_requirements(thumbnail_sizes):
         method = size["method"]
         jpeg_thumbnail = ThumbnailRequirement(width, height, method, "image/jpeg")
         png_thumbnail = ThumbnailRequirement(width, height, method, "image/png")
-        gif_thumbnail = ThumbnailRequirement(width, height, method, "image/gif")  # noqa: F841 (never used, FIXME)
+        gif_thumbnail = ThumbnailRequirement(  # noqa: F841 (never used, FIXME)
+            width, height, method, "image/gif"
+        )
         requirements.setdefault("image/jpeg", []).append(jpeg_thumbnail)
         requirements.setdefault("image/webp", []).append(jpeg_thumbnail)
         requirements.setdefault("image/gif", []).append(png_thumbnail)
