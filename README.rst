@@ -182,6 +182,7 @@ Using a reverse proxy with Synapse
 
 It is recommended to put a reverse proxy such as
 `nginx <https://nginx.org/en/docs/http/ngx_http_proxy_module.html>`_,
+`Kong <https://docs.konghq.com/getting-started-guide/2.3.x/overview/>`_,
 `Apache <https://httpd.apache.org/docs/current/mod/mod_proxy_http.html>`_,
 `Caddy <https://caddyserver.com/docs/quick-starts/reverse-proxy>`_,
 `HAProxy <https://www.haproxy.org/>`_ or

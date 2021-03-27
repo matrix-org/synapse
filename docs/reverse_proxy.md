@@ -2,6 +2,7 @@
 
 It is recommended to put a reverse proxy such as
 [nginx](https://nginx.org/en/docs/http/ngx_http_proxy_module.html),
+[Kong](https://docs.konghq.com/getting-started-guide/2.3.x/overview/),
 [Apache](https://httpd.apache.org/docs/current/mod/mod_proxy_http.html),
 [Caddy](https://caddyserver.com/docs/quick-starts/reverse-proxy),
 [HAProxy](https://www.haproxy.org/) or
@@ -65,6 +66,40 @@ server {
 
 **NOTE**: Do not add a path after the port in `proxy_pass`, otherwise nginx will
 canonicalise/normalise the URI.
+
+### Kong
+
+```yaml
+_format_version: "2.1"
+_transform: true
+
+# Synapse
+services:
+- name: synapse-service
+  url: http://127.0.0.1:8008
+  routes:
+  - name: synapse-client-route
+    paths:
+    - /_matrix
+    - /_synapse/client
+    strip_path: false
+  - name: synapse-admin-route
+    paths:
+    - /_synapse/admin
+    strip_path: false
+  plugins:
+  - name: ip-restriction
+    route: synapse-admin-route
+    config:
+      allow:
+      - x.x.x.x
+```
+
+**NOTE**: The `ip-restriction` built-in plugin is optional to restrict
+any route (in this case, the admin API) to one or more IP addresses.
+
+**NOTE 2**: The example above is using Kong's
+[DB-less configuration format](https://docs.konghq.com/gateway-oss/2.3.x/db-less-and-declarative-config/).
 
 ### Caddy 1
 
