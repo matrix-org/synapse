@@ -15,9 +15,9 @@
 # limitations under the License.
 import logging
 from io import BytesIO
-from typing import Tuple
+from typing import Callable, Tuple
 
-from PIL import Image
+from PIL import Image, ImageSequence
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class ThumbnailError(Exception):
 
 class Thumbnailer:
 
-    FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG"}
+    FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG", "image/gif": "GIF"}
 
     def __init__(self, input_path: str):
         try:
@@ -93,27 +93,16 @@ class Thumbnailer:
         else:
             return (max_height * self.width) // self.height, max_height
 
-    def _resize(self, width: int, height: int) -> Image:
-        # 1-bit or 8-bit color palette images need converting to RGB
-        # otherwise they will be scaled using nearest neighbour which
-        # looks awful.
-        #
-        # If the image has transparency, use RGBA instead.
-        if self.image.mode in ["1", "L", "P"]:
-            mode = "RGB"
-            if self.image.info.get("transparency", None) is not None:
-                mode = "RGBA"
-            self.image = self.image.convert(mode)
-        return self.image.resize((width, height), Image.ANTIALIAS)
-
     def scale(self, width: int, height: int, output_type: str) -> BytesIO:
         """Rescales the image to the given dimensions.
 
         Returns:
             BytesIO: the bytes of the encoded image ready to be written to disk
         """
-        scaled = self._resize(width, height)
-        return self._encode_image(scaled, output_type)
+
+        return self._process_animated_aware(
+            self.image, output_type, lambda i: self._resize(i, width, height)
+        )
 
     def crop(self, width: int, height: int, output_type: str) -> BytesIO:
         """Rescales and crops the image to the given dimensions preserving
@@ -129,24 +118,62 @@ class Thumbnailer:
         Returns:
             BytesIO: the bytes of the encoded image ready to be written to disk
         """
+
+        return self._process_animated_aware(
+            self.image, output_type, lambda i: self._crop(i, width, height)
+        )
+
+    def _process_animated_aware(
+        self, image: Image, output_type: str, transform: "Callable[[Image], Image]"
+    ) -> BytesIO:
+        if self.FORMATS[output_type] == "GIF" and getattr(image, "n_frames", 1) > 1:
+            first, *rest = (transform(i) for i in ImageSequence.Iterator(image))
+            return self._encode_image(first, output_type, append_images=rest)
+        else:
+            return self._encode_image(transform(image), output_type)
+
+    def _crop(self, image: Image, width: int, height: int) -> Image:
         if width * self.height > height * self.width:
             scaled_height = (width * self.height) // self.width
-            scaled_image = self._resize(width, scaled_height)
+            scaled_image = self._resize(image, width, scaled_height)
             crop_top = (scaled_height - height) // 2
             crop_bottom = height + crop_top
             cropped = scaled_image.crop((0, crop_top, width, crop_bottom))
         else:
             scaled_width = (height * self.width) // self.height
-            scaled_image = self._resize(scaled_width, height)
+            scaled_image = self._resize(image, scaled_width, height)
             crop_left = (scaled_width - width) // 2
             crop_right = width + crop_left
             cropped = scaled_image.crop((crop_left, 0, crop_right, height))
-        return self._encode_image(cropped, output_type)
+        return cropped
 
-    def _encode_image(self, output_image: Image, output_type: str) -> BytesIO:
+    def _encode_image(
+        self, output_image: Image, output_type: str, **extra_options
+    ) -> BytesIO:
         output_bytes_io = BytesIO()
         fmt = self.FORMATS[output_type]
+
+        if fmt in {"JPEG", "PNG"}:
+            extra_options["quality"] = 80
+
         if fmt == "JPEG":
             output_image = output_image.convert("RGB")
-        output_image.save(output_bytes_io, fmt, quality=80)
+        elif fmt == "GIF":
+            extra_options.update({"save_all": True, "loop": 0})
+
+        output_image.save(output_bytes_io, fmt, **extra_options)
         return output_bytes_io
+
+    @staticmethod
+    def _resize(image: Image, width: int, height: int) -> Image:
+        # 1-bit or 8-bit color palette images need converting to RGB
+        # otherwise they will be scaled using nearest neighbour which
+        # looks awful.
+        #
+        # If the image has transparency, use RGBA instead.
+        if image.mode in ["1", "L", "P"]:
+            mode = "RGB"
+            if image.info.get("transparency", None) is not None:
+                mode = "RGBA"
+            image = image.convert(mode)
+        return image.resize((width, height), Image.ANTIALIAS)
