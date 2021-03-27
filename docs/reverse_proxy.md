@@ -73,7 +73,7 @@ canonicalise/normalise the URI.
 _format_version: "2.1"
 _transform: true
 
-## Synapse
+# Synapse
 services:
 - name: synapse-service
   url: http://127.0.0.1:8008
