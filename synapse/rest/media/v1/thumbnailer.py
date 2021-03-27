@@ -159,7 +159,7 @@ class Thumbnailer:
         if fmt == "JPEG":
             output_image = output_image.convert("RGB")
         elif fmt == "GIF":
-            extra_options.update({"save_all": True, "loop": 0})
+            extra_options.update({"save_all": True, "optimize": True})
 
         output_image.save(output_bytes_io, fmt, **extra_options)
         return output_bytes_io
