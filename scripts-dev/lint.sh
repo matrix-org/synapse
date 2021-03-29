@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Runs linting scripts over the local Synapse checkout
 # isort - sorts import statements

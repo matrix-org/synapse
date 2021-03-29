@@ -147,7 +147,6 @@ from synapse.storage.databases.main.user_directory import UserDirectoryStore
 from synapse.types import ReadReceipt
 from synapse.util.async_helpers import Linearizer
 from synapse.util.httpresourcetree import create_resource_tree
-from synapse.util.manhole import manhole
 from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger("synapse.app.generic_worker")
@@ -641,12 +640,8 @@ class GenericWorkerServer(HomeServer):
             if listener.type == "http":
                 self._listen_http(listener)
             elif listener.type == "manhole":
-                _base.listen_tcp(
-                    listener.bind_addresses,
-                    listener.port,
-                    manhole(
-                        username="matrix", password="rabbithole", globals={"hs": self}
-                    ),
+                _base.listen_manhole(
+                    listener.bind_addresses, listener.port, manhole_globals={"hs": self}
                 )
             elif listener.type == "metrics":
                 if not self.get_config().enable_metrics:

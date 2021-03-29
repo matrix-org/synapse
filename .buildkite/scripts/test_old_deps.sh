@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # this script is run by buildkite in a plain `xenial` container; it installs the
 # minimal requirements for tox and hands over to the py35-old tox environment.
