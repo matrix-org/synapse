@@ -37,7 +37,7 @@ class ApiConfig(Config):
 
         return """\
         ## API Configuration ##
-        
+
         # Controls for the state that is shared with users who receive an invite
         # to a room
         #
@@ -51,7 +51,7 @@ class ApiConfig(Config):
            # types listed in 'additional_event_types' are shared). Defaults to 'false'.
            #
            #disable_default_event_types: true
-        
+
            # Additional state event types to share with users when they are invited
            # to a room.
            #
