@@ -649,7 +649,14 @@ try:
                 "",
                 labels=["type"],
             )
-            for t in ("allocated", "active", "resident", "mapped", "retained"):
+            for t in (
+                "allocated",
+                "active",
+                "resident",
+                "mapped",
+                "retained",
+                "metadata",
+            ):
                 g.add_metric([t], value=get_val(f"stats.{t}"))
 
             yield g
