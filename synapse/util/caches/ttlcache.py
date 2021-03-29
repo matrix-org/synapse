@@ -15,7 +15,7 @@
 
 import logging
 import time
-from typing import Callable, Dict, Generic, Tuple, TypeVar, Union
+from typing import Any, Callable, Dict, Generic, Tuple, TypeVar, Union
 
 import attr
 from sortedcontainers import SortedList
@@ -24,7 +24,7 @@ from synapse.util.caches import register_cache
 
 logger = logging.getLogger(__name__)
 
-SENTINEL = object()
+SENTINEL = object()  # type: Any
 
 T = TypeVar("T")
 KT = TypeVar("KT")
@@ -65,7 +65,7 @@ class TTLCache(Generic[KT, VT]):
         self._data[key] = entry
         self._expiry_list.add(entry)
 
-    def get(self, key: KT, default: T = SENTINEL) -> Union[VT, T]:  # type: ignore
+    def get(self, key: KT, default: T = SENTINEL) -> Union[VT, T]:
         """Get a value from the cache
 
         Args:
