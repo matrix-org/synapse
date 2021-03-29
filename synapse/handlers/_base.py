@@ -92,11 +92,6 @@ class BaseHandler:
         if app_service is not None:
             return  # do not ratelimit app service senders
 
-        # Disable rate limiting of users belonging to any AS that is configured
-        # not to be rate limited in its registration file (rate_limited: true|false).
-        if requester.app_service and not requester.app_service.is_rate_limited():
-            return
-
         messages_per_second = self._rc_message.per_second
         burst_count = self._rc_message.burst_count
 

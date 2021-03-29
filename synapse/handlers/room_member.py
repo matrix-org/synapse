@@ -432,9 +432,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         if effective_membership_state == Membership.INVITE:
             target_id = target.to_string()
             if ratelimit:
-                # Don't ratelimit application services.
-                if not requester.app_service or requester.app_service.is_rate_limited():
-                    await self.ratelimit_invite(requester, room_id, target_id)
+                await self.ratelimit_invite(requester, room_id, target_id)
 
             # block any attempts to invite the server notices mxid
             if target_id == self._server_notices_mxid:
