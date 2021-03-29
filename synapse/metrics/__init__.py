@@ -656,7 +656,7 @@ try:
                 "jemalloc_stats_retained", "", value=get_val(b"stats.retained")
             )
 
-    REGISTRY.register(JemallocCollector)
+    REGISTRY.register(JemallocCollector())
 
 
 except Exception:
