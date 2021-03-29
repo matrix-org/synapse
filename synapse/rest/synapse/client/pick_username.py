@@ -104,6 +104,9 @@ class AccountDetailsResource(DirectServeHtmlResource):
         respond_with_html(request, 200, html)
 
     async def _async_render_POST(self, request: SynapseRequest):
+        # This will always be set by the time Twisted calls us.
+        assert request.args is not None
+
         try:
             session_id = get_username_mapping_session_cookie_from_request(request)
         except SynapseError as e:
