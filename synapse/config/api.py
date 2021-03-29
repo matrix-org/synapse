@@ -88,6 +88,10 @@ class ApiConfig(Config):
         if not room_prejoin_state_config.get("disable_default_event_types"):
             yield from _DEFAULT_PREJOIN_STATE_TYPES
 
+            if self.spaces_enabled:
+                # MSC1772 suggests adding m.room.create to the prejoin state
+                yield EventTypes.Create
+
         yield from room_prejoin_state_config.get("additional_event_types", [])
 
 
