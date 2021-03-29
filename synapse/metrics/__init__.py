@@ -660,4 +660,4 @@ try:
 
 
 except Exception:
-    pass
+    logger.exception("Failed to start jemalloc metrics")
