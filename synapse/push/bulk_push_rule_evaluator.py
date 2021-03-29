@@ -345,6 +345,15 @@ class RulesForRoom:
         # to self around in the callback.
         self.invalidate_all_cb = _Invalidation(rules_for_room_cache, room_id)
 
+    def get_data_for_memory_size(self):
+        return (
+            self.member_map,
+            self.rules_by_user,
+            self.state_group,
+            self.sequence,
+            self.uninteresting_user_set,
+        )
+
     async def get_rules(
         self, event: EventBase, context: EventContext
     ) -> Dict[str, List[Dict[str, dict]]]:

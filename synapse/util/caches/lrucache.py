@@ -67,8 +67,12 @@ class _Node:
         self.value = value
         self.callbacks = callbacks
 
-        if asizeof and not (value.__class__ and value.__class__.endswith("_JoinedHostsCache"):
-            self.memory = asizeof.asizeof(key) + asizeof.asizeof(value)
+        if asizeof:
+            data = getattr(value, "get_data_for_memory_size", None)
+            if data:
+                self.memory = asizeof.asizeof(key) + asizeof.asizeof(data)
+            else:
+                self.memory = asizeof.asizeof(key) + asizeof.asizeof(value)
         else:
             self.memory = 0
 

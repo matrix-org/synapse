@@ -1043,6 +1043,9 @@ class _JoinedHostsCache:
 
         self._len = 0
 
+    def get_data_for_memory_size(self):
+        return (self.hosts_to_joined_users, self.state_group)
+
     async def get_destinations(self, state_entry: "_StateCacheEntry") -> Set[str]:
         """Get set of destinations for a state entry
 
