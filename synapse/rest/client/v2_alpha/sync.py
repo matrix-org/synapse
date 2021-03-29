@@ -91,6 +91,9 @@ class SyncRestServlet(RestServlet):
         self._event_serializer = hs.get_event_client_serializer()
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        # This will always be set by the time Twisted calls us.
+        assert request.args is not None
+
         if b"from" in request.args:
             # /events used to use 'from', but /sync uses 'since'.
             # Lets be helpful and whine if we see a 'from'.
