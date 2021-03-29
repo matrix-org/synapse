@@ -59,6 +59,8 @@ class JoinRules:
     KNOCK = "knock"
     INVITE = "invite"
     PRIVATE = "private"
+    # As defined for MSC2962.
+    MSC2962_RESTRICTED = "restricted"
 
 
 class LoginType:

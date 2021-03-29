@@ -207,6 +207,36 @@ class EventAuthTestCase(unittest.TestCase):
                 do_sig_check=False,
             )
 
+    def test_msc2962_join_rules(self):
+        """
+        Test joining an MSC2962 restricted join_rule room.
+        """
+        creator = "@creator:example.com"
+        pleb = "@joiner:example.com"
+
+        auth_events = {
+            ("m.room.create", ""): _create_event(creator),
+            ("m.room.member", creator): _join_event(creator),
+            ("m.room.join_rules", ""): _join_rules_event(creator, "restricted"),
+        }
+
+        # Older room versions don't understand this join rule.
+        with self.assertRaises(AuthError):
+            event_auth.check(
+                RoomVersions.V6,
+                _join_event(pleb),
+                auth_events,
+                do_sig_check=False,
+            )
+
+        # This completes successfully.
+        event_auth.check(
+            RoomVersions.MSC2962,
+            _join_event(pleb),
+            auth_events,
+            do_sig_check=False,
+        )
+
 
 # helpers for making events
 
@@ -234,6 +264,7 @@ def _join_event(user_id):
             "sender": user_id,
             "state_key": user_id,
             "content": {"membership": "join"},
+            "prev_events": [],
         }
     )
 
@@ -273,6 +304,21 @@ def _random_state_event(sender):
             "sender": sender,
             "state_key": "",
             "content": {"membership": "join"},
+        }
+    )
+
+
+def _join_rules_event(sender, join_rule):
+    return make_event_from_dict(
+        {
+            "room_id": TEST_ROOM_ID,
+            "event_id": _get_event_id(),
+            "type": "m.room.join_rules",
+            "sender": sender,
+            "state_key": "",
+            "content": {
+                "join_rule": join_rule,
+            },
         }
     )
 
