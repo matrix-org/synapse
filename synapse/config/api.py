@@ -28,7 +28,7 @@ class ApiConfig(Config):
 
     def read_config(self, config: JsonDict, **kwargs):
         validate_config(_MAIN_SCHEMA, config, ())
-        self.room_prejoin_state = list(_get_prejoin_state_types(config))
+        self.room_prejoin_state = list(self._get_prejoin_state_types(config))
 
     def generate_config_section(cls, **kwargs) -> str:
         formatted_default_state_types = "\n".join(
@@ -63,33 +63,32 @@ class ApiConfig(Config):
             "formatted_default_state_types": formatted_default_state_types
         }
 
+    def _get_prejoin_state_types(self, config: JsonDict) -> Iterable[str]:
+        """Get the event types to include in the prejoin state
 
-def _get_prejoin_state_types(config: JsonDict) -> Iterable[str]:
-    """Get the event types to include in the prejoin state
+        Parsees the config and returns an iterable of the event types to be included.
+        """
+        room_prejoin_state_config = config.get("room_prejoin_state") or {}
 
-    Parsees the config and returns an iterable of the event types to be included.
-    """
-    room_prejoin_state_config = config.get("room_prejoin_state") or {}
+        # backwards-compatibility support for room_invite_state_types
+        if "room_invite_state_types" in config:
+            # if both "room_invite_state_types" and "room_prejoin_state" are set, then
+            # we don't really know what to do.
+            if room_prejoin_state_config:
+                raise ConfigError(
+                    "Can't specify both 'room_invite_state_types' and 'room_prejoin_state' "
+                    "in config"
+                )
 
-    # backwards-compatibility support for room_invite_state_types
-    if "room_invite_state_types" in config:
-        # if both "room_invite_state_types" and "room_prejoin_state" are set, then
-        # we don't really know what to do.
-        if room_prejoin_state_config:
-            raise ConfigError(
-                "Can't specify both 'room_invite_state_types' and 'room_prejoin_state' "
-                "in config"
-            )
+            logger.warning(_ROOM_INVITE_STATE_TYPES_WARNING)
 
-        logger.warning(_ROOM_INVITE_STATE_TYPES_WARNING)
+            yield from config["room_invite_state_types"]
+            return
 
-        yield from config["room_invite_state_types"]
-        return
+        if not room_prejoin_state_config.get("disable_default_event_types"):
+            yield from _DEFAULT_PREJOIN_STATE_TYPES
 
-    if not room_prejoin_state_config.get("disable_default_event_types"):
-        yield from _DEFAULT_PREJOIN_STATE_TYPES
-
-    yield from room_prejoin_state_config.get("additional_event_types", [])
+        yield from room_prejoin_state_config.get("additional_event_types", [])
 
 
 _ROOM_INVITE_STATE_TYPES_WARNING = """\
