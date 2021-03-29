@@ -187,6 +187,8 @@ class PreviewUrlResource(DirectServeJsonResource):
         respond_with_json(request, 200, {}, send_cors=True)
 
     async def _async_render_GET(self, request: SynapseRequest) -> None:
+        # This will always be set by the time Twisted calls us.
+        assert request.args is not None
 
         # XXX: if get_user_by_req fails, what should we do in an async render?
         requester = await self.auth.get_user_by_req(request)

@@ -1,0 +1,1 @@
+Fix undetected mypy error when using Python 3.6.
