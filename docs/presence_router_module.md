@@ -27,7 +27,8 @@ async def ModuleApi.send_local_online_presence_to(users: Iterable[str]) -> None
 
 which can be given a list of local or remote MXIDs to broadcast known, online user
 presence to (for those users that the receiving user is considered interested in). 
-It does not include state for users who are currently offline.
+It does not include state for users who are currently offline, and it can only be
+called on workers that support sending federation.
 
 ### Module structure
 

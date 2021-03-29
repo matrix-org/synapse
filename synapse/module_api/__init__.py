@@ -51,7 +51,6 @@ class ModuleApi:
         self._auth_handler = auth_handler
         self._server_name = hs.hostname
         self._presence_stream = hs.get_event_sources().sources["presence"]
-        self._federation_sender = hs.get_federation_sender()
 
         # We expose these as properties below in order to attach a helpful docstring.
         self._http_client = hs.get_simple_http_client()  # type: SimpleHttpClient
@@ -400,7 +399,16 @@ class ModuleApi:
 
         Updates to remote users will be sent immediately, whereas local users will receive
         them on their next sync attempt.
+
+        Note that this method can only be run on the main or federation_sender worker
+        processes.
         """
+        if not self._hs.should_send_presence:
+            raise Exception(
+                "send_local_online_presence_to can only be run "
+                "on processes that send federation",
+            )
+
         for user in users:
             if self._hs.is_mine_id(user):
                 # Modify SyncHandler._generate_sync_entry_for_presence to call
@@ -419,7 +427,9 @@ class ModuleApi:
 
                 # Send to remote destinations
                 await make_deferred_yieldable(
-                    self._federation_sender.send_presence(presence_events)
+                    # We pull the federation sender here as we can only do so on workers
+                    # that support sending presence
+                    self._hs.get_federation_sender().send_presence(presence_events)
                 )
 
 
