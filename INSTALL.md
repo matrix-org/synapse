@@ -554,6 +554,7 @@ Alternatively, you can do so from the command line. This can be done as follows:
     ```
 
 This will prompt you to add details for the new user. For example:
+```
 New user localpart: erikj
 Password:
 Confirm password:
