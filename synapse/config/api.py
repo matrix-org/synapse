@@ -55,7 +55,7 @@ class ApiConfig(Config):
            # Additional state event types to share with users when they are invited
            # to a room.
            #
-           # By default, this list is empty (so only the default event types are shared)
+           # By default, this list is empty (so only the default event types are shared).
            #
            #additional_event_types:
            #  - org.example.custom.event.type
@@ -66,7 +66,7 @@ class ApiConfig(Config):
     def _get_prejoin_state_types(self, config: JsonDict) -> Iterable[str]:
         """Get the event types to include in the prejoin state
 
-        Parsees the config and returns an iterable of the event types to be included.
+        Parses the config and returns an iterable of the event types to be included.
         """
         room_prejoin_state_config = config.get("room_prejoin_state") or {}
 
@@ -94,7 +94,7 @@ class ApiConfig(Config):
 _ROOM_INVITE_STATE_TYPES_WARNING = """\
 WARNING: The 'room_invite_state_types' configuration setting is now deprecated,
 and replaced with 'room_prejoin_state'. New features may not work correctly
-unless room_invite_state_types is removed. See the sample configuration file for
+unless 'room_invite_state_types' is removed. See the sample configuration file for
 details of 'room_prejoin_state'.
 --------------------------------------------------------------------------------
 """
