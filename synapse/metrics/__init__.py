@@ -648,7 +648,6 @@ try:
                 "jemalloc_stats_app_memory",
                 "",
                 labels=["type"],
-                value=get_val(b"stats.allocated"),
             )
             for t in ("allocated", "active", "resident", "mapped", "retained"):
                 g.add_metric([t], value=get_val(f"stats.{t}"))
