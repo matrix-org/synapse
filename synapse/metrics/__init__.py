@@ -614,3 +614,50 @@ __all__ = [
     "InFlightGauge",
     "BucketCollector",
 ]
+
+
+try:
+    import ctypes
+    import ctypes.util
+
+    jemalloc = ctypes.CDLL(ctypes.util.find_library("jemalloc"))
+
+    def get_val(name):
+        allocated = ctypes.c_size_t(0)
+        allocated_len = ctypes.c_size_t(ctypes.sizeof(allocated))
+        jemalloc.mallctl(
+            name, ctypes.byref(allocated), ctypes.byref(allocated_len), None, None
+        )
+        return allocated.value
+
+    def refresh_stats():
+        epoch = ctypes.c_uint64(0)
+        jemalloc.mallctl(
+            b"epoch", None, None, ctypes.byref(epoch), ctypes.sizeof(epoch)
+        )
+
+    class JemallocCollector(object):
+        def collect(self):
+            refresh_stats()
+
+            yield GaugeMetricFamily(
+                "jemalloc_stats_allocated", "", value=get_val(b"stats.allocated")
+            )
+            yield GaugeMetricFamily(
+                "jemalloc_stats_active", "", value=get_val(b"stats.active")
+            )
+            yield GaugeMetricFamily(
+                "jemalloc_stats_resident", "", value=get_val(b"stats.resident")
+            )
+            yield GaugeMetricFamily(
+                "jemalloc_stats_mapped", "", value=get_val(b"stats.mapped")
+            )
+            yield GaugeMetricFamily(
+                "jemalloc_stats_retained", "", value=get_val(b"stats.retained")
+            )
+
+    REGISTRY.register(JemallocCollector)
+
+
+except Exception:
+    pass
