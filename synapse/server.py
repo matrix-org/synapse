@@ -61,7 +61,7 @@ from synapse.federation.federation_server import (
     FederationServer,
 )
 from synapse.federation.send_queue import FederationRemoteSendQueue
-from synapse.federation.sender import FederationSender
+from synapse.federation.sender import AbstractFederationSender, FederationSender
 from synapse.federation.transport.client import TransportLayerClient
 from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
 from synapse.groups.groups_server import GroupsServerHandler, GroupsServerWorkerHandler
@@ -576,7 +576,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return TransportLayerClient(self)
 
     @cache_in_self
-    def get_federation_sender(self):
+    def get_federation_sender(self) -> AbstractFederationSender:
         if self.should_send_federation():
             return FederationSender(self)
         elif not self.config.worker_app:
