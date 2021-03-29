@@ -626,7 +626,11 @@ try:
         allocated = ctypes.c_size_t(0)
         allocated_len = ctypes.c_size_t(ctypes.sizeof(allocated))
         jemalloc.mallctl(
-            name, ctypes.byref(allocated), ctypes.byref(allocated_len), None, None
+            name.encode("ascii"),
+            ctypes.byref(allocated),
+            ctypes.byref(allocated_len),
+            None,
+            None,
         )
         return allocated.value
 
@@ -640,21 +644,16 @@ try:
         def collect(self):
             refresh_stats()
 
-            yield GaugeMetricFamily(
-                "jemalloc_stats_allocated", "", value=get_val(b"stats.allocated")
+            g = GaugeMetricFamily(
+                "jemalloc_stats_app_memory",
+                "",
+                labels=["type"],
+                value=get_val(b"stats.allocated"),
             )
-            yield GaugeMetricFamily(
-                "jemalloc_stats_active", "", value=get_val(b"stats.active")
-            )
-            yield GaugeMetricFamily(
-                "jemalloc_stats_resident", "", value=get_val(b"stats.resident")
-            )
-            yield GaugeMetricFamily(
-                "jemalloc_stats_mapped", "", value=get_val(b"stats.mapped")
-            )
-            yield GaugeMetricFamily(
-                "jemalloc_stats_retained", "", value=get_val(b"stats.retained")
-            )
+            for t in ("allocated", "active", "resident", "mapped", "retained"):
+                g.add_metric([t], value=get_val(f"stats.{t}"))
+
+            yield g
 
     REGISTRY.register(JemallocCollector())
 
