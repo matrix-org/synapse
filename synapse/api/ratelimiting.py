@@ -112,6 +112,12 @@ class Ratelimiter:
                 * The reactor timestamp for when the action can be performed next.
                   -1 if rate_hz is less than or equal to zero
         """
+        if requester:
+            # Disable rate limiting of users belonging to any AS that is configured
+            # not to be rate limited in its registration file (rate_limited: true|false).
+            if requester.app_service and not requester.app_service.is_rate_limited():
+                return True, -1.0
+
         # Override default values if set
         time_now_s = _time_now_s if _time_now_s is not None else self.clock.time()
         rate_hz = rate_hz if rate_hz is not None else self.rate_hz
