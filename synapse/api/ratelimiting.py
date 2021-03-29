@@ -122,6 +122,18 @@ class Ratelimiter:
             if requester.app_service and not requester.app_service.is_rate_limited():
                 return True, -1.0
 
+            # Check if ratelimiting has been disabled for the user.
+            #
+            # Note that we don't use the returned rate/burst count, as the table
+            # is specifically for the event sending ratelimiter. Instead, we
+            # only use it to (somewhat cheekily) infer whether the user should
+            # be subject to any rate limiting or not.
+            override = await self.store.get_ratelimit_for_user(
+                requester.authenticated_entity
+            )
+            if override and not override.messages_per_second:
+                return True, -1.0
+
         # Override default values if set
         time_now_s = _time_now_s if _time_now_s is not None else self.clock.time()
         rate_hz = rate_hz if rate_hz is not None else self.rate_hz
