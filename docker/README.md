@@ -253,9 +253,15 @@ when running the container. All possible worker names are defined by the keys of
 `WORKERS_CONFIG` variable in [this script](configure_workers_and_start.py), which the
 Dockerfile makes use of to generate appropriate worker, nginx and supervisord config files.
 
-Otherwise, `SYNAPSE_WORKERS` can be set to `*` to use all possible workers, or either left
-empty or unset to spawn no workers (leaving only the main process). The container is
-configured to use redis-based worker mode.
+Sharding is supported for a subset of workers, in line with the [worker documentation]
+(../docs/workers.md). To run multiple instances of a given worker type, simply specify 
+the type multiple times in `SYNAPSE_WORKERS`
+(e.g `SYNAPSE_WORKERS=event_creator,event_creator...`).
 
-Note that currently only one instance of a worker can be spun up at once, but this may
-improve in the future.
+Otherwise, `SYNAPSE_WORKERS` can either be left empty or unset to spawn no workers (
+leaving only the main process). The container is configured to use redis-based worker
+mode.
+
+Setting `SYNAPSE_WORKERS_WRITE_LOGS_TO_DISK=1` will cause worker logs to be written to 
+`<data_dir>/logs/<worker_name>.log`. Logs are kept for 1 week and rotate every day at 
+00:00, according to the container's clock.
