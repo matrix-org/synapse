@@ -1,1 +1,0 @@
-Speed up Docker builds and make it nicer to test against Complement while developing (install all dependencies before copying the project).
