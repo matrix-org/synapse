@@ -1,0 +1,1 @@
+Replace deprecated `imp` module with successor `importlib`. Contributed by Cristina Muñoz.
