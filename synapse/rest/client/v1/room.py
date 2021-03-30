@@ -284,6 +284,74 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         )
 
 
+class RoomBulkSendEventRestServlet(TransactionRestServlet):
+    def __init__(self, hs):
+        super().__init__(hs)
+        self.event_creation_handler = hs.get_event_creation_handler()
+        self.auth = hs.get_auth()
+
+        self._msc2716_enabled = hs.config.experimental.msc2716_enabled
+
+    def register(self, http_server):
+        # /rooms/$roomid/bulksend
+        PATTERNS = "/rooms/(?P<room_id>[^/]*)/bulksend"
+        register_txn_path(self, PATTERNS, http_server, with_get=True)
+
+    async def on_POST(self, request, room_id):
+        requester = await self.auth.get_user_by_req(request, allow_guest=False)
+        body = parse_json_object_from_request(request)
+        prev_events = parse_strings_from_args(request.args, "prev_event")
+
+        auth_event_ids = []
+        for stateEv in body.state_events_at_start:
+            event_dict = {
+                "type": stateEv.type,
+                "content": stateEv.content,
+                "room_id": room_id,
+                "sender": stateEv.sender,  # requester.user.to_string(),
+            }
+
+            # Make the events float off in their own
+            fake_prev_event_id = "$" + random_string(43)
+
+            # Also mark the event as an outlier outside of the normal DAG
+            (event, _,) = await self.event_creation_handler.create_event(
+                requester, event_dict, prev_event_ids=[fake_prev_event_id], outlier=True
+            )
+            event_id = event.event_id
+            auth_event_ids.append(event_id)
+
+        prev_event_ids = prev_events
+        for ev in body.events:
+            event_dict = {
+                "type": ev.type,
+                "content": ev.content,
+                "room_id": room_id,
+                "sender": ev.sender,  # requester.user.to_string(),
+            }
+
+            (event, _,) = await self.event_creation_handler.create_event(
+                requester,
+                event_dict,
+                # We are allowed to post these messages because we are referencing the
+                # floating auth state events that we just created above
+                auth_event_ids=auth_event_ids,
+                prev_event_ids=prev_event_ids,
+                inherit_depth=True,
+            )
+            event_id = event.event_id
+
+            prev_event_ids = [event_id]
+
+        return 200, {"foo": "bar"}
+
+    def on_GET(self, request, room_id, event_type, txn_id):
+        return 501, "Not implemented"
+
+    def on_PUT(self, request, room_id, event_type, txn_id):
+        return 501, "Not implemented"
+
+
 # TODO: Needs unit testing for room ID + alias joins
 class JoinRoomAliasServlet(TransactionRestServlet):
     def __init__(self, hs):

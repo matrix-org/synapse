@@ -455,6 +455,7 @@ class EventCreationHandler:
         inherit_depth: bool = False,
         auth_event_ids: Optional[List[str]] = None,
         require_consent: bool = True,
+        outlier: bool = False,
     ) -> Tuple[EventBase, EventContext]:
         """
         Given a dict from a client, create a new event.
@@ -538,6 +539,8 @@ class EventCreationHandler:
 
         if txn_id is not None:
             builder.internal_metadata.txn_id = txn_id
+
+        builder.internal_metadata.outlier = outlier
 
         event, context = await self.create_new_client_event(
             builder=builder,
