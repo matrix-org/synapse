@@ -1472,7 +1472,7 @@ room_prejoin_state:
    # Additional state event types to share with users when they are invited
    # to a room.
    #
-   # By default, this list is empty (so only the default event types are shared)
+   # By default, this list is empty (so only the default event types are shared).
    #
    #additional_event_types:
    #  - org.example.custom.event.type
