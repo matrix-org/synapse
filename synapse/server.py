@@ -329,6 +329,7 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_registration_ratelimiter(self) -> Ratelimiter:
         return Ratelimiter(
+            store=self.get_datastore(),
             clock=self.get_clock(),
             rate_hz=self.config.rc_registration.per_second,
             burst_count=self.config.rc_registration.burst_count,
