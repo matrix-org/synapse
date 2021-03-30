@@ -2,7 +2,7 @@
 
 It is recommended to put a reverse proxy such as
 [nginx](https://nginx.org/en/docs/http/ngx_http_proxy_module.html),
-[Kong](https://docs.konghq.com/getting-started-guide/2.3.x/overview/),
+[Kong](https://docs.konghq.com/getting-started-guide/latest/overview/),
 [Apache](https://httpd.apache.org/docs/current/mod/mod_proxy_http.html),
 [Caddy](https://caddyserver.com/docs/quick-starts/reverse-proxy),
 [HAProxy](https://www.haproxy.org/) or
@@ -78,7 +78,7 @@ services:
 - name: synapse-service
   url: http://127.0.0.1:8008
   routes:
-  - name: synapse-client-route
+  - name: synapse-public-route
     paths:
     - /_matrix
     - /_synapse/client
@@ -99,7 +99,7 @@ services:
 any route (in this case, the admin API) to one or more IP addresses.
 
 **NOTE 2**: The example above is using Kong's
-[DB-less configuration format](https://docs.konghq.com/gateway-oss/2.3.x/db-less-and-declarative-config/).
+[DB-less configuration format](https://docs.konghq.com/gateway-oss/latest/db-less-and-declarative-config/).
 
 ### Caddy 1
 
