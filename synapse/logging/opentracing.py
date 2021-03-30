@@ -169,7 +169,7 @@ import inspect
 import logging
 import re
 from functools import wraps
-from typing import TYPE_CHECKING, Dict, Optional, Type
+from typing import TYPE_CHECKING, Dict, Optional, Pattern, Type
 
 import attr
 
@@ -262,7 +262,7 @@ logger = logging.getLogger(__name__)
 # Block everything by default
 # A regex which matches the server_names to expose traces for.
 # None means 'block everything'.
-_homeserver_whitelist = None
+_homeserver_whitelist = None  # type: Optional[Pattern[str]]
 
 # Util methods
 

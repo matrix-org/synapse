@@ -24,7 +24,7 @@ from ._base import Config, ConfigError
 _CACHE_PREFIX = "SYNAPSE_CACHE_FACTOR"
 
 # Map from canonicalised cache name to cache.
-_CACHES = {}
+_CACHES = {}  # type: Dict[str, Callable[[float], None]]
 
 # a lock on the contents of _CACHES
 _CACHES_LOCK = threading.Lock()
@@ -59,7 +59,9 @@ def _canonicalise_cache_name(cache_name: str) -> str:
     return cache_name.lower()
 
 
-def add_resizable_cache(cache_name: str, cache_resize_callback: Callable):
+def add_resizable_cache(
+    cache_name: str, cache_resize_callback: Callable[[float], None]
+):
     """Register a cache that's size can dynamically change
 
     Args:

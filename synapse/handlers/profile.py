@@ -36,7 +36,7 @@ from synapse.types import (
 from ._base import BaseHandler
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -310,6 +310,15 @@ class ProfileHandler(BaseHandler):
         await self._update_join_states(requester, target_user)
 
     async def on_profile_query(self, args: JsonDict) -> JsonDict:
+        """Handles federation profile query requests."""
+
+        if not self.hs.config.allow_profile_lookup_over_federation:
+            raise SynapseError(
+                403,
+                "Profile lookup over federation is disabled on this homeserver",
+                Codes.FORBIDDEN,
+            )
+
         user = UserID.from_string(args["user_id"])
         if not self.hs.is_mine(user):
             raise SynapseError(400, "User is not hosted on this homeserver")

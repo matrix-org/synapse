@@ -23,7 +23,7 @@ from synapse.types import Requester, UserID, create_requester
 from ._base import BaseHandler
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +119,11 @@ class DeactivateAccountHandler(BaseHandler):
         await self._auth_handler.delete_access_tokens_for_user(user_id)
 
         await self.store.user_set_password_hash(user_id, None)
+
+        # Most of the pushers will have been deleted when we logged out the
+        # associated devices above, but we still need to delete pushers not
+        # associated with devices, e.g. email pushers.
+        await self.store.delete_all_pushers_for_user(user_id)
 
         # Add the user to a table of users pending deactivation (ie.
         # removal from all the rooms they're a member of)

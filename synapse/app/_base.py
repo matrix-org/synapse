@@ -21,8 +21,10 @@ import signal
 import socket
 import sys
 import traceback
+import warnings
 from typing import Awaitable, Callable, Iterable
 
+from cryptography.utils import CryptographyDeprecationWarning
 from typing_extensions import NoReturn
 
 from twisted.internet import defer, error, reactor
@@ -193,6 +195,25 @@ def listen_metrics(bind_addresses, port):
     for host in bind_addresses:
         logger.info("Starting metrics listener on %s:%d", host, port)
         start_http_server(port, addr=host, registry=RegistryProxy)
+
+
+def listen_manhole(bind_addresses: Iterable[str], port: int, manhole_globals: dict):
+    # twisted.conch.manhole 21.1.0 uses "int_from_bytes", which produces a confusing
+    # warning. It's fixed by https://github.com/twisted/twisted/pull/1522), so
+    # suppress the warning for now.
+    warnings.filterwarnings(
+        action="ignore",
+        category=CryptographyDeprecationWarning,
+        message="int_from_bytes is deprecated",
+    )
+
+    from synapse.util.manhole import manhole
+
+    listen_tcp(
+        bind_addresses,
+        port,
+        manhole(username="matrix", password="rabbithole", globals=manhole_globals),
+    )
 
 
 def listen_tcp(bind_addresses, port, factory, reactor=reactor, backlog=50):

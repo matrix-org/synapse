@@ -24,7 +24,7 @@ from ._base import BaseSlavedStore
 from ._slaved_id_tracker import SlavedIdTracker
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 
 class SlavedPusherStore(PusherWorkerStore, BaseSlavedStore):

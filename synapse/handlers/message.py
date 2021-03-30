@@ -387,6 +387,12 @@ class EventCreationHandler:
 
         self.room_invite_state_types = self.hs.config.room_invite_state_types
 
+        self.membership_types_to_include_profile_data_in = (
+            {Membership.JOIN, Membership.INVITE}
+            if self.hs.config.include_profile_data_on_invite
+            else {Membership.JOIN}
+        )
+
         self.send_event = ReplicationSendEventRestServlet.make_client(hs)
 
         # This is only used to get at ratelimit function, and maybe_kick_guest_users
@@ -504,7 +510,7 @@ class EventCreationHandler:
             membership = builder.content.get("membership", None)
             target = UserID.from_string(builder.state_key)
 
-            if membership in {Membership.JOIN, Membership.INVITE}:
+            if membership in self.membership_types_to_include_profile_data_in:
                 # If event doesn't include a display name, add one.
                 profile = self.profile_handler
                 content = builder.content

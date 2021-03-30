@@ -22,8 +22,8 @@ from typing import IO, TYPE_CHECKING, Dict, List, Optional, Set, Tuple
 
 import twisted.internet.error
 import twisted.web.http
-from twisted.web.http import Request
 from twisted.web.resource import Resource
+from twisted.web.server import Request
 
 from synapse.api.errors import (
     FederationDeniedError,
@@ -35,6 +35,7 @@ from synapse.api.errors import (
 from synapse.config._base import ConfigError
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.types import UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import random_string
@@ -57,7 +58,7 @@ from .thumbnailer import Thumbnailer, ThumbnailError
 from .upload_resource import UploadResource
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +146,7 @@ class MediaRepository:
         upload_name: Optional[str],
         content: IO,
         content_length: int,
-        auth_user: str,
+        auth_user: UserID,
     ) -> str:
         """Store uploaded content for a local user and return the mxc URL
 
@@ -509,7 +510,7 @@ class MediaRepository:
         t_height: int,
         t_method: str,
         t_type: str,
-        url_cache: str,
+        url_cache: Optional[str],
     ) -> Optional[str]:
         input_path = await self.media_storage.ensure_media_is_in_local_cache(
             FileInfo(None, media_id, url_cache=url_cache)

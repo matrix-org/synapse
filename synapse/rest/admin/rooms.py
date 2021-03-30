@@ -44,6 +44,48 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class ResolveRoomIdMixin:
+    def __init__(self, hs: "HomeServer"):
+        self.room_member_handler = hs.get_room_member_handler()
+
+    async def resolve_room_id(
+        self, room_identifier: str, remote_room_hosts: Optional[List[str]] = None
+    ) -> Tuple[str, Optional[List[str]]]:
+        """
+        Resolve a room identifier to a room ID, if necessary.
+
+        This also performanes checks to ensure the room ID is of the proper form.
+
+        Args:
+            room_identifier: The room ID or alias.
+            remote_room_hosts: The potential remote room hosts to use.
+
+        Returns:
+            The resolved room ID.
+
+        Raises:
+            SynapseError if the room ID is of the wrong form.
+        """
+        if RoomID.is_valid(room_identifier):
+            resolved_room_id = room_identifier
+        elif RoomAlias.is_valid(room_identifier):
+            room_alias = RoomAlias.from_string(room_identifier)
+            (
+                room_id,
+                remote_room_hosts,
+            ) = await self.room_member_handler.lookup_room_alias(room_alias)
+            resolved_room_id = room_id.to_string()
+        else:
+            raise SynapseError(
+                400, "%s was not legal room ID or room alias" % (room_identifier,)
+            )
+        if not resolved_room_id:
+            raise SynapseError(
+                400, "Unknown room ID or room alias %s" % room_identifier
+            )
+        return resolved_room_id, remote_room_hosts
+
+
 class ShutdownRoomRestServlet(RestServlet):
     """Shuts down a room by removing all local users from the room and blocking
     all future invites and joins to the room. Any local aliases will be repointed
@@ -334,20 +376,23 @@ class RoomStateRestServlet(RestServlet):
         return 200, ret
 
 
-class JoinRoomAliasServlet(RestServlet):
+class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
 
     PATTERNS = admin_patterns("/join/(?P<room_identifier>[^/]*)")
 
     def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
         self.hs = hs
         self.auth = hs.get_auth()
-        self.room_member_handler = hs.get_room_member_handler()
         self.admin_handler = hs.get_admin_handler()
         self.state_handler = hs.get_state_handler()
 
     async def on_POST(
         self, request: SynapseRequest, room_identifier: str
     ) -> Tuple[int, JsonDict]:
+        # This will always be set by the time Twisted calls us.
+        assert request.args is not None
+
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
 
@@ -362,22 +407,16 @@ class JoinRoomAliasServlet(RestServlet):
         if not await self.admin_handler.get_user(target_user):
             raise NotFoundError("User not found")
 
-        if RoomID.is_valid(room_identifier):
-            room_id = room_identifier
-            try:
-                remote_room_hosts = [
-                    x.decode("ascii") for x in request.args[b"server_name"]
-                ]  # type: Optional[List[str]]
-            except Exception:
-                remote_room_hosts = None
-        elif RoomAlias.is_valid(room_identifier):
-            handler = self.room_member_handler
-            room_alias = RoomAlias.from_string(room_identifier)
-            room_id, remote_room_hosts = await handler.lookup_room_alias(room_alias)
-        else:
-            raise SynapseError(
-                400, "%s was not legal room ID or room alias" % (room_identifier,)
-            )
+        # Get the room ID from the identifier.
+        try:
+            remote_room_hosts = [
+                x.decode("ascii") for x in request.args[b"server_name"]
+            ]  # type: Optional[List[str]]
+        except Exception:
+            remote_room_hosts = None
+        room_id, remote_room_hosts = await self.resolve_room_id(
+            room_identifier, remote_room_hosts
+        )
 
         fake_requester = create_requester(
             target_user, authenticated_entity=requester.authenticated_entity
@@ -412,7 +451,7 @@ class JoinRoomAliasServlet(RestServlet):
         return 200, {"room_id": room_id}
 
 
-class MakeRoomAdminRestServlet(RestServlet):
+class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
     """Allows a server admin to get power in a room if a local user has power in
     a room. Will also invite the user if they're not in the room and it's a
     private room. Can specify another user (rather than the admin user) to be
@@ -427,29 +466,21 @@ class MakeRoomAdminRestServlet(RestServlet):
     PATTERNS = admin_patterns("/rooms/(?P<room_identifier>[^/]*)/make_room_admin")
 
     def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
         self.hs = hs
         self.auth = hs.get_auth()
-        self.room_member_handler = hs.get_room_member_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.state_handler = hs.get_state_handler()
         self.is_mine_id = hs.is_mine_id
 
-    async def on_POST(self, request, room_identifier):
+    async def on_POST(
+        self, request: SynapseRequest, room_identifier: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
         content = parse_json_object_from_request(request, allow_empty_body=True)
 
-        # Resolve to a room ID, if necessary.
-        if RoomID.is_valid(room_identifier):
-            room_id = room_identifier
-        elif RoomAlias.is_valid(room_identifier):
-            room_alias = RoomAlias.from_string(room_identifier)
-            room_id, _ = await self.room_member_handler.lookup_room_alias(room_alias)
-            room_id = room_id.to_string()
-        else:
-            raise SynapseError(
-                400, "%s was not legal room ID or room alias" % (room_identifier,)
-            )
+        room_id, _ = await self.resolve_room_id(room_identifier)
 
         # Which user to grant room admin rights to.
         user_to_add = content.get("user_id", requester.user.to_string())
@@ -556,7 +587,7 @@ class MakeRoomAdminRestServlet(RestServlet):
         return 200, {}
 
 
-class ForwardExtremitiesRestServlet(RestServlet):
+class ForwardExtremitiesRestServlet(ResolveRoomIdMixin, RestServlet):
     """Allows a server admin to get or clear forward extremities.
 
     Clearing does not require restarting the server.
@@ -571,43 +602,29 @@ class ForwardExtremitiesRestServlet(RestServlet):
     PATTERNS = admin_patterns("/rooms/(?P<room_identifier>[^/]*)/forward_extremities")
 
     def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
         self.hs = hs
         self.auth = hs.get_auth()
-        self.room_member_handler = hs.get_room_member_handler()
         self.store = hs.get_datastore()
 
-    async def resolve_room_id(self, room_identifier: str) -> str:
-        """Resolve to a room ID, if necessary."""
-        if RoomID.is_valid(room_identifier):
-            resolved_room_id = room_identifier
-        elif RoomAlias.is_valid(room_identifier):
-            room_alias = RoomAlias.from_string(room_identifier)
-            room_id, _ = await self.room_member_handler.lookup_room_alias(room_alias)
-            resolved_room_id = room_id.to_string()
-        else:
-            raise SynapseError(
-                400, "%s was not legal room ID or room alias" % (room_identifier,)
-            )
-        if not resolved_room_id:
-            raise SynapseError(
-                400, "Unknown room ID or room alias %s" % room_identifier
-            )
-        return resolved_room_id
-
-    async def on_DELETE(self, request, room_identifier):
+    async def on_DELETE(
+        self, request: SynapseRequest, room_identifier: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
 
-        room_id = await self.resolve_room_id(room_identifier)
+        room_id, _ = await self.resolve_room_id(room_identifier)
 
         deleted_count = await self.store.delete_forward_extremities_for_room(room_id)
         return 200, {"deleted": deleted_count}
 
-    async def on_GET(self, request, room_identifier):
+    async def on_GET(
+        self, request: SynapseRequest, room_identifier: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
 
-        room_id = await self.resolve_room_id(room_identifier)
+        room_id, _ = await self.resolve_room_id(room_identifier)
 
         extremities = await self.store.get_forward_extremities_for_room(room_id)
         return 200, {"count": len(extremities), "results": extremities}
@@ -623,14 +640,16 @@ class RoomEventContextServlet(RestServlet):
 
     PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]*)/context/(?P<event_id>[^/]*)$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.clock = hs.get_clock()
         self.room_context_handler = hs.get_room_context_handler()
         self._event_serializer = hs.get_event_client_serializer()
         self.auth = hs.get_auth()
 
-    async def on_GET(self, request, room_id, event_id):
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str, event_id: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=False)
         await assert_user_is_admin(self.auth, requester.user)
 
@@ -669,7 +688,10 @@ class RoomEventContextServlet(RestServlet):
             results["events_after"], time_now
         )
         results["state"] = await self._event_serializer.serialize_events(
-            results["state"], time_now
+            results["state"],
+            time_now,
+            # No need to bundle aggregations for state events
+            bundle_aggregations=False,
         )
 
         return 200, results

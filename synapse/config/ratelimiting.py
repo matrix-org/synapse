@@ -95,11 +95,21 @@ class RatelimitConfig(Config):
 
         self.rc_joins_local = RateLimitConfig(
             config.get("rc_joins", {}).get("local", {}),
-            defaults={"per_second": 0.1, "burst_count": 3},
+            defaults={"per_second": 0.1, "burst_count": 10},
         )
         self.rc_joins_remote = RateLimitConfig(
             config.get("rc_joins", {}).get("remote", {}),
-            defaults={"per_second": 0.01, "burst_count": 3},
+            defaults={"per_second": 0.01, "burst_count": 10},
+        )
+
+        # Ratelimit cross-user key requests:
+        # * For local requests this is keyed by the sending device.
+        # * For requests received over federation this is keyed by the origin.
+        #
+        # Note that this isn't exposed in the configuration as it is obscure.
+        self.rc_key_requests = RateLimitConfig(
+            config.get("rc_key_requests", {}),
+            defaults={"per_second": 20, "burst_count": 100},
         )
 
         self.rc_3pid_validation = RateLimitConfig(
@@ -177,10 +187,10 @@ class RatelimitConfig(Config):
         #rc_joins:
         #  local:
         #    per_second: 0.1
-        #    burst_count: 3
+        #    burst_count: 10
         #  remote:
         #    per_second: 0.01
-        #    burst_count: 3
+        #    burst_count: 10
         #
         #rc_3pid_validation:
         #  per_second: 0.003

@@ -85,23 +85,54 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+Upgrading to v1.29.0
+====================
+
+Requirement for X-Forwarded-Proto header
+----------------------------------------
+
+When using Synapse with a reverse proxy (in particular, when using the
+`x_forwarded` option on an HTTP listener), Synapse now expects to receive an
+`X-Forwarded-Proto` header on incoming HTTP requests. If it is not set, Synapse
+will log a warning on each received request.
+
+To avoid the warning, administrators using a reverse proxy should ensure that
+the reverse proxy sets `X-Forwarded-Proto` header to `https` or `http` to
+indicate the protocol used by the client.
+
+Synapse also requires the `Host` header to be preserved.
+
+See the `reverse proxy documentation <docs/reverse_proxy.md>`_, where the
+example configurations have been updated to show how to set these headers.
+
+(Users of `Caddy <https://caddyserver.com/>`_ are unaffected, since we believe it
+sets `X-Forwarded-Proto` by default.)
+
 Upgrading to v1.27.0
 ====================
 
-Changes to callback URI for OAuth2 / OpenID Connect
----------------------------------------------------
+Changes to callback URI for OAuth2 / OpenID Connect and SAML2
+-------------------------------------------------------------
 
-This version changes the URI used for callbacks from OAuth2 identity providers. If
-your server is configured for single sign-on via an OpenID Connect or OAuth2 identity
-provider, you will need to add ``[synapse public baseurl]/_synapse/client/oidc/callback``
-to the list of permitted "redirect URIs" at the identity provider.
+This version changes the URI used for callbacks from OAuth2 and SAML2 identity providers:
 
-See `docs/openid.md <docs/openid.md>`_ for more information on setting up OpenID
-Connect.
+* If your server is configured for single sign-on via an OpenID Connect or OAuth2 identity
+  provider, you will need to add ``[synapse public baseurl]/_synapse/client/oidc/callback``
+  to the list of permitted "redirect URIs" at the identity provider.
 
-(Note: a similar change is being made for SAML2; in this case the old URI
-``[synapse public baseurl]/_matrix/saml2`` is being deprecated, but will continue to
-work, so no immediate changes are required for existing installations.)
+  See `docs/openid.md <docs/openid.md>`_ for more information on setting up OpenID
+  Connect.
+
+* If your server is configured for single sign-on via a SAML2 identity provider, you will
+  need to add ``[synapse public baseurl]/_synapse/client/saml2/authn_response`` as a permitted
+  "ACS location" (also known as "allowed callback URLs") at the identity provider.
+
+  The "Issuer" in the "AuthnRequest" to the SAML2 identity provider is also updated to
+  ``[synapse public baseurl]/_synapse/client/saml2/metadata.xml``. If your SAML2 identity
+  provider uses this property to validate or otherwise identify Synapse, its configuration
+  will need to be updated to use the new URL. Alternatively you could create a new, separate
+  "EntityDescriptor" in your SAML2 identity provider with the new URLs and leave the URLs in
+  the existing "EntityDescriptor" as they were.
 
 Changes to HTML templates
 -------------------------

@@ -42,7 +42,9 @@ from synapse.logging.utils import log_function
 from synapse.storage._base import db_to_json, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.search import SearchEntry
+from synapse.storage.types import Connection
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
+from synapse.storage.util.sequence import SequenceGenerator
 from synapse.types import StateMap, get_domain_from_id
 from synapse.util import json_encoder
 from synapse.util.iterutils import batch_iter, sorted_topologically
@@ -90,7 +92,11 @@ class PersistEventsStore:
     """
 
     def __init__(
-        self, hs: "HomeServer", db: DatabasePool, main_data_store: "DataStore"
+        self,
+        hs: "HomeServer",
+        db: DatabasePool,
+        main_data_store: "DataStore",
+        db_conn: Connection,
     ):
         self.hs = hs
         self.db_pool = db
@@ -474,6 +480,7 @@ class PersistEventsStore:
         self._add_chain_cover_index(
             txn,
             self.db_pool,
+            self.store.event_chain_id_gen,
             event_to_room_id,
             event_to_types,
             event_to_auth_chain,
@@ -484,6 +491,7 @@ class PersistEventsStore:
         cls,
         txn,
         db_pool: DatabasePool,
+        event_chain_id_gen: SequenceGenerator,
         event_to_room_id: Dict[str, str],
         event_to_types: Dict[str, Tuple[str, str]],
         event_to_auth_chain: Dict[str, List[str]],
@@ -630,6 +638,7 @@ class PersistEventsStore:
         new_chain_tuples = cls._allocate_chain_ids(
             txn,
             db_pool,
+            event_chain_id_gen,
             event_to_room_id,
             event_to_types,
             event_to_auth_chain,
@@ -768,6 +777,7 @@ class PersistEventsStore:
     def _allocate_chain_ids(
         txn,
         db_pool: DatabasePool,
+        event_chain_id_gen: SequenceGenerator,
         event_to_room_id: Dict[str, str],
         event_to_types: Dict[str, Tuple[str, str]],
         event_to_auth_chain: Dict[str, List[str]],
@@ -880,7 +890,7 @@ class PersistEventsStore:
             chain_to_max_seq_no[new_chain_tuple[0]] = new_chain_tuple[1]
 
         # Generate new chain IDs for all unallocated chain IDs.
-        newly_allocated_chain_ids = db_pool.event_chain_id_gen.get_next_mult_txn(
+        newly_allocated_chain_ids = event_chain_id_gen.get_next_mult_txn(
             txn, len(unallocated_chain_ids)
         )
 
@@ -1260,8 +1270,10 @@ class PersistEventsStore:
                     logger.exception("")
                     raise
 
+                # update the stored internal_metadata to update the "outlier" flag.
+                # TODO: This is unused as of Synapse 1.31. Remove it once we are happy
+                #  to drop backwards-compatibility with 1.30.
                 metadata_json = json_encoder.encode(event.internal_metadata.get_dict())
-
                 sql = "UPDATE event_json SET internal_metadata = ? WHERE event_id = ?"
                 txn.execute(sql, (metadata_json, event.event_id))
 
@@ -1309,6 +1321,19 @@ class PersistEventsStore:
             d.pop("redacted_because", None)
             return d
 
+        def get_internal_metadata(event):
+            im = event.internal_metadata.get_dict()
+
+            # temporary hack for database compatibility with Synapse 1.30 and earlier:
+            # store the `outlier` flag inside the internal_metadata json as well as in
+            # the `events` table, so that if anyone rolls back to an older Synapse,
+            # things keep working. This can be removed once we are happy to drop support
+            # for that
+            if event.internal_metadata.is_outlier():
+                im["outlier"] = True
+
+            return im
+
         self.db_pool.simple_insert_many_txn(
             txn,
             table="event_json",
@@ -1317,7 +1342,7 @@ class PersistEventsStore:
                     "event_id": event.event_id,
                     "room_id": event.room_id,
                     "internal_metadata": json_encoder.encode(
-                        event.internal_metadata.get_dict()
+                        get_internal_metadata(event)
                     ),
                     "json": json_encoder.encode(event_dict(event)),
                     "format_version": event.format_version,

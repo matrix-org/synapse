@@ -18,7 +18,7 @@
 import functools
 import logging
 import re
-from typing import Optional, Tuple, Type
+from typing import Container, Mapping, Optional, Sequence, Tuple, Type
 
 import synapse
 from synapse.api.constants import MAX_GROUP_CATEGORYID_LENGTH, MAX_GROUP_ROLEID_LENGTH
@@ -29,7 +29,7 @@ from synapse.api.urls import (
     FEDERATION_V1_PREFIX,
     FEDERATION_V2_PREFIX,
 )
-from synapse.http.server import JsonResource
+from synapse.http.server import HttpServer, JsonResource
 from synapse.http.servlet import (
     parse_boolean_from_args,
     parse_integer_from_args,
@@ -44,7 +44,8 @@ from synapse.logging.opentracing import (
     whitelisted_homeserver,
 )
 from synapse.server import HomeServer
-from synapse.types import ThirdPartyInstanceID, get_domain_from_id
+from synapse.types import JsonDict, ThirdPartyInstanceID, get_domain_from_id
+from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import parse_and_validate_server_name
 from synapse.util.versionstring import get_version_string
 
@@ -484,10 +485,9 @@ class FederationQueryServlet(BaseFederationServlet):
 
     # This is when we receive a server-server Query
     async def on_GET(self, origin, content, query, query_type):
-        return await self.handler.on_query_request(
-            query_type,
-            {k.decode("utf8"): v[0].decode("utf-8") for k, v in query.items()},
-        )
+        args = {k.decode("utf8"): v[0].decode("utf-8") for k, v in query.items()}
+        args["origin"] = origin
+        return await self.handler.on_query_request(query_type, args)
 
 
 class FederationMakeJoinServlet(BaseFederationServlet):
@@ -1377,6 +1377,40 @@ class FederationGroupsSettingJoinPolicyServlet(BaseFederationServlet):
         return 200, new_content
 
 
+class FederationSpaceSummaryServlet(BaseFederationServlet):
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc2946"
+    PATH = "/spaces/(?P<room_id>[^/]*)"
+
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Mapping[bytes, Sequence[bytes]],
+        room_id: str,
+    ) -> Tuple[int, JsonDict]:
+        suggested_only = content.get("suggested_only", False)
+        if not isinstance(suggested_only, bool):
+            raise SynapseError(
+                400, "'suggested_only' must be a boolean", Codes.BAD_JSON
+            )
+
+        exclude_rooms = content.get("exclude_rooms", [])
+        if not isinstance(exclude_rooms, list) or any(
+            not isinstance(x, str) for x in exclude_rooms
+        ):
+            raise SynapseError(400, "bad value for 'exclude_rooms'", Codes.BAD_JSON)
+
+        max_rooms_per_space = content.get("max_rooms_per_space")
+        if max_rooms_per_space is not None and not isinstance(max_rooms_per_space, int):
+            raise SynapseError(
+                400, "bad value for 'max_rooms_per_space'", Codes.BAD_JSON
+            )
+
+        return 200, await self.handler.federation_space_summary(
+            room_id, suggested_only, max_rooms_per_space, exclude_rooms
+        )
+
+
 class RoomComplexityServlet(BaseFederationServlet):
     """
     Indicates to other servers how complex (and therefore likely
@@ -1475,18 +1509,24 @@ DEFAULT_SERVLET_GROUPS = (
 )
 
 
-def register_servlets(hs, resource, authenticator, ratelimiter, servlet_groups=None):
+def register_servlets(
+    hs: HomeServer,
+    resource: HttpServer,
+    authenticator: Authenticator,
+    ratelimiter: FederationRateLimiter,
+    servlet_groups: Optional[Container[str]] = None,
+):
     """Initialize and register servlet classes.
 
     Will by default register all servlets. For custom behaviour, pass in
     a list of servlet_groups to register.
 
     Args:
-        hs (synapse.server.HomeServer): homeserver
-        resource (JsonResource): resource class to register to
-        authenticator (Authenticator): authenticator to use
-        ratelimiter (util.ratelimitutils.FederationRateLimiter): ratelimiter to use
-        servlet_groups (list[str], optional): List of servlet groups to register.
+        hs: homeserver
+        resource: resource class to register to
+        authenticator: authenticator to use
+        ratelimiter: ratelimiter to use
+        servlet_groups: List of servlet groups to register.
             Defaults to ``DEFAULT_SERVLET_GROUPS``.
     """
     if not servlet_groups:
@@ -1496,6 +1536,14 @@ def register_servlets(hs, resource, authenticator, ratelimiter, servlet_groups=N
         for servletclass in FEDERATION_SERVLET_CLASSES:
             servletclass(
                 handler=hs.get_federation_server(),
+                authenticator=authenticator,
+                ratelimiter=ratelimiter,
+                server_name=hs.hostname,
+            ).register(resource)
+
+        if hs.config.experimental.spaces_enabled:
+            FederationSpaceSummaryServlet(
+                handler=hs.get_space_summary_handler(),
                 authenticator=authenticator,
                 ratelimiter=ratelimiter,
                 server_name=hs.hostname,
