@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Runs linting scripts over the local Synapse checkout
 # isort - sorts import statements
@@ -95,4 +95,4 @@ isort "${files[@]}"
 python3 -m black "${files[@]}"
 ./scripts-dev/config-lint.sh
 flake8 "${files[@]}"
-mypy
+dmypy run

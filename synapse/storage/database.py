@@ -1906,6 +1906,7 @@ class DatabasePool:
         retcols: Iterable[str],
         filters: Optional[Dict[str, Any]] = None,
         keyvalues: Optional[Dict[str, Any]] = None,
+        exclude_keyvalues: Optional[Dict[str, Any]] = None,
         order_direction: str = "ASC",
     ) -> List[Dict[str, Any]]:
         """
@@ -1929,7 +1930,10 @@ class DatabasePool:
                 apply a WHERE ? LIKE ? clause.
             keyvalues:
                 column names and values to select the rows with, or None to not
-                apply a WHERE clause.
+                apply a WHERE key = value clause.
+            exclude_keyvalues:
+                column names and values to exclude rows with, or None to not
+                apply a WHERE key != value clause.
             order_direction: Whether the results should be ordered "ASC" or "DESC".
 
         Returns:
@@ -1938,7 +1942,7 @@ class DatabasePool:
         if order_direction not in ["ASC", "DESC"]:
             raise ValueError("order_direction must be one of 'ASC' or 'DESC'.")
 
-        where_clause = "WHERE " if filters or keyvalues else ""
+        where_clause = "WHERE " if filters or keyvalues or exclude_keyvalues else ""
         arg_list = []  # type: List[Any]
         if filters:
             where_clause += " AND ".join("%s LIKE ?" % (k,) for k in filters)
@@ -1947,6 +1951,9 @@ class DatabasePool:
         if keyvalues:
             where_clause += " AND ".join("%s = ?" % (k,) for k in keyvalues)
             arg_list += list(keyvalues.values())
+        if exclude_keyvalues:
+            where_clause += " AND ".join("%s != ?" % (k,) for k in exclude_keyvalues)
+            arg_list += list(exclude_keyvalues.values())
 
         sql = "SELECT %s FROM %s %s ORDER BY %s %s LIMIT ? OFFSET ?" % (
             ", ".join(retcols),

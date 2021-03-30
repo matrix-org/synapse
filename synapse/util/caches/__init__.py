@@ -25,8 +25,8 @@ from synapse.config.cache import add_resizable_cache
 
 logger = logging.getLogger(__name__)
 
-caches_by_name = {}
-collectors_by_name = {}  # type: Dict
+caches_by_name = {}  # type: Dict[str, Sized]
+collectors_by_name = {}  # type: Dict[str, CacheMetric]
 
 cache_size = Gauge("synapse_util_caches_cache:size", "", ["name"])
 cache_hits = Gauge("synapse_util_caches_cache:hits", "", ["name"])
