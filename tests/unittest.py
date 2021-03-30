@@ -22,7 +22,7 @@ import logging
 import time
 from typing import Callable, Dict, Iterable, Optional, Tuple, Type, TypeVar, Union
 
-from mock import Mock, patch
+from unittest.mock import Mock, patch
 
 from canonicaljson import json
 

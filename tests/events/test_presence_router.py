@@ -14,7 +14,7 @@
 # limitations under the License.
 from typing import Dict, Iterable, List, Optional, Set, Tuple, Union
 
-from mock import Mock
+from unittest.mock import Mock
 
 import attr
 

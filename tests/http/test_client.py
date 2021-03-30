@@ -14,7 +14,7 @@
 
 from io import BytesIO
 
-from mock import Mock
+from unittest.mock import Mock
 
 from netaddr import IPSet
 

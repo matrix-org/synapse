@@ -14,7 +14,7 @@
 # limitations under the License.
 import time
 
-from mock import Mock
+from unittest.mock import Mock
 
 import attr
 import canonicaljson

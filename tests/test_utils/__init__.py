@@ -22,7 +22,7 @@ import warnings
 from asyncio import Future
 from typing import Any, Awaitable, Callable, TypeVar
 
-from mock import Mock
+from unittest.mock import Mock
 
 import attr
 

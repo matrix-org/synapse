@@ -18,7 +18,7 @@ import urllib.parse
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlencode
 
-from mock import Mock
+from unittest.mock import Mock
 
 import pymacaroons
 

@@ -15,7 +15,7 @@
 import threading
 from typing import Dict
 
-from mock import Mock
+from unittest.mock import Mock
 
 from synapse.events import EventBase
 from synapse.module_api import ModuleApi

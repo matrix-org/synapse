@@ -16,7 +16,7 @@ import json
 import os
 import tempfile
 
-from mock import Mock
+from unittest.mock import Mock
 
 import yaml
 

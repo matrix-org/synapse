@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 
-from mock import Mock
+from unittest.mock import Mock
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.events.builder import EventBuilderFactory

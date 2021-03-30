@@ -16,7 +16,7 @@
 import os.path
 from unittest.mock import patch
 
-from mock import Mock
+from unittest.mock import Mock
 
 import synapse.rest.admin
 from synapse.api.constants import EventTypes

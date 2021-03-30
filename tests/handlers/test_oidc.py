@@ -16,7 +16,7 @@ import json
 import os
 from urllib.parse import parse_qs, urlparse
 
-from mock import ANY, Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 import pymacaroons
 

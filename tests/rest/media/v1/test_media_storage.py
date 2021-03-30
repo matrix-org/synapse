@@ -20,7 +20,7 @@ from io import BytesIO
 from typing import Optional
 from urllib import parse
 
-from mock import Mock
+from unittest.mock import Mock
 
 import attr
 from parameterized import parameterized_class

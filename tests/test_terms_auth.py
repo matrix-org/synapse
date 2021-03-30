@@ -14,7 +14,7 @@
 
 import json
 
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactorClock
 

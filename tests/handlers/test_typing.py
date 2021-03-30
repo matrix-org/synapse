@@ -17,7 +17,7 @@
 import json
 from typing import Dict
 
-from mock import ANY, Mock, call
+from unittest.mock import ANY, Mock, call
 
 from twisted.internet import defer
 from twisted.web.resource import Resource

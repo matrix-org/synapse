@@ -23,7 +23,7 @@ import warnings
 from typing import Type
 from urllib import parse as urlparse
 
-from mock import Mock, patch
+from unittest.mock import Mock, patch
 
 from twisted.internet import defer
 

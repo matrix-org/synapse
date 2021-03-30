@@ -17,7 +17,7 @@
 
 import copy
 
-import mock
+from unittest import mock
 
 from synapse.api.errors import SynapseError
 

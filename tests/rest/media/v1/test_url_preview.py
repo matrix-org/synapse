@@ -16,7 +16,7 @@ import json
 import os
 import re
 
-from mock import patch
+from unittest.mock import patch
 
 from twisted.internet._resolver import HostResolution
 from twisted.internet.address import IPv4Address, IPv6Address
