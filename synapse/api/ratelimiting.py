@@ -97,9 +97,14 @@ class Ratelimiter:
     ) -> Tuple[bool, float]:
         """Can the entity (e.g. user or IP address) perform the action?
 
+        Checks if the user has ratelimiting disabled in the database by looking
+        for null/zero values in the `ratelimit_override` table. (Non-zero
+        values aren't honoured, as they're specific to the event sending
+        ratelimiter, rather than all ratelimiters)
+
         Args:
-            requester: The requester that is doing the action, if any. Used to check for
-                ratelimit overrides.
+            requester: The requester that is doing the action, if any. Used to check
+                if the user has ratelimits disabled in the database.
             key: The key we should use when rate limiting. Can be a user ID
                 (when sending events), an IP address, etc.
             rate_hz: The long term number of actions that can be performed in a second.
@@ -211,9 +216,14 @@ class Ratelimiter:
     ):
         """Checks if an action can be performed. If not, raises a LimitExceededError
 
+        Checks if the user has ratelimiting disabled in the database by looking
+        for null/zero values in the `ratelimit_override` table. (Non-zero
+        values aren't honoured, as they're specific to the event sending
+        ratelimiter, rather than all ratelimiters)
+
         Args:
             requester: The requester that is doing the action, if any. Used to check for
-                ratelimit overrides.
+                if the user has ratelimits disabled.
             key: An arbitrary key used to classify an action
             rate_hz: The long term number of actions that can be performed in a second.
                 Overrides the value set during instantiation if set.
