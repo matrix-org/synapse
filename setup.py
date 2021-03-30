@@ -110,7 +110,7 @@ CONDITIONAL_REQUIREMENTS["mypy"] = ["mypy==0.812", "mypy-zope==0.2.13"]
 # Tests assume that all optional dependencies are installed.
 #
 # parameterized_class decorator was introduced in parameterized 0.7.0
-CONDITIONAL_REQUIREMENTS["test"] = ["mock>=2.0", "parameterized>=0.7.0"]
+CONDITIONAL_REQUIREMENTS["test"] = ["parameterized>=0.7.0"]
 
 setup(
     name="matrix-synapse",
