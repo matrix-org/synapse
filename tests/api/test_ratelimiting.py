@@ -203,3 +203,30 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         )
 
         self.assertNotIn("test_id_1", limiter.actions)
+
+    def test_db_user_override(self):
+        """Test that users that have ratelimiting disabled in the DB aren't
+        ratelimited.
+        """
+        store = self.hs.get_datastore()
+
+        user_id = "@user:test"
+        requester = create_requester(user_id)
+
+        self.get_success(
+            store.db_pool.simple_insert(
+                table="ratelimit_override",
+                values={
+                    "user_id": user_id,
+                    "messages_per_second": None,
+                    "burst_count": None,
+                },
+                desc="test_db_user_override",
+            )
+        )
+
+        limiter = Ratelimiter(store=store, clock=None, rate_hz=0.1, burst_count=1)
+
+        # Shouldn't raise
+        for _ in range(20):
+            self.get_success_or_raise(limiter.ratelimit(requester, _time_now_s=0))
