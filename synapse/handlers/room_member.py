@@ -246,9 +246,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 (
                     allowed,
                     time_allowed,
-                ) = await self._join_rate_limiter_local.can_requester_do_action(
-                    requester
-                )
+                ) = await self._join_rate_limiter_local.can_do_action(requester)
 
                 if not allowed:
                     raise LimitExceededError(
@@ -543,7 +541,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     (
                         allowed,
                         time_allowed,
-                    ) = await self._join_rate_limiter_remote.can_requester_do_action(
+                    ) = await self._join_rate_limiter_remote.can_do_action(
                         requester,
                     )
 

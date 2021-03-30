@@ -354,9 +354,7 @@ class AuthHandler(BaseHandler):
         requester_user_id = requester.user.to_string()
 
         # Check if we should be ratelimited due to too many previous failed attempts
-        await self._failed_uia_attempts_ratelimiter.ratelimit(
-            requester, requester_user_id, update=False
-        )
+        await self._failed_uia_attempts_ratelimiter.ratelimit(requester, update=False)
 
         # build a list of supported flows
         supported_ui_auth_types = await self._get_available_ui_auth_types(
@@ -378,7 +376,7 @@ class AuthHandler(BaseHandler):
         except LoginError:
             # Update the ratelimiter to say we failed (`can_do_action` doesn't raise).
             await self._failed_uia_attempts_ratelimiter.can_do_action(
-                requester, requester_user_id
+                requester,
             )
             raise
 
