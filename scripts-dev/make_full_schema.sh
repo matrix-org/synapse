@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # This script generates SQL files for creating a brand new Synapse DB with the latest
 # schema, on both SQLite3 and Postgres.

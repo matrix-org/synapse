@@ -23,7 +23,7 @@ from synapse.http.server import DirectServeJsonResource, respond_with_json
 from synapse.http.site import SynapseRequest
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 
 class MediaConfigResource(DirectServeJsonResource):
