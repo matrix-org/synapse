@@ -89,7 +89,7 @@ class Ratelimiter:
     async def can_do_action(
         self,
         requester: Optional[Requester],
-        key: Hashable,
+        key: Optional[Hashable] = None,
         rate_hz: Optional[float] = None,
         burst_count: Optional[int] = None,
         update: bool = True,
@@ -105,8 +105,8 @@ class Ratelimiter:
         Args:
             requester: The requester that is doing the action, if any. Used to check
                 if the user has ratelimits disabled in the database.
-            key: The key we should use when rate limiting. Can be a user ID
-                (when sending events), an IP address, etc.
+            key: An arbitrary key used to classify an action. Defaults to the
+                requester's user ID.
             rate_hz: The long term number of actions that can be performed in a second.
                 Overrides the value set during instantiation if set.
             burst_count: How many actions that can be performed before being limited.
@@ -121,6 +121,12 @@ class Ratelimiter:
                 * The reactor timestamp for when the action can be performed next.
                   -1 if rate_hz is less than or equal to zero
         """
+        if key is None:
+            if not requester:
+                raise ValueError("Must supply at least one of `requester` or `key`")
+
+            key = requester.user.to_string()
+
         if requester:
             # Disable rate limiting of users belonging to any AS that is configured
             # not to be rate limited in its registration file (rate_limited: true|false).
@@ -208,7 +214,7 @@ class Ratelimiter:
     async def ratelimit(
         self,
         requester: Optional[Requester],
-        key: Hashable,
+        key: Optional[Hashable] = None,
         rate_hz: Optional[float] = None,
         burst_count: Optional[int] = None,
         update: bool = True,
@@ -224,7 +230,8 @@ class Ratelimiter:
         Args:
             requester: The requester that is doing the action, if any. Used to check for
                 if the user has ratelimits disabled.
-            key: An arbitrary key used to classify an action
+            key: An arbitrary key used to classify an action. Defaults to the
+                requester's user ID.
             rate_hz: The long term number of actions that can be performed in a second.
                 Overrides the value set during instantiation if set.
             burst_count: How many actions that can be performed before being limited.
