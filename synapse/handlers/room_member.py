@@ -20,7 +20,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 
 from synapse import types
-from synapse.api.constants import AccountDataTypes, EventTypes, Membership
+from synapse.api.constants import AccountDataTypes, EventTypes, JoinRules, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -178,6 +178,60 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         await self._invites_per_user_limiter.ratelimit(requester, invitee_user_id)
 
+    async def _can_join_restricted_room(
+        self, state_ids: StateMap[str], room_id: str, user_id: str
+    ) -> bool:
+        """
+        Check whether a user can join a restricted room.
+
+        Args:
+            state_ids: The state of the room as it currently is.
+            room_id: The room being joined.
+            user_id: The user joining the room.
+
+        Returns:
+            True if the user can join the room, false otherwise.
+        """
+        # This only applies to room versions which support the new join rule.
+        room_version = await self.store.get_room_version(room_id)
+        if not room_version.msc3083_join_rules:
+            return True
+
+        # If there's no join rule, then it defaults to public (so this doesn't apply).
+        join_rules_event_id = state_ids.get((EventTypes.JoinRules, ""), None)
+        if not join_rules_event_id:
+            return True
+
+        # If the join rule is not restricted, this doesn't apply.
+        join_rules_event = await self.store.get_event(join_rules_event_id)
+        if join_rules_event.content.get("join_rule") != JoinRules.MSC3083_RESTRICTED:
+            return True
+
+        # If allowed is of the wrong form, then ignore it (and treat the room as public).
+        allowed_spaces = join_rules_event.content.get("allow", [])
+        if not isinstance(allowed_spaces, list):
+            return True
+
+        # Get the list of joined rooms and see if there's an overlap.
+        joined_rooms = await self.store.get_rooms_for_user(user_id)
+
+        # Pull out the other room IDs, invalid data gets filtered.
+        for space in allowed_spaces:
+            if not isinstance(space, dict):
+                continue
+
+            soace_id = space.get("space")
+            if not isinstance(soace_id, str):
+                continue
+
+            # The user was joined to one of the spaces specified, they can join
+            # this room!
+            if soace_id in joined_rooms:
+                return True
+
+        # The user was not in any of the required spaces.
+        return False
+
     async def _local_membership_update(
         self,
         requester: Requester,
@@ -238,6 +292,16 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             if prev_member_event_id:
                 prev_member_event = await self.store.get_event(prev_member_event_id)
                 newly_joined = prev_member_event.membership != Membership.JOIN
+
+            # If the member is not already in the room, check if they should be
+            # allowed access via membership in a space.
+            if newly_joined and not await self._can_join_restricted_room(
+                prev_state_ids, room_id, user_id
+            ):
+                raise AuthError(
+                    403,
+                    "You do not belong to any of the required spaces to join this room.",
+                )
 
             # Only rate-limit if the user actually joined the room, otherwise we'll end
             # up blocking profile updates.
