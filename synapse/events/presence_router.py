@@ -28,6 +28,8 @@ class PresenceRouter:
     passed to that instead.
     """
 
+    ALL_USERS = "ALL"
+
     def __init__(self, hs: "HomeServer"):
         self.custom_presence_router = None
 
@@ -74,11 +76,12 @@ class PresenceRouter:
         # Don't include any extra destinations for presence updates
         return {}
 
-    async def get_interested_users(self, user_id: str) -> Union[Set[str], str]:
+    async def get_interested_users(self, user_id: str) -> Union[Set[str], ALL_USERS]:
         """
-        Retrieve a list of users that the provided user is interested in receiving the presence
-        of. Optionally, the str "ALL" can be returned to mean that this user should receive all
-        local and remote incoming presence.
+        Retrieve a list of users that `user_id` is interested in receiving the
+        presence of. This will be in addition to those they share a room with.
+        Optionally, the object PresenceRouter.ALL_USERS can be returned to indicate
+        that this user should receive all incoming local and remote presence updates.
 
         Note that this method will only be called for local users.
 
@@ -86,7 +89,7 @@ class PresenceRouter:
             user_id: A user requesting presence updates.
 
         Returns:
-            A set of user IDs to return presence updates for, or "ALL" to return all
+            A set of user IDs to return presence updates for, or ALL_USERS to return all
             known updates.
         """
         if self.custom_presence_router is not None:

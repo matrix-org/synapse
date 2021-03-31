@@ -1126,7 +1126,7 @@ class PresenceEventSource:
 
             # Check whether this user should see all user updates
 
-            if users_interested_in == "ALL":
+            if users_interested_in == PresenceRouter.ALL_USERS:
                 if from_key:
                     # We need to return all new presence updates to this user, regardless of whether
                     # they share a room with that user
@@ -1309,11 +1309,11 @@ class PresenceEventSource:
         additional_users = await self.get_presence_router().get_interested_users(
             user.to_string()
         )
-        if additional_users == "ALL":
+        if additional_users == PresenceRouter.ALL_USERS:
             # If the module requested that this user see the presence updates of *all*
             # users, then simply return that instead of calculating what rooms this
             # user shares
-            return "ALL"
+            return PresenceRouter.ALL_USERS
 
         # Add the additional users from the router
         users_interested_in.update(additional_users)

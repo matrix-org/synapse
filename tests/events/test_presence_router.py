@@ -16,6 +16,7 @@ from typing import Dict, Iterable, List, Optional, Set, Union
 
 import attr
 
+from synapse.events.presence_router import PresenceRouter
 from synapse.handlers.presence import UserPresenceState
 from synapse.module_api import ModuleApi
 from synapse.rest import admin
@@ -46,9 +47,11 @@ class PresenceRouterTestModule:
         }
         return users_to_state
 
-    async def get_interested_users(self, user_id: str) -> Union[Set[str], str]:
+    async def get_interested_users(
+        self, user_id: str
+    ) -> Union[Set[str], PresenceRouter.ALL_USERS]:
         if user_id in self._config.users_who_should_receive_all_presence:
-            return "ALL"
+            return PresenceRouter.ALL_USERS
 
         return set()
 
