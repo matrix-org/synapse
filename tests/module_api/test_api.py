@@ -27,6 +27,7 @@ from tests.events.test_presence_router import (
     send_presence_update,
     sync_presence,
 )
+from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import FederatingHomeserverTestCase, override_config
 
 
@@ -220,6 +221,163 @@ class ModuleApiTestCase(FederatingHomeserverTestCase):
         )
         self.assertFalse(is_in_public_rooms)
 
+    # The ability to send federation is required by send_local_online_presence_to.
+    @override_config({"send_federation": True})
+    def test_send_local_online_presence_to(self):
+        """Tests that send_local_presence_to_users sends local online presence to local users."""
+        # Create a user who will send presence updates
+        self.presence_receiver_id = self.register_user("presence_receiver", "monkey")
+        self.presence_receiver_tok = self.login("presence_receiver", "monkey")
+
+        # And another user that will send presence updates out
+        self.presence_sender_id = self.register_user("presence_sender", "monkey")
+        self.presence_sender_tok = self.login("presence_sender", "monkey")
+
+        # Put them in a room together so they will receive each other's presence updates
+        room_id = self.helper.create_room_as(
+            self.presence_receiver_id,
+            tok=self.presence_receiver_tok,
+        )
+        self.helper.join(room_id, self.presence_sender_id, tok=self.presence_sender_tok)
+
+        # Presence sender comes online
+        send_presence_update(
+            self,
+            self.presence_sender_id,
+            self.presence_sender_tok,
+            "online",
+            "I'm online!",
+        )
+
+        # Presence receiver should have received it
+        presence_updates, sync_token = sync_presence(self, self.presence_receiver_id)
+        self.assertEqual(len(presence_updates), 1)
+
+        presence_update = presence_updates[0]  # type: UserPresenceState
+        self.assertEqual(presence_update.user_id, self.presence_sender_id)
+        self.assertEqual(presence_update.state, "online")
+
+        # Syncing again should result in no presence updates
+        presence_updates, sync_token = sync_presence(
+            self, self.presence_receiver_id, sync_token
+        )
+        self.assertEqual(len(presence_updates), 0)
+
+        # Trigger sending local online presence
+        self.get_success(
+            self.module_api.send_local_online_presence_to(
+                [
+                    self.presence_receiver_id,
+                ]
+            )
+        )
+
+        # Presence receiver should have received online presence again
+        presence_updates, sync_token = sync_presence(
+            self, self.presence_receiver_id, sync_token
+        )
+        self.assertEqual(len(presence_updates), 1)
+
+        presence_update = presence_updates[0]  # type: UserPresenceState
+        self.assertEqual(presence_update.user_id, self.presence_sender_id)
+        self.assertEqual(presence_update.state, "online")
+
+        # Presence sender goes offline
+        send_presence_update(
+            self,
+            self.presence_sender_id,
+            self.presence_sender_tok,
+            "offline",
+            "I slink back into the darkness.",
+        )
+
+        # Trigger sending local online presence
+        self.get_success(
+            self.module_api.send_local_online_presence_to(
+                [
+                    self.presence_receiver_id,
+                ]
+            )
+        )
+
+        # Presence receiver should *not* have received offline state
+        presence_updates, sync_token = sync_presence(
+            self, self.presence_receiver_id, sync_token
+        )
+        self.assertEqual(len(presence_updates), 0)
+
+    @override_config({"send_federation": True})
+    def test_send_local_online_presence_to_federation(self):
+        """Tests that send_local_presence_to_users sends local online presence to remote users."""
+        # Create a user who will send presence updates
+        self.presence_sender_id = self.register_user("presence_sender", "monkey")
+        self.presence_sender_tok = self.login("presence_sender", "monkey")
+
+        # And a room they're a part of
+        room_id = self.helper.create_room_as(
+            self.presence_sender_id,
+            tok=self.presence_sender_tok,
+        )
+
+        # Mark them as online
+        send_presence_update(
+            self,
+            self.presence_sender_id,
+            self.presence_sender_tok,
+            "online",
+            "I'm online!",
+        )
+
+        # Make up a remote user to send presence to
+        remote_user_id = "@far_away_person:island"
+
+        # Create a join membership event for the remote user into the room.
+        # This allows presence information to flow from one user to the other.
+        self.get_success(
+            inject_member_event(
+                self.hs,
+                room_id,
+                sender=remote_user_id,
+                target=remote_user_id,
+                membership="join",
+            )
+        )
+
+        # The remote user would have received the existing room members' presence
+        # when they joined the room.
+        #
+        # Thus we reset the mock, and try sending online local user
+        # presence again
+        self.hs.get_federation_transport_client().send_transaction.reset_mock()
+
+        # Broadcast local user online presence
+        self.get_success(
+            self.module_api.send_local_online_presence_to([remote_user_id])
+        )
+
+        # Check that a presence update was sent as part of a federation transaction
+        found_update = False
+        calls = (
+            self.hs.get_federation_transport_client().send_transaction.call_args_list
+        )
+        for call in calls:
+            federation_transaction = call.args[0]  # type: Transaction
+
+            # Get the sent EDUs in this transaction
+            edus = federation_transaction.get_dict()["edus"]
+
+            for edu in edus:
+                # Make sure we're only checking presence-type EDUs
+                if edu["edu_type"] != EduTypes.Presence:
+                    continue
+
+                # EDUs can contain multiple presence updates
+                for presence_update in edu["content"]["push"]:
+                    if presence_update["user_id"] == self.presence_sender_id:
+                        found_update = True
+
+        self.assertTrue(found_update)
+
     @override_config(
         {
             "presence": {
@@ -241,12 +399,10 @@ class ModuleApiTestCase(FederatingHomeserverTestCase):
             "send_federation": True,
         }
     )
-    def test_send_local_online_presence_to(self):
+    def test_send_local_online_presence_to_with_module(self):
         """Tests that send_local_presence_to_users sends local online presence to a set
-        of specified local and remote users.
+        of specified local and remote users, with a custom PresenceRouter module enabled.
         """
-        self.sync_handler = self.hs.get_sync_handler()
-
         # Create a user who will send presence updates
         self.other_user_id = self.register_user("other_user", "monkey")
         self.other_user_tok = self.login("other_user", "monkey")
@@ -298,7 +454,7 @@ class ModuleApiTestCase(FederatingHomeserverTestCase):
         # Perform a sync for each user
 
         # The other user should only receive their own presence
-        presence_updates = sync_presence(self, self.other_user_id)
+        presence_updates, _ = sync_presence(self, self.other_user_id)
         self.assertEqual(len(presence_updates), 1)
 
         presence_update = presence_updates[0]  # type: UserPresenceState
@@ -307,9 +463,9 @@ class ModuleApiTestCase(FederatingHomeserverTestCase):
         self.assertEqual(presence_update.status_msg, "I'm online!")
 
         # Whereas both presence receiving users should receive everyone's presence updates
-        presence_updates = sync_presence(self, self.presence_receiving_user_one_id)
+        presence_updates, _ = sync_presence(self, self.presence_receiving_user_one_id)
         self.assertEqual(len(presence_updates), 3)
-        presence_updates = sync_presence(self, self.presence_receiving_user_two_id)
+        presence_updates, _ = sync_presence(self, self.presence_receiving_user_two_id)
         self.assertEqual(len(presence_updates), 3)
 
         # Test that sending to a remote user works
@@ -323,7 +479,7 @@ class ModuleApiTestCase(FederatingHomeserverTestCase):
         # presence again
         self.hs.get_federation_transport_client().send_transaction.reset_mock()
 
-        # Track the outgoing presence on the federation client
+        # Broadcast local user online presence
         self.get_success(
             self.module_api.send_local_online_presence_to([remote_user_id])
         )

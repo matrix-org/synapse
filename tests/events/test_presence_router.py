@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Dict, Iterable, List, Optional, Set, Union
+from typing import Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import attr
 
@@ -21,7 +21,7 @@ from synapse.handlers.presence import UserPresenceState
 from synapse.module_api import ModuleApi
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, presence, room
-from synapse.types import JsonDict, create_requester
+from synapse.types import JsonDict, StreamToken, create_requester
 
 from tests import unittest
 from tests.handlers.test_sync import generate_sync_config
@@ -140,7 +140,9 @@ class PresenceRouterTestCase(unittest.HomeserverTestCase):
         )
 
         # Check that the presence receiving user gets user one's presence when syncing
-        presence_updates = sync_presence(self, self.presence_receiving_user_id)
+        presence_updates, sync_token = sync_presence(
+            self, self.presence_receiving_user_id
+        )
         self.assertEqual(len(presence_updates), 1)
 
         presence_update = presence_updates[0]  # type: UserPresenceState
@@ -172,11 +174,13 @@ class PresenceRouterTestCase(unittest.HomeserverTestCase):
         )
 
         # Check that the presence receiving user gets everyone's presence
-        presence_updates = sync_presence(self, self.presence_receiving_user_id)
+        presence_updates, _ = sync_presence(
+            self, self.presence_receiving_user_id, sync_token
+        )
         self.assertEqual(len(presence_updates), 3)
 
         # But that User One only get itself and User Two's presence
-        presence_updates = sync_presence(self, self.other_user_one_id)
+        presence_updates, _ = sync_presence(self, self.other_user_one_id)
         self.assertEqual(len(presence_updates), 2)
 
         found = False
@@ -213,11 +217,26 @@ def send_presence_update(
 def sync_presence(
     testcase: TestCase,
     user_id: str,
-) -> List[UserPresenceState]:
+    since_token: Optional[StreamToken] = None,
+) -> Tuple[List[UserPresenceState], StreamToken]:
+    """Perform a sync request for the given user and return the user presence updates
+    they've received, as well as the next_batch token.
+
+    Args:
+        testcase: The testcase that is currently being run.
+        user_id: The ID of the user to generate a sync response for.
+        since_token: An optional token to indicate from at what point to sync from.
+
+    Returns:
+        A tuple containing a list of presence updates, and the sync response's
+        next_batch token.
+    """
     requester = create_requester(user_id)
     sync_config = generate_sync_config(requester.user.to_string())
     sync_result = testcase.get_success(
-        testcase.sync_handler.wait_for_sync_for_user(requester, sync_config)
+        testcase.sync_handler.wait_for_sync_for_user(
+            requester, sync_config, since_token
+        )
     )
 
-    return sync_result.presence
+    return sync_result.presence, sync_result.next_batch
