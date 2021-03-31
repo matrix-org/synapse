@@ -13,19 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import Dict, Iterable, List, Optional, Set, Tuple, Union
+from mock import Mock
 
 import attr
 
+from synapse.api.constants import EduTypes
 from synapse.events.presence_router import PresenceRouter
+from synapse.federation.units import Transaction
 from synapse.handlers.presence import UserPresenceState
 from synapse.module_api import ModuleApi
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, presence, room
 from synapse.types import JsonDict, StreamToken, create_requester
 
-from tests import unittest
 from tests.handlers.test_sync import generate_sync_config
-from tests.unittest import TestCase
+from tests.unittest import FederatingHomeserverTestCase, TestCase, override_config
 
 
 @attr.s
@@ -76,7 +78,7 @@ class PresenceRouterTestModule:
         return config
 
 
-class PresenceRouterTestCase(unittest.HomeserverTestCase):
+class PresenceRouterTestCase(FederatingHomeserverTestCase):
     servlets = [
         admin.register_servlets,
         login.register_servlets,
@@ -95,6 +97,11 @@ class PresenceRouterTestCase(unittest.HomeserverTestCase):
             }
         }
         return config
+
+    def make_homeserver(self, reactor, clock):
+        return self.setup_test_homeserver(
+            federation_transport_client=Mock(spec=["send_transaction"]),
+        )
 
     def prepare(self, reactor, clock, homeserver):
         self.sync_handler = self.hs.get_sync_handler()
@@ -125,6 +132,8 @@ class PresenceRouterTestCase(unittest.HomeserverTestCase):
         self.helper.join(
             self.room_id, self.other_user_two_id, tok=self.other_user_two_tok
         )
+
+        self.module_api = homeserver.get_module_api()
 
     def test_receiving_all_presence(self):
         """Test that a user that does not share a room with another other can receive
@@ -192,6 +201,139 @@ class PresenceRouterTestCase(unittest.HomeserverTestCase):
 
         self.assertTrue(found)
 
+    @override_config(
+        {
+            "presence": {
+                "presence_router": {
+                    "module": __name__ + ".PresenceRouterTestModule",
+                    "config": {
+                        "users_who_should_receive_all_presence": [
+                            "@presence_gobbler1:test",
+                            "@presence_gobbler2:test",
+                            "@far_away_person:island",
+                        ]
+                    },
+                }
+            },
+            "send_federation": True,
+        }
+    )
+    def test_send_local_online_presence_to_with_module(self):
+        """Tests that send_local_presence_to_users sends local online presence to a set
+        of specified local and remote users, with a custom PresenceRouter module enabled.
+        """
+        # Create a user who will send presence updates
+        self.other_user_id = self.register_user("other_user", "monkey")
+        self.other_user_tok = self.login("other_user", "monkey")
+
+        # And another two users that will also send out presence updates, as well as receive
+        # theirs and everyone else's
+        self.presence_receiving_user_one_id = self.register_user(
+            "presence_gobbler1", "monkey"
+        )
+        self.presence_receiving_user_one_tok = self.login("presence_gobbler1", "monkey")
+        self.presence_receiving_user_two_id = self.register_user(
+            "presence_gobbler2", "monkey"
+        )
+        self.presence_receiving_user_two_tok = self.login("presence_gobbler2", "monkey")
+
+        # Have all three users send some presence updates
+        send_presence_update(
+            self,
+            self.other_user_id,
+            self.other_user_tok,
+            "online",
+            "I'm online!",
+        )
+        send_presence_update(
+            self,
+            self.presence_receiving_user_one_id,
+            self.presence_receiving_user_one_tok,
+            "online",
+            "I'm also online!",
+        )
+        send_presence_update(
+            self,
+            self.presence_receiving_user_two_id,
+            self.presence_receiving_user_two_tok,
+            "unavailable",
+            "I'm in a meeting!",
+        )
+
+        # Mark each presence-receiving user for receiving all user presence
+        self.get_success(
+            self.module_api.send_local_online_presence_to(
+                [
+                    self.presence_receiving_user_one_id,
+                    self.presence_receiving_user_two_id,
+                ]
+            )
+        )
+
+        # Perform a sync for each user
+
+        # The other user should only receive their own presence
+        presence_updates, _ = sync_presence(self, self.other_user_id)
+        self.assertEqual(len(presence_updates), 1)
+
+        presence_update = presence_updates[0]  # type: UserPresenceState
+        self.assertEqual(presence_update.user_id, self.other_user_id)
+        self.assertEqual(presence_update.state, "online")
+        self.assertEqual(presence_update.status_msg, "I'm online!")
+
+        # Whereas both presence receiving users should receive everyone's presence updates
+        presence_updates, _ = sync_presence(self, self.presence_receiving_user_one_id)
+        self.assertEqual(len(presence_updates), 3)
+        presence_updates, _ = sync_presence(self, self.presence_receiving_user_two_id)
+        self.assertEqual(len(presence_updates), 3)
+
+        # Test that sending to a remote user works
+        remote_user_id = "@far_away_person:island"
+
+        # Note that due to the remote user being in our module's
+        # users_who_should_receive_all_presence config, they would have
+        # received user presence updates already.
+        #
+        # Thus we reset the mock, and try sending all online local user
+        # presence again
+        self.hs.get_federation_transport_client().send_transaction.reset_mock()
+
+        # Broadcast local user online presence
+        self.get_success(
+            self.module_api.send_local_online_presence_to([remote_user_id])
+        )
+
+        # Check that the expected presence updates were sent
+        expected_users = [
+            self.other_user_id,
+            self.presence_receiving_user_one_id,
+            self.presence_receiving_user_two_id,
+        ]
+
+        calls = (
+            self.hs.get_federation_transport_client().send_transaction.call_args_list
+        )
+        for call in calls:
+            federation_transaction = call.args[0]  # type: Transaction
+
+            # Get the sent EDUs in this transaction
+            edus = federation_transaction.get_dict()["edus"]
+
+            for edu in edus:
+                # Make sure we're only checking presence-type EDUs
+                if edu["edu_type"] != EduTypes.Presence:
+                    continue
+
+                # EDUs can contain multiple presence updates
+                for presence_update in edu["content"]["push"]:
+                    # Check for presence updates that contain the user IDs we're after
+                    expected_users.remove(presence_update["user_id"])
+
+                    # Ensure that no offline states are being sent out
+                    self.assertNotEqual(presence_update["presence"], "offline")
+
+        self.assertEqual(len(expected_users), 0)
+
 
 def send_presence_update(
     testcase: TestCase,
@@ -221,6 +363,8 @@ def sync_presence(
 ) -> Tuple[List[UserPresenceState], StreamToken]:
     """Perform a sync request for the given user and return the user presence updates
     they've received, as well as the next_batch token.
+
+    This method assumes testcase.sync_handler points to the homeserver's sync handler.
 
     Args:
         testcase: The testcase that is currently being run.
