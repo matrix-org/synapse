@@ -386,7 +386,7 @@ class FederationSender(AbstractFederationSender):
                 room_with_dest_stream_ordering = {}  # type: Dict[Tuple[str, str], int]
 
                 # List of events to send to each destination
-                dest_to_events = {}  # type: Dict[str, List[EventBase]]
+                event_to_dests = {}  # type: Dict[str, List[EventBase]]
 
                 # For each roomID + events with destinations pair...
                 for room_id, event_and_dests in per_room_events_and_dests:
@@ -410,7 +410,7 @@ class FederationSender(AbstractFederationSender):
                                 ] = event.internal_metadata.stream_ordering
 
                             # ...and add the event to each destination queue.
-                            dest_to_events.setdefault(destination, []).append(event)
+                            event_to_dests.setdefault(destination, []).append(event)
 
                 # Bulk-store destination_rooms stream_ids
                 await self.store.bulk_store_destination_rooms_entries(
@@ -418,7 +418,7 @@ class FederationSender(AbstractFederationSender):
                 )
 
                 # Send corresponding events to each destination queue
-                self._distribute_pdus(dest_to_events)
+                self._distribute_pdus(event_to_dests)
 
                 await self.store.update_federation_out_pos("events", next_token)
 
