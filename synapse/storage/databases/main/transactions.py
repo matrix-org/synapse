@@ -300,7 +300,7 @@ class TransactionStore(TransactionWorkerStore):
         self, room_and_destination_to_ordering: Dict[Tuple[str, str], int]
     ):
         """
-        Updates or creates `destination_rooms` entries in batch for many events.
+        Updates or creates `destination_rooms` entries for a number of events.
 
         Args:
             room_and_destination_to_ordering: A mapping of (room, destination) -> stream_id
@@ -309,7 +309,7 @@ class TransactionStore(TransactionWorkerStore):
         await self.db_pool.simple_upsert_many(
             table="destinations",
             key_names=("destination",),
-            key_values=[(key[1],) for key in room_and_destination_to_ordering.keys()],
+            key_values={(r, ) for r, _ in room_and_destination_to_ordering.keys()},
             value_names=[],
             value_values=[],
             desc="store_destination_rooms_entries_dests",
