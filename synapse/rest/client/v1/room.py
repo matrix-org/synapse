@@ -357,7 +357,7 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
             #     auth_event_ids=auth_event_ids,
             # )
 
-            (event, _,) = await self.event_creation_handler.create_event(
+            event, context = await self.event_creation_handler.create_event(
                 requester,
                 event_dict,
                 # We are allowed to post these messages because we are referencing the
@@ -366,6 +366,18 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                 prev_event_ids=prev_event_ids,
                 inherit_depth=True,
             )
+            # await self.event_creation_handler.persist_and_notify_client_event(
+            #     requester, event, context, ratelimit=False
+            # )
+
+            (
+                event,
+                _,
+                _,
+            ) = await self.event_creation_handler.storage.persistence.persist_event(
+                event, context=context, backfilled=True
+            )
+
             event_id = event.event_id
             event_ids.append(event_id)
 
