@@ -1089,7 +1089,7 @@ class PresenceEventSource:
         stream_change_cache = self.store.presence_stream_cache
 
         with Measure(self.clock, "presence.get_new_events"):
-            if user_id in self.get_module_api().send_full_presence_to_local_users:
+            if user_id in self.get_module_api()._send_full_presence_to_local_users:
                 # This user has been specified by a module to receive all current, online
                 # user presence. Removing from_key and setting include_offline to false
                 # will do effectively this.
@@ -1133,8 +1133,8 @@ class PresenceEventSource:
                 )
 
                 # Remove the user from the list of users to receive all presence
-                if user_id in self.get_module_api().send_full_presence_to_local_users:
-                    self.get_module_api().send_full_presence_to_local_users.remove(
+                if user_id in self.get_module_api()._send_full_presence_to_local_users:
+                    self.get_module_api()._send_full_presence_to_local_users.remove(
                         user_id
                     )
 
@@ -1187,8 +1187,8 @@ class PresenceEventSource:
             presence_updates = list(users_to_state.values())
 
         # Remove the user from the list of users to receive all presence
-        if user_id in self.get_module_api().send_full_presence_to_local_users:
-            self.get_module_api().send_full_presence_to_local_users.remove(user_id)
+        if user_id in self.get_module_api()._send_full_presence_to_local_users:
+            self.get_module_api()._send_full_presence_to_local_users.remove(user_id)
 
         if not include_offline:
             # Filter out offline presence states

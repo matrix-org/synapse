@@ -59,7 +59,10 @@ class ModuleApi:
         # The next time these users sync, they will receive the current presence
         # state of all local users. Users are added by send_local_online_presence_to,
         # and removed after a successful sync.
-        self.send_full_presence_to_local_users = set()
+        #
+        # We make this a private variable to deter modules from accessing it directly,
+        # though other classes in Synapse will still do so.
+        self._send_full_presence_to_local_users = set()
 
     @property
     def http_client(self):
@@ -417,7 +420,7 @@ class ModuleApi:
                 # That user would then get all presence state on next incremental sync.
 
                 # Force a presence initial_sync for this user next time
-                self.send_full_presence_to_local_users.add(user)
+                self._send_full_presence_to_local_users.add(user)
             else:
                 # Retrieve presence state for currently online users that this user
                 # is considered interested in
