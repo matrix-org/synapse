@@ -1127,21 +1127,18 @@ class PresenceEventSource:
             # Check whether this user should see all user updates
 
             if users_interested_in == PresenceRouter.ALL_USERS:
-                if from_key:
-                    # We need to return all new presence updates to this user, regardless of whether
-                    # they share a room with that user
-                    presence_updates = await self._filter_all_presence_updates_for_user(
-                        user_id, from_key, include_offline
-                    )
-                    return presence_updates, max_token
-                else:
-                    # This user should receive all user presence, and hasn't provided a from_key.
-                    # Send all currently known user presence states.
-                    users_to_state = await self.store.get_presence_for_all_users(
-                        include_offline=include_offline
+                # Provide presence state for all users
+                presence_updates = await self._filter_all_presence_updates_for_user(
+                    user_id, include_offline, from_key
+                )
+
+                # Remove the user from the list of users to receive all presence
+                if user_id in self.get_module_api().send_full_presence_to_local_users:
+                    self.get_module_api().send_full_presence_to_local_users.remove(
+                        user_id
                     )
 
-                    return list(users_to_state.values()), max_token
+                return presence_updates, max_token
 
             assert not isinstance(users_interested_in, str)
 
@@ -1202,35 +1199,47 @@ class PresenceEventSource:
     async def _filter_all_presence_updates_for_user(
         self,
         user_id: str,
-        from_key: int,
         include_offline: bool,
+        from_key: Optional[int] = None,
     ) -> List[UserPresenceState]:
         """
         Computes the presence updates a user should receive.
 
-        First pulls presence updates from the database. Then consults presence_router
-        for whether updates should be excluded by user ID.
+        First pulls presence updates from the database. Then consults PresenceRouter
+        for whether any updates should be excluded by user ID.
 
         Args:
             user_id: The User ID of the user to compute presence updates for.
+            include_offline: Whether to include offline presence states from the results.
             from_key: The minimum stream ID of updates to pull from the database
                 before filtering.
-            include_offline: Whether to include offline presence states from the results.
 
         Returns:
             A list of presence states for the given user to receive.
         """
-        # Only return updates since the last sync
-        updated_users = self.store.presence_stream_cache.get_all_entities_changed(
-            from_key
-        )
-        if not updated_users:
-            updated_users = []
+        if from_key:
+            # Only return updates since the last sync
+            updated_users = self.store.presence_stream_cache.get_all_entities_changed(
+                from_key
+            )
+            if not updated_users:
+                updated_users = []
 
-        # Get the actual presence update for each change
-        users_to_state = await self.get_presence_handler().current_state_for_users(
-            updated_users
-        )
+            # Get the actual presence update for each change
+            users_to_state = await self.get_presence_handler().current_state_for_users(
+                updated_users
+            )
+            presence_updates = list(users_to_state.values())
+
+            if not include_offline:
+                # Filter out offline states
+                presence_updates = self._filter_offline_presence_state(presence_updates)
+        else:
+            users_to_state = await self.store.get_presence_for_all_users(
+                include_offline=include_offline
+            )
+
+            presence_updates = list(users_to_state.values())
 
         # TODO: This feels wildly inefficient, and it's unfortunate we need to ask the
         # module for information on a number of users when we then only take the info
@@ -1238,21 +1247,13 @@ class PresenceEventSource:
 
         # Filter through the presence router
         users_to_state_set = await self.get_presence_router().get_users_for_states(
-            users_to_state.values()
+            presence_updates
         )
 
         # We only want the mapping for the syncing user
         presence_updates = list(users_to_state_set[user_id])
 
-        # Remove the user from the list of users to receive all presence
-        if user_id in self.get_module_api().send_full_presence_to_local_users:
-            self.get_module_api().send_full_presence_to_local_users.remove(user_id)
-
-        if not include_offline:
-            # Filter out offline states
-            presence_updates = self._filter_offline_presence_state(presence_updates)
-
-        # Return presence updates for all users since the last sync
+        # Return presence information for all users
         return presence_updates
 
     def _filter_offline_presence_state(
