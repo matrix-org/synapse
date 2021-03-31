@@ -95,4 +95,4 @@ isort "${files[@]}"
 python3 -m black "${files[@]}"
 ./scripts-dev/config-lint.sh
 flake8 "${files[@]}"
-dmypy run
+mypy
