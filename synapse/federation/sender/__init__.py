@@ -236,6 +236,8 @@ class FederationSender:
                             )
                             return None
 
+                    destinations.discard(self.server_name)
+
                     destinations = {
                         d
                         for d in destinations
@@ -252,9 +254,6 @@ class FederationSender:
 
                     logger.debug("Sending %s to %r", event, destinations)
 
-                    destinations = set(destinations)
-                    destinations.discard(self.server_name)
-
                     if destinations:
                         now = self.clock.time_msec()
                         ts = await self.store.get_received_ts(event.event_id)
@@ -270,14 +269,18 @@ class FederationSender:
                     room_id: str, events: Iterable[EventBase]
                 ) -> Tuple[str, Dict[EventBase, Collection[str]]]:
                     with Measure(self.clock, "handle_room_events"):
-                        event_mapping = {}  # type: Dict[EventBase, Collection[str]]
-
-                        for event in events:
-                            ret = await handle_event(event)
-                            if ret is not None:
-                                event_mapping[ret[0]] = ret[1]
-
-                        return room_id, event_mapping
+                        # Generate event -> destination pairs for every event in events,
+                        # skip if handle_event returns None.
+                        return room_id, {
+                            event: dests
+                            for event, dests in (
+                                ret
+                                for ret in (
+                                    await handle_event(event) for event in events
+                                )
+                                if ret is not None
+                            )
+                        }
 
                 events_by_room = {}  # type: Dict[str, List[EventBase]]
                 for event in events:
@@ -293,34 +296,43 @@ class FederationSender:
                     )
                 )  # type: List[Tuple[str, Dict[EventBase, Collection[str]]]]
 
-                room_and_dest_to_max = {}  # type: Dict[Tuple[str, str], int]
+                # Tuples of room_id + destination to their max-seen stream_ordering
+                room_with_dest_stream_ordering = {}  # type: Dict[Tuple[str, str], int]
+
+                # List of events to send to each destination
                 dest_to_events = {}  # type: Dict[str, List[EventBase]]
 
+                # For each roomID + events with destinations pair...
                 for room_id, event_and_dests in per_room_events_and_dests:
-                    for event, dests in event_and_dests.items():
+                    # ...get every event with their destinations...
+                    for event, destinations in event_and_dests.items():
 
-                        # we got this from the database, it's filled
+                        # (we got this from the database, it's filled)
                         assert event.internal_metadata.stream_ordering
 
-                        for destination in dests:
+                        # ...iterate over those destinations..
+                        for destination in destinations:
                             if (
-                                room_and_dest_to_max.setdefault(
+                                room_with_dest_stream_ordering.setdefault(
                                     (room_id, destination), 0
                                 )
                                 < event.internal_metadata.stream_ordering
                             ):
-                                room_and_dest_to_max[
+                                # ...update their stream-ordering...
+                                room_with_dest_stream_ordering[
                                     (room_id, destination)
                                 ] = event.internal_metadata.stream_ordering
 
+                            # ...and add the event to each destination queue.
                             dest_to_events.setdefault(destination, []).append(event)
 
-                for dest, events in dest_to_events.items():
-                    self._distribute_pdus(dest, events)
-
+                # Bulk-store destination_rooms properties
                 await self.store.bulk_store_destination_rooms_entries(
-                    room_and_dest_to_max
+                    room_with_dest_stream_ordering
                 )
+
+                # Send corresponding events to each destination queue
+                self._distribute_pdus(dest_to_events)
 
                 await self.store.update_federation_out_pos("events", next_token)
 
@@ -350,12 +362,13 @@ class FederationSender:
         finally:
             self._is_processing = False
 
-    def _distribute_pdus(self, destination: str, pdus: List[EventBase]) -> None:
-        logger.debug("Sending %d to: %s", len(pdus), destination)
+    def _distribute_pdus(self, destination_to_pdus: Dict[str, List[EventBase]]) -> None:
+        for destination, pdus in destination_to_pdus.items():
+            logger.debug("Sending %d to: %s", len(pdus), destination)
 
-        sent_pdus_destination_dist_total.inc(len(pdus))
+            sent_pdus_destination_dist_total.inc(len(pdus))
 
-        self._get_per_destination_queue(destination).send_pdu(*pdus)
+            self._get_per_destination_queue(destination).send_pdu(*pdus)
 
     async def send_read_receipt(self, receipt: ReadReceipt) -> None:
         """Send a RR to any other servers in the room
