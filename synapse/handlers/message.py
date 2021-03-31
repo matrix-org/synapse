@@ -385,7 +385,7 @@ class EventCreationHandler:
         self._events_shard_config = self.config.worker.events_shard_config
         self._instance_name = hs.get_instance_name()
 
-        self.room_invite_state_types = self.hs.config.room_invite_state_types
+        self.room_invite_state_types = self.hs.config.api.room_prejoin_state
 
         self.membership_types_to_include_profile_data_in = (
             {Membership.JOIN, Membership.INVITE}

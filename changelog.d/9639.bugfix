@@ -1,1 +1,0 @@
-Fix bug where federation sending can stall due to `concurrent access` database exceptions when it falls behind.

@@ -81,6 +81,7 @@ class DeviceMessageHandler:
             )
 
         self._ratelimiter = Ratelimiter(
+            store=self.store,
             clock=hs.get_clock(),
             rate_hz=hs.config.rc_key_requests.per_second,
             burst_count=hs.config.rc_key_requests.burst_count,
@@ -191,8 +192,8 @@ class DeviceMessageHandler:
             if (
                 message_type == EduTypes.RoomKeyRequest
                 and user_id != sender_user_id
-                and self._ratelimiter.can_do_action(
-                    (sender_user_id, requester.device_id)
+                and await self._ratelimiter.can_do_action(
+                    requester, (sender_user_id, requester.device_id)
                 )
             ):
                 continue
