@@ -348,8 +348,6 @@ class FederationSender(AbstractFederationSender):
                         # send the event to it.
                         destinations.discard(send_on_behalf_of)
 
-                    logger.debug("Sending %s to %r", event, destinations)
-
                     if destinations:
                         now = self.clock.time_msec()
                         ts = await self.store.get_received_ts(event.event_id)
