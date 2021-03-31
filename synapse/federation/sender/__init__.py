@@ -444,6 +444,9 @@ class FederationSender(AbstractFederationSender):
                 # (we got this from the database, it's filled)
                 assert event.internal_metadata.stream_ordering
 
+                sent_pdus_destination_dist_total.inc(len(destinations))
+                sent_pdus_destination_dist_count.inc()
+
                 # ...iterate over those destinations..
                 for destination in destinations:
                     if (
@@ -468,8 +471,6 @@ class FederationSender(AbstractFederationSender):
 
         for destination, pdus in events_by_dest.items():
             logger.debug("Sending %d pdus to %s", len(pdus), destination)
-
-            sent_pdus_destination_dist_total.inc(len(pdus))
 
             self._get_per_destination_queue(destination).send_pdu(*pdus)
 
