@@ -86,18 +86,6 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
         presence.register_servlets,
     ]
 
-    def default_config(self):
-        config = super().default_config()
-        config["presence"] = {
-            "presence_router": {
-                "module": __name__ + ".PresenceRouterTestModule",
-                "config": {
-                    "users_who_should_receive_all_presence": ["@presence_gobbler:test"]
-                },
-            }
-        }
-        return config
-
     def make_homeserver(self, reactor, clock):
         return self.setup_test_homeserver(
             federation_transport_client=Mock(spec=["send_transaction"]),
@@ -105,7 +93,27 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
 
     def prepare(self, reactor, clock, homeserver):
         self.sync_handler = self.hs.get_sync_handler()
+        self.module_api = homeserver.get_module_api()
 
+    @override_config(
+        {
+            "presence": {
+                "presence_router": {
+                    "module": __name__ + ".PresenceRouterTestModule",
+                    "config": {
+                        "users_who_should_receive_all_presence": [
+                            "@presence_gobbler:test",
+                        ]
+                    },
+                }
+            },
+            "send_federation": True,
+        }
+    )
+    def test_receiving_all_presence(self):
+        """Test that a user that does not share a room with another other can receive
+        presence for them, due to presence routing.
+        """
         # Create a user who should receive all presence of others
         self.presence_receiving_user_id = self.register_user(
             "presence_gobbler", "monkey"
@@ -119,26 +127,17 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
         self.other_user_two_tok = self.login("other_user_two", "monkey")
 
         # Put the other two users in a room with each other
-        self.room_id = self.helper.create_room_as(
+        room_id = self.helper.create_room_as(
             self.other_user_one_id, tok=self.other_user_one_tok
         )
 
         self.helper.invite(
-            self.room_id,
+            room_id,
             self.other_user_one_id,
             self.other_user_two_id,
             tok=self.other_user_one_tok,
         )
-        self.helper.join(
-            self.room_id, self.other_user_two_id, tok=self.other_user_two_tok
-        )
-
-        self.module_api = homeserver.get_module_api()
-
-    def test_receiving_all_presence(self):
-        """Test that a user that does not share a room with another other can receive
-        presence for them, due to presence routing.
-        """
+        self.helper.join(room_id, self.other_user_two_id, tok=self.other_user_two_tok)
         # User one sends some presence
         send_presence_update(
             self,
