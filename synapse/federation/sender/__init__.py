@@ -322,8 +322,6 @@ class FederationSender(AbstractFederationSender):
                             )
                             return None
 
-                    destinations.discard(self.server_name)
-
                     destinations = {
                         d
                         for d in destinations
@@ -331,6 +329,8 @@ class FederationSender(AbstractFederationSender):
                             self._instance_name, d
                         )
                     }
+
+                    destinations.discard(self.server_name)
 
                     if send_on_behalf_of is not None:
                         # If we are sending the event on behalf of another server
@@ -355,17 +355,16 @@ class FederationSender(AbstractFederationSender):
                     room_id: str, events: Iterable[EventBase]
                 ) -> Tuple[str, Dict[EventBase, Collection[str]]]:
                     with Measure(self.clock, "handle_room_events"):
-                        # Generate event -> destination pairs for every event in events,
-                        # skip if handle_event returns None.
+                        # Handle all events, skip if handle_event returns None
+                        handled_events = (
+                            ret
+                            for ret in (await handle_event(event) for event in events)
+                            if ret is not None
+                        )
+
+                        # Generate event -> destination pairs for every handled event
                         return room_id, {
-                            event: dests
-                            for event, dests in (
-                                ret
-                                for ret in (
-                                    await handle_event(event) for event in events
-                                )
-                                if ret is not None
-                            )
+                            event: dests for event, dests in handled_events
                         }
 
                 events_by_room = {}  # type: Dict[str, List[EventBase]]
