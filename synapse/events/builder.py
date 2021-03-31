@@ -138,6 +138,11 @@ class EventBuilder:
             auth_events = auth_event_ids
             prev_events = prev_event_ids
 
+        logger.info(
+            "prev_events %s",
+            prev_events,
+        )
+
         (
             most_recent_prev_event_id,
             most_recent_prev_event_depth,

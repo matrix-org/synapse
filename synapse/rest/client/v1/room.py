@@ -300,15 +300,23 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
     async def on_POST(self, request, room_id):
         requester = await self.auth.get_user_by_req(request, allow_guest=False)
         body = parse_json_object_from_request(request)
-        prev_events = parse_strings_from_args(request.args, "prev_event")
+        assert_params_in_dict(body, ["state_events_at_start", "events"])
+
+        prev_events_from_query = parse_strings_from_args(request.args, "prev_event")
+
+        logger.info("body waewefaew %s", body)
 
         auth_event_ids = []
-        for stateEv in body.state_events_at_start:
+        for stateEv in body["state_events_at_start"]:
+            logger.info("stateEv %s", stateEv)
+            assert_params_in_dict(stateEv, ["type", "content", "sender"])
+
             event_dict = {
-                "type": stateEv.type,
-                "content": stateEv.content,
+                "type": stateEv["type"],
+                "content": stateEv["content"],
                 "room_id": room_id,
-                "sender": stateEv.sender,  # requester.user.to_string(),
+                "sender": stateEv["sender"],  # requester.user.to_string(),
+                "state_key": stateEv["state_key"],
             }
 
             # Make the events float off in their own
@@ -321,14 +329,33 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
             event_id = event.event_id
             auth_event_ids.append(event_id)
 
-        prev_event_ids = prev_events
-        for ev in body.events:
+        logger.info("Done with state events grrtrsrdhh %s", auth_event_ids)
+
+        event_ids = []
+        prev_event_ids = prev_events_from_query
+        for ev in body["events"]:
+            logger.info("ev %s", ev)
+            assert_params_in_dict(ev, ["type", "content", "sender"])
+
             event_dict = {
-                "type": ev.type,
-                "content": ev.content,
+                "type": ev["type"],
+                "content": ev["content"],
                 "room_id": room_id,
-                "sender": ev.sender,  # requester.user.to_string(),
+                "sender": ev["sender"],  # requester.user.to_string(),
+                "prev_events": prev_event_ids,
             }
+
+            # (
+            #     event,
+            #     _,
+            # ) = await self.event_creation_handler.create_and_send_nonmember_event(
+            #     requester,
+            #     event_dict,
+            #     inherit_depth=True,
+            #     # We are allowed to post these messages because we are referencing the
+            #     # floating auth state events that we just created above
+            #     auth_event_ids=auth_event_ids,
+            # )
 
             (event, _,) = await self.event_creation_handler.create_event(
                 requester,
@@ -340,16 +367,23 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                 inherit_depth=True,
             )
             event_id = event.event_id
+            event_ids.append(event_id)
+
+            logger.info("event esrgegrerg %s", event)
 
             prev_event_ids = [event_id]
 
-        return 200, {"foo": "bar"}
+        logger.info("Done with events afeefwaefw")
 
-    def on_GET(self, request, room_id, event_type, txn_id):
+        return 200, {"state_events": auth_event_ids, "events": event_ids}
+
+    def on_GET(self, request, room_id):
         return 501, "Not implemented"
 
-    def on_PUT(self, request, room_id, event_type, txn_id):
-        return 501, "Not implemented"
+    def on_PUT(self, request, room_id):
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request, room_id
+        )
 
 
 # TODO: Needs unit testing for room ID + alias joins
@@ -1140,6 +1174,7 @@ def register_servlets(hs: "HomeServer", http_server, is_worker=False):
     JoinRoomAliasServlet(hs).register(http_server)
     RoomMembershipRestServlet(hs).register(http_server)
     RoomSendEventRestServlet(hs).register(http_server)
+    RoomBulkSendEventRestServlet(hs).register(http_server)
     PublicRoomListRestServlet(hs).register(http_server)
     RoomStateRestServlet(hs).register(http_server)
     RoomRedactEventRestServlet(hs).register(http_server)

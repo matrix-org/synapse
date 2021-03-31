@@ -705,6 +705,7 @@ class EventCreationHandler:
         requester: Requester,
         event_dict: dict,
         inherit_depth: bool = False,
+        auth_event_ids: Optional[List[str]] = None,
         ratelimit: bool = True,
         txn_id: Optional[str] = None,
         ignore_shadow_ban: bool = False,
@@ -768,6 +769,7 @@ class EventCreationHandler:
                 event_dict,
                 txn_id=txn_id,
                 prev_event_ids=prev_events,
+                auth_event_ids=auth_event_ids,
                 inherit_depth=inherit_depth,
             )
 
