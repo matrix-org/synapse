@@ -412,7 +412,7 @@ class FederationSender(AbstractFederationSender):
                             # ...and add the event to each destination queue.
                             dest_to_events.setdefault(destination, []).append(event)
 
-                # Bulk-store destination_rooms properties
+                # Bulk-store destination_rooms stream_ids
                 await self.store.bulk_store_destination_rooms_entries(
                     room_with_dest_stream_ordering
                 )
