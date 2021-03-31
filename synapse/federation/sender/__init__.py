@@ -358,7 +358,7 @@ class FederationSender(AbstractFederationSender):
                         # Handle all events, skip if handle_event returns None
                         handled_events = (
                             ret
-                            for ret in (await handle_event(event) for event in events)
+                            for ret in [await handle_event(event) for event in events]
                             if ret is not None
                         )
 
