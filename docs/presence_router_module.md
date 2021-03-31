@@ -53,10 +53,10 @@ async def get_users_for_states(
 ) -> Dict[str, Set[UserPresenceState]]:
 ```
 
-**Required.** An asynchronous class method that is passed an iterable of user presence
+**Required.** An asynchronous method that is passed an iterable of user presence
 state. This method can determine whether a given presence update should be sent to certain
 users. It does this by returning a dictionary with keys representing local or remote
-Matrix User IDs, and values being a python Set
+Matrix User IDs, and values being a python set
 of `synapse.handlers.presence.UserPresenceState` instances.
 
 Synapse will then attempt to send the specified presence updates to each user when
@@ -68,10 +68,10 @@ possible.
 async def get_interested_users(self, user_id: str) -> Union[Set[str], str]
 ```
 
-**Required.** An asynchronous class method that is passed a single Matrix User ID. This
+**Required.** An asynchronous method that is passed a single Matrix User ID. This
 method is expected to return the users that the passed in user may be interested in the
-presence of. This may be local or remote users. It does so by returning a python Set of
-Matrix User IDs, or the object
+presence of, in addition to users they share a room with. This may be local or remote
+users. It does so by returning a python set of Matrix User IDs, or the object
 `synapse.events.presence_router.PresenceRouter.ALL_USERS` to indicate that the passed
 user should receive presence information for *all* known users.
 
