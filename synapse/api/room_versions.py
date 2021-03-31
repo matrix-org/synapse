@@ -69,8 +69,8 @@ class RoomVersion:
     limit_notifications_power_levels = attr.ib(type=bool)
     # MSC2174/MSC2176: Apply updated redaction rules algorithm.
     msc2176_redaction_rules = attr.ib(type=bool)
-    # MSC2962: Support the 'restricted' join_rule.
-    msc2962_join_rules = attr.ib(type=bool)
+    # MSC3083: Support the 'restricted' join_rule.
+    msc3083_join_rules = attr.ib(type=bool)
 
 
 class RoomVersions:
@@ -84,7 +84,7 @@ class RoomVersions:
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
         msc2176_redaction_rules=False,
-        msc2962_join_rules=False,
+        msc3083_join_rules=False,
     )
     V2 = RoomVersion(
         "2",
@@ -96,7 +96,7 @@ class RoomVersions:
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
         msc2176_redaction_rules=False,
-        msc2962_join_rules=False,
+        msc3083_join_rules=False,
     )
     V3 = RoomVersion(
         "3",
@@ -108,7 +108,7 @@ class RoomVersions:
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
         msc2176_redaction_rules=False,
-        msc2962_join_rules=False,
+        msc3083_join_rules=False,
     )
     V4 = RoomVersion(
         "4",
@@ -120,7 +120,7 @@ class RoomVersions:
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
         msc2176_redaction_rules=False,
-        msc2962_join_rules=False,
+        msc3083_join_rules=False,
     )
     V5 = RoomVersion(
         "5",
@@ -132,7 +132,7 @@ class RoomVersions:
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
         msc2176_redaction_rules=False,
-        msc2962_join_rules=False,
+        msc3083_join_rules=False,
     )
     V6 = RoomVersion(
         "6",
@@ -144,7 +144,7 @@ class RoomVersions:
         strict_canonicaljson=True,
         limit_notifications_power_levels=True,
         msc2176_redaction_rules=False,
-        msc2962_join_rules=False,
+        msc3083_join_rules=False,
     )
     MSC2176 = RoomVersion(
         "org.matrix.msc2176",
@@ -156,10 +156,10 @@ class RoomVersions:
         strict_canonicaljson=True,
         limit_notifications_power_levels=True,
         msc2176_redaction_rules=True,
-        msc2962_join_rules=False,
+        msc3083_join_rules=False,
     )
-    MSC2962 = RoomVersion(
-        "org.matrix.msc2962",
+    MSC3083 = RoomVersion(
+        "org.matrix.msc3083",
         RoomDisposition.UNSTABLE,
         EventFormatVersions.V3,
         StateResolutionVersions.V2,
@@ -168,7 +168,7 @@ class RoomVersions:
         strict_canonicaljson=True,
         limit_notifications_power_levels=True,
         msc2176_redaction_rules=False,
-        msc2962_join_rules=True,
+        msc3083_join_rules=True,
     )
 
 
@@ -182,6 +182,6 @@ KNOWN_ROOM_VERSIONS = {
         RoomVersions.V5,
         RoomVersions.V6,
         RoomVersions.MSC2176,
-        RoomVersions.MSC2962,
+        RoomVersions.MSC3083,
     )
 }  # type: Dict[str, RoomVersion]

@@ -347,9 +347,9 @@ class EventAuthTestCase(unittest.TestCase):
             do_sig_check=False,
         )
 
-    def test_join_rules_msc2962_restricted(self):
+    def test_join_rules_msc3083_restricted(self):
         """
-        Test joining a restricted room from MSC2962.
+        Test joining a restricted room from MSC3083.
 
         This is pretty much the same test as public.
         """
@@ -373,7 +373,7 @@ class EventAuthTestCase(unittest.TestCase):
 
         # Check join.
         event_auth.check(
-            RoomVersions.MSC2962,
+            RoomVersions.MSC3083,
             _join_event(pleb),
             auth_events,
             do_sig_check=False,
@@ -382,7 +382,7 @@ class EventAuthTestCase(unittest.TestCase):
         # A user cannot be force-joined to a room.
         with self.assertRaises(AuthError):
             event_auth.check(
-                RoomVersions.MSC2962,
+                RoomVersions.MSC3083,
                 _member_event(pleb, "join", sender=creator),
                 auth_events,
                 do_sig_check=False,
@@ -392,7 +392,7 @@ class EventAuthTestCase(unittest.TestCase):
         auth_events[("m.room.member", pleb)] = _member_event(pleb, "ban")
         with self.assertRaises(AuthError):
             event_auth.check(
-                RoomVersions.MSC2962,
+                RoomVersions.MSC3083,
                 _join_event(pleb),
                 auth_events,
                 do_sig_check=False,
@@ -401,7 +401,7 @@ class EventAuthTestCase(unittest.TestCase):
         # A user who left can re-join.
         auth_events[("m.room.member", pleb)] = _member_event(pleb, "leave")
         event_auth.check(
-            RoomVersions.MSC2962,
+            RoomVersions.MSC3083,
             _join_event(pleb),
             auth_events,
             do_sig_check=False,
@@ -410,7 +410,7 @@ class EventAuthTestCase(unittest.TestCase):
         # A user can send a join if they're in the room.
         auth_events[("m.room.member", pleb)] = _member_event(pleb, "join")
         event_auth.check(
-            RoomVersions.MSC2962,
+            RoomVersions.MSC3083,
             _join_event(pleb),
             auth_events,
             do_sig_check=False,
@@ -421,7 +421,7 @@ class EventAuthTestCase(unittest.TestCase):
             pleb, "invite", sender=creator
         )
         event_auth.check(
-            RoomVersions.MSC2962,
+            RoomVersions.MSC3083,
             _join_event(pleb),
             auth_events,
             do_sig_check=False,

@@ -336,8 +336,8 @@ def _is_membership_change_allowed(
         elif target_banned:
             raise AuthError(403, "You are banned from this room")
         elif join_rule == JoinRules.PUBLIC or (
-            room_version.msc2962_join_rules
-            and join_rule == JoinRules.MSC2962_RESTRICTED
+            room_version.msc3083_join_rules
+            and join_rule == JoinRules.MSC3083_RESTRICTED
         ):
             pass
         elif join_rule == JoinRules.INVITE:
