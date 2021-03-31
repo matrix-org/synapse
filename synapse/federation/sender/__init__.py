@@ -275,9 +275,19 @@ class FederationSender(AbstractFederationSender):
                 if not events and next_token >= self._last_poked_id:
                     break
 
-                async def handle_event(
+                async def get_destinations_for_event(
                     event: EventBase,
-                ) -> Optional[Tuple[EventBase, Collection[str]]]:
+                ) -> Optional[Collection[str]]:
+                    """Computes the destinations to which this event must be sent.
+
+                    This returns None when there are no destinations to send to,
+                    or if this event is not from this homeserver and it is not sending
+                    it on behalf of another server.
+
+                    Will also filter out destinations which this sender is not responsible for,
+                    if multiple federation senders exist.
+                    """
+
                     # Only send events for this server.
                     send_on_behalf_of = event.internal_metadata.get_send_on_behalf_of()
                     is_mine = self.is_mine_id(event.sender)
@@ -348,24 +358,22 @@ class FederationSender(AbstractFederationSender):
                             "federation_sender"
                         ).observe((now - ts) / 1000)
 
-                        return event, destinations
+                        return destinations
                     return None
 
-                async def handle_room_events(
+                async def get_federatable_events_and_destinations(
                     room_id: str, events: Iterable[EventBase]
-                ) -> Tuple[str, Dict[EventBase, Collection[str]]]:
+                ) -> Tuple[str, List[Tuple[EventBase, Collection[str]]]]:
                     with Measure(self.clock, "handle_room_events"):
-                        # Handle all events, skip if handle_event returns None
-                        handled_events = (
-                            ret
-                            for ret in [await handle_event(event) for event in events]
-                            if ret is not None
-                        )
-
-                        # Generate event -> destination pairs for every handled event
-                        return room_id, {
-                            event: dests for event, dests in handled_events
-                        }
+                        # Get destinations for events, skip if get_destinations_for_event returns None
+                        return room_id, [
+                            (event, dests)
+                            for (event, dests) in [
+                                (event, await get_destinations_for_event(event))
+                                for event in events
+                            ]
+                            if dests is not None
+                        ]
 
                 events_by_room = {}  # type: Dict[str, List[EventBase]]
                 for event in events:
@@ -374,50 +382,17 @@ class FederationSender(AbstractFederationSender):
                 per_room_events_and_dests = await make_deferred_yieldable(
                     defer.gatherResults(
                         [
-                            run_in_background(handle_room_events, rid, evs)
+                            run_in_background(
+                                get_federatable_events_and_destinations, rid, evs
+                            )
                             for rid, evs in events_by_room.items()
                         ],
                         consumeErrors=True,
                     )
-                )  # type: List[Tuple[str, Dict[EventBase, Collection[str]]]]
-
-                # Tuples of room_id + destination to their max-seen stream_ordering
-                room_with_dest_stream_ordering = {}  # type: Dict[Tuple[str, str], int]
-
-                # List of events to send to each destination
-                dest_to_events = {}  # type: Dict[str, List[EventBase]]
-
-                # For each roomID + events with destinations pair...
-                for room_id, event_and_dests in per_room_events_and_dests:
-                    # ...get every event with their destinations...
-                    for event, destinations in event_and_dests.items():
-
-                        # (we got this from the database, it's filled)
-                        assert event.internal_metadata.stream_ordering
-
-                        # ...iterate over those destinations..
-                        for destination in destinations:
-                            if (
-                                room_with_dest_stream_ordering.setdefault(
-                                    (room_id, destination), 0
-                                )
-                                < event.internal_metadata.stream_ordering
-                            ):
-                                # ...update their stream-ordering...
-                                room_with_dest_stream_ordering[
-                                    (room_id, destination)
-                                ] = event.internal_metadata.stream_ordering
-
-                            # ...and add the event to each destination queue.
-                            dest_to_events.setdefault(destination, []).append(event)
-
-                # Bulk-store destination_rooms stream_ids
-                await self.store.bulk_store_destination_rooms_entries(
-                    room_with_dest_stream_ordering
-                )
+                )  # type: List[Tuple[str, List[Tuple[EventBase, Collection[str]]]]]
 
                 # Send corresponding events to each destination queue
-                self._distribute_pdus(dest_to_events)
+                await self._distribute_events(per_room_events_and_dests)
 
                 await self.store.update_federation_out_pos("events", next_token)
 
@@ -447,9 +422,54 @@ class FederationSender(AbstractFederationSender):
         finally:
             self._is_processing = False
 
-    def _distribute_pdus(self, destination_to_pdus: Dict[str, List[EventBase]]) -> None:
-        for destination, pdus in destination_to_pdus.items():
-            logger.debug("Sending %d to: %s", len(pdus), destination)
+    async def _distribute_events(
+        self,
+        per_room_events_and_dests: List[
+            Tuple[str, List[Tuple[EventBase, Collection[str]]]]
+        ],
+    ) -> None:
+        # Tuples of room_id + destination to their max-seen stream_ordering
+        room_with_dest_stream_ordering = {}  # type: Dict[Tuple[str, str], int]
+
+        # List of events to send to each destination
+        events_by_dest = {}  # type: Dict[str, List[EventBase]]
+
+        # For each roomID + events with destinations pair...
+        for room_id, event_and_dests in per_room_events_and_dests:
+
+            # (dest -> stream_id)
+            this_stream_ordering = {}  # type: Dict[str, int]
+
+            # ...get every event with their destinations...
+            for event, destinations in event_and_dests:
+
+                # (we got this from the database, it's filled)
+                assert event.internal_metadata.stream_ordering
+
+                # ...iterate over those destinations..
+                for destination in destinations:
+                    if (
+                        this_stream_ordering.setdefault(destination, 0)
+                        < event.internal_metadata.stream_ordering
+                    ):
+                        # ...update their stream-ordering...
+                        this_stream_ordering[
+                            destination
+                        ] = event.internal_metadata.stream_ordering
+
+                    # ...and add the event to each destination queue.
+                    events_by_dest.setdefault(destination, []).append(event)
+
+            for dest, stream_id in this_stream_ordering.items():
+                room_with_dest_stream_ordering[(room_id, dest)] = stream_id
+
+        # Bulk-store destination_rooms stream_ids
+        await self.store.bulk_store_destination_rooms_entries(
+            room_with_dest_stream_ordering
+        )
+
+        for destination, pdus in events_by_dest.items():
+            logger.debug("Sending %d pdus to %s", len(pdus), destination)
 
             sent_pdus_destination_dist_total.inc(len(pdus))
 

@@ -309,7 +309,7 @@ class TransactionStore(TransactionWorkerStore):
         await self.db_pool.simple_upsert_many(
             table="destinations",
             key_names=("destination",),
-            key_values={(r, ) for r, _ in room_and_destination_to_ordering.keys()},
+            key_values={(r,) for r, _ in room_and_destination_to_ordering.keys()},
             value_names=[],
             value_values=[],
             desc="store_destination_rooms_entries_dests",
