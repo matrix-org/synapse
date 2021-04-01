@@ -182,7 +182,9 @@ class LruCache(Generic[KT, VT]):
                 or 0 < list_root.prev_node.allocated_ts < ten_minutes_ago + 60
             ):
                 i += 1
-                if list_root.prev_node.allocated_ts > ten_minutes_ago:
+                todelete = list_root.prev_node
+
+                if 0 < todelete.allocated_ts < ten_minutes_ago:
                     continue
 
                 todelete = list_root.prev_node
