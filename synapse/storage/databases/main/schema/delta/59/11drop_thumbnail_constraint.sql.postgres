@@ -18,5 +18,5 @@
 -- This was originally part of 57.07, but it was done wrong, per
 -- https://github.com/matrix-org/synapse/issues/8649, so we do it again.
 INSERT INTO background_updates (ordering, update_name, progress_json, depends_on) VALUES
-  (5911, 'media_repository_drop_index_wo_method', '{}', 'remote_media_repository_thumbnails_method_idx');
+  (5911, 'media_repository_drop_index_wo_method_2', '{}', 'remote_media_repository_thumbnails_method_idx');
 

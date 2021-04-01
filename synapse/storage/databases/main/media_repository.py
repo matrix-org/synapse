@@ -22,6 +22,9 @@ from synapse.storage.database import DatabasePool
 BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD = (
     "media_repository_drop_index_wo_method"
 )
+BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD_2 = (
+    "media_repository_drop_index_wo_method_2"
+)
 
 
 class MediaSortOrder(Enum):
@@ -85,8 +88,15 @@ class MediaRepositoryBackgroundUpdateStore(SQLBaseStore):
             unique=True,
         )
 
+        # the original impl of _drop_media_index_without_method was broken (see
+        # https://github.com/matrix-org/synapse/issues/8649), so we replace the original
+        # impl with a no-op and run the fixed migration as
+        # media_repository_drop_index_wo_method_2.
+        self.db_pool.updates.register_noop_background_update(
+            BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD
+        )
         self.db_pool.updates.register_background_update_handler(
-            BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD,
+            BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD_2,
             self._drop_media_index_without_method,
         )
 
@@ -106,7 +116,7 @@ class MediaRepositoryBackgroundUpdateStore(SQLBaseStore):
 
         await self.db_pool.runInteraction("drop_media_indices_without_method", f)
         await self.db_pool.updates._end_background_update(
-            BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD
+            BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD_2
         )
         return 1
 
