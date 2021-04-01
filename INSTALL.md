@@ -3,7 +3,6 @@
 There are 3 steps to follow under **Installation Instructions**.
 
 - [Installation Instructions](#installation-instructions)
-  - [Platform Dependencies](#choosing-your-server-name)
   - [Choosing your server name](#choosing-your-server-name)
   - [Installing Synapse](#installing-synapse)
     - [Installing from source](#installing-from-source)
@@ -38,13 +37,6 @@ There are 3 steps to follow under **Installation Instructions**.
     - [Setting up a TURN server](#setting-up-a-turn-server)
     - [URL previews](#url-previews)
     - [Troubleshooting Installation](#troubleshooting-installation)
-
-
-## Platform dependencies
-
-Synapse uses a number of platform dependencies such as Python and PostgreSQL,
-and aims to support versions supported upstream. See the
-[deprecation policy](docs/deprecation_policy.md) document for more details.
 
 
 ## Choosing your server name
