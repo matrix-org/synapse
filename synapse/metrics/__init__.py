@@ -249,7 +249,7 @@ class GaugeBucketCollector:
 
         # We initially set this to None. We won't report metrics until
         # this has been initialised after a successful data update
-        self._metric = None
+        self._metric = None  # type: Optional[GaugeHistogramMetricFamily]
 
         registry.register(self)
 
