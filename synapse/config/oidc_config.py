@@ -15,17 +15,18 @@
 # limitations under the License.
 
 from collections import Counter
-from typing import Iterable, Optional, Tuple, Type
+from typing import Iterable, List, Mapping, Optional, Tuple, Type
 
 import attr
 
 from synapse.config._util import validate_config
+from synapse.config.sso import SsoAttributeRequirement
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.types import Collection, JsonDict
 from synapse.util.module_loader import load_module
 from synapse.util.stringutils import parse_and_validate_mxc_uri
 
-from ._base import Config, ConfigError
+from ._base import Config, ConfigError, read_file
 
 DEFAULT_USER_MAPPING_PROVIDER = "synapse.handlers.oidc_handler.JinjaOidcMappingProvider"
 
@@ -41,7 +42,9 @@ class OIDCConfig(Config):
         try:
             check_requirements("oidc")
         except DependencyException as e:
-            raise ConfigError(e.message) from e
+            raise ConfigError(
+                e.message  # noqa: B306, DependencyException.message is a property
+            ) from e
 
         # check we don't have any duplicate idp_ids now. (The SSO handler will also
         # check for duplicates when the REST listeners get registered, but that happens
@@ -76,6 +79,9 @@ class OIDCConfig(Config):
         #       Note that, if this is changed, users authenticating via that provider
         #       will no longer be recognised as the same user!
         #
+        #       (Use "oidc" here if you are migrating from an old "oidc_config"
+        #       configuration.)
+        #
         #   idp_name: A user-facing name for this identity provider, which is used to
         #       offer the user a choice of login mechanisms.
         #
@@ -97,7 +103,26 @@ class OIDCConfig(Config):
         #
         #   client_id: Required. oauth2 client id to use.
         #
-        #   client_secret: Required. oauth2 client secret to use.
+        #   client_secret: oauth2 client secret to use. May be omitted if
+        #        client_secret_jwt_key is given, or if client_auth_method is 'none'.
+        #
+        #   client_secret_jwt_key: Alternative to client_secret: details of a key used
+        #      to create a JSON Web Token to be used as an OAuth2 client secret. If
+        #      given, must be a dictionary with the following properties:
+        #
+        #          key: a pem-encoded signing key. Must be a suitable key for the
+        #              algorithm specified. Required unless 'key_file' is given.
+        #
+        #          key_file: the path to file containing a pem-encoded signing key file.
+        #              Required unless 'key' is given.
+        #
+        #          jwt_header: a dictionary giving properties to include in the JWT
+        #              header. Must include the key 'alg', giving the algorithm used to
+        #              sign the JWT, such as "ES256", using the JWA identifiers in
+        #              RFC7518.
+        #
+        #          jwt_payload: an optional dictionary giving properties to include in
+        #              the JWT payload. Normally this should include an 'iss' key.
         #
         #   client_auth_method: auth method to use when exchanging the token. Valid
         #       values are 'client_secret_basic' (default), 'client_secret_post' and
@@ -172,6 +197,24 @@ class OIDCConfig(Config):
         #           which is set to the claims returned by the UserInfo Endpoint and/or
         #           in the ID Token.
         #
+        #   It is possible to configure Synapse to only allow logins if certain attributes
+        #   match particular values in the OIDC userinfo. The requirements can be listed under
+        #   `attribute_requirements` as shown below. All of the listed attributes must
+        #   match for the login to be permitted. Additional attributes can be added to
+        #   userinfo by expanding the `scopes` section of the OIDC config to retrieve
+        #   additional information from the OIDC provider.
+        #
+        #   If the OIDC claim is a list, then the attribute must match any value in the list.
+        #   Otherwise, it must exactly match the value of the claim. Using the example
+        #   below, the `family_name` claim MUST be "Stephensson", but the `groups`
+        #   claim MUST contain "admin".
+        #
+        #   attribute_requirements:
+        #     - attribute: family_name
+        #       value: "Stephensson"
+        #     - attribute: groups
+        #       value: "admin"
+        #
         # See https://github.com/matrix-org/synapse/blob/master/docs/openid.md
         # for information on how to configure these options.
         #
@@ -204,34 +247,9 @@ class OIDCConfig(Config):
           #      localpart_template: "{{{{ user.login }}}}"
           #      display_name_template: "{{{{ user.name }}}}"
           #      email_template: "{{{{ user.email }}}}"
-
-          # For use with Keycloak
-          #
-          #- idp_id: keycloak
-          #  idp_name: Keycloak
-          #  issuer: "https://127.0.0.1:8443/auth/realms/my_realm_name"
-          #  client_id: "synapse"
-          #  client_secret: "copy secret generated in Keycloak UI"
-          #  scopes: ["openid", "profile"]
-
-          # For use with Github
-          #
-          #- idp_id: github
-          #  idp_name: Github
-          #  idp_brand: org.matrix.github
-          #  discover: false
-          #  issuer: "https://github.com/"
-          #  client_id: "your-client-id" # TO BE FILLED
-          #  client_secret: "your-client-secret" # TO BE FILLED
-          #  authorization_endpoint: "https://github.com/login/oauth/authorize"
-          #  token_endpoint: "https://github.com/login/oauth/access_token"
-          #  userinfo_endpoint: "https://api.github.com/user"
-          #  scopes: ["read:user"]
-          #  user_mapping_provider:
-          #    config:
-          #      subject_claim: "id"
-          #      localpart_template: "{{{{ user.login }}}}"
-          #      display_name_template: "{{{{ user.name }}}}"
+          #  attribute_requirements:
+          #    - attribute: userGroup
+          #      value: "synapseUsers"
         """.format(
             mapping_provider=DEFAULT_USER_MAPPING_PROVIDER
         )
@@ -240,7 +258,7 @@ class OIDCConfig(Config):
 # jsonschema definition of the configuration settings for an oidc identity provider
 OIDC_PROVIDER_CONFIG_SCHEMA = {
     "type": "object",
-    "required": ["issuer", "client_id", "client_secret"],
+    "required": ["issuer", "client_id"],
     "properties": {
         "idp_id": {
             "type": "string",
@@ -253,7 +271,12 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
         "idp_icon": {"type": "string"},
         "idp_brand": {
             "type": "string",
-            # MSC2758-style namespaced identifier
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[a-z][a-z0-9_.-]*$",
+        },
+        "idp_unstable_brand": {
+            "type": "string",
             "minLength": 1,
             "maxLength": 255,
             "pattern": "^[a-z][a-z0-9_.-]*$",
@@ -262,6 +285,30 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
         "issuer": {"type": "string"},
         "client_id": {"type": "string"},
         "client_secret": {"type": "string"},
+        "client_secret_jwt_key": {
+            "type": "object",
+            "required": ["jwt_header"],
+            "oneOf": [
+                {"required": ["key"]},
+                {"required": ["key_file"]},
+            ],
+            "properties": {
+                "key": {"type": "string"},
+                "key_file": {"type": "string"},
+                "jwt_header": {
+                    "type": "object",
+                    "required": ["alg"],
+                    "properties": {
+                        "alg": {"type": "string"},
+                    },
+                    "additionalProperties": {"type": "string"},
+                },
+                "jwt_payload": {
+                    "type": "object",
+                    "additionalProperties": {"type": "string"},
+                },
+            },
+        },
         "client_auth_method": {
             "type": "string",
             # the following list is the same as the keys of
@@ -281,6 +328,10 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
         },
         "allow_existing_users": {"type": "boolean"},
         "user_mapping_provider": {"type": ["object", "null"]},
+        "attribute_requirements": {
+            "type": "array",
+            "items": SsoAttributeRequirement.JSON_SCHEMA,
+        },
     },
 }
 
@@ -404,15 +455,36 @@ def _parse_oidc_config_dict(
                 "idp_icon must be a valid MXC URI", config_path + ("idp_icon",)
             ) from e
 
+    client_secret_jwt_key_config = oidc_config.get("client_secret_jwt_key")
+    client_secret_jwt_key = None  # type: Optional[OidcProviderClientSecretJwtKey]
+    if client_secret_jwt_key_config is not None:
+        keyfile = client_secret_jwt_key_config.get("key_file")
+        if keyfile:
+            key = read_file(keyfile, config_path + ("client_secret_jwt_key",))
+        else:
+            key = client_secret_jwt_key_config["key"]
+        client_secret_jwt_key = OidcProviderClientSecretJwtKey(
+            key=key,
+            jwt_header=client_secret_jwt_key_config["jwt_header"],
+            jwt_payload=client_secret_jwt_key_config.get("jwt_payload", {}),
+        )
+    # parse attribute_requirements from config (list of dicts) into a list of SsoAttributeRequirement
+    attribute_requirements = [
+        SsoAttributeRequirement(**x)
+        for x in oidc_config.get("attribute_requirements", [])
+    ]
+
     return OidcProviderConfig(
         idp_id=idp_id,
         idp_name=oidc_config.get("idp_name", "OIDC"),
         idp_icon=idp_icon,
         idp_brand=oidc_config.get("idp_brand"),
+        unstable_idp_brand=oidc_config.get("unstable_idp_brand"),
         discover=oidc_config.get("discover", True),
         issuer=oidc_config["issuer"],
         client_id=oidc_config["client_id"],
-        client_secret=oidc_config["client_secret"],
+        client_secret=oidc_config.get("client_secret"),
+        client_secret_jwt_key=client_secret_jwt_key,
         client_auth_method=oidc_config.get("client_auth_method", "client_secret_basic"),
         scopes=oidc_config.get("scopes", ["openid"]),
         authorization_endpoint=oidc_config.get("authorization_endpoint"),
@@ -424,7 +496,20 @@ def _parse_oidc_config_dict(
         allow_existing_users=oidc_config.get("allow_existing_users", False),
         user_mapping_provider_class=user_mapping_provider_class,
         user_mapping_provider_config=user_mapping_provider_config,
+        attribute_requirements=attribute_requirements,
     )
+
+
+@attr.s(slots=True, frozen=True)
+class OidcProviderClientSecretJwtKey:
+    # a pem-encoded signing key
+    key = attr.ib(type=str)
+
+    # properties to include in the JWT header
+    jwt_header = attr.ib(type=Mapping[str, str])
+
+    # properties to include in the JWT payload.
+    jwt_payload = attr.ib(type=Mapping[str, str])
 
 
 @attr.s(slots=True, frozen=True)
@@ -442,6 +527,9 @@ class OidcProviderConfig:
     # Optional brand identifier for this IdP.
     idp_brand = attr.ib(type=Optional[str])
 
+    # Optional brand identifier for the unstable API (see MSC2858).
+    unstable_idp_brand = attr.ib(type=Optional[str])
+
     # whether the OIDC discovery mechanism is used to discover endpoints
     discover = attr.ib(type=bool)
 
@@ -452,8 +540,13 @@ class OidcProviderConfig:
     # oauth2 client id to use
     client_id = attr.ib(type=str)
 
-    # oauth2 client secret to use
-    client_secret = attr.ib(type=str)
+    # oauth2 client secret to use. if `None`, use client_secret_jwt_key to generate
+    # a secret.
+    client_secret = attr.ib(type=Optional[str])
+
+    # key to use to construct a JWT to use as a client secret. May be `None` if
+    # `client_secret` is set.
+    client_secret_jwt_key = attr.ib(type=Optional[OidcProviderClientSecretJwtKey])
 
     # auth method to use when exchanging the token.
     # Valid values are 'client_secret_basic', 'client_secret_post' and
@@ -493,3 +586,6 @@ class OidcProviderConfig:
 
     # the config of the user mapping provider
     user_mapping_provider_config = attr.ib()
+
+    # required attributes to require in userinfo to allow login/registration
+    attribute_requirements = attr.ib(type=List[SsoAttributeRequirement])

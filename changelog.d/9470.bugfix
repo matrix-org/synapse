@@ -1,1 +1,0 @@
-Fix missing startup checks for the consistency of certain PostgreSQL sequences.

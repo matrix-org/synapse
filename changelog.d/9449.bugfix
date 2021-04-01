@@ -1,1 +1,0 @@
-Fix a bug introduced in v1.26.0 where some sequences were not properly configured when running `synapse_port_db`.

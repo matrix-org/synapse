@@ -28,7 +28,7 @@ class ToTwistedHandler(logging.Handler):
     def emit(self, record):
         log_entry = self.format(record)
         log_level = record.levelname.lower().replace("warning", "warn")
-        self.tx_log.emit(
+        self.tx_log.emit(  # type: ignore
             twisted.logger.LogLevel.levelWithName(log_level), "{entry}", entry=log_entry
         )
 

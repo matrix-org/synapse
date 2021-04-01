@@ -98,7 +98,7 @@ class DefaultDictProperty(DictProperty):
 
 
 class _EventInternalMetadata:
-    __slots__ = ["_dict", "stream_ordering"]
+    __slots__ = ["_dict", "stream_ordering", "outlier"]
 
     def __init__(self, internal_metadata_dict: JsonDict):
         # we have to copy the dict, because it turns out that the same dict is
@@ -108,7 +108,10 @@ class _EventInternalMetadata:
         # the stream ordering of this event. None, until it has been persisted.
         self.stream_ordering = None  # type: Optional[int]
 
-    outlier = DictProperty("outlier")  # type: bool
+        # whether this event is an outlier (ie, whether we have the state at that point
+        # in the DAG)
+        self.outlier = False
+
     out_of_band_membership = DictProperty("out_of_band_membership")  # type: bool
     send_on_behalf_of = DictProperty("send_on_behalf_of")  # type: str
     recheck_redaction = DictProperty("recheck_redaction")  # type: bool
@@ -129,7 +132,7 @@ class _EventInternalMetadata:
         return dict(self._dict)
 
     def is_outlier(self) -> bool:
-        return self._dict.get("outlier", False)
+        return self.outlier
 
     def is_out_of_band_membership(self) -> bool:
         """Whether this is an out of band membership, like an invite or an invite

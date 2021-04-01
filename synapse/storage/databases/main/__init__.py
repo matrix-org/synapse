@@ -16,18 +16,19 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from synapse.api.constants import PresenceState
 from synapse.config.homeserver import HomeServerConfig
 from synapse.storage.database import DatabasePool
+from synapse.storage.databases.main.stats import UserSortOrder
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import (
     IdGenerator,
     MultiWriterIdGenerator,
     StreamIdGenerator,
 )
-from synapse.types import get_domain_from_id
+from synapse.types import JsonDict, get_domain_from_id
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from .account_data import AccountDataStore
@@ -264,7 +265,7 @@ class DataStore(
 
         return [UserPresenceState(**row) for row in rows]
 
-    async def get_users(self) -> List[Dict[str, Any]]:
+    async def get_users(self) -> List[JsonDict]:
         """Function to retrieve a list of users in users table.
 
         Returns:
@@ -292,7 +293,9 @@ class DataStore(
         name: Optional[str] = None,
         guests: bool = True,
         deactivated: bool = False,
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        order_by: UserSortOrder = UserSortOrder.USER_ID.value,
+        direction: str = "f",
+    ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of users from
         users list. This will return a json list of users and the
         total number of users matching the filter criteria.
@@ -304,6 +307,8 @@ class DataStore(
             name: search for local part of user_id or display name
             guests: whether to in include guest users
             deactivated: whether to include deactivated users
+            order_by: the sort order of the returned list
+            direction: sort ascending or descending
         Returns:
             A tuple of a list of mappings from user to information and a count of total users.
         """
@@ -311,6 +316,14 @@ class DataStore(
         def get_users_paginate_txn(txn):
             filters = []
             args = [self.hs.config.server_name]
+
+            # Set ordering
+            order_by_column = UserSortOrder(order_by).value
+
+            if direction == "b":
+                order = "DESC"
+            else:
+                order = "ASC"
 
             # `name` is in database already in lower case
             if name:
@@ -339,10 +352,15 @@ class DataStore(
             txn.execute(sql, args)
             count = txn.fetchone()[0]
 
-            sql = (
-                "SELECT name, user_type, is_guest, admin, deactivated, shadow_banned, displayname, avatar_url "
-                + sql_base
-                + " ORDER BY u.name LIMIT ? OFFSET ?"
+            sql = """
+                SELECT name, user_type, is_guest, admin, deactivated, shadow_banned, displayname, avatar_url
+                {sql_base}
+                ORDER BY {order_by_column} {order}, u.name ASC
+                LIMIT ? OFFSET ?
+            """.format(
+                sql_base=sql_base,
+                order_by_column=order_by_column,
+                order=order,
             )
             args += [limit, start]
             txn.execute(sql, args)
@@ -353,7 +371,7 @@ class DataStore(
             "get_users_paginate_txn", get_users_paginate_txn
         )
 
-    async def search_users(self, term: str) -> Optional[List[Dict[str, Any]]]:
+    async def search_users(self, term: str) -> Optional[List[JsonDict]]:
         """Function to search users list for one or more users with
         the matched term.
 

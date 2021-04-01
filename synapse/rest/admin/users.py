@@ -16,7 +16,7 @@ import hashlib
 import hmac
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, NotFoundError, SynapseError
@@ -36,6 +36,7 @@ from synapse.rest.admin._base import (
 )
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.databases.main.media_repository import MediaSortOrder
+from synapse.storage.databases.main.stats import UserSortOrder
 from synapse.types import JsonDict, UserID
 
 if TYPE_CHECKING:
@@ -47,13 +48,15 @@ logger = logging.getLogger(__name__)
 class UsersRestServlet(RestServlet):
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_admin_handler()
 
-    async def on_GET(self, request, user_id):
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, List[JsonDict]]:
         target_user = UserID.from_string(user_id)
         await assert_requester_is_admin(self.auth, request)
 
@@ -115,8 +118,26 @@ class UsersRestServletV2(RestServlet):
         guests = parse_boolean(request, "guests", default=True)
         deactivated = parse_boolean(request, "deactivated", default=False)
 
+        order_by = parse_string(
+            request,
+            "order_by",
+            default=UserSortOrder.NAME.value,
+            allowed_values=(
+                UserSortOrder.NAME.value,
+                UserSortOrder.DISPLAYNAME.value,
+                UserSortOrder.GUEST.value,
+                UserSortOrder.ADMIN.value,
+                UserSortOrder.DEACTIVATED.value,
+                UserSortOrder.USER_TYPE.value,
+                UserSortOrder.AVATAR_URL.value,
+                UserSortOrder.SHADOW_BANNED.value,
+            ),
+        )
+
+        direction = parse_string(request, "dir", default="f", allowed_values=("f", "b"))
+
         users, total = await self.store.get_users_paginate(
-            start, limit, user_id, name, guests, deactivated
+            start, limit, user_id, name, guests, deactivated, order_by, direction
         )
         ret = {"users": users, "total": total}
         if (start + limit) < total:
@@ -153,7 +174,7 @@ class UserRestServletV2(RestServlet):
         otherwise an error.
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_admin_handler()
@@ -165,7 +186,9 @@ class UserRestServletV2(RestServlet):
         self.registration_handler = hs.get_registration_handler()
         self.pusher_pool = hs.get_pusherpool()
 
-    async def on_GET(self, request, user_id):
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
         target_user = UserID.from_string(user_id)
@@ -179,7 +202,9 @@ class UserRestServletV2(RestServlet):
 
         return 200, ret
 
-    async def on_PUT(self, request, user_id):
+    async def on_PUT(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
 
@@ -263,7 +288,10 @@ class UserRestServletV2(RestServlet):
                         target_user.to_string(), False, requester, by_admin=True
                     )
                 elif not deactivate and user["deactivated"]:
-                    if "password" not in body:
+                    if (
+                        "password" not in body
+                        and self.auth_handler.can_change_password()
+                    ):
                         raise SynapseError(
                             400, "Must provide a password to re-activate an account."
                         )
@@ -273,6 +301,8 @@ class UserRestServletV2(RestServlet):
                     )
 
             user = await self.admin_handler.get_user(target_user)
+            assert user is not None
+
             return 200, user
 
         else:  # create user
@@ -330,9 +360,10 @@ class UserRestServletV2(RestServlet):
                     target_user, requester, body["avatar_url"], True
                 )
 
-            ret = await self.admin_handler.get_user(target_user)
+            user = await self.admin_handler.get_user(target_user)
+            assert user is not None
 
-            return 201, ret
+            return 201, user
 
 
 class UserRegisterServlet(RestServlet):
@@ -346,10 +377,10 @@ class UserRegisterServlet(RestServlet):
     PATTERNS = admin_patterns("/register")
     NONCE_TIMEOUT = 60
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.auth_handler = hs.get_auth_handler()
         self.reactor = hs.get_reactor()
-        self.nonces = {}
+        self.nonces = {}  # type: Dict[str, int]
         self.hs = hs
 
     def _clear_old_nonces(self):
@@ -362,7 +393,7 @@ class UserRegisterServlet(RestServlet):
             if now - v > self.NONCE_TIMEOUT:
                 del self.nonces[k]
 
-    def on_GET(self, request):
+    def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         """
         Generate a new nonce.
         """
@@ -372,7 +403,7 @@ class UserRegisterServlet(RestServlet):
         self.nonces[nonce] = int(self.reactor.seconds())
         return 200, {"nonce": nonce}
 
-    async def on_POST(self, request):
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         self._clear_old_nonces()
 
         if not self.hs.config.registration_shared_secret:
@@ -478,12 +509,14 @@ class WhoisRestServlet(RestServlet):
         client_patterns("/admin" + path_regex, v1=True)
     )
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_admin_handler()
 
-    async def on_GET(self, request, user_id):
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
         target_user = UserID.from_string(user_id)
         requester = await self.auth.get_user_by_req(request)
         auth_user = requester.user
@@ -508,7 +541,9 @@ class DeactivateAccountRestServlet(RestServlet):
         self.is_mine = hs.is_mine
         self.store = hs.get_datastore()
 
-    async def on_POST(self, request: str, target_user_id: str) -> Tuple[int, JsonDict]:
+    async def on_POST(
+        self, request: SynapseRequest, target_user_id: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
 
@@ -550,7 +585,7 @@ class AccountValidityRenewServlet(RestServlet):
         self.account_activity_handler = hs.get_account_validity_handler()
         self.auth = hs.get_auth()
 
-    async def on_POST(self, request):
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
         body = parse_json_object_from_request(request)
@@ -584,14 +619,16 @@ class ResetPasswordRestServlet(RestServlet):
 
     PATTERNS = admin_patterns("/reset_password/(?P<target_user_id>[^/]*)")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
         self.hs = hs
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self._set_password_handler = hs.get_set_password_handler()
 
-    async def on_POST(self, request, target_user_id):
+    async def on_POST(
+        self, request: SynapseRequest, target_user_id: str
+    ) -> Tuple[int, JsonDict]:
         """Post request to allow an administrator reset password for a user.
         This needs user to have administrator access in Synapse.
         """
@@ -626,12 +663,14 @@ class SearchUsersRestServlet(RestServlet):
 
     PATTERNS = admin_patterns("/search_users/(?P<target_user_id>[^/]*)")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 
-    async def on_GET(self, request, target_user_id):
+    async def on_GET(
+        self, request: SynapseRequest, target_user_id: str
+    ) -> Tuple[int, Optional[List[JsonDict]]]:
         """Get request to search user table for specific users according to
         search term.
         This needs user to have a administrator access in Synapse.
@@ -682,12 +721,14 @@ class UserAdminServlet(RestServlet):
 
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/admin$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 
-    async def on_GET(self, request, user_id):
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
         target_user = UserID.from_string(user_id)
@@ -699,7 +740,9 @@ class UserAdminServlet(RestServlet):
 
         return 200, {"admin": is_admin}
 
-    async def on_PUT(self, request, user_id):
+    async def on_PUT(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
         auth_user = requester.user
@@ -730,12 +773,14 @@ class UserMembershipRestServlet(RestServlet):
 
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]+)/joined_rooms$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.is_mine = hs.is_mine
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
 
-    async def on_GET(self, request, user_id):
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
         room_ids = await self.store.get_rooms_for_user(user_id)
@@ -758,7 +803,7 @@ class PushersRestServlet(RestServlet):
 
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/pushers$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.is_mine = hs.is_mine
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
@@ -799,7 +844,7 @@ class UserMediaRestServlet(RestServlet):
 
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]+)/media$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.is_mine = hs.is_mine
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
@@ -807,6 +852,9 @@ class UserMediaRestServlet(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
+        # This will always be set by the time Twisted calls us.
+        assert request.args is not None
+
         await assert_requester_is_admin(self.auth, request)
 
         if not self.is_mine(UserID.from_string(user_id)):
@@ -891,7 +939,9 @@ class UserTokenRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
 
-    async def on_POST(self, request, user_id):
+    async def on_POST(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
         auth_user = requester.user
@@ -943,7 +993,9 @@ class ShadowBanRestServlet(RestServlet):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 
-    async def on_POST(self, request, user_id):
+    async def on_POST(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
         if not self.hs.is_mine_id(user_id):

@@ -27,7 +27,7 @@ from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +37,16 @@ class PusherWorkerStore(SQLBaseStore):
         super().__init__(database, db_conn, hs)
         self._pushers_id_gen = StreamIdGenerator(
             db_conn, "pushers", "id", extra_tables=[("deleted_pushers", "stream_id")]
+        )
+
+        self.db_pool.updates.register_background_update_handler(
+            "remove_deactivated_pushers",
+            self._remove_deactivated_pushers,
+        )
+
+        self.db_pool.updates.register_background_update_handler(
+            "remove_stale_pushers",
+            self._remove_stale_pushers,
         )
 
     def _decode_pushers_rows(self, rows: Iterable[dict]) -> Iterator[PusherConfig]:
@@ -283,6 +293,101 @@ class PusherWorkerStore(SQLBaseStore):
             desc="set_throttle_params",
             lock=False,
         )
+
+    async def _remove_deactivated_pushers(self, progress: dict, batch_size: int) -> int:
+        """A background update that deletes all pushers for deactivated users.
+
+        Note that we don't proacively tell the pusherpool that we've deleted
+        these (just because its a bit off a faff to do from here), but they will
+        get cleaned up at the next restart
+        """
+
+        last_user = progress.get("last_user", "")
+
+        def _delete_pushers(txn) -> int:
+
+            sql = """
+                SELECT name FROM users
+                WHERE deactivated = ? and name > ?
+                ORDER BY name ASC
+                LIMIT ?
+            """
+
+            txn.execute(sql, (1, last_user, batch_size))
+            users = [row[0] for row in txn]
+
+            self.db_pool.simple_delete_many_txn(
+                txn,
+                table="pushers",
+                column="user_name",
+                iterable=users,
+                keyvalues={},
+            )
+
+            if users:
+                self.db_pool.updates._background_update_progress_txn(
+                    txn, "remove_deactivated_pushers", {"last_user": users[-1]}
+                )
+
+            return len(users)
+
+        number_deleted = await self.db_pool.runInteraction(
+            "_remove_deactivated_pushers", _delete_pushers
+        )
+
+        if number_deleted < batch_size:
+            await self.db_pool.updates._end_background_update(
+                "remove_deactivated_pushers"
+            )
+
+        return number_deleted
+
+    async def _remove_stale_pushers(self, progress: dict, batch_size: int) -> int:
+        """A background update that deletes all pushers for logged out devices.
+
+        Note that we don't proacively tell the pusherpool that we've deleted
+        these (just because its a bit off a faff to do from here), but they will
+        get cleaned up at the next restart
+        """
+
+        last_pusher = progress.get("last_pusher", 0)
+
+        def _delete_pushers(txn) -> int:
+
+            sql = """
+                SELECT p.id, access_token FROM pushers AS p
+                LEFT JOIN access_tokens AS a ON (p.access_token = a.id)
+                WHERE p.id > ?
+                ORDER BY p.id ASC
+                LIMIT ?
+            """
+
+            txn.execute(sql, (last_pusher, batch_size))
+            pushers = [(row[0], row[1]) for row in txn]
+
+            self.db_pool.simple_delete_many_txn(
+                txn,
+                table="pushers",
+                column="id",
+                iterable=(pusher_id for pusher_id, token in pushers if token is None),
+                keyvalues={},
+            )
+
+            if pushers:
+                self.db_pool.updates._background_update_progress_txn(
+                    txn, "remove_stale_pushers", {"last_pusher": pushers[-1][0]}
+                )
+
+            return len(pushers)
+
+        number_deleted = await self.db_pool.runInteraction(
+            "_remove_stale_pushers", _delete_pushers
+        )
+
+        if number_deleted < batch_size:
+            await self.db_pool.updates._end_background_update("remove_stale_pushers")
+
+        return number_deleted
 
 
 class PusherStore(PusherWorkerStore):
