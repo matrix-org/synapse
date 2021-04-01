@@ -3,6 +3,7 @@
 There are 3 steps to follow under **Installation Instructions**.
 
 - [Installation Instructions](#installation-instructions)
+  - [Platform Dependencies](#choosing-your-server-name)
   - [Choosing your server name](#choosing-your-server-name)
   - [Installing Synapse](#installing-synapse)
     - [Installing from source](#installing-from-source)
@@ -37,6 +38,14 @@ There are 3 steps to follow under **Installation Instructions**.
     - [Setting up a TURN server](#setting-up-a-turn-server)
     - [URL previews](#url-previews)
     - [Troubleshooting Installation](#troubleshooting-installation)
+
+
+## Platform dependencies
+
+Synapse uses a number of platform dependencies such as Python and PostgreSQL,
+and aims to support versions supported upstream. See the
+[deprecation policy](docs/deprecation_policy.md) document for more details.
+
 
 ## Choosing your server name
 
@@ -542,7 +551,7 @@ Alternatively, you can do so from the command line. This can be done as follows:
     register_new_matrix_user -c homeserver.yaml http://localhost:8008
     ```
 
-This will prompt you to add details for the new user, and will then connect to 
+This will prompt you to add details for the new user, and will then connect to
 the running Synapse to create the new user. For example:
 ```
 New user localpart: erikj
