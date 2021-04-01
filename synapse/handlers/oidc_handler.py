@@ -15,7 +15,7 @@
 import inspect
 import logging
 from typing import TYPE_CHECKING, Dict, Generic, List, Optional, TypeVar, Union
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import attr
 import pymacaroons
@@ -71,8 +71,8 @@ logger = logging.getLogger(__name__)
 #
 # Here we have the names of the cookies, and the options we use to set them.
 _SESSION_COOKIES = [
-    (b"oidc_session", b"Path=/_synapse/client/oidc; HttpOnly; Secure; SameSite=None"),
-    (b"oidc_session_no_samesite", b"Path=/_synapse/client/oidc; HttpOnly"),
+    (b"oidc_session", b"HttpOnly; Secure; SameSite=None"),
+    (b"oidc_session_no_samesite", b"HttpOnly"),
 ]
 
 #: A token exchanged from the token endpoint, as per RFC6749 sec 5.1. and
@@ -281,6 +281,13 @@ class OidcProvider:
 
         self._config = provider
         self._callback_url = hs.config.oidc_callback_url  # type: str
+
+        # TODO: This is pretty much a hack to get the path specified by public_baseurl.
+        # It'd probably be nicer to have a config option that lets you specify a custom
+        # path, which we'd then use here.
+        self._callback_path_prefix = urlparse(hs.config.public_baseurl).path
+        if self._callback_path_prefix.endswith("/"):
+            self._callback_path_prefix = self._callback_path_prefix[:-1]
 
         self._oidc_attribute_requirements = provider.attribute_requirements
         self._scopes = provider.scopes
@@ -782,8 +789,14 @@ class OidcProvider:
 
         for cookie_name, options in _SESSION_COOKIES:
             request.cookies.append(
-                b"%s=%s; Max-Age=3600; %s"
-                % (cookie_name, cookie.encode("utf-8"), options)
+                b"%s=%s; Max-Age=3600; Path=%s; %s"
+                % (
+                    cookie_name,
+                    cookie.encode("utf-8"),
+                    self._callback_path_prefix.encode("utf-8")
+                    + b"/_synapse/client/oidc",
+                    options,
+                )
             )
 
         metadata = await self.load_metadata()
