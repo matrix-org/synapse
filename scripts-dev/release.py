@@ -169,7 +169,7 @@ def release():
             default = "master"
 
         branch_name = click.prompt(
-            "Which branch should release be based off of?", default=default
+            "Which branch should release be based on?", default=default
         )
 
         base_branch = find_ref(repo, branch_name)
@@ -177,7 +177,7 @@ def release():
             print(f"Could not find base branch {branch_name}!")
             click.get_current_context().abort()
 
-        # Checkout the base branch and ensure its up to date
+        # Check out the base branch and ensure it's up to date
         repo.head.reference = base_branch
         repo.head.reset(index=True, working_tree=True)
         if not base_branch.is_remote():
