@@ -91,12 +91,17 @@ class MediaRepositoryBackgroundUpdateStore(SQLBaseStore):
         )
 
     async def _drop_media_index_without_method(self, progress, batch_size):
+        """background update handler which removes the old constraints.
+
+        Note that this is only run on postgres.
+        """
+
         def f(txn):
             txn.execute(
                 "ALTER TABLE local_media_repository_thumbnails DROP CONSTRAINT IF EXISTS local_media_repository_thumbn_media_id_thumbnail_width_thum_key"
             )
             txn.execute(
-                "ALTER TABLE remote_media_cache_thumbnails DROP CONSTRAINT IF EXISTS remote_media_repository_thumbn_media_id_thumbnail_width_thum_key"
+                "ALTER TABLE remote_media_cache_thumbnails DROP CONSTRAINT IF EXISTS remote_media_cache_thumbnails_media_origin_media_id_thumbna_key"
             )
 
         await self.db_pool.runInteraction("drop_media_indices_without_method", f)
