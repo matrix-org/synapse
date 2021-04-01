@@ -41,7 +41,6 @@ from synapse.api.errors import (
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.api.urls import ConsentURIBuilder
-from synapse.config.api import DEFAULT_ROOM_STATE_TYPES
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext
@@ -387,7 +386,7 @@ class EventCreationHandler:
         self._events_shard_config = self.config.worker.events_shard_config
         self._instance_name = hs.get_instance_name()
 
-        self.room_invite_state_types = self.hs.config.api.room_prejoin_state
+        self.room_prejoin_state_types = self.hs.config.api.room_prejoin_state
 
         self.membership_types_to_include_profile_data_in = {
             Membership.JOIN,
@@ -1166,7 +1165,7 @@ class EventCreationHandler:
                     "invite_room_state"
                 ] = await self.store.get_stripped_room_state_from_event_context(
                     context,
-                    self.room_invite_state_types,
+                    self.room_prejoin_state_types,
                     membership_user_id=event.sender,
                 )
 
@@ -1189,7 +1188,7 @@ class EventCreationHandler:
                     "knock_room_state"
                 ] = await self.store.get_stripped_room_state_from_event_context(
                     context,
-                    DEFAULT_ROOM_STATE_TYPES,
+                    self.room_prejoin_state_types,
                 )
 
         if event.type == EventTypes.Redaction:

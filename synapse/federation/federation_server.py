@@ -47,7 +47,6 @@ from synapse.api.errors import (
 )
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
-from synapse.config.api import DEFAULT_ROOM_STATE_TYPES
 from synapse.events import EventBase
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.federation.persistence import TransactionActions
@@ -138,8 +137,10 @@ class FederationServer(FederationBase):
         )  # type: ResponseCache[Tuple[str, str]]
 
         self._federation_metrics_domains = (
-            hs.get_config().federation.federation_metrics_domains
+            hs.config.federation.federation_metrics_domains
         )
+
+        self._room_prejoin_state_types = hs.config.api.room_prejoin_state
 
     async def on_backfill_request(
         self, origin: str, room_id: str, versions: List[str], limit: int
@@ -659,7 +660,7 @@ class FederationServer(FederationBase):
         # related to the room while the knock request is pending.
         stripped_room_state = (
             await self.store.get_stripped_room_state_from_event_context(
-                event_context, DEFAULT_ROOM_STATE_TYPES
+                event_context, self._room_prejoin_state_types
             )
         )
         return {"knock_state_events": stripped_room_state}
