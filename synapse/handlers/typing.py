@@ -89,7 +89,7 @@ class FollowerTypingHandler:
         self._member_last_federation_poke = {}
         self.wheel_timer = WheelTimer(bucket_size=5000)
 
-    @wrap_as_background_process("typing.run_as_background_process")
+    @wrap_as_background_process("typing._handle_timeouts")
     def _handle_timeouts(self) -> None:
         logger.debug("Checking for typing timeouts")
 
