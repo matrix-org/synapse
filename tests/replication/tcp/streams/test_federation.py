@@ -24,7 +24,7 @@ class FederationStreamTestCase(BaseStreamTestCase):
         # enable federation sending on the worker
         config = super()._get_worker_hs_config()
         # TODO: make it so we don't need both of these
-        config["send_federation"] = True
+        config["send_federation"] = False
         config["worker_app"] = "synapse.app.federation_sender"
         return config
 

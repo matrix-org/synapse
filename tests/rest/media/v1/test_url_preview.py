@@ -26,8 +26,15 @@ from twisted.test.proto_helpers import AccumulatingProtocol
 from tests import unittest
 from tests.server import FakeTransport
 
+try:
+    import lxml
+except ImportError:
+    lxml = None
+
 
 class URLPreviewTests(unittest.HomeserverTestCase):
+    if not lxml:
+        skip = "url preview feature requires lxml"
 
     hijack_auth = True
     user_id = "@test:user"
@@ -113,7 +120,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
     def test_cache_returns_correct_type(self):
         self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "preview_url?url=http://matrix.org",
             shorthand=False,
@@ -138,7 +145,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
 
         # Check the cache returns the correct response
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "preview_url?url=http://matrix.org", shorthand=False
         )
 
@@ -154,7 +161,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertNotIn("http://matrix.org", self.preview_url._cache)
 
         # Check the database cache returns the correct response
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "preview_url?url=http://matrix.org", shorthand=False
         )
 
@@ -175,7 +182,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             b"</head></html>"
         )
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "preview_url?url=http://matrix.org",
             shorthand=False,
@@ -210,7 +217,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             b"</head></html>"
         )
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "preview_url?url=http://matrix.org",
             shorthand=False,
@@ -245,7 +252,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             b"</head></html>"
         )
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "preview_url?url=http://matrix.org",
             shorthand=False,
@@ -278,7 +285,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """
         self.lookups["example.com"] = [(IPv4Address, "10.1.2.3")]
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "preview_url?url=http://example.com",
             shorthand=False,
@@ -308,7 +315,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """
         self.lookups["example.com"] = [(IPv4Address, "192.168.1.1")]
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "preview_url?url=http://example.com", shorthand=False
         )
 
@@ -329,7 +336,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """
         self.lookups["example.com"] = [(IPv4Address, "1.1.1.2")]
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "preview_url?url=http://example.com", shorthand=False
         )
 
@@ -346,7 +353,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """
         Blacklisted IP addresses, accessed directly, are not spidered.
         """
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "preview_url?url=http://192.168.1.1", shorthand=False
         )
 
@@ -365,7 +372,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """
         Blacklisted IP ranges, accessed directly, are not spidered.
         """
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "preview_url?url=http://1.1.1.2", shorthand=False
         )
 
@@ -385,7 +392,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """
         self.lookups["example.com"] = [(IPv4Address, "1.1.1.1")]
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "preview_url?url=http://example.com",
             shorthand=False,
@@ -422,7 +429,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             (IPv4Address, "10.1.2.3"),
         ]
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "preview_url?url=http://example.com", shorthand=False
         )
         self.assertEqual(channel.code, 502)
@@ -442,7 +449,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             (IPv6Address, "3fff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
         ]
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "preview_url?url=http://example.com", shorthand=False
         )
 
@@ -463,7 +470,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """
         self.lookups["example.com"] = [(IPv6Address, "2001:800::1")]
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "preview_url?url=http://example.com", shorthand=False
         )
 
@@ -480,7 +487,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """
         OPTIONS returns the OPTIONS.
         """
-        request, channel = self.make_request(
+        channel = self.make_request(
             "OPTIONS", "preview_url?url=http://example.com", shorthand=False
         )
         self.assertEqual(channel.code, 200)
@@ -493,7 +500,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.lookups["example.com"] = [(IPv4Address, "10.1.2.3")]
 
         # Build and make a request to the server
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "preview_url?url=http://example.com",
             shorthand=False,
@@ -567,7 +574,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                 b"</head></html>"
             )
 
-            request, channel = self.make_request(
+            channel = self.make_request(
                 "GET",
                 "preview_url?url=http://twitter.com/matrixdotorg/status/12345",
                 shorthand=False,
@@ -632,7 +639,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             }
             end_content = json.dumps(result).encode("utf-8")
 
-            request, channel = self.make_request(
+            channel = self.make_request(
                 "GET",
                 "preview_url?url=http://twitter.com/matrixdotorg/status/12345",
                 shorthand=False,

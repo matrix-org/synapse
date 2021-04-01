@@ -48,8 +48,7 @@ class _GetStateGroupDelta(
 
 
 class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
-    """A data store for fetching/storing state groups.
-    """
+    """A data store for fetching/storing state groups."""
 
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
@@ -89,7 +88,8 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             50000,
         )
         self._state_group_members_cache = DictionaryCache(
-            "*stateGroupMembersCache*", 500000,
+            "*stateGroupMembersCache*",
+            500000,
         )
 
         def get_max_state_group_txn(txn: Cursor):
@@ -97,10 +97,12 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             return txn.fetchone()[0]
 
         self._state_group_seq_gen = build_sequence_generator(
-            self.database_engine, get_max_state_group_txn, "state_group_id_seq"
-        )
-        self._state_group_seq_gen.check_consistency(
-            db_conn, table="state_groups", id_column="id"
+            db_conn,
+            self.database_engine,
+            get_max_state_group_txn,
+            "state_group_id_seq",
+            table="state_groups",
+            id_column="id",
         )
 
     @cached(max_entries=10000, iterable=True)
@@ -181,12 +183,13 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         requests state from the cache, if False we need to query the DB for the
         missing state.
         """
-        is_all, known_absent, state_dict_ids = cache.get(group)
+        cache_entry = cache.get(group)
+        state_dict_ids = cache_entry.value
 
-        if is_all or state_filter.is_full():
+        if cache_entry.full or state_filter.is_full():
             # Either we have everything or want everything, either way
             # `is_all` tells us whether we've gotten everything.
-            return state_filter.filter_state(state_dict_ids), is_all
+            return state_filter.filter_state(state_dict_ids), cache_entry.full
 
         # tracks whether any of our requested types are missing from the cache
         missing_types = False
@@ -200,7 +203,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             # There aren't any wild cards, so `concrete_types()` returns the
             # complete list of event types we're wanting.
             for key in state_filter.concrete_types():
-                if key not in state_dict_ids and key not in known_absent:
+                if key not in state_dict_ids and key not in cache_entry.known_absent:
                     missing_types = True
                     break
 
@@ -565,11 +568,11 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             )
 
         logger.info("[purge] removing redundant state groups")
-        txn.executemany(
+        txn.execute_batch(
             "DELETE FROM state_groups_state WHERE state_group = ?",
             ((sg,) for sg in state_groups_to_delete),
         )
-        txn.executemany(
+        txn.execute_batch(
             "DELETE FROM state_groups WHERE id = ?",
             ((sg,) for sg in state_groups_to_delete),
         )

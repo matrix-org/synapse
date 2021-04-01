@@ -73,7 +73,7 @@ class FederationReaderOpenIDListenerTests(HomeserverTestCase):
                 return
             raise
 
-        _, channel = make_request(
+        channel = make_request(
             self.reactor, site, "GET", "/_matrix/federation/v1/openid/userinfo"
         )
 
@@ -121,7 +121,7 @@ class SynapseHomeserverOpenIDListenerTests(HomeserverTestCase):
                 return
             raise
 
-        _, channel = make_request(
+        channel = make_request(
             self.reactor, site, "GET", "/_matrix/federation/v1/openid/userinfo"
         )
 

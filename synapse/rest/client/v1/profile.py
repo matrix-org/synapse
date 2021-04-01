@@ -60,7 +60,9 @@ class ProfileDisplaynameRestServlet(RestServlet):
             new_name = content["displayname"]
         except Exception:
             raise SynapseError(
-                code=400, msg="Unable to parse name", errcode=Codes.BAD_JSON,
+                code=400,
+                msg="Unable to parse name",
+                errcode=Codes.BAD_JSON,
             )
 
         await self.profile_handler.set_displayname(user, requester, new_name, is_admin)

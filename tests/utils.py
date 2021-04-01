@@ -33,7 +33,6 @@ from synapse.api.room_versions import RoomVersions
 from synapse.config.database import DatabaseConnectionConfig
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import DEFAULT_ROOM_VERSION
-from synapse.http.server import HttpServer
 from synapse.logging.context import current_context, set_current_context
 from synapse.server import HomeServer
 from synapse.storage import DataStore
@@ -115,7 +114,6 @@ def default_config(name, parse=False):
         "server_name": name,
         "send_federation": False,
         "media_store_path": "media",
-        "uploads_path": "uploads",
         # the test signing key is just an arbitrary ed25519 key to keep the config
         # parser happy
         "signing_key": "ed25519 a_lPym qvioDNmfExFBRPgdTU+wtFYKq4JfwFRv7sYVgWvmgJg",
@@ -124,7 +122,6 @@ def default_config(name, parse=False):
         "enable_registration_captcha": False,
         "macaroon_secret_key": "not even a little secret",
         "trusted_third_party_id_servers": [],
-        "room_invite_state_types": [],
         "password_providers": [],
         "worker_replication_url": "",
         "worker_app": None,
@@ -158,6 +155,7 @@ def default_config(name, parse=False):
             "local": {"per_second": 10000, "burst_count": 10000},
             "remote": {"per_second": 10000, "burst_count": 10000},
         },
+        "rc_3pid_validation": {"per_second": 10000, "burst_count": 10000},
         "saml2_enabled": False,
         "public_baseurl": None,
         "default_identity_server": None,
@@ -263,7 +261,10 @@ def setup_test_homeserver(
         db_conn.close()
 
     hs = homeserver_to_use(
-        name, config=config, version_string="Synapse/tests", reactor=reactor,
+        name,
+        config=config,
+        version_string="Synapse/tests",
+        reactor=reactor,
     )
 
     # Install @cache_in_self attributes
@@ -352,7 +353,7 @@ def mock_getRawHeaders(headers=None):
 
 
 # This is a mock /resource/ not an entire server
-class MockHttpResource(HttpServer):
+class MockHttpResource:
     def __init__(self, prefix=""):
         self.callbacks = []  # 3-tuple of method/pattern/function
         self.prefix = prefix
@@ -365,7 +366,7 @@ class MockHttpResource(HttpServer):
     def trigger(
         self, http_method, path, content, mock_request, federation_auth_origin=None
     ):
-        """ Fire an HTTP event.
+        """Fire an HTTP event.
 
         Args:
             http_method : The HTTP method
@@ -528,8 +529,7 @@ class MockClock:
 
 
 async def create_room(hs, room_id: str, creator_id: str):
-    """Creates and persist a creation event for the given room
-    """
+    """Creates and persist a creation event for the given room"""
 
     persistence_store = hs.get_storage().persistence
     store = hs.get_datastore()

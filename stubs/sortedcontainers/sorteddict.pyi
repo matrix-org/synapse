@@ -7,17 +7,17 @@ from typing import (
     Callable,
     Dict,
     Hashable,
-    Iterator,
-    Iterable,
     ItemsView,
+    Iterable,
+    Iterator,
     KeysView,
     List,
     Mapping,
     Optional,
     Sequence,
+    Tuple,
     Type,
     TypeVar,
-    Tuple,
     Union,
     ValuesView,
     overload,
@@ -89,12 +89,16 @@ class SortedDict(Dict[_KT, _VT]):
     def __reduce__(
         self,
     ) -> Tuple[
-        Type[SortedDict[_KT, _VT]], Tuple[Callable[[_KT], Any], List[Tuple[_KT, _VT]]],
+        Type[SortedDict[_KT, _VT]],
+        Tuple[Callable[[_KT], Any], List[Tuple[_KT, _VT]]],
     ]: ...
     def __repr__(self) -> str: ...
     def _check(self) -> None: ...
     def islice(
-        self, start: Optional[int] = ..., stop: Optional[int] = ..., reverse=bool,
+        self,
+        start: Optional[int] = ...,
+        stop: Optional[int] = ...,
+        reverse=bool,
     ) -> Iterator[_KT]: ...
     def bisect_left(self, value: _KT) -> int: ...
     def bisect_right(self, value: _KT) -> int: ...

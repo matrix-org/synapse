@@ -86,7 +86,7 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         callback = Mock(spec=[], side_effect=check)
         current_rules_module().check_event_allowed = callback
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/rooms/%s/send/foo.bar.allowed/1" % self.room_id,
             {},
@@ -104,7 +104,7 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
             self.assertEqual(ev.type, k[0])
             self.assertEqual(ev.state_key, k[1])
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/rooms/%s/send/foo.bar.forbidden/2" % self.room_id,
             {},
@@ -123,7 +123,7 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         current_rules_module().check_event_allowed = check
 
         # now send the event
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/rooms/%s/send/modifyme/1" % self.room_id,
             {"x": "x"},
@@ -142,7 +142,7 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         current_rules_module().check_event_allowed = check
 
         # now send the event
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/rooms/%s/send/modifyme/1" % self.room_id,
             {"x": "x"},
@@ -152,7 +152,7 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         event_id = channel.json_body["event_id"]
 
         # ... and check that it got modified
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/_matrix/client/r0/rooms/%s/event/%s" % (self.room_id, event_id),
             access_token=self.tok,
@@ -160,6 +160,68 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.result["code"], b"200", channel.result)
         ev = channel.json_body
         self.assertEqual(ev["content"]["x"], "y")
+
+    def test_message_edit(self):
+        """Ensure that the module doesn't cause issues with edited messages."""
+        # first patch the event checker so that it will modify the event
+        async def check(ev: EventBase, state):
+            d = ev.get_dict()
+            d["content"] = {
+                "msgtype": "m.text",
+                "body": d["content"]["body"].upper(),
+            }
+            return d
+
+        current_rules_module().check_event_allowed = check
+
+        # Send an event, then edit it.
+        channel = self.make_request(
+            "PUT",
+            "/_matrix/client/r0/rooms/%s/send/modifyme/1" % self.room_id,
+            {
+                "msgtype": "m.text",
+                "body": "Original body",
+            },
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.result["code"], b"200", channel.result)
+        orig_event_id = channel.json_body["event_id"]
+
+        channel = self.make_request(
+            "PUT",
+            "/_matrix/client/r0/rooms/%s/send/m.room.message/2" % self.room_id,
+            {
+                "m.new_content": {"msgtype": "m.text", "body": "Edited body"},
+                "m.relates_to": {
+                    "rel_type": "m.replace",
+                    "event_id": orig_event_id,
+                },
+                "msgtype": "m.text",
+                "body": "Edited body",
+            },
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.result["code"], b"200", channel.result)
+        edited_event_id = channel.json_body["event_id"]
+
+        # ... and check that they both got modified
+        channel = self.make_request(
+            "GET",
+            "/_matrix/client/r0/rooms/%s/event/%s" % (self.room_id, orig_event_id),
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.result["code"], b"200", channel.result)
+        ev = channel.json_body
+        self.assertEqual(ev["content"]["body"], "ORIGINAL BODY")
+
+        channel = self.make_request(
+            "GET",
+            "/_matrix/client/r0/rooms/%s/event/%s" % (self.room_id, edited_event_id),
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.result["code"], b"200", channel.result)
+        ev = channel.json_body
+        self.assertEqual(ev["content"]["body"], "EDITED BODY")
 
     def test_send_event(self):
         """Tests that the module can send an event into a room via the module api"""

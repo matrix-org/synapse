@@ -25,7 +25,7 @@ RoomsForUser = namedtuple(
 )
 
 GetRoomsForUserWithStreamOrdering = namedtuple(
-    "_GetRoomsForUserWithStreamOrdering", ("room_id", "event_pos")
+    "GetRoomsForUserWithStreamOrdering", ("room_id", "event_pos")
 )
 
 

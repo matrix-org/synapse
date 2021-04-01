@@ -41,7 +41,13 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         device_id = "MY_DEVICE"
 
         # Insert a user IP
-        self.get_success(self.store.store_device(user_id, device_id, "display name",))
+        self.get_success(
+            self.store.store_device(
+                user_id,
+                device_id,
+                "display name",
+            )
+        )
         self.get_success(
             self.store.insert_client_ip(
                 user_id, "access_token", "ip", "user_agent", device_id
@@ -214,7 +220,13 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         device_id = "MY_DEVICE"
 
         # Insert a user IP
-        self.get_success(self.store.store_device(user_id, device_id, "display name",))
+        self.get_success(
+            self.store.store_device(
+                user_id,
+                device_id,
+                "display name",
+            )
+        )
         self.get_success(
             self.store.insert_client_ip(
                 user_id, "access_token", "ip", "user_agent", device_id
@@ -303,7 +315,13 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         device_id = "MY_DEVICE"
 
         # Insert a user IP
-        self.get_success(self.store.store_device(user_id, device_id, "display name",))
+        self.get_success(
+            self.store.store_device(
+                user_id,
+                device_id,
+                "display name",
+            )
+        )
         self.get_success(
             self.store.insert_client_ip(
                 user_id, "access_token", "ip", "user_agent", device_id

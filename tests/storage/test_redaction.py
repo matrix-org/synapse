@@ -299,8 +299,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         )
 
     def test_redact_censor(self):
-        """Test that a redacted event gets censored in the DB after a month
-        """
+        """Test that a redacted event gets censored in the DB after a month"""
 
         self.get_success(
             self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
@@ -370,8 +369,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         self.assert_dict({"content": {}}, json.loads(event_json))
 
     def test_redact_redaction(self):
-        """Tests that we can redact a redaction and can fetch it again.
-        """
+        """Tests that we can redact a redaction and can fetch it again."""
 
         self.get_success(
             self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
@@ -404,8 +402,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         )
 
     def test_store_redacted_redaction(self):
-        """Tests that we can store a redacted redaction.
-        """
+        """Tests that we can store a redacted redaction."""
 
         self.get_success(
             self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)

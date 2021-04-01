@@ -36,7 +36,9 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
         self.registration_handler = hs.get_registration_handler()
 
     @staticmethod
-    async def _serialize_payload(user_id, device_id, initial_display_name, is_guest):
+    async def _serialize_payload(
+        user_id, device_id, initial_display_name, is_guest, is_appservice_ghost
+    ):
         """
         Args:
             device_id (str|None): Device ID to use, if None a new one is
@@ -48,6 +50,7 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
             "device_id": device_id,
             "initial_display_name": initial_display_name,
             "is_guest": is_guest,
+            "is_appservice_ghost": is_appservice_ghost,
         }
 
     async def _handle_request(self, request, user_id):
@@ -56,12 +59,17 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
         device_id = content["device_id"]
         initial_display_name = content["initial_display_name"]
         is_guest = content["is_guest"]
+        is_appservice_ghost = content["is_appservice_ghost"]
 
-        device_id, access_token = await self.registration_handler.register_device(
-            user_id, device_id, initial_display_name, is_guest
+        res = await self.registration_handler.register_device_inner(
+            user_id,
+            device_id,
+            initial_display_name,
+            is_guest,
+            is_appservice_ghost=is_appservice_ghost,
         )
 
-        return 200, {"device_id": device_id, "access_token": access_token}
+        return 200, res
 
 
 def register_servlets(hs, http_server):

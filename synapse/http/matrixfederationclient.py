@@ -37,16 +37,19 @@ from twisted.web.iweb import IBodyProducer, IResponse
 import synapse.metrics
 import synapse.util.retryutils
 from synapse.api.errors import (
+    Codes,
     FederationDeniedError,
     HttpResponseException,
     RequestSendFailed,
+    SynapseError,
 )
 from synapse.http import QuieterFileBodyProducer
 from synapse.http.client import (
     BlacklistingAgentWrapper,
     BlacklistingReactorWrapper,
+    BodyExceededMaxSize,
     encode_query_args,
-    readBodyToFile,
+    read_body_with_max_size,
 )
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.logging.context import make_deferred_yieldable
@@ -56,7 +59,7 @@ from synapse.logging.opentracing import (
     start_active_span,
     tags,
 )
-from synapse.types import JsonDict
+from synapse.types import ISynapseReactor, JsonDict
 from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.metrics import Measure
@@ -171,6 +174,16 @@ async def _handle_json_response(
         d = timeout_deferred(d, timeout=timeout_sec, reactor=reactor)
 
         body = await make_deferred_yieldable(d)
+    except ValueError as e:
+        # The JSON content was invalid.
+        logger.warning(
+            "{%s} [%s] Failed to parse JSON response - %s %s",
+            request.txn_id,
+            request.destination,
+            request.method,
+            request.uri.decode("ascii"),
+        )
+        raise RequestSendFailed(e, can_retry=False) from e
     except defer.TimeoutError as e:
         logger.warning(
             "{%s} [%s] Timed out reading response - %s %s",
@@ -224,14 +237,14 @@ class MatrixFederationHttpClient:
         # addresses, to prevent DNS rebinding.
         self.reactor = BlacklistingReactorWrapper(
             hs.get_reactor(), None, hs.config.federation_ip_range_blacklist
-        )
+        )  # type: ISynapseReactor
 
         user_agent = hs.version_string
         if hs.config.user_agent_suffix:
             user_agent = "%s %s" % (user_agent, hs.config.user_agent_suffix)
         user_agent = user_agent.encode("ascii")
 
-        self.agent = MatrixFederationAgent(
+        federation_agent = MatrixFederationAgent(
             self.reactor,
             tls_client_options_factory,
             user_agent,
@@ -241,7 +254,8 @@ class MatrixFederationHttpClient:
         # Use a BlacklistingAgentWrapper to prevent circumventing the IP
         # blacklist via IP literals in server names
         self.agent = BlacklistingAgentWrapper(
-            self.agent, ip_blacklist=hs.config.federation_ip_range_blacklist,
+            federation_agent,
+            ip_blacklist=hs.config.federation_ip_range_blacklist,
         )
 
         self.clock = hs.get_clock()
@@ -520,9 +534,10 @@ class MatrixFederationHttpClient:
                             response.code, response_phrase, body
                         )
 
-                        # Retry if the error is a 429 (Too Many Requests),
-                        # otherwise just raise a standard HttpResponseException
-                        if response.code == 429:
+                        # Retry if the error is a 5xx or a 429 (Too Many
+                        # Requests), otherwise just raise a standard
+                        # `HttpResponseException`
+                        if 500 <= response.code < 600 or response.code == 429:
                             raise RequestSendFailed(exc, can_retry=True) from exc
                         else:
                             raise exc
@@ -639,7 +654,7 @@ class MatrixFederationHttpClient:
         backoff_on_404: bool = False,
         try_trailing_slash_on_400: bool = False,
     ) -> Union[JsonDict, list]:
-        """ Sends the specified json data using PUT
+        """Sends the specified json data using PUT
 
         Args:
             destination: The remote server to send the HTTP request to.
@@ -727,7 +742,7 @@ class MatrixFederationHttpClient:
         ignore_backoff: bool = False,
         args: Optional[QueryArgs] = None,
     ) -> Union[JsonDict, list]:
-        """ Sends the specified json data using POST
+        """Sends the specified json data using POST
 
         Args:
             destination: The remote server to send the HTTP request to.
@@ -786,7 +801,11 @@ class MatrixFederationHttpClient:
             _sec_timeout = self.default_timeout
 
         body = await _handle_json_response(
-            self.reactor, _sec_timeout, request, response, start_ms,
+            self.reactor,
+            _sec_timeout,
+            request,
+            response,
+            start_ms,
         )
         return body
 
@@ -800,7 +819,7 @@ class MatrixFederationHttpClient:
         ignore_backoff: bool = False,
         try_trailing_slash_on_400: bool = False,
     ) -> Union[JsonDict, list]:
-        """ GETs some json from the given host homeserver and path
+        """GETs some json from the given host homeserver and path
 
         Args:
             destination: The remote server to send the HTTP request to.
@@ -975,9 +994,18 @@ class MatrixFederationHttpClient:
         headers = dict(response.headers.getAllRawHeaders())
 
         try:
-            d = readBodyToFile(response, output_stream, max_size)
+            d = read_body_with_max_size(response, output_stream, max_size)
             d.addTimeout(self.default_timeout, self.reactor)
             length = await make_deferred_yieldable(d)
+        except BodyExceededMaxSize:
+            msg = "Requested file is too large > %r bytes" % (max_size,)
+            logger.warning(
+                "{%s} [%s] %s",
+                request.txn_id,
+                request.destination,
+                msg,
+            )
+            raise SynapseError(502, msg, Codes.TOO_LARGE)
         except Exception as e:
             logger.warning(
                 "{%s} [%s] Error reading response: %s",
@@ -1022,14 +1050,14 @@ def check_content_type_is_json(headers: Headers) -> None:
         RequestSendFailed: if the Content-Type header is missing or isn't JSON
 
     """
-    c_type = headers.getRawHeaders(b"Content-Type")
-    if c_type is None:
+    content_type_headers = headers.getRawHeaders(b"Content-Type")
+    if content_type_headers is None:
         raise RequestSendFailed(
             RuntimeError("No Content-Type header received from remote server"),
             can_retry=False,
         )
 
-    c_type = c_type[0].decode("ascii")  # only the first header
+    c_type = content_type_headers[0].decode("ascii")  # only the first header
     val, options = cgi.parse_header(c_type)
     if val != "application/json":
         raise RequestSendFailed(

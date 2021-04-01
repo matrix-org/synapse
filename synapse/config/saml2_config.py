@@ -17,8 +17,7 @@
 import logging
 from typing import Any, List
 
-import attr
-
+from synapse.config.sso import SsoAttributeRequirement
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module, load_python_module
 
@@ -77,7 +76,9 @@ class SAML2Config(Config):
         try:
             check_requirements("saml2")
         except DependencyException as e:
-            raise ConfigError(e.message)
+            raise ConfigError(
+                e.message  # noqa: B306, DependencyException.message is a property
+            )
 
         self.saml2_enabled = True
 
@@ -196,8 +197,8 @@ class SAML2Config(Config):
             optional_attributes.add(self.saml2_grandfathered_mxid_source_attribute)
         optional_attributes -= required_attributes
 
-        metadata_url = public_baseurl + "_matrix/saml2/metadata.xml"
-        response_url = public_baseurl + "_matrix/saml2/authn_response"
+        metadata_url = public_baseurl + "_synapse/client/saml2/metadata.xml"
+        response_url = public_baseurl + "_synapse/client/saml2/authn_response"
         return {
             "entityid": metadata_url,
             "service": {
@@ -235,10 +236,10 @@ class SAML2Config(Config):
         # enable SAML login.
         #
         # Once SAML support is enabled, a metadata file will be exposed at
-        # https://<server>:<port>/_matrix/saml2/metadata.xml, which you may be able to
+        # https://<server>:<port>/_synapse/client/saml2/metadata.xml, which you may be able to
         # use to configure your SAML IdP with. Alternatively, you can manually configure
         # the IdP to use an ACS location of
-        # https://<server>:<port>/_matrix/saml2/authn_response.
+        # https://<server>:<port>/_synapse/client/saml2/authn_response.
         #
         saml2_config:
           # `sp_config` is the configuration for the pysaml2 Service Provider.
@@ -398,32 +399,18 @@ class SAML2Config(Config):
         }
 
 
-@attr.s(frozen=True)
-class SamlAttributeRequirement:
-    """Object describing a single requirement for SAML attributes."""
-
-    attribute = attr.ib(type=str)
-    value = attr.ib(type=str)
-
-    JSON_SCHEMA = {
-        "type": "object",
-        "properties": {"attribute": {"type": "string"}, "value": {"type": "string"}},
-        "required": ["attribute", "value"],
-    }
-
-
 ATTRIBUTE_REQUIREMENTS_SCHEMA = {
     "type": "array",
-    "items": SamlAttributeRequirement.JSON_SCHEMA,
+    "items": SsoAttributeRequirement.JSON_SCHEMA,
 }
 
 
 def _parse_attribute_requirements_def(
     attribute_requirements: Any,
-) -> List[SamlAttributeRequirement]:
+) -> List[SsoAttributeRequirement]:
     validate_config(
         ATTRIBUTE_REQUIREMENTS_SCHEMA,
         attribute_requirements,
-        config_path=["saml2_config", "attribute_requirements"],
+        config_path=("saml2_config", "attribute_requirements"),
     )
-    return [SamlAttributeRequirement(**x) for x in attribute_requirements]
+    return [SsoAttributeRequirement(**x) for x in attribute_requirements]

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2019-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,18 +16,19 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from synapse.api.constants import PresenceState
 from synapse.config.homeserver import HomeServerConfig
 from synapse.storage.database import DatabasePool
+from synapse.storage.databases.main.stats import UserSortOrder
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import (
     IdGenerator,
     MultiWriterIdGenerator,
     StreamIdGenerator,
 )
-from synapse.types import get_domain_from_id
+from synapse.types import JsonDict, get_domain_from_id
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from .account_data import AccountDataStore
@@ -43,6 +44,7 @@ from .end_to_end_keys import EndToEndKeyStore
 from .event_federation import EventFederationStore
 from .event_push_actions import EventPushActionsStore
 from .events_bg_updates import EventsBackgroundUpdatesStore
+from .events_forward_extremities import EventForwardExtremitiesStore
 from .filtering import FilteringStore
 from .group_server import GroupServerStore
 from .keys import KeyStore
@@ -118,6 +120,7 @@ class DataStore(
     UIAuthStore,
     CacheInvalidationWorkerStore,
     ServerMetricsStore,
+    EventForwardExtremitiesStore,
 ):
     def __init__(self, database: DatabasePool, db_conn, hs):
         self.hs = hs
@@ -126,9 +129,6 @@ class DataStore(
 
         self._presence_id_gen = StreamIdGenerator(
             db_conn, "presence_stream", "stream_id"
-        )
-        self._device_inbox_id_gen = StreamIdGenerator(
-            db_conn, "device_inbox", "stream_id"
         )
         self._public_room_id_gen = StreamIdGenerator(
             db_conn, "public_room_list_stream", "stream_id"
@@ -149,9 +149,6 @@ class DataStore(
         self._event_reports_id_gen = IdGenerator(db_conn, "event_reports", "id")
         self._push_rule_id_gen = IdGenerator(db_conn, "push_rules", "id")
         self._push_rules_enable_id_gen = IdGenerator(db_conn, "push_rules_enable", "id")
-        self._pushers_id_gen = StreamIdGenerator(
-            db_conn, "pushers", "id", extra_tables=[("deleted_pushers", "stream_id")]
-        )
         self._group_updates_id_gen = StreamIdGenerator(
             db_conn, "local_group_updates", "stream_id"
         )
@@ -166,9 +163,13 @@ class DataStore(
                 database,
                 stream_name="caches",
                 instance_name=hs.get_instance_name(),
-                table="cache_invalidation_stream_by_instance",
-                instance_column="instance_name",
-                id_column="stream_id",
+                tables=[
+                    (
+                        "cache_invalidation_stream_by_instance",
+                        "instance_name",
+                        "stream_id",
+                    )
+                ],
                 sequence_name="cache_invalidation_stream_seq",
                 writers=[],
             )
@@ -190,36 +191,6 @@ class DataStore(
             "PresenceStreamChangeCache",
             min_presence_val,
             prefilled_cache=presence_cache_prefill,
-        )
-
-        max_device_inbox_id = self._device_inbox_id_gen.get_current_token()
-        device_inbox_prefill, min_device_inbox_id = self.db_pool.get_cache_dict(
-            db_conn,
-            "device_inbox",
-            entity_column="user_id",
-            stream_column="stream_id",
-            max_value=max_device_inbox_id,
-            limit=1000,
-        )
-        self._device_inbox_stream_cache = StreamChangeCache(
-            "DeviceInboxStreamChangeCache",
-            min_device_inbox_id,
-            prefilled_cache=device_inbox_prefill,
-        )
-        # The federation outbox and the local device inbox uses the same
-        # stream_id generator.
-        device_outbox_prefill, min_device_outbox_id = self.db_pool.get_cache_dict(
-            db_conn,
-            "device_federation_outbox",
-            entity_column="destination",
-            stream_column="stream_id",
-            max_value=max_device_inbox_id,
-            limit=1000,
-        )
-        self._device_federation_outbox_stream_cache = StreamChangeCache(
-            "DeviceFederationOutboxStreamChangeCache",
-            min_device_outbox_id,
-            prefilled_cache=device_outbox_prefill,
         )
 
         device_list_max = self._device_list_id_gen.get_current_token()
@@ -294,7 +265,7 @@ class DataStore(
 
         return [UserPresenceState(**row) for row in rows]
 
-    async def get_users(self) -> List[Dict[str, Any]]:
+    async def get_users(self) -> List[JsonDict]:
         """Function to retrieve a list of users in users table.
 
         Returns:
@@ -322,7 +293,9 @@ class DataStore(
         name: Optional[str] = None,
         guests: bool = True,
         deactivated: bool = False,
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        order_by: UserSortOrder = UserSortOrder.USER_ID.value,
+        direction: str = "f",
+    ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of users from
         users list. This will return a json list of users and the
         total number of users matching the filter criteria.
@@ -334,6 +307,8 @@ class DataStore(
             name: search for local part of user_id or display name
             guests: whether to in include guest users
             deactivated: whether to include deactivated users
+            order_by: the sort order of the returned list
+            direction: sort ascending or descending
         Returns:
             A tuple of a list of mappings from user to information and a count of total users.
         """
@@ -342,12 +317,21 @@ class DataStore(
             filters = []
             args = [self.hs.config.server_name]
 
+            # Set ordering
+            order_by_column = UserSortOrder(order_by).value
+
+            if direction == "b":
+                order = "DESC"
+            else:
+                order = "ASC"
+
+            # `name` is in database already in lower case
             if name:
-                filters.append("(name LIKE ? OR displayname LIKE ?)")
-                args.extend(["@%" + name + "%:%", "%" + name + "%"])
+                filters.append("(name LIKE ? OR LOWER(displayname) LIKE ?)")
+                args.extend(["@%" + name.lower() + "%:%", "%" + name.lower() + "%"])
             elif user_id:
                 filters.append("name LIKE ?")
-                args.extend(["%" + user_id + "%"])
+                args.extend(["%" + user_id.lower() + "%"])
 
             if not guests:
                 filters.append("is_guest = 0")
@@ -368,10 +352,15 @@ class DataStore(
             txn.execute(sql, args)
             count = txn.fetchone()[0]
 
-            sql = (
-                "SELECT name, user_type, is_guest, admin, deactivated, displayname, avatar_url "
-                + sql_base
-                + " ORDER BY u.name LIMIT ? OFFSET ?"
+            sql = """
+                SELECT name, user_type, is_guest, admin, deactivated, shadow_banned, displayname, avatar_url
+                {sql_base}
+                ORDER BY {order_by_column} {order}, u.name ASC
+                LIMIT ? OFFSET ?
+            """.format(
+                sql_base=sql_base,
+                order_by_column=order_by_column,
+                order=order,
             )
             args += [limit, start]
             txn.execute(sql, args)
@@ -382,7 +371,7 @@ class DataStore(
             "get_users_paginate_txn", get_users_paginate_txn
         )
 
-    async def search_users(self, term: str) -> Optional[List[Dict[str, Any]]]:
+    async def search_users(self, term: str) -> Optional[List[JsonDict]]:
         """Function to search users list for one or more users with
         the matched term.
 

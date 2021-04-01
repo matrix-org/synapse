@@ -61,7 +61,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.hs.get_datastore().services_cache.append(appservice)
         request_data = json.dumps({"username": "as_user_kermit"})
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             b"POST", self.url + b"?access_token=i_am_an_app_service", request_data
         )
 
@@ -72,7 +72,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
     def test_POST_appservice_registration_invalid(self):
         self.appservice = None  # no application service exists
         request_data = json.dumps({"username": "kermit"})
-        request, channel = self.make_request(
+        channel = self.make_request(
             b"POST", self.url + b"?access_token=i_am_an_app_service", request_data
         )
 
@@ -80,14 +80,14 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     def test_POST_bad_password(self):
         request_data = json.dumps({"username": "kermit", "password": 666})
-        request, channel = self.make_request(b"POST", self.url, request_data)
+        channel = self.make_request(b"POST", self.url, request_data)
 
         self.assertEquals(channel.result["code"], b"400", channel.result)
         self.assertEquals(channel.json_body["error"], "Invalid password")
 
     def test_POST_bad_username(self):
         request_data = json.dumps({"username": 777, "password": "monkey"})
-        request, channel = self.make_request(b"POST", self.url, request_data)
+        channel = self.make_request(b"POST", self.url, request_data)
 
         self.assertEquals(channel.result["code"], b"400", channel.result)
         self.assertEquals(channel.json_body["error"], "Invalid username")
@@ -102,7 +102,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             "auth": {"type": LoginType.DUMMY},
         }
         request_data = json.dumps(params)
-        request, channel = self.make_request(b"POST", self.url, request_data)
+        channel = self.make_request(b"POST", self.url, request_data)
 
         det_data = {
             "user_id": user_id,
@@ -117,7 +117,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         request_data = json.dumps({"username": "kermit", "password": "monkey"})
         self.auth_result = (None, {"username": "kermit", "password": "monkey"}, None)
 
-        request, channel = self.make_request(b"POST", self.url, request_data)
+        channel = self.make_request(b"POST", self.url, request_data)
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(channel.json_body["error"], "Registration has been disabled")
@@ -127,7 +127,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.hs.config.macaroon_secret_key = "test"
         self.hs.config.allow_guest_access = True
 
-        request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
+        channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
 
         det_data = {"home_server": self.hs.hostname, "device_id": "guest_device"}
         self.assertEquals(channel.result["code"], b"200", channel.result)
@@ -136,7 +136,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
     def test_POST_disabled_guest_registration(self):
         self.hs.config.allow_guest_access = False
 
-        request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
+        channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(channel.json_body["error"], "Guest access is disabled")
@@ -145,7 +145,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
     def test_POST_ratelimiting_guest(self):
         for i in range(0, 6):
             url = self.url + b"?kind=guest"
-            request, channel = self.make_request(b"POST", url, b"{}")
+            channel = self.make_request(b"POST", url, b"{}")
 
             if i == 5:
                 self.assertEquals(channel.result["code"], b"429", channel.result)
@@ -155,7 +155,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         self.reactor.advance(retry_after_ms / 1000.0 + 1.0)
 
-        request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
+        channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
@@ -169,7 +169,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
                 "auth": {"type": LoginType.DUMMY},
             }
             request_data = json.dumps(params)
-            request, channel = self.make_request(b"POST", self.url, request_data)
+            channel = self.make_request(b"POST", self.url, request_data)
 
             if i == 5:
                 self.assertEquals(channel.result["code"], b"429", channel.result)
@@ -179,12 +179,12 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         self.reactor.advance(retry_after_ms / 1000.0 + 1.0)
 
-        request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
+        channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
     def test_advertised_flows(self):
-        request, channel = self.make_request(b"POST", self.url, b"{}")
+        channel = self.make_request(b"POST", self.url, b"{}")
         self.assertEquals(channel.result["code"], b"401", channel.result)
         flows = channel.json_body["flows"]
 
@@ -207,7 +207,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         }
     )
     def test_advertised_flows_captcha_and_terms_and_3pids(self):
-        request, channel = self.make_request(b"POST", self.url, b"{}")
+        channel = self.make_request(b"POST", self.url, b"{}")
         self.assertEquals(channel.result["code"], b"401", channel.result)
         flows = channel.json_body["flows"]
 
@@ -239,7 +239,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         }
     )
     def test_advertised_flows_no_msisdn_email_required(self):
-        request, channel = self.make_request(b"POST", self.url, b"{}")
+        channel = self.make_request(b"POST", self.url, b"{}")
         self.assertEquals(channel.result["code"], b"401", channel.result)
         flows = channel.json_body["flows"]
 
@@ -279,7 +279,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             b"register/email/requestToken",
             {"client_secret": "foobar", "email": email, "send_attempt": 1},
@@ -318,13 +318,13 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
 
         # The specific endpoint doesn't matter, all we need is an authenticated
         # endpoint.
-        request, channel = self.make_request(b"GET", "/sync", access_token=tok)
+        channel = self.make_request(b"GET", "/sync", access_token=tok)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         self.reactor.advance(datetime.timedelta(weeks=1).total_seconds())
 
-        request, channel = self.make_request(b"GET", "/sync", access_token=tok)
+        channel = self.make_request(b"GET", "/sync", access_token=tok)
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(
@@ -346,14 +346,12 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v1/account_validity/validity"
         params = {"user_id": user_id}
         request_data = json.dumps(params)
-        request, channel = self.make_request(
-            b"POST", url, request_data, access_token=admin_tok
-        )
+        channel = self.make_request(b"POST", url, request_data, access_token=admin_tok)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # The specific endpoint doesn't matter, all we need is an authenticated
         # endpoint.
-        request, channel = self.make_request(b"GET", "/sync", access_token=tok)
+        channel = self.make_request(b"GET", "/sync", access_token=tok)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
     def test_manual_expire(self):
@@ -370,14 +368,12 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
             "enable_renewal_emails": False,
         }
         request_data = json.dumps(params)
-        request, channel = self.make_request(
-            b"POST", url, request_data, access_token=admin_tok
-        )
+        channel = self.make_request(b"POST", url, request_data, access_token=admin_tok)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # The specific endpoint doesn't matter, all we need is an authenticated
         # endpoint.
-        request, channel = self.make_request(b"GET", "/sync", access_token=tok)
+        channel = self.make_request(b"GET", "/sync", access_token=tok)
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(
             channel.json_body["errcode"], Codes.EXPIRED_ACCOUNT, channel.result
@@ -397,20 +393,18 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
             "enable_renewal_emails": False,
         }
         request_data = json.dumps(params)
-        request, channel = self.make_request(
-            b"POST", url, request_data, access_token=admin_tok
-        )
+        channel = self.make_request(b"POST", url, request_data, access_token=admin_tok)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # Try to log the user out
-        request, channel = self.make_request(b"POST", "/logout", access_token=tok)
+        channel = self.make_request(b"POST", "/logout", access_token=tok)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # Log the user in again (allowed for expired accounts)
         tok = self.login("kermit", "monkey")
 
         # Try to log out all of the user's sessions
-        request, channel = self.make_request(b"POST", "/logout/all", access_token=tok)
+        channel = self.make_request(b"POST", "/logout/all", access_token=tok)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
 
@@ -484,7 +478,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         # retrieve the token from the DB.
         renewal_token = self.get_success(self.store.get_renewal_token_for_user(user_id))
         url = "/_matrix/client/unstable/account_validity/renew?token=%s" % renewal_token
-        request, channel = self.make_request(b"GET", url)
+        channel = self.make_request(b"GET", url)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # Check that we're getting HTML back.
@@ -504,14 +498,14 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         # our access token should be denied from now, otherwise they should
         # succeed.
         self.reactor.advance(datetime.timedelta(days=3).total_seconds())
-        request, channel = self.make_request(b"GET", "/sync", access_token=tok)
+        channel = self.make_request(b"GET", "/sync", access_token=tok)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
     def test_renewal_invalid_token(self):
         # Hit the renewal endpoint with an invalid token and check that it behaves as
         # expected, i.e. that it responds with 404 Not Found and the correct HTML.
         url = "/_matrix/client/unstable/account_validity/renew?token=123"
-        request, channel = self.make_request(b"GET", url)
+        channel = self.make_request(b"GET", url)
         self.assertEquals(channel.result["code"], b"404", channel.result)
 
         # Check that we're getting HTML back.
@@ -532,7 +526,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         self.email_attempts = []
 
         (user_id, tok) = self.create_user()
-        request, channel = self.make_request(
+        channel = self.make_request(
             b"POST",
             "/_matrix/client/unstable/account_validity/send_mail",
             access_token=tok,
@@ -556,10 +550,10 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
                 "erase": False,
             }
         )
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", "account/deactivate", request_data, access_token=tok
         )
-        self.assertEqual(request.code, 200)
+        self.assertEqual(channel.code, 200)
 
         self.reactor.advance(datetime.timedelta(days=8).total_seconds())
 
@@ -607,7 +601,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         self.email_attempts = []
 
         # Test that we're still able to manually trigger a mail to be sent.
-        request, channel = self.make_request(
+        channel = self.make_request(
             b"POST",
             "/_matrix/client/unstable/account_validity/send_mail",
             access_token=tok,

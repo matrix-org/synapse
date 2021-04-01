@@ -143,14 +143,14 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         self.datastore.get_current_state_deltas = Mock(return_value=(0, None))
 
         self.datastore.get_to_device_stream_token = lambda: 0
-        self.datastore.get_new_device_msgs_for_remote = lambda *args, **kargs: make_awaitable(
-            ([], 0)
+        self.datastore.get_new_device_msgs_for_remote = (
+            lambda *args, **kargs: make_awaitable(([], 0))
         )
-        self.datastore.delete_device_msgs_for_remote = lambda *args, **kargs: make_awaitable(
-            None
+        self.datastore.delete_device_msgs_for_remote = (
+            lambda *args, **kargs: make_awaitable(None)
         )
-        self.datastore.set_received_txn_response = lambda *args, **kwargs: make_awaitable(
-            None
+        self.datastore.set_received_txn_response = (
+            lambda *args, **kwargs: make_awaitable(None)
         )
 
     def test_started_typing_local(self):
@@ -220,7 +220,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(self.event_source.get_current_key(), 0)
 
-        (request, channel) = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/federation/v1/send/1000000",
             _make_edu_transaction_json(

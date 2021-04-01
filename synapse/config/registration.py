@@ -14,14 +14,13 @@
 # limitations under the License.
 
 import os
-from distutils.util import strtobool
 
 import pkg_resources
 
 from synapse.api.constants import RoomCreationPreset
 from synapse.config._base import Config, ConfigError
 from synapse.types import RoomAlias, UserID
-from synapse.util.stringutils import random_string_with_symbols
+from synapse.util.stringutils import random_string_with_symbols, strtobool
 
 
 class AccountValidityConfig(Config):
@@ -86,12 +85,12 @@ class RegistrationConfig(Config):
     section = "registration"
 
     def read_config(self, config, **kwargs):
-        self.enable_registration = bool(
-            strtobool(str(config.get("enable_registration", False)))
+        self.enable_registration = strtobool(
+            str(config.get("enable_registration", False))
         )
         if "disable_registration" in config:
-            self.enable_registration = not bool(
-                strtobool(str(config["disable_registration"]))
+            self.enable_registration = not strtobool(
+                str(config["disable_registration"])
             )
 
         self.account_validity = AccountValidityConfig(
@@ -188,9 +187,7 @@ class RegistrationConfig(Config):
         self.session_lifetime = session_lifetime
 
         # The success template used during fallback auth.
-        self.fallback_success_template = self.read_templates(
-            ["auth_success.html"], autoescape=True
-        )[0]
+        self.fallback_success_template = self.read_template("auth_success.html")
 
     def generate_config_section(self, generate_secrets=False, **kwargs):
         if generate_secrets:
@@ -301,9 +298,9 @@ class RegistrationConfig(Config):
         #
         #allowed_local_3pids:
         #  - medium: email
-        #    pattern: '.*@matrix\\.org'
+        #    pattern: '^[^@]+@matrix\\.org$'
         #  - medium: email
-        #    pattern: '.*@vector\\.im'
+        #    pattern: '^[^@]+@vector\\.im$'
         #  - medium: msisdn
         #    pattern: '\\+44'
 
@@ -394,6 +391,8 @@ class RegistrationConfig(Config):
         # By default, any room aliases included in this list will be created
         # as a publicly joinable room when the first user registers for the
         # homeserver. This behaviour can be customised with the settings below.
+        # If the room already exists, make certain it is a publicly joinable
+        # room. The join rule of the room must be set to 'public'.
         #
         #auto_join_rooms:
         #  - "#example:example.com"

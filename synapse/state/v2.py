@@ -118,7 +118,11 @@ async def resolve_events_with_store(
         if event.room_id != room_id:
             raise Exception(
                 "Attempting to state-resolve for room %s with event %s which is in %s"
-                % (room_id, event.event_id, event.room_id,)
+                % (
+                    room_id,
+                    event.event_id,
+                    event.room_id,
+                )
             )
 
     full_conflicted_set = {eid for eid in full_conflicted_set if eid in event_map}
@@ -658,7 +662,7 @@ async def _get_mainline_depth_for_event(
     # We do an iterative search, replacing `event with the power level in its
     # auth events (if any)
     while tmp_event:
-        depth = mainline_map.get(event.event_id)
+        depth = mainline_map.get(tmp_event.event_id)
         if depth is not None:
             return depth
 

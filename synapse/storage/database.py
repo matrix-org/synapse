@@ -42,7 +42,6 @@ from synapse.api.errors import StoreError
 from synapse.config.database import DatabaseConnectionConfig
 from synapse.logging.context import (
     LoggingContext,
-    LoggingContextOrSentinel,
     current_context,
     make_deferred_yieldable,
 )
@@ -85,8 +84,7 @@ UNIQUE_INDEX_BACKGROUND_UPDATES = {
 def make_pool(
     reactor, db_config: DatabaseConnectionConfig, engine: BaseDatabaseEngine
 ) -> adbapi.ConnectionPool:
-    """Get the connection pool for the database.
-    """
+    """Get the connection pool for the database."""
 
     # By default enable `cp_reconnect`. We need to fiddle with db_args in case
     # someone has explicitly set `cp_reconnect`.
@@ -158,8 +156,8 @@ class LoggingDatabaseConnection:
     def commit(self) -> None:
         self.conn.commit()
 
-    def rollback(self, *args, **kwargs) -> None:
-        self.conn.rollback(*args, **kwargs)
+    def rollback(self) -> None:
+        self.conn.rollback()
 
     def __enter__(self) -> "Connection":
         self.conn.__enter__()
@@ -178,6 +176,9 @@ class LoggingDatabaseConnection:
 # Python 3.5.2 doesn't support Callable with an ellipsis, so we wrap it in quotes so
 # that mypy sees the type but the runtime python doesn't.
 _CallbackListEntry = Tuple["Callable[..., None]", Iterable[Any], Dict[str, Any]]
+
+
+R = TypeVar("R")
 
 
 class LoggingTransaction:
@@ -241,11 +242,14 @@ class LoggingTransaction:
         assert self.exception_callbacks is not None
         self.exception_callbacks.append((callback, args, kwargs))
 
+    def fetchone(self) -> Optional[Tuple]:
+        return self.txn.fetchone()
+
+    def fetchmany(self, size: Optional[int] = None) -> List[Tuple]:
+        return self.txn.fetchmany(size=size)
+
     def fetchall(self) -> List[Tuple]:
         return self.txn.fetchall()
-
-    def fetchone(self) -> Tuple:
-        return self.txn.fetchone()
 
     def __iter__(self) -> Iterator[Tuple]:
         return self.txn.__iter__()
@@ -259,13 +263,32 @@ class LoggingTransaction:
         return self.txn.description
 
     def execute_batch(self, sql: str, args: Iterable[Iterable[Any]]) -> None:
+        """Similar to `executemany`, except `txn.rowcount` will not be correct
+        afterwards.
+
+        More efficient than `executemany` on PostgreSQL
+        """
+
         if isinstance(self.database_engine, PostgresEngine):
             from psycopg2.extras import execute_batch  # type: ignore
 
             self._do_execute(lambda *x: execute_batch(self.txn, *x), sql, args)
         else:
-            for val in args:
-                self.execute(sql, val)
+            self.executemany(sql, args)
+
+    def execute_values(self, sql: str, *args: Any) -> List[Tuple]:
+        """Corresponds to psycopg2.extras.execute_values. Only available when
+        using postgres.
+
+        Always sets fetch=True when caling `execute_values`, so will return the
+        results.
+        """
+        assert isinstance(self.database_engine, PostgresEngine)
+        from psycopg2.extras import execute_values  # type: ignore
+
+        return self._do_execute(
+            lambda *x: execute_values(self.txn, *x, fetch=True), sql, *args
+        )
 
     def execute(self, sql: str, *args: Any) -> None:
         self._do_execute(self.txn.execute, sql, *args)
@@ -277,7 +300,7 @@ class LoggingTransaction:
         "Strip newlines out of SQL so that the loggers in the DB are on one line"
         return " ".join(line.strip() for line in sql.splitlines() if line.strip())
 
-    def _do_execute(self, func, sql: str, *args: Any) -> None:
+    def _do_execute(self, func: Callable[..., R], sql: str, *args: Any) -> R:
         sql = self._make_sql_one_line(sql)
 
         # TODO(paul): Maybe use 'info' and 'debug' for values?
@@ -348,9 +371,6 @@ class PerformanceCounters:
         return top_n_counters
 
 
-R = TypeVar("R")
-
-
 class DatabasePool:
     """Wraps a single physical database and connection pool.
 
@@ -360,7 +380,10 @@ class DatabasePool:
     _TXN_ID = 0
 
     def __init__(
-        self, hs, database_config: DatabaseConnectionConfig, engine: BaseDatabaseEngine
+        self,
+        hs,
+        database_config: DatabaseConnectionConfig,
+        engine: BaseDatabaseEngine,
     ):
         self.hs = hs
         self._clock = hs.get_clock()
@@ -400,8 +423,7 @@ class DatabasePool:
             )
 
     def is_running(self) -> bool:
-        """Is the database pool currently running
-        """
+        """Is the database pool currently running"""
         return self._db_pool.running
 
     async def _check_safe_to_upsert(self) -> None:
@@ -514,7 +536,11 @@ class DatabasePool:
                     # This can happen if the database disappears mid
                     # transaction.
                     transaction_logger.warning(
-                        "[TXN OPERROR] {%s} %s %d/%d", name, e, i, N,
+                        "[TXN OPERROR] {%s} %s %d/%d",
+                        name,
+                        e,
+                        i,
+                        N,
                     )
                     if i < N:
                         i += 1
@@ -535,7 +561,9 @@ class DatabasePool:
                                 conn.rollback()
                             except self.engine.module.Error as e1:
                                 transaction_logger.warning(
-                                    "[TXN EROLL] {%s} %s", name, e1,
+                                    "[TXN EROLL] {%s} %s",
+                                    name,
+                                    e1,
                                 )
                             continue
                     raise
@@ -642,7 +670,7 @@ class DatabasePool:
 
             for after_callback, after_args, after_kwargs in after_callbacks:
                 after_callback(*after_args, **after_kwargs)
-        except:  # noqa: E722, as we reraise the exception this is fine.
+        except Exception:
             for after_callback, after_args, after_kwargs in exception_callbacks:
                 after_callback(*after_args, **after_kwargs)
             raise
@@ -671,12 +699,15 @@ class DatabasePool:
         Returns:
             The result of func
         """
-        parent_context = current_context()  # type: Optional[LoggingContextOrSentinel]
-        if not parent_context:
+        curr_context = current_context()
+        if not curr_context:
             logger.warning(
                 "Starting db connection from sentinel context: metrics will be lost"
             )
             parent_context = None
+        else:
+            assert isinstance(curr_context, LoggingContext)
+            parent_context = curr_context
 
         start_time = monotonic_time()
 
@@ -722,6 +753,7 @@ class DatabasePool:
         Returns:
             A list of dicts where the key is the column header.
         """
+        assert cursor.description is not None, "cursor.description was None"
         col_headers = [intern(str(column[0])) for column in cursor.description]
         results = [dict(zip(col_headers, row)) for row in cursor]
         return results
@@ -861,7 +893,7 @@ class DatabasePool:
             ", ".join("?" for _ in keys[0]),
         )
 
-        txn.executemany(sql, vals)
+        txn.execute_batch(sql, vals)
 
     async def simple_upsert(
         self,
@@ -1370,7 +1402,10 @@ class DatabasePool:
 
     @staticmethod
     def simple_select_onecol_txn(
-        txn: LoggingTransaction, table: str, keyvalues: Dict[str, Any], retcol: str,
+        txn: LoggingTransaction,
+        table: str,
+        keyvalues: Dict[str, Any],
+        retcol: str,
     ) -> List[Any]:
         sql = ("SELECT %(retcol)s FROM %(table)s") % {"retcol": retcol, "table": table}
 
@@ -1680,7 +1715,11 @@ class DatabasePool:
             desc: description of the transaction, for logging and metrics
         """
         await self.runInteraction(
-            desc, self.simple_delete_one_txn, table, keyvalues, db_autocommit=True,
+            desc,
+            self.simple_delete_one_txn,
+            table,
+            keyvalues,
+            db_autocommit=True,
         )
 
     @staticmethod
@@ -1867,6 +1906,7 @@ class DatabasePool:
         retcols: Iterable[str],
         filters: Optional[Dict[str, Any]] = None,
         keyvalues: Optional[Dict[str, Any]] = None,
+        exclude_keyvalues: Optional[Dict[str, Any]] = None,
         order_direction: str = "ASC",
     ) -> List[Dict[str, Any]]:
         """
@@ -1890,7 +1930,10 @@ class DatabasePool:
                 apply a WHERE ? LIKE ? clause.
             keyvalues:
                 column names and values to select the rows with, or None to not
-                apply a WHERE clause.
+                apply a WHERE key = value clause.
+            exclude_keyvalues:
+                column names and values to exclude rows with, or None to not
+                apply a WHERE key != value clause.
             order_direction: Whether the results should be ordered "ASC" or "DESC".
 
         Returns:
@@ -1899,7 +1942,7 @@ class DatabasePool:
         if order_direction not in ["ASC", "DESC"]:
             raise ValueError("order_direction must be one of 'ASC' or 'DESC'.")
 
-        where_clause = "WHERE " if filters or keyvalues else ""
+        where_clause = "WHERE " if filters or keyvalues or exclude_keyvalues else ""
         arg_list = []  # type: List[Any]
         if filters:
             where_clause += " AND ".join("%s LIKE ?" % (k,) for k in filters)
@@ -1908,6 +1951,9 @@ class DatabasePool:
         if keyvalues:
             where_clause += " AND ".join("%s = ?" % (k,) for k in keyvalues)
             arg_list += list(keyvalues.values())
+        if exclude_keyvalues:
+            where_clause += " AND ".join("%s != ?" % (k,) for k in exclude_keyvalues)
+            arg_list += list(exclude_keyvalues.values())
 
         sql = "SELECT %s FROM %s %s ORDER BY %s %s LIMIT ? OFFSET ?" % (
             ", ".join(retcols),

@@ -1,15 +1,22 @@
 # Contents
-- [List all media in a room](#list-all-media-in-a-room)
+- [Querying media](#querying-media)
+  * [List all media in a room](#list-all-media-in-a-room)
+  * [List all media uploaded by a user](#list-all-media-uploaded-by-a-user)
 - [Quarantine media](#quarantine-media)
   * [Quarantining media by ID](#quarantining-media-by-id)
   * [Quarantining media in a room](#quarantining-media-in-a-room)
   * [Quarantining all media of a user](#quarantining-all-media-of-a-user)
+  * [Protecting media from being quarantined](#protecting-media-from-being-quarantined)
 - [Delete local media](#delete-local-media)
   * [Delete a specific local media](#delete-a-specific-local-media)
   * [Delete local media by date or size](#delete-local-media-by-date-or-size)
 - [Purge Remote Media API](#purge-remote-media-api)
 
-# List all media in a room
+# Querying media
+
+These APIs allow extracting media information from the homeserver.
+
+## List all media in a room
 
 This API gets a list of known media in a room.
 However, it only shows media from unencrypted events or rooms.
@@ -34,6 +41,12 @@ The API returns a JSON body like the following:
   ]
 }
 ```
+
+## List all media uploaded by a user
+
+Listing all media that has been uploaded by a local user can be achieved through
+the use of the [List media of a user](user_admin_api.rst#list-media-of-a-user)
+Admin API.
 
 # Quarantine media
 
@@ -122,6 +135,29 @@ Response:
 The following fields are returned in the JSON response body:
 
 * `num_quarantined`: integer - The number of media items successfully quarantined
+
+## Protecting media from being quarantined
+
+This API protects a single piece of local media from being quarantined using the
+above APIs. This is useful for sticker packs and other shared media which you do
+not want to get quarantined, especially when
+[quarantining media in a room](#quarantining-media-in-a-room).
+
+Request:
+
+```
+POST /_synapse/admin/v1/media/protect/<media_id>
+
+{}
+```
+
+Where `media_id` is in the  form of `abcdefg12345...`.
+
+Response:
+
+```json
+{}
+```
 
 # Delete local media
 This API deletes the *local* media from the disk of your own server.

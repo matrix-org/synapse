@@ -22,7 +22,6 @@ from canonicaljson import encode_canonical_json
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool, LoggingTransaction
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import JsonDict
 from synapse.util.caches.expiringcache import ExpiringCache
 
@@ -64,8 +63,7 @@ class TransactionWorkerStore(SQLBaseStore):
 
 
 class TransactionStore(TransactionWorkerStore):
-    """A collection of queries for handling PDUs.
-    """
+    """A collection of queries for handling PDUs."""
 
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
@@ -198,7 +196,7 @@ class TransactionStore(TransactionWorkerStore):
         retry_interval: int,
     ) -> None:
         """Sets the current retry timings for a given destination.
-        Both timings should be zero if retrying is no longer occuring.
+        Both timings should be zero if retrying is no longer occurring.
 
         Args:
             destination
@@ -299,7 +297,10 @@ class TransactionStore(TransactionWorkerStore):
             )
 
     async def store_destination_rooms_entries(
-        self, destinations: Iterable[str], room_id: str, stream_ordering: int,
+        self,
+        destinations: Iterable[str],
+        room_id: str,
+        stream_ordering: int,
     ) -> None:
         """
         Updates or creates `destination_rooms` entries in batch for a single event.
@@ -310,49 +311,23 @@ class TransactionStore(TransactionWorkerStore):
             stream_ordering: the stream_ordering of the event
         """
 
-        return await self.db_pool.runInteraction(
-            "store_destination_rooms_entries",
-            self._store_destination_rooms_entries_txn,
-            destinations,
-            room_id,
-            stream_ordering,
+        await self.db_pool.simple_upsert_many(
+            table="destinations",
+            key_names=("destination",),
+            key_values=[(d,) for d in destinations],
+            value_names=[],
+            value_values=[],
+            desc="store_destination_rooms_entries_dests",
         )
 
-    def _store_destination_rooms_entries_txn(
-        self,
-        txn: LoggingTransaction,
-        destinations: Iterable[str],
-        room_id: str,
-        stream_ordering: int,
-    ) -> None:
-
-        # ensure we have a `destinations` row for this destination, as there is
-        # a foreign key constraint.
-        if isinstance(self.database_engine, PostgresEngine):
-            q = """
-                INSERT INTO destinations (destination)
-                    VALUES (?)
-                    ON CONFLICT DO NOTHING;
-            """
-        elif isinstance(self.database_engine, Sqlite3Engine):
-            q = """
-                INSERT OR IGNORE INTO destinations (destination)
-                    VALUES (?);
-            """
-        else:
-            raise RuntimeError("Unknown database engine")
-
-        txn.execute_batch(q, ((destination,) for destination in destinations))
-
         rows = [(destination, room_id) for destination in destinations]
-
-        self.db_pool.simple_upsert_many_txn(
-            txn,
-            "destination_rooms",
-            ["destination", "room_id"],
-            rows,
-            ["stream_ordering"],
-            [(stream_ordering,)] * len(rows),
+        await self.db_pool.simple_upsert_many(
+            table="destination_rooms",
+            key_names=("destination", "room_id"),
+            key_values=rows,
+            value_names=["stream_ordering"],
+            value_values=[(stream_ordering,)] * len(rows),
+            desc="store_destination_rooms_entries_rooms",
         )
 
     async def get_destination_last_successful_stream_ordering(
@@ -394,7 +369,9 @@ class TransactionStore(TransactionWorkerStore):
         )
 
     async def get_catch_up_room_event_ids(
-        self, destination: str, last_successful_stream_ordering: int,
+        self,
+        destination: str,
+        last_successful_stream_ordering: int,
     ) -> List[str]:
         """
         Returns at most 50 event IDs and their corresponding stream_orderings
@@ -418,7 +395,9 @@ class TransactionStore(TransactionWorkerStore):
 
     @staticmethod
     def _get_catch_up_room_event_ids_txn(
-        txn: LoggingTransaction, destination: str, last_successful_stream_ordering: int,
+        txn: LoggingTransaction,
+        destination: str,
+        last_successful_stream_ordering: int,
     ) -> List[str]:
         q = """
                 SELECT event_id FROM destination_rooms
@@ -429,7 +408,8 @@ class TransactionStore(TransactionWorkerStore):
                 LIMIT 50
             """
         txn.execute(
-            q, (destination, last_successful_stream_ordering),
+            q,
+            (destination, last_successful_stream_ordering),
         )
         event_ids = [row[0] for row in txn]
         return event_ids
@@ -464,19 +444,17 @@ class TransactionStore(TransactionWorkerStore):
         txn: LoggingTransaction, now_time_ms: int, after_destination: Optional[str]
     ) -> List[str]:
         q = """
-            SELECT destination FROM destinations
-                WHERE destination IN (
-                    SELECT destination FROM destination_rooms
-                        WHERE destination_rooms.stream_ordering >
-                            destinations.last_successful_stream_ordering
-                )
-                AND destination > ?
-                AND (
-                    retry_last_ts IS NULL OR
-                    retry_last_ts + retry_interval < ?
-                )
-                ORDER BY destination
-                LIMIT 25
+            SELECT DISTINCT destination FROM destinations
+            INNER JOIN destination_rooms USING (destination)
+                WHERE
+                    stream_ordering > last_successful_stream_ordering
+                    AND destination > ?
+                    AND (
+                        retry_last_ts IS NULL OR
+                        retry_last_ts + retry_interval < ?
+                    )
+                    ORDER BY destination
+                    LIMIT 25
         """
         txn.execute(
             q,
