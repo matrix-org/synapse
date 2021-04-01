@@ -33,6 +33,7 @@ from typing_extensions import Literal
 from synapse.config import cache as cache_config
 from synapse.util.caches import CacheMetric, register_cache
 from synapse.util.caches.treecache import TreeCache
+from twisted.internet import reactor
 
 try:
     from pympler import asizeof
@@ -60,7 +61,15 @@ def enumerate_leaves(node, depth):
 
 
 class _Node:
-    __slots__ = ["prev_node", "next_node", "key", "value", "callbacks", "memory"]
+    __slots__ = [
+        "prev_node",
+        "next_node",
+        "key",
+        "value",
+        "callbacks",
+        "memory",
+        "allocated_ts",
+    ]
 
     def __init__(self, prev_node, next_node, key, value, callbacks=set()):
         self.key = key
@@ -78,6 +87,7 @@ class _Node:
 
         self.prev_node = prev_node
         self.next_node = next_node
+        self.allocated_ts = int(reactor.seconds())
 
 
 class LruCache(Generic[KT, VT]):
@@ -163,7 +173,11 @@ class LruCache(Generic[KT, VT]):
         lock = threading.Lock()
 
         def evict():
-            while cache_len() > self.max_size:
+            ten_minutes_ago = int(reactor.seconds()) - 10 * 60
+            while (
+                cache_len() > self.max_size
+                or 0 < list_root.prev_node.allocated_ts < ten_minutes_ago
+            ):
                 todelete = list_root.prev_node
                 evicted_len = delete_node(todelete)
                 cache.pop(todelete.key, None)
@@ -263,7 +277,11 @@ class LruCache(Generic[KT, VT]):
         ):
             node = cache.get(key, None)
             if node is not None:
-                move_node_to_front(node)
+                ten_minutes_ago = int(reactor.seconds()) - 10 * 60
+                if 0 < node.allocated_ts < ten_minutes_ago:
+                    delete_node(node)
+                else:
+                    move_node_to_front(node)
                 node.callbacks.update(callbacks)
                 if update_metrics and metrics:
                     metrics.inc_hits()
