@@ -170,6 +170,7 @@ class LruCache(Generic[KT, VT]):
         list_root = _Node(None, None, None, None)
         list_root.next_node = list_root
         list_root.prev_node = list_root
+        list_root.allocated_ts = -1
 
         lock = threading.Lock()
 
@@ -178,7 +179,7 @@ class LruCache(Generic[KT, VT]):
             ten_minutes_ago = int(reactor.seconds()) - 10 * 60
             while i < 100 and (
                 cache_len() > self.max_size
-                or list_root.prev_node.allocated_ts < ten_minutes_ago + 60
+                or 0 < list_root.prev_node.allocated_ts < ten_minutes_ago + 60
             ):
                 i += 1
                 if list_root.prev_node.allocated_ts > ten_minutes_ago:
