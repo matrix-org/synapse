@@ -292,9 +292,10 @@ class LruCache(Generic[KT, VT]):
                 ten_minutes_ago = int(reactor.seconds()) - 10 * 60
                 if 0 < node.allocated_ts < ten_minutes_ago:
                     delete_node(node)
+                    cache.pop(node.key, None)
                 else:
                     move_node_to_front(node)
-                node.callbacks.update(callbacks)
+                    node.callbacks.update(callbacks)
                 if update_metrics and metrics:
                     metrics.inc_hits()
                 return node.value
