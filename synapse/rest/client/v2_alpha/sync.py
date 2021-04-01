@@ -14,7 +14,7 @@
 # limitations under the License.
 import itertools
 import logging
-from typing import TYPE_CHECKING, Tuple, Any, Callable, Dict, List
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Tuple
 
 from synapse.api.constants import Membership, PresenceState
 from synapse.api.errors import Codes, StoreError, SynapseError

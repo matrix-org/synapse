@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 from urllib import parse as urlparse
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
@@ -25,7 +25,6 @@ from synapse.http.servlet import (
     assert_params_in_dict,
     parse_integer,
     parse_json_object_from_request,
-    parse_list_from_args,
     parse_string,
 )
 from synapse.http.site import SynapseRequest
@@ -410,7 +409,9 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
 
         # Get the room ID from the identifier.
         try:
-            remote_room_hosts = parse_list_from_args(request.args, "server_name")
+            remote_room_hosts = [
+                x.decode("ascii") for x in request.args[b"server_name"]
+            ]  # type: Optional[List[str]]
         except Exception:
             remote_room_hosts = None
         room_id, remote_room_hosts = await self.resolve_room_id(
