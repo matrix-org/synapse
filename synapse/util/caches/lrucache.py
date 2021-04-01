@@ -182,6 +182,9 @@ class LruCache(Generic[KT, VT]):
             ):
                 i += 1
                 todelete = list_root.prev_node
+                if list_root == todelete:
+                    break
+
                 evicted_len = delete_node(todelete)
                 cache.pop(todelete.key, None)
                 if metrics:
