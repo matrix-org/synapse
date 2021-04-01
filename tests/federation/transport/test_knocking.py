@@ -64,7 +64,7 @@ class KnockingStrippedStateEventHelperMixin(TestCase):
         self.get_success(
             event_injection.inject_event(
                 hs,
-                room_version=RoomVersions.MSC2403_DEV.identifier,
+                room_version=RoomVersions.MSC2403.identifier,
                 room_id=room_id,
                 sender=sender,
                 type="com.example.secret",
@@ -124,7 +124,7 @@ class KnockingStrippedStateEventHelperMixin(TestCase):
             self.get_success(
                 event_injection.inject_event(
                     hs,
-                    room_version=RoomVersions.MSC2403_DEV.identifier,
+                    room_version=RoomVersions.MSC2403.identifier,
                     room_id=room_id,
                     sender=sender,
                     type=event_type,
@@ -223,7 +223,7 @@ class FederationKnockingTestCase(
         room_id = self.helper.create_room_as(
             "u1",
             is_public=False,
-            room_version=RoomVersions.MSC2403_DEV.identifier,
+            room_version=RoomVersions.MSC2403.identifier,
             tok=user_token,
         )
 
@@ -241,7 +241,7 @@ class FederationKnockingTestCase(
                 fake_knocking_user_id,
                 # Inform the remote that we support the room version of the room we're
                 # knocking on
-                RoomVersions.MSC2403_DEV.identifier,
+                RoomVersions.MSC2403.identifier,
             ),
         )
         self.assertEquals(200, channel.code, channel.result)
@@ -266,7 +266,7 @@ class FederationKnockingTestCase(
             self.clock,
             self.hs.hostname,
             self.hs.signing_key,
-            room_version=RoomVersions.MSC2403_DEV,
+            room_version=RoomVersions.MSC2403,
             event_dict=knock_event,
         )
 
