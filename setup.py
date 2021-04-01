@@ -103,6 +103,13 @@ CONDITIONAL_REQUIREMENTS["lint"] = [
     "flake8",
 ]
 
+CONDITIONAL_REQUIREMENTS["dev"] = CONDITIONAL_REQUIREMENTS["lint"] + [
+    # The following are used by the release script
+    "click==7.1.2",
+    "redbaron==0.9.2",
+    "GitPython==3.1.14",
+]
+
 CONDITIONAL_REQUIREMENTS["mypy"] = ["mypy==0.812", "mypy-zope==0.2.13"]
 
 # Dependencies which are exclusively required by unit test code. This is
