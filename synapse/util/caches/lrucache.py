@@ -88,7 +88,7 @@ class _Node:
 
         self.prev_node = prev_node
         self.next_node = next_node
-        self.allocated_ts = int(reactor.seconds()) + random.randint(-30, 30)
+        self.allocated_ts = int(reactor.seconds()) + random.randint(-60, 60)
 
 
 class LruCache(Generic[KT, VT]):
@@ -178,9 +178,12 @@ class LruCache(Generic[KT, VT]):
             ten_minutes_ago = int(reactor.seconds()) - 10 * 60
             while i < 100 and (
                 cache_len() > self.max_size
-                or 0 < list_root.prev_node.allocated_ts < ten_minutes_ago
+                or list_root.prev_node.allocated_ts < ten_minutes_ago + 60
             ):
                 i += 1
+                if list_root.prev_node.allocated_ts > ten_minutes_ago:
+                    continue
+
                 todelete = list_root.prev_node
                 if list_root == todelete:
                     break
