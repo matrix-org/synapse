@@ -220,8 +220,6 @@ class GaugeBucketCollector:
         "_documentation",
         "_bucket_bounds",
         "_metric",
-        "_registry",
-        "_registered",
     )
 
     def __init__(
@@ -241,8 +239,6 @@ class GaugeBucketCollector:
         """
         self._name = name
         self._documentation = documentation
-        self._registry = registry
-        self._registered = False
 
         # the tops of the buckets
         self._bucket_bounds = [float(b) for b in buckets]
@@ -252,10 +248,16 @@ class GaugeBucketCollector:
         if self._bucket_bounds[-1] != float("inf"):
             self._bucket_bounds.append(float("inf"))
 
-        self._metric = self._values_to_metric([])
+        # We initially set this to None. We won't report metrics until
+        # this has been initialised after a successful data update
+        self._metric = None
+
+        registry.register(self)
 
     def collect(self):
-        yield self._metric
+        # Don't report metrics unless we've already collected some data
+        if self._metric is not None:
+            yield self._metric
 
     def update_data(self, values: Iterable[float]):
         """Update the data to be reported by the metric
@@ -263,11 +265,6 @@ class GaugeBucketCollector:
         The existing data is cleared, and each measurement in the input is assigned
         to the relevant bucket.
         """
-        # Wait until we have data to report before registering
-        if not self._registered:
-            self._registry.register(self)
-            self._registered = True
-
         self._metric = self._values_to_metric(values)
 
     def _values_to_metric(self, values: Iterable[float]) -> GaugeHistogramMetricFamily:
