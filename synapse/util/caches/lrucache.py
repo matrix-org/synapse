@@ -27,6 +27,7 @@ from typing import (
     cast,
     overload,
 )
+import random
 
 from typing_extensions import Literal
 
@@ -87,7 +88,7 @@ class _Node:
 
         self.prev_node = prev_node
         self.next_node = next_node
-        self.allocated_ts = int(reactor.seconds())
+        self.allocated_ts = int(reactor.seconds()) + random.randint(-30, 30)
 
 
 class LruCache(Generic[KT, VT]):
