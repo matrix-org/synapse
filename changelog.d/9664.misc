@@ -1,1 +1,0 @@
-Improve performance of federation catch up by sending events the latest events in the room to the remote, rather than just the last event sent by the local server.

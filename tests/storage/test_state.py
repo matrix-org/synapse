@@ -377,14 +377,11 @@ class StateStoreTestCase(tests.unittest.TestCase):
         #######################################################
         # deliberately remove e2 (room name) from the _state_group_cache
 
-        (
-            is_all,
-            known_absent,
-            state_dict_ids,
-        ) = self.state_datastore._state_group_cache.get(group)
+        cache_entry = self.state_datastore._state_group_cache.get(group)
+        state_dict_ids = cache_entry.value
 
-        self.assertEqual(is_all, True)
-        self.assertEqual(known_absent, set())
+        self.assertEqual(cache_entry.full, True)
+        self.assertEqual(cache_entry.known_absent, set())
         self.assertDictEqual(
             state_dict_ids,
             {
@@ -403,14 +400,11 @@ class StateStoreTestCase(tests.unittest.TestCase):
             fetched_keys=((e1.type, e1.state_key),),
         )
 
-        (
-            is_all,
-            known_absent,
-            state_dict_ids,
-        ) = self.state_datastore._state_group_cache.get(group)
+        cache_entry = self.state_datastore._state_group_cache.get(group)
+        state_dict_ids = cache_entry.value
 
-        self.assertEqual(is_all, False)
-        self.assertEqual(known_absent, {(e1.type, e1.state_key)})
+        self.assertEqual(cache_entry.full, False)
+        self.assertEqual(cache_entry.known_absent, {(e1.type, e1.state_key)})
         self.assertDictEqual(state_dict_ids, {(e1.type, e1.state_key): e1.event_id})
 
         ############################################
