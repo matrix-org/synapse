@@ -175,13 +175,11 @@ class LruCache(Generic[KT, VT]):
         lock = threading.Lock()
 
         def evict():
-            i = 0
             ten_minutes_ago = int(reactor.seconds()) - 10 * 60
-            while i < 100 and (
+            while (
                 cache_len() > self.max_size
                 or 0 < list_root.prev_node.allocated_ts < ten_minutes_ago + 60
             ):
-                i += 1
                 todelete = list_root.prev_node
 
                 if 0 < todelete.allocated_ts < ten_minutes_ago:
