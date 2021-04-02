@@ -99,7 +99,7 @@ CONDITIONAL_REQUIREMENTS["lint"] = [
     "isort==5.7.0",
     "black==20.8b1",
     "flake8-comprehensions",
-    "flake8-bugbear",
+    "flake8-bugbear==21.3.2",
     "flake8",
 ]
 
