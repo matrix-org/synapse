@@ -289,14 +289,20 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         if event.membership == Membership.JOIN:
             newly_joined = True
+            is_invite = False
             if prev_member_event_id:
                 prev_member_event = await self.store.get_event(prev_member_event_id)
                 newly_joined = prev_member_event.membership != Membership.JOIN
+                is_invite = prev_member_event.membership == Membership.INVITE
 
             # If the member is not already in the room, check if they should be
             # allowed access via membership in a space.
-            if newly_joined and not await self._can_join_restricted_room(
-                prev_state_ids, room_id, user_id
+            if (
+                newly_joined
+                and not is_invite
+                and not await self._can_join_restricted_room(
+                    prev_state_ids, room_id, user_id
+                )
             ):
                 raise AuthError(
                     403,
