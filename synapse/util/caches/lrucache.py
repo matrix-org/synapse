@@ -176,13 +176,13 @@ class LruCache(Generic[KT, VT]):
 
         def evict():
             ten_minutes_ago = int(reactor.seconds()) - 10 * 60
+            todelete = list_root.prev_node
             while (
                 cache_len() > self.max_size
-                or 0 < list_root.prev_node.allocated_ts < ten_minutes_ago + 60
+                or 0 < todelete.allocated_ts < ten_minutes_ago + 60
             ):
-                todelete = list_root.prev_node
-
                 if 0 < todelete.allocated_ts < ten_minutes_ago:
+                    todelete = list_root.prev_node
                     continue
 
                 todelete = list_root.prev_node
@@ -193,6 +193,8 @@ class LruCache(Generic[KT, VT]):
                 cache.pop(todelete.key, None)
                 if metrics:
                     metrics.inc_evictions(evicted_len)
+
+                todelete = list_root.prev_node
 
         def synchronized(f: FT) -> FT:
             @wraps(f)
