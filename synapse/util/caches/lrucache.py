@@ -34,7 +34,6 @@ from typing_extensions import Literal
 from synapse.config import cache as cache_config
 from synapse.util.caches import CacheMetric, register_cache
 from synapse.util.caches.treecache import TreeCache
-from twisted.internet import reactor
 
 try:
     from pympler import asizeof
@@ -72,7 +71,7 @@ class _Node:
         "allocated_ts",
     ]
 
-    def __init__(self, prev_node, next_node, key, value, callbacks=set()):
+    def __init__(self, prev_node, next_node, key, value, allocated_ts, callbacks=set()):
         self.key = key
         self.value = value
         self.callbacks = callbacks
@@ -88,7 +87,7 @@ class _Node:
 
         self.prev_node = prev_node
         self.next_node = next_node
-        self.allocated_ts = int(reactor.seconds()) + random.randint(-60, 60)
+        self.allocated_ts = allocated_ts
 
 
 class LruCache(Generic[KT, VT]):
@@ -108,6 +107,7 @@ class LruCache(Generic[KT, VT]):
         size_callback: Optional[Callable] = None,
         metrics_collection_callback: Optional[Callable[[], None]] = None,
         apply_cache_factor_from_config: bool = True,
+        reactor=None,
     ):
         """
         Args:
@@ -136,6 +136,11 @@ class LruCache(Generic[KT, VT]):
             apply_cache_factor_from_config (bool): If true, `max_size` will be
                 multiplied by a cache factor derived from the homeserver config
         """
+        if reactor is None:
+            from twisted.internet import reactor as _reactor
+
+            reactor = _reactor
+
         cache = cache_type()
         self.cache = cache  # Used for introspection.
         self.apply_cache_factor_from_config = apply_cache_factor_from_config
@@ -167,10 +172,9 @@ class LruCache(Generic[KT, VT]):
         # this is exposed for access from outside this class
         self.metrics = metrics
 
-        list_root = _Node(None, None, None, None)
+        list_root = _Node(None, None, None, None, -1)
         list_root.next_node = list_root
         list_root.prev_node = list_root
-        list_root.allocated_ts = -1
 
         lock = threading.Lock()
 
@@ -188,7 +192,7 @@ class LruCache(Generic[KT, VT]):
                 if list_root == todelete:
                     break
 
-                if 0 < todelete.allocated_ts < ten_minutes_ago:
+                if ten_minutes_ago < todelete.allocated_ts:
                     todelete = todelete.prev_node
                     continue
 
@@ -225,7 +229,11 @@ class LruCache(Generic[KT, VT]):
         def add_node(key, value, callbacks=set()):
             prev_node = list_root
             next_node = prev_node.next_node
-            node = _Node(prev_node, next_node, key, value, callbacks)
+
+            ts = int(reactor.seconds()) + random.randint(-60, 60)
+            print("Allocating at", ts)
+
+            node = _Node(prev_node, next_node, key, value, ts, callbacks)
             prev_node.next_node = node
             next_node.prev_node = node
             cache[key] = node

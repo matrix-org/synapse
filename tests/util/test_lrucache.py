@@ -30,6 +30,23 @@ class LruCacheTestCase(unittest.HomeserverTestCase):
         self.assertEquals(cache.get("key"), "value")
         self.assertEquals(cache["key"], "value")
 
+    def test_time_evict(self):
+        self.reactor.advance(100 * 60)
+
+        cache = LruCache(100, reactor=self.reactor)
+        cache["key"] = "value"
+        cache["key2"] = "value2"
+
+        cache._on_resize()
+        self.assertEquals(cache.get("key"), "value")
+
+        self.reactor.advance(20 * 60)
+
+        print(self.reactor.seconds())
+
+        cache._on_resize()
+        self.assertEquals(cache.get("key"), None)
+
     def test_eviction(self):
         cache = LruCache(2)
         cache[1] = 1
