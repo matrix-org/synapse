@@ -417,7 +417,7 @@ class FederationSender(AbstractFederationSender):
         # List of events to send to each destination
         events_by_dest = {}  # type: Dict[str, List[EventBase]]
 
-        # For each events with destinations pair...
+        # For each event-destinations pair...
         for event, destinations in events_and_dests:
 
             # (we got this from the database, it's filled)
