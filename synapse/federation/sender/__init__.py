@@ -19,8 +19,6 @@ from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Set,
 
 from prometheus_client import Counter
 
-from twisted.internet import defer
-
 import synapse.metrics
 from synapse.api.presence import UserPresenceState
 from synapse.events import EventBase
@@ -28,11 +26,7 @@ from synapse.federation.sender.per_destination_queue import PerDestinationQueue
 from synapse.federation.sender.transaction_manager import TransactionManager
 from synapse.federation.units import Edu
 from synapse.handlers.presence import get_interested_remotes
-from synapse.logging.context import (
-    make_deferred_yieldable,
-    preserve_fn,
-    run_in_background,
-)
+from synapse.logging.context import preserve_fn
 from synapse.metrics import (
     LaterGauge,
     event_processing_loop_counter,
@@ -277,7 +271,7 @@ class FederationSender(AbstractFederationSender):
 
                 async def get_destinations_for_event(
                     event: EventBase,
-                ) -> Optional[Collection[str]]:
+                ) -> Collection[str]:
                     """Computes the destinations to which this event must be sent.
 
                     This returns None when there are no destinations to send to,
@@ -292,10 +286,10 @@ class FederationSender(AbstractFederationSender):
                     send_on_behalf_of = event.internal_metadata.get_send_on_behalf_of()
                     is_mine = self.is_mine_id(event.sender)
                     if not is_mine and send_on_behalf_of is None:
-                        return None
+                        return ()
 
                     if not event.internal_metadata.should_proactively_send():
-                        return None
+                        return ()
 
                     destinations = None  # type: Optional[Set[str]]
                     if not event.prev_event_ids():
@@ -330,7 +324,7 @@ class FederationSender(AbstractFederationSender):
                                 "Failed to calculate hosts in room for event: %s",
                                 event.event_id,
                             )
-                            return None
+                            return ()
 
                     destinations = {
                         d
@@ -357,40 +351,28 @@ class FederationSender(AbstractFederationSender):
                         ).observe((now - ts) / 1000)
 
                         return destinations
-                    return None
+                    return ()
 
                 async def get_federatable_events_and_destinations(
-                    room_id: str, events: Iterable[EventBase]
-                ) -> Tuple[str, List[Tuple[EventBase, Collection[str]]]]:
-                    with Measure(self.clock, "handle_room_events"):
+                    events: Iterable[EventBase],
+                ) -> List[Tuple[EventBase, Collection[str]]]:
+                    with Measure(self.clock, "fetch_destinations_for_events"):
                         # Get destinations for events, skip if get_destinations_for_event returns None
-                        return room_id, [
+                        return [
                             (event, dests)
                             for (event, dests) in [
                                 (event, await get_destinations_for_event(event))
                                 for event in events
                             ]
-                            if dests is not None
+                            if dests
                         ]
 
-                events_by_room = {}  # type: Dict[str, List[EventBase]]
-                for event in events:
-                    events_by_room.setdefault(event.room_id, []).append(event)
-
-                per_room_events_and_dests = await make_deferred_yieldable(
-                    defer.gatherResults(
-                        [
-                            run_in_background(
-                                get_federatable_events_and_destinations, rid, evs
-                            )
-                            for rid, evs in events_by_room.items()
-                        ],
-                        consumeErrors=True,
-                    )
-                )  # type: List[Tuple[str, List[Tuple[EventBase, Collection[str]]]]]
+                events_and_dests = await get_federatable_events_and_destinations(
+                    events
+                )  # type: List[Tuple[EventBase, Collection[str]]]
 
                 # Send corresponding events to each destination queue
-                await self._distribute_events(per_room_events_and_dests)
+                await self._distribute_events(events_and_dests)
 
                 await self.store.update_federation_out_pos("events", next_token)
 
@@ -408,7 +390,7 @@ class FederationSender(AbstractFederationSender):
                     events_processed_counter.inc(len(events))
 
                     event_processing_loop_room_count.labels("federation_sender").inc(
-                        len(events_by_room)
+                        len({event.room_id for event in events})
                     )
 
                 event_processing_loop_counter.labels("federation_sender").inc()
@@ -422,47 +404,38 @@ class FederationSender(AbstractFederationSender):
 
     async def _distribute_events(
         self,
-        per_room_events_and_dests: List[
-            Tuple[str, List[Tuple[EventBase, Collection[str]]]]
-        ],
+        events_and_dests: List[Tuple[EventBase, Collection[str]]],
     ) -> None:
+        """Distribute events from the transmission loop.
+
+        Args:
+            events_and_dests: A list of tuples, which are (event, destinations).
+        """
         # Tuples of room_id + destination to their max-seen stream_ordering
         room_with_dest_stream_ordering = {}  # type: Dict[Tuple[str, str], int]
 
         # List of events to send to each destination
         events_by_dest = {}  # type: Dict[str, List[EventBase]]
 
-        # For each roomID + events with destinations pair...
-        for room_id, event_and_dests in per_room_events_and_dests:
+        # Flatten the incoming list, and for each events with destinations pair...
+        for event, destinations in events_and_dests:
 
-            # (dest -> stream_id)
-            this_stream_ordering = {}  # type: Dict[str, int]
+            # (we got this from the database, it's filled)
+            assert event.internal_metadata.stream_ordering
 
-            # ...get every event with their destinations...
-            for event, destinations in event_and_dests:
+            sent_pdus_destination_dist_total.inc(len(destinations))
+            sent_pdus_destination_dist_count.inc()
 
-                # (we got this from the database, it's filled)
-                assert event.internal_metadata.stream_ordering
+            # ...iterate over those destinations..
+            for destination in destinations:
+                # ...update their stream-ordering...
+                room_with_dest_stream_ordering[(event.room_id, destination)] = max(
+                    event.internal_metadata.stream_ordering,
+                    room_with_dest_stream_ordering.get((event.room_id, destination), 0),
+                )
 
-                sent_pdus_destination_dist_total.inc(len(destinations))
-                sent_pdus_destination_dist_count.inc()
-
-                # ...iterate over those destinations..
-                for destination in destinations:
-                    if (
-                        this_stream_ordering.setdefault(destination, 0)
-                        < event.internal_metadata.stream_ordering
-                    ):
-                        # ...update their stream-ordering...
-                        this_stream_ordering[
-                            destination
-                        ] = event.internal_metadata.stream_ordering
-
-                    # ...and add the event to each destination queue.
-                    events_by_dest.setdefault(destination, []).append(event)
-
-            for dest, stream_id in this_stream_ordering.items():
-                room_with_dest_stream_ordering[(room_id, dest)] = stream_id
+                # ...and add the event to each destination queue.
+                events_by_dest.setdefault(destination, []).append(event)
 
         # Bulk-store destination_rooms stream_ids
         await self.store.bulk_store_destination_rooms_entries(
@@ -472,7 +445,7 @@ class FederationSender(AbstractFederationSender):
         for destination, pdus in events_by_dest.items():
             logger.debug("Sending %d pdus to %s", len(pdus), destination)
 
-            self._get_per_destination_queue(destination).send_pdu(*pdus)
+            self._get_per_destination_queue(destination).send_pdus(pdus)
 
     async def send_read_receipt(self, receipt: ReadReceipt) -> None:
         """Send a RR to any other servers in the room

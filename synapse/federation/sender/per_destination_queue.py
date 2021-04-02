@@ -31,7 +31,7 @@ from synapse.federation.units import Edu
 from synapse.handlers.presence import format_user_presence_state
 from synapse.metrics import sent_transactions_counter
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import ReadReceipt
+from synapse.types import Collection, ReadReceipt
 from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
 
 if TYPE_CHECKING:
@@ -154,11 +154,11 @@ class PerDestinationQueue:
             + len(self._pending_edus_keyed)
         )
 
-    def send_pdu(self, *pdus: EventBase) -> None:
-        """Add a PDU to the queue, and start the transmission loop if necessary
+    def send_pdus(self, pdus: Collection[EventBase]) -> None:
+        """Add PDUs to the queue, and start the transmission loop if necessary
 
         Args:
-            pdu: pdu to send
+            pdus: pdus to send
         """
         if not self._catching_up or self._last_successful_stream_ordering is None:
             # only enqueue the PDU if we are not catching up (False) or do not
