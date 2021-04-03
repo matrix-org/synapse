@@ -182,7 +182,7 @@ class ApplicationServicesHandler:
         self,
         stream_key: str,
         new_token: Optional[int],
-        users: Collection[Union[str, UserID]] = None,
+        users: Optional[Collection[Union[str, UserID]]] = None,
     ):
         """This is called by the notifier in the background
         when a ephemeral event handled by the homeserver.

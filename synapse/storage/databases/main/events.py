@@ -320,8 +320,8 @@ class PersistEventsStore:
         txn: LoggingTransaction,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
         backfilled: bool,
-        state_delta_for_room: Dict[str, DeltaState] = None,
-        new_forward_extremeties: Dict[str, List[str]] = None,
+        state_delta_for_room: Optional[Dict[str, DeltaState]] = None,
+        new_forward_extremeties: Optional[Dict[str, List[str]]] = None,
     ):
         """Insert some number of room events into the necessary database tables.
 

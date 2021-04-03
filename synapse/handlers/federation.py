@@ -1772,7 +1772,7 @@ class FederationHandler(BaseHandler):
         room_id: str,
         user_id: str,
         membership: str,
-        content: JsonDict = None,
+        content: JsonDict,
         params: Optional[Dict[str, Union[str, Iterable[str]]]] = None,
     ) -> Tuple[str, EventBase, RoomVersion]:
         (
@@ -1780,7 +1780,7 @@ class FederationHandler(BaseHandler):
             event,
             room_version,
         ) = await self.federation_client.make_membership_event(
-            target_hosts, room_id, user_id, membership, content or {}, params=params
+            target_hosts, room_id, user_id, membership, content, params=params
         )
 
         logger.debug("Got response to make_%s: %s", membership, event)

@@ -266,7 +266,7 @@ class Notifier:
         event: EventBase,
         event_pos: PersistedEventPosition,
         max_room_stream_token: RoomStreamToken,
-        extra_users: Collection[UserID] = None,
+        extra_users: Optional[Collection[UserID]] = None,
     ):
         """Unwraps event and calls `on_new_room_event_args`."""
         self.on_new_room_event_args(
@@ -287,7 +287,7 @@ class Notifier:
         membership: Optional[str],
         event_pos: PersistedEventPosition,
         max_room_stream_token: RoomStreamToken,
-        extra_users: Collection[UserID] = None,
+        extra_users: Optional[Collection[UserID]] = None,
     ):
         """Used by handlers to inform the notifier something has happened
         in the room, room event wise.
@@ -372,7 +372,7 @@ class Notifier:
         self,
         stream_key: str,
         new_token: Union[int, RoomStreamToken],
-        users: Collection[Union[str, UserID]] = None,
+        users: Optional[Collection[Union[str, UserID]]] = None,
     ):
         try:
             stream_token = None
@@ -394,8 +394,8 @@ class Notifier:
         self,
         stream_key: str,
         new_token: Union[int, RoomStreamToken],
-        users: Collection[Union[str, UserID]] = None,
-        rooms: Collection[str] = None,
+        users: Optional[Collection[Union[str, UserID]]] = None,
+        rooms: Optional[Collection[str]] = None,
     ):
         """Used to inform listeners that something has happened event wise.
 
@@ -510,7 +510,7 @@ class Notifier:
         pagination_config: PaginationConfig,
         timeout: int,
         is_guest: bool = False,
-        explicit_room_id: str = None,
+        explicit_room_id: Optional[str] = None,
     ) -> EventStreamResult:
         """For the given user and rooms, return any new events for them. If
         there are no new events wait for up to `timeout` milliseconds for any
