@@ -30,7 +30,7 @@ class SyncResponseCache(ResponseCache[T]):
                 res = cond(result)  # type: Any
             except Exception:
                 logger.exception(
-                    "[%s]:Executing conditional %r on %s raised an exception.",
+                    "[%s]: Executing conditional %r on %s raised an exception.",
                     self._name,
                     cond,
                     key,
@@ -40,7 +40,7 @@ class SyncResponseCache(ResponseCache[T]):
             else:
                 if not isinstance(res, bool):
                     logger.warning(
-                        "[%s]:Conditional %r returned non-bool value %r (for key %r)",
+                        "[%s]: Conditional %r returned non-bool value %r (for key %r)",
                         self._name,
                         cond,
                         res,
