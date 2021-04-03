@@ -41,7 +41,7 @@ from synapse.types import (
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.caches.lrucache import LruCache
-from synapse.util.caches.response_cache import ResponseCache
+from synapse.util.caches.sync_response_cache import SyncResponseCache
 from synapse.util.metrics import Measure, measure_func
 from synapse.visibility import filter_events_for_client
 
@@ -244,9 +244,11 @@ class SyncHandler:
         self.presence_handler = hs.get_presence_handler()
         self.event_sources = hs.get_event_sources()
         self.clock = hs.get_clock()
-        self.response_cache = ResponseCache(
-            hs.get_clock(), "sync"
-        )  # type: ResponseCache[Tuple[Any, ...]]
+        self.response_cache = SyncResponseCache(
+            hs.get_clock(),
+            "sync",
+            timeout_ms=self.hs_config.experimental.sync_cache_timeout,
+        )  # type: SyncResponseCache[Tuple[Any, ...]]
         self.state = hs.get_state_handler()
         self.auth = hs.get_auth()
         self.storage = hs.get_storage()
@@ -278,8 +280,10 @@ class SyncHandler:
         user_id = sync_config.user.to_string()
         await self.auth.check_auth_blocking(requester=requester)
 
-        res = await self.response_cache.wrap(
+        res = await self.response_cache.wrap_conditional(
             sync_config.request_key,
+            # Evict cache if next_batch would refer to this cached result
+            lambda result: since_token != result.next_batch,
             self._wait_for_sync_for_user,
             sync_config,
             since_token,

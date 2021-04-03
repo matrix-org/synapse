@@ -36,3 +36,8 @@ class ExperimentalConfig(Config):
 
         # MSC3026 (busy presence state)
         self.msc3026_enabled = experimental.get("msc3026_enabled", False)  # type: bool
+
+        # /sync ResponseCache timeout (in ms)
+        self.sync_cache_timeout = experimental.get(
+            "sync_cache_timeout_ms", 0
+        )  # type: int
