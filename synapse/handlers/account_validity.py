@@ -241,10 +241,7 @@ class AccountValidityHandler:
         return True
 
     async def renew_account_for_user(
-        self,
-        user_id: str,
-        expiration_ts: int = None,
-        email_sent: bool = False,
+        self, user_id: str, expiration_ts: int = None, email_sent: bool = False
     ) -> int:
         """Renews the account attached to a given user by pushing back the
         expiration date by the current validity period in the server's
