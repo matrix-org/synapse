@@ -400,11 +400,14 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         user_id = channel.json_body["user_id"]
 
         whoami = self.whoami(tok)
-        self.assertObjectHasAttributes({
-            "user_id": user_id,
-            # Unstable until MSC3069 enters spec
-            "org.matrix.msc3069.is_guest": True,
-        }, whoami)
+        self.assertObjectHasAttributes(
+            {
+                "user_id": user_id,
+                # Unstable until MSC3069 enters spec
+                "org.matrix.msc3069.is_guest": True,
+            },
+            whoami,
+        )
 
     def test_deactivate_account(self):
         user_id = self.register_user("kermit", "test")
@@ -479,9 +482,7 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
 
     def whoami(self, tok):
-        channel = self.make_request(
-            "GET", "account/whoami", {}, access_token=tok
-        )
+        channel = self.make_request("GET", "account/whoami", {}, access_token=tok)
         self.assertEqual(channel.code, 200)
         return channel.json_body
 
