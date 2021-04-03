@@ -386,29 +386,6 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         self.hs = self.setup_test_homeserver()
         return self.hs
 
-    def test_GET_whoami(self):
-        user_id = self.register_user("kermit", "test")
-        tok = self.login("kermit", "test")
-
-        whoami = self.whoami(tok)
-        self.assertObjectHasAttributes({"user_id": user_id}, whoami)
-
-    @override_config({"allow_guest_access": True})
-    def test_GET_whoami_guests(self):
-        channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
-        tok = channel.json_body["access_token"]
-        user_id = channel.json_body["user_id"]
-
-        whoami = self.whoami(tok)
-        self.assertObjectHasAttributes(
-            {
-                "user_id": user_id,
-                # Unstable until MSC3069 enters spec
-                "org.matrix.msc3069.is_guest": True,
-            },
-            whoami,
-        )
-
     def test_deactivate_account(self):
         user_id = self.register_user("kermit", "test")
         tok = self.login("kermit", "test")
@@ -480,6 +457,38 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
             "POST", "account/deactivate", request_data, access_token=tok
         )
         self.assertEqual(channel.code, 200)
+
+class WhoamiTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+        account.register_servlets,
+        room.register_servlets,
+    ]
+
+    def test_GET_whoami(self):
+        user_id = self.register_user("kermit", "test")
+        tok = self.login("kermit", "test")
+
+        whoami = self.whoami(tok)
+        self.assertObjectHasAttributes({"user_id": user_id}, whoami)
+
+    @override_config({"allow_guest_access": True})
+    def test_GET_whoami_guests(self):
+        channel = self.make_request(b"POST", b"/_matrix/client/r0/register?kind=guest", b"{}")
+        tok = channel.json_body["access_token"]
+        user_id = channel.json_body["user_id"]
+
+        whoami = self.whoami(tok)
+        self.assertObjectHasAttributes(
+            {
+                "user_id": user_id,
+                # Unstable until MSC3069 enters spec
+                "org.matrix.msc3069.is_guest": True,
+            },
+            whoami,
+        )
 
     def whoami(self, tok):
         channel = self.make_request("GET", "account/whoami", {}, access_token=tok)
