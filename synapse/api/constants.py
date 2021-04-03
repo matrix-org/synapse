@@ -51,6 +51,7 @@ class PresenceState:
     OFFLINE = "offline"
     UNAVAILABLE = "unavailable"
     ONLINE = "online"
+    BUSY = "org.matrix.msc3026.busy"
 
 
 class JoinRules:
@@ -58,6 +59,8 @@ class JoinRules:
     KNOCK = "knock"
     INVITE = "invite"
     PRIVATE = "private"
+    # As defined for MSC3083.
+    MSC3083_RESTRICTED = "restricted"
 
 
 class LoginType:

@@ -29,6 +29,7 @@ from synapse.api.presence import UserPresenceState
 from synapse.events import EventBase
 from synapse.federation.units import Edu
 from synapse.handlers.presence import format_user_presence_state
+from synapse.logging.opentracing import SynapseTags, set_tag
 from synapse.metrics import sent_transactions_counter
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import ReadReceipt
@@ -480,6 +481,8 @@ class PerDestinationQueue:
                     # the other sending servers are up).
                     if new_pdus:
                         room_catchup_pdus = new_pdus
+                    else:
+                        room_catchup_pdus = [pdu]
 
                 logger.info(
                     "Catching up rooms to %s: %r", self._destination, pdu.room_id
@@ -555,6 +558,13 @@ class PerDestinationQueue:
         contents, stream_id = await self._store.get_new_device_msgs_for_remote(
             self._destination, last_device_stream_id, to_device_stream_id, limit
         )
+        for content in contents:
+            message_id = content.get("message_id")
+            if not message_id:
+                continue
+
+            set_tag(SynapseTags.TO_DEVICE_MESSAGE_ID, message_id)
+
         edus = [
             Edu(
                 origin=self._server_name,

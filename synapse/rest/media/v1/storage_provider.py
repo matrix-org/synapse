@@ -29,7 +29,7 @@ from .media_storage import FileResponder
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 
 class StorageProvider(metaclass=abc.ABCMeta):

@@ -1,1 +1,0 @@
-In the `federation_client` commandline client, handle inline `signing_key`s in `homeserver.yaml`.
