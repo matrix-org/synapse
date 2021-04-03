@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This script builds the Docker image to run the PostgreSQL tests, and then runs
 # the tests.

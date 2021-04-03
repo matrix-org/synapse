@@ -44,7 +44,7 @@ from tests.server import FakeTransport
 try:
     import hiredis
 except ImportError:
-    hiredis = None
+    hiredis = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 

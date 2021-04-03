@@ -98,9 +98,12 @@ will log a warning on each received request.
 
 To avoid the warning, administrators using a reverse proxy should ensure that
 the reverse proxy sets `X-Forwarded-Proto` header to `https` or `http` to
-indicate the protocol used by the client. See the `reverse proxy documentation
-<docs/reverse_proxy.md>`_, where the example configurations have been updated to
-show how to set this header.
+indicate the protocol used by the client.
+
+Synapse also requires the `Host` header to be preserved.
+
+See the `reverse proxy documentation <docs/reverse_proxy.md>`_, where the
+example configurations have been updated to show how to set these headers.
 
 (Users of `Caddy <https://caddyserver.com/>`_ are unaffected, since we believe it
 sets `X-Forwarded-Proto` by default.)

@@ -183,12 +183,13 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         requests state from the cache, if False we need to query the DB for the
         missing state.
         """
-        is_all, known_absent, state_dict_ids = cache.get(group)
+        cache_entry = cache.get(group)
+        state_dict_ids = cache_entry.value
 
-        if is_all or state_filter.is_full():
+        if cache_entry.full or state_filter.is_full():
             # Either we have everything or want everything, either way
             # `is_all` tells us whether we've gotten everything.
-            return state_filter.filter_state(state_dict_ids), is_all
+            return state_filter.filter_state(state_dict_ids), cache_entry.full
 
         # tracks whether any of our requested types are missing from the cache
         missing_types = False
@@ -202,7 +203,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             # There aren't any wild cards, so `concrete_types()` returns the
             # complete list of event types we're wanting.
             for key in state_filter.concrete_types():
-                if key not in state_dict_ids and key not in known_absent:
+                if key not in state_dict_ids and key not in cache_entry.known_absent:
                     missing_types = True
                     break
 
