@@ -1,0 +1,1 @@
+Added experimental support to cache `/sync` responses with config key `experimental_features.sync_cache_timeout_ms` (in milliseconds).
