@@ -458,6 +458,7 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, 200)
 
+
 class WhoamiTestCase(unittest.HomeserverTestCase):
 
     servlets = [
@@ -476,7 +477,9 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
 
     @override_config({"allow_guest_access": True})
     def test_GET_whoami_guests(self):
-        channel = self.make_request(b"POST", b"/_matrix/client/r0/register?kind=guest", b"{}")
+        channel = self.make_request(
+            b"POST", b"/_matrix/client/r0/register?kind=guest", b"{}"
+        )
         tok = channel.json_body["access_token"]
         user_id = channel.json_body["user_id"]
 
