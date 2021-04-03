@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List
+from typing import List, Optional
 
 from mock import Mock
 
@@ -38,7 +38,7 @@ def create_event(
     state_key=None,
     depth=2,
     event_id=None,
-    prev_events: List[str] = None,
+    prev_events: Optional[List[str]] = None,
     **kwargs
 ):
     global _next_event_id

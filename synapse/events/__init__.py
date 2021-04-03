@@ -330,7 +330,7 @@ class FrozenEvent(EventBase):
         self,
         event_dict: JsonDict,
         room_version: RoomVersion,
-        internal_metadata_dict: JsonDict = None,
+        internal_metadata_dict: Optional[JsonDict] = None,
         rejected_reason: Optional[str] = None,
     ):
         internal_metadata_dict = internal_metadata_dict or {}
@@ -388,7 +388,7 @@ class FrozenEventV2(EventBase):
         self,
         event_dict: JsonDict,
         room_version: RoomVersion,
-        internal_metadata_dict: JsonDict = None,
+        internal_metadata_dict: Optional[JsonDict] = None,
         rejected_reason: Optional[str] = None,
     ):
         internal_metadata_dict = internal_metadata_dict or {}
@@ -511,7 +511,7 @@ def _event_type_from_format_version(format_version: int) -> Type[EventBase]:
 def make_event_from_dict(
     event_dict: JsonDict,
     room_version: RoomVersion = RoomVersions.V1,
-    internal_metadata_dict: JsonDict = None,
+    internal_metadata_dict: Optional[JsonDict] = None,
     rejected_reason: Optional[str] = None,
 ) -> EventBase:
     """Construct an EventBase from the given event dict"""

@@ -283,9 +283,7 @@ class DeferredCache(Generic[KT, VT]):
         # we return a new Deferred which will be called before any subsequent observers.
         return observable.observe()
 
-    def prefill(
-        self, key: KT, value: VT, callback: Optional[Callable[[], None]] = None
-    ):
+    def prefill(self, key: KT, value: VT, callback: Callable[[], None] = None):
         callbacks = [callback] if callback else []
         self.cache.set(key, value, callbacks=callbacks)
 

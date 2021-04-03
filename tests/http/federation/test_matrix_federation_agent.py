@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import Optional
 
 from mock import Mock
 
@@ -180,7 +181,11 @@ class MatrixFederationAgentTests(unittest.TestCase):
                 _check_logcontext(context)
 
     def _handle_well_known_connection(
-        self, client_factory, expected_sni, content, response_headers: dict = None
+        self,
+        client_factory,
+        expected_sni,
+        content,
+        response_headers: Optional[dict] = None,
     ):
         """Handle an outgoing HTTPs connection: wire it up to a server, check that the
         request is for a .well-known, and send the response.
@@ -205,7 +210,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self._send_well_known_response(request, content, headers=response_headers or {})
         return well_known_server
 
-    def _send_well_known_response(self, request, content, headers: dict = None):
+    def _send_well_known_response(
+        self, request, content, headers: Optional[dict] = None
+    ):
         """Check that an incoming request looks like a valid .well-known request, and
         send back the response.
         """

@@ -24,6 +24,7 @@ import sys
 import time
 import urllib
 from http import TwistedHttpClient
+from typing import Optional
 
 import nacl.encoding
 import nacl.signing
@@ -718,7 +719,7 @@ class SynapseCmd(cmd.Cmd):
         method,
         path,
         data=None,
-        query_params: dict = None,
+        query_params: Optional[dict] = None,
         alt_text=None,
     ):
         """Runs an HTTP request and pretty prints the output.

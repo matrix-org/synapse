@@ -16,6 +16,7 @@
 import json
 import urllib
 from pprint import pformat
+from typing import Optional
 
 from twisted.internet import defer, reactor
 from twisted.web.client import Agent, readBody
@@ -85,7 +86,7 @@ class TwistedHttpClient(HttpClient):
         body = yield readBody(response)
         defer.returnValue(json.loads(body))
 
-    def _create_put_request(self, url, json_data, headers_dict: dict = None):
+    def _create_put_request(self, url, json_data, headers_dict: Optional[dict] = None):
         """Wrapper of _create_request to issue a PUT request"""
         headers_dict = headers_dict or {}
 
@@ -96,7 +97,7 @@ class TwistedHttpClient(HttpClient):
             "PUT", url, producer=_JsonProducer(json_data), headers_dict=headers_dict
         )
 
-    def _create_get_request(self, url, headers_dict: dict = None):
+    def _create_get_request(self, url, headers_dict: Optional[dict] = None):
         """Wrapper of _create_request to issue a GET request"""
         return self._create_request("GET", url, headers_dict=headers_dict or {})
 
@@ -126,7 +127,9 @@ class TwistedHttpClient(HttpClient):
         defer.returnValue(json.loads(body))
 
     @defer.inlineCallbacks
-    def _create_request(self, method, url, producer=None, headers_dict: dict = None):
+    def _create_request(
+        self, method, url, producer=None, headers_dict: Optional[dict] = None
+    ):
         """Creates and sends a request to the given url"""
         headers_dict = headers_dict or {}
 

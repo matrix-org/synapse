@@ -77,7 +77,7 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         self,
         session: str,
         expected_post_response: int,
-        post_session: Optional[str] = None,
+        post_session: str = None,
     ) -> None:
         """Get and respond to a fallback recaptcha. Returns the second request."""
         if post_session is None:

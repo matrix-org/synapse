@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List
+from typing import List, Optional
 
 from synapse.storage.database import DatabasePool
 from synapse.storage.engines import IncorrectDatabaseSetup
@@ -45,7 +45,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         )
 
     def _create_id_generator(
-        self, instance_name="master", writers: List[str] = None
+        self, instance_name="master", writers: Optional[List[str]] = None
     ) -> MultiWriterIdGenerator:
         def _create(conn):
             return MultiWriterIdGenerator(
@@ -478,7 +478,7 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
         )
 
     def _create_id_generator(
-        self, instance_name="master", writers: List[str] = None
+        self, instance_name="master", writers: Optional[List[str]] = None
     ) -> MultiWriterIdGenerator:
         def _create(conn):
             return MultiWriterIdGenerator(
@@ -614,7 +614,7 @@ class MultiTableMultiWriterIdGeneratorTestCase(HomeserverTestCase):
         )
 
     def _create_id_generator(
-        self, instance_name="master", writers: List[str] = None
+        self, instance_name="master", writers: Optional[List[str]] = None
     ) -> MultiWriterIdGenerator:
         def _create(conn):
             return MultiWriterIdGenerator(

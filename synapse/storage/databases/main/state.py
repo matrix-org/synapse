@@ -190,7 +190,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
     # FIXME: how should this be cached?
     async def get_filtered_current_state_ids(
-        self, room_id: str, state_filter: StateFilter = None
+        self, room_id: str, state_filter: Optional[StateFilter] = None
     ) -> StateMap[str]:
         """Get the current state event of a given type for a room based on the
         current_state_events table.  This may not be as up-to-date as the result

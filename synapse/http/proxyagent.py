@@ -88,7 +88,7 @@ class ProxyAgent(_AgentBase):
         self,
         reactor,
         proxy_reactor=None,
-        contextFactory: IPolicyForHTTPS = None,
+        contextFactory: Optional[IPolicyForHTTPS] = None,
         connectTimeout=None,
         bindAddress=None,
         pool=None,
