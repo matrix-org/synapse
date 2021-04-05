@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -318,7 +317,7 @@ class ApplicationService:
         dict_copy = self.__dict__.copy()
         dict_copy["token"] = "<redacted>"
         dict_copy["hs_token"] = "<redacted>"
-        return "ApplicationService: %s" % (dict_copy,)
+        return f"ApplicationService: {dict_copy}"
 
 
 class AppServiceTransaction:

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -135,7 +134,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         if service.url is None:
             return []
 
-        uri = "%s%s/thirdparty/%s/%s" % (
+        uri = "{}{}/thirdparty/{}/{}".format(
             service.url,
             APP_SERVICE_PREFIX,
             kind,
@@ -170,7 +169,7 @@ class ApplicationServiceApi(SimpleHttpClient):
             return {}
 
         async def _get() -> Optional[JsonDict]:
-            uri = "%s%s/thirdparty/protocol/%s" % (
+            uri = "{}{}/thirdparty/protocol/{}".format(
                 service.url,
                 APP_SERVICE_PREFIX,
                 urllib.parse.quote(protocol),
