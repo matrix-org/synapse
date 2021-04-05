@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -88,7 +87,7 @@ def _rule_to_template(rule: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     else:
         # This should not be reached unless this function is not kept in sync
         # with PRIORITY_CLASS_INVERSE_MAP.
-        raise ValueError("Unexpected template_name: %s" % (template_name,))
+        raise ValueError(f"Unexpected template_name: {template_name}")
 
     if unscoped_rule_id:
         templaterule["rule_id"] = unscoped_rule_id

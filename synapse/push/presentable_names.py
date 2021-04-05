@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -99,7 +98,7 @@ async def calculate_room_name(
             )
             if inviter_member_event:
                 if fallback_to_single_member:
-                    return "Invite from %s" % (
+                    return "Invite from {}".format(
                         name_from_member_event(inviter_member_event),
                     )
                 else:
@@ -182,7 +181,7 @@ def descriptor_from_member_events(member_events: Iterable[EventBase]) -> str:
     elif len(member_events) == 1:
         return name_from_member_event(member_events[0])
     elif len(member_events) == 2:
-        return "%s and %s" % (
+        return "{} and {}".format(
             name_from_member_event(member_events[0]),
             name_from_member_event(member_events[1]),
         )

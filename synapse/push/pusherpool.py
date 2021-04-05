@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -354,7 +353,7 @@ class PusherPool:
         if not p:
             return None
 
-        appid_pushkey = "%s:%s" % (pusher_config.app_id, pusher_config.pushkey)
+        appid_pushkey = f"{pusher_config.app_id}:{pusher_config.pushkey}"
 
         byuser = self.pushers.setdefault(pusher_config.user_name, {})
         if appid_pushkey in byuser:
@@ -382,7 +381,7 @@ class PusherPool:
         return p
 
     async def remove_pusher(self, app_id: str, pushkey: str, user_id: str) -> None:
-        appid_pushkey = "%s:%s" % (app_id, pushkey)
+        appid_pushkey = f"{app_id}:{pushkey}"
 
         byuser = self.pushers.get(user_id, {})
 

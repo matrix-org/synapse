@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2017 New Vector Ltd
 #
@@ -81,7 +80,7 @@ class HttpPusher(Pusher):
         if self.data is None:
             raise PusherConfigException("'data' key can not be null for HTTP pusher")
 
-        self.name = "%s/%s/%s" % (
+        self.name = "{}/{}/{}".format(
             pusher_config.user_name,
             pusher_config.app_id,
             pusher_config.pushkey,

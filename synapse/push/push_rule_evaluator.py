@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2017 New Vector Ltd
 #
@@ -237,7 +236,9 @@ def _glob_to_re(glob: str, word_boundary: bool) -> Pattern:
         # handle [abc], [a-z] and [!a-z] style ranges.
         r = GLOB_REGEX.sub(
             lambda x: (
-                "[%s%s]" % (x.group(1) and "^" or "", x.group(2).replace(r"\\\-", "-"))
+                "[{}{}]".format(
+                    x.group(1) and "^" or "", x.group(2).replace(r"\\\-", "-")
+                )
             ),
             r,
         )
@@ -268,7 +269,7 @@ def _re_word_boundary(r: str) -> str:
     """
     # we can't use \b as it chokes on unicode. however \W seems to be okay
     # as shorthand for [^0-9A-Za-z_].
-    return r"(^|\W)%s(\W|$)" % (r,)
+    return fr"(^|\W){r}(\W|$)"
 
 
 def _flatten_dict(

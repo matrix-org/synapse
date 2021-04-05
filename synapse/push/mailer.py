@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -803,7 +802,7 @@ class Mailer:
             base_url = "https://vector.im/beta/#/room"
         else:
             base_url = "https://matrix.to/#"
-        return "%s/%s" % (base_url, room_id)
+        return f"{base_url}/{room_id}"
 
     def _make_notif_link(self, notif: Dict[str, str]) -> str:
         """
@@ -816,19 +815,21 @@ class Mailer:
              A link to open the notification in the web client.
         """
         if self.hs.config.email_riot_base_url:
-            return "%s/#/room/%s/%s" % (
+            return "{}/#/room/{}/{}".format(
                 self.hs.config.email_riot_base_url,
                 notif["room_id"],
                 notif["event_id"],
             )
         elif self.app_name == "Vector":
             # need /beta for Universal Links to work on iOS
-            return "https://vector.im/beta/#/room/%s/%s" % (
+            return "https://vector.im/beta/#/room/{}/{}".format(
                 notif["room_id"],
                 notif["event_id"],
             )
         else:
-            return "https://matrix.to/#/%s/%s" % (notif["room_id"], notif["event_id"])
+            return "https://matrix.to/#/{}/{}".format(
+                notif["room_id"], notif["event_id"]
+            )
 
     def _make_unsubscribe_link(
         self, user_id: str, app_id: str, email_address: str
@@ -851,7 +852,7 @@ class Mailer:
         }
 
         # XXX: make r0 once API is stable
-        return "%s_matrix/client/unstable/pushers/remove?%s" % (
+        return "{}_matrix/client/unstable/pushers/remove?{}".format(
             self.hs.config.public_baseurl,
             urllib.parse.urlencode(params),
         )
