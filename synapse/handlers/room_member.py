@@ -187,7 +187,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         Args:
             state_ids: The state of the room as it currently is.
-            room_id: The room being joined.
+            room_version: The room version of the room being joined.
             user_id: The user joining the room.
 
         Returns:
