@@ -179,7 +179,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         await self._invites_per_user_limiter.ratelimit(requester, invitee_user_id)
 
-    async def _can_join_without_invite(
+    async def can_join_without_invite(
         self, state_ids: StateMap[str], room_version: RoomVersion, user_id: str
     ) -> bool:
         """
@@ -303,7 +303,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             if (
                 newly_joined
                 and not user_is_invited
-                and not await self._can_join_without_invite(
+                and not await self.can_join_without_invite(
                     prev_state_ids, event.room_version, user_id
                 )
             ):

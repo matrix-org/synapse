@@ -1667,15 +1667,51 @@ class FederationHandler(BaseHandler):
         # would introduce the danger of backwards-compatibility problems.
         event.internal_metadata.send_on_behalf_of = origin
 
-        context = await self._handle_new_event(origin, event)
+        # Calculate the event context.
+        context = await self._prep_event(
+            origin, event, state=None, auth_events=None, backfilled=False
+        )
+
+        # Get the current state at the to-be created event.
+        prev_state_ids = await context.get_prev_state_ids()
+
+        # Check if the user is already in the room or invited to the room.
+        user_id = event.state_key
+        prev_member_event_id = prev_state_ids.get((EventTypes.Member, user_id), None)
+        newly_joined = True
+        is_invite = False
+        if prev_member_event_id:
+            prev_member_event = await self.store.get_event(prev_member_event_id)
+            newly_joined = prev_member_event.membership != Membership.JOIN
+            is_invite = prev_member_event.membership == Membership.INVITE
+
+        # We retrieve the room member handler here as to not cause a cyclic dependency
+        member_handler = self.hs.get_room_member_handler()
+
+        # If the member is not already in the room, and not invited, check if
+        # they should be allowed access via membership in a space.
+        if (
+            newly_joined
+            and not is_invite
+            and not await member_handler.can_join_without_invite(
+                prev_state_ids,
+                event.room_version,
+                user_id,
+            )
+        ):
+            raise SynapseError(
+                400,
+                "You do not belong to any of the required spaces to join this room.",
+            )
+
+        # Persist the event.
+        await self._handle_new_event(origin, event, context)
 
         logger.debug(
             "on_send_join_request: After _handle_new_event: %s, sigs: %s",
             event.event_id,
             event.signatures,
         )
-
-        prev_state_ids = await context.get_prev_state_ids()
 
         state_ids = list(prev_state_ids.values())
         auth_chain = await self.store.get_auth_chain(event.room_id, state_ids)
