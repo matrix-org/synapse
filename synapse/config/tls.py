@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -111,10 +110,8 @@ class TlsConfig(Config):
         if self.federation_client_minimum_tls_version == "1.3":
             if getattr(SSL, "OP_NO_TLSv1_3", None) is None:
                 raise ConfigError(
-                    (
-                        "federation_client_minimum_tls_version cannot be 1.3, "
-                        "your OpenSSL does not support it"
-                    )
+                    "federation_client_minimum_tls_version cannot be 1.3, "
+                    "your OpenSSL does not support it"
                 )
 
         # Whitelist of domains to not verify certificates for
@@ -164,7 +161,7 @@ class TlsConfig(Config):
                     certs.append(cert_base)
                 except Exception as e:
                     raise ConfigError(
-                        "Error parsing custom CA certificate file %s: %s" % (ca_file, e)
+                        f"Error parsing custom CA certificate file {ca_file}: {e}"
                     )
 
             self.federation_ca_trust_root = trustRootFromCertificates(certs)
@@ -495,11 +492,9 @@ class TlsConfig(Config):
         # Check if it is self-signed, and issue a warning if so.
         if cert.get_issuer() == cert.get_subject():
             warnings.warn(
-                (
-                    "Self-signed TLS certificates will not be accepted by Synapse 1.0. "
-                    "Please either provide a valid certificate, or use Synapse's ACME "
-                    "support to provision one."
-                )
+                "Self-signed TLS certificates will not be accepted by Synapse 1.0. "
+                "Please either provide a valid certificate, or use Synapse's ACME "
+                "support to provision one."
             )
 
         return cert

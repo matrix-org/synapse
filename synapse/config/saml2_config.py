@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
@@ -317,7 +316,7 @@ class SAML2Config(Config):
           # Instead of putting the config inline as above, you can specify a
           # separate pysaml2 configuration file:
           #
-          #config_path: "%(config_dir_path)s/sp_conf.py"
+          #config_path: "{config_dir_path}/sp_conf.py"
 
           # The lifetime of a SAML session. This defines how long a user has to
           # complete the authentication process, if allow_unsolicited is unset.
@@ -394,9 +393,9 @@ class SAML2Config(Config):
           # option.
           #
           #idp_entityid: 'https://our_idp/entityid'
-        """ % {
-            "config_dir_path": config_dir_path
-        }
+        """.format(
+            config_dir_path=config_dir_path
+        )
 
 
 ATTRIBUTE_REQUIREMENTS_SCHEMA = {

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -185,9 +184,7 @@ class CacheConfig(Config):
 
         for cache, factor in individual_factors.items():
             if not isinstance(factor, (int, float)):
-                raise ConfigError(
-                    "caches.per_cache_factors.%s must be a number" % (cache,)
-                )
+                raise ConfigError(f"caches.per_cache_factors.{cache} must be a number")
             self.cache_factors[cache] = factor
 
         # Resize all caches (if necessary) with the new factors we've loaded

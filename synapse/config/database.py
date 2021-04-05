@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -87,7 +86,7 @@ class DatabaseConnectionConfig:
         db_engine = db_config.get("name", "sqlite3")
 
         if db_engine not in ("sqlite3", "psycopg2"):
-            raise ConfigError("Unsupported database type %r" % (db_engine,))
+            raise ConfigError(f"Unsupported database type {db_engine!r}")
 
         if db_engine == "sqlite3":
             db_config.setdefault("args", {}).update(

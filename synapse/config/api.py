@@ -32,7 +32,7 @@ class ApiConfig(Config):
 
     def generate_config_section(cls, **kwargs) -> str:
         formatted_default_state_types = "\n".join(
-            "           # - %s" % (t,) for t in _DEFAULT_PREJOIN_STATE_TYPES
+            f"           # - {t}" for t in _DEFAULT_PREJOIN_STATE_TYPES
         )
 
         return """\
@@ -45,7 +45,7 @@ class ApiConfig(Config):
            # By default, the following state event types are shared with users who
            # receive invites to the room:
            #
-%(formatted_default_state_types)s
+{formatted_default_state_types}
            #
            # Uncomment the following to disable these defaults (so that only the event
            # types listed in 'additional_event_types' are shared). Defaults to 'false'.
@@ -59,9 +59,9 @@ class ApiConfig(Config):
            #
            #additional_event_types:
            #  - org.example.custom.event.type
-        """ % {
-            "formatted_default_state_types": formatted_default_state_types
-        }
+        """.format(
+            formatted_default_state_types=formatted_default_state_types
+        )
 
     def _get_prejoin_state_types(self, config: JsonDict) -> Iterable[str]:
         """Get the event types to include in the prejoin state

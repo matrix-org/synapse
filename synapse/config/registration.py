@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -126,7 +125,7 @@ class RegistrationConfig(Config):
         self.auto_join_rooms = config.get("auto_join_rooms", [])
         for room_alias in self.auto_join_rooms:
             if not RoomAlias.is_valid(room_alias):
-                raise ConfigError("Invalid auto_join_rooms entry %s" % (room_alias,))
+                raise ConfigError(f"Invalid auto_join_rooms entry {room_alias}")
 
         # Options for creating auto-join rooms if they do not exist yet.
         self.autocreate_auto_join_rooms = config.get("autocreate_auto_join_rooms", True)
@@ -191,7 +190,7 @@ class RegistrationConfig(Config):
 
     def generate_config_section(self, generate_secrets=False, **kwargs):
         if generate_secrets:
-            registration_shared_secret = 'registration_shared_secret: "%s"' % (
+            registration_shared_secret = 'registration_shared_secret: "{}"'.format(
                 random_string_with_symbols(50),
             )
         else:

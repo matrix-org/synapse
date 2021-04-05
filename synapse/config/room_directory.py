@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -170,7 +169,7 @@ class _RoomDirectoryRule:
             self.action = action
         else:
             raise ConfigError(
-                "%s rules can only have action of 'allow' or 'deny'" % (option_name,)
+                f"{option_name} rules can only have action of 'allow' or 'deny'"
             )
 
         self._alias_matches_all = alias == "*"

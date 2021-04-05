@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,5 +31,5 @@ if __name__ == "__main__":
         print(getattr(config, key))
         sys.exit(0)
     else:
-        sys.stderr.write("Unknown command %r\n" % (action,))
+        sys.stderr.write(f"Unknown command {action!r}\n")
         sys.exit(1)

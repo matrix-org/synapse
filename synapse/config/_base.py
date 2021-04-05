@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -188,7 +187,7 @@ class Config:
     @classmethod
     def check_file(cls, file_path, config_name):
         if file_path is None:
-            raise ConfigError("Missing config for %s." % (config_name,))
+            raise ConfigError(f"Missing config for {config_name}.")
         try:
             os.stat(file_path)
         except OSError as e:
@@ -207,7 +206,7 @@ class Config:
             if e.errno != errno.EEXIST:
                 raise
         if not os.path.isdir(dir_path):
-            raise ConfigError("%s is not a directory" % (dir_path,))
+            raise ConfigError(f"{dir_path} is not a directory")
         return dir_path
 
     @classmethod
@@ -313,12 +312,12 @@ class RootConfig:
 
         for config_class in self.config_classes:
             if config_class.section is None:
-                raise ValueError("%r requires a section name" % (config_class,))
+                raise ValueError(f"{config_class!r} requires a section name")
 
             try:
                 conf = config_class(self)
             except Exception as e:
-                raise Exception("Failed making %s: %r" % (config_class.section, e))
+                raise Exception(f"Failed making {config_class.section}: {e!r}")
             self._configs[config_class.section] = conf
 
     def __getattr__(self, item: str) -> Any:
@@ -354,7 +353,7 @@ class RootConfig:
             if item in dir(val):
                 return getattr(val, item)
 
-        raise AttributeError(item, "not found in %s" % (list(self._configs.keys()),))
+        raise AttributeError(item, "not found in {}".format(list(self._configs.keys())))
 
     def invoke_all(self, func_name: str, *args, **kwargs) -> MutableMapping[str, Any]:
         """
@@ -668,7 +667,7 @@ class RootConfig:
 
             (config_path,) = config_files
             if not path_exists(config_path):
-                print("Generating config file %s" % (config_path,))
+                print(f"Generating config file {config_path}")
 
                 if config_args.data_directory:
                     data_dir_path = config_args.data_directory
@@ -915,7 +914,7 @@ def read_file(file_path: Any, config_path: Iterable[str]) -> str:
         with open(file_path) as file_stream:
             return file_stream.read()
     except OSError as e:
-        raise ConfigError("Error accessing file %r" % (file_path,), config_path) from e
+        raise ConfigError(f"Error accessing file {file_path!r}", config_path) from e
 
 
 __all__ = [

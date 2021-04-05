@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -91,9 +90,7 @@ def generate_ip_set(
         try:
             network = IPNetwork(ip)
         except AddrFormatError as e:
-            raise ConfigError(
-                "Invalid IP range provided: %s." % (ip,), config_path
-            ) from e
+            raise ConfigError(f"Invalid IP range provided: {ip}.", config_path) from e
         result.add(network)
 
         # It is possible that these already exist in the set, but that's OK.

@@ -64,7 +64,7 @@ def load_appservices(hostname, config_files):
 
     for config_file in config_files:
         try:
-            with open(config_file, "r") as f:
+            with open(config_file) as f:
                 appservice = _load_appservice(hostname, yaml.safe_load(f), config_file)
                 if appservice.id in seen_ids:
                     raise ConfigError(
@@ -97,15 +97,13 @@ def _load_appservice(hostname, as_info, config_filename):
     required_string_fields = ["id", "as_token", "hs_token", "sender_localpart"]
     for field in required_string_fields:
         if not isinstance(as_info.get(field), str):
-            raise KeyError(
-                "Required string field: '%s' (%s)" % (field, config_filename)
-            )
+            raise KeyError(f"Required string field: '{field}' ({config_filename})")
 
     # 'url' must either be a string or explicitly null, not missing
     # to avoid accidentally turning off push for ASes.
     if not isinstance(as_info.get("url"), str) and as_info.get("url", "") is not None:
         raise KeyError(
-            "Required string field or explicit null: 'url' (%s)" % (config_filename,)
+            f"Required string field or explicit null: 'url' ({config_filename})"
         )
 
     localpart = as_info["sender_localpart"]

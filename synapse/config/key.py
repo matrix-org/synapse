@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
@@ -170,7 +169,7 @@ class KeyConfig(Config):
         base_key_name = os.path.join(config_dir_path, server_name)
 
         if generate_secrets:
-            macaroon_secret_key = 'macaroon_secret_key: "%s"' % (
+            macaroon_secret_key = 'macaroon_secret_key: "{}"'.format(
                 random_string_with_symbols(50),
             )
             form_secret = 'form_secret: "%s"' % random_string_with_symbols(50)
@@ -292,7 +291,7 @@ class KeyConfig(Config):
         try:
             return read_signing_keys(signing_keys.splitlines(True))
         except Exception as e:
-            raise ConfigError("Error reading %s: %s" % (name, str(e)))
+            raise ConfigError("Error reading {}: {}".format(name, str(e)))
 
     def read_old_signing_keys(self, old_signing_keys):
         if old_signing_keys is None:
@@ -307,7 +306,7 @@ class KeyConfig(Config):
                 keys[key_id] = verify_key
             else:
                 raise ConfigError(
-                    "Unsupported signing algorithm for old key: %r" % (key_id,)
+                    f"Unsupported signing algorithm for old key: {key_id!r}"
                 )
         return keys
 
@@ -322,7 +321,7 @@ class KeyConfig(Config):
             )
 
         if not self.path_exists(signing_key_path):
-            print("Generating signing key file %s" % (signing_key_path,))
+            print(f"Generating signing key file {signing_key_path}")
             with open(signing_key_path, "w") as signing_key_file:
                 key_id = "a_" + random_string(4)
                 write_signing_keys(signing_key_file, (generate_signing_key(key_id),))
