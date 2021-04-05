@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -94,7 +93,7 @@ class LaterGauge:
 
     def _register(self):
         if self.name in all_gauges.keys():
-            logger.warning("%s already registered, reregistering" % (self.name,))
+            logger.warning(f"{self.name} already registered, reregistering")
             REGISTRY.unregister(all_gauges.pop(self.name))
 
         REGISTRY.register(self)
@@ -198,7 +197,7 @@ class InFlightGauge:
 
     def _register_with_collector(self):
         if self.name in all_gauges.keys():
-            logger.warning("%s already registered, reregistering" % (self.name,))
+            logger.warning(f"{self.name} already registered, reregistering")
             REGISTRY.unregister(all_gauges.pop(self.name))
 
         REGISTRY.register(self)
