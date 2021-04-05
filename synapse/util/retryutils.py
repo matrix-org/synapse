@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -44,7 +43,7 @@ class NotRetryingDestination(Exception):
             destination (str): the domain in question
         """
 
-        msg = "Not retrying server %s." % (destination,)
+        msg = f"Not retrying server {destination}."
         super().__init__(msg)
 
         self.retry_last_ts = retry_last_ts

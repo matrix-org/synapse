@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -101,7 +100,7 @@ def _create_mxc_to_http_filter(
             fragment = "#" + fragment
 
         params = {"width": width, "height": height, "method": resize_method}
-        return "%s_matrix/media/v1/thumbnail/%s?%s%s" % (
+        return "{}_matrix/media/v1/thumbnail/{}?{}{}".format(
             public_baseurl,
             server_and_media_id,
             urllib.parse.urlencode(params),

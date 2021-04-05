@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -99,7 +98,7 @@ def get_version_string(module):
                 s for s in (git_branch, git_tag, git_commit, git_dirty) if s
             )
 
-            version_string = "%s (%s)" % (module.__version__, git_version)
+            version_string = f"{module.__version__} ({git_version})"
     except Exception as e:
         logger.info("Failed to check for git repository: %s", e)
 

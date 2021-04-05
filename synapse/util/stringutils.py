@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -121,14 +120,12 @@ def parse_and_validate_server_name(server_name: str) -> Tuple[str, Optional[int]
     # look for ipv6 literals
     if host[0] == "[":
         if host[-1] != "]":
-            raise ValueError("Mismatched [...] in server name '%s'" % (server_name,))
+            raise ValueError(f"Mismatched [...] in server name '{server_name}'")
         return host, port
 
     # otherwise it should only be alphanumerics.
     if not VALID_HOST_REGEX.match(host):
-        raise ValueError(
-            "Server name '%s' contains invalid characters" % (server_name,)
-        )
+        raise ValueError(f"Server name '{server_name}' contains invalid characters")
 
     return host, port
 
@@ -147,7 +144,7 @@ def parse_and_validate_mxc_uri(mxc: str) -> Tuple[str, Optional[int], str]:
     """
     m = MXC_REGEX.match(mxc)
     if not m:
-        raise ValueError("mxc URI %r did not match expected format" % (mxc,))
+        raise ValueError(f"mxc URI {mxc!r} did not match expected format")
     server_name = m.group(1)
     media_id = m.group(2)
     host, port = parse_and_validate_server_name(server_name)
@@ -188,4 +185,4 @@ def strtobool(val: str) -> bool:
     elif val in ("n", "no", "f", "false", "off", "0"):
         return False
     else:
-        raise ValueError("invalid truth value %r" % (val,))
+        raise ValueError(f"invalid truth value {val!r}")

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2019, 2020 The Matrix.org Foundation C.I.C.
 #
@@ -120,7 +119,7 @@ def register_cache(
         add_resizable_cache(cache_name, resize_callback)
 
     metric = CacheMetric(cache, cache_type, cache_name, collect_callback)
-    metric_name = "cache_%s_%s" % (cache_type, cache_name)
+    metric_name = f"cache_{cache_type}_{cache_name}"
     caches_by_name[cache_name] = cache
     collectors_by_name[metric_name] = metric
     return metric

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -87,7 +86,7 @@ class JsonEncodedObject:
         return d
 
     def __str__(self):
-        return "(%s, %s)" % (self.__class__.__name__, repr(self.__dict__))
+        return "({}, {})".format(self.__class__.__name__, repr(self.__dict__))
 
 
 def _encode(obj, internal=False):

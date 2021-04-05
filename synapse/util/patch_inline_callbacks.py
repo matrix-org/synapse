@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -52,7 +51,7 @@ def do_patch():
                     for err in changes:
                         print(err, file=sys.stderr)
 
-                    err = "%s changed context from %s to %s on exception" % (
+                    err = "{} changed context from {} to {} on exception".format(
                         f,
                         start_context,
                         current_context(),
@@ -66,7 +65,7 @@ def do_patch():
                     for err in changes:
                         print(err, file=sys.stderr)
 
-                    err = "Completed %s changed context from %s to %s" % (
+                    err = "Completed {} changed context from {} to {}".format(
                         f,
                         start_context,
                         current_context(),
@@ -89,7 +88,7 @@ def do_patch():
                 if current_context() != start_context:
                     for err in changes:
                         print(err, file=sys.stderr)
-                    err = "%s completion of %s changed context from %s to %s" % (
+                    err = "{} completion of {} changed context from {} to {}".format(
                         "Failure" if isinstance(r, Failure) else "Success",
                         f,
                         start_context,

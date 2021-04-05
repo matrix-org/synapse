@@ -80,8 +80,7 @@ def iterate_tree_cache_entry(d):
     """
     if isinstance(d, dict):
         for value_d in d.values():
-            for value in iterate_tree_cache_entry(value_d):
-                yield value
+            yield from iterate_tree_cache_entry(value_d)
     else:
         if isinstance(d, _Entry):
             yield d.value

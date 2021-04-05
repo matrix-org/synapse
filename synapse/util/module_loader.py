@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -57,13 +56,13 @@ def load_module(provider: dict, config_path: Iterable[str]) -> Tuple[Type, Any]:
         raise json_error_to_config_error(e, itertools.chain(config_path, ("config",)))
     except ConfigError as e:
         raise _wrap_config_error(
-            "Failed to parse config for module %r" % (modulename,),
+            f"Failed to parse config for module {modulename!r}",
             prefix=itertools.chain(config_path, ("config",)),
             e=e,
         )
     except Exception as e:
         raise ConfigError(
-            "Failed to parse config for module %r" % (modulename,),
+            f"Failed to parse config for module {modulename!r}",
             path=itertools.chain(config_path, ("config",)),
         ) from e
 
@@ -81,7 +80,7 @@ def load_python_module(location: str):
     """
     spec = importlib.util.spec_from_file_location(location, location)
     if spec is None:
-        raise Exception("Unable to load module at %s" % (location,))
+        raise Exception(f"Unable to load module at {location}")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)  # type: ignore
     return mod

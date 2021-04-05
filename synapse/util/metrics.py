@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -118,9 +117,7 @@ class Measure:
         else:
             assert isinstance(curr_context, LoggingContext)
             parent_context = curr_context
-        self._logging_context = LoggingContext(
-            "Measure[%s]" % (self.name,), parent_context
-        )
+        self._logging_context = LoggingContext(f"Measure[{self.name}]", parent_context)
         self.start = None
 
     def __enter__(self) -> "Measure":

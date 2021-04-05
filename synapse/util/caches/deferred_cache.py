@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
@@ -307,7 +306,7 @@ class DeferredCache(Generic[KT, VT]):
     def invalidate_many(self, key: KT):
         self.check_thread()
         if not isinstance(key, tuple):
-            raise TypeError("The cache key must be a tuple not %r" % (type(key),))
+            raise TypeError("The cache key must be a tuple not {!r}".format(type(key)))
         key = cast(KT, key)
         self.cache.del_multi(key)
 
