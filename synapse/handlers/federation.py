@@ -1994,13 +1994,36 @@ class FederationHandler(BaseHandler):
         self,
         origin: str,
         event: EventBase,
+        context: Optional[EventContext] = None,
         state: Optional[Iterable[EventBase]] = None,
         auth_events: Optional[MutableStateMap[EventBase]] = None,
         backfilled: bool = False,
     ) -> EventContext:
-        context = await self._prep_event(
-            origin, event, state=state, auth_events=auth_events, backfilled=backfilled
-        )
+        """
+        Process an event.
+
+        Args:
+            origin: The host the event originates from.
+            event: The event itself.
+            context: The event context, if available. Otherwise this is calculated
+                from state and auth_events.
+            state: The state events to calculate the event context from. This is
+                ignored if context is provided.
+            auth_events: The auth events to calculate the event context from. This is
+                ignored if context is provided.
+            backfilled: True if the event was backfilled.
+
+        Returns:
+             The event context.
+        """
+        if not context:
+            context = await self._prep_event(
+                origin,
+                event,
+                state=state,
+                auth_events=auth_events,
+                backfilled=backfilled,
+            )
 
         try:
             if (
