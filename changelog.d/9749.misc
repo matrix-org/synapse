@@ -1,0 +1,1 @@
+Run `pyupgrade --py36-plus` over the codebase.
