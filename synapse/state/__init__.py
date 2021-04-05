@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -702,7 +701,7 @@ class StateResolutionHandler:
             "%i biggest rooms for state-res by %s: %s",
             len(biggest),
             metric_name,
-            ["%s (%gs)" % (r, extract_key(m)) for (r, m) in biggest],
+            ["{} ({:g}s)".format(r, extract_key(m)) for (r, m) in biggest],
         )
 
         # report info on the single biggest to prometheus

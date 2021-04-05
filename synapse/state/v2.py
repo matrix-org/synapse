@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -732,7 +731,7 @@ async def _get_event(
     if event is None:
         if allow_none:
             return None
-        raise Exception("Unknown event %s" % (event_id,))
+        raise Exception(f"Unknown event {event_id}")
 
     if event.room_id != room_id:
         raise Exception(
