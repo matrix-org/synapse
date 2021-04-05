@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -147,7 +146,7 @@ class Auth:
                 if not forgot:
                     return member
 
-        raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
+        raise AuthError(403, f"User {user_id} not in room {room_id}")
 
     async def check_host_in_room(self, room_id, host):
         with Measure(self.clock, "check_host_in_room"):

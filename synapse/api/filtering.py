@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018-2019 New Vector Ltd
@@ -190,7 +189,7 @@ class FilterCollection:
         self.event_format = filter_json.get("event_format", "client")
 
     def __repr__(self):
-        return "<FilterCollection %s>" % (json.dumps(self._filter_json),)
+        return "<FilterCollection {}>".format(json.dumps(self._filter_json))
 
     def get_filter_json(self):
         return self._filter_json
@@ -327,7 +326,7 @@ class Filter:
         }
 
         for name, match_func in literal_keys.items():
-            not_name = "not_%s" % (name,)
+            not_name = f"not_{name}"
             disallowed_values = getattr(self, not_name)
             if any(map(match_func, disallowed_values)):
                 return False
