@@ -29,6 +29,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.api.ratelimiting import Ratelimiter
+from synapse.api.room_versions import RoomVersion
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.types import JsonDict, Requester, RoomAlias, RoomID, StateMap, UserID
@@ -179,7 +180,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         await self._invites_per_user_limiter.ratelimit(requester, invitee_user_id)
 
     async def _can_join_restricted_room(
-        self, state_ids: StateMap[str], room_id: str, user_id: str
+        self, state_ids: StateMap[str], room_version: RoomVersion, user_id: str
     ) -> bool:
         """
         Check whether a user can join a restricted room.
@@ -193,7 +194,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             True if the user can join the room, false otherwise.
         """
         # This only applies to room versions which support the new join rule.
-        room_version = await self.store.get_room_version(room_id)
         if not room_version.msc3083_join_rules:
             return True
 
@@ -301,7 +301,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 newly_joined
                 and not is_invite
                 and not await self._can_join_restricted_room(
-                    prev_state_ids, room_id, user_id
+                    prev_state_ids, event.room_version, user_id
                 )
             ):
                 raise AuthError(
