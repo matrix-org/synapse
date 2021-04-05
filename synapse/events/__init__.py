@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
@@ -63,7 +62,7 @@ class DictProperty:
             # because that would omit any *earlier* exceptions).
             #
             raise AttributeError(
-                "'%s' has no '%s' property" % (type(instance), self.key)
+                "'{}' has no '{}' property".format(type(instance), self.key)
             ) from e1.__context__
 
     def __set__(self, instance, v):
@@ -74,7 +73,7 @@ class DictProperty:
             del instance._dict[self.key]
         except KeyError as e1:
             raise AttributeError(
-                "'%s' has no '%s' property" % (type(instance), self.key)
+                "'{}' has no '{}' property".format(type(instance), self.key)
             ) from e1.__context__
 
 
@@ -284,7 +283,7 @@ class EventBase(metaclass=abc.ABCMeta):
         return pdu_json
 
     def __set__(self, instance, value):
-        raise AttributeError("Unrecognized attribute %s" % (instance,))
+        raise AttributeError(f"Unrecognized attribute {instance}")
 
     def __getitem__(self, field):
         return self._dict[field]
@@ -372,7 +371,7 @@ class FrozenEvent(EventBase):
         return self.__repr__()
 
     def __repr__(self):
-        return "<FrozenEvent event_id=%r, type=%r, state_key=%r>" % (
+        return "<FrozenEvent event_id={!r}, type={!r}, state_key={!r}>".format(
             self.get("event_id", None),
             self.get("type", None),
             self.get("state_key", None),
@@ -455,7 +454,7 @@ class FrozenEventV2(EventBase):
         return self.__repr__()
 
     def __repr__(self):
-        return "<%s event_id=%r, type=%r, state_key=%r>" % (
+        return "<{} event_id={!r}, type={!r}, state_key={!r}>".format(
             self.__class__.__name__,
             self.event_id,
             self.get("type", None),
@@ -501,7 +500,7 @@ def _event_type_from_format_version(format_version: int) -> Type[EventBase]:
     elif format_version == EventFormatVersions.V3:
         return FrozenEventV3
     else:
-        raise Exception("No event format %r" % (format_version,))
+        raise Exception(f"No event format {format_version!r}")
 
 
 def make_event_from_dict(

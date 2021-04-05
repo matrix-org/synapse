@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -51,14 +50,14 @@ class EventValidator:
 
         for k in required:
             if not hasattr(event, k):
-                raise SynapseError(400, "Event does not have key %s" % (k,))
+                raise SynapseError(400, f"Event does not have key {k}")
 
         # Check that the following keys have string values
         event_strings = ["origin"]
 
         for s in event_strings:
             if not isinstance(getattr(event, s), str):
-                raise SynapseError(400, "'%s' not a string type" % (s,))
+                raise SynapseError(400, f"'{s}' not a string type")
 
         # Depending on the room version, ensure the data is spec compliant JSON.
         if event.room_version.strict_canonicaljson:
@@ -141,7 +140,7 @@ class EventValidator:
 
         for s in strings:
             if not isinstance(getattr(event, s), str):
-                raise SynapseError(400, "Not '%s' a string type" % (s,))
+                raise SynapseError(400, f"Not '{s}' a string type")
 
         RoomID.from_string(event.room_id)
         UserID.from_string(event.sender)
@@ -179,10 +178,10 @@ class EventValidator:
     def _ensure_strings(self, d, keys):
         for s in keys:
             if s not in d:
-                raise SynapseError(400, "'%s' not in content" % (s,))
+                raise SynapseError(400, f"'{s}' not in content")
             if not isinstance(d[s], str):
-                raise SynapseError(400, "'%s' not a string type" % (s,))
+                raise SynapseError(400, f"'{s}' not a string type")
 
     def _ensure_state_event(self, event):
         if not event.is_state():
-            raise SynapseError(400, "'%s' must be state events" % (event.type,))
+            raise SynapseError(400, f"'{event.type}' must be state events")

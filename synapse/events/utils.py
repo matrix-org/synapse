@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -453,7 +452,7 @@ def copy_power_levels_contents(
         TypeError if the input does not look like a valid power levels event content
     """
     if not isinstance(old_power_levels, collections.abc.Mapping):
-        raise TypeError("Not a valid power-levels content: %r" % (old_power_levels,))
+        raise TypeError(f"Not a valid power-levels content: {old_power_levels!r}")
 
     power_levels = {}
     for k, v in old_power_levels.items():
@@ -467,13 +466,11 @@ def copy_power_levels_contents(
             for k1, v1 in v.items():
                 # we should only have one level of nesting
                 if not isinstance(v1, int):
-                    raise TypeError(
-                        "Invalid power_levels value for %s.%s: %r" % (k, k1, v1)
-                    )
+                    raise TypeError(f"Invalid power_levels value for {k}.{k1}: {v1!r}")
                 h[k1] = v1
             continue
 
-        raise TypeError("Invalid power_levels value for %s: %r" % (k, v))
+        raise TypeError(f"Invalid power_levels value for {k}: {v!r}")
 
     return power_levels
 

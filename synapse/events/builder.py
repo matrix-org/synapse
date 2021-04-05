@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -245,7 +244,7 @@ def create_local_event_from_event_dict(
 
     format_version = room_version.event_format
     if format_version not in KNOWN_EVENT_FORMAT_VERSIONS:
-        raise Exception("No event format defined for version %r" % (format_version,))
+        raise Exception(f"No event format defined for version {format_version!r}")
 
     if internal_metadata_dict is None:
         internal_metadata_dict = {}
