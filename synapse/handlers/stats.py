@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -233,7 +232,7 @@ class StatsHandler:
                     room_stats_delta["banned_members"] -= 1
                 else:
                     raise ValueError(
-                        "%r is not a valid prev_membership" % (prev_membership,)
+                        f"{prev_membership!r} is not a valid prev_membership"
                     )
 
                 if membership == prev_membership:
@@ -253,7 +252,7 @@ class StatsHandler:
                 elif membership == Membership.BAN:
                     room_stats_delta["banned_members"] += 1
                 else:
-                    raise ValueError("%r is not a valid membership" % (membership,))
+                    raise ValueError(f"{membership!r} is not a valid membership")
 
                 user_id = state_key
                 if self.is_mine_id(user_id):

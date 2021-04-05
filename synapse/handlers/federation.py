@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -617,7 +616,7 @@ class FederationHandler(BaseHandler):
             # we need to make sure we re-load from the database to get the rejected
             # state correct.
             fetched_events.update(
-                (await self.store.get_events(missing_events, allow_rejected=True))
+                await self.store.get_events(missing_events, allow_rejected=True)
             )
 
         # check for events which were in the wrong room.
@@ -719,7 +718,7 @@ class FederationHandler(BaseHandler):
         # we need to make sure we re-load from the database to get the rejected
         # state correct.
         fetched_events.update(
-            (await self.store.get_events(missing_desired_events, allow_rejected=True))
+            await self.store.get_events(missing_desired_events, allow_rejected=True)
         )
 
         # check for events which were in the wrong room.
@@ -751,7 +750,7 @@ class FederationHandler(BaseHandler):
         # if we couldn't get the prev event in question, that's a problem.
         remote_event = fetched_events.get(event_id)
         if not remote_event:
-            raise Exception("Unable to get missing prev_event %s" % (event_id,))
+            raise Exception(f"Unable to get missing prev_event {event_id}")
 
         # missing state at that event is a warning, not a blocker
         # XXX: this doesn't sound right? it means that we'll end up with incomplete
@@ -836,7 +835,7 @@ class FederationHandler(BaseHandler):
                         == RoomEncryptionAlgorithms.MEGOLM_V1_AES_SHA2
                     ):
                         # For this algorithm we expect a curve25519 key.
-                        key_name = "curve25519:%s" % (device_id,)
+                        key_name = f"curve25519:{device_id}"
                         current_keys = [keys.get(key_name)]
                     else:
                         # We don't know understand the algorithm, so we just

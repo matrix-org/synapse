@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -174,7 +173,7 @@ class MessageHandler:
             )
 
             if not last_events:
-                raise NotFoundError("Can't find event for token %s" % (at_token,))
+                raise NotFoundError(f"Can't find event for token {at_token}")
 
             visible_events = await filter_events_for_client(
                 self.storage,
@@ -754,7 +753,7 @@ class EventCreationHandler:
                 requester, event_dict, txn_id=txn_id
             )
 
-            assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
+            assert self.hs.is_mine_id(event.sender), "User must be our own: {}".format(
                 event.sender,
             )
 
@@ -1053,7 +1052,7 @@ class EventCreationHandler:
             if e.errcode == Codes.NOT_FOUND:
                 raise SynapseError(
                     400,
-                    "Room alias %s does not point to the room" % (room_alias_str,),
+                    f"Room alias {room_alias_str} does not point to the room",
                     Codes.BAD_ALIAS,
                 )
             raise
@@ -1061,7 +1060,7 @@ class EventCreationHandler:
         if mapping["room_id"] != expected_room_id:
             raise SynapseError(
                 400,
-                "Room alias %s does not point to the room" % (room_alias_str,),
+                f"Room alias {room_alias_str} does not point to the room",
                 Codes.BAD_ALIAS,
             )
 
@@ -1218,7 +1217,7 @@ class EventCreationHandler:
                 # checks on the original event. Let's start by checking the original
                 # event exists.
                 if not original_event:
-                    raise NotFoundError("Could not find event %s" % (event.redacts,))
+                    raise NotFoundError(f"Could not find event {event.redacts}")
 
                 if event.user_id != original_event.user_id:
                     raise AuthError(403, "You don't have permission to redact events")

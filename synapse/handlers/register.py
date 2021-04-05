@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -125,7 +124,7 @@ class RegistrationHandler(BaseHandler):
         if len(user_id) > MAX_USERID_LENGTH:
             raise SynapseError(
                 400,
-                "User ID may not be longer than %s characters" % (MAX_USERID_LENGTH,),
+                f"User ID may not be longer than {MAX_USERID_LENGTH} characters",
                 Codes.INVALID_USERNAME,
             )
 
@@ -442,9 +441,7 @@ class RegistrationHandler(BaseHandler):
                     ) = await room_member_handler.lookup_room_alias(room_alias)
                     room_id = room.to_string()
                 else:
-                    raise SynapseError(
-                        400, "%s was not legal room ID or room alias" % (r,)
-                    )
+                    raise SynapseError(400, f"{r} was not legal room ID or room alias")
 
                 # Calculate whether the room requires an invite or can be
                 # joined directly. Note that unless a join rule of public exists,

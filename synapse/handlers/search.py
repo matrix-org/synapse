@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -171,7 +170,7 @@ class SearchHandler(BaseHandler):
             raise SynapseError(400, "Invalid search query")
 
         if order_by not in ("rank", "recent"):
-            raise SynapseError(400, "Invalid order by: %r" % (order_by,))
+            raise SynapseError(400, f"Invalid order by: {order_by!r}")
 
         if set(group_keys) - {"room_id", "sender"}:
             raise SynapseError(
@@ -328,14 +327,16 @@ class SearchHandler(BaseHandler):
                     )
                 else:
                     global_next_batch = encode_base64(
-                        ("%s\n%s\n%s" % ("all", "", pagination_token)).encode("ascii")
+                        ("{}\n{}\n{}".format("all", "", pagination_token)).encode(
+                            "ascii"
+                        )
                     )
 
                 for room_id, group in room_groups.items():
                     group["next_batch"] = encode_base64(
-                        ("%s\n%s\n%s" % ("room_id", room_id, pagination_token)).encode(
-                            "ascii"
-                        )
+                        (
+                            "{}\n{}\n{}".format("room_id", room_id, pagination_token)
+                        ).encode("ascii")
                     )
 
             allowed_events.extend(room_events)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018 New Vector Ltd
@@ -186,10 +185,10 @@ class IdentityHandler(BaseHandler):
         headers = {}
         bind_data = {"sid": sid, "client_secret": client_secret, "mxid": mxid}
         if use_v2:
-            bind_url = "https://%s/_matrix/identity/v2/3pid/bind" % (id_server,)
+            bind_url = f"https://{id_server}/_matrix/identity/v2/3pid/bind"
             headers["Authorization"] = create_id_access_token_header(id_access_token)  # type: ignore
         else:
-            bind_url = "https://%s/_matrix/identity/api/v1/3pid/bind" % (id_server,)
+            bind_url = f"https://{id_server}/_matrix/identity/api/v1/3pid/bind"
 
         try:
             # Use the blacklisting http client as this call is only to identity servers
@@ -276,8 +275,8 @@ class IdentityHandler(BaseHandler):
             True on success, otherwise False if the identity
             server doesn't support unbinding
         """
-        url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
-        url_bytes = "/_matrix/identity/api/v1/3pid/unbind".encode("ascii")
+        url = f"https://{id_server}/_matrix/identity/api/v1/3pid/unbind"
+        url_bytes = b"/_matrix/identity/api/v1/3pid/unbind"
 
         content = {
             "mxid": mxid,
@@ -659,7 +658,7 @@ class IdentityHandler(BaseHandler):
         """
         try:
             data = await self.blacklisting_http_client.get_json(
-                "%s%s/_matrix/identity/api/v1/lookup" % (id_server_scheme, id_server),
+                f"{id_server_scheme}{id_server}/_matrix/identity/api/v1/lookup",
                 {"medium": medium, "address": address},
             )
 
@@ -670,8 +669,8 @@ class IdentityHandler(BaseHandler):
                 return data["mxid"]
         except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
-        except IOError as e:
-            logger.warning("Error from v1 identity server lookup: %s" % (e,))
+        except OSError as e:
+            logger.warning(f"Error from v1 identity server lookup: {e}")
 
         return None
 
@@ -693,7 +692,7 @@ class IdentityHandler(BaseHandler):
         # Check what hashing details are supported by this identity server
         try:
             hash_details = await self.blacklisting_http_client.get_json(
-                "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server),
+                f"{id_server_scheme}{id_server}/_matrix/identity/v2/hash_details",
                 {"access_token": id_access_token},
             )
         except RequestTimedOutError:
@@ -733,7 +732,7 @@ class IdentityHandler(BaseHandler):
             lookup_algorithm = LookupAlgorithm.SHA256
 
             # Hash address, medium and the pepper with sha256
-            to_hash = "%s %s %s" % (address, medium, lookup_pepper)
+            to_hash = f"{address} {medium} {lookup_pepper}"
             lookup_value = sha256_and_url_safe_base64(to_hash)
 
         elif LookupAlgorithm.NONE in supported_lookup_algorithms:
@@ -741,7 +740,7 @@ class IdentityHandler(BaseHandler):
             lookup_algorithm = LookupAlgorithm.NONE
 
             # Combine together plaintext address and medium
-            lookup_value = "%s %s" % (address, medium)
+            lookup_value = f"{address} {medium}"
 
         else:
             logger.warning(
@@ -760,7 +759,7 @@ class IdentityHandler(BaseHandler):
 
         try:
             lookup_results = await self.blacklisting_http_client.post_json_get_json(
-                "%s%s/_matrix/identity/v2/lookup" % (id_server_scheme, id_server),
+                f"{id_server_scheme}{id_server}/_matrix/identity/v2/lookup",
                 {
                     "addresses": [lookup_value],
                     "algorithm": lookup_algorithm,
@@ -851,10 +850,10 @@ class IdentityHandler(BaseHandler):
         # Add the identity service access token to the JSON body and use the v2
         # Identity Service endpoints if id_access_token is present
         data = None
-        base_url = "%s%s/_matrix/identity" % (id_server_scheme, id_server)
+        base_url = f"{id_server_scheme}{id_server}/_matrix/identity"
 
         if id_access_token:
-            key_validity_url = "%s%s/_matrix/identity/v2/pubkey/isvalid" % (
+            key_validity_url = "{}{}/_matrix/identity/v2/pubkey/isvalid".format(
                 id_server_scheme,
                 id_server,
             )
@@ -875,7 +874,7 @@ class IdentityHandler(BaseHandler):
                     raise e
 
         if data is None:
-            key_validity_url = "%s%s/_matrix/identity/api/v1/pubkey/isvalid" % (
+            key_validity_url = "{}{}/_matrix/identity/api/v1/pubkey/isvalid".format(
                 id_server_scheme,
                 id_server,
             )

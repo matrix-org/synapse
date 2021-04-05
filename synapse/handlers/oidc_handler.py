@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Quentin Gliech
 # Copyright 2021 The Matrix.org Foundation C.I.C.
 #
@@ -76,26 +75,26 @@ _SESSION_COOKIES = [
     (b"oidc_session_no_samesite", b"Path=/_synapse/client/oidc; HttpOnly"),
 ]
 
+
 #: A token exchanged from the token endpoint, as per RFC6749 sec 5.1. and
 #: OpenID.Core sec 3.1.3.3.
-Token = TypedDict(
-    "Token",
-    {
-        "access_token": str,
-        "token_type": str,
-        "id_token": Optional[str],
-        "refresh_token": Optional[str],
-        "expires_in": int,
-        "scope": Optional[str],
-    },
-)
+class Token(TypedDict):
+    access_token: str
+    token_type: str
+    id_token: Optional[str]
+    refresh_token: Optional[str]
+    expires_in: int
+    scope: Optional[str]
+
 
 #: A JWK, as per RFC7517 sec 4. The type could be more precise than that, but
 #: there is no real point of doing this in our case.
 JWK = Dict[str, str]
 
+
 #: A JWK Set, as per RFC7517 sec 5.
-JWKS = TypedDict("JWKS", {"keys": List[JWK]})
+class JWKS(TypedDict):
+    keys: List[JWK]
 
 
 class OidcHandler:
@@ -124,7 +123,7 @@ class OidcHandler:
                 await p.load_jwks()
             except Exception as e:
                 raise Exception(
-                    "Error while initialising OIDC provider %r" % (idp_id,)
+                    f"Error while initialising OIDC provider {idp_id!r}"
                 ) from e
 
     async def handle_oidc_callback(self, request: SynapseRequest) -> None:
@@ -259,7 +258,7 @@ class OidcError(Exception):
 
     def __str__(self):
         if self.error_description:
-            return "{}: {}".format(self.error, self.error_description)
+            return f"{self.error}: {self.error_description}"
         return self.error
 
 
@@ -636,7 +635,7 @@ class OidcProvider:
             )
             logger.warning(description)
             # Body was still valid JSON. Might be useful to log it for debugging.
-            logger.warning("Code exchange response: {resp!r}".format(resp=resp))
+            logger.warning(f"Code exchange response: {resp!r}")
             raise OidcError("server_error", description)
 
         return resp
@@ -918,9 +917,7 @@ class OidcProvider:
         try:
             remote_user_id = self._remote_id_from_userinfo(userinfo)
         except Exception as e:
-            raise MappingException(
-                "Failed to extract subject from OIDC response: %s" % (e,)
-            )
+            raise MappingException(f"Failed to extract subject from OIDC response: {e}")
 
         # Older mapping providers don't accept the `failures` argument, so we
         # try and detect support.
@@ -1127,14 +1124,14 @@ class OidcSessionTokenGenerator:
         )
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("type = session")
-        macaroon.add_first_party_caveat("state = %s" % (state,))
-        macaroon.add_first_party_caveat("idp_id = %s" % (session_data.idp_id,))
-        macaroon.add_first_party_caveat("nonce = %s" % (session_data.nonce,))
+        macaroon.add_first_party_caveat(f"state = {state}")
+        macaroon.add_first_party_caveat(f"idp_id = {session_data.idp_id}")
+        macaroon.add_first_party_caveat(f"nonce = {session_data.nonce}")
         macaroon.add_first_party_caveat(
-            "client_redirect_url = %s" % (session_data.client_redirect_url,)
+            f"client_redirect_url = {session_data.client_redirect_url}"
         )
         macaroon.add_first_party_caveat(
-            "ui_auth_session_id = %s" % (session_data.ui_auth_session_id,)
+            f"ui_auth_session_id = {session_data.ui_auth_session_id}"
         )
         now = self._clock.time_msec()
         expiry = now + duration_in_ms
@@ -1165,7 +1162,7 @@ class OidcSessionTokenGenerator:
         v = pymacaroons.Verifier()
         v.satisfy_exact("gen = 1")
         v.satisfy_exact("type = session")
-        v.satisfy_exact("state = %s" % (state,))
+        v.satisfy_exact(f"state = {state}")
         v.satisfy_general(lambda c: c.startswith("nonce = "))
         v.satisfy_general(lambda c: c.startswith("idp_id = "))
         v.satisfy_general(lambda c: c.startswith("client_redirect_url = "))
@@ -1204,10 +1201,12 @@ class OidcSessionData:
     ui_auth_session_id = attr.ib(type=str)
 
 
-UserAttributeDict = TypedDict(
-    "UserAttributeDict",
-    {"localpart": Optional[str], "display_name": Optional[str], "emails": List[str]},
-)
+class UserAttributeDict(TypedDict):
+    localpart: Optional[str]
+    display_name: Optional[str]
+    emails: List[str]
+
+
 C = TypeVar("C")
 
 
@@ -1384,5 +1383,5 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
                 extras[key] = template.render(user=userinfo).strip()
             except Exception as e:
                 # Log an error and skip this value (don't break login for this).
-                logger.error("Failed to render OIDC extra attribute %s: %s" % (key, e))
+                logger.error(f"Failed to render OIDC extra attribute {key}: {e}")
         return extras

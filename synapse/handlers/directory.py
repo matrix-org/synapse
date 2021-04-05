@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -260,7 +259,7 @@ class DirectoryHandler(BaseHandler):
         if not room_id:
             raise SynapseError(
                 404,
-                "Room alias %s not found" % (room_alias.to_string(),),
+                f"Room alias {room_alias.to_string()} not found",
                 Codes.NOT_FOUND,
             )
 
@@ -288,7 +287,7 @@ class DirectoryHandler(BaseHandler):
         else:
             raise SynapseError(
                 404,
-                "Room alias %r not found" % (room_alias.to_string(),),
+                f"Room alias {room_alias.to_string()!r} not found",
                 Codes.NOT_FOUND,
             )
 

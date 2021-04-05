@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 # Copyright 2018-2019 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -191,12 +190,12 @@ class RoomCreationHandler(BaseHandler):
             ShadowBanError if the requester is shadow-banned.
         """
         user_id = requester.user.to_string()
-        assert self.hs.is_mine_id(user_id), "User must be our own: %s" % (user_id,)
+        assert self.hs.is_mine_id(user_id), f"User must be our own: {user_id}"
 
         # start by allocating a new room id
         r = await self.store.get_room(old_room_id)
         if r is None:
-            raise NotFoundError("Unknown room id %s" % (old_room_id,))
+            raise NotFoundError(f"Unknown room id {old_room_id}")
         new_room_id = await self._generate_room_id(
             creator_id=user_id,
             is_public=r["is_public"],
@@ -667,7 +666,7 @@ class RoomCreationHandler(BaseHandler):
                 uid = UserID.from_string(i)
                 parse_and_validate_server_name(uid.domain)
             except Exception:
-                raise SynapseError(400, "Invalid user_id: %s" % (i,))
+                raise SynapseError(400, f"Invalid user_id: {i}")
 
         if (invite_list or invite_3pid_list) and requester.shadow_banned:
             # We randomly sleep a bit just to annoy the requester.
@@ -1281,10 +1280,10 @@ class RoomShutdownHandler:
             message = self.DEFAULT_MESSAGE
 
         if not RoomID.is_valid(room_id):
-            raise SynapseError(400, "%s is not a legal room ID" % (room_id,))
+            raise SynapseError(400, f"{room_id} is not a legal room ID")
 
         if not await self.store.get_room(room_id):
-            raise NotFoundError("Unknown room id %s" % (room_id,))
+            raise NotFoundError(f"Unknown room id {room_id}")
 
         # This will work even if the room is already blocked, but that is
         # desirable in case the first attempt at blocking the room failed below.
@@ -1293,9 +1292,7 @@ class RoomShutdownHandler:
 
         if new_room_user_id is not None:
             if not self.hs.is_mine_id(new_room_user_id):
-                raise SynapseError(
-                    400, "User must be our own: %s" % (new_room_user_id,)
-                )
+                raise SynapseError(400, f"User must be our own: {new_room_user_id}")
 
             room_creator_requester = create_requester(
                 new_room_user_id, authenticated_entity=requester_user_id

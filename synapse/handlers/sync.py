@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2018, 2019 New Vector Ltd
 #
@@ -1546,7 +1545,7 @@ class SyncHandler:
             logger.debug(
                 "Membership changes in %s: [%s]",
                 room_id,
-                ", ".join(("%s (%s)" % (e.event_id, e.membership) for e in events)),
+                ", ".join(f"{e.event_id} ({e.membership})" for e in events),
             )
 
             non_joins = [e for e in events if e.membership != Membership.JOIN]

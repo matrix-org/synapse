@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -33,7 +32,7 @@ def _create_rerouter(func_name):
 
     async def f(self, group_id, *args, **kwargs):
         if not GroupID.is_valid(group_id):
-            raise SynapseError(400, "%s is not a legal group ID" % (group_id,))
+            raise SynapseError(400, f"{group_id} is not a legal group ID")
 
         if self.is_mine_id(group_id):
             return await getattr(self.groups_server_handler, func_name)(

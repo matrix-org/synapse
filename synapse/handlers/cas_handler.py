@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,7 +40,7 @@ class CasError(Exception):
 
     def __str__(self):
         if self.error_description:
-            return "{}: {}".format(self.error, self.error_description)
+            return f"{self.error}: {self.error_description}"
         return self.error
 
 
@@ -100,7 +99,7 @@ class CasHandler:
         Returns:
             The URL to use as a "service" parameter.
         """
-        return "%s?%s" % (
+        return "{}?{}".format(
             self._cas_service_url,
             urllib.parse.urlencode(args),
         )
@@ -222,7 +221,7 @@ class CasHandler:
             {"service": self._build_service_param(service_args)}
         )
 
-        return "%s/login?%s" % (self._cas_server_url, args)
+        return f"{self._cas_server_url}/login?{args}"
 
     async def handle_ticket(
         self,

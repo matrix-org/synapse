@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -118,7 +117,7 @@ class SamlHandler(BaseHandler):
         )
 
         # Since SAML sessions timeout it is useful to log when they were created.
-        logger.info("Initiating a new SAML session: %s" % (reqid,))
+        logger.info(f"Initiating a new SAML session: {reqid}")
 
         now = self.clock.time_msec()
         self._outstanding_requests_dict[reqid] = Saml2SessionData(
@@ -170,7 +169,7 @@ class SamlHandler(BaseHandler):
             self._sso_handler.render_error(
                 request,
                 "invalid_response",
-                "Unable to parse SAML2 response: %s." % (e,),
+                f"Unable to parse SAML2 response: {e}.",
             )
             return
 
@@ -373,7 +372,7 @@ class SamlHandler(BaseHandler):
 
 
 DOT_REPLACE_PATTERN = re.compile(
-    ("[^%s]" % (re.escape("".join(mxid_localpart_allowed_characters)),))
+    "[^{}]".format(re.escape("".join(mxid_localpart_allowed_characters)))
 )
 
 
@@ -456,7 +455,7 @@ class DefaultSamlMappingProvider:
                 self._mxid_source_attribute,
             )
             raise SynapseError(
-                400, "%s not in SAML2 response" % (self._mxid_source_attribute,)
+                400, f"{self._mxid_source_attribute} not in SAML2 response"
             )
 
         # Use the configured mapper for this mxid_source

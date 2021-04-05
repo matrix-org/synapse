@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -98,7 +97,7 @@ class AccountValidityHandler:
 
         # If this user isn't set to be expired, raise an error.
         if expiration_ts is None:
-            raise SynapseError(400, "User has no expiration time: %s" % (user_id,))
+            raise SynapseError(400, f"User has no expiration time: {user_id}")
 
         await self._send_renewal_email(user_id, expiration_ts)
 
@@ -132,7 +131,7 @@ class AccountValidityHandler:
             user_display_name = user_id
 
         renewal_token = await self._get_renewal_token(user_id)
-        url = "%s_matrix/client/unstable/account_validity/renew?token=%s" % (
+        url = "{}_matrix/client/unstable/account_validity/renew?token={}".format(
             self.hs.config.public_baseurl,
             renewal_token,
         )

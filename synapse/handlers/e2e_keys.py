@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2018-2019 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -470,7 +469,7 @@ class E2eKeysHandler:
             "Claimed one-time-keys: %s",
             ",".join(
                 (
-                    "%s for %s:%s" % (key_id, user_id, device_id)
+                    f"{key_id} for {user_id}:{device_id}"
                     for user_id, user_keys in json_result.items()
                     for device_id, device_keys in user_keys.items()
                     for key_id, _ in device_keys.items()
@@ -1050,7 +1049,7 @@ class E2eKeysHandler:
         if self.is_mine(user) or key_type not in ["master", "self_signing"]:
             # Note that master and self_signing keys are the only cross-signing keys we
             # can request over federation
-            raise NotFoundError("No %s key found for %s" % (key_type, user_id))
+            raise NotFoundError(f"No {key_type} key found for {user_id}")
 
         (
             key,
@@ -1059,7 +1058,7 @@ class E2eKeysHandler:
         ) = await self._retrieve_cross_signing_keys_for_remote_user(user, key_type)
 
         if key is None:
-            raise NotFoundError("No %s key found for %s" % (key_type, user_id))
+            raise NotFoundError(f"No {key_type} key found for {user_id}")
 
         return key, key_id, verify_key
 
@@ -1180,7 +1179,7 @@ def _check_cross_signing_key(
         or key_type not in key.get("usage", [])
         or len(key.get("keys", {})) != 1
     ):
-        raise SynapseError(400, ("Invalid %s key" % (key_type,)), Codes.INVALID_PARAM)
+        raise SynapseError(400, (f"Invalid {key_type} key"), Codes.INVALID_PARAM)
 
     if signing_key:
         try:

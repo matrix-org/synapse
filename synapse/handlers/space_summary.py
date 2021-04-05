@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -127,7 +126,7 @@ class SpaceSummaryHandler:
                 "Query of %s returned rooms %s, events %s",
                 queue_entry.room_id,
                 [room.get("room_id") for room in rooms],
-                ["%s->%s" % (ev["room_id"], ev["state_key"]) for ev in events],
+                ["{}->{}".format(ev["room_id"], ev["state_key"]) for ev in events],
             )
 
             rooms_result.extend(rooms)
@@ -324,7 +323,7 @@ class SpaceSummaryHandler:
         # currently this should be impossible because we call
         # check_user_in_room_or_world_readable on the room before we get here, so
         # there should always be an entry
-        assert stats is not None, "unable to retrieve stats for %s" % (room_id,)
+        assert stats is not None, f"unable to retrieve stats for {room_id}"
 
         current_state_ids = await self._store.get_current_state_ids(room_id)
         create_event = await self._store.get_event(

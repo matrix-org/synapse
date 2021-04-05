@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 # Copyright 2017 - 2018 New Vector Ltd
 #
@@ -217,7 +216,7 @@ class PaginationHandler:
             self._purges_by_id[purge_id] = PurgeStatus()
 
             logger.info(
-                "Starting purging events in room %s (purge_id %s)" % (room_id, purge_id)
+                f"Starting purging events in room {room_id} (purge_id {purge_id})"
             )
 
             # We want to purge everything, including local events, and to run the purge in
@@ -247,9 +246,7 @@ class PaginationHandler:
             unique ID for this purge transaction.
         """
         if room_id in self._purges_in_progress_by_room:
-            raise SynapseError(
-                400, "History purge already in progress for %s" % (room_id,)
-            )
+            raise SynapseError(400, f"History purge already in progress for {room_id}")
 
         purge_id = random_string(16)
 

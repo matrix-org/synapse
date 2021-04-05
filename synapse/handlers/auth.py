@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2019 - 2020 The Matrix.org Foundation C.I.C.
@@ -515,7 +514,7 @@ class AuthHandler(BaseHandler):
             try:
                 session = await self.store.get_ui_auth_session(sid)
             except StoreError:
-                raise SynapseError(400, "Unknown session ID: %s" % (sid,))
+                raise SynapseError(400, f"Unknown session ID: {sid}")
 
             # If the client provides parameters, update what is persisted,
             # otherwise use whatever was last provided.
@@ -669,7 +668,7 @@ class AuthHandler(BaseHandler):
         try:
             await self.store.set_ui_auth_session_data(session_id, key, value)
         except StoreError:
-            raise SynapseError(400, "Unknown session ID: %s" % (session_id,))
+            raise SynapseError(400, f"Unknown session ID: {session_id}")
 
     async def get_session_data(
         self, session_id: str, key: str, default: Optional[Any] = None
@@ -686,7 +685,7 @@ class AuthHandler(BaseHandler):
         try:
             return await self.store.get_ui_auth_session_data(session_id, key, default)
         except StoreError:
-            raise SynapseError(400, "Unknown session ID: %s" % (session_id,))
+            raise SynapseError(400, f"Unknown session ID: {session_id}")
 
     async def _expire_old_sessions(self):
         """
@@ -1266,7 +1265,7 @@ class AuthHandler(BaseHandler):
         if medium not in ["email", "msisdn"]:
             raise SynapseError(
                 code=400,
-                msg=("'%s' is not a valid value for 'medium'" % (medium,)),
+                msg=(f"'{medium}' is not a valid value for 'medium'"),
                 errcode=Codes.INVALID_PARAM,
             )
 
@@ -1385,7 +1384,7 @@ class AuthHandler(BaseHandler):
         try:
             session = await self.store.get_ui_auth_session(session_id)
         except StoreError:
-            raise SynapseError(400, "Unknown session ID: %s" % (session_id,))
+            raise SynapseError(400, f"Unknown session ID: {session_id}")
 
         user_id_to_verify = await self.get_session_data(
             session_id, UIAuthSessionDataConstants.REQUEST_USER_ID
@@ -1595,7 +1594,7 @@ class MacaroonGenerator:
         # Include a nonce, to make sure that each login gets a different
         # access token.
         macaroon.add_first_party_caveat(
-            "nonce = %s" % (stringutils.random_string_with_symbols(16),)
+            "nonce = {}".format(stringutils.random_string_with_symbols(16))
         )
         for caveat in extra_caveats:
             macaroon.add_first_party_caveat(caveat)
@@ -1612,7 +1611,7 @@ class MacaroonGenerator:
         now = self.hs.get_clock().time_msec()
         expiry = now + duration_in_ms
         macaroon.add_first_party_caveat("time < %d" % (expiry,))
-        macaroon.add_first_party_caveat("auth_provider_id = %s" % (auth_provider_id,))
+        macaroon.add_first_party_caveat(f"auth_provider_id = {auth_provider_id}")
         return macaroon.serialize()
 
     def verify_short_term_login_token(self, token: str) -> LoginTokenAttributes:
@@ -1656,7 +1655,7 @@ class MacaroonGenerator:
             key=self.hs.config.macaroon_secret_key,
         )
         macaroon.add_first_party_caveat("gen = 1")
-        macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
+        macaroon.add_first_party_caveat(f"user_id = {user_id}")
         return macaroon
 
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016-2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -488,7 +487,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             if old_membership == "ban" and action != "unban":
                 raise SynapseError(
                     403,
-                    "Cannot %s user who was banned" % (action,),
+                    f"Cannot {action} user who was banned",
                     errcode=Codes.BAD_STATE,
                 )
 
@@ -736,8 +735,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             sender = UserID.from_string(event.sender)
             assert (
                 sender == requester.user
-            ), "Sender (%s) must be same as requester (%s)" % (sender, requester.user)
-            assert self.hs.is_mine(sender), "Sender must be our own: %s" % (sender,)
+            ), f"Sender ({sender}) must be same as requester ({requester.user})"
+            assert self.hs.is_mine(sender), f"Sender must be our own: {sender}"
         else:
             requester = types.create_requester(target_user)
 
@@ -1257,7 +1256,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             Membership.LEAVE,
             Membership.BAN,
         ]:
-            raise SynapseError(400, "User %s in room %s" % (user_id, room_id))
+            raise SynapseError(400, f"User {user_id} in room {room_id}")
 
         if membership:
             await self.store.forget(user_id, room_id)

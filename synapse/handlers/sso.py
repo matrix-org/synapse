@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -603,7 +602,7 @@ class SsoHandler:
         if not attributes.localpart or contains_invalid_mxid_characters(
             attributes.localpart
         ):
-            raise MappingException("localpart is invalid: %s" % (attributes.localpart,))
+            raise MappingException(f"localpart is invalid: {attributes.localpart}")
 
         logger.debug("Mapped SSO user to local part %s", attributes.localpart)
         registered_user_id = await self._registration_handler.register_user(
@@ -733,7 +732,7 @@ class SsoHandler:
         )
 
         if contains_invalid_mxid_characters(localpart):
-            raise SynapseError(400, "localpart is invalid: %s" % (localpart,))
+            raise SynapseError(400, f"localpart is invalid: {localpart}")
         user_id = UserID(localpart, self._server_name).to_string()
         user_infos = await self._store.get_users_by_id_case_insensitive(user_id)
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017, 2018 New Vector Ltd
 # Copyright 2019 Matrix.org Foundation C.I.C.
 #
@@ -190,7 +189,7 @@ class E2eRoomKeysHandler:
                 version_info = await self.store.get_e2e_room_keys_version_info(user_id)
             except StoreError as e:
                 if e.code == 404:
-                    raise NotFoundError("Version '%s' not found" % (version,))
+                    raise NotFoundError(f"Version '{version}' not found")
                 else:
                     raise
 
@@ -204,7 +203,7 @@ class E2eRoomKeysHandler:
                     raise RoomKeysVersionError(current_version=version_info["version"])
                 except StoreError as e:
                     if e.code == 404:
-                        raise NotFoundError("Version '%s' not found" % (version,))
+                        raise NotFoundError(f"Version '{version}' not found")
                     else:
                         raise
 
