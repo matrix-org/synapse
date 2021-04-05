@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -597,7 +596,9 @@ def get_statements(f: Iterable[str]) -> Generator[str, None, None]:
         statements = line.split(";")
 
         # We must prepend statement_buffer to the first statement
-        first_statement = "%s %s" % (statement_buffer.strip(), statements[0].strip())
+        first_statement = "{} {}".format(
+            statement_buffer.strip(), statements[0].strip()
+        )
         statements[0] = first_statement
 
         # Every entry, except the last, is a full statement
@@ -610,7 +611,7 @@ def get_statements(f: Iterable[str]) -> Generator[str, None, None]:
 
 
 def executescript(txn: Cursor, schema_path: str) -> None:
-    with open(schema_path, "r") as f:
+    with open(schema_path) as f:
         execute_statements_from_stream(txn, f)
 
 

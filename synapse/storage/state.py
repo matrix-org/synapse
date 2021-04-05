@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -226,7 +225,7 @@ class StateFilter:
             if where_clause:
                 where_clause += " OR "
 
-            where_clause += "type NOT IN (%s)" % (",".join(["?"] * len(self.types)),)
+            where_clause += "type NOT IN ({})".format(",".join(["?"] * len(self.types)))
             where_args.extend(self.types)
 
         return where_clause, where_args

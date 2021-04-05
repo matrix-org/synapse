@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -132,7 +131,7 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
                 " AND (%s)"
                 " ORDER BY stream_ordering DESC"
                 " LIMIT ?"
-            ) % (" OR ".join("type = '%s'" % (t,) for t in TYPES),)
+            ) % (" OR ".join(f"type = '{t}'" for t in TYPES),)
 
             txn.execute(sql, (target_min_stream_id, max_stream_id, batch_size))
 
@@ -376,7 +375,7 @@ class SearchStore(SearchBackgroundUpdateStore):
             local_clauses.append("key = ?")
             args.append(key)
 
-        clauses.append("(%s)" % (" OR ".join(local_clauses),))
+        clauses.append("({})".format(" OR ".join(local_clauses)))
 
         count_args = args
         count_clauses = clauses
@@ -498,7 +497,7 @@ class SearchStore(SearchBackgroundUpdateStore):
             local_clauses.append("key = ?")
             args.append(key)
 
-        clauses.append("(%s)" % (" OR ".join(local_clauses),))
+        clauses.append("({})".format(" OR ".join(local_clauses)))
 
         # take copies of the current args and clauses lists, before adding
         # pagination clauses to main query.
@@ -679,7 +678,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 
                 # Now we need to pick the possible highlights out of the haedline
                 # result.
-                matcher_regex = "%s(.*?)%s" % (
+                matcher_regex = "{}(.*?){}".format(
                     re.escape(start_sel),
                     re.escape(stop_sel),
                 )
@@ -693,7 +692,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 
 
 def _to_postgres_options(options_dict):
-    return "'%s'" % (",".join("%s=%s" % (k, v) for k, v in options_dict.items()),)
+    return "'{}'".format(",".join(f"{k}={v}" for k, v in options_dict.items()))
 
 
 def _parse_query(database_engine, search_term):

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
 # Copyright 2019,2020 The Matrix.org Foundation C.I.C.
@@ -990,12 +989,12 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
             sql = """
                 SELECT stream_id, destination, user_id, device_id, MAX(ts) AS ts
                 FROM device_lists_outbound_pokes
-                WHERE %s
-                GROUP BY %s
+                WHERE {}
+                GROUP BY {}
                 HAVING count(*) > 1
-                ORDER BY %s
+                ORDER BY {}
                 LIMIT ?
-                """ % (
+                """.format(
                 clause,  # WHERE
                 ",".join(KEY_COLS),  # GROUP BY
                 ",".join(KEY_COLS),  # ORDER BY

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -181,7 +180,7 @@ class DirectoryStore(DirectoryWorkerStore):
                 update_creator_sql = ", creator = ?"
                 sql_params = (new_room_id, creator, old_room_id)
 
-            sql = "UPDATE room_aliases SET room_id = ? %s WHERE room_id = ?" % (
+            sql = "UPDATE room_aliases SET room_id = ? {} WHERE room_id = ?".format(
                 update_creator_sql,
             )
             txn.execute(sql, sql_params)

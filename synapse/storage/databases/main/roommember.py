@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -342,8 +341,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             INNER JOIN events AS e USING (room_id, event_id)
             WHERE
                 user_id = ?
-                AND %s
-        """ % (
+                AND {}
+        """.format(
             clause,
         )
 
@@ -602,7 +601,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             event_to_memberships = await self._get_joined_profiles_from_event_ids(
                 missing_member_event_ids
             )
-            users_in_room.update((row for row in event_to_memberships.values() if row))
+            users_in_room.update(row for row in event_to_memberships.values() if row)
 
         if event is not None and event.type == EventTypes.Member:
             if event.membership == Membership.JOIN:
@@ -831,9 +830,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             SELECT 1 FROM local_current_membership
             WHERE
                 room_id = ? AND membership = ?
-                AND NOT (%s)
+                AND NOT ({})
                 LIMIT 1
-        """ % (
+        """.format(
             clause,
         )
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2020-2021 The Matrix.org Foundation C.I.C.
 #
@@ -246,7 +245,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                          WHERE room_stats_state.avatar = '{media_prefix}' || lmr.media_id)
                 )
             """.format(
-                media_prefix="mxc://%s/" % (self.server_name,),
+                media_prefix=f"mxc://{self.server_name}/",
             )
             sql += sql_keep
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -129,11 +128,11 @@ class PostgresSequenceGenerator(SequenceGenerator):
         txn = db_conn.cursor(txn_name="sequence.check_consistency")
 
         # First we get the current max ID from the table.
-        table_sql = "SELECT GREATEST(%(agg)s(%(id)s), 0) FROM %(table)s" % {
-            "id": id_column,
-            "table": table,
-            "agg": "MAX" if positive else "-MIN",
-        }
+        table_sql = "SELECT GREATEST({agg}({id}), 0) FROM {table}".format(
+            id=id_column,
+            table=table,
+            agg="MAX" if positive else "-MIN",
+        )
 
         txn.execute(table_sql)
         row = txn.fetchone()
@@ -145,9 +144,7 @@ class PostgresSequenceGenerator(SequenceGenerator):
         # Now we fetch the current value from the sequence and compare with the
         # above.
         max_stream_id = row[0]
-        txn.execute(
-            "SELECT last_value, is_called FROM %(seq)s" % {"seq": self._sequence_name}
-        )
+        txn.execute(f"SELECT last_value, is_called FROM {self._sequence_name}")
         fetch_res = txn.fetchone()
         assert fetch_res is not None
         last_value, is_called = fetch_res

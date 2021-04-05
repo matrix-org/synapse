@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -36,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 class _NoChainCoverIndex(Exception):
     def __init__(self, room_id: str):
-        super().__init__("Unexpectedly no chain cover for events in %s" % (room_id,))
+        super().__init__(f"Unexpectedly no chain cover for events in {room_id}")
 
 
 class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBaseStore):
@@ -744,18 +743,18 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         def _get_rooms_with_many_extremities_txn(txn):
             where_clause = "1=1"
             if room_id_filter:
-                where_clause = "room_id NOT IN (%s)" % (
+                where_clause = "room_id NOT IN ({})".format(
                     ",".join("?" for _ in room_id_filter),
                 )
 
             sql = """
                 SELECT room_id FROM event_forward_extremities
-                WHERE %s
+                WHERE {}
                 GROUP BY room_id
                 HAVING count(*) > ?
                 ORDER BY count(*) DESC
                 LIMIT ?
-            """ % (
+            """.format(
                 where_clause,
             )
 
@@ -835,7 +834,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         """
 
         if stream_ordering <= self.stream_ordering_month_ago:
-            raise StoreError(400, "stream_ordering too old %s" % (stream_ordering,))
+            raise StoreError(400, f"stream_ordering too old {stream_ordering}")
 
         sql = """
                 SELECT event_id FROM stream_ordering_to_exterm

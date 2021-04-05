@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
 # Copyright 2019,2020 The Matrix.org Foundation C.I.C.
@@ -527,11 +526,11 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
                 sql = """
                     SELECT DISTINCT ON (user_id, keytype) user_id, keytype, keydata, stream_id
                         FROM e2e_cross_signing_keys
-                        WHERE %(clause)s
+                        WHERE {clause}
                         ORDER BY user_id, keytype, stream_id DESC
-                """ % {
-                    "clause": clause
-                }
+                """.format(
+                    clause=clause
+                )
             else:
                 # SQLite has special handling for bare columns when using
                 # MIN/MAX with a `GROUP BY` clause where it picks the value from
@@ -539,11 +538,11 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
                 sql = """
                     SELECT user_id, keytype, keydata, MAX(stream_id)
                         FROM e2e_cross_signing_keys
-                        WHERE %(clause)s
+                        WHERE {clause}
                         GROUP BY user_id, keytype
-                """ % {
-                    "clause": clause
-                }
+                """.format(
+                    clause=clause
+                )
 
             txn.execute(sql, params)
             rows = self.db_pool.cursor_to_dict(txn)

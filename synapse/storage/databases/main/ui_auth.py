@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -154,7 +153,7 @@ class UIAuthWorkerStore(SQLBaseStore):
                 desc="mark_ui_auth_stage_complete",
             )
         except self.db_pool.engine.module.IntegrityError:
-            raise StoreError(400, "Unknown session ID: %s" % (session_id,))
+            raise StoreError(400, f"Unknown session ID: {session_id}")
 
     async def get_completed_ui_auth_stages(
         self, session_id: str

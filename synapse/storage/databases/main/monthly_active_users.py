@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -174,12 +173,12 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
                     DELETE FROM monthly_active_users
                     WHERE user_id NOT IN (
                         SELECT user_id FROM monthly_active_users
-                        WHERE NOT %s
+                        WHERE NOT {}
                         ORDER BY timestamp DESC
                         LIMIT ?
                     )
-                    AND NOT %s
-                """ % (
+                    AND NOT {}
+                """.format(
                     in_clause,
                     in_clause,
                 )

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -398,7 +397,7 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
             "local_current_membership",
         ):
             logger.info("[purge] removing %s from %s", room_id, table)
-            txn.execute("DELETE FROM %s WHERE room_id=?" % (table,), (room_id,))
+            txn.execute(f"DELETE FROM {table} WHERE room_id=?", (room_id,))
 
         # Other tables we do NOT need to clear out:
         #

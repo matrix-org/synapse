@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -155,7 +154,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                     (data.state_key,)
                 )
         else:
-            raise Exception("Unknown events stream row type %s" % (row.type,))
+            raise Exception(f"Unknown events stream row type {row.type}")
 
     def _invalidate_caches_for_event(
         self,

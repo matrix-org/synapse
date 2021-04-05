@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -310,15 +309,15 @@ class ClientIpBackgroundUpdateStore(SQLBaseStore):
                         user_id, device_id, MAX(u.last_seen) AS last_seen
                     FROM devices
                     INNER JOIN user_ips AS u USING (user_id, device_id)
-                    WHERE %(where_clause)s
+                    WHERE {where_clause}
                     GROUP BY user_id, device_id
                     ORDER BY user_id ASC, device_id ASC
                     LIMIT ?
                 ) c
                 INNER JOIN user_ips AS u USING (user_id, device_id, last_seen)
-            """ % {
-                "where_clause": where_clause
-            }
+            """.format(
+                where_clause=where_clause
+            )
             txn.execute(sql, where_args + [batch_size])
 
             rows = txn.fetchall()

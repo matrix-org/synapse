@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,7 +31,7 @@ def create_engine(database_config) -> BaseDatabaseEngine:
 
         return PostgresEngine(psycopg2, database_config)
 
-    raise RuntimeError("Unsupported database engine '%s'" % (name,))
+    raise RuntimeError(f"Unsupported database engine '{name}'")
 
 
 __all__ = ["create_engine", "BaseDatabaseEngine", "IncorrectDatabaseSetup"]

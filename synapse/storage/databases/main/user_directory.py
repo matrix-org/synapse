@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -153,10 +152,10 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             # Only fetch 250 rooms, so we don't fetch too many at once, even
             # if those 250 rooms have less than batch_size state events.
             sql = """
-                SELECT room_id, events FROM %s
+                SELECT room_id, events FROM {}
                 ORDER BY events DESC
                 LIMIT 250
-            """ % (
+            """.format(
                 TEMP_TABLE + "_rooms",
             )
             txn.execute(sql)
@@ -278,7 +277,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             return 1
 
         def _get_next_batch(txn):
-            sql = "SELECT user_id FROM %s LIMIT %s" % (
+            sql = "SELECT user_id FROM {} LIMIT {}".format(
                 TEMP_TABLE + "_users",
                 str(batch_size),
             )
@@ -453,7 +452,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                             "upsert returned None when 'can_native_upsert' is False"
                         )
             elif isinstance(self.database_engine, Sqlite3Engine):
-                value = "%s %s" % (user_id, display_name) if display_name else user_id
+                value = f"{user_id} {display_name}" if display_name else user_id
                 self.db_pool.simple_upsert_txn(
                     txn,
                     table="user_directory_search",
@@ -785,7 +784,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 FROM user_directory_search as t
                 INNER JOIN user_directory AS d USING (user_id)
                 WHERE
-                    %(where_clause)s
+                    {where_clause}
                     AND vector @@ to_tsquery('simple', ?)
                 ORDER BY
                     (CASE WHEN d.user_id IS NOT NULL THEN 4.0 ELSE 1.0 END)
@@ -793,27 +792,27 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                     * (CASE WHEN avatar_url IS NOT NULL THEN 1.2 ELSE 1.0 END)
                     * (
                         3 * ts_rank_cd(
-                            '{0.1, 0.1, 0.9, 1.0}',
+                            '{{0.1, 0.1, 0.9, 1.0}}',
                             vector,
                             to_tsquery('simple', ?),
                             8
                         )
                         + ts_rank_cd(
-                            '{0.1, 0.1, 0.9, 1.0}',
+                            '{{0.1, 0.1, 0.9, 1.0}}',
                             vector,
                             to_tsquery('simple', ?),
                             8
                         )
                     )
-                    %(order_case_statements)s
+                    {order_case_statements}
                     DESC,
                     display_name IS NULL,
                     avatar_url IS NULL
                 LIMIT ?
-            """ % {
-                "where_clause": where_clause,
-                "order_case_statements": " ".join(additional_ordering_statements),
-            }
+            """.format(
+                where_clause=where_clause,
+                order_case_statements=" ".join(additional_ordering_statements),
+            )
             args = (
                 join_args
                 + (full_query, exact_query, prefix_query)
@@ -840,18 +839,18 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 FROM user_directory_search as t
                 INNER JOIN user_directory AS d USING (user_id)
                 WHERE
-                    %(where_clause)s
+                    {where_clause}
                     AND value MATCH ?
                 ORDER BY
                     rank(matchinfo(user_directory_search)) DESC,
-                    %(order_statements)s
+                    {order_statements}
                     display_name IS NULL,
                     avatar_url IS NULL
                 LIMIT ?
-            """ % {
-                "where_clause": where_clause,
-                "order_statements": " ".join(additional_ordering_statements),
-            }
+            """.format(
+                where_clause=where_clause,
+                order_statements=" ".join(additional_ordering_statements),
+            )
             args = join_args + (search_query,) + ordering_arguments + (limit + 1,)
         else:
             # This should be unreachable.
@@ -878,7 +877,7 @@ def _parse_query_sqlite(search_term):
 
     # Pull out the individual words, discarding any non-word characters.
     results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
-    return " & ".join("(%s* OR %s)" % (result, result) for result in results)
+    return " & ".join(f"({result}* OR {result})" for result in results)
 
 
 def _parse_query_postgres(search_term):
@@ -891,8 +890,8 @@ def _parse_query_postgres(search_term):
     # Pull out the individual words, discarding any non-word characters.
     results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
 
-    both = " & ".join("(%s:* | %s)" % (result, result) for result in results)
-    exact = " & ".join("%s" % (result,) for result in results)
-    prefix = " & ".join("%s:*" % (result,) for result in results)
+    both = " & ".join(f"({result}:* | {result})" for result in results)
+    exact = " & ".join(f"{result}" for result in results)
+    prefix = " & ".join(f"{result}:*" for result in results)
 
     return both, exact, prefix

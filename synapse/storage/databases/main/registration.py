@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019,2020 The Matrix.org Foundation C.I.C.
@@ -861,8 +860,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             sql = """
                 SELECT address, session_id, medium, client_secret,
                 last_send_attempt, validated_at
-                FROM threepid_validation_session WHERE %s
-                """ % (
+                FROM threepid_validation_session WHERE {}
+                """.format(
                 " AND ".join("%s = ?" % k for k in keyvalues.keys()),
             )
 

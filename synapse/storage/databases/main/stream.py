@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018-2019 New Vector Ltd
@@ -499,8 +498,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
                     room_id = ?
                     AND not outlier
                     AND stream_ordering > ? AND stream_ordering <= ?
-                ORDER BY stream_ordering %s LIMIT ?
-            """ % (
+                ORDER BY stream_ordering {} LIMIT ?
+            """.format(
                 order,
             )
             txn.execute(sql, (room_id, min_from_id, max_to_id, 2 * limit))
@@ -1152,20 +1151,20 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
                 select_keywords += "DISTINCT"
 
         sql = """
-            %(select_keywords)s
+            {select_keywords}
                 event_id, instance_name,
                 topological_ordering, stream_ordering
             FROM events
-            %(join_clause)s
-            WHERE outlier = ? AND room_id = ? AND %(bounds)s
-            ORDER BY topological_ordering %(order)s,
-            stream_ordering %(order)s LIMIT ?
-        """ % {
-            "select_keywords": select_keywords,
-            "join_clause": join_clause,
-            "bounds": bounds,
-            "order": order,
-        }
+            {join_clause}
+            WHERE outlier = ? AND room_id = ? AND {bounds}
+            ORDER BY topological_ordering {order},
+            stream_ordering {order} LIMIT ?
+        """.format(
+            select_keywords=select_keywords,
+            join_clause=join_clause,
+            bounds=bounds,
+            order=order,
+        )
 
         txn.execute(sql, args)
 

@@ -39,12 +39,12 @@ def run_create(cur, database_engine, *args, **kwargs):
                 filter_json BYTEA NOT NULL
             );
             INSERT INTO user_filters_migration (user_id, filter_id, filter_json)
-                %s;
+                {};
             CREATE UNIQUE INDEX user_filters_unique ON user_filters_migration
                 (user_id, filter_id);
             DROP TABLE user_filters;
             ALTER TABLE user_filters_migration RENAME TO user_filters;
-        """ % (
+        """.format(
         select_clause,
     )
 

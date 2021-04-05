@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -156,7 +155,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         # If we can't find the create event, assume we've hit a dead end
         if not create_id:
-            raise NotFoundError("Unknown room %s" % (room_id,))
+            raise NotFoundError(f"Unknown room {room_id}")
 
         # Retrieve the room's create event and return
         create_event = await self.get_event(create_id)
@@ -219,7 +218,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             """
 
             if where_clause:
-                sql += " AND (%s)" % (where_clause,)
+                sql += f" AND ({where_clause})"
 
             args = [room_id]
             args.extend(where_args)

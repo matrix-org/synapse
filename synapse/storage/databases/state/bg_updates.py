@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -82,7 +81,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
         # Unless the filter clause is empty, we're going to append it after an
         # existing where clause
         if where_clause:
-            where_clause = " AND (%s)" % (where_clause,)
+            where_clause = f" AND ({where_clause})"
 
         if isinstance(self.database_engine, PostgresEngine):
             # Temporarily disable sequential scans in this transaction. This is

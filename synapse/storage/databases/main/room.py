@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
@@ -172,7 +171,7 @@ class RoomWorkerStore(SQLBaseStore):
                 SELECT
                     COALESCE(COUNT(*), 0)
                 FROM (
-                    %(published_sql)s
+                    {published_sql}
                 ) published
                 INNER JOIN room_stats_state USING (room_id)
                 INNER JOIN room_stats_current USING (room_id)
@@ -181,9 +180,9 @@ class RoomWorkerStore(SQLBaseStore):
                         join_rules = 'public' OR history_visibility = 'world_readable'
                     )
                     AND joined_members > 0
-            """ % {
-                "published_sql": published_sql
-            }
+            """.format(
+                published_sql=published_sql
+            )
 
             txn.execute(sql, query_args)
             return txn.fetchone()[0]
@@ -306,7 +305,7 @@ class RoomWorkerStore(SQLBaseStore):
                 room_id, name, topic, canonical_alias, joined_members,
                 avatar, history_visibility, joined_members, guest_access
             FROM (
-                %(published_sql)s
+                {published_sql}
             ) published
             INNER JOIN room_stats_state USING (room_id)
             INNER JOIN room_stats_current USING (room_id)
@@ -315,13 +314,13 @@ class RoomWorkerStore(SQLBaseStore):
                     join_rules = 'public' OR history_visibility = 'world_readable'
                 )
                 AND joined_members > 0
-                %(where_clause)s
-            ORDER BY joined_members %(dir)s, room_id %(dir)s
-        """ % {
-            "published_sql": published_sql,
-            "where_clause": where_clause,
-            "dir": "DESC" if forwards else "ASC",
-        }
+                {where_clause}
+            ORDER BY joined_members {dir}, room_id {dir}
+        """.format(
+            published_sql=published_sql,
+            where_clause=where_clause,
+            dir="DESC" if forwards else "ASC",
+        )
 
         if limit is not None:
             query_args.append(limit)
@@ -456,11 +455,11 @@ class RoomWorkerStore(SQLBaseStore):
             FROM room_stats_state state
             INNER JOIN room_stats_current curr USING (room_id)
             INNER JOIN rooms USING (room_id)
-            %s
-            ORDER BY %s %s
+            {}
+            ORDER BY {} {}
             LIMIT ?
             OFFSET ?
-        """ % (
+        """.format(
             where_statement,
             order_by_column,
             "ASC" if order_by_asc else "DESC",
@@ -470,9 +469,9 @@ class RoomWorkerStore(SQLBaseStore):
         count_sql = """
             SELECT count(*) FROM (
               SELECT room_id FROM room_stats_state state
-              %s
+              {}
             ) AS get_room_ids
-        """ % (
+        """.format(
             where_statement,
         )
 
@@ -621,9 +620,9 @@ class RoomWorkerStore(SQLBaseStore):
 
             # Convert the IDs to MXC URIs
             for media_id in local_mxcs:
-                local_media_mxcs.append("mxc://%s/%s" % (self.hs.hostname, media_id))
+                local_media_mxcs.append(f"mxc://{self.hs.hostname}/{media_id}")
             for hostname, media_id in remote_mxcs:
-                remote_media_mxcs.append("mxc://%s/%s" % (hostname, media_id))
+                remote_media_mxcs.append(f"mxc://{hostname}/{media_id}")
 
             return local_media_mxcs, remote_media_mxcs
 

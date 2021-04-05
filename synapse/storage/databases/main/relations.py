@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -98,10 +97,10 @@ class RelationsWorkerStore(SQLBaseStore):
             SELECT event_id, topological_ordering, stream_ordering
             FROM event_relations
             INNER JOIN events USING (event_id)
-            WHERE %s
-            ORDER BY topological_ordering %s, stream_ordering %s
+            WHERE {}
+            ORDER BY topological_ordering {}, stream_ordering {}
             LIMIT ?
-        """ % (
+        """.format(
             " AND ".join(where_clause),
             order,
             order,

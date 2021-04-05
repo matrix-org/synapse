@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -401,7 +400,7 @@ class PushRuleStore(PushRulesWorkerStore):
 
         if not res:
             raise RuleNotFoundException(
-                "before/after rule not found: %s" % (relative_to_rule,)
+                f"before/after rule not found: {relative_to_rule}"
             )
 
         base_priority_class = res["priority_class"]

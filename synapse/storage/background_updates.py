@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -366,7 +365,7 @@ class BackgroundUpdater:
                 # we may already have a half-built index. Let's just drop it
                 # before trying to create it again.
 
-                sql = "DROP INDEX IF EXISTS %s" % (index_name,)
+                sql = f"DROP INDEX IF EXISTS {index_name}"
                 logger.debug("[SQL] %s", sql)
                 c.execute(sql)
 

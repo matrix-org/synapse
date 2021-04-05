@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -585,9 +584,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
                 sql = """
                     SELECT event_id WHERE room_id = ? AND stream_ordering IN (
-                        SELECT max(stream_ordering) WHERE %s
+                        SELECT max(stream_ordering) WHERE {}
                     )
-                """ % (
+                """.format(
                     clause,
                 )
 
@@ -596,7 +595,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 if rows:
                     return rows[0][0]
                 else:
-                    raise RuntimeError("Unrecognized event_ids: %r" % (event_ids,))
+                    raise RuntimeError(f"Unrecognized event_ids: {event_ids!r}")
 
             linearized_event_id = await self.db_pool.runInteraction(
                 "insert_receipt_conv", graph_to_linear

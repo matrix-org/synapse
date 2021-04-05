@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018, 2019 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
@@ -354,7 +353,7 @@ class StatsStore(StateDeltasStore):
         table, id_col = TYPE_TO_TABLE[stats_type]
 
         return await self.db_pool.simple_select_one_onecol(
-            "%s_current" % (table,),
+            f"{table}_current",
             keyvalues={id_col: id},
             retcol="completed_delta_stream_id",
             allow_none=True,
@@ -523,7 +522,7 @@ class StatsStore(StateDeltasStore):
         """
         if self.database_engine.can_native_upsert:
             absolute_updates = [
-                "%(field)s = EXCLUDED.%(field)s" % {"field": field}
+                "{field} = EXCLUDED.{field}".format(field=field)
                 for field in absolutes.keys()
             ]
 
@@ -543,18 +542,18 @@ class StatsStore(StateDeltasStore):
                 qargs.append(val)
 
             sql = """
-                INSERT INTO %(table)s (%(insert_cols_cs)s)
-                VALUES (%(insert_vals_qs)s)
-                ON CONFLICT (%(key_columns)s) DO UPDATE SET %(updates)s
-            """ % {
-                "table": table,
-                "insert_cols_cs": ", ".join(insert_cols),
-                "insert_vals_qs": ", ".join(
+                INSERT INTO {table} ({insert_cols_cs})
+                VALUES ({insert_vals_qs})
+                ON CONFLICT ({key_columns}) DO UPDATE SET {updates}
+            """.format(
+                table=table,
+                insert_cols_cs=", ".join(insert_cols),
+                insert_vals_qs=", ".join(
                     ["?"] * (len(keyvalues) + len(absolutes) + len(additive_relatives))
                 ),
-                "key_columns": ", ".join(keyvalues),
-                "updates": ", ".join(chain(absolute_updates, relative_updates)),
-            }
+                key_columns=", ".join(keyvalues),
+                updates=", ".join(chain(absolute_updates, relative_updates)),
+            )
 
             txn.execute(sql, qargs)
         else:
@@ -621,30 +620,29 @@ class StatsStore(StateDeltasStore):
             )
             keyvalues_where = ("%s = ?" % f for f in keyvalues)
 
-            sets_cc = ("%s = EXCLUDED.%s" % (f, f) for f in copy_columns)
+            sets_cc = (f"{f} = EXCLUDED.{f}" for f in copy_columns)
             sets_ar = (
-                "%s = EXCLUDED.%s + %s.%s" % (f, f, into_table, f)
-                for f in additive_relatives
+                f"{f} = EXCLUDED.{f} + {into_table}.{f}" for f in additive_relatives
             )
 
             sql = """
-                INSERT INTO %(into_table)s (%(ins_columns)s)
-                SELECT %(sel_exprs)s
-                FROM %(src_table)s
-                WHERE %(keyvalues_where)s
-                ON CONFLICT (%(keyvalues)s)
-                DO UPDATE SET %(sets)s
-            """ % {
-                "into_table": into_table,
-                "ins_columns": ", ".join(ins_columns),
-                "sel_exprs": ", ".join(sel_exprs),
-                "keyvalues_where": " AND ".join(keyvalues_where),
-                "src_table": src_table,
-                "keyvalues": ", ".join(
+                INSERT INTO {into_table} ({ins_columns})
+                SELECT {sel_exprs}
+                FROM {src_table}
+                WHERE {keyvalues_where}
+                ON CONFLICT ({keyvalues})
+                DO UPDATE SET {sets}
+            """.format(
+                into_table=into_table,
+                ins_columns=", ".join(ins_columns),
+                sel_exprs=", ".join(sel_exprs),
+                keyvalues_where=" AND ".join(keyvalues_where),
+                src_table=src_table,
+                keyvalues=", ".join(
                     chain(keyvalues.keys(), extra_dst_keyvalues.keys())
                 ),
-                "sets": ", ".join(chain(sets_cc, sets_ar)),
-            }
+                sets=", ".join(chain(sets_cc, sets_ar)),
+            )
 
             qargs = list(
                 chain(
@@ -731,12 +729,12 @@ class StatsStore(StateDeltasStore):
             new_bytes_expression = "LENGTH(CAST(json AS BLOB))"
 
         sql = """
-            SELECT events.room_id, COUNT(*) AS new_events, SUM(%s) AS new_bytes
+            SELECT events.room_id, COUNT(*) AS new_events, SUM({}) AS new_bytes
             FROM events INNER JOIN event_json USING (event_id)
             WHERE (? < stream_ordering AND stream_ordering <= ?)
                 OR (? <= stream_ordering AND stream_ordering <= ?)
             GROUP BY events.room_id
-        """ % (
+        """.format(
             new_bytes_expression,
         )
 
@@ -748,12 +746,12 @@ class StatsStore(StateDeltasStore):
         }
 
         sql = """
-            SELECT events.sender, COUNT(*) AS new_events, SUM(%s) AS new_bytes
+            SELECT events.sender, COUNT(*) AS new_events, SUM({}) AS new_bytes
             FROM events INNER JOIN event_json USING (event_id)
             WHERE (? < stream_ordering AND stream_ordering <= ?)
                 OR (? <= stream_ordering AND stream_ordering <= ?)
             GROUP BY events.sender
-        """ % (
+        """.format(
             new_bytes_expression,
         )
 

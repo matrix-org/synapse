@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -515,7 +514,7 @@ class DatabasePool:
         # growing really large.
         self._TXN_ID = (self._TXN_ID + 1) % (MAX_TXN_ID)
 
-        name = "%s-%x" % (desc, txn_id)
+        name = f"{desc}-{txn_id:x}"
 
         transaction_logger.debug("[TXN START] {%s}", name)
 
@@ -837,7 +836,7 @@ class DatabasePool:
     ) -> None:
         keys, vals = zip(*values.items())
 
-        sql = "INSERT INTO %s (%s) VALUES(%s)" % (
+        sql = "INSERT INTO {} ({}) VALUES({})".format(
             table,
             ", ".join(k for k in keys),
             ", ".join("?" for _ in keys),
@@ -887,7 +886,7 @@ class DatabasePool:
             if k != keys[0]:
                 raise RuntimeError("All items must have the same keys")
 
-        sql = "INSERT INTO %s (%s) VALUES(%s)" % (
+        sql = "INSERT INTO {} ({}) VALUES({})".format(
             table,
             ", ".join(k for k in keys[0]),
             ", ".join("?" for _ in keys[0]),
@@ -1025,15 +1024,15 @@ class DatabasePool:
             # If the value we're passing in is None (aka NULL), we need to use
             # IS, not =, as NULL = NULL equals NULL (False).
             if keyvalues[key] is None:
-                return "%s IS ?" % (key,)
+                return f"{key} IS ?"
             else:
-                return "%s = ?" % (key,)
+                return f"{key} = ?"
 
         if not values:
             # If `values` is empty, then all of the values we care about are in
             # the unique key, so there is nothing to UPDATE. We can just do a
             # SELECT instead to see if it exists.
-            sql = "SELECT 1 FROM %s WHERE %s" % (
+            sql = "SELECT 1 FROM {} WHERE {}".format(
                 table,
                 " AND ".join(_getwhere(k) for k in keyvalues),
             )
@@ -1044,9 +1043,9 @@ class DatabasePool:
                 return False
         else:
             # First try to update.
-            sql = "UPDATE %s SET %s WHERE %s" % (
+            sql = "UPDATE {} SET {} WHERE {}".format(
                 table,
-                ", ".join("%s = ?" % (k,) for k in values),
+                ", ".join(f"{k} = ?" for k in values),
                 " AND ".join(_getwhere(k) for k in keyvalues),
             )
             sqlargs = list(values.values()) + list(keyvalues.values())
@@ -1062,7 +1061,7 @@ class DatabasePool:
         allvalues.update(values)
         allvalues.update(insertion_values)
 
-        sql = "INSERT INTO %s (%s) VALUES (%s)" % (
+        sql = "INSERT INTO {} ({}) VALUES ({})".format(
             table,
             ", ".join(k for k in allvalues),
             ", ".join("?" for _ in allvalues),
@@ -1238,7 +1237,7 @@ class DatabasePool:
                 k + "=EXCLUDED." + k for k in value_names
             )
 
-        sql = "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO %s" % (
+        sql = "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO {}".format(
             table,
             ", ".join(k for k in allnames),
             ", ".join("?" for _ in allnames),
@@ -1495,14 +1494,14 @@ class DatabasePool:
             retcols: the names of the columns to return
         """
         if keyvalues:
-            sql = "SELECT %s FROM %s WHERE %s" % (
+            sql = "SELECT {} FROM {} WHERE {}".format(
                 ", ".join(retcols),
                 table,
-                " AND ".join("%s = ?" % (k,) for k in keyvalues),
+                " AND ".join(f"{k} = ?" for k in keyvalues),
             )
             txn.execute(sql, list(keyvalues.values()))
         else:
-            sql = "SELECT %s FROM %s" % (", ".join(retcols), table)
+            sql = "SELECT {} FROM {}".format(", ".join(retcols), table)
             txn.execute(sql)
 
         return cls.cursor_to_dict(txn)
@@ -1588,10 +1587,10 @@ class DatabasePool:
         clauses = [clause]
 
         for key, value in keyvalues.items():
-            clauses.append("%s = ?" % (key,))
+            clauses.append(f"{key} = ?")
             values.append(value)
 
-        sql = "SELECT %s FROM %s WHERE %s" % (
+        sql = "SELECT {} FROM {} WHERE {}".format(
             ", ".join(retcols),
             table,
             " AND ".join(clauses),
@@ -1623,9 +1622,9 @@ class DatabasePool:
         else:
             where = ""
 
-        update_sql = "UPDATE %s SET %s %s" % (
+        update_sql = "UPDATE {} SET {} {}".format(
             table,
-            ", ".join("%s = ?" % (k,) for k in updatevalues),
+            ", ".join(f"{k} = ?" for k in updatevalues),
             where,
         )
 
@@ -1669,9 +1668,9 @@ class DatabasePool:
         rowcount = cls.simple_update_txn(txn, table, keyvalues, updatevalues)
 
         if rowcount == 0:
-            raise StoreError(404, "No row found (%s)" % (table,))
+            raise StoreError(404, f"No row found ({table})")
         if rowcount > 1:
-            raise StoreError(500, "More than one row matched (%s)" % (table,))
+            raise StoreError(500, f"More than one row matched ({table})")
 
     # Ideally we could use the overload decorator here to specify that the
     # return type is only optional if allow_none is True, but this does not work
@@ -1685,10 +1684,10 @@ class DatabasePool:
         retcols: Iterable[str],
         allow_none: bool = False,
     ) -> Optional[Dict[str, Any]]:
-        select_sql = "SELECT %s FROM %s WHERE %s" % (
+        select_sql = "SELECT {} FROM {} WHERE {}".format(
             ", ".join(retcols),
             table,
-            " AND ".join("%s = ?" % (k,) for k in keyvalues),
+            " AND ".join(f"{k} = ?" for k in keyvalues),
         )
 
         txn.execute(select_sql, list(keyvalues.values()))
@@ -1697,9 +1696,9 @@ class DatabasePool:
         if not row:
             if allow_none:
                 return None
-            raise StoreError(404, "No row found (%s)" % (table,))
+            raise StoreError(404, f"No row found ({table})")
         if txn.rowcount > 1:
-            raise StoreError(500, "More than one row matched (%s)" % (table,))
+            raise StoreError(500, f"More than one row matched ({table})")
 
         return dict(zip(retcols, row))
 
@@ -1733,16 +1732,16 @@ class DatabasePool:
             table: string giving the table name
             keyvalues: dict of column names and values to select the row with
         """
-        sql = "DELETE FROM %s WHERE %s" % (
+        sql = "DELETE FROM {} WHERE {}".format(
             table,
-            " AND ".join("%s = ?" % (k,) for k in keyvalues),
+            " AND ".join(f"{k} = ?" for k in keyvalues),
         )
 
         txn.execute(sql, list(keyvalues.values()))
         if txn.rowcount == 0:
-            raise StoreError(404, "No row found (%s)" % (table,))
+            raise StoreError(404, f"No row found ({table})")
         if txn.rowcount > 1:
-            raise StoreError(500, "More than one row matched (%s)" % (table,))
+            raise StoreError(500, f"More than one row matched ({table})")
 
     async def simple_delete(
         self, table: str, keyvalues: Dict[str, Any], desc: str
@@ -1778,9 +1777,9 @@ class DatabasePool:
         Returns:
             The number of deleted rows.
         """
-        sql = "DELETE FROM %s WHERE %s" % (
+        sql = "DELETE FROM {} WHERE {}".format(
             table,
-            " AND ".join("%s = ?" % (k,) for k in keyvalues),
+            " AND ".join(f"{k} = ?" for k in keyvalues),
         )
 
         txn.execute(sql, list(keyvalues.values()))
@@ -1849,11 +1848,11 @@ class DatabasePool:
         clauses = [clause]
 
         for key, value in keyvalues.items():
-            clauses.append("%s = ?" % (key,))
+            clauses.append(f"{key} = ?")
             values.append(value)
 
         if clauses:
-            sql = "%s WHERE %s" % (sql, " AND ".join(clauses))
+            sql = "{} WHERE {}".format(sql, " AND ".join(clauses))
         txn.execute(sql, values)
 
         return txn.rowcount
@@ -1945,17 +1944,17 @@ class DatabasePool:
         where_clause = "WHERE " if filters or keyvalues or exclude_keyvalues else ""
         arg_list = []  # type: List[Any]
         if filters:
-            where_clause += " AND ".join("%s LIKE ?" % (k,) for k in filters)
+            where_clause += " AND ".join(f"{k} LIKE ?" for k in filters)
             arg_list += list(filters.values())
         where_clause += " AND " if filters and keyvalues else ""
         if keyvalues:
-            where_clause += " AND ".join("%s = ?" % (k,) for k in keyvalues)
+            where_clause += " AND ".join(f"{k} = ?" for k in keyvalues)
             arg_list += list(keyvalues.values())
         if exclude_keyvalues:
-            where_clause += " AND ".join("%s != ?" % (k,) for k in exclude_keyvalues)
+            where_clause += " AND ".join(f"{k} != ?" for k in exclude_keyvalues)
             arg_list += list(exclude_keyvalues.values())
 
-        sql = "SELECT %s FROM %s %s ORDER BY %s %s LIMIT ? OFFSET ?" % (
+        sql = "SELECT {} FROM {} {} ORDER BY {} {} LIMIT ? OFFSET ?".format(
             ", ".join(retcols),
             table,
             where_clause,
@@ -2020,7 +2019,9 @@ class DatabasePool:
             None if no term is given, otherwise a list of dictionaries.
         """
         if term:
-            sql = "SELECT %s FROM %s WHERE %s LIKE ?" % (", ".join(retcols), table, col)
+            sql = "SELECT {} FROM {} WHERE {} LIKE ?".format(
+                ", ".join(retcols), table, col
+            )
             termvalues = ["%%" + term + "%%"]
             txn.execute(sql, termvalues)
         else:
@@ -2051,9 +2052,11 @@ def make_in_list_sql_clause(
     if database_engine.supports_using_any_list:
         # This should hopefully be faster, but also makes postgres query
         # stats easier to understand.
-        return "%s = ANY(?)" % (column,), [list(iterable)]
+        return f"{column} = ANY(?)", [list(iterable)]
     else:
-        return "%s IN (%s)" % (column, ",".join("?" for _ in iterable)), list(iterable)
+        return "{} IN ({})".format(column, ",".join("?" for _ in iterable)), list(
+            iterable
+        )
 
 
 KV = TypeVar("KV")
@@ -2076,7 +2079,9 @@ def make_tuple_comparison_clause(
     """
     if database_engine.supports_tuple_comparison:
         return (
-            "(%s) > (%s)" % (",".join(k[0] for k in keys), ",".join("?" for _ in keys)),
+            "({}) > ({})".format(
+                ",".join(k[0] for k in keys), ",".join("?" for _ in keys)
+            ),
             [k[1] for k in keys],
         )
 
@@ -2116,11 +2121,11 @@ def make_tuple_comparison_clause(
     clause = ""
     args = []  # type: List[KV]
     for k, v in keys[:-1]:
-        clause = clause + "(%s >= ? AND (%s > ? OR " % (k, k)
+        clause = clause + f"({k} >= ? AND ({k} > ? OR "
         args.extend([v, v])
 
     (k, v) = keys[-1]
-    clause += "%s > ?" % (k,)
+    clause += f"{k} > ?"
     args.append(v)
 
     clause += "))" * (len(keys) - 1)

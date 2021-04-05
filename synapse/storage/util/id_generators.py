@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -56,9 +55,9 @@ def _load_current_id(db_conn, table, column, step=1):
     logger.info("initialising stream generator for %s(%s)", table, column)
     cur = db_conn.cursor(txn_name="_load_current_id")
     if step == 1:
-        cur.execute("SELECT MAX(%s) FROM %s" % (column, table))
+        cur.execute(f"SELECT MAX({column}) FROM {table}")
     else:
-        cur.execute("SELECT MIN(%s) FROM %s" % (column, table))
+        cur.execute(f"SELECT MIN({column}) FROM {table}")
     (val,) = cur.fetchone()
     cur.close()
     current_id = int(val) if val else step
@@ -320,13 +319,13 @@ class MultiWriterIdGenerator:
             max_stream_id = 1
             for table, _, id_column in tables:
                 sql = """
-                    SELECT GREATEST(COALESCE(%(agg)s(%(id)s), 1), 1)
-                    FROM %(table)s
-                """ % {
-                    "id": id_column,
-                    "table": table,
-                    "agg": "MAX" if self._positive else "-MIN",
-                }
+                    SELECT GREATEST(COALESCE({agg}({id}), 1), 1)
+                    FROM {table}
+                """.format(
+                    id=id_column,
+                    table=table,
+                    agg="MAX" if self._positive else "-MIN",
+                )
                 cur.execute(sql)
                 (stream_id,) = cur.fetchone()
 
@@ -350,14 +349,14 @@ class MultiWriterIdGenerator:
             rows = []
             for table, instance_column, id_column in tables:
                 sql = """
-                    SELECT %(instance)s, %(id)s FROM %(table)s
-                    WHERE ? %(cmp)s %(id)s
-                """ % {
-                    "id": id_column,
-                    "table": table,
-                    "instance": instance_column,
-                    "cmp": "<=" if self._positive else ">=",
-                }
+                    SELECT {instance}, {id} FROM {table}
+                    WHERE ? {cmp} {id}
+                """.format(
+                    id=id_column,
+                    table=table,
+                    instance=instance_column,
+                    cmp="<=" if self._positive else ">=",
+                )
                 cur.execute(sql, (min_stream_id * self._return_factor,))
 
                 rows.extend(cur)
@@ -597,10 +596,10 @@ class MultiWriterIdGenerator:
             VALUES (?, ?, ?)
             ON CONFLICT (stream_name, instance_name)
             DO UPDATE SET
-                stream_id = %(agg)s(stream_positions.stream_id, EXCLUDED.stream_id)
-        """ % {
-            "agg": "GREATEST" if self._positive else "LEAST",
-        }
+                stream_id = {agg}(stream_positions.stream_id, EXCLUDED.stream_id)
+        """.format(
+            agg="GREATEST" if self._positive else "LEAST",
+        )
 
         pos = (self.get_current_token_for_writer(self._instance_name),)
         txn.execute(sql, (self._stream_name, self._instance_name, pos))

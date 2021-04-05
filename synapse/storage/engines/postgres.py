@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -90,10 +89,10 @@ class PostgresEngine(BaseDatabaseEngine):
         errors = []
 
         if collation != "C":
-            errors.append("    - 'COLLATE' is set to %r. Should be 'C'" % (collation,))
+            errors.append(f"    - 'COLLATE' is set to {collation!r}. Should be 'C'")
 
         if ctype != "C":
-            errors.append("    - 'CTYPE' is set to %r. Should be 'C'" % (ctype,))
+            errors.append(f"    - 'CTYPE' is set to {ctype!r}. Should be 'C'")
 
         if errors:
             raise IncorrectDatabaseSetup(
@@ -153,7 +152,7 @@ class PostgresEngine(BaseDatabaseEngine):
         return bool(conn.closed)
 
     def lock_table(self, txn, table):
-        txn.execute("LOCK TABLE %s in EXCLUSIVE MODE" % (table,))
+        txn.execute(f"LOCK TABLE {table} in EXCLUSIVE MODE")
 
     @property
     def server_version(self):
