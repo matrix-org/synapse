@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -175,7 +174,7 @@ def cache_in_self(builder: T) -> T:
 
         # Prevent cyclic dependencies from deadlocking
         if building[0]:
-            raise ValueError("Cyclic dependency while building %s" % (depname,))
+            raise ValueError(f"Cyclic dependency while building {depname}")
 
         building[0] = True
         try:

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -626,7 +625,7 @@ class Notifier:
             # over /events.
             #
             # I am sorry for what I have done.
-            user_id_for_stream = "_PEEKING_%s_%s" % (
+            user_id_for_stream = "_PEEKING_{}_{}".format(
                 explicit_room_id,
                 user_id_for_stream,
             )

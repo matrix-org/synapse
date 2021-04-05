@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
@@ -200,14 +199,14 @@ def create_requester(
 def get_domain_from_id(string):
     idx = string.find(":")
     if idx == -1:
-        raise SynapseError(400, "Invalid ID: %r" % (string,))
+        raise SynapseError(400, f"Invalid ID: {string!r}")
     return string[idx + 1 :]
 
 
 def get_localpart_from_id(string):
     idx = string.find(":")
     if idx == -1:
-        raise SynapseError(400, "Invalid ID: %r" % (string,))
+        raise SynapseError(400, f"Invalid ID: {string!r}")
     return string[1:idx]
 
 
@@ -232,7 +231,7 @@ class DomainSpecificString(
     # set by:
     #    users = set(user)
     def __iter__(self):
-        raise ValueError("Attempted to iterate a %s" % (type(self).__name__,))
+        raise ValueError("Attempted to iterate a {}".format(type(self).__name__))
 
     # Because this class is a namedtuple of strings and booleans, it is deeply
     # immutable.
@@ -248,7 +247,7 @@ class DomainSpecificString(
         if len(s) < 1 or s[0:1] != cls.SIGIL:
             raise SynapseError(
                 400,
-                "Expected %s string to start with '%s'" % (cls.__name__, cls.SIGIL),
+                f"Expected {cls.__name__} string to start with '{cls.SIGIL}'",
                 Codes.INVALID_PARAM,
             )
 
@@ -269,7 +268,7 @@ class DomainSpecificString(
 
     def to_string(self) -> str:
         """Return a string encoding the fields of the structure object."""
-        return "%s%s:%s" % (self.SIGIL, self.localpart, self.domain)
+        return f"{self.SIGIL}{self.localpart}:{self.domain}"
 
     @classmethod
     def is_valid(cls: Type[DS], s: str) -> bool:
@@ -364,9 +363,9 @@ UPPER_CASE_PATTERN = re.compile(b"[A-Z_]")
 #    bytes rather than strings
 #
 NON_MXID_CHARACTER_PATTERN = re.compile(
-    ("[^%s]" % (re.escape("".join(mxid_localpart_allowed_characters - {"="})),)).encode(
-        "ascii"
-    )
+    (
+        "[^{}]".format(re.escape("".join(mxid_localpart_allowed_characters - {"="})))
+    ).encode("ascii")
 )
 
 
@@ -519,7 +518,7 @@ class RoomStreamToken:
                 )
         except Exception:
             pass
-        raise SynapseError(400, "Invalid token %r" % (string,))
+        raise SynapseError(400, f"Invalid token {string!r}")
 
     @classmethod
     def parse_stream_token(cls, string: str) -> "RoomStreamToken":
@@ -528,7 +527,7 @@ class RoomStreamToken:
                 return cls(topological=None, stream=int(string[1:]))
         except Exception:
             pass
-        raise SynapseError(400, "Invalid token %r" % (string,))
+        raise SynapseError(400, f"Invalid token {string!r}")
 
     def copy_and_advance(self, other: "RoomStreamToken") -> "RoomStreamToken":
         """Return a new token such that if an event is after both this token and
@@ -591,10 +590,10 @@ class RoomStreamToken:
             entries = []
             for name, pos in self.instance_map.items():
                 instance_id = await store.get_id_for_instance(name)
-                entries.append("{}.{}".format(instance_id, pos))
+                entries.append(f"{instance_id}.{pos}")
 
             encoded_map = "~".join(entries)
-            return "m{}~{}".format(self.stream, encoded_map)
+            return f"m{self.stream}~{encoded_map}"
         else:
             return "s%d" % (self.stream,)
 
@@ -708,7 +707,7 @@ class ThirdPartyInstanceID(
     # set by:
     #    users = set(user)
     def __iter__(self):
-        raise ValueError("Attempted to iterate a %s" % (type(self).__name__,))
+        raise ValueError("Attempted to iterate a {}".format(type(self).__name__))
 
     # Because this class is a namedtuple of strings, it is deeply immutable.
     def __copy__(self):
@@ -721,12 +720,12 @@ class ThirdPartyInstanceID(
     def from_string(cls, s):
         bits = s.split("|", 2)
         if len(bits) != 2:
-            raise SynapseError(400, "Invalid ID %r" % (s,))
+            raise SynapseError(400, f"Invalid ID {s!r}")
 
         return cls(appservice_id=bits[0], network_id=bits[1])
 
     def to_string(self):
-        return "%s|%s" % (self.appservice_id, self.network_id)
+        return f"{self.appservice_id}|{self.network_id}"
 
     __str__ = to_string
 

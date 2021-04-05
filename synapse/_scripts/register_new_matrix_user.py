@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2018 New Vector
 #
@@ -37,7 +36,7 @@ def request_registration(
     exit=sys.exit,
 ):
 
-    url = "%s/_synapse/admin/v1/register" % (server_location.rstrip("/"),)
+    url = "{}/_synapse/admin/v1/register".format(server_location.rstrip("/"))
 
     # Get the nonce
     r = requests.get(url, verify=False)
@@ -100,7 +99,7 @@ def register_new_user(user, password, server_location, shared_secret, admin, use
             default_user = None
 
         if default_user:
-            user = input("New user localpart [%s]: " % (default_user,))
+            user = input(f"New user localpart [{default_user}]: ")
             if not user:
                 user = default_user
         else:

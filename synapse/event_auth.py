@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -121,7 +120,7 @@ def check(
         if room_version_prop not in KNOWN_ROOM_VERSIONS:
             raise AuthError(
                 403,
-                "room appears to have unsupported version %s" % (room_version_prop,),
+                f"room appears to have unsupported version {room_version_prop}",
             )
 
         logger.debug("Allowing! %s", event)
@@ -194,7 +193,7 @@ def check(
 
 def _check_size_limits(event: EventBase) -> None:
     def too_big(field):
-        raise EventSizeError("%s too large" % (field,))
+        raise EventSizeError(f"{field} too large")
 
     if len(event.user_id) > 255:
         too_big("user_id")
@@ -297,7 +296,7 @@ def _is_membership_change_allowed(
         if not _verify_third_party_invite(event, auth_events):
             raise AuthError(403, "You are not invited to this room.")
         if target_banned:
-            raise AuthError(403, "%s is banned from the room" % (target_user_id,))
+            raise AuthError(403, f"{target_user_id} is banned from the room")
         return
 
     if Membership.JOIN != membership:
@@ -309,7 +308,7 @@ def _is_membership_change_allowed(
             return
 
         if not caller_in_room:  # caller isn't joined
-            raise AuthError(403, "%s not in room %s." % (event.user_id, event.room_id))
+            raise AuthError(403, f"{event.user_id} not in room {event.room_id}.")
 
     if Membership.INVITE == membership:
         # TODO (erikj): We should probably handle this more intelligently
@@ -317,7 +316,7 @@ def _is_membership_change_allowed(
 
         # Invites are valid iff caller is in the room and target isn't.
         if target_banned:
-            raise AuthError(403, "%s is banned from the room" % (target_user_id,))
+            raise AuthError(403, f"{target_user_id} is banned from the room")
         elif target_in_room:  # the target is already in the room.
             raise AuthError(403, "%s is already in the room." % target_user_id)
         else:
@@ -350,7 +349,7 @@ def _is_membership_change_allowed(
     elif Membership.LEAVE == membership:
         # TODO (erikj): Implement kicks.
         if target_banned and user_level < ban_level:
-            raise AuthError(403, "You cannot unban user %s." % (target_user_id,))
+            raise AuthError(403, f"You cannot unban user {target_user_id}.")
         elif target_user_id != event.user_id:
             kick_level = _get_named_level(auth_events, "kick", 50)
 
@@ -375,7 +374,7 @@ def _check_event_sender_in_room(
 def _check_joined_room(member: Optional[EventBase], user_id: str, room_id: str) -> None:
     if not member or member.membership != Membership.JOIN:
         raise AuthError(
-            403, "User %s not in room %s (%s)" % (user_id, room_id, repr(member))
+            403, "User {} not in room {} ({})".format(user_id, room_id, repr(member))
         )
 
 
@@ -487,12 +486,12 @@ def _check_power_levels(
         try:
             UserID.from_string(k)
         except Exception:
-            raise SynapseError(400, "Not a valid user_id: %s" % (k,))
+            raise SynapseError(400, f"Not a valid user_id: {k}")
 
         try:
             int(v)
         except Exception:
-            raise SynapseError(400, "Not a valid power level: %s" % (v,))
+            raise SynapseError(400, f"Not a valid power level: {v}")
 
     key = (event.type, event.state_key)
     current_state = auth_events.get(key)

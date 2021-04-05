@@ -140,7 +140,7 @@ for dep in itertools.chain(
 ):
     if '"' in dep:
         raise Exception(
-            "Dependency `%s` contains double-quote; use single-quotes instead" % (dep,)
+            f"Dependency `{dep}` contains double-quote; use single-quotes instead"
         )
 
 
@@ -153,9 +153,11 @@ class DependencyException(Exception):
     def message(self):
         return "\n".join(
             [
-                "Missing Requirements: %s" % (", ".join(self.dependencies),),
+                "Missing Requirements: {}".format(", ".join(self.dependencies)),
                 "To install run:",
-                "    pip install --upgrade --force %s" % (" ".join(self.dependencies),),
+                "    pip install --upgrade --force {}".format(
+                    " ".join(self.dependencies)
+                ),
                 "",
             ]
         )
@@ -196,7 +198,7 @@ def check_requirements(for_feature=None):
                     % (dependency, for_feature)
                 )
             else:
-                errors.append("Needed %s but it was not installed" % (dependency,))
+                errors.append(f"Needed {dependency} but it was not installed")
 
     if not for_feature:
         # Check the optional dependencies are up to date. We allow them to not be
