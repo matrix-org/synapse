@@ -295,8 +295,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 newly_joined = prev_member_event.membership != Membership.JOIN
                 is_invite = prev_member_event.membership == Membership.INVITE
 
-            # If the member is not already in the room, check if they should be
-            # allowed access via membership in a space.
+            # If the member is not already in the room and is not accepting an invite,
+            # check if they should be allowed access via membership in a space.
             if (
                 newly_joined
                 and not is_invite
