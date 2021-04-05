@@ -1008,7 +1008,7 @@ class E2eKeysHandler:
         return signature_list, failures
 
     async def _get_e2e_cross_signing_verify_key(
-        self, user_id: str, key_type: str, from_user_id: str = None
+        self, user_id: str, key_type: str, from_user_id: Optional[str] = None
     ) -> Tuple[JsonDict, str, VerifyKey]:
         """Fetch locally or remotely query for a cross-signing public key.
 
