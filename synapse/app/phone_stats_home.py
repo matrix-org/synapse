@@ -125,7 +125,7 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
     log_level = synapse_logger.getEffectiveLevel()
     stats["log_level"] = logging.getLevelName(log_level)
 
-    logger.info("Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats))
+    logger.info(f"Reporting stats to {hs.config.report_stats_endpoint}: {stats}")
     try:
         await hs.get_proxied_http_client().put_json(
             hs.config.report_stats_endpoint, stats

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
 #
@@ -105,7 +104,7 @@ class SynapseHomeServer(HomeServer):
         for path, resmodule in additional_resources.items():
             handler_cls, config = load_module(
                 resmodule,
-                ("listeners", site_tag, "additional_resources", "<%s>" % (path,)),
+                ("listeners", site_tag, "additional_resources", f"<{path}>"),
             )
             handler = handler_cls(config, module_api)
             if IResource.providedBy(handler):
@@ -134,7 +133,7 @@ class SynapseHomeServer(HomeServer):
                 bind_addresses,
                 port,
                 SynapseSite(
-                    "synapse.access.https.%s" % (site_tag,),
+                    f"synapse.access.https.{site_tag}",
                     site_tag,
                     listener_config,
                     root_resource,
@@ -150,7 +149,7 @@ class SynapseHomeServer(HomeServer):
                 bind_addresses,
                 port,
                 SynapseSite(
-                    "synapse.access.http.%s" % (site_tag,),
+                    f"synapse.access.http.{site_tag}",
                     site_tag,
                     listener_config,
                     root_resource,
@@ -301,10 +300,8 @@ class SynapseHomeServer(HomeServer):
             elif listener.type == "metrics":
                 if not self.get_config().enable_metrics:
                     logger.warning(
-                        (
-                            "Metrics listener configured, but "
-                            "enable_metrics is not True!"
-                        )
+                        "Metrics listener configured, but "
+                        "enable_metrics is not True!"
                     )
                 else:
                     _base.listen_metrics(listener.bind_addresses, listener.port)
@@ -356,7 +353,7 @@ def setup(config_options):
     except IncorrectDatabaseSetup as e:
         quit_with_error(str(e))
     except UpgradeDatabaseException as e:
-        quit_with_error("Failed to upgrade database: %s" % (e,))
+        quit_with_error(f"Failed to upgrade database: {e}")
 
     async def do_acme() -> bool:
         """
@@ -442,15 +439,15 @@ def format_config_error(e: ConfigError) -> Iterator[str]:
     yield "Error in configuration"
 
     if e.path:
-        yield " at '%s'" % (".".join(e.path),)
+        yield " at '{}'".format(".".join(e.path))
 
-    yield ":\n  %s" % (e.msg,)
+    yield f":\n  {e.msg}"
 
     e = e.__cause__
     indent = 1
     while e:
         indent += 1
-        yield ":\n%s%s" % ("  " * indent, str(e))
+        yield ":\n{}{}".format("  " * indent, str(e))
         e = e.__cause__
 
 

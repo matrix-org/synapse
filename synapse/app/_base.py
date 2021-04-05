@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 New Vector Ltd
 # Copyright 2019-2021 The Matrix.org Foundation C.I.C
 #
@@ -142,7 +141,7 @@ def quit_with_error(error_string: str) -> NoReturn:
     line_length = max(len(line) for line in message_lines if len(line) < 80) + 2
     sys.stderr.write("*" * line_length + "\n")
     for line in message_lines:
-        sys.stderr.write(" %s\n" % (line.rstrip(),))
+        sys.stderr.write(f" {line.rstrip()}\n")
     sys.stderr.write("*" * line_length + "\n")
     sys.exit(1)
 

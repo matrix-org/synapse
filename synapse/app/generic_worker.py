@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -623,7 +622,7 @@ class GenericWorkerServer(HomeServer):
             bind_addresses,
             port,
             SynapseSite(
-                "synapse.access.http.%s" % (site_tag,),
+                f"synapse.access.http.{site_tag}",
                 site_tag,
                 listener_config,
                 root_resource,
@@ -645,10 +644,8 @@ class GenericWorkerServer(HomeServer):
             elif listener.type == "metrics":
                 if not self.get_config().enable_metrics:
                     logger.warning(
-                        (
-                            "Metrics listener configured, but "
-                            "enable_metrics is not True!"
-                        )
+                        "Metrics listener configured, but "
+                        "enable_metrics is not True!"
                     )
                 else:
                     _base.listen_metrics(listener.bind_addresses, listener.port)
@@ -742,7 +739,7 @@ class GenericWorkerReplicationHandler(ReplicationDataHandler):
         if not self.notify_pushers:
             return
 
-        key = "%s:%s" % (app_id, pushkey)
+        key = f"{app_id}:{pushkey}"
         pushers_for_user = self.pusher_pool.pushers.get(user_id, {})
         pusher = pushers_for_user.pop(key, None)
         if pusher is None:
@@ -754,7 +751,7 @@ class GenericWorkerReplicationHandler(ReplicationDataHandler):
         if not self.notify_pushers:
             return
 
-        key = "%s:%s" % (app_id, pushkey)
+        key = f"{app_id}:{pushkey}"
         logger.info("Starting pusher %r / %r", user_id, key)
         return await self.pusher_pool.start_pusher_by_id(app_id, pushkey, user_id)
 
