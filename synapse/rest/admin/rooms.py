@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -77,7 +76,7 @@ class ResolveRoomIdMixin:
             resolved_room_id = room_id.to_string()
         else:
             raise SynapseError(
-                400, "%s was not legal room ID or room alias" % (room_identifier,)
+                400, f"{room_identifier} was not legal room ID or room alias"
             )
         if not resolved_room_id:
             raise SynapseError(
@@ -232,7 +231,7 @@ class ListRoomRestServlet(RestServlet):
         ):
             raise SynapseError(
                 400,
-                "Unknown value for order_by: %s" % (order_by,),
+                f"Unknown value for order_by: {order_by}",
                 errcode=Codes.INVALID_PARAM,
             )
 
@@ -247,7 +246,7 @@ class ListRoomRestServlet(RestServlet):
         direction = parse_string(request, "dir", default="f")
         if direction not in ("f", "b"):
             raise SynapseError(
-                400, "Unknown direction: %s" % (direction,), errcode=Codes.INVALID_PARAM
+                400, f"Unknown direction: {direction}", errcode=Codes.INVALID_PARAM
             )
 
         reverse_order = True if direction == "b" else False

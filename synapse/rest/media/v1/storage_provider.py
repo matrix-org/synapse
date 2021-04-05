@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -85,7 +84,7 @@ class StorageProviderWrapper(StorageProvider):
         self.store_remote = store_remote
 
     def __str__(self) -> str:
-        return "StorageProviderWrapper[%s]" % (self.backend,)
+        return f"StorageProviderWrapper[{self.backend}]"
 
     async def store_file(self, path: str, file_info: FileInfo) -> None:
         if not file_info.server_name and not self.store_local:
@@ -130,7 +129,7 @@ class FileStorageProviderBackend(StorageProvider):
         self.base_directory = config
 
     def __str__(self):
-        return "FileStorageProviderBackend[%s]" % (self.base_directory,)
+        return f"FileStorageProviderBackend[{self.base_directory}]"
 
     async def store_file(self, path: str, file_info: FileInfo) -> None:
         """See StorageProvider.store_file"""

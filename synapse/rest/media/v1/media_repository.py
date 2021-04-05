@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018-2021 The Matrix.org Foundation C.I.C.
 #
@@ -180,7 +179,7 @@ class MediaRepository:
 
         await self._generate_thumbnails(None, media_id, media_id, media_type)
 
-        return "mxc://%s/%s" % (self.server_name, media_id)
+        return f"mxc://{self.server_name}/{media_id}"
 
     async def get_local_media(
         self, request: Request, media_id: str, name: Optional[str]

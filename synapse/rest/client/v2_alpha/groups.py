@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -52,7 +51,7 @@ def _validate_group_id(f):
     @wraps(f)
     def wrapper(self, request: Request, group_id: str, *args, **kwargs):
         if not GroupID.is_valid(group_id):
-            raise SynapseError(400, "%s is not a legal group ID" % (group_id,))
+            raise SynapseError(400, f"{group_id} is not a legal group ID")
 
         return f(self, request, group_id, *args, **kwargs)
 
@@ -596,7 +595,7 @@ class GroupCreateServlet(RestServlet):
         if len(group_id) > MAX_GROUPID_LENGTH:
             raise SynapseError(
                 400,
-                "Group ID may not be longer than %s characters" % (MAX_GROUPID_LENGTH,),
+                f"Group ID may not be longer than {MAX_GROUPID_LENGTH} characters",
                 Codes.INVALID_PARAM,
             )
 

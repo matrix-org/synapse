@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -71,7 +70,7 @@ class NewUserConsentResource(DirectServeHtmlResource):
             "user_id": user_id.to_string(),
             "user_profile": user_profile,
             "consent_version": self._consent_version,
-            "terms_url": "/_matrix/consent?v=%s" % (self._consent_version,),
+            "terms_url": f"/_matrix/consent?v={self._consent_version}",
         }
 
         template = self._jinja_env.get_template("sso_new_user_consent.html")

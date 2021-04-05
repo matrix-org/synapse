@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Dirk Klimpel
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -81,7 +80,7 @@ class EventReportsRestServlet(RestServlet):
 
         if direction not in ("f", "b"):
             raise SynapseError(
-                400, "Unknown direction: %s" % (direction,), errcode=Codes.INVALID_PARAM
+                400, f"Unknown direction: {direction}", errcode=Codes.INVALID_PARAM
             )
 
         event_reports, total = await self.store.get_event_reports_paginate(

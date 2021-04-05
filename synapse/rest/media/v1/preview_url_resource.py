@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2020-2021 The Matrix.org Foundation C.I.C.
 #
@@ -102,7 +101,7 @@ for endpoint, globs in _oembed_globs.items():
 
         # Ensure the scheme does not have wildcards (and is a sane scheme).
         if results.scheme not in {"http", "https"}:
-            raise ValueError("Insecure oEmbed glob scheme: %s" % (results.scheme,))
+            raise ValueError(f"Insecure oEmbed glob scheme: {results.scheme}")
 
         pattern = urlparse.urlunparse(
             [
@@ -329,7 +328,7 @@ class PreviewUrlResource(DirectServeJsonResource):
                     else:
                         logger.warning("Couldn't get dims for %s", og["og:image"])
 
-                    og["og:image"] = "mxc://%s/%s" % (
+                    og["og:image"] = "mxc://{}/{}".format(
                         self.server_name,
                         image_info["filesystem_id"],
                     )
@@ -412,7 +411,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
             # Ensure there's a version of 1.0.
             if result.get("version") != "1.0":
-                raise OEmbedError("Invalid version: %s" % (result.get("version"),))
+                raise OEmbedError("Invalid version: {}".format(result.get("version")))
 
             oembed_type = result.get("type")
 
@@ -748,7 +747,7 @@ def decode_and_calc_og(
         # blindly consider the encoding as utf-8.
         parser = etree.HTMLParser(recover=True, encoding="utf-8")
     except Exception as e:
-        logger.warning("Unable to create HTML parser: %s" % (e,))
+        logger.warning(f"Unable to create HTML parser: {e}")
         return {}
 
     def _attempt_calc_og(body_attempt: Union[bytes, str]) -> Dict[str, Optional[str]]:

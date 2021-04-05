@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -79,7 +78,7 @@ class LocalKey(Resource):
         verify_keys = {}
         for key in self.config.signing_key:
             verify_key_bytes = key.verify_key.encode()
-            key_id = "%s:%s" % (key.alg, key.version)
+            key_id = f"{key.alg}:{key.version}"
             verify_keys[key_id] = {"key": encode_base64(verify_key_bytes)}
 
         old_verify_keys = {}

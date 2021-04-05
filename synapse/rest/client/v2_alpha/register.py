@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015 - 2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
 #
@@ -419,7 +418,7 @@ class RegisterRestServlet(RestServlet):
             return ret
         elif kind != b"user":
             raise UnrecognizedRequestError(
-                "Do not understand membership kind: %s" % (kind.decode("utf8"),)
+                "Do not understand membership kind: {}".format(kind.decode("utf8"))
             )
 
         # Pull out the provided username and do basic sanity checks early since

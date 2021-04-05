@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -144,7 +143,7 @@ class ConsentResource(DirectServeHtmlResource):
         try:
             self._render_template(
                 request,
-                "%s.html" % (version,),
+                f"{version}.html",
                 user=username,
                 userhmac=userhmac,
                 version=version,

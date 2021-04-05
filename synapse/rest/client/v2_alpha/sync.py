@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -207,7 +206,7 @@ class SyncRestServlet(RestServlet):
         elif filter.event_format == "federation":
             event_formatter = format_event_raw
         else:
-            raise Exception("Unknown event format %s" % (filter.event_format,))
+            raise Exception(f"Unknown event format {filter.event_format}")
 
         joined = await self.encode_joined(
             sync_result.joined,

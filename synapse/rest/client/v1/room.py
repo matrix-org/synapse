@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -304,7 +303,7 @@ class JoinRoomAliasServlet(TransactionRestServlet):
             room_id = room_id.to_string()
         else:
             raise SynapseError(
-                400, "%s was not legal room ID or room alias" % (room_identifier,)
+                400, f"{room_identifier} was not legal room ID or room alias"
             )
 
         await self.room_member_handler.update_membership(
@@ -372,7 +371,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             except ValueError:
                 raise SynapseError(
                     400,
-                    "Invalid server name: %s" % (server,),
+                    f"Invalid server name: {server}",
                     Codes.INVALID_PARAM,
                 )
 
@@ -425,7 +424,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             except ValueError:
                 raise SynapseError(
                     400,
-                    "Invalid server name: %s" % (server,),
+                    f"Invalid server name: {server}",
                     Codes.INVALID_PARAM,
                 )
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Dirk Klimpel
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -55,7 +54,7 @@ class UserMediaStatisticsRestServlet(RestServlet):
         ):
             raise SynapseError(
                 400,
-                "Unknown value for order_by: %s" % (order_by,),
+                f"Unknown value for order_by: {order_by}",
                 errcode=Codes.INVALID_PARAM,
             )
 
@@ -109,7 +108,7 @@ class UserMediaStatisticsRestServlet(RestServlet):
         direction = parse_string(request, "dir", default="f")
         if direction not in ("f", "b"):
             raise SynapseError(
-                400, "Unknown direction: %s" % (direction,), errcode=Codes.INVALID_PARAM
+                400, f"Unknown direction: {direction}", errcode=Codes.INVALID_PARAM
             )
 
         users_media, total = await self.store.get_users_media_usage_paginate(

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -127,9 +126,7 @@ class LoginRestServlet(RestServlet):
             # login flow types returned.
             flows.append({"type": LoginRestServlet.TOKEN_TYPE})
 
-        flows.extend(
-            ({"type": t} for t in self.auth_handler.get_supported_login_types())
-        )
+        flows.extend({"type": t} for t in self.auth_handler.get_supported_login_types())
 
         flows.append({"type": LoginRestServlet.APPSERVICE_TYPE})
 
@@ -332,7 +329,7 @@ class LoginRestServlet(RestServlet):
             # A JWT error occurred, return some info back to the client.
             raise LoginError(
                 403,
-                "JWT validation failed: %s" % (str(e),),
+                "JWT validation failed: {}".format(str(e)),
                 errcode=Codes.FORBIDDEN,
             )
 

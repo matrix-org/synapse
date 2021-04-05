@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2019-2021 The Matrix.org Foundation C.I.C.
 #
@@ -68,7 +67,7 @@ def parse_media_id(request: Request) -> Tuple[str, str, Optional[str]]:
         return server_name, media_id, file_name
     except Exception:
         raise SynapseError(
-            404, "Invalid media id token %r" % (request.postpath,), Codes.UNKNOWN
+            404, f"Invalid media id token {request.postpath!r}", Codes.UNKNOWN
         )
 
 
@@ -76,7 +75,7 @@ def respond_404(request: Request) -> None:
     respond_with_json(
         request,
         404,
-        cs_error("Not found %r" % (request.postpath,), code=Codes.NOT_FOUND),
+        cs_error(f"Not found {request.postpath!r}", code=Codes.NOT_FOUND),
         send_cors=True,
     )
 
@@ -153,9 +152,9 @@ def add_file_headers(
         # correctly interpret those as of 0.99.2 and (b) they are a bit of a pain and we
         # may as well just do the filename* version.
         if _can_encode_filename_as_token(upload_name):
-            disposition = "inline; filename=%s" % (upload_name,)
+            disposition = f"inline; filename={upload_name}"
         else:
-            disposition = "inline; filename*=utf-8''%s" % (_quote(upload_name),)
+            disposition = "inline; filename*=utf-8''{}".format(_quote(upload_name))
 
         request.setHeader(b"Content-Disposition", disposition.encode("ascii"))
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -171,7 +170,7 @@ class PushRuleRestServlet(RestServlet):
         is_default_rule = rule_id.startswith(".")
         if is_default_rule:
             if namespaced_rule_id not in BASE_RULE_IDS:
-                raise NotFoundError("Unknown rule %s" % (namespaced_rule_id,))
+                raise NotFoundError(f"Unknown rule {namespaced_rule_id}")
         if spec["attr"] == "enabled":
             if isinstance(val, dict) and "enabled" in val:
                 val = val["enabled"]
@@ -196,7 +195,7 @@ class PushRuleRestServlet(RestServlet):
                     rule_ids = BASE_RULE_IDS
 
                 if namespaced_rule_id not in rule_ids:
-                    raise SynapseError(404, "Unknown rule %r" % (namespaced_rule_id,))
+                    raise SynapseError(404, f"Unknown rule {namespaced_rule_id!r}")
             return await self.store.set_push_rule_actions(
                 user_id, namespaced_rule_id, actions, is_default_rule
             )
@@ -267,7 +266,7 @@ def _rule_tuple_from_request_object(rule_template, rule_id, req_obj):
 
         conditions = [{"kind": "event_match", "key": "content.body", "pattern": pat}]
     else:
-        raise InvalidRuleException("Unknown rule template: %s" % (rule_template,))
+        raise InvalidRuleException(f"Unknown rule template: {rule_template}")
 
     if "actions" not in req_obj:
         raise InvalidRuleException("No actions found")
@@ -344,7 +343,7 @@ def _namespaced_rule_id_from_spec(spec):
 
 
 def _namespaced_rule_id(spec, rule_id):
-    return "global/%s/%s" % (spec["template"], rule_id)
+    return "global/{}/{}".format(spec["template"], rule_id)
 
 
 class InvalidRuleException(Exception):
