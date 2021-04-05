@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -61,7 +60,7 @@ def log_function(f):
                     r = r[:50] + "..."
                 return r
 
-            func_args = ["%s=%s" % (k, format(v)) for k, v in bound_args.items()]
+            func_args = ["{}={}".format(k, format(v)) for k, v in bound_args.items()]
 
             msg_args = {"func_name": func_name, "args": ", ".join(func_args)}
 

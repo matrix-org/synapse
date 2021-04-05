@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -130,7 +129,7 @@ class RemoteHandler(logging.Handler):
             elif isinstance(ip, IPv6Address):
                 endpoint = TCP6ClientEndpoint(_reactor, self.host, self.port)
             else:
-                raise ValueError("Unknown IP address provided: %s" % (self.host,))
+                raise ValueError(f"Unknown IP address provided: {self.host}")
         except ValueError:
             endpoint = HostnameEndpoint(_reactor, self.host, self.port)
 

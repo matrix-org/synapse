@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -353,7 +352,7 @@ def init_tracer(hs: "HomeServer"):
 
     config = JaegerConfig(
         config=hs.config.jaeger_config,
-        service_name="{} {}".format(hs.config.server_name, hs.get_instance_name()),
+        service_name=f"{hs.config.server_name} {hs.get_instance_name()}",
         scope_manager=LogContextScopeManager(hs.config),
     )
 

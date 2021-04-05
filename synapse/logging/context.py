@@ -290,7 +290,7 @@ class LoggingContext:
     def __str__(self) -> str:
         if self.request:
             return str(self.request)
-        return "%s@%x" % (self.name, id(self))
+        return "{}@{:x}".format(self.name, id(self))
 
     @classmethod
     def current_context(cls) -> LoggingContextOrSentinel:
@@ -354,11 +354,9 @@ class LoggingContext:
         current = set_current_context(self.previous_context)
         if current is not self:
             if current is SENTINEL_CONTEXT:
-                logcontext_error("Expected logging context %s was lost" % (self,))
+                logcontext_error(f"Expected logging context {self} was lost")
             else:
-                logcontext_error(
-                    "Expected logging context %s but found %s" % (self, current)
-                )
+                logcontext_error(f"Expected logging context {self} but found {current}")
 
         # the fact that we are here suggests that the caller thinks that everything
         # is done and dusted for this logcontext, and further activity will not get
@@ -388,16 +386,16 @@ class LoggingContext:
                 support getrusuage.
         """
         if get_thread_id() != self.main_thread:
-            logcontext_error("Started logcontext %s on different thread" % (self,))
+            logcontext_error(f"Started logcontext {self} on different thread")
             return
 
         if self.finished:
-            logcontext_error("Re-starting finished log context %s" % (self,))
+            logcontext_error(f"Re-starting finished log context {self}")
 
         # If we haven't already started record the thread resource usage so
         # far
         if self.usage_start:
-            logcontext_error("Re-starting already-active log context %s" % (self,))
+            logcontext_error(f"Re-starting already-active log context {self}")
         else:
             self.usage_start = rusage
 
@@ -415,7 +413,7 @@ class LoggingContext:
 
         try:
             if get_thread_id() != self.main_thread:
-                logcontext_error("Stopped logcontext %s on different thread" % (self,))
+                logcontext_error(f"Stopped logcontext {self} on different thread")
                 return
 
             if not rusage:
@@ -583,7 +581,7 @@ class PreserveLoggingContext:
         if context != self._new_context:
             if not context:
                 logcontext_error(
-                    "Expected logging context %s was lost" % (self._new_context,)
+                    f"Expected logging context {self._new_context} was lost"
                 )
             else:
                 logcontext_error(

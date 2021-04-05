@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -56,7 +55,7 @@ def parse_drain_configs(
             logging_type = DrainType.lookupByName(config["type"].upper())
         except ValueError:
             raise ConfigError(
-                "%s is not a known logging drain type." % (config["type"],)
+                "{} is not a known logging drain type.".format(config["type"])
             )
 
         # Either use the default formatter or the tersejson one.
@@ -98,7 +97,7 @@ def parse_drain_configs(
         elif logging_type in [DrainType.FILE, DrainType.FILE_JSON]:
             if "location" not in config:
                 raise ConfigError(
-                    "The %s drain needs the 'location' key set." % (logging_type,)
+                    f"The {logging_type} drain needs the 'location' key set."
                 )
 
             location = config.get("location")
