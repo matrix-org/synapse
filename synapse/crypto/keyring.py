@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017, 2018 New Vector Ltd
 #
@@ -209,7 +208,7 @@ class Keyring:
                 return defer.fail(
                     SynapseError(
                         400,
-                        "Not signed by %s" % (verify_request.server_name,),
+                        f"Not signed by {verify_request.server_name}",
                         Codes.UNAUTHORIZED,
                     )
                 )
@@ -319,7 +318,7 @@ class Keyring:
                 loop_count,
             )
             with PreserveLoggingContext():
-                await defer.DeferredList((w[1] for w in wait_on))
+                await defer.DeferredList(w[1] for w in wait_on)
 
             loop_count += 1
 
@@ -369,7 +368,7 @@ class Keyring:
                             verify_request.key_ready.errback,
                             SynapseError(
                                 401,
-                                "Failed to find any key to satisfy %s" % (rq_str,),
+                                f"Failed to find any key to satisfy {rq_str}",
                                 Codes.UNAUTHORIZED,
                             ),
                         )
@@ -688,7 +687,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
             # these both have str() representations which we can't really improve upon
             raise KeyLookupError(str(e))
         except HttpResponseException as e:
-            raise KeyLookupError("Remote server returned an error: %s" % (e,))
+            raise KeyLookupError(f"Remote server returned an error: {e}")
 
         keys = {}  # type: Dict[str, Dict[str, FetchKeyResult]]
         added_keys = []  # type: List[Tuple[str, str, FetchKeyResult]]
@@ -856,7 +855,7 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
                 # upon
                 raise KeyLookupError(str(e))
             except HttpResponseException as e:
-                raise KeyLookupError("Remote server returned an error: %s" % (e,))
+                raise KeyLookupError(f"Remote server returned an error: {e}")
 
             assert isinstance(response, dict)
             if response["server_name"] != server_name:

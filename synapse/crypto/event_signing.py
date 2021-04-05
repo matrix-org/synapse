@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
@@ -53,13 +52,13 @@ def check_event_content_hash(
     # nb it might be a frozendict or a dict
     if not isinstance(hashes, collections.abc.Mapping):
         raise SynapseError(
-            400, "Malformed 'hashes': %s" % (type(hashes),), Codes.UNAUTHORIZED
+            400, "Malformed 'hashes': {}".format(type(hashes)), Codes.UNAUTHORIZED
         )
 
     if name not in hashes:
         raise SynapseError(
             400,
-            "Algorithm %s not in hashes %s" % (name, list(hashes)),
+            "Algorithm {} not in hashes {}".format(name, list(hashes)),
             Codes.UNAUTHORIZED,
         )
     message_hash_base64 = hashes[name]
@@ -67,7 +66,7 @@ def check_event_content_hash(
         message_hash_bytes = decode_base64(message_hash_base64)
     except Exception:
         raise SynapseError(
-            400, "Invalid base64: %s" % (message_hash_base64,), Codes.UNAUTHORIZED
+            400, f"Invalid base64: {message_hash_base64}", Codes.UNAUTHORIZED
         )
     return message_hash_bytes == expected_hash
 
