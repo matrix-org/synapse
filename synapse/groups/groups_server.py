@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018 New Vector Ltd
 # Copyright 2019 Michael Telatynski <7t3chguy@gmail.com>
@@ -554,13 +553,13 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
                 if not isinstance(value, str):
                     raise SynapseError(
                         400,
-                        "%r value is not a string" % (keyname,),
+                        f"{keyname!r} value is not a string",
                         errcode=Codes.INVALID_PARAM,
                     )
                 if len(value) > max_length:
                     raise SynapseError(
                         400,
-                        "Invalid %s parameter" % (keyname,),
+                        f"Invalid {keyname} parameter",
                         errcode=Codes.INVALID_PARAM,
                     )
                 profile[keyname] = value
