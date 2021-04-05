@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -110,7 +109,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         # changes. ARGH.
         def register(name: str, queue: Sized) -> None:
             LaterGauge(
-                "synapse_federation_send_queue_%s_size" % (queue_name,),
+                f"synapse_federation_send_queue_{queue_name}_size",
                 "",
                 [],
                 lambda: len(queue),

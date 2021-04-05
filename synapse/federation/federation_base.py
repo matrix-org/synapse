@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -209,7 +208,7 @@ def _check_sigs_on_pdus(
     )
 
     def sender_err(e, pdu_to_check):
-        errmsg = "event id %s: unable to verify signature for sender %s: %s" % (
+        errmsg = "event id {}: unable to verify signature for sender {}: {}".format(
             pdu_to_check.pdu.event_id,
             pdu_to_check.sender_domain,
             e.getErrorMessage(),
@@ -298,7 +297,7 @@ def event_from_pdu_json(
 
     depth = pdu_json["depth"]
     if not isinstance(depth, int):
-        raise SynapseError(400, "Depth %r not an intger" % (depth,), Codes.BAD_JSON)
+        raise SynapseError(400, f"Depth {depth!r} not an intger", Codes.BAD_JSON)
 
     if depth < 0:
         raise SynapseError(400, "Depth too small", Codes.BAD_JSON)
