@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -279,7 +278,7 @@ class BlacklistingAgentWrapper(Agent):
             if check_against_blacklist(
                 ip_address, self._ip_whitelist, self._ip_blacklist
             ):
-                logger.info("Blocking access to %s due to blacklist" % (ip_address,))
+                logger.info(f"Blocking access to {ip_address} due to blacklist")
                 e = SynapseError(403, "IP address blocked by IP blacklist entry")
                 return defer.fail(Failure(e))
 
@@ -322,7 +321,7 @@ class SimpleHttpClient:
         self.user_agent = hs.version_string
         self.clock = hs.get_clock()
         if hs.config.user_agent_suffix:
-            self.user_agent = "%s %s" % (self.user_agent, hs.config.user_agent_suffix)
+            self.user_agent = f"{self.user_agent} {hs.config.user_agent_suffix}"
 
         # We use this for our body producers to ensure that they use the correct
         # reactor.
@@ -612,7 +611,7 @@ class SimpleHttpClient:
         """
         if args:
             query_str = urllib.parse.urlencode(args, True)
-            uri = "%s?%s" % (uri, query_str)
+            uri = f"{uri}?{query_str}"
 
         json_str = encode_canonical_json(json_body)
 
@@ -661,7 +660,7 @@ class SimpleHttpClient:
         """
         if args:
             query_str = urllib.parse.urlencode(args, True)
-            uri = "%s?%s" % (uri, query_str)
+            uri = f"{uri}?{query_str}"
 
         actual_headers = {b"User-Agent": [self.user_agent]}
         if headers:
@@ -729,7 +728,7 @@ class SimpleHttpClient:
         except BodyExceededMaxSize:
             raise SynapseError(
                 502,
-                "Requested file is too large > %r bytes" % (max_size,),
+                f"Requested file is too large > {max_size!r} bytes",
                 Codes.TOO_LARGE,
             )
         except Exception as e:

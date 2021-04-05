@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -297,7 +296,7 @@ class MatrixHostnameEndpoint:
 
         # This shouldn't happen as we should always have at least one host/port
         # to try and if that doesn't work then we'll have an exception.
-        raise Exception("Failed to resolve server %r" % (self._parsed_uri.netloc,))
+        raise Exception(f"Failed to resolve server {self._parsed_uri.netloc!r}")
 
     async def _resolve_server(self) -> List[Server]:
         """Resolves the server name to a list of hosts and ports to attempt to

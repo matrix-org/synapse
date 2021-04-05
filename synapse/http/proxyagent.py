@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -170,7 +169,7 @@ class ProxyAgent(_AgentBase):
         """
         uri = uri.strip()
         if not _VALID_URI.match(uri):
-            raise ValueError("Invalid URI {!r}".format(uri))
+            raise ValueError(f"Invalid URI {uri!r}")
 
         parsed_uri = URI.fromBytes(uri)
         pool_key = (parsed_uri.scheme, parsed_uri.host, parsed_uri.port)
@@ -233,7 +232,7 @@ class ProxyAgent(_AgentBase):
         else:
             return defer.fail(
                 Failure(
-                    SchemeNotSupported("Unsupported scheme: %r" % (parsed_uri.scheme,))
+                    SchemeNotSupported(f"Unsupported scheme: {parsed_uri.scheme!r}")
                 )
             )
 

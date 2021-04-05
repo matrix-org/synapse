@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -53,11 +52,11 @@ def parse_integer_from_args(args, name, default=None, required=False):
         try:
             return int(args[name][0])
         except Exception:
-            message = "Query parameter %r must be an integer" % (name,)
+            message = f"Query parameter {name!r} must be an integer"
             raise SynapseError(400, message, errcode=Codes.INVALID_PARAM)
     else:
         if required:
-            message = "Missing integer query parameter %r" % (name,)
+            message = f"Missing integer query parameter {name!r}"
             raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
         else:
             return default
@@ -100,7 +99,7 @@ def parse_boolean_from_args(args, name, default=None, required=False):
             raise SynapseError(400, message)
     else:
         if required:
-            message = "Missing boolean query parameter %r" % (name,)
+            message = f"Missing boolean query parameter {name!r}"
             raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
         else:
             return default
@@ -167,12 +166,10 @@ def parse_string_from_args(
             try:
                 value = value.decode(encoding)
             except ValueError:
-                raise SynapseError(
-                    400, "Query parameter %r must be %s" % (name, encoding)
-                )
+                raise SynapseError(400, f"Query parameter {name!r} must be {encoding}")
 
         if allowed_values is not None and value not in allowed_values:
-            message = "Query parameter %r must be one of [%s]" % (
+            message = "Query parameter {!r} must be one of [{}]".format(
                 name,
                 ", ".join(repr(v) for v in allowed_values),
             )
@@ -181,7 +178,7 @@ def parse_string_from_args(
             return value
     else:
         if required:
-            message = "Missing %s query parameter %r" % (param_type, name)
+            message = f"Missing {param_type} query parameter {name!r}"
             raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
         else:
 
@@ -283,9 +280,9 @@ class RestServlet:
             patterns = self.PATTERNS
 
             for method in ("GET", "PUT", "POST", "DELETE"):
-                if hasattr(self, "on_%s" % (method,)):
+                if hasattr(self, f"on_{method}"):
                     servlet_classname = self.__class__.__name__
-                    method_handler = getattr(self, "on_%s" % (method,))
+                    method_handler = getattr(self, f"on_{method}")
                     http_server.register_paths(
                         method, patterns, method_handler, servlet_classname
                     )

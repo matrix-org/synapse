@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -121,7 +120,7 @@ class MatrixFederationRequest:
 
     def __attrs_post_init__(self) -> None:
         global _next_id
-        txn_id = "%s-O-%s" % (self.method, _next_id)
+        txn_id = f"{self.method}-O-{_next_id}"
         _next_id = (_next_id + 1) % (MAXINT - 1)
 
         object.__setattr__(self, "txn_id", txn_id)
@@ -241,7 +240,7 @@ class MatrixFederationHttpClient:
 
         user_agent = hs.version_string
         if hs.config.user_agent_suffix:
-            user_agent = "%s %s" % (user_agent, hs.config.user_agent_suffix)
+            user_agent = f"{user_agent} {hs.config.user_agent_suffix}"
         user_agent = user_agent.encode("ascii")
 
         federation_agent = MatrixFederationAgent(
@@ -998,7 +997,7 @@ class MatrixFederationHttpClient:
             d.addTimeout(self.default_timeout, self.reactor)
             length = await make_deferred_yieldable(d)
         except BodyExceededMaxSize:
-            msg = "Requested file is too large > %r bytes" % (max_size,)
+            msg = f"Requested file is too large > {max_size!r} bytes"
             logger.warning(
                 "{%s} [%s] %s",
                 request.txn_id,
@@ -1033,7 +1032,7 @@ def _flatten_response_never_received(e):
             _flatten_response_never_received(f.value) for f in e.reasons
         )
 
-        return "%s:[%s]" % (type(e).__name__, reasons)
+        return "{}:[{}]".format(type(e).__name__, reasons)
     else:
         return repr(e)
 

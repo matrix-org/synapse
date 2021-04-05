@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -278,7 +277,7 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
         if request_method == "HEAD":
             request_method = "GET"
 
-        method_handler = getattr(self, "_async_render_%s" % (request_method,), None)
+        method_handler = getattr(self, f"_async_render_{request_method}", None)
         if method_handler:
             raw_callback_return = method_handler(request)
 
