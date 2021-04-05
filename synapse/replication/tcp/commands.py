@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -259,7 +258,7 @@ class UserSyncCommand(Command):
         instance_id, user_id, state, last_sync_ms = line.split(" ", 3)
 
         if state not in ("start", "end"):
-            raise Exception("Invalid USER_SYNC state %r" % (state,))
+            raise Exception(f"Invalid USER_SYNC state {state!r}")
 
         return cls(instance_id, user_id, state == "start", int(last_sync_ms))
 
@@ -322,7 +321,7 @@ class FederationAckCommand(Command):
         return cls(instance_name, int(token))
 
     def to_line(self) -> str:
-        return "%s %s" % (self.instance_name, self.token)
+        return f"{self.instance_name} {self.token}"
 
 
 class UserIpCommand(Command):

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -191,7 +190,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                 port = instance_map[instance_name].port
             else:
                 raise Exception(
-                    "Instance %r not in 'instance_map' config" % (instance_name,)
+                    f"Instance {instance_name!r} not in 'instance_map' config"
                 )
 
             data = await cls._serialize_payload(**kwargs)
@@ -213,11 +212,9 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
             else:
                 # We have already asserted in the constructor that a
                 # compatible was picked, but lets be paranoid.
-                raise Exception(
-                    "Unknown METHOD on %s replication endpoint" % (cls.NAME,)
-                )
+                raise Exception(f"Unknown METHOD on {cls.NAME} replication endpoint")
 
-            uri = "http://%s:%s/_synapse/replication/%s/%s" % (
+            uri = "http://{}:{}/_synapse/replication/{}/{}".format(
                 host,
                 port,
                 cls.NAME,
@@ -272,8 +269,8 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         if self.CACHE:
             url_args.append("txn_id")
 
-        args = "/".join("(?P<%s>[^/]+)" % (arg,) for arg in url_args)
-        pattern = re.compile("^/_synapse/replication/%s/%s$" % (self.NAME, args))
+        args = "/".join(f"(?P<{arg}>[^/]+)" for arg in url_args)
+        pattern = re.compile(f"^/_synapse/replication/{self.NAME}/{args}$")
 
         http_server.register_paths(
             method,

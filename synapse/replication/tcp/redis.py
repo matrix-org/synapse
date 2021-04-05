@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -163,7 +162,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
             cmd: received command
         """
 
-        cmd_func = getattr(self.synapse_handler, "on_%s" % (cmd.NAME,), None)
+        cmd_func = getattr(self.synapse_handler, f"on_{cmd.NAME}", None)
         if not cmd_func:
             logger.warning("Unhandled command: %r", cmd)
             return
@@ -198,7 +197,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
 
     async def _async_send_command(self, cmd: Command):
         """Encode a replication command and send it over our outbound connection"""
-        string = "%s %s" % (cmd.NAME, cmd.to_line())
+        string = f"{cmd.NAME} {cmd.to_line()}"
         if "\n" in string:
             raise Exception("Unexpected newline in command: %r", string)
 

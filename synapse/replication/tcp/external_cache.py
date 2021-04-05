@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -49,7 +48,7 @@ class ExternalCache:
         self._redis_connection = hs.get_outbound_redis_connection()
 
     def _get_redis_key(self, cache_name: str, key: str) -> str:
-        return "cache_v1:%s:%s" % (cache_name, key)
+        return f"cache_v1:{cache_name}:{key}"
 
     def is_enabled(self) -> bool:
         """Whether the external cache is used or not.
