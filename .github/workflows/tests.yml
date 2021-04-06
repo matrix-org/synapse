@@ -180,9 +180,8 @@ jobs:
           || true
 
   sytest:
-    if: ${{ always() }}
-    #if: ${{ !failure() }}
-    #needs: linting-done
+    if: ${{ !failure() }}
+    needs: linting-done
     runs-on: ubuntu-latest
     container:
       image: matrixdotorg/sytest-synapse:${{ matrix.sytest-tag }}
@@ -229,9 +228,11 @@ jobs:
         run: /bootstrap.sh synapse
         working-directory: /src
       - name: Dump results.tap
+        if: ${{ always() }}
         run: cat /logs/results.tap
-      - name: Upload logs
+      - name: Upload SyTest logs
         uses: actions/upload-artifact@v2
+        if: ${{ always() }}
         with:
           name: Sytest Logs (${{ join(matrix.*, ', ') }})
           path: |
