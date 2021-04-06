@@ -228,16 +228,15 @@ jobs:
       - name: Run SyTest
         run: /bootstrap.sh synapse
         working-directory: /src
-      - name: Dump logs
-        # Note: Dumps to workflow logs instead of using actions/upload-artifact
-        #       This keeps logs colocated with failing jobs
-        #       It also ignores find's exit code; this is a best effort affair
-        run: >-
-          find /logs -name '*.log*' -o -name 'results.tap'
-          -exec echo "::group::{}" \;
-          -exec cat {} \;
-          -exec echo "::endgroup::" \;
-          || true
+      - name: Dump results.tap
+        run: cat /logs/results.tap
+      - name: Upload logs
+        uses: actions/uploat-artifact@v2
+        with:
+          name: Sytest Logs (${{ join(matrix.*, ', ') }})
+          path: |
+            /logs/results.tap
+            /logs/**/*.log*
 
   portdb:
     if: ${{ !failure() }} # Allow previous steps to be skipped, but not fail
