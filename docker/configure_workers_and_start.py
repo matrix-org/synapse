@@ -169,6 +169,37 @@ WORKERS_CONFIG = {
     },
 }
 
+# Templates for sections that may be inserted multiple times in config files
+SUPERVISORD_PROCESS_CONFIG_BLOCK = """
+[program:synapse_{name}]
+command=/usr/local/bin/python -m {app} \
+    --config-path="{config_path}" \
+    --config-path=/conf/workers/shared.yaml \
+    --config-path=/conf/workers/{name}.yaml
+autorestart=unexpected
+priority=500
+exitcodes=0
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
+"""
+
+NGINX_LOCATION_CONFIG_BLOCK = """
+    location ~* {endpoint} {
+        proxy_pass {upstream};
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host $host;
+    }
+"""
+
+NGINX_UPSTREAM_CONFIG_BLOCK = """
+upstream {upstream_worker_type} {
+{body}
+}
+"""
+
 
 # Utility functions
 def log(txt: str):
@@ -390,22 +421,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
             )
 
         # Enable the worker in supervisord
-        supervisord_config += """
-[program:synapse_{name}]
-command=/usr/local/bin/python -m {app} \
-    --config-path="{config_path}" \
-    --config-path=/conf/workers/shared.yaml \
-    --config-path=/conf/workers/{name}.yaml
-autorestart=unexpected
-priority=500
-exitcodes=0
-stdout_logfile=/dev/stdout
-stdout_logfile_maxbytes=0
-stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0
-""".format_map(
-            worker_config
-        )
+        supervisord_config += SUPERVISORD_PROCESS_CONFIG_BLOCK.format_map(worker_config)
 
         # Add nginx location blocks for this worker's endpoints (if any are defined)
         for pattern in worker_config["endpoint_patterns"]:
@@ -453,16 +469,9 @@ stderr_logfile_maxbytes=0
     # Build the nginx location config blocks
     nginx_location_config = ""
     for endpoint, upstream in nginx_locations.items():
-        nginx_location_config += """
-    location ~* %s {
-        proxy_pass %s;
-        proxy_set_header X-Forwarded-For $remote_addr;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Host $host;
-    }
-""" % (
-            endpoint,
-            upstream,
+        nginx_location_config += NGINX_LOCATION_CONFIG_BLOCK.format(
+            endpoint=endpoint,
+            upstream=upstream,
         )
 
     # Determine the load-balancing upstreams to configure
@@ -473,13 +482,9 @@ stderr_logfile_maxbytes=0
             body += "    server localhost:%d;\n" % (port,)
 
         # Add to the list of configured upstreams
-        nginx_upstream_config += """
-upstream %s {
-%s
-}
-""" % (
-            upstream_worker_type,
-            body,
+        nginx_upstream_config += NGINX_UPSTREAM_CONFIG_BLOCK.format(
+            upstream_worker_type=upstream_worker_type,
+            body=body,
         )
 
     # Finally, we'll write out the config files.
