@@ -117,11 +117,13 @@ jobs:
       - name: Dump logs
         # Note: Dumps to workflow logs instead of using actions/upload-artifact
         #       This keeps logs colocated with failing jobs
+        #       It also ignores find's exit code; this is a best effort affair
         run: >-
           find _trial_temp -name '*.log'
           -exec echo "::group::{}" \;
           -exec cat {} \;
           -exec echo "::endgroup::" \;
+          || true
 
   trial-olddeps:
     if: ${{ !failure() }} # Allow previous steps to be skipped, but not fail
@@ -139,11 +141,13 @@ jobs:
       - name: Dump logs
         # Note: Dumps to workflow logs instead of using actions/upload-artifact
         #       This keeps logs colocated with failing jobs
+        #       It also ignores find's exit code; this is a best effort affair
         run: >-
           find _trial_temp -name '*.log'
           -exec echo "::group::{}" \;
           -exec cat {} \;
           -exec echo "::endgroup::" \;
+          || true
 
   trial-pypy:
     # Very slow; only run if the branch name includes 'pypy'
@@ -167,11 +171,13 @@ jobs:
       - name: Dump logs
         # Note: Dumps to workflow logs instead of using actions/upload-artifact
         #       This keeps logs colocated with failing jobs
+        #       It also ignores find's exit code; this is a best effort affair
         run: >-
           find _trial_temp -name '*.log'
           -exec echo "::group::{}" \;
           -exec cat {} \;
           -exec echo "::endgroup::" \;
+          || true
 
   sytest:
     if: ${{ !failure() }}
@@ -224,11 +230,13 @@ jobs:
       - name: Dump logs
         # Note: Dumps to workflow logs instead of using actions/upload-artifact
         #       This keeps logs colocated with failing jobs
+        #       It also ignores find's exit code; this is a best effort affair
         run: >-
-          find logs -name '*.log*' -o -name 'results.tap'
+          find /logs -name '*.log*' -o -name 'results.tap'
           -exec echo "::group::{}" \;
           -exec cat {} \;
           -exec echo "::endgroup::" \;
+          || true
 
   portdb:
     if: ${{ !failure() }} # Allow previous steps to be skipped, but not fail
