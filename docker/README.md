@@ -53,7 +53,7 @@ The following environment variables are supported in `generate` mode:
 * `SYNAPSE_SERVER_NAME` (mandatory): the server public hostname.
 * `SYNAPSE_REPORT_STATS` (mandatory, `yes` or `no`): whether to enable
   anonymous statistics reporting.
-* `SYNAPSE_HTTP_PORT`: the port Synapse should start listen for http traffic on.
+* `SYNAPSE_HTTP_PORT`: the port Synapse should listen on for http traffic.
 * `SYNAPSE_CONFIG_DIR`: where additional config files (such as the log config
   and event signing key) will be stored. Defaults to `/data`.
 * `SYNAPSE_CONFIG_PATH`: path to the file to be generated. Defaults to
@@ -74,7 +74,7 @@ docker run -d --name synapse \
     matrixdotorg/synapse:latest
 ```
 
-assuming 8008 is the port Synapse is listening for traffic on.
+assuming 8008 is the port Synapse is configured to listen on for http traffic.
 
 You can then check that it has started correctly with:
 
@@ -211,7 +211,7 @@ healthcheck:
 ## Using jemalloc
 
 Jemalloc is embedded in the image and will be used instead of the default allocator.
-You can read about jemalloc by reading the Synapse [README](../README.md)
+You can read about jemalloc by reading the Synapse [README](../README.md).
 
 ### Running all worker processes in a single container for testing
 
@@ -258,8 +258,8 @@ Sharding is supported for a subset of workers, in line with the [worker document
 the type multiple times in `SYNAPSE_WORKERS`
 (e.g `SYNAPSE_WORKERS=event_creator,event_creator...`).
 
-Otherwise, `SYNAPSE_WORKERS` can either be left empty or unset to spawn no workers (
-leaving only the main process). The container is configured to use redis-based worker
+Otherwise, `SYNAPSE_WORKERS` can either be left empty or unset to spawn no workers 
+(leaving only the main process). The container is configured to use redis-based worker
 mode.
 
 Setting `SYNAPSE_WORKERS_WRITE_LOGS_TO_DISK=1` will cause worker logs to be written to 
