@@ -180,8 +180,9 @@ jobs:
           || true
 
   sytest:
-    if: ${{ !failure() }}
-    needs: linting-done
+    if: ${{ always() }}
+    #if: ${{ !failure() }}
+    #needs: linting-done
     runs-on: ubuntu-latest
     container:
       image: matrixdotorg/sytest-synapse:${{ matrix.sytest-tag }}
