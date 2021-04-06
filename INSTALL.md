@@ -38,6 +38,7 @@ There are 3 steps to follow under **Installation Instructions**.
     - [URL previews](#url-previews)
     - [Troubleshooting Installation](#troubleshooting-installation)
 
+
 ## Choosing your server name
 
 It is important to choose the name for your server before you install Synapse,
@@ -542,7 +543,7 @@ Alternatively, you can do so from the command line. This can be done as follows:
     register_new_matrix_user -c homeserver.yaml http://localhost:8008
     ```
 
-This will prompt you to add details for the new user, and will then connect to 
+This will prompt you to add details for the new user, and will then connect to
 the running Synapse to create the new user. For example:
 ```
 New user localpart: erikj
