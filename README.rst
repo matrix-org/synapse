@@ -319,7 +319,7 @@ Platform dependencies
 =====================
 
 Synapse uses a number of platform dependencies such as Python and PostgreSQL,
-and aims to support versions supported upstream. See the
+and aims to follow supported upstream versions. See the
 `<docs/deprecation_policy.md>`_ document for more details.
 
 
