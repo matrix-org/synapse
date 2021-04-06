@@ -541,6 +541,11 @@ class EventCreationHandler:
         if txn_id is not None:
             builder.internal_metadata.txn_id = txn_id
 
+        logger.info("setting internal_metadata.outlier %s", outlier)
+        # Setting the outlier on the builder does not work to propogate it over to the event
+        # because `outlier` is not part of the `interal_metadata_dict` that is serialized later.
+        # Not sure why it is separate.
+        # See https://github.com/matrix-org/synapse/pull/9247#r607595779
         builder.internal_metadata.outlier = outlier
 
         event, context = await self.create_new_client_event(
@@ -775,6 +780,7 @@ class EventCreationHandler:
                 prev_event_ids=prev_events,
                 auth_event_ids=auth_event_ids,
                 inherit_depth=inherit_depth,
+                outlier=outlier,
             )
 
             assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
@@ -855,6 +861,11 @@ class EventCreationHandler:
             auth_event_ids=auth_event_ids,
             inherit_depth=inherit_depth,
         )
+
+        # Pass on the outlier property from the builder to the event
+        if builder.internal_metadata.outlier:
+            event.internal_metadata.outlier = builder.internal_metadata.outlier
+
         context = await self.state.compute_event_context(event, state_for_events)
         if requester:
             context.app_service = requester.app_service

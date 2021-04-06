@@ -308,8 +308,22 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
 
         logger.info("body waewefaew %s", body)
 
+        # current_state_ids = await self.store.get_current_state_ids(
+        #     room_id,
+        # )
+        # current_auth_event_ids = self.auth.compute_auth_events(
+        #     # TODO,
+        #     asdf,
+        #     current_state_ids
+        # )
+
         state_for_events = []
         auth_event_ids = []
+
+        create_event = await self.store.get_create_event_for_room(room_id)
+        state_for_events.append(create_event)
+        auth_event_ids.append(create_event.event_id)
+
         for stateEv in body["state_events_at_start"]:
             logger.info("stateEv %s", stateEv)
             assert_params_in_dict(stateEv, ["type", "content", "sender"])
@@ -322,7 +336,7 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                 "state_key": stateEv["state_key"],
             }
 
-            # Make the events float off in their own
+            # Make the events float off on their own
             fake_prev_event_id = "$" + random_string(43)
 
             # # Also mark the event as an outlier outside of the normal DAG
@@ -338,7 +352,9 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                     room_id=room_id,
                     action=membership,
                     content=stateEv["content"],
-                    outlier=True
+                    outlier=True,
+                    # TODO:
+                    # state_for_events=current_auth_event_ids,
                 )
                 auth_event = await self.store.get_event(event_id)
                 state_for_events.append(auth_event)
@@ -382,8 +398,8 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                 # We are allowed to post these messages because we are referencing the
                 # floating auth state events that we just created above
                 auth_event_ids=auth_event_ids,
-                state_for_events=state_for_events,
-                outlier=True,
+                # state_for_events=state_for_events,
+                # outlier=True,
             )
 
             # event, context = await self.event_creation_handler.create_event(
