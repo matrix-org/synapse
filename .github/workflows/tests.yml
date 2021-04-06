@@ -232,7 +232,7 @@ jobs:
       - name: Dump results.tap
         run: cat /logs/results.tap
       - name: Upload logs
-        uses: actions/uploat-artifact@v2
+        uses: actions/upload-artifact@v2
         with:
           name: Sytest Logs (${{ join(matrix.*, ', ') }})
           path: |
