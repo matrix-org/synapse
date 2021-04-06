@@ -287,7 +287,9 @@ class RoomSendEventRestServlet(TransactionRestServlet):
 class RoomBulkSendEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
         super().__init__(hs)
+        self.store = hs.get_datastore()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
         self._msc2716_enabled = hs.config.experimental.msc2716_enabled
@@ -306,6 +308,7 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
 
         logger.info("body waewefaew %s", body)
 
+        state_for_events = []
         auth_event_ids = []
         for stateEv in body["state_events_at_start"]:
             logger.info("stateEv %s", stateEv)
@@ -322,12 +325,36 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
             # Make the events float off in their own
             fake_prev_event_id = "$" + random_string(43)
 
-            # Also mark the event as an outlier outside of the normal DAG
-            (event, _,) = await self.event_creation_handler.create_event(
-                requester, event_dict, prev_event_ids=[fake_prev_event_id], outlier=True
-            )
-            event_id = event.event_id
-            auth_event_ids.append(event_id)
+            # # Also mark the event as an outlier outside of the normal DAG
+            # (event, _,) = await self.event_creation_handler.create_event(
+            #     requester, event_dict, prev_event_ids=[fake_prev_event_id], outlier=True
+            # )
+
+            if stateEv["type"] == EventTypes.Member:
+                membership = stateEv["content"].get("membership", None)
+                event_id, _ = await self.room_member_handler.update_membership(
+                    requester,
+                    target=UserID.from_string(stateEv["state_key"]),
+                    room_id=room_id,
+                    action=membership,
+                    content=stateEv["content"],
+                    outlier=True
+                )
+                auth_event = await self.store.get_event(event_id)
+                state_for_events.append(auth_event)
+                auth_event_ids.append(event_id)
+            else:
+                (
+                    event,
+                    _,
+                ) = await self.event_creation_handler.create_and_send_nonmember_event(
+                    requester,
+                    event_dict,
+                    outlier=True,
+                )
+                state_for_events.append(event)
+                event_id = event.event_id
+                auth_event_ids.append(event_id)
 
         logger.info("Done with state events grrtrsrdhh %s", auth_event_ids)
 
@@ -345,38 +372,40 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                 "prev_events": prev_event_ids,
             }
 
-            # (
-            #     event,
-            #     _,
-            # ) = await self.event_creation_handler.create_and_send_nonmember_event(
-            #     requester,
-            #     event_dict,
-            #     inherit_depth=True,
-            #     # We are allowed to post these messages because we are referencing the
-            #     # floating auth state events that we just created above
-            #     auth_event_ids=auth_event_ids,
-            # )
-
-            event, context = await self.event_creation_handler.create_event(
-                requester,
-                event_dict,
-                # We are allowed to post these messages because we are referencing the
-                # floating auth state events that we just created above
-                auth_event_ids=auth_event_ids,
-                prev_event_ids=prev_event_ids,
-                inherit_depth=True,
-            )
-            # await self.event_creation_handler.persist_and_notify_client_event(
-            #     requester, event, context, ratelimit=False
-            # )
-
             (
                 event,
                 _,
-                _,
-            ) = await self.event_creation_handler.storage.persistence.persist_event(
-                event, context=context, backfilled=True
+            ) = await self.event_creation_handler.create_and_send_nonmember_event(
+                requester,
+                event_dict,
+                inherit_depth=True,
+                # We are allowed to post these messages because we are referencing the
+                # floating auth state events that we just created above
+                auth_event_ids=auth_event_ids,
+                state_for_events=state_for_events,
+                outlier=True,
             )
+
+            # event, context = await self.event_creation_handler.create_event(
+            #     requester,
+            #     event_dict,
+            #     # We are allowed to post these messages because we are referencing the
+            #     # floating auth state events that we just created above
+            #     auth_event_ids=auth_event_ids,
+            #     prev_event_ids=prev_event_ids,
+            #     inherit_depth=True,
+            # )
+            # # await self.event_creation_handler.persist_and_notify_client_event(
+            # #     requester, event, context, ratelimit=False
+            # # )
+
+            # (
+            #     event,
+            #     _,
+            #     _,
+            # ) = await self.event_creation_handler.storage.persistence.persist_event(
+            #     event, context=context, backfilled=True
+            # )
 
             event_id = event.event_id
             event_ids.append(event_id)

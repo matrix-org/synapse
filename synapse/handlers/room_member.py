@@ -180,6 +180,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         ratelimit: bool = True,
         content: Optional[dict] = None,
         require_consent: bool = True,
+        outlier: bool = False,
     ) -> Tuple[str, int]:
         user_id = target.to_string()
 
@@ -218,6 +219,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             txn_id=txn_id,
             prev_event_ids=prev_event_ids,
             require_consent=require_consent,
+            outlier=outlier
         )
 
         prev_state_ids = await context.get_prev_state_ids()
@@ -312,6 +314,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         ratelimit: bool = True,
         content: Optional[dict] = None,
         require_consent: bool = True,
+        outlier: bool = False,
     ) -> Tuple[str, int]:
         """Update a user's membership in a room.
 
@@ -352,6 +355,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 ratelimit=ratelimit,
                 content=content,
                 require_consent=require_consent,
+                outlier=outlier,
             )
 
         return result
@@ -368,6 +372,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         ratelimit: bool = True,
         content: Optional[dict] = None,
         require_consent: bool = True,
+        outlier: bool = False,
     ) -> Tuple[str, int]:
         """Helper for update_membership.
 
@@ -623,6 +628,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             prev_event_ids=latest_event_ids,
             content=content,
             require_consent=require_consent,
+            outlier=outlier
         )
 
     async def transfer_room_state_on_room_upgrade(

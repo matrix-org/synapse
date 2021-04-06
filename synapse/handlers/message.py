@@ -16,7 +16,7 @@
 # limitations under the License.
 import logging
 import random
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
 
 from canonicaljson import encode_canonical_json
 
@@ -454,6 +454,7 @@ class EventCreationHandler:
         prev_event_ids: Optional[List[str]] = None,
         inherit_depth: bool = False,
         auth_event_ids: Optional[List[str]] = None,
+        state_for_events: Optional[Iterable[EventBase]] = None,
         require_consent: bool = True,
         outlier: bool = False,
     ) -> Tuple[EventBase, EventContext]:
@@ -548,6 +549,7 @@ class EventCreationHandler:
             prev_event_ids=prev_event_ids,
             inherit_depth=inherit_depth,
             auth_event_ids=auth_event_ids,
+            state_for_events=state_for_events,
         )
 
         # In an ideal world we wouldn't need the second part of this condition. However,
@@ -706,9 +708,11 @@ class EventCreationHandler:
         event_dict: dict,
         inherit_depth: bool = False,
         auth_event_ids: Optional[List[str]] = None,
+        state_for_events: Optional[Iterable[EventBase]] = None,
         ratelimit: bool = True,
         txn_id: Optional[str] = None,
         ignore_shadow_ban: bool = False,
+        outlier: bool = False,
     ) -> Tuple[EventBase, int]:
         """
         Creates an event, then sends it.
@@ -803,6 +807,7 @@ class EventCreationHandler:
         prev_event_ids: Optional[List[str]] = None,
         inherit_depth: bool = False,
         auth_event_ids: Optional[List[str]] = None,
+        state_for_events: Optional[Iterable[EventBase]] = None,
     ) -> Tuple[EventBase, EventContext]:
         """Create a new event for a local client
 
@@ -850,7 +855,7 @@ class EventCreationHandler:
             auth_event_ids=auth_event_ids,
             inherit_depth=inherit_depth,
         )
-        context = await self.state.compute_event_context(event)
+        context = await self.state.compute_event_context(event, state_for_events)
         if requester:
             context.app_service = requester.app_service
 
