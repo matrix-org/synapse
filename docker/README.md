@@ -213,7 +213,7 @@ healthcheck:
 Jemalloc is embedded in the image and will be used instead of the default allocator.
 You can read about jemalloc by reading the Synapse [README](../README.md)
 
-### Running all worker processes in a single container
+### Running all worker processes in a single container for testing
 
 Anyone looking to run Synapse workers with docker in production should use one container
 per Synapse process, specifying a different worker config per container.
