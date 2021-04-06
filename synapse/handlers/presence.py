@@ -1140,7 +1140,7 @@ class PresenceEventSource:
 
                 return presence_updates, max_token
 
-            # Make mypy happy. users_interested_in should be a set now
+            # Make mypy happy. users_interested_in should now be a set
             assert not isinstance(users_interested_in, str)
 
             # The set of users that we're interested in and that have had a presence update.

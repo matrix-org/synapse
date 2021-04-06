@@ -83,7 +83,8 @@ class PresenceRouter:
         Optionally, the object PresenceRouter.ALL_USERS can be returned to indicate
         that this user should receive all incoming local and remote presence updates.
 
-        Note that this method will only be called for local users.
+        Note that this method will only be called for local users, but can return users
+        that are local or remote.
 
         Args:
             user_id: A user requesting presence updates.
