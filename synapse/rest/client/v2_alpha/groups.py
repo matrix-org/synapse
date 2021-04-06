@@ -38,7 +38,7 @@ from synapse.types import GroupID, JsonDict
 from ._base import client_patterns
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 

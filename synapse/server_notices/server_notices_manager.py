@@ -58,7 +58,7 @@ class ServerNoticesManager:
         user_id: str,
         event_content: dict,
         type: str = EventTypes.Message,
-        state_key: Optional[bool] = None,
+        state_key: Optional[str] = None,
     ) -> EventBase:
         """Send a notice to the given user
 

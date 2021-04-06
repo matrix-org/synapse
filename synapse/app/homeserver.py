@@ -67,7 +67,6 @@ from synapse.storage import DataStore
 from synapse.storage.engines import IncorrectDatabaseSetup
 from synapse.storage.prepare_database import UpgradeDatabaseException
 from synapse.util.httpresourcetree import create_resource_tree
-from synapse.util.manhole import manhole
 from synapse.util.module_loader import load_module
 from synapse.util.versionstring import get_version_string
 
@@ -288,12 +287,8 @@ class SynapseHomeServer(HomeServer):
             if listener.type == "http":
                 self._listening_services.extend(self._listener_http(config, listener))
             elif listener.type == "manhole":
-                listen_tcp(
-                    listener.bind_addresses,
-                    listener.port,
-                    manhole(
-                        username="matrix", password="rabbithole", globals={"hs": self}
-                    ),
+                _base.listen_manhole(
+                    listener.bind_addresses, listener.port, manhole_globals={"hs": self}
                 )
             elif listener.type == "replication":
                 services = listen_tcp(

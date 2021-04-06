@@ -36,7 +36,7 @@ def freeze(o):
 
 def unfreeze(o):
     if isinstance(o, (dict, frozendict)):
-        return dict({k: unfreeze(v) for k, v in o.items()})
+        return {k: unfreeze(v) for k, v in o.items()}
 
     if isinstance(o, (bytes, str)):
         return o

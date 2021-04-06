@@ -122,7 +122,6 @@ def default_config(name, parse=False):
         "enable_registration_captcha": False,
         "macaroon_secret_key": "not even a little secret",
         "trusted_third_party_id_servers": [],
-        "room_invite_state_types": [],
         "password_providers": [],
         "worker_replication_url": "",
         "worker_app": None,

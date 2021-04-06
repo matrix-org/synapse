@@ -1027,8 +1027,8 @@ class GroupServerStore(GroupServerWorkerStore):
         user_id: str,
         is_admin: bool = False,
         is_public: bool = True,
-        local_attestation: dict = None,
-        remote_attestation: dict = None,
+        local_attestation: Optional[dict] = None,
+        remote_attestation: Optional[dict] = None,
     ) -> None:
         """Add a user to the group server.
 

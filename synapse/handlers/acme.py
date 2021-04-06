@@ -24,7 +24,7 @@ from twisted.web.resource import Resource
 from synapse.app import check_bind_error
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
