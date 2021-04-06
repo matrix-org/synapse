@@ -233,7 +233,7 @@ using the instructions in [Building the image](#building-the-image), then afterw
 the worker image:
 
 ```
-docker build -t matrixdotorg/synapse:workers -f docker/Dockerfile-workers .
+docker build -t matrixdotorg/synapse-workers -f docker/Dockerfile-workers .
 ```
 
 To start a container, use the following:
