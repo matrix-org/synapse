@@ -169,7 +169,7 @@ def release():
             default = "master"
 
         branch_name = click.prompt(
-            "Which branch should release be based on?", default=default
+            "Which branch should the release be based on?", default=default
         )
 
         base_branch = find_ref(repo, branch_name)
@@ -195,7 +195,7 @@ def release():
     with open("synapse/__init__.py", "w") as f:
         f.write(red.dumps())
 
-    # Generate changelgs
+    # Generate changelogs
     subprocess.run("python3 -m towncrier", shell=True)
 
     # Generate debian changelogs if its not an RC.
