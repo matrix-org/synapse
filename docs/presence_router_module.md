@@ -4,11 +4,11 @@ Synapse supports configuring a module that can specify additional users
 (local or remote) to should receive certain presence updates from local
 users.
 
-Note that routing presence via an Application Service transactions is not
+Note that routing presence via Application Service transactions is not
 currently supported.
 
-The presence routing module is implemented as a Python class, which will be imported by
-the running Synapse.
+The presence routing module is implemented as a Python class, which will
+be imported by the running Synapse.
 
 ## Python Presence Router Class
 
@@ -40,6 +40,7 @@ required.
 ```python
 def parse_config(config_dict: dict) -> Any
 ```
+
 **Required.** A static method that is passed a dictionary of config options, and
   should return a validated config object. This method is described further in
   [Configuration](#configuration).
@@ -70,8 +71,11 @@ async def get_interested_users(self, user_id: str) -> Union[Set[str], str]
 
 **Required.** An asynchronous method that is passed a single Matrix User ID. This
 method is expected to return the users that the passed in user may be interested in the
-presence of, in addition to users they share a room with. This may be local or remote
-users. It does so by returning a python set of Matrix User IDs, or the object
+presence of. Returned users may be local or remote. The presence routed as a result of
+what this method returns is sent in addition to the updates already sent between users
+that share a room together. Presence updates are deduplicated.
+
+This method should return a python set of Matrix User IDs, or the object
 `synapse.events.presence_router.PresenceRouter.ALL_USERS` to indicate that the passed
 user should receive presence information for *all* known users.
 
