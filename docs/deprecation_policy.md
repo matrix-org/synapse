@@ -2,14 +2,14 @@ Deprecation Policy for Platform Dependencies
 ============================================
 
 Synapse has a number of platform dependencies, including Python and PostgreSQL.
-This document outlines the policy towards which versions we support, and how we
+This document outlines the policy towards which versions we support, and when we
 drop support for versions in the future.
 
 
 Policy
 ------
 
-For Python and PostgreSQL Synapse will follow the upstream support life cycles,
+Synapse follows the upstream support life cycles for Python and PostgreSQL,
 i.e. when a version reaches End of Life Synapse will withdraw support for that
 version in future releases.
 
