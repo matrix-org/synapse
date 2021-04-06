@@ -31,7 +31,7 @@ jobs:
         run: scripts-dev/check_line_terminators.sh
 
   lint-newsfile:
-    if: ${{ github.base_ref == 'develop'  || contains(github.ref, 'release-') }}
+    if: ${{ github.base_ref == 'develop'  || contains(github.base_ref, 'release-') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
