@@ -314,6 +314,15 @@ Testing with SyTest is recommended for verifying that changes related to the
 Client-Server API are functioning correctly. See the `installation instructions
 <https://github.com/matrix-org/sytest#installing>`_ for details.
 
+
+Platform dependencies
+=====================
+
+Synapse uses a number of platform dependencies such as Python and PostgreSQL,
+and aims to follow supported upstream versions. See the
+`<docs/deprecation_policy.md>`_ document for more details.
+
+
 Troubleshooting
 ===============
 
@@ -389,7 +398,7 @@ likely cause. The misbehavior can be worked around by setting
 People can't accept room invitations from me
 --------------------------------------------
 
-The typical failure mode here is that you send an invitation to someone 
+The typical failure mode here is that you send an invitation to someone
 to join a room or direct chat, but when they go to accept it, they get an
 error (typically along the lines of "Invalid signature"). They might see
 something like the following in their logs::
