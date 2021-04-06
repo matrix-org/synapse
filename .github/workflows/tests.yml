@@ -114,10 +114,9 @@ jobs:
           SYNAPSE_POSTGRES_HOST: localhost
           SYNAPSE_POSTGRES_USER: postgres
           SYNAPSE_POSTGRES_PASSWORD: postgres
-      - name: Dump logs #on failure
+      - name: Dump logs
         # Note: Dumps to workflow logs instead of using actions/upload-artifact
         #       This keeps logs colocated with failing jobs
-        #if: ${{ failure() }}
         run: >-
           find _trial_temp -name '*.log'
           -exec echo "::group::{}" \;
@@ -137,6 +136,14 @@ jobs:
           entrypoint: .buildkite/scripts/test_old_deps.sh
         env:
           TRIAL_FLAGS: "--jobs=2"
+      - name: Dump logs
+        # Note: Dumps to workflow logs instead of using actions/upload-artifact
+        #       This keeps logs colocated with failing jobs
+        run: >-
+          find _trial_temp -name '*.log'
+          -exec echo "::group::{}" \;
+          -exec cat {} \;
+          -exec echo "::endgroup::" \;
 
   trial-pypy:
     # Very slow; only run if the branch name includes 'pypy'
@@ -157,6 +164,14 @@ jobs:
       - run: tox -e py,combine
         env:
           TRIAL_FLAGS: "--jobs=2"
+      - name: Dump logs
+        # Note: Dumps to workflow logs instead of using actions/upload-artifact
+        #       This keeps logs colocated with failing jobs
+        run: >-
+          find _trial_temp -name '*.log'
+          -exec echo "::group::{}" \;
+          -exec cat {} \;
+          -exec echo "::endgroup::" \;
 
   sytest:
     if: ${{ !failure() }}
@@ -206,6 +221,14 @@ jobs:
       - name: Run SyTest
         run: /bootstrap.sh synapse
         working-directory: /src
+      - name: Dump logs
+        # Note: Dumps to workflow logs instead of using actions/upload-artifact
+        #       This keeps logs colocated with failing jobs
+        run: >-
+          find logs -name '*.log*' -o -name 'results.tap'
+          -exec echo "::group::{}" \;
+          -exec cat {} \;
+          -exec echo "::endgroup::" \;
 
   portdb:
     if: ${{ !failure() }} # Allow previous steps to be skipped, but not fail
