@@ -38,7 +38,7 @@ from synapse.types import Collection, JsonDict, RoomAlias, RoomStreamToken, User
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 

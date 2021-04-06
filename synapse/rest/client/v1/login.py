@@ -74,11 +74,13 @@ class LoginRestServlet(RestServlet):
 
         self._well_known_builder = WellKnownBuilder(hs)
         self._address_ratelimiter = Ratelimiter(
+            store=hs.get_datastore(),
             clock=hs.get_clock(),
             rate_hz=self.hs.config.rc_login_address.per_second,
             burst_count=self.hs.config.rc_login_address.burst_count,
         )
         self._account_ratelimiter = Ratelimiter(
+            store=hs.get_datastore(),
             clock=hs.get_clock(),
             rate_hz=self.hs.config.rc_login_account.per_second,
             burst_count=self.hs.config.rc_login_account.burst_count,
@@ -141,20 +143,22 @@ class LoginRestServlet(RestServlet):
                 appservice = self.auth.get_appservice_by_req(request)
 
                 if appservice.is_rate_limited():
-                    self._address_ratelimiter.ratelimit(request.getClientIP())
+                    await self._address_ratelimiter.ratelimit(
+                        None, request.getClientIP()
+                    )
 
                 result = await self._do_appservice_login(login_submission, appservice)
             elif self.jwt_enabled and (
                 login_submission["type"] == LoginRestServlet.JWT_TYPE
                 or login_submission["type"] == LoginRestServlet.JWT_TYPE_DEPRECATED
             ):
-                self._address_ratelimiter.ratelimit(request.getClientIP())
+                await self._address_ratelimiter.ratelimit(None, request.getClientIP())
                 result = await self._do_jwt_login(login_submission)
             elif login_submission["type"] == LoginRestServlet.TOKEN_TYPE:
-                self._address_ratelimiter.ratelimit(request.getClientIP())
+                await self._address_ratelimiter.ratelimit(None, request.getClientIP())
                 result = await self._do_token_login(login_submission)
             else:
-                self._address_ratelimiter.ratelimit(request.getClientIP())
+                await self._address_ratelimiter.ratelimit(None, request.getClientIP())
                 result = await self._do_other_login(login_submission)
         except KeyError:
             raise SynapseError(400, "Missing JSON keys.")
@@ -258,7 +262,7 @@ class LoginRestServlet(RestServlet):
         # too often. This happens here rather than before as we don't
         # necessarily know the user before now.
         if ratelimit:
-            self._account_ratelimiter.ratelimit(user_id.lower())
+            await self._account_ratelimiter.ratelimit(None, user_id.lower())
 
         if create_non_existent_users:
             canonical_uid = await self.auth_handler.check_user_exists(user_id)

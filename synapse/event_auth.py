@@ -162,7 +162,7 @@ def check(
         logger.debug("Auth events: %s", [a.event_id for a in auth_events.values()])
 
     if event.type == EventTypes.Member:
-        _is_membership_change_allowed(event, auth_events)
+        _is_membership_change_allowed(room_version_obj, event, auth_events)
         logger.debug("Allowing! %s", event)
         return
 
@@ -220,8 +220,19 @@ def _can_federate(event: EventBase, auth_events: StateMap[EventBase]) -> bool:
 
 
 def _is_membership_change_allowed(
-    event: EventBase, auth_events: StateMap[EventBase]
+    room_version: RoomVersion, event: EventBase, auth_events: StateMap[EventBase]
 ) -> None:
+    """
+    Confirms that the event which changes membership is an allowed change.
+
+    Args:
+        room_version: The version of the room.
+        event: The event to check.
+        auth_events: The current auth events of the room.
+
+    Raises:
+        AuthError if the event is not allowed.
+    """
     membership = event.content["membership"]
 
     # Check if this is the room creator joining:
@@ -315,14 +326,19 @@ def _is_membership_change_allowed(
             if user_level < invite_level:
                 raise AuthError(403, "You don't have permission to invite users")
     elif Membership.JOIN == membership:
-        # Joins are valid iff caller == target and they were:
-        # invited: They are accepting the invitation
-        # joined: It's a NOOP
+        # Joins are valid iff caller == target and:
+        # * They are not banned.
+        # * They are accepting a previously sent invitation.
+        # * They are already joined (it's a NOOP).
+        # * The room is public or restricted.
         if event.user_id != target_user_id:
             raise AuthError(403, "Cannot force another user to join.")
         elif target_banned:
             raise AuthError(403, "You are banned from this room")
-        elif join_rule == JoinRules.PUBLIC:
+        elif join_rule == JoinRules.PUBLIC or (
+            room_version.msc3083_join_rules
+            and join_rule == JoinRules.MSC3083_RESTRICTED
+        ):
             pass
         elif join_rule == JoinRules.INVITE:
             if not caller_in_room and not caller_invited:

@@ -18,7 +18,7 @@ import email.utils
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Optional
 
 from synapse.api.errors import StoreError, SynapseError
 from synapse.logging.context import make_deferred_yieldable
@@ -27,7 +27,7 @@ from synapse.types import UserID
 from synapse.util import stringutils
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -241,7 +241,10 @@ class AccountValidityHandler:
         return True
 
     async def renew_account_for_user(
-        self, user_id: str, expiration_ts: int = None, email_sent: bool = False
+        self,
+        user_id: str,
+        expiration_ts: Optional[int] = None,
+        email_sent: bool = False,
     ) -> int:
         """Renews the account attached to a given user by pushing back the
         expiration date by the current validity period in the server's

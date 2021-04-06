@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import List, Tuple
+from typing import TYPE_CHECKING, List, Tuple
 
 from synapse.api.constants import (
     EventTypes,
@@ -24,6 +24,9 @@ from synapse.api.constants import (
 from synapse.api.errors import AuthError, ResourceLimitError, SynapseError
 from synapse.server_notices.server_notices_manager import SERVER_NOTICE_ROOM_TAG
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
 
@@ -32,11 +35,7 @@ class ResourceLimitsServerNotices:
     ensures that the client is kept up to date.
     """
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer):
-        """
+    def __init__(self, hs: "HomeServer"):
         self._server_notices_manager = hs.get_server_notices_manager()
         self._store = hs.get_datastore()
         self._auth = hs.get_auth()

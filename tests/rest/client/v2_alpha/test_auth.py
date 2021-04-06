@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Union
+from typing import Optional, Union
 
 from twisted.internet.defer import succeed
 
@@ -74,7 +74,10 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         return channel
 
     def recaptcha(
-        self, session: str, expected_post_response: int, post_session: str = None
+        self,
+        session: str,
+        expected_post_response: int,
+        post_session: Optional[str] = None,
     ) -> None:
         """Get and respond to a fallback recaptcha. Returns the second request."""
         if post_session is None:

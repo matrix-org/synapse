@@ -21,7 +21,7 @@ from synapse.api.errors import HttpResponseException, RequestSendFailed, Synapse
 from synapse.types import GroupID, JsonDict, get_domain_from_id
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
