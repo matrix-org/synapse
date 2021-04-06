@@ -590,7 +590,7 @@ class SimpleHttpClient:
         uri: str,
         json_body: Any,
         args: Optional[QueryParams] = None,
-        headers: RawHeaders = None,
+        headers: Optional[RawHeaders] = None,
     ) -> Any:
         """Puts some json to the given URI.
 

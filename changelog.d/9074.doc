@@ -1,1 +1,0 @@
-Clarify that register_new_matrix_user is present also when installed via non-pip package.

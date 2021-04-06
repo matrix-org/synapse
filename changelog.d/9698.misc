@@ -1,1 +1,0 @@
-Suppress "CryptographyDeprecationWarning: int_from_bytes is deprecated".
