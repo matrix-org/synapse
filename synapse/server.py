@@ -65,6 +65,7 @@ from synapse.federation.sender import AbstractFederationSender, FederationSender
 from synapse.federation.transport.client import TransportLayerClient
 from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
 from synapse.groups.groups_server import GroupsServerHandler, GroupsServerWorkerHandler
+from synapse.handlers.abuse_reports import AbuseReportHandler
 from synapse.handlers.account_data import AccountDataHandler
 from synapse.handlers.account_validity import AccountValidityHandler
 from synapse.handlers.acme import AcmeHandler
@@ -769,6 +770,11 @@ class HomeServer(metaclass=abc.ABCMeta):
             password=self.config.redis.redis_password,
             reconnect=True,
         )
+
+    @cache_in_self
+    def get_abuse_reporter(self) -> AbuseReportHandler:
+        return AbuseReportHandler(self)
+
 
     def should_send_federation(self) -> bool:
         "Should this server be sending federation traffic directly?"

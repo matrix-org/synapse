@@ -735,7 +735,12 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
 
         return messages
 
-    @override_config({"server_notices": {"system_mxid_localpart": "server-notices"}})
+    @override_config(
+        {
+            "server_notices": {"system_mxid_localpart": "server-notices"},
+            "experimental_features": {"msc2983_enabled": True},
+        }
+    )
     def test_good_report(self):
         """
         A user who is member of the room reports an event in that room.
@@ -816,7 +821,12 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
             "We should have received all the messages %s" % sent_reports_by_id,
         )
 
-    @override_config({"server_notices": {"system_mxid_localpart": "reporter"}})
+    @override_config(
+        {
+            "server_notices": {"system_mxid_localpart": "reporter"},
+            "experimental_features": {"msc2983_enabled": True},
+        }
+    )
     def test_bad_report(self):
         """
         Sending a report with an event id that is ill-formed will trigger an error.
@@ -840,7 +850,9 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
                 400, int(channel.result["code"]), msg=channel.result["body"]
             )
 
-    @override_config({"server_notices": None})
+    @override_config(
+        {"server_notices": None, "experimental_features": {"msc2983_enabled": True}}
+    )
     def test_no_notices(self):
         """
         Sending a report with user notices doesn't cause an error.
