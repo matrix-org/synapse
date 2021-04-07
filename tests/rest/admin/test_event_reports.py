@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import random
+import urllib
 import uuid
 from typing import Dict, List, Tuple
 
@@ -81,7 +82,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         """
         Try to get an event report without authentication.
         """
-        request, channel = self.make_request("GET", self.url, b"{}")
+        channel = self.make_request("GET", self.url, b"{}")
 
         self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
@@ -91,7 +92,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         If the user is not a server admin, an error 403 is returned.
         """
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", self.url, access_token=self.other_user_tok,
         )
 
@@ -103,7 +104,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         Testing list of reported events
         """
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", self.url, access_token=self.admin_user_tok,
         )
 
@@ -118,7 +119,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         Testing list of reported events with limit
         """
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", self.url + "?limit=5", access_token=self.admin_user_tok,
         )
 
@@ -133,7 +134,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         Testing list of reported events with a defined starting point (from)
         """
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", self.url + "?from=5", access_token=self.admin_user_tok,
         )
 
@@ -148,7 +149,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         Testing list of reported events with a defined starting point and limit
         """
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", self.url + "?from=5&limit=10", access_token=self.admin_user_tok,
         )
 
@@ -163,7 +164,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         Testing list of reported events with a filter of room
         """
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             self.url + "?room_id=%s" % self.room_id1,
             access_token=self.admin_user_tok,
@@ -183,7 +184,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         Testing list of reported events with a filter of user
         """
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             self.url + "?user_id=%s" % self.other_user,
             access_token=self.admin_user_tok,
@@ -203,7 +204,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         Testing list of reported events with a filter of user and room
         """
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             self.url + "?user_id=%s&room_id=%s" % (self.other_user, self.room_id1),
             access_token=self.admin_user_tok,
@@ -225,7 +226,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         """
 
         # fetch the most recent first, largest timestamp
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", self.url + "?dir=b", access_token=self.admin_user_tok,
         )
 
@@ -241,7 +242,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             report += 1
 
         # fetch the oldest first, smallest timestamp
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", self.url + "?dir=f", access_token=self.admin_user_tok,
         )
 
@@ -261,7 +262,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         Testing that a invalid search order returns a 400
         """
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", self.url + "?dir=bar", access_token=self.admin_user_tok,
         )
 
@@ -274,7 +275,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         Testing that a negative limit parameter returns a 400
         """
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", self.url + "?limit=-5", access_token=self.admin_user_tok,
         )
 
@@ -286,7 +287,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         Testing that a negative from parameter returns a 400
         """
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", self.url + "?from=-5", access_token=self.admin_user_tok,
         )
 
@@ -300,7 +301,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
         #  `next_token` does not appear
         # Number of results is the number of entries
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", self.url + "?limit=20", access_token=self.admin_user_tok,
         )
 
@@ -311,7 +312,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
         #  `next_token` does not appear
         # Number of max results is larger than the number of entries
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", self.url + "?limit=21", access_token=self.admin_user_tok,
         )
 
@@ -322,7 +323,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
         #  `next_token` does appear
         # Number of max results is smaller than the number of entries
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", self.url + "?limit=19", access_token=self.admin_user_tok,
         )
 
@@ -334,7 +335,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         # Check
         # Set `from` to value of `next_token` for request remaining entries
         #  `next_token` does not appear
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", self.url + "?from=19", access_token=self.admin_user_tok,
         )
 
@@ -407,7 +408,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         """
         Try to get event report without authentication.
         """
-        request, channel = self.make_request("GET", self.url, b"{}")
+        channel = self.make_request("GET", self.url, b"{}")
 
         self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
@@ -417,7 +418,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         If the user is not a server admin, an error 403 is returned.
         """
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", self.url, access_token=self.other_user_tok,
         )
 
@@ -429,7 +430,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         Testing get a reported event
         """
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", self.url, access_token=self.admin_user_tok,
         )
 
@@ -442,7 +443,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         """
 
         # `report_id` is negative
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/_synapse/admin/v1/event_reports/-123",
             access_token=self.admin_user_tok,
@@ -456,7 +457,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         )
 
         # `report_id` is a non-numerical string
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/_synapse/admin/v1/event_reports/abcdef",
             access_token=self.admin_user_tok,
@@ -470,7 +471,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         )
 
         # `report_id` is undefined
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/_synapse/admin/v1/event_reports/",
             access_token=self.admin_user_tok,
@@ -488,7 +489,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         Testing that a not existing `report_id` returns a 404.
         """
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/_synapse/admin/v1/event_reports/123",
             access_token=self.admin_user_tok,
@@ -504,7 +505,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         resp = self.helper.send(room_id, tok=user_tok)
         event_id = resp["event_id"]
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "rooms/%s/report/%s" % (urllib.parse.quote(room_id), urllib.parse.quote(event_id)),
             {"score": -100, "reason": "this makes me sad"},
@@ -656,7 +657,7 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
 
     def _get_notice_messages(self, user: TestUser):
         # Initial sync, to get any invite
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/_matrix/client/r0/sync", access_token=user.tok
         )
         self.assertEqual(int(channel.result["code"]), 200, channel.json_body)
@@ -669,7 +670,7 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
         room_id = list(invites.keys())[0]
 
         # Join the room
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/" + room_id + "/join",
             access_token=user.tok,
@@ -677,7 +678,7 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
         self.assertEqual(int(channel.result["code"]), 200)
 
         # Sync again, to get the latest message in the room
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/_matrix/client/r0/sync", access_token=user.tok
         )
         self.assertEqual(int(channel.result["code"]), 200)
@@ -689,7 +690,7 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
         ]
         prev_batch = room["timeline"]["prev_batch"]
         while prev_batch is not None:
-            request, channel = self.make_request(
+            channel = self.make_request(
                 "GET",
                 "/_matrix/client/r0/rooms/%(room_id)s/messages?from=%(from)s&dir=%(dir)s&limit=%(limit)s"
                 % {"room_id": room_id, "from": prev_batch, "dir": "b", "limit": 100},
@@ -732,7 +733,7 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
                 # Post report
                 reason = uuid.uuid4().hex
                 score = random.randrange(-100, 0)
-                request, channel = self.make_request(
+                channel = self.make_request(
                     "POST",
                     "/_matrix/client/r0/rooms/%s/report/%s" % (room_id, event_id),
                     {
@@ -802,7 +803,7 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
         Sending a report with an event id that is ill-formed will trigger an error.
         """
         for user in self.users.values():
-            request, channel = self.make_request(
+            channel = self.make_request(
                 "POST",
                 "/_matrix/client/r0/rooms/%s/report/%s"
                 % (
@@ -837,7 +838,7 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
                 # Post report
                 reason = uuid.uuid4().hex
                 score = random.randrange(-100, 0)
-                request, channel = self.make_request(
+                channel = self.make_request(
                     "POST",
                     "/_matrix/client/r0/rooms/%s/report/%s" % (room_id, event_id),
                     {
