@@ -46,4 +46,4 @@ if [[ -n "$1" ]]; then
 fi
 
 # Run the tests!
-COMPLEMENT_BASE_IMAGE=complement-synapse go test -v -tags synapse_blacklist,msc3083 -count=1 $EXTRA_COMPLEMENT_ARGS ./tests
+COMPLEMENT_BASE_IMAGE=complement-synapse go test -v -tags synapse_blacklist,msc2946,msc3083 -count=1 $EXTRA_COMPLEMENT_ARGS ./tests
