@@ -44,7 +44,6 @@ jobs:
       - run: scripts-dev/check-newsfragment
 
   lint-sdist:
-    if: ${{ contains(github.ref, 'release-') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -55,7 +54,7 @@ jobs:
       - run: python setup.py sdist bdist_wheel
       - uses: actions/upload-artifact@v2
         with:
-          name: distributions
+          name: Python Distributions
           path: dist/*
 
   # Dummy step to gate other tests on without repeating the whole list
@@ -234,7 +233,7 @@ jobs:
         uses: actions/upload-artifact@v2
         if: ${{ always() }}
         with:
-          name: Sytest Logs (${{ join(matrix.*, ', ') }})
+          name: Sytest Logs - ${{ job.status }} - (${{ join(matrix.*, ', ') }})
           path: |
             /logs/results.tap
             /logs/**/*.log*
@@ -310,8 +309,9 @@ jobs:
       - run: docker build -t matrixdotorg/synapse:latest -f docker/Dockerfile .
         working-directory: synapse
 
-      # Build another Synapse image based on the latest release, but suitable
-      # for testing federation with the image built in the prior step.
+      # Build a ready-to-run Synapse image based on the initial image above.
+      # This new image includes a config file, keys for signing and TLS, and
+      # other settings to make it suitable for testing under Complement.
       - run: docker build -t complement-synapse -f Synapse.Dockerfile .
         working-directory: complement/dockerfiles
 
