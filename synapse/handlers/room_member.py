@@ -210,10 +210,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         if join_rules_event.content.get("join_rule") != JoinRules.MSC3083_RESTRICTED:
             return True
 
-        # If allowed is of the wrong form, then ignore it (and treat the room as public).
+        # If allowed is of the wrong form, then only allows invites.
         allowed_spaces = join_rules_event.content.get("allow", [])
         if not isinstance(allowed_spaces, list):
-            return True
+            return False
 
         # Get the list of joined rooms and see if there's an overlap.
         joined_rooms = await self.store.get_rooms_for_user(user_id)
