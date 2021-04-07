@@ -220,13 +220,13 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             if not isinstance(space, dict):
                 continue
 
-            soace_id = space.get("space")
-            if not isinstance(soace_id, str):
+            space_id = space.get("space")
+            if not isinstance(space_id, str):
                 continue
 
             # The user was joined to one of the spaces specified, they can join
             # this room!
-            if soace_id in joined_rooms:
+            if space_id in joined_rooms:
                 return True
 
         # The user was not in any of the required spaces.
@@ -289,17 +289,17 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         if event.membership == Membership.JOIN:
             newly_joined = True
-            is_invite = False
+            user_is_invited = False
             if prev_member_event_id:
                 prev_member_event = await self.store.get_event(prev_member_event_id)
                 newly_joined = prev_member_event.membership != Membership.JOIN
-                is_invite = prev_member_event.membership == Membership.INVITE
+                user_is_invited = prev_member_event.membership == Membership.INVITE
 
             # If the member is not already in the room and is not accepting an invite,
             # check if they should be allowed access via membership in a space.
             if (
                 newly_joined
-                and not is_invite
+                and not user_is_invited
                 and not await self._can_join_restricted_room(
                     prev_state_ids, event.room_version, user_id
                 )
