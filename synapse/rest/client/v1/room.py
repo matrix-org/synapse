@@ -27,10 +27,15 @@ from synapse.api.errors import (
     Codes,
     HttpResponseException,
     InvalidClientCredentialsError,
+    NotFoundError,
     ShadowBanError,
     SynapseError,
 )
+from synapse.api.room_versions import (
+    KNOWN_ROOM_VERSIONS,
+)
 from synapse.api.filtering import Filter
+from synapse.events import make_event_from_dict
 from synapse.events.utils import format_event_for_client_v2
 from synapse.http.servlet import (
     RestServlet,
@@ -308,15 +313,6 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
 
         logger.info("body waewefaew %s", body)
 
-        # current_state_ids = await self.store.get_current_state_ids(
-        #     room_id,
-        # )
-        # current_auth_event_ids = self.auth.compute_auth_events(
-        #     # TODO,
-        #     asdf,
-        #     current_state_ids
-        # )
-
         state_for_events = []
         auth_event_ids = []
 
@@ -344,6 +340,24 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
             #     requester, event_dict, prev_event_ids=[fake_prev_event_id], outlier=True
             # )
 
+            try:
+                room_version_id = await self.store.get_room_version_id(
+                    event_dict["room_id"]
+                )
+                room_version = KNOWN_ROOM_VERSIONS.get(room_version_id)
+            except NotFoundError:
+                raise AuthError(403, "Unknown room")
+
+            current_state_ids = await self.store.get_current_state_ids(
+                event_dict["room_id"],
+            )
+            current_auth_event_ids = self.auth.compute_auth_events(
+                make_event_from_dict(event_dict, room_version),
+                current_state_ids,
+            )
+            current_auth_event_map = await self.store.get_events(current_auth_event_ids)
+            current_auth_events = current_auth_event_map.values()
+
             if stateEv["type"] == EventTypes.Member:
                 membership = stateEv["content"].get("membership", None)
                 event_id, _ = await self.room_member_handler.update_membership(
@@ -353,8 +367,7 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                     action=membership,
                     content=stateEv["content"],
                     outlier=True,
-                    # TODO:
-                    # state_for_events=current_auth_event_ids,
+                    state_for_events=current_auth_events,
                 )
                 auth_event = await self.store.get_event(event_id)
                 state_for_events.append(auth_event)
