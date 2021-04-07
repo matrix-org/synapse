@@ -179,11 +179,14 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         await self._invites_per_user_limiter.ratelimit(requester, invitee_user_id)
 
-    async def _can_join_restricted_room(
+    async def _can_join_without_invite(
         self, state_ids: StateMap[str], room_version: RoomVersion, user_id: str
     ) -> bool:
         """
-        Check whether a user can join a restricted room.
+        Check whether a user can join a room without an invite.
+
+        When joining a room with restricted joined rules (as defined in MSC3083),
+        the membership of spaces must be checked during join.
 
         Args:
             state_ids: The state of the room as it currently is.
@@ -300,7 +303,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             if (
                 newly_joined
                 and not user_is_invited
-                and not await self._can_join_restricted_room(
+                and not await self._can_join_without_invite(
                     prev_state_ids, event.room_version, user_id
                 )
             ):
