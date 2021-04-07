@@ -11,12 +11,10 @@ cd "$(dirname $0)/.."
 docker build -t matrixdotorg/synapse:latest -f docker/Dockerfile .
 
 # Download Complement
-wget -N https://github.com/matrix-org/complement/archive/master.tar.gz
-tar -xzf master.tar.gz
-cd complement-master
+cd ../complement
 
 # Build the Synapse image from Complement, based on the above image we just built
 docker build -t complement-synapse -f dockerfiles/Synapse.Dockerfile ./dockerfiles
 
 # Run the tests on the resulting image!
-COMPLEMENT_BASE_IMAGE=complement-synapse go test -v -count=1 ./tests
+COMPLEMENT_BASE_IMAGE=complement-synapse go test -tags msc2716 -v -count=1 ./tests/main_test.go ./tests/msc2716_test.go -run TestBackfillingHistory/parallel/Backfilled_historical_events_resolve_with_proper_state

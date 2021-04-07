@@ -31,3 +31,5 @@ class ExperimentalConfig(Config):
         self.spaces_enabled = experimental.get("spaces_enabled", False)  # type: bool
         # MSC3026 (busy presence state)
         self.msc3026_enabled = experimental.get("msc3026_enabled", False)  # type: bool
+        # MSC2716 (backfill existing history)
+        self.msc2716_enabled = experimental.get("msc2716_enabled", False)  # type: bool

@@ -454,6 +454,7 @@ class EventCreationHandler:
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
         require_consent: bool = True,
+        outlier: bool = False,
     ) -> Tuple[EventBase, EventContext]:
         """
         Given a dict from a client, create a new event.
@@ -534,6 +535,8 @@ class EventCreationHandler:
 
         if txn_id is not None:
             builder.internal_metadata.txn_id = txn_id
+
+        builder.internal_metadata.outlier = outlier
 
         event, context = await self.create_new_client_event(
             builder=builder,
@@ -696,6 +699,7 @@ class EventCreationHandler:
         self,
         requester: Requester,
         event_dict: dict,
+        auth_event_ids: Optional[List[str]] = None,
         ratelimit: bool = True,
         txn_id: Optional[str] = None,
         ignore_shadow_ban: bool = False,
@@ -751,7 +755,7 @@ class EventCreationHandler:
                     return event, event.internal_metadata.stream_ordering
 
             event, context = await self.create_event(
-                requester, event_dict, txn_id=txn_id
+                requester, event_dict, txn_id=txn_id, auth_event_ids=auth_event_ids
             )
 
             assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
@@ -825,6 +829,12 @@ class EventCreationHandler:
         event = await builder.build(
             prev_event_ids=prev_event_ids, auth_event_ids=auth_event_ids
         )
+
+        # Pass on the outlier property from the builder to the event
+        # after it is created
+        if builder.internal_metadata.outlier:
+            event.internal_metadata.outlier = builder.internal_metadata.outlier
+
         context = await self.state.compute_event_context(event)
         if requester:
             context.app_service = requester.app_service

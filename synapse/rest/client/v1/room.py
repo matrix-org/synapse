@@ -39,6 +39,7 @@ from synapse.http.servlet import (
     parse_integer,
     parse_json_object_from_request,
     parse_string,
+    parse_strings_from_args,
 )
 from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import set_tag
@@ -264,6 +265,128 @@ class RoomSendEventRestServlet(TransactionRestServlet):
 
         return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_id, event_type, txn_id
+        )
+
+
+class RoomBulkSendEventRestServlet(TransactionRestServlet):
+    def __init__(self, hs):
+        super().__init__(hs)
+        self.store = hs.get_datastore()
+        self.event_creation_handler = hs.get_event_creation_handler()
+        self.room_member_handler = hs.get_room_member_handler()
+        self.auth = hs.get_auth()
+
+        self._msc2716_enabled = hs.config.experimental.msc2716_enabled
+
+    def register(self, http_server):
+        # /rooms/$roomid/bulksend
+        PATTERNS = "/rooms/(?P<room_id>[^/]*)/bulksend"
+        register_txn_path(self, PATTERNS, http_server, with_get=True)
+
+    async def on_POST(self, request, room_id):
+        requester = await self.auth.get_user_by_req(request, allow_guest=False)
+        body = parse_json_object_from_request(request)
+        assert_params_in_dict(body, ["state_events_at_start", "events"])
+
+        prev_events_from_query = parse_strings_from_args(request.args, "prev_event")
+
+        logger.info("body waewefaew %s", body)
+
+        auth_event_ids = []
+
+        create_event = await self.store.get_create_event_for_room(room_id)
+        auth_event_ids.append(create_event.event_id)
+
+        for stateEv in body["state_events_at_start"]:
+            logger.info("stateEv %s", stateEv)
+            assert_params_in_dict(stateEv, ["type", "content", "sender"])
+
+            event_dict = {
+                "type": stateEv["type"],
+                "content": stateEv["content"],
+                "room_id": room_id,
+                "sender": stateEv["sender"],
+                "state_key": stateEv["state_key"],
+            }
+
+            # Make the events float off on their own
+            # fake_prev_event_id = "$" + random_string(43)
+
+            # TODO: Do we pop on the auth events for the `prev_events_from_query`?
+
+            if event_dict["type"] == EventTypes.Member:
+                membership = event_dict["content"].get("membership", None)
+                event_id, _ = await self.room_member_handler.update_membership(
+                    requester,
+                    target=UserID.from_string(event_dict["state_key"]),
+                    room_id=room_id,
+                    action=membership,
+                    content=event_dict["content"],
+                    outlier=True,
+                )
+            else:
+                (
+                    event,
+                    _,
+                ) = await self.event_creation_handler.create_and_send_nonmember_event(
+                    requester,
+                    event_dict,
+                    # TODO: outlier
+                )
+                event_id = event.event_id
+
+            auth_event_ids.append(event_id)
+
+        logger.info("Done with state events grrtrsrdhh %s", auth_event_ids)
+
+        event_ids = []
+        prev_event_ids = prev_events_from_query
+        for ev in body["events"]:
+            logger.info("ev %s", ev)
+            assert_params_in_dict(ev, ["type", "content", "sender"])
+
+            event_dict = {
+                "type": ev["type"],
+                "content": ev["content"],
+                "room_id": room_id,
+                "sender": ev["sender"],  # requester.user.to_string(),
+                "prev_events": prev_event_ids,
+            }
+
+            # TODO
+            # Make sure backfilled
+            # Add all of the inherit_depth stuff
+            # Do we need to use `self.auth.compute_auth_events(...)` to filter the `auth_event_ids`?
+
+            inherit_depth = True
+
+            (
+                event,
+                _,
+            ) = await self.event_creation_handler.create_and_send_nonmember_event(
+                requester,
+                event_dict,
+                inherit_depth=inherit_depth,
+                auth_event_ids=auth_event_ids,
+            )
+            event_id = event.event_id
+
+            event_ids.append(event_id)
+
+            logger.info("event esrgegrerg %s", event)
+
+            prev_event_ids = [event_id]
+
+        logger.info("Done with events afeefwaefw")
+
+        return 200, {"state_events": auth_event_ids, "events": event_ids}
+
+    def on_GET(self, request, room_id):
+        return 501, "Not implemented"
+
+    def on_PUT(self, request, room_id):
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request, room_id
         )
 
 
@@ -1055,6 +1178,7 @@ def register_servlets(hs: "HomeServer", http_server, is_worker=False):
     JoinRoomAliasServlet(hs).register(http_server)
     RoomMembershipRestServlet(hs).register(http_server)
     RoomSendEventRestServlet(hs).register(http_server)
+    RoomBulkSendEventRestServlet(hs).register(http_server)
     PublicRoomListRestServlet(hs).register(http_server)
     RoomStateRestServlet(hs).register(http_server)
     RoomRedactEventRestServlet(hs).register(http_server)
