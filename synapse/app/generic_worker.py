@@ -14,12 +14,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import contextlib
 import logging
 import sys
 from typing import Dict, Iterable, Optional
-
-from typing_extensions import ContextManager
 
 from twisted.internet import address
 from twisted.web.resource import IResource
@@ -43,11 +40,6 @@ from synapse.config.logger import setup_logging
 from synapse.config.server import ListenerConfig
 from synapse.federation import send_queue
 from synapse.federation.transport.server import TransportLayerServer
-from synapse.handlers.presence import (
-    BasePresenceHandler,
-    PresenceState,
-    get_interested_parties,
-)
 from synapse.http.server import JsonResource, OptionsResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseSite
@@ -55,10 +47,6 @@ from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
-from synapse.replication.http.presence import (
-    ReplicationBumpPresenceActiveTime,
-    ReplicationPresenceSetState,
-)
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
@@ -79,7 +67,6 @@ from synapse.replication.slave.storage.registration import SlavedRegistrationSto
 from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.replication.tcp.client import ReplicationDataHandler
-from synapse.replication.tcp.commands import ClearUserSyncsCommand
 from synapse.replication.tcp.streams import (
     DeviceListsStream,
     PresenceStream,
@@ -133,7 +120,6 @@ from synapse.storage.databases.main.metrics import ServerMetricsStore
 from synapse.storage.databases.main.monthly_active_users import (
     MonthlyActiveUsersWorkerStore,
 )
-from synapse.storage.databases.main.presence import UserPresenceState
 from synapse.storage.databases.main.search import SearchWorkerStore
 from synapse.storage.databases.main.stats import StatsStore
 from synapse.storage.databases.main.transactions import TransactionWorkerStore
@@ -258,214 +244,6 @@ class KeyUploadServlet(RestServlet):
             # Just interested in counts.
             result = await self.store.count_e2e_one_time_keys(user_id, device_id)
             return 200, {"one_time_key_counts": result}
-
-
-class _NullContextManager(ContextManager[None]):
-    """A context manager which does nothing."""
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        pass
-
-
-UPDATE_SYNCING_USERS_MS = 10 * 1000
-
-
-class GenericWorkerPresence(BasePresenceHandler):
-    def __init__(self, hs):
-        super().__init__(hs)
-        self.hs = hs
-        self.is_mine_id = hs.is_mine_id
-
-        self.presence_router = hs.get_presence_router()
-        self._presence_enabled = hs.config.use_presence
-
-        # The number of ongoing syncs on this process, by user id.
-        # Empty if _presence_enabled is false.
-        self._user_to_num_current_syncs = {}  # type: Dict[str, int]
-
-        self.notifier = hs.get_notifier()
-        self.instance_id = hs.get_instance_id()
-
-        # user_id -> last_sync_ms. Lists the users that have stopped syncing
-        # but we haven't notified the master of that yet
-        self.users_going_offline = {}
-
-        self._bump_active_client = ReplicationBumpPresenceActiveTime.make_client(hs)
-        self._set_state_client = ReplicationPresenceSetState.make_client(hs)
-
-        self._send_stop_syncing_loop = self.clock.looping_call(
-            self.send_stop_syncing, UPDATE_SYNCING_USERS_MS
-        )
-
-        self._busy_presence_enabled = hs.config.experimental.msc3026_enabled
-
-        hs.get_reactor().addSystemEventTrigger(
-            "before",
-            "shutdown",
-            run_as_background_process,
-            "generic_presence.on_shutdown",
-            self._on_shutdown,
-        )
-
-    def _on_shutdown(self):
-        if self._presence_enabled:
-            self.hs.get_tcp_replication().send_command(
-                ClearUserSyncsCommand(self.instance_id)
-            )
-
-    def send_user_sync(self, user_id, is_syncing, last_sync_ms):
-        if self._presence_enabled:
-            self.hs.get_tcp_replication().send_user_sync(
-                self.instance_id, user_id, is_syncing, last_sync_ms
-            )
-
-    def mark_as_coming_online(self, user_id):
-        """A user has started syncing. Send a UserSync to the master, unless they
-        had recently stopped syncing.
-
-        Args:
-            user_id (str)
-        """
-        going_offline = self.users_going_offline.pop(user_id, None)
-        if not going_offline:
-            # Safe to skip because we haven't yet told the master they were offline
-            self.send_user_sync(user_id, True, self.clock.time_msec())
-
-    def mark_as_going_offline(self, user_id):
-        """A user has stopped syncing. We wait before notifying the master as
-        its likely they'll come back soon. This allows us to avoid sending
-        a stopped syncing immediately followed by a started syncing notification
-        to the master
-
-        Args:
-            user_id (str)
-        """
-        self.users_going_offline[user_id] = self.clock.time_msec()
-
-    def send_stop_syncing(self):
-        """Check if there are any users who have stopped syncing a while ago
-        and haven't come back yet. If there are poke the master about them.
-        """
-        now = self.clock.time_msec()
-        for user_id, last_sync_ms in list(self.users_going_offline.items()):
-            if now - last_sync_ms > UPDATE_SYNCING_USERS_MS:
-                self.users_going_offline.pop(user_id, None)
-                self.send_user_sync(user_id, False, last_sync_ms)
-
-    async def user_syncing(
-        self, user_id: str, affect_presence: bool
-    ) -> ContextManager[None]:
-        """Record that a user is syncing.
-
-        Called by the sync and events servlets to record that a user has connected to
-        this worker and is waiting for some events.
-        """
-        if not affect_presence or not self._presence_enabled:
-            return _NullContextManager()
-
-        curr_sync = self._user_to_num_current_syncs.get(user_id, 0)
-        self._user_to_num_current_syncs[user_id] = curr_sync + 1
-
-        # If we went from no in flight sync to some, notify replication
-        if self._user_to_num_current_syncs[user_id] == 1:
-            self.mark_as_coming_online(user_id)
-
-        def _end():
-            # We check that the user_id is in user_to_num_current_syncs because
-            # user_to_num_current_syncs may have been cleared if we are
-            # shutting down.
-            if user_id in self._user_to_num_current_syncs:
-                self._user_to_num_current_syncs[user_id] -= 1
-
-                # If we went from one in flight sync to non, notify replication
-                if self._user_to_num_current_syncs[user_id] == 0:
-                    self.mark_as_going_offline(user_id)
-
-        @contextlib.contextmanager
-        def _user_syncing():
-            try:
-                yield
-            finally:
-                _end()
-
-        return _user_syncing()
-
-    async def notify_from_replication(self, states, stream_id):
-        parties = await get_interested_parties(self.store, self.presence_router, states)
-        room_ids_to_states, users_to_states = parties
-
-        self.notifier.on_new_event(
-            "presence_key",
-            stream_id,
-            rooms=room_ids_to_states.keys(),
-            users=users_to_states.keys(),
-        )
-
-    async def process_replication_rows(self, token, rows):
-        states = [
-            UserPresenceState(
-                row.user_id,
-                row.state,
-                row.last_active_ts,
-                row.last_federation_update_ts,
-                row.last_user_sync_ts,
-                row.status_msg,
-                row.currently_active,
-            )
-            for row in rows
-        ]
-
-        for state in states:
-            self.user_to_current_state[state.user_id] = state
-
-        stream_id = token
-        await self.notify_from_replication(states, stream_id)
-
-    def get_currently_syncing_users_for_replication(self) -> Iterable[str]:
-        return [
-            user_id
-            for user_id, count in self._user_to_num_current_syncs.items()
-            if count > 0
-        ]
-
-    async def set_state(self, target_user, state, ignore_status_msg=False):
-        """Set the presence state of the user."""
-        presence = state["presence"]
-
-        valid_presence = (
-            PresenceState.ONLINE,
-            PresenceState.UNAVAILABLE,
-            PresenceState.OFFLINE,
-            PresenceState.BUSY,
-        )
-
-        if presence not in valid_presence or (
-            presence == PresenceState.BUSY and not self._busy_presence_enabled
-        ):
-            raise SynapseError(400, "Invalid presence state")
-
-        user_id = target_user.to_string()
-
-        # If presence is disabled, no-op
-        if not self.hs.config.use_presence:
-            return
-
-        # Proxy request to master
-        await self._set_state_client(
-            user_id=user_id, state=state, ignore_status_msg=ignore_status_msg
-        )
-
-    async def bump_presence_active_time(self, user):
-        """We've seen the user do something that indicates they're interacting
-        with the app.
-        """
-        # If presence is disabled, no-op
-        if not self.hs.config.use_presence:
-            return
-
-        # Proxy request to master
-        user_id = user.to_string()
-        await self._bump_active_client(user_id=user_id)
 
 
 class GenericWorkerSlavedStore(
@@ -657,17 +435,13 @@ class GenericWorkerServer(HomeServer):
     def get_replication_data_handler(self):
         return GenericWorkerReplicationHandler(self)
 
-    @cache_in_self
-    def get_presence_handler(self):
-        return GenericWorkerPresence(self)
-
 
 class GenericWorkerReplicationHandler(ReplicationDataHandler):
     def __init__(self, hs):
         super().__init__(hs)
 
         self.store = hs.get_datastore()
-        self.presence_handler = hs.get_presence_handler()  # type: GenericWorkerPresence
+        self.presence_handler = hs.get_presence_handler()
         self.notifier = hs.get_notifier()
 
         self.notify_pushers = hs.config.start_pushers

@@ -86,7 +86,11 @@ from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.message import EventCreationHandler, MessageHandler
 from synapse.handlers.pagination import PaginationHandler
 from synapse.handlers.password_policy import PasswordPolicyHandler
-from synapse.handlers.presence import PresenceHandler
+from synapse.handlers.presence import (
+    BasePresenceHandler,
+    PresenceHandler,
+    WorkerPresenceHandler,
+)
 from synapse.handlers.profile import ProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.receipts import ReceiptsHandler
@@ -416,8 +420,11 @@ class HomeServer(metaclass=abc.ABCMeta):
         return StateResolutionHandler(self)
 
     @cache_in_self
-    def get_presence_handler(self) -> PresenceHandler:
-        return PresenceHandler(self)
+    def get_presence_handler(self) -> BasePresenceHandler:
+        if self.config.worker_app:
+            return WorkerPresenceHandler(self)
+        else:
+            return PresenceHandler(self)
 
     @cache_in_self
     def get_typing_writer_handler(self) -> TypingWriterHandler:
