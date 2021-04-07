@@ -35,6 +35,8 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
+
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
@@ -79,7 +81,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         """
         Try to get an event report without authentication.
         """
-        channel = self.make_request("GET", self.url, b"{}")
+        request, channel = self.make_request("GET", self.url, b"{}")
 
         self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
@@ -89,10 +91,8 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         If the user is not a server admin, an error 403 is returned.
         """
 
-        channel = self.make_request(
-            "GET",
-            self.url,
-            access_token=self.other_user_tok,
+        request, channel = self.make_request(
+            "GET", self.url, access_token=self.other_user_tok,
         )
 
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
@@ -103,10 +103,8 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         Testing list of reported events
         """
 
-        channel = self.make_request(
-            "GET",
-            self.url,
-            access_token=self.admin_user_tok,
+        request, channel = self.make_request(
+            "GET", self.url, access_token=self.admin_user_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -120,10 +118,8 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         Testing list of reported events with limit
         """
 
-        channel = self.make_request(
-            "GET",
-            self.url + "?limit=5",
-            access_token=self.admin_user_tok,
+        request, channel = self.make_request(
+            "GET", self.url + "?limit=5", access_token=self.admin_user_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -137,10 +133,8 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         Testing list of reported events with a defined starting point (from)
         """
 
-        channel = self.make_request(
-            "GET",
-            self.url + "?from=5",
-            access_token=self.admin_user_tok,
+        request, channel = self.make_request(
+            "GET", self.url + "?from=5", access_token=self.admin_user_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -154,10 +148,8 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         Testing list of reported events with a defined starting point and limit
         """
 
-        channel = self.make_request(
-            "GET",
-            self.url + "?from=5&limit=10",
-            access_token=self.admin_user_tok,
+        request, channel = self.make_request(
+            "GET", self.url + "?from=5&limit=10", access_token=self.admin_user_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -171,7 +163,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         Testing list of reported events with a filter of room
         """
 
-        channel = self.make_request(
+        request, channel = self.make_request(
             "GET",
             self.url + "?room_id=%s" % self.room_id1,
             access_token=self.admin_user_tok,
@@ -191,7 +183,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         Testing list of reported events with a filter of user
         """
 
-        channel = self.make_request(
+        request, channel = self.make_request(
             "GET",
             self.url + "?user_id=%s" % self.other_user,
             access_token=self.admin_user_tok,
@@ -211,7 +203,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         Testing list of reported events with a filter of user and room
         """
 
-        channel = self.make_request(
+        request, channel = self.make_request(
             "GET",
             self.url + "?user_id=%s&room_id=%s" % (self.other_user, self.room_id1),
             access_token=self.admin_user_tok,
@@ -233,10 +225,8 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         """
 
         # fetch the most recent first, largest timestamp
-        channel = self.make_request(
-            "GET",
-            self.url + "?dir=b",
-            access_token=self.admin_user_tok,
+        request, channel = self.make_request(
+            "GET", self.url + "?dir=b", access_token=self.admin_user_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -251,10 +241,8 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             report += 1
 
         # fetch the oldest first, smallest timestamp
-        channel = self.make_request(
-            "GET",
-            self.url + "?dir=f",
-            access_token=self.admin_user_tok,
+        request, channel = self.make_request(
+            "GET", self.url + "?dir=f", access_token=self.admin_user_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -273,10 +261,8 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         Testing that a invalid search order returns a 400
         """
 
-        channel = self.make_request(
-            "GET",
-            self.url + "?dir=bar",
-            access_token=self.admin_user_tok,
+        request, channel = self.make_request(
+            "GET", self.url + "?dir=bar", access_token=self.admin_user_tok,
         )
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
@@ -288,10 +274,8 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         Testing that a negative limit parameter returns a 400
         """
 
-        channel = self.make_request(
-            "GET",
-            self.url + "?limit=-5",
-            access_token=self.admin_user_tok,
+        request, channel = self.make_request(
+            "GET", self.url + "?limit=-5", access_token=self.admin_user_tok,
         )
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
@@ -302,10 +286,8 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         Testing that a negative from parameter returns a 400
         """
 
-        channel = self.make_request(
-            "GET",
-            self.url + "?from=-5",
-            access_token=self.admin_user_tok,
+        request, channel = self.make_request(
+            "GET", self.url + "?from=-5", access_token=self.admin_user_tok,
         )
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
@@ -318,10 +300,8 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
         #  `next_token` does not appear
         # Number of results is the number of entries
-        channel = self.make_request(
-            "GET",
-            self.url + "?limit=20",
-            access_token=self.admin_user_tok,
+        request, channel = self.make_request(
+            "GET", self.url + "?limit=20", access_token=self.admin_user_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -331,10 +311,8 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
         #  `next_token` does not appear
         # Number of max results is larger than the number of entries
-        channel = self.make_request(
-            "GET",
-            self.url + "?limit=21",
-            access_token=self.admin_user_tok,
+        request, channel = self.make_request(
+            "GET", self.url + "?limit=21", access_token=self.admin_user_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -344,10 +322,8 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
         #  `next_token` does appear
         # Number of max results is smaller than the number of entries
-        channel = self.make_request(
-            "GET",
-            self.url + "?limit=19",
-            access_token=self.admin_user_tok,
+        request, channel = self.make_request(
+            "GET", self.url + "?limit=19", access_token=self.admin_user_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -358,10 +334,8 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         # Check
         # Set `from` to value of `next_token` for request remaining entries
         #  `next_token` does not appear
-        channel = self.make_request(
-            "GET",
-            self.url + "?from=19",
-            access_token=self.admin_user_tok,
+        request, channel = self.make_request(
+            "GET", self.url + "?from=19", access_token=self.admin_user_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -370,20 +344,22 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         self.assertNotIn("next_token", channel.json_body)
 
     def _create_event_and_report(self, room_id, user_tok):
-        """Create and report events"""
+        """Create and report events
+        """
         resp = self.helper.send(room_id, tok=user_tok)
         event_id = resp["event_id"]
 
         channel = self.make_request(
             "POST",
-            "rooms/%s/report/%s" % (room_id, event_id),
+            "rooms/%s/report/%s" % (urllib.parse.quote(room_id), urllib.parse.quote(event_id)),
             {"score": -100, "reason": "this makes me sad"},
             access_token=user_tok,
         )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
     def _check_fields(self, content):
-        """Checks that all attributes are present in an event report"""
+        """Checks that all attributes are present in an event report
+        """
         for c in content:
             self.assertIn("id", c)
             self.assertIn("received_ts", c)
@@ -406,6 +382,8 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
+
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
@@ -429,7 +407,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         """
         Try to get event report without authentication.
         """
-        channel = self.make_request("GET", self.url, b"{}")
+        request, channel = self.make_request("GET", self.url, b"{}")
 
         self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
@@ -439,10 +417,8 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         If the user is not a server admin, an error 403 is returned.
         """
 
-        channel = self.make_request(
-            "GET",
-            self.url,
-            access_token=self.other_user_tok,
+        request, channel = self.make_request(
+            "GET", self.url, access_token=self.other_user_tok,
         )
 
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
@@ -453,10 +429,8 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         Testing get a reported event
         """
 
-        channel = self.make_request(
-            "GET",
-            self.url,
-            access_token=self.admin_user_tok,
+        request, channel = self.make_request(
+            "GET", self.url, access_token=self.admin_user_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -468,7 +442,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         """
 
         # `report_id` is negative
-        channel = self.make_request(
+        request, channel = self.make_request(
             "GET",
             "/_synapse/admin/v1/event_reports/-123",
             access_token=self.admin_user_tok,
@@ -482,7 +456,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         )
 
         # `report_id` is a non-numerical string
-        channel = self.make_request(
+        request, channel = self.make_request(
             "GET",
             "/_synapse/admin/v1/event_reports/abcdef",
             access_token=self.admin_user_tok,
@@ -496,7 +470,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         )
 
         # `report_id` is undefined
-        channel = self.make_request(
+        request, channel = self.make_request(
             "GET",
             "/_synapse/admin/v1/event_reports/",
             access_token=self.admin_user_tok,
@@ -514,7 +488,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         Testing that a not existing `report_id` returns a 404.
         """
 
-        channel = self.make_request(
+        request, channel = self.make_request(
             "GET",
             "/_synapse/admin/v1/event_reports/123",
             access_token=self.admin_user_tok,
@@ -525,21 +499,22 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         self.assertEqual("Event report not found", channel.json_body["error"])
 
     def _create_event_and_report(self, room_id, user_tok):
-        """Create and report events"""
+        """Create and report events
+        """
         resp = self.helper.send(room_id, tok=user_tok)
         event_id = resp["event_id"]
-        print("_create_event_and_report: %s" % resp)
 
-        channel = self.make_request(
+        request, channel = self.make_request(
             "POST",
-            "rooms/%s/report/%s" % (room_id, event_id),
+            "rooms/%s/report/%s" % (urllib.parse.quote(room_id), urllib.parse.quote(event_id)),
             {"score": -100, "reason": "this makes me sad"},
             access_token=user_tok,
         )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
     def _check_fields(self, content):
-        """Checks that all attributes are present in a event report"""
+        """Checks that all attributes are present in a event report
+        """
         self.assertIn("id", content)
         self.assertIn("received_ts", content)
         self.assertIn("room_id", content)
@@ -607,8 +582,6 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
     server_notices: ServerNoticesManager
 
     def prepare(self, reactor, clock, hs):
-        print("hs %s" % hs)
-
         # Prepare a bunch of users.
         self.users = {}
         for role in ["admin", "creator", "moderator", "author", "reporter", "exterior"]:
@@ -682,12 +655,11 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
         self.server_notices = self.hs.get_server_notices_manager()
 
     def _get_notice_messages(self, user: TestUser):
-        print("_get_notice_messages for %s %s" % (user.role, user.tok))
         # Initial sync, to get any invite
-        channel = self.make_request(
+        request, channel = self.make_request(
             "GET", "/_matrix/client/r0/sync", access_token=user.tok
         )
-        self.assertEqual(channel.code, 200, channel.json_body)
+        self.assertEqual(int(channel.result["code"]), 200, channel.json_body)
 
         # Get the Room ID to join
         invites = channel.json_body["rooms"]["invite"]
@@ -697,35 +669,34 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
         room_id = list(invites.keys())[0]
 
         # Join the room
-        channel = self.make_request(
+        request, channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/" + room_id + "/join",
             access_token=user.tok,
         )
-        self.assertEqual(channel.code, 200)
+        self.assertEqual(int(channel.result["code"]), 200)
 
         # Sync again, to get the latest message in the room
-        channel = self.make_request(
+        request, channel = self.make_request(
             "GET", "/_matrix/client/r0/sync", access_token=user.tok
         )
-        self.assertEqual(channel.code, 200)
+        self.assertEqual(int(channel.result["code"]), 200)
 
         # Get the messages
         room = channel.json_body["rooms"]["join"][room_id]
-        print("Events in room %s" % room["timeline"]["events"])
         messages = [
             x for x in room["timeline"]["events"] if x["type"] == "m.room.message"
         ]
         prev_batch = room["timeline"]["prev_batch"]
         while prev_batch is not None:
-            response = self.make_request(
+            request, channel = self.make_request(
                 "GET",
                 "/_matrix/client/r0/rooms/%(room_id)s/messages?from=%(from)s&dir=%(dir)s&limit=%(limit)s"
                 % {"room_id": room_id, "from": prev_batch, "dir": "b", "limit": 100},
                 access_token=user.tok,
             )
-            prev_batch = response.json_body.get("end", None)
-            chunk = response.json_body.get("chunk", [])
+            prev_batch = channel.json_body.get("end", None)
+            chunk = channel.json_body.get("chunk", [])
             if len(chunk) == 0:
                 # No more messages to read
                 break
@@ -761,7 +732,7 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
                 # Post report
                 reason = uuid.uuid4().hex
                 score = random.randrange(-100, 0)
-                channel = self.make_request(
+                request, channel = self.make_request(
                     "POST",
                     "/_matrix/client/r0/rooms/%s/report/%s" % (room_id, event_id),
                     {
@@ -802,7 +773,6 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
                     reporter_user_id = message["content"]["userId"]
 
                     sent_reports_for_event_id = sent_reports_by_id[reported_event_id]
-                    print("Keys %s" % sent_reports_for_event_id.keys())
                     sent_report = sent_reports_for_event_id[reporter_user_id]
 
                     self.assertEqual(sent_report[0].mxid, message["content"]["roomId"])
@@ -832,7 +802,7 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
         Sending a report with an event id that is ill-formed will trigger an error.
         """
         for user in self.users.values():
-            channel = self.make_request(
+            request, channel = self.make_request(
                 "POST",
                 "/_matrix/client/r0/rooms/%s/report/%s"
                 % (
@@ -867,7 +837,7 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
                 # Post report
                 reason = uuid.uuid4().hex
                 score = random.randrange(-100, 0)
-                channel = self.make_request(
+                request, channel = self.make_request(
                     "POST",
                     "/_matrix/client/r0/rooms/%s/report/%s" % (room_id, event_id),
                     {

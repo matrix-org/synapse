@@ -30,16 +30,19 @@ logger = logging.getLogger(__name__)
 class ReportEventRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/report/(?P<event_id>[^/]*)$")
 
-    def __init__(self, hs: HomeServer):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.abuse_report_handler = hs.get_abuse_reporter()
 
     async def on_POST(self, request, room_id, event_id):
+        logger.debug("on_POST %s" % event_id)
         requester = await self.auth.get_user_by_req(request)
         body = parse_json_object_from_request(request)
-        self.abuse_report_handler.report(requester.user, body, room_id, event_id)
+        return await self.abuse_report_handler.report(
+            requester.user, body, room_id, event_id
+        )
 
 
 def register_servlets(hs, http_server):
