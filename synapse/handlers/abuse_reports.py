@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 from synapse.api.auth import Auth
 from synapse.api.constants import EventTypes
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import Codes, LimitExceededError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.federation.sender import AbstractFederationSender
 from synapse.http.servlet import assert_params_in_dict
@@ -37,8 +37,8 @@ from synapse.types import (
     JsonDict,
     RoomID,
     UserID,
-    get_domain_from_id,
     create_requester,
+    get_domain_from_id,
 )
 from synapse.visibility import filter_events_for_client
 
@@ -87,8 +87,19 @@ class AbuseReportHandler:
         room_id_: str,
         event_id_: str,
     ):
+        # Create a requester for the rate limiter.
         requester = create_requester(user_id)
-        await self._room_key_request_rate_limiter.can_do_action(requester=requester)
+        time_now_s = self.clock.time()
+
+        (
+            allowed,
+            time_allowed,
+        ) = await self._room_key_request_rate_limiter.can_do_action(requester=requester)
+        if not allowed:
+            raise LimitExceededError(
+                retry_after_ms=int(1000 * (time_allowed - time_now_s))
+            )
+
         room_id = RoomID.from_string(room_id_)
         event_id = None
         try:
