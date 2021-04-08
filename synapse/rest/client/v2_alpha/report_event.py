@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.http.site import SynapseRequest
 
 from ._base import client_patterns
 
@@ -36,12 +37,12 @@ class ReportEventRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.abuse_report_handler = hs.get_abuse_reporter()
 
-    async def on_POST(self, request, room_id, event_id):
+    async def on_POST(self, request: SynapseRequest, room_id, event_id):
         logger.debug("on_POST %s" % event_id)
         requester = await self.auth.get_user_by_req(request)
         body = parse_json_object_from_request(request)
         return await self.abuse_report_handler.report(
-            requester.user, body, room_id, event_id
+            request, requester.user, body, room_id, event_id
         )
 
 

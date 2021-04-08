@@ -26,12 +26,20 @@ from synapse.api.auth import Auth
 from synapse.api.constants import EventTypes
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
-from synapse.federation.sender import AbstractFederationSender, FederationSender
+from synapse.federation.sender import AbstractFederationSender
 from synapse.http.servlet import assert_params_in_dict
+from synapse.http.site import SynapseRequest
 from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.state import StateHandler
 from synapse.storage import DataStore, Storage
-from synapse.types import EventID, JsonDict, RoomID, UserID, get_domain_from_id
+from synapse.types import (
+    EventID,
+    JsonDict,
+    RoomID,
+    UserID,
+    get_domain_from_id,
+    create_requester,
+)
 from synapse.visibility import filter_events_for_client
 
 logger = logging.getLogger(__name__)
@@ -71,13 +79,22 @@ class AbuseReportHandler:
             burst_count=self.config.rc_message.burst_count,
         )
 
-    async def report(self, user_id: UserID, body: dict, room_id_: str, event_id_: str):
+    async def report(
+        self,
+        request: SynapseRequest,
+        user_id: UserID,
+        body: dict,
+        room_id_: str,
+        event_id_: str,
+    ):
+        requester = create_requester(user_id)
+        await self._room_key_request_rate_limiter.can_do_action(requester=requester)
         room_id = RoomID.from_string(room_id_)
         event_id = None
         try:
             event_id = EventID.from_string(event_id_)
         except Exception:
-            event_id = EventID.from_string('%s:%s' % (event_id_, self.hs.hostname))
+            event_id = EventID.from_string("%s:%s" % (event_id_, self.hs.hostname))
         assert_params_in_dict(body, ("reason", "score"))
 
         if not isinstance(body["reason"], str):

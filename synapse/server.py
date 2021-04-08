@@ -775,7 +775,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_abuse_reporter(self) -> AbuseReportHandler:
         return AbuseReportHandler(self)
 
-
     def should_send_federation(self) -> bool:
         "Should this server be sending federation traffic directly?"
         return self.config.send_federation
