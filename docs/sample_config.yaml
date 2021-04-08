@@ -82,9 +82,28 @@ pid_file: DATADIR/homeserver.pid
 #
 #soft_file_limit: 0
 
-# Set to false to disable presence tracking on this homeserver.
+# Presence tracking allows users to see the state (e.g online/offline)
+# of other local and remote users.
 #
-#use_presence: false
+presence:
+  # Uncomment to disable presence tracking on this homeserver. This option
+  # replaces the previous top-level 'use_presence' option.
+  #
+  #enabled: false
+
+  # Presence routers are third-party modules that can specify additional logic
+  # to where presence updates from users are routed.
+  #
+  presence_router:
+    # The custom module's class. Uncomment to use a custom presence router module.
+    #
+    #module: "my_custom_router.PresenceRouter"
+
+    # Configuration options of the custom module. Refer to your module's
+    # documentation for available options.
+    #
+    #config:
+    #  example_option: 'something'
 
 # Whether to require authentication to retrieve profile data (avatars,
 # display names) of other users through the client API. Defaults to
