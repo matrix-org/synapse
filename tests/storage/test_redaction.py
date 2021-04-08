@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2014-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,8 +14,6 @@
 # limitations under the License.
 
 from canonicaljson import json
-
-from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import RoomVersions
@@ -230,10 +227,9 @@ class RedactionTestCase(unittest.HomeserverTestCase):
                 self._base_builder = base_builder
                 self._event_id = event_id
 
-            @defer.inlineCallbacks
-            def build(self, prev_event_ids, auth_event_ids):
-                built_event = yield defer.ensureDeferred(
-                    self._base_builder.build(prev_event_ids, auth_event_ids)
+            async def build(self, prev_event_ids, auth_event_ids):
+                built_event = await self._base_builder.build(
+                    prev_event_ids, auth_event_ids
                 )
 
                 built_event._event_id = self._event_id
