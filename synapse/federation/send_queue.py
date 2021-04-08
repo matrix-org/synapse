@@ -244,23 +244,6 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         """
         # nothing to do here: the replication listener will handle it.
 
-    def send_presence(self, states: List[UserPresenceState]) -> None:
-        """As per FederationSender
-
-        Args:
-            states
-        """
-        pos = self._next_pos()
-
-        # We only want to send presence for our own users, so lets always just
-        # filter here just in case.
-        local_states = [s for s in states if self.is_mine_id(s.user_id)]
-
-        self.presence_map.update({state.user_id: state for state in local_states})
-        self.presence_changed[pos] = [state.user_id for state in local_states]
-
-        self.notifier.on_new_replication_data()
-
     def send_presence_to_destinations(
         self, states: Iterable[UserPresenceState], destinations: Iterable[str]
     ) -> None:
@@ -558,9 +541,6 @@ def process_rows_for_federation(
         RowType = TypeToRow[row.type]
         parsed_row = RowType.from_data(row.data)
         parsed_row.add_to_buffer(buff)
-
-    if buff.presence:
-        transaction_queue.send_presence(buff.presence)
 
     for state, destinations in buff.presence_destinations:
         transaction_queue.send_presence_to_destinations(
