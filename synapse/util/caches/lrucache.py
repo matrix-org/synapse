@@ -255,9 +255,7 @@ class LruCache(Generic[KT, VT]):
                 return default
 
         @synchronized
-        def cache_set(
-            key: KT, value: VT, callbacks: Iterable[Callable[[], None]] = ()
-        ):
+        def cache_set(key: KT, value: VT, callbacks: Iterable[Callable[[], None]] = ()):
             node = cache.get(key, None)
             if node is not None:
                 # We sometimes store large objects, e.g. dicts, which cause
