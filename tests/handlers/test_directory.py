@@ -19,7 +19,9 @@ from mock import Mock
 import synapse
 import synapse.api.errors
 from synapse.api.constants import EventTypes
+from synapse.appservice import ApplicationService
 from synapse.config.room_directory import RoomDirectoryConfig
+from synapse.rest import admin
 from synapse.rest.client.v1 import directory, login, room
 from synapse.types import RoomAlias, create_requester
 
@@ -472,3 +474,191 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
             "PUT", b"directory/list/room/%s" % (room_id.encode("ascii"),), b"{}"
         )
         self.assertEquals(403, channel.code, channel.result)
+
+
+class TestAppserviceRoomDirectoryList(unittest.HomeserverTestCase):
+
+    servlets = [
+        admin.register_servlets_for_client_rest_resource,
+        directory.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, homeserver):
+        # Create a fake appservice
+        self.as_token = "i_am_an_app_service"
+
+        appservice = ApplicationService(
+            self.as_token,
+            self.hs.config.server_name,
+            id="1234",
+            namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
+            sender="@as:test",
+        )
+        self.hs.get_datastore().services_cache.append(appservice)
+
+        # Create a user and a room
+        self.room_owner = self.register_user("room_owner", "test")
+        self.room_owner_tok = self.login("room_owner", "test")
+
+        self.room_id = self.helper.create_room_as(
+            self.room_owner, tok=self.room_owner_tok
+        )
+
+        # Create another user to poll the room directory with
+        self.user = self.register_user("user", "test")
+        self.user_tok = self.login("user", "test")
+
+        # Create a server admin to attempt delisting rooms
+        self.admin_user = self.register_user("admin", "test", admin=True)
+        self.admin_tok = self.login("admin", "test")
+
+    def test_normal_user_cannot_edit_appservice_room_directory(self):
+        """Tests that a normal user (not an appservice) cannot edit the appservice-specific
+        room directory.
+        """
+        # Attempt to list the room as a normal user
+        self._set_visibility_of_appservice_room(
+            self.room_id,
+            visible=True,
+            access_token=self.user_tok,
+            expect_code=403,
+        )
+
+        # Attempt to delist the room as a normal user
+        self._set_visibility_of_appservice_room(
+            self.room_id,
+            visible=False,
+            access_token=self.user_tok,
+            expect_code=403,
+        )
+
+    def test_add_and_remove_from_appservice_room_directory(self):
+        """Tests that we can add and remove rooms from the appservice-specific
+        room directory.
+        """
+        # Check that the room is not currently in the public room directory
+        self.assertFalse(self._is_room_in_public_room_directory(self.room_id))
+
+        # Attempt to list the room as an appservice
+        self._set_visibility_of_appservice_room(
+            self.room_id,
+            visible=True,
+        )
+
+        # Check that the room is currently in the public room directory
+        self.assertTrue(self._is_room_in_public_room_directory(self.room_id))
+
+        # Attempt to remove the room as an appservice
+        self._set_visibility_of_appservice_room(
+            self.room_id,
+            visible=False,
+        )
+
+        # Check that the room is no longer in the public room directory
+        self.assertFalse(self._is_room_in_public_room_directory(self.room_id))
+
+    def test_admin_remove_from_appservice_room_directory(self):
+        """Tests that a homeserver admin can remove a room from the appservice-specific room directory"""
+        # Check that the room is not currently in the public room directory
+        self.assertFalse(self._is_room_in_public_room_directory(self.room_id))
+
+        # Attempt to list the room as an appservice
+        self._set_visibility_of_appservice_room(
+            self.room_id,
+            visible=True,
+        )
+
+        # Check that the room is currently in the public room directory
+        self.assertTrue(self._is_room_in_public_room_directory(self.room_id))
+
+        # Attempt to remove the room as a homeserver admin
+        self._set_visibility_of_appservice_room(
+            self.room_id, visible=False, access_token=self.admin_tok
+        )
+
+        # Check that the room is no longer in the public room directory
+        self.assertFalse(self._is_room_in_public_room_directory(self.room_id))
+
+    def _set_visibility_of_appservice_room(
+        self,
+        room_id: str,
+        visible: bool,
+        access_token: str = None,
+        expect_code: int = 200,
+    ):
+        """Adds or removes a room from the appservice room list.
+
+        Args:
+            room_id: The ID of the room.
+            visible: True to list the room, False to delist it.
+            access_token: The access token to use for the request. If None,
+                self.as_token is used.
+            expect_code: The expected HTTP status code in the response. If None,
+                will expect 200 OK.
+        """
+        # Allow modifying the token used
+        if not access_token:
+            access_token = self.as_token
+
+        # Build the directory room list URL
+        network_id = "some_network"
+        url = f"/_matrix/client/api/v1/directory/list/appservice/{network_id}/{room_id}"
+
+        if visible:
+            # List the room
+            channel = self.make_request(
+                "PUT",
+                url,
+                {"visibility": "public"},
+                access_token=access_token,
+                shorthand=False,
+            )
+            self.assertEquals(channel.code, expect_code, channel.json_body)
+        else:
+            # Delist the room
+            channel = self.make_request(
+                "DELETE",
+                url,
+                access_token=access_token,
+                shorthand=False,
+            )
+            self.assertEquals(channel.code, expect_code, channel.json_body)
+
+    def _is_room_in_public_room_directory(self, room_id: str) -> bool:
+        """Return True or False if a given room_id is currently listed in the
+        public room directory.
+
+        Sets "include_all_networks": True in the request so that appservice
+        rooms appear as well.
+
+        Args:
+            room_id: The room ID to check the public room directory for.
+
+        Returns:
+            True or False if the room is in the public room list.
+        """
+        channel = self.make_request(
+            "POST",
+            "publicRooms",
+            # We need to make sure to specify 'include_all_networks', or our specific network,
+            # in order for the room to appear.
+            {
+                "include_all_networks": True,
+            },
+            access_token=self.user_tok,
+        )
+        self.assertEquals(200, channel.code, channel.result)
+
+        # Pull out the returned public rooms
+        public_room_chunks = channel.json_body["chunk"]
+
+        # Check that we found our listed room
+        found_room = False
+        for room_chunk in public_room_chunks:
+            if room_chunk["room_id"] == room_id:
+                found_room = True
+
+        # Return whether we found the room
+        return found_room
