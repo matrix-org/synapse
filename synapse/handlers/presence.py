@@ -680,7 +680,7 @@ class PresenceHandler(BasePresenceHandler):
             if to_federation_ping:
                 federation_presence_out_counter.inc(len(to_federation_ping))
 
-                self._push_to_remotes(to_federation_ping.values())
+                await self._push_to_remotes(to_federation_ping.values())
 
     async def _handle_timeouts(self):
         """Checks the presence of users that have timed out and updates as
@@ -920,15 +920,23 @@ class PresenceHandler(BasePresenceHandler):
             users=[UserID.from_string(u) for u in users_to_states],
         )
 
-        self._push_to_remotes(states)
+        await self._push_to_remotes(states)
 
-    def _push_to_remotes(self, states):
+    async def _push_to_remotes(self, states):
         """Sends state updates to remote servers.
 
         Args:
             states (list(UserPresenceState))
         """
-        self.federation.send_presence(states)
+        hosts_and_states = await get_interested_remotes(
+            self.store,
+            self.presence_router,
+            states,
+            self.state,
+        )
+
+        for destinations, states in hosts_and_states:
+            self.federation.send_presence_to_destinations(states, destinations)
 
     async def incoming_presence(self, origin, content):
         """Called when we receive a `m.presence` EDU from a remote server."""
