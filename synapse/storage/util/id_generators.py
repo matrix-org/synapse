@@ -96,7 +96,7 @@ class StreamIdGenerator:
         db_conn,
         table,
         column,
-        extra_tables: Iterable[Tuple] = frozenset(),
+        extra_tables: Iterable[Tuple[str, str]] = (),
         step=1,
     ):
         assert step != 0

@@ -239,7 +239,7 @@ class LruCache(Generic[KT, VT]):
         def cache_get(
             key: KT,
             default: Optional[T] = None,
-            callbacks: Iterable[Callable[[], None]] = frozenset(),
+            callbacks: Iterable[Callable[[], None]] = (),
             update_metrics: bool = True,
         ):
             node = cache.get(key, None)
@@ -256,7 +256,7 @@ class LruCache(Generic[KT, VT]):
 
         @synchronized
         def cache_set(
-            key: KT, value: VT, callbacks: Iterable[Callable[[], None]] = frozenset()
+            key: KT, value: VT, callbacks: Iterable[Callable[[], None]] = ()
         ):
             node = cache.get(key, None)
             if node is not None:
