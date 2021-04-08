@@ -16,7 +16,7 @@
 import logging
 import threading
 from functools import wraps
-from typing import TYPE_CHECKING, Dict, Optional, Set
+from typing import TYPE_CHECKING, Dict, Optional, Set, Union
 
 from prometheus_client.core import REGISTRY, Counter, Gauge
 
@@ -199,11 +199,11 @@ def run_as_background_process(desc: str, func, *args, bg_start_span=True, **kwar
         _background_process_start_count.labels(desc).inc()
         _background_process_in_flight_count.labels(desc).inc()
 
-        with BackgroundProcessLoggingContext(desc, "%s-%i" % (desc, count)) as context:
+        with BackgroundProcessLoggingContext(desc, count) as context:
             try:
                 ctx = noop_context_manager()
                 if bg_start_span:
-                    ctx = start_active_span(desc, tags={"request_id": context.request})
+                    ctx = start_active_span(desc, tags={"request_id": str(context)})
                 with ctx:
                     return await maybe_awaitable(func(*args, **kwargs))
             except Exception:
@@ -242,12 +242,18 @@ class BackgroundProcessLoggingContext(LoggingContext):
     processes.
     """
 
-    __slots__ = ["_proc"]
+    __slots__ = ["_id", "_proc"]
 
-    def __init__(self, name: str, request: Optional[str] = None):
-        super().__init__(name, request=request)
+    def __init__(self, name: str, id: Optional[Union[int, str]] = None):
+        super().__init__(name)
+        self._id = id
 
         self._proc = _BackgroundProcess(name, self)
+
+    def __str__(self) -> str:
+        if self._id is not None:
+            return "%s-%s" % (self.name, self._id)
+        return "%s@%x" % (self.name, id(self))
 
     def start(self, rusage: "Optional[resource._RUsage]"):
         """Log context has started running (again)."""
