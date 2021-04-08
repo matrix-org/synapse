@@ -71,7 +71,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.5", "3.6", "3.7", "3.8", "3.9"]
+        python-version: ["3.6", "3.7", "3.8", "3.9"]
         database: ["sqlite"]
         include:
           # Newest Python without optional deps
@@ -79,14 +79,14 @@ jobs:
             toxenv: "py-noextras,combine"
 
           # Oldest Python with PostgreSQL
-          - python-version: "3.5"
+          - python-version: "3.6"
             database: "postgres"
-            postgres-version: 9.5
+            postgres-version: "9.6"
 
           # Newest Python with PostgreSQL
           - python-version: "3.9"
             database: "postgres"
-            postgres-version: 13
+            postgres-version: "13"
 
     steps:
       - uses: actions/checkout@v2
@@ -131,7 +131,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Test with old deps
-        uses: docker://ubuntu:xenial # For old python and sqlite
+        uses: docker://ubuntu:bionic # For old python and sqlite
         with:
           workdir: /github/workspace
           entrypoint: .buildkite/scripts/test_old_deps.sh
@@ -198,23 +198,23 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - sytest-tag: py35
+          - sytest-tag: bionic
 
-          - sytest-tag: py35
+          - sytest-tag: bionic
             postgres: postgres
 
-          - sytest-tag: py38
+          - sytest-tag: testing
             postgres: postgres
 
-          - sytest-tag: py35
+          - sytest-tag: bionic
             postgres: multi-postgres
             workers: workers
 
-          - sytest-tag: py37
+          - sytest-tag: buster
             postgres: multi-postgres
             workers: workers
 
-          - sytest-tag: py37
+          - sytest-tag: buster
             postgres: postgres
             workers: workers
             redis: redis
@@ -245,8 +245,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - python-version: "3.5"
-            postgres-version: "9.5"
+          - python-version: "3.6"
+            postgres-version: "9.6"
 
           - python-version: "3.9"
             postgres-version: "13"
