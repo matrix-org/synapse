@@ -130,13 +130,6 @@ class PostgresEngine(BaseDatabaseEngine):
         return True
 
     @property
-    def supports_tuple_comparison(self):
-        """
-        Do we support comparing tuples, i.e. `(a, b) > (c, d)`?
-        """
-        return True
-
-    @property
     def supports_using_any_list(self):
         """Do we support using `a = ANY(?)` and passing a list"""
         return True
