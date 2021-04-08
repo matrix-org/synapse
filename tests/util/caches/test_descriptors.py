@@ -143,8 +143,7 @@ class DescriptorTestCase(unittest.TestCase):
         obj.mock.assert_not_called()
 
     def test_cache_with_sync_exception(self):
-        """If the wrapped function throws synchronously, things should continue to work
-        """
+        """If the wrapped function throws synchronously, things should continue to work"""
 
         class Cls:
             @cached()
@@ -165,8 +164,7 @@ class DescriptorTestCase(unittest.TestCase):
         self.failureResultOf(d, SynapseError)
 
     def test_cache_with_async_exception(self):
-        """The wrapped function returns a failure
-        """
+        """The wrapped function returns a failure"""
 
         class Cls:
             result = None
@@ -282,7 +280,8 @@ class DescriptorTestCase(unittest.TestCase):
                 try:
                     d = obj.fn(1)
                     self.assertEqual(
-                        current_context(), SENTINEL_CONTEXT,
+                        current_context(),
+                        SENTINEL_CONTEXT,
                     )
                     yield d
                     self.fail("No exception thrown")
@@ -374,8 +373,7 @@ class DescriptorTestCase(unittest.TestCase):
         obj.mock.assert_not_called()
 
     def test_cache_iterable_with_sync_exception(self):
-        """If the wrapped function throws synchronously, things should continue to work
-        """
+        """If the wrapped function throws synchronously, things should continue to work"""
 
         class Cls:
             @descriptors.cached(iterable=True)
@@ -663,14 +661,13 @@ class CachedListDescriptorTestCase(unittest.TestCase):
 
             @descriptors.cachedList("fn", "args1")
             async def list_fn(self, args1, arg2):
-                assert current_context().request == "c1"
+                assert current_context().name == "c1"
                 # we want this to behave like an asynchronous function
                 await run_on_reactor()
-                assert current_context().request == "c1"
+                assert current_context().name == "c1"
                 return self.mock(args1, arg2)
 
-        with LoggingContext() as c1:
-            c1.request = "c1"
+        with LoggingContext("c1") as c1:
             obj = Cls()
             obj.mock.return_value = {10: "fish", 20: "chips"}
             d1 = obj.list_fn([10, 20], 2)

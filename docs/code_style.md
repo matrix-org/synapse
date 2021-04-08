@@ -8,15 +8,15 @@ errors in code.
 
 The necessary tools are detailed below.
 
+First install them with:
+
+    pip install -e ".[lint,mypy]"
+
 -   **black**
 
     The Synapse codebase uses [black](https://pypi.org/project/black/)
     as an opinionated code formatter, ensuring all comitted code is
     properly formatted.
-
-    First install `black` with:
-
-        pip install --upgrade black
 
     Have `black` auto-format your code (it shouldn't change any
     functionality) with:
@@ -28,10 +28,6 @@ The necessary tools are detailed below.
     `flake8` is a code checking tool. We require code to pass `flake8`
     before being merged into the codebase.
 
-    Install `flake8` with:
-
-        pip install --upgrade flake8 flake8-comprehensions
-
     Check all application and test code with:
 
         flake8 synapse tests
@@ -40,10 +36,6 @@ The necessary tools are detailed below.
 
     `isort` ensures imports are nicely formatted, and can suggest and
     auto-fix issues such as double-importing.
-
-    Install `isort` with:
-
-        pip install --upgrade isort
 
     Auto-fix imports with:
 
@@ -136,6 +128,9 @@ Some guidelines follow:
     will be if no sub-options are enabled).
 -   Lines should be wrapped at 80 characters.
 -   Use two-space indents.
+-   `true` and `false` are spelt thus (as opposed to `True`, etc.)
+-   Use single quotes (`'`) rather than double-quotes (`"`) or backticks
+    (`` ` ``) to refer to configuration options.
 
 Example:
 

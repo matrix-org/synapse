@@ -45,7 +45,7 @@ from synapse.util.threepids import canonicalise_email, check_3pid_allowed
 from ._base import client_patterns, interactive_auth_handler
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 
 logger = logging.getLogger(__name__)
@@ -103,7 +103,9 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             # Raise if the provided next_link value isn't valid
             assert_valid_next_link(self.hs, next_link)
 
-        self.identity_handler.ratelimit_request_token_requests(request, "email", email)
+        await self.identity_handler.ratelimit_request_token_requests(
+            request, "email", email
+        )
 
         # The email will be sent to the stored address.
         # This avoids a potential account hijack by requesting a password reset to
@@ -193,7 +195,10 @@ class PasswordRestServlet(RestServlet):
             requester = await self.auth.get_user_by_req(request)
             try:
                 params, session_id = await self.auth_handler.validate_user_via_ui_auth(
-                    requester, request, body, "modify your account password",
+                    requester,
+                    request,
+                    body,
+                    "modify your account password",
                 )
             except InteractiveAuthIncompleteError as e:
                 # The user needs to provide more steps to complete auth, but
@@ -312,7 +317,10 @@ class DeactivateAccountRestServlet(RestServlet):
             return 200, {}
 
         await self.auth_handler.validate_user_via_ui_auth(
-            requester, request, body, "deactivate your account",
+            requester,
+            request,
+            body,
+            "deactivate your account",
         )
         result = await self._deactivate_account_handler.deactivate_account(
             requester.user.to_string(),
@@ -381,7 +389,9 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        self.identity_handler.ratelimit_request_token_requests(request, "email", email)
+        await self.identity_handler.ratelimit_request_token_requests(
+            request, "email", email
+        )
 
         if next_link:
             # Raise if the provided next_link value isn't valid
@@ -462,7 +472,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        self.identity_handler.ratelimit_request_token_requests(
+        await self.identity_handler.ratelimit_request_token_requests(
             request, "msisdn", msisdn
         )
 
@@ -703,7 +713,10 @@ class ThreepidAddRestServlet(RestServlet):
         assert_valid_client_secret(client_secret)
 
         await self.auth_handler.validate_user_via_ui_auth(
-            requester, request, body, "add a third-party identifier to your account",
+            requester,
+            request,
+            body,
+            "add a third-party identifier to your account",
         )
 
         validation_session = await self.identity_handler.validate_threepid_session(

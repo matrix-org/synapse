@@ -161,7 +161,11 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
         response = self.get_success(
             self.query_handlers["profile"](
-                {"user_id": "@caroline:test", "field": "displayname"}
+                {
+                    "user_id": "@caroline:test",
+                    "field": "displayname",
+                    "origin": "servername.tld",
+                }
             )
         )
 
@@ -208,7 +212,9 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         # Set avatar to an empty string
         self.get_success(
             self.handler.set_avatar_url(
-                self.frank, synapse.types.create_requester(self.frank), "",
+                self.frank,
+                synapse.types.create_requester(self.frank),
+                "",
             )
         )
 

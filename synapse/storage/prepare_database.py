@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import imp
+import importlib.util
 import logging
 import os
 import re
@@ -425,7 +425,10 @@ def _upgrade_existing_database(
             # We don't support using the same file name in the same delta version.
             raise PrepareDatabaseException(
                 "Found multiple delta files with the same name in v%d: %s"
-                % (v, duplicates,)
+                % (
+                    v,
+                    duplicates,
+                )
             )
 
         # We sort to ensure that we apply the delta files in a consistent
@@ -451,8 +454,13 @@ def _upgrade_existing_database(
                     )
 
                 module_name = "synapse.storage.v%d_%s" % (v, root_name)
-                with open(absolute_path) as python_file:
-                    module = imp.load_source(module_name, absolute_path, python_file)  # type: ignore
+
+                spec = importlib.util.spec_from_file_location(
+                    module_name, absolute_path
+                )
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)  # type: ignore
+
                 logger.info("Running script %s", relative_path)
                 module.run_create(cur, database_engine)  # type: ignore
                 if not is_empty:
@@ -532,7 +540,8 @@ def _apply_module_schema_files(
         names_and_streams: the names and streams of schemas to be applied
     """
     cur.execute(
-        "SELECT file FROM applied_module_schemas WHERE module_name = ?", (modname,),
+        "SELECT file FROM applied_module_schemas WHERE module_name = ?",
+        (modname,),
     )
     applied_deltas = {d for d, in cur}
     for (name, stream) in names_and_streams:

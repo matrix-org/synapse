@@ -39,6 +39,7 @@ from synapse.logging import opentracing as opentracing
 from synapse.storage.databases.main.registration import TokenLookupResult
 from synapse.types import StateMap, UserID
 from synapse.util.caches.lrucache import LruCache
+from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
@@ -163,12 +164,12 @@ class Auth:
 
     async def get_user_by_req(
         self,
-        request: Request,
+        request: SynapseRequest,
         allow_guest: bool = False,
         rights: str = "access",
         allow_expired: bool = False,
     ) -> synapse.types.Requester:
-        """ Get a registered user's ID.
+        """Get a registered user's ID.
 
         Args:
             request: An HTTP request with an access_token query parameter.
@@ -294,9 +295,12 @@ class Auth:
         return user_id, app_service
 
     async def get_user_by_access_token(
-        self, token: str, rights: str = "access", allow_expired: bool = False,
+        self,
+        token: str,
+        rights: str = "access",
+        allow_expired: bool = False,
     ) -> TokenLookupResult:
-        """ Validate access token and get user_id from it
+        """Validate access token and get user_id from it
 
         Args:
             token: The access token to get the user by
@@ -405,7 +409,7 @@ class Auth:
             raise _InvalidMacaroonException()
 
         try:
-            user_id = self.get_user_id_from_macaroon(macaroon)
+            user_id = get_value_from_macaroon(macaroon, "user_id")
 
             guest = False
             for caveat in macaroon.caveats:
@@ -413,34 +417,18 @@ class Auth:
                     guest = True
 
             self.validate_macaroon(macaroon, rights, user_id=user_id)
-        except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
+        except (
+            pymacaroons.exceptions.MacaroonException,
+            KeyError,
+            TypeError,
+            ValueError,
+        ):
             raise InvalidClientTokenError("Invalid macaroon passed.")
 
         if rights == "access":
             self.token_cache[token] = (user_id, guest)
 
         return user_id, guest
-
-    def get_user_id_from_macaroon(self, macaroon):
-        """Retrieve the user_id given by the caveats on the macaroon.
-
-        Does *not* validate the macaroon.
-
-        Args:
-            macaroon (pymacaroons.Macaroon): The macaroon to validate
-
-        Returns:
-            (str) user id
-
-        Raises:
-            InvalidClientCredentialsError if there is no user_id caveat in the
-                macaroon
-        """
-        user_prefix = "user_id = "
-        for caveat in macaroon.caveats:
-            if caveat.caveat_id.startswith(user_prefix):
-                return caveat.caveat_id[len(user_prefix) :]
-        raise InvalidClientTokenError("No user caveat in macaroon")
 
     def validate_macaroon(self, macaroon, type_string, user_id):
         """
@@ -462,20 +450,12 @@ class Auth:
         v.satisfy_exact("type = " + type_string)
         v.satisfy_exact("user_id = %s" % user_id)
         v.satisfy_exact("guest = true")
-        v.satisfy_general(self._verify_expiry)
+        satisfy_expiry(v, self.clock.time_msec)
 
         # access_tokens include a nonce for uniqueness: any value is acceptable
         v.satisfy_general(lambda c: c.startswith("nonce = "))
 
         v.verify(macaroon, self._macaroon_secret_key)
-
-    def _verify_expiry(self, caveat):
-        prefix = "time < "
-        if not caveat.startswith(prefix):
-            return False
-        expiry = int(caveat[len(prefix) :])
-        now = self.hs.get_clock().time_msec()
-        return now < expiry
 
     def get_appservice_by_req(self, request: SynapseRequest) -> ApplicationService:
         token = self.get_access_token_from_request(request)
@@ -489,7 +469,7 @@ class Auth:
         return service
 
     async def is_server_admin(self, user: UserID) -> bool:
-        """ Check if the given user is a local server admin.
+        """Check if the given user is a local server admin.
 
         Args:
             user: user to check
@@ -500,7 +480,10 @@ class Auth:
         return await self.store.is_server_admin(user)
 
     def compute_auth_events(
-        self, event, current_state_ids: StateMap[str], for_verification: bool = False,
+        self,
+        event,
+        current_state_ids: StateMap[str],
+        for_verification: bool = False,
     ) -> List[str]:
         """Given an event and current state return the list of event IDs used
         to auth an event.
@@ -575,6 +558,9 @@ class Auth:
         Returns:
             bool: False if no access_token was given, True otherwise.
         """
+        # This will always be set by the time Twisted calls us.
+        assert request.args is not None
+
         query_params = request.args.get(b"access_token")
         auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
         return bool(query_params) or bool(auth_headers)
@@ -591,6 +577,8 @@ class Auth:
             MissingClientTokenError: If there isn't a single access_token in the
                 request
         """
+        # This will always be set by the time Twisted calls us.
+        assert request.args is not None
 
         auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
         query_params = request.args.get(b"access_token")

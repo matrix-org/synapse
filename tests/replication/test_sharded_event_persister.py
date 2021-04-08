@@ -29,8 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
-    """Checks event persisting sharding works
-    """
+    """Checks event persisting sharding works"""
 
     # Event persister sharding requires postgres (due to needing
     # `MutliWriterIdGenerator`).
@@ -63,8 +62,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         return conf
 
     def _create_room(self, room_id: str, user_id: str, tok: str):
-        """Create a room with given room_id
-        """
+        """Create a room with given room_id"""
 
         # We control the room ID generation by patching out the
         # `_generate_room_id` method
@@ -91,11 +89,13 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         """
 
         self.make_worker_hs(
-            "synapse.app.generic_worker", {"worker_name": "worker1"},
+            "synapse.app.generic_worker",
+            {"worker_name": "worker1"},
         )
 
         self.make_worker_hs(
-            "synapse.app.generic_worker", {"worker_name": "worker2"},
+            "synapse.app.generic_worker",
+            {"worker_name": "worker2"},
         )
 
         persisted_on_1 = False
@@ -139,15 +139,18 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         """
 
         self.make_worker_hs(
-            "synapse.app.generic_worker", {"worker_name": "worker1"},
+            "synapse.app.generic_worker",
+            {"worker_name": "worker1"},
         )
 
         worker_hs2 = self.make_worker_hs(
-            "synapse.app.generic_worker", {"worker_name": "worker2"},
+            "synapse.app.generic_worker",
+            {"worker_name": "worker2"},
         )
 
         sync_hs = self.make_worker_hs(
-            "synapse.app.generic_worker", {"worker_name": "sync"},
+            "synapse.app.generic_worker",
+            {"worker_name": "sync"},
         )
         sync_hs_site = self._hs_to_site[sync_hs]
 
@@ -323,7 +326,9 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
             sync_hs_site,
             "GET",
             "/rooms/{}/messages?from={}&to={}&dir=f".format(
-                room_id2, vector_clock_token, prev_batch2,
+                room_id2,
+                vector_clock_token,
+                prev_batch2,
             ),
             access_token=access_token,
         )

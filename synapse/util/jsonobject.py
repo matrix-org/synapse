@@ -15,7 +15,7 @@
 
 
 class JsonEncodedObject:
-    """ A common base class for defining protocol units that are represented
+    """A common base class for defining protocol units that are represented
     as JSON.
 
     Attributes:
@@ -39,7 +39,7 @@ class JsonEncodedObject:
     """
 
     def __init__(self, **kwargs):
-        """ Takes the dict of `kwargs` and loads all keys that are *valid*
+        """Takes the dict of `kwargs` and loads all keys that are *valid*
         (i.e., are included in the `valid_keys` list) into the dictionary`
         instance variable.
 
@@ -61,7 +61,7 @@ class JsonEncodedObject:
                 self.unrecognized_keys[k] = v
 
     def get_dict(self):
-        """ Converts this protocol unit into a :py:class:`dict`, ready to be
+        """Converts this protocol unit into a :py:class:`dict`, ready to be
         encoded as JSON.
 
         The keys it encodes are: `valid_keys` - `internal_keys`

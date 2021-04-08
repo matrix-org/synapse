@@ -52,7 +52,7 @@ MediaStorageProviderConfig = namedtuple(
 
 
 def parse_thumbnail_requirements(thumbnail_sizes):
-    """ Takes a list of dictionaries with "width", "height", and "method" keys
+    """Takes a list of dictionaries with "width", "height", and "method" keys
     and creates a map from image media types to the thumbnail size, thumbnailing
     method, and thumbnail media type to precalculate
 
@@ -176,7 +176,9 @@ class ContentRepositoryConfig(Config):
                 check_requirements("url_preview")
 
             except DependencyException as e:
-                raise ConfigError(e.message)
+                raise ConfigError(
+                    e.message  # noqa: B306, DependencyException.message is a property
+                )
 
             if "url_preview_ip_range_blacklist" not in config:
                 raise ConfigError(
@@ -206,7 +208,6 @@ class ContentRepositoryConfig(Config):
 
     def generate_config_section(self, data_dir_path, **kwargs):
         media_store = os.path.join(data_dir_path, "media_store")
-        uploads_path = os.path.join(data_dir_path, "uploads")
 
         formatted_thumbnail_sizes = "".join(
             THUMBNAIL_SIZE_YAML % s for s in DEFAULT_THUMBNAIL_SIZES

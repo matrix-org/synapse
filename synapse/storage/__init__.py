@@ -36,15 +36,14 @@ from synapse.storage.purge_events import PurgeEventsStorage
 from synapse.storage.state import StateGroupStorage
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 
 __all__ = ["Databases", "DataStore"]
 
 
 class Storage:
-    """The high level interfaces for talking to various storage layers.
-    """
+    """The high level interfaces for talking to various storage layers."""
 
     def __init__(self, hs: "HomeServer", stores: Databases):
         # We include the main data store here mainly so that we don't have to

@@ -169,7 +169,7 @@ import inspect
 import logging
 import re
 from functools import wraps
-from typing import TYPE_CHECKING, Dict, Optional, Type
+from typing import TYPE_CHECKING, Dict, Optional, Pattern, Type
 
 import attr
 
@@ -238,8 +238,7 @@ try:
 
     @attr.s(slots=True, frozen=True)
     class _WrappedRustReporter:
-        """Wrap the reporter to ensure `report_span` never throws.
-        """
+        """Wrap the reporter to ensure `report_span` never throws."""
 
         _reporter = attr.ib(type=Reporter, default=attr.Factory(Reporter))
 
@@ -260,10 +259,18 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+class SynapseTags:
+    # The message ID of any to_device message processed
+    TO_DEVICE_MESSAGE_ID = "to_device.message_id"
+
+    # Whether the sync response has new data to be returned to the client.
+    SYNC_RESULT = "sync.new_data"
+
+
 # Block everything by default
 # A regex which matches the server_names to expose traces for.
 # None means 'block everything'.
-_homeserver_whitelist = None
+_homeserver_whitelist = None  # type: Optional[Pattern[str]]
 
 # Util methods
 
@@ -326,8 +333,7 @@ def noop_context_manager(*args, **kwargs):
 
 
 def init_tracer(hs: "HomeServer"):
-    """Set the whitelists and initialise the JaegerClient tracer
-    """
+    """Set the whitelists and initialise the JaegerClient tracer"""
     global opentracing
     if not hs.config.opentracer_enabled:
         # We don't have a tracer
@@ -384,7 +390,7 @@ def whitelisted_homeserver(destination):
 
     Args:
         destination (str)
-        """
+    """
 
     if _homeserver_whitelist:
         return _homeserver_whitelist.match(destination)

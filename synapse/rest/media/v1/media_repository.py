@@ -22,8 +22,8 @@ from typing import IO, TYPE_CHECKING, Dict, List, Optional, Set, Tuple
 
 import twisted.internet.error
 import twisted.web.http
-from twisted.web.http import Request
 from twisted.web.resource import Resource
+from twisted.web.server import Request
 
 from synapse.api.errors import (
     FederationDeniedError,
@@ -35,6 +35,7 @@ from synapse.api.errors import (
 from synapse.config._base import ConfigError
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.types import UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import random_string
@@ -57,7 +58,7 @@ from .thumbnailer import Thumbnailer, ThumbnailError
 from .upload_resource import UploadResource
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +146,7 @@ class MediaRepository:
         upload_name: Optional[str],
         content: IO,
         content_length: int,
-        auth_user: str,
+        auth_user: UserID,
     ) -> str:
         """Store uploaded content for a local user and return the mxc URL
 
@@ -325,7 +326,10 @@ class MediaRepository:
         # Failed to find the file anywhere, lets download it.
 
         try:
-            media_info = await self._download_remote_file(server_name, media_id,)
+            media_info = await self._download_remote_file(
+                server_name,
+                media_id,
+            )
         except SynapseError:
             raise
         except Exception as e:
@@ -351,7 +355,11 @@ class MediaRepository:
         responder = await self.media_storage.fetch_media(file_info)
         return responder, media_info
 
-    async def _download_remote_file(self, server_name: str, media_id: str,) -> dict:
+    async def _download_remote_file(
+        self,
+        server_name: str,
+        media_id: str,
+    ) -> dict:
         """Attempt to download the remote file from the given server name,
         using the given file_id as the local id.
 
@@ -502,7 +510,7 @@ class MediaRepository:
         t_height: int,
         t_method: str,
         t_type: str,
-        url_cache: str,
+        url_cache: Optional[str],
     ) -> Optional[str]:
         input_path = await self.media_storage.ensure_media_is_in_local_cache(
             FileInfo(None, media_id, url_cache=url_cache)
@@ -773,7 +781,11 @@ class MediaRepository:
                         )
                     except Exception as e:
                         thumbnail_exists = await self.store.get_remote_media_thumbnail(
-                            server_name, media_id, t_width, t_height, t_type,
+                            server_name,
+                            media_id,
+                            t_width,
+                            t_height,
+                            t_type,
                         )
                         if not thumbnail_exists:
                             raise e
@@ -832,7 +844,10 @@ class MediaRepository:
         return await self._remove_local_media_from_disk([media_id])
 
     async def delete_old_local_media(
-        self, before_ts: int, size_gt: int = 0, keep_profiles: bool = True,
+        self,
+        before_ts: int,
+        size_gt: int = 0,
+        keep_profiles: bool = True,
     ) -> Tuple[List[str], int]:
         """
         Delete local or remote media from this server by size and timestamp. Removes
@@ -849,7 +864,9 @@ class MediaRepository:
             A tuple of (list of deleted media IDs, total deleted media IDs).
         """
         old_media = await self.store.get_local_media_before(
-            before_ts, size_gt, keep_profiles,
+            before_ts,
+            size_gt,
+            keep_profiles,
         )
         return await self._remove_local_media_from_disk(old_media)
 

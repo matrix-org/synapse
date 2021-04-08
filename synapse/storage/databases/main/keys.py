@@ -33,8 +33,7 @@ db_binary_type = memoryview
 
 
 class KeyStore(SQLBaseStore):
-    """Persistence for signature verification keys
-    """
+    """Persistence for signature verification keys"""
 
     @cached()
     def _get_server_verify_key(self, server_name_and_key_id):

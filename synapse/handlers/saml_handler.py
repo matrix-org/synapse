@@ -81,6 +81,7 @@ class SamlHandler(BaseHandler):
         # the SsoIdentityProvider protocol type.
         self.idp_icon = None
         self.idp_brand = None
+        self.unstable_idp_brand = None
 
         # a map from saml session id to Saml2SessionData object
         self._outstanding_requests_dict = {}  # type: Dict[str, Saml2SessionData]
@@ -121,7 +122,8 @@ class SamlHandler(BaseHandler):
 
         now = self.clock.time_msec()
         self._outstanding_requests_dict[reqid] = Saml2SessionData(
-            creation_time=now, ui_auth_session_id=ui_auth_session_id,
+            creation_time=now,
+            ui_auth_session_id=ui_auth_session_id,
         )
 
         for key, value in info["headers"]:
@@ -450,7 +452,8 @@ class DefaultSamlMappingProvider:
             mxid_source = saml_response.ava[self._mxid_source_attribute][0]
         except KeyError:
             logger.warning(
-                "SAML2 response lacks a '%s' attestation", self._mxid_source_attribute,
+                "SAML2 response lacks a '%s' attestation",
+                self._mxid_source_attribute,
             )
             raise SynapseError(
                 400, "%s not in SAML2 response" % (self._mxid_source_attribute,)

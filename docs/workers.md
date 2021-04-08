@@ -232,7 +232,6 @@ expressions:
     # Registration/login requests
     ^/_matrix/client/(api/v1|r0|unstable)/login$
     ^/_matrix/client/(r0|unstable)/register$
-    ^/_matrix/client/(r0|unstable)/auth/.*/fallback/web$
 
     # Event sending requests
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/redact
@@ -276,7 +275,8 @@ using):
 
 Ensure that all SSO logins go to a single process.
 For multiple workers not handling the SSO endpoints properly, see
-[#7530](https://github.com/matrix-org/synapse/issues/7530).
+[#7530](https://github.com/matrix-org/synapse/issues/7530) and
+[#9427](https://github.com/matrix-org/synapse/issues/9427).
 
 Note that a HTTP listener with `client` and `federation` resources must be
 configured in the `worker_listeners` option in the worker config.
@@ -373,7 +373,15 @@ Handles sending push notifications to sygnal and email. Doesn't handle any
 REST endpoints itself, but you should set `start_pushers: False` in the
 shared configuration file to stop the main synapse sending push notifications.
 
-Note this worker cannot be load-balanced: only one instance should be active.
+To run multiple instances at once the `pusher_instances` option should list all
+pusher instances by their worker name, e.g.:
+
+```yaml
+pusher_instances:
+    - pusher_worker1
+    - pusher_worker2
+```
+
 
 ### `synapse.app.appservice`
 

@@ -22,6 +22,7 @@ from typing import (
     Callable,
     DefaultDict,
     Dict,
+    FrozenSet,
     Iterable,
     List,
     Optional,
@@ -398,7 +399,7 @@ class StateHandler:
     async def resolve_state_groups_for_events(
         self, room_id: str, event_ids: Iterable[str]
     ) -> _StateCacheEntry:
-        """ Given a list of event_ids this method fetches the state at each
+        """Given a list of event_ids this method fetches the state at each
         event, resolves conflicts between them and returns them.
 
         Args:
@@ -515,7 +516,7 @@ class StateResolutionHandler:
             expiry_ms=EVICTION_TIMEOUT_SECONDS * 1000,
             iterable=True,
             reset_expiry_on_get=True,
-        )
+        )  # type: ExpiringCache[FrozenSet[int], _StateCacheEntry]
 
         #
         # stuff for tracking time spent on state-res by room
@@ -536,7 +537,7 @@ class StateResolutionHandler:
         state_groups_ids: Dict[int, StateMap[str]],
         event_map: Optional[Dict[str, EventBase]],
         state_res_store: "StateResolutionStore",
-    ):
+    ) -> _StateCacheEntry:
         """Resolves conflicts between a set of state groups
 
         Always generates a new state group (unless we hit the cache), so should
@@ -570,7 +571,9 @@ class StateResolutionHandler:
                 return cache
 
             logger.info(
-                "Resolving state for %s with groups %s", room_id, list(group_names),
+                "Resolving state for %s with groups %s",
+                room_id,
+                list(group_names),
             )
 
             state_groups_histogram.observe(len(state_groups_ids))
@@ -656,11 +659,15 @@ class StateResolutionHandler:
             return
 
         self._report_biggest(
-            lambda i: i.cpu_time, "CPU time", _biggest_room_by_cpu_counter,
+            lambda i: i.cpu_time,
+            "CPU time",
+            _biggest_room_by_cpu_counter,
         )
 
         self._report_biggest(
-            lambda i: i.db_time, "DB time", _biggest_room_by_db_counter,
+            lambda i: i.db_time,
+            "DB time",
+            _biggest_room_by_db_counter,
         )
 
         self._state_res_metrics.clear()

@@ -1,4 +1,4 @@
-/* Copyright 2020 The Matrix.org Foundation C.I.C
+/* Copyright 2021 The Matrix.org Foundation C.I.C
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,5 +13,8 @@
  * limitations under the License.
  */
 
+
+-- We may not have deleted all pushers for deactivated accounts, so we set up a
+-- background job to delete them.
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
-  (5828, 'rejected_events_metadata', '{}');
+  (5908, 'remove_deactivated_pushers', '{}');

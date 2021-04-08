@@ -81,6 +81,8 @@ class VersionsRestServlet(RestServlet):
                     "io.element.e2ee_forced.public": self.e2ee_forced_public,
                     "io.element.e2ee_forced.private": self.e2ee_forced_private,
                     "io.element.e2ee_forced.trusted_private": self.e2ee_forced_trusted_private,
+                    # Supports the busy presence state described in MSC3026.
+                    "org.matrix.msc3026.busy_presence": self.config.experimental.msc3026_enabled,
                 },
             },
         )

@@ -21,8 +21,10 @@ import signal
 import socket
 import sys
 import traceback
+import warnings
 from typing import Awaitable, Callable, Iterable
 
+from cryptography.utils import CryptographyDeprecationWarning
 from typing_extensions import NoReturn
 
 from twisted.internet import defer, error, reactor
@@ -58,7 +60,7 @@ def register_sighup(func, *args, **kwargs):
 
 
 def start_worker_reactor(appname, config, run_command=reactor.run):
-    """ Run the reactor in the main process
+    """Run the reactor in the main process
 
     Daemonizes if necessary, and then configures some resources, before starting
     the reactor. Pulls configuration from the 'worker' settings in 'config'.
@@ -93,7 +95,7 @@ def start_reactor(
     logger,
     run_command=reactor.run,
 ):
-    """ Run the reactor in the main process
+    """Run the reactor in the main process
 
     Daemonizes if necessary, and then configures some resources, before starting
     the reactor
@@ -193,6 +195,25 @@ def listen_metrics(bind_addresses, port):
     for host in bind_addresses:
         logger.info("Starting metrics listener on %s:%d", host, port)
         start_http_server(port, addr=host, registry=RegistryProxy)
+
+
+def listen_manhole(bind_addresses: Iterable[str], port: int, manhole_globals: dict):
+    # twisted.conch.manhole 21.1.0 uses "int_from_bytes", which produces a confusing
+    # warning. It's fixed by https://github.com/twisted/twisted/pull/1522), so
+    # suppress the warning for now.
+    warnings.filterwarnings(
+        action="ignore",
+        category=CryptographyDeprecationWarning,
+        message="int_from_bytes is deprecated",
+    )
+
+    from synapse.util.manhole import manhole
+
+    listen_tcp(
+        bind_addresses,
+        port,
+        manhole(username="matrix", password="rabbithole", globals=manhole_globals),
+    )
 
 
 def listen_tcp(bind_addresses, port, factory, reactor=reactor, backlog=50):
@@ -313,9 +334,7 @@ async def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerCon
     refresh_certificate(hs)
 
     # Start the tracer
-    synapse.logging.opentracing.init_tracer(  # type: ignore[attr-defined] # noqa
-        hs
-    )
+    synapse.logging.opentracing.init_tracer(hs)  # type: ignore[attr-defined] # noqa
 
     # It is now safe to start your Synapse.
     hs.start_listening(listeners)
@@ -370,8 +389,7 @@ def setup_sentry(hs):
 
 
 def setup_sdnotify(hs):
-    """Adds process state hooks to tell systemd what we are up to.
-    """
+    """Adds process state hooks to tell systemd what we are up to."""
 
     # Tell systemd our state, if we're using it. This will silently fail if
     # we're not using systemd.
@@ -405,8 +423,7 @@ def install_dns_limiter(reactor, max_dns_requests_in_flight=100):
 
 
 class _LimitedHostnameResolver:
-    """Wraps a IHostnameResolver, limiting the number of in-flight DNS lookups.
-    """
+    """Wraps a IHostnameResolver, limiting the number of in-flight DNS lookups."""
 
     def __init__(self, resolver, max_dns_requests_in_flight):
         self._resolver = resolver
