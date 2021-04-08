@@ -36,7 +36,6 @@ def _stub_db_engine(**kwargs) -> BaseDatabaseEngine:
 
 class TupleComparisonClauseTestCase(unittest.TestCase):
     def test_native_tuple_comparison(self):
-        db_engine = _stub_db_engine()
-        clause, args = make_tuple_comparison_clause(db_engine, [("a", 1), ("b", 2)])
+        clause, args = make_tuple_comparison_clause([("a", 1), ("b", 2)])
         self.assertEqual(clause, "(a,b) > (?,?)")
         self.assertEqual(args, [1, 2])

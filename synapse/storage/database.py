@@ -2059,15 +2059,12 @@ def make_in_list_sql_clause(
 KV = TypeVar("KV")
 
 
-def make_tuple_comparison_clause(
-    _database_engine: BaseDatabaseEngine, keys: List[Tuple[str, KV]]
-) -> Tuple[str, List[KV]]:
+def make_tuple_comparison_clause(keys: List[Tuple[str, KV]]) -> Tuple[str, List[KV]]:
     """Returns a tuple comparison SQL clause
 
     Builds a SQL clause that looks like "(a, b) > (?, ?)"
 
     Args:
-        _database_engine
         keys: A set of (column, value) pairs to be compared.
 
     Returns:
