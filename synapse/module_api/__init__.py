@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Any, Generator, Iterable, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Generator, Iterable, List, Optional, Tuple
 
 from twisted.internet import defer
 
@@ -127,7 +127,7 @@ class ModuleApi:
         return defer.ensureDeferred(self._auth_handler.check_user_exists(user_id))
 
     @defer.inlineCallbacks
-    def register(self, localpart, displayname=None, emails=[]):
+    def register(self, localpart, displayname=None, emails: Optional[List[str]] = None):
         """Registers a new user with given localpart and optional displayname, emails.
 
         Also returns an access token for the new user.
@@ -147,11 +147,13 @@ class ModuleApi:
         logger.warning(
             "Using deprecated ModuleApi.register which creates a dummy user device."
         )
-        user_id = yield self.register_user(localpart, displayname, emails)
+        user_id = yield self.register_user(localpart, displayname, emails or [])
         _, access_token = yield self.register_device(user_id)
         return user_id, access_token
 
-    def register_user(self, localpart, displayname=None, emails=[]):
+    def register_user(
+        self, localpart, displayname=None, emails: Optional[List[str]] = None
+    ):
         """Registers a new user with given localpart and optional displayname, emails.
 
         Args:
@@ -170,7 +172,7 @@ class ModuleApi:
             self._hs.get_registration_handler().register_user(
                 localpart=localpart,
                 default_display_name=displayname,
-                bind_emails=emails,
+                bind_emails=emails or [],
             )
         )
 
