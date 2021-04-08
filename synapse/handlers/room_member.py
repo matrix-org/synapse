@@ -210,7 +210,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         if join_rules_event.content.get("join_rule") != JoinRules.MSC3083_RESTRICTED:
             return True
 
-        # If allowed is of the wrong form, then only allows invites.
+        # If allowed is of the wrong form, then only allow invited users.
         allowed_spaces = join_rules_event.content.get("allow", [])
         if not isinstance(allowed_spaces, list):
             return False
