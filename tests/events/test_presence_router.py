@@ -313,7 +313,8 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
             self.hs.get_federation_transport_client().send_transaction.call_args_list
         )
         for call in calls:
-            federation_transaction = call.args[0]  # type: Transaction
+            call_args = call[0]
+            federation_transaction = call_args[0]  # type: Transaction
 
             # Get the sent EDUs in this transaction
             edus = federation_transaction.get_dict()["edus"]
