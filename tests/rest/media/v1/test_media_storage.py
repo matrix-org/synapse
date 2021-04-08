@@ -18,9 +18,8 @@ import tempfile
 from binascii import unhexlify
 from io import BytesIO
 from typing import Optional
-from urllib import parse
-
 from unittest.mock import Mock
+from urllib import parse
 
 import attr
 from parameterized import parameterized_class

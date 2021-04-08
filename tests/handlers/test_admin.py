@@ -14,7 +14,6 @@
 # limitations under the License.
 
 from collections import Counter
-
 from unittest.mock import Mock
 
 import synapse.api.errors

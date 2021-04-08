@@ -14,7 +14,6 @@
 # limitations under the License.
 import threading
 from typing import Dict
-
 from unittest.mock import Mock
 
 from synapse.events import EventBase

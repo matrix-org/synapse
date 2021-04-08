@@ -16,7 +16,6 @@
 
 import threading
 from io import StringIO
-
 from unittest.mock import NonCallableMock
 
 from twisted.internet import defer, reactor

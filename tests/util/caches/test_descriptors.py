@@ -15,7 +15,6 @@
 # limitations under the License.
 import logging
 from typing import Set
-
 from unittest import mock
 
 from twisted.internet import defer, reactor

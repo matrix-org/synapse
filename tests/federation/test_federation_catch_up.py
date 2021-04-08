@@ -1,5 +1,4 @@
 from typing import List, Tuple
-
 from unittest.mock import Mock
 
 from synapse.api.constants import EventTypes

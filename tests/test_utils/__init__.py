@@ -21,7 +21,6 @@ import sys
 import warnings
 from asyncio import Future
 from typing import Any, Awaitable, Callable, TypeVar
-
 from unittest.mock import Mock
 
 import attr

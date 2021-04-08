@@ -16,7 +16,6 @@
 import logging
 import warnings
 from io import StringIO
-
 from unittest.mock import Mock
 
 from pyperf import perf_counter

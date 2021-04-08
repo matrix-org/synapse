@@ -20,9 +20,8 @@
 
 import json
 from typing import Iterable
-from urllib import parse as urlparse
-
 from unittest.mock import Mock
+from urllib import parse as urlparse
 
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, Membership

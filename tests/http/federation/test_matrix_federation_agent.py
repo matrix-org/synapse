@@ -14,7 +14,6 @@
 # limitations under the License.
 import logging
 from typing import Optional
-
 from unittest.mock import Mock
 
 import treq

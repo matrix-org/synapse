@@ -16,7 +16,6 @@
 
 import json
 from typing import Dict
-
 from unittest.mock import ANY, Mock, call
 
 from twisted.internet import defer

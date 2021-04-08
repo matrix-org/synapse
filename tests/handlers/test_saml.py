@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 from typing import Optional
-
 from unittest.mock import Mock
 
 import attr

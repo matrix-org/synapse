@@ -16,7 +16,6 @@
 import json
 import urllib.parse
 from typing import List, Optional
-
 from unittest.mock import Mock
 
 import synapse.rest.admin

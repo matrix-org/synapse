@@ -15,7 +15,6 @@
 import json
 import logging
 from io import BytesIO, StringIO
-
 from unittest.mock import Mock, patch
 
 from twisted.web.server import Request

@@ -14,7 +14,6 @@
 # limitations under the License.
 import urllib.parse
 from io import BytesIO, StringIO
-
 from unittest.mock import Mock
 
 import signedjson.key

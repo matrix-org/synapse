@@ -16,7 +16,6 @@
 # limitations under the License.
 
 import copy
-
 from unittest import mock
 
 from synapse.api.errors import SynapseError

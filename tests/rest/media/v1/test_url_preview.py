@@ -15,7 +15,6 @@
 import json
 import os
 import re
-
 from unittest.mock import patch
 
 from twisted.internet._resolver import HostResolution

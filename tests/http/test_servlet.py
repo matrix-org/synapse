@@ -14,7 +14,6 @@
 # limitations under the License.
 import json
 from io import BytesIO
-
 from unittest.mock import Mock
 
 from synapse.api.errors import SynapseError

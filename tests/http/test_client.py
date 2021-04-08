@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 from io import BytesIO
-
 from unittest.mock import Mock
 
 from netaddr import IPSet
