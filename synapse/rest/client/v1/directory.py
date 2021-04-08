@@ -15,6 +15,7 @@
 
 
 import logging
+from typing import Tuple
 
 from synapse.api.errors import (
     AuthError,
@@ -24,8 +25,9 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.http.site import SynapseRequest
 from synapse.rest.client.v2_alpha._base import client_patterns
-from synapse.types import RoomAlias
+from synapse.types import JsonDict, RoomAlias
 
 logger = logging.getLogger(__name__)
 
@@ -164,15 +166,39 @@ class ClientAppserviceDirectoryListServer(RestServlet):
         self.directory_handler = hs.get_directory_handler()
         self.auth = hs.get_auth()
 
-    def on_PUT(self, request, network_id, room_id):
+    async def on_PUT(
+        self, request: SynapseRequest, network_id: str, room_id: str
+    ) -> Tuple[int, JsonDict]:
         content = parse_json_object_from_request(request)
         visibility = content.get("visibility", "public")
-        return self._edit(request, network_id, room_id, visibility)
+        return await self._edit_appservice_room_visibility(
+            request, network_id, room_id, visibility
+        )
 
-    def on_DELETE(self, request, network_id, room_id):
-        return self._edit(request, network_id, room_id, "private")
+    async def on_DELETE(
+        self, request: SynapseRequest, network_id: str, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        return await self._edit_appservice_room_visibility(
+            request, network_id, room_id, "private"
+        )
 
-    async def _edit(self, request, network_id, room_id, visibility):
+    async def _edit_appservice_room_visibility(
+        self, request: SynapseRequest, network_id: str, room_id: str, visibility: str
+    ) -> Tuple[int, JsonDict]:
+        """Adds or removes a room ID from the appservice room list.
+
+        Args:
+            request: The initiating request.
+            network_id: The third-party network ID of the appservice.
+            room_id: The ID of the room to add or remove.
+            visibility: The visibility of the room. "public" to list, "private" to delist.
+
+        Returns:
+            A tuple of (http status code, empty json dict).
+
+        Raises:
+            AuthError if the request was not performed by an appservice or homeserver admin.
+        """
         requester = await self.auth.get_user_by_req(request)
         is_server_admin = await self.auth.is_server_admin(requester.user)
 
