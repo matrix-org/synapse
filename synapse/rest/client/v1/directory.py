@@ -174,13 +174,25 @@ class ClientAppserviceDirectoryListServer(RestServlet):
 
     async def _edit(self, request, network_id, room_id, visibility):
         requester = await self.auth.get_user_by_req(request)
-        if not requester.app_service:
+        is_server_admin = await self.auth.is_server_admin(requester.user)
+
+        if requester.app_service:
+            appservice_id = requester.app_service.id
+        elif is_server_admin and visibility == "private":
+            # We allow homeserver admins to remove entries from the appservice room list,
+            # while we don't allow them to add entries. This limitation is because:
+            #
+            # 1. There shouldn't be much reason for a homeserver admin to use the appservice
+            #    room list to list a room over the client room list.
+            # 2. We can't retrieve a proper appservice ID for a homeserver admin.
+            appservice_id = ""
+        else:
             raise AuthError(
                 403, "Only appservices can edit the appservice published room list"
             )
 
         await self.directory_handler.edit_published_appservice_room_list(
-            requester.app_service.id, network_id, room_id, visibility
+            appservice_id, network_id, room_id, visibility
         )
 
         return 200, {}
