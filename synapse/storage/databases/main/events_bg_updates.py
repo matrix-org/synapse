@@ -838,7 +838,6 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         # We want to do a `(topological_ordering, stream_ordering) > (?,?)`
         # comparison, but that is not supported on older SQLite versions
         tuple_clause, tuple_args = make_tuple_comparison_clause(
-            self.database_engine,
             [
                 ("events.room_id", last_room_id),
                 ("topological_ordering", last_depth),
