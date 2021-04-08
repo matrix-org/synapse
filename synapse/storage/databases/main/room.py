@@ -1396,8 +1396,6 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                     txn,
                     table="appservice_room_list",
                     keyvalues={
-                        "appservice_id": appservice_id,
-                        "network_id": network_id,
                         "room_id": room_id,
                     },
                 )
