@@ -64,6 +64,10 @@ class WriterLocations:
     Attributes:
         events: The instances that write to the event and backfill streams.
         typing: The instance that writes to the typing stream.
+        to_device: The instance that writes to the to_device stream.
+        account_data: The instance that writes to the account data streams.
+        receipts: The instance that writes to the receipts stream.
+        presence: The instance that writes to the presence stream.
     """
 
     events = attr.ib(
@@ -81,6 +85,11 @@ class WriterLocations:
         converter=_instance_to_list_converter,
     )
     receipts = attr.ib(
+        default=["master"],
+        type=List[str],
+        converter=_instance_to_list_converter,
+    )
+    presence = attr.ib(
         default=["master"],
         type=List[str],
         converter=_instance_to_list_converter,
@@ -188,7 +197,14 @@ class WorkerConfig(Config):
 
         # Check that the configured writers for events and typing also appears in
         # `instance_map`.
-        for stream in ("events", "typing", "to_device", "account_data", "receipts"):
+        for stream in (
+            "events",
+            "typing",
+            "to_device",
+            "account_data",
+            "receipts",
+            "presence",
+        ):
             instances = _instance_to_list_converter(getattr(self.writers, stream))
             for instance in instances:
                 if instance != "master" and instance not in self.instance_map:
@@ -214,6 +230,11 @@ class WorkerConfig(Config):
 
         if len(self.writers.events) == 0:
             raise ConfigError("Must specify at least one instance to handle `events`.")
+
+        if len(self.writers.presence) != 1:
+            raise ConfigError(
+                "Must only specify one instance to handle `presence` messages."
+            )
 
         self.events_shard_config = RoutableShardedWorkerHandlingConfig(
             self.writers.events

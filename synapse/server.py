@@ -417,10 +417,10 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_presence_handler(self) -> BasePresenceHandler:
-        if self.config.worker_app:
-            return WorkerPresenceHandler(self)
-        else:
+        if self.get_instance_name() in self.config.worker.writers.presence:
             return PresenceHandler(self)
+        else:
+            return WorkerPresenceHandler(self)
 
     @cache_in_self
     def get_typing_writer_handler(self) -> TypingWriterHandler:
