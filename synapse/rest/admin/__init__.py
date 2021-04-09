@@ -62,7 +62,6 @@ from synapse.rest.admin.users import (
     UserMembershipRestServlet,
     UserRegisterServlet,
     UserRestServletV2,
-    UsersRestServlet,
     UsersRestServletV2,
     UserTokenRestServlet,
     WhoisRestServlet,
@@ -248,7 +247,6 @@ def register_servlets_for_client_rest_resource(hs, http_server):
     PurgeHistoryStatusRestServlet(hs).register(http_server)
     DeactivateAccountRestServlet(hs).register(http_server)
     PurgeHistoryRestServlet(hs).register(http_server)
-    UsersRestServlet(hs).register(http_server)
     ResetPasswordRestServlet(hs).register(http_server)
     SearchUsersRestServlet(hs).register(http_server)
     ShutdownRoomRestServlet(hs).register(http_server)

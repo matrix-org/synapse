@@ -82,9 +82,28 @@ pid_file: DATADIR/homeserver.pid
 #
 #soft_file_limit: 0
 
-# Set to false to disable presence tracking on this homeserver.
+# Presence tracking allows users to see the state (e.g online/offline)
+# of other local and remote users.
 #
-#use_presence: false
+presence:
+  # Uncomment to disable presence tracking on this homeserver. This option
+  # replaces the previous top-level 'use_presence' option.
+  #
+  #enabled: false
+
+  # Presence routers are third-party modules that can specify additional logic
+  # to where presence updates from users are routed.
+  #
+  presence_router:
+    # The custom module's class. Uncomment to use a custom presence router module.
+    #
+    #module: "my_custom_router.PresenceRouter"
+
+    # Configuration options of the custom module. Refer to your module's
+    # documentation for available options.
+    #
+    #config:
+    #  example_option: 'something'
 
 # Whether to require authentication to retrieve profile data (avatars,
 # display names) of other users through the client API. Defaults to
@@ -876,10 +895,10 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #rc_joins:
 #  local:
 #    per_second: 0.1
-#    burst_count: 3
+#    burst_count: 10
 #  remote:
 #    per_second: 0.01
-#    burst_count: 3
+#    burst_count: 10
 #
 #rc_3pid_validation:
 #  per_second: 0.003
@@ -1253,9 +1272,9 @@ account_validity:
 #
 #allowed_local_3pids:
 #  - medium: email
-#    pattern: '.*@matrix\.org'
+#    pattern: '^[^@]+@matrix\.org$'
 #  - medium: email
-#    pattern: '.*@vector\.im'
+#    pattern: '^[^@]+@vector\.im$'
 #  - medium: msisdn
 #    pattern: '\+44'
 
@@ -1458,14 +1477,31 @@ metrics_flags:
 
 ## API Configuration ##
 
-# A list of event types that will be included in the room_invite_state
+# Controls for the state that is shared with users who receive an invite
+# to a room
 #
-#room_invite_state_types:
-#  - "m.room.join_rules"
-#  - "m.room.canonical_alias"
-#  - "m.room.avatar"
-#  - "m.room.encryption"
-#  - "m.room.name"
+room_prejoin_state:
+   # By default, the following state event types are shared with users who
+   # receive invites to the room:
+   #
+   # - m.room.join_rules
+   # - m.room.canonical_alias
+   # - m.room.avatar
+   # - m.room.encryption
+   # - m.room.name
+   #
+   # Uncomment the following to disable these defaults (so that only the event
+   # types listed in 'additional_event_types' are shared). Defaults to 'false'.
+   #
+   #disable_default_event_types: true
+
+   # Additional state event types to share with users when they are invited
+   # to a room.
+   #
+   # By default, this list is empty (so only the default event types are shared).
+   #
+   #additional_event_types:
+   #  - org.example.custom.event.type
 
 
 # A list of application service config files to use
@@ -1765,6 +1801,9 @@ saml2_config:
 #       Note that, if this is changed, users authenticating via that provider
 #       will no longer be recognised as the same user!
 #
+#       (Use "oidc" here if you are migrating from an old "oidc_config"
+#       configuration.)
+#
 #   idp_name: A user-facing name for this identity provider, which is used to
 #       offer the user a choice of login mechanisms.
 #
@@ -1933,37 +1972,6 @@ oidc_providers:
   #  attribute_requirements:
   #    - attribute: userGroup
   #      value: "synapseUsers"
-
-  # For use with Keycloak
-  #
-  #- idp_id: keycloak
-  #  idp_name: Keycloak
-  #  issuer: "https://127.0.0.1:8443/auth/realms/my_realm_name"
-  #  client_id: "synapse"
-  #  client_secret: "copy secret generated in Keycloak UI"
-  #  scopes: ["openid", "profile"]
-  #  attribute_requirements:
-  #    - attribute: groups
-  #      value: "admin"
-
-  # For use with Github
-  #
-  #- idp_id: github
-  #  idp_name: Github
-  #  idp_brand: github
-  #  discover: false
-  #  issuer: "https://github.com/"
-  #  client_id: "your-client-id" # TO BE FILLED
-  #  client_secret: "your-client-secret" # TO BE FILLED
-  #  authorization_endpoint: "https://github.com/login/oauth/authorize"
-  #  token_endpoint: "https://github.com/login/oauth/access_token"
-  #  userinfo_endpoint: "https://api.github.com/user"
-  #  scopes: ["read:user"]
-  #  user_mapping_provider:
-  #    config:
-  #      subject_claim: "id"
-  #      localpart_template: "{{ user.login }}"
-  #      display_name_template: "{{ user.name }}"
 
 
 # Enable Central Authentication Service (CAS) for registration and login.

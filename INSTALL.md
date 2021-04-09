@@ -6,7 +6,7 @@ There are 3 steps to follow under **Installation Instructions**.
   - [Choosing your server name](#choosing-your-server-name)
   - [Installing Synapse](#installing-synapse)
     - [Installing from source](#installing-from-source)
-      - [Platform-Specific Instructions](#platform-specific-instructions)
+      - [Platform-specific prerequisites](#platform-specific-prerequisites)
         - [Debian/Ubuntu/Raspbian](#debianubunturaspbian)
         - [ArchLinux](#archlinux)
         - [CentOS/Fedora](#centosfedora)
@@ -38,6 +38,7 @@ There are 3 steps to follow under **Installation Instructions**.
     - [URL previews](#url-previews)
     - [Troubleshooting Installation](#troubleshooting-installation)
 
+
 ## Choosing your server name
 
 It is important to choose the name for your server before you install Synapse,
@@ -60,17 +61,14 @@ that your email address is probably `user@example.com` rather than
 
 (Prebuilt packages are available for some platforms - see [Prebuilt packages](#prebuilt-packages).)
 
+When installing from source please make sure that the [Platform-specific prerequisites](#platform-specific-prerequisites) are already installed.
+
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
 - Python 3.5.2 or later, up to Python 3.9.
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
-Synapse is written in Python but some of the libraries it uses are written in
-C. So before we can install Synapse itself we need a working C compiler and the
-header files for Python C extensions. See [Platform-Specific
-Instructions](#platform-specific-instructions) for information on installing
-these on various platforms.
 
 To install the Synapse homeserver run:
 
@@ -128,7 +126,11 @@ source env/bin/activate
 synctl start
 ```
 
-#### Platform-Specific Instructions
+#### Platform-specific prerequisites
+
+Synapse is written in Python but some of the libraries it uses are written in
+C. So before we can install Synapse itself we need a working C compiler and the
+header files for Python C extensions.
 
 ##### Debian/Ubuntu/Raspbian
 
@@ -526,14 +528,24 @@ email will be disabled.
 
 The easiest way to create a new user is to do so from a client like [Element](https://element.io/).
 
-Alternatively you can do so from the command line if you have installed via pip.
+Alternatively, you can do so from the command line. This can be done as follows:
 
-This can be done as follows:
+ 1. If synapse was installed via pip, activate the virtualenv as follows (if Synapse was
+    installed via a prebuilt package, `register_new_matrix_user` should already be
+    on the search path):
+    ```sh
+    cd ~/synapse
+    source env/bin/activate
+    synctl start # if not already running
+    ```
+ 2. Run the following command:
+    ```sh
+    register_new_matrix_user -c homeserver.yaml http://localhost:8008
+    ```
 
-```sh
-$ source ~/synapse/env/bin/activate
-$ synctl start # if not already running
-$ register_new_matrix_user -c homeserver.yaml http://localhost:8008
+This will prompt you to add details for the new user, and will then connect to
+the running Synapse to create the new user. For example:
+```
 New user localpart: erikj
 Password:
 Confirm password:

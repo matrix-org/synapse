@@ -1,0 +1,1 @@
+Move opencontainers labels to the final Docker image such that users can inspect them.
