@@ -74,7 +74,9 @@ class RefreshTokenLookupResult:
     user_id = attr.ib(type=str)
     device_id = attr.ib(type=str)
     token_id = attr.ib(type=int)
-    valid = attr.ib(type=bool)
+    next_token_id = attr.ib(type=int)
+    has_next_refresh_token_been_refreshed = attr.ib(type=bool)
+    has_next_access_token_been_used = attr.ib(type=bool)
 
 
 class RegistrationWorkerStore(CacheInvalidationWorkerStore):
@@ -1050,30 +1052,46 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="update_access_token_last_validated",
         )
 
-    async def lookup_refresh_token(
-        self, token: str
-    ) -> Optional[RefreshTokenLookupResult]:
-        d = await self.db_pool.simple_select_one(
-            "refresh_tokens",
-            {"token": token},
-            ["id", "user_id", "device_id", "valid"],
-            allow_none=True,
-            desc="lookup_refresh_token",
-        )
+    async def lookup_refresh_token(self, token: str) -> Optional[RefreshTokenLookupResult]:
+        """Lookup a refresh token with hints about its validity.
+        """
 
-        if d is not None:
-            d["token_id"] = d["id"]
-            del d["id"]
-            return RefreshTokenLookupResult(**d)
+        def _lookup_refresh_token_txn(txn) -> Optional[RefreshTokenLookupResult]:
+            txn.execute("""
+                SELECT
+                    rt.id token_id,
+                    rt.user_id,
+                    rt.device_id,
+                    rt.next_token_id,
+                    (nrt.next_token_id IS NOT NULL) has_next_refresh_token_been_refreshed,
+                    (at.last_validated IS NOT NULL) has_next_access_token_been_used
+                FROM refresh_tokens rt
+                LEFT JOIN refresh_tokens nrt ON rt.next_token_id = nrt.id
+                LEFT JOIN access_tokens at ON at.refresh_token_id = nrt.id
+                WHERE rt.token = ?
+            """, (token,))
+            row = txn.fetchone()
 
-        return None
+            if row is None:
+                return None
 
-    async def invalidate_refresh_token(self, token_id: int) -> None:
+            return RefreshTokenLookupResult(
+                token_id=row[0],
+                user_id=row[1],
+                device_id=row[2],
+                next_token_id=row[3],
+                has_next_refresh_token_been_refreshed=row[4],
+                has_next_access_token_been_used=row[5],
+            )
+
+        return await self.db_pool.runInteraction("lookup_refresh_token", _lookup_refresh_token_txn)
+
+    async def replace_refresh_token(self, token_id: int, next_token_id: int) -> None:
         await self.db_pool.simple_update_one(
             "refresh_tokens",
             {"id": token_id},
-            {"valid": False},
-            desc="invalidate_refresh_token",
+            {"next_token_id": next_token_id},
+            desc="replace_refresh_token",
         )
 
 
@@ -1325,7 +1343,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                 "user_id": user_id,
                 "device_id": device_id,
                 "token": token,
-                "valid": True,
+                "next_token_id": None,
             },
             desc="add_access_token_to_user",
         )

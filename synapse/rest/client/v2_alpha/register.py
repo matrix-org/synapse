@@ -724,19 +724,25 @@ class RegisterRestServlet(RestServlet):
         # we have nowhere to store it.
         device_id = synapse.api.auth.GUEST_DEVICE_ID
         initial_display_name = params.get("initial_device_display_name")
-        device_id, access_token = await self.registration_handler.register_device(
+        device_id, access_token, valid_until_ms, refresh_token = await self.registration_handler.register_device(
             user_id, device_id, initial_display_name, is_guest=True
         )
 
-        return (
-            200,
-            {
-                "user_id": user_id,
-                "device_id": device_id,
-                "access_token": access_token,
-                "home_server": self.hs.hostname,
-            },
-        )
+        result = {
+            "user_id": user_id,
+            "device_id": device_id,
+            "access_token": access_token,
+            "home_server": self.hs.hostname,
+        }
+
+        if valid_until_ms is not None:
+            expires_in_ms = valid_until_ms - self.clock.time_msec()
+            result["expires_in"] = int(expires_in_ms / 1000)
+
+        if refresh_token is not None:
+            result["refresh_token"] = refresh_token
+
+        return 200, result
 
 
 def _calculate_registration_flows(

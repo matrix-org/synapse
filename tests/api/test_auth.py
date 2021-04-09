@@ -270,6 +270,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             device_id="DEVICE",
             valid_until_ms=None,
             puppets_user_id=None,
+            refresh_token_id=None,
         )
 
         async def get_user(tok):

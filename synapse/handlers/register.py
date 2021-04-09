@@ -97,6 +97,7 @@ class RegistrationHandler(BaseHandler):
             self.pusher_pool = hs.get_pusherpool()
 
         self.session_lifetime = hs.config.session_lifetime
+        self.access_token_lifetime = hs.config.access_token_lifetime
 
     async def check_username(
         self,
@@ -757,7 +758,7 @@ class RegistrationHandler(BaseHandler):
                     user_id,
                     device_id=registered_device_id,
                 )
-                valid_until_ms = self.clock.time_msec() + 60 * 1000
+                valid_until_ms = self.clock.time_msec() + self.access_token_lifetime
 
             access_token = await self._auth_handler.get_access_token_for_user_id(
                 user_id,
