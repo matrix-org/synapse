@@ -1,8 +1,9 @@
 Room and User Statistics
 ========================
 
-Synapse maintains room and user statistics in various tables. These can be used for administrative purposes but are also
-used when generating the public room directory.
+Synapse maintains room and user statistics in various tables. These can be used
+for administrative purposes but are also used when generating the public room
+directory.
 
 
 # Synapse Developer Documentation
@@ -17,5 +18,5 @@ used when generating the public room directory.
 
 ### Overview
 
-Stats correspond to the present values. Current rows contain the most up-to-date statistics for a room. Each subject can only have one
-entry.
+Stats correspond to the present values. Current rows contain the most up-to-date
+statistics for a room. Each subject can only have one entry.
