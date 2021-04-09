@@ -766,7 +766,8 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
                 score = random.randrange(-100, 0)
                 channel = self.make_request(
                     "POST",
-                    "/_matrix/client/r0/rooms/%s/report/%s" % (room_id, partial_event_id),
+                    "/_matrix/client/r0/rooms/%s/report/%s"
+                    % (room_id, partial_event_id),
                     {
                         "score": score,
                         "reason": reason,
@@ -870,7 +871,8 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
                 score = random.randrange(-100, 0)
                 channel = self.make_request(
                     "POST",
-                    "/_matrix/client/r0/rooms/%s/report/%s" % (room_id, partial_event_id),
+                    "/_matrix/client/r0/rooms/%s/report/%s"
+                    % (room_id, partial_event_id),
                     {
                         "score": score,
                         "reason": reason,

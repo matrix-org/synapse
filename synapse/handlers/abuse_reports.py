@@ -32,13 +32,7 @@ from synapse.http.site import SynapseRequest
 from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.state import StateHandler
 from synapse.storage import DataStore, Storage
-from synapse.types import (
-    JsonDict,
-    RoomID,
-    UserID,
-    create_requester,
-    get_domain_from_id,
-)
+from synapse.types import JsonDict, RoomID, UserID, create_requester, get_domain_from_id
 from synapse.visibility import filter_events_for_client
 
 logger = logging.getLogger(__name__)
@@ -208,9 +202,7 @@ class AbuseReportHandler:
         # First, let's make sure that we should.
 
         # A little sanity check on the event itself.
-        event = await self.store.get_event(
-            event_id=event_id, check_room_id=None
-        )
+        event = await self.store.get_event(event_id=event_id, check_room_id=None)
         if event.room_id != room_id.to_string():
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST, "No such event in this room", Codes.NOT_FOUND
