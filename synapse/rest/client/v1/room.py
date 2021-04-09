@@ -309,8 +309,8 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                 "state_key": stateEv["state_key"],
             }
 
-            # Make the events float off on their own
-            # fake_prev_event_id = "$" + random_string(43)
+            # Make the state events float off on their own
+            fake_prev_event_id = "$" + random_string(43)
 
             # TODO: Do we pop on the auth events for the `prev_events_from_query`?
 
@@ -323,6 +323,7 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                     action=membership,
                     content=event_dict["content"],
                     outlier=True,
+                    prev_event_ids=[fake_prev_event_id],
                 )
             else:
                 (

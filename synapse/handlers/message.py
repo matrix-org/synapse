@@ -830,12 +830,20 @@ class EventCreationHandler:
             prev_event_ids=prev_event_ids, auth_event_ids=auth_event_ids
         )
 
+        old_state = None
+
         # Pass on the outlier property from the builder to the event
         # after it is created
         if builder.internal_metadata.outlier:
             event.internal_metadata.outlier = builder.internal_metadata.outlier
 
-        context = await self.state.compute_event_context(event)
+            # For outliers that pass in their own auth_event_ids, let's calculate the state for them
+            if auth_event_ids:
+                old_state = await self.store.get_events_as_list(auth_event_ids)
+
+        logger.info("asdfdfsa old_state=%s", old_state)
+
+        context = await self.state.compute_event_context(event, old_state=old_state)
         if requester:
             context.app_service = requester.app_service
 
@@ -948,7 +956,7 @@ class EventCreationHandler:
             # are invite rejections we have generated ourselves.
             assert event.type == EventTypes.Member
             assert event.content["membership"] == Membership.LEAVE
-        else:
+        elif not event.internal_metadata.is_outlier():
             try:
                 await self.auth.check_from_context(room_version, event, context)
             except AuthError as err:
