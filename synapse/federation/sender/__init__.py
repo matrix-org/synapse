@@ -360,7 +360,7 @@ class FederationSender(AbstractFederationSender):
                 ) -> List[Tuple[EventBase, Collection[str]]]:
                     with Measure(self.clock, "get_destinations_for_events"):
                         # Fetch federation destinations per event,
-                        # skip if get_destinations_for_event returns None,
+                        # skip if get_destinations_for_event returns an empty collection,
                         # return list of event->destinations pairs.
                         return [
                             (event, dests)
