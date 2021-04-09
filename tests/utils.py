@@ -190,7 +190,7 @@ def setup_test_homeserver(
     config=None,
     reactor=None,
     homeserver_to_use: Type[HomeServer] = TestHomeServer,
-    **kwargs
+    **kwargs,
 ):
     """
     Setup a homeserver suitable for running tests against.  Keyword arguments
