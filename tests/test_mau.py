@@ -15,8 +15,6 @@
 
 """Tests REST events for /rooms paths."""
 
-import json
-
 from synapse.api.constants import APP_SERVICE_REGISTRATION_TYPE, LoginType
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.appservice import ApplicationService
