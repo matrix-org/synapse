@@ -1672,7 +1672,7 @@ class FederationHandler(BaseHandler):
             origin, event, state=None, auth_events=None, backfilled=False
         )
 
-        # Get the current state at the to-be created event.
+        # Get the state before the new event.
         prev_state_ids = await context.get_prev_state_ids()
 
         # Check if the user is already in the room or invited to the room.
