@@ -15,7 +15,7 @@
 """A replication client for use by synapse workers.
 """
 import logging
-from typing import TYPE_CHECKING, Dict, List, Tuple
+from typing import TYPE_CHECKING, Dict, List, Set, Tuple
 
 from twisted.internet.defer import Deferred
 from twisted.internet.protocol import ReconnectingClientFactory
@@ -23,7 +23,17 @@ from twisted.internet.protocol import ReconnectingClientFactory
 from synapse.api.constants import EventTypes
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.replication.tcp.protocol import ClientReplicationStreamProtocol
-from synapse.replication.tcp.streams import TypingStream
+from synapse.replication.tcp.streams import (
+    AccountDataStream,
+    DeviceListsStream,
+    GroupServerStream,
+    PushersStream,
+    PushRulesStream,
+    ReceiptsStream,
+    TagAccountDataStream,
+    ToDeviceStream,
+    TypingStream,
+)
 from synapse.replication.tcp.streams.events import (
     EventsStream,
     EventsStreamEventRow,
@@ -106,6 +116,9 @@ class ReplicationDataHandler:
         self._instance_name = hs.get_instance_name()
         self._typing_handler = hs.get_typing_handler()
 
+        self._notify_pushers = hs.config.start_pushers
+        self._pusher_pool = hs.get_pusherpool()
+
         # Map from stream to list of deferreds waiting for the stream to
         # arrive at a particular position. The lists are sorted by stream position.
         self._streams_to_waiters = {}  # type: Dict[str, List[Tuple[int, Deferred]]]
@@ -131,6 +144,42 @@ class ReplicationDataHandler:
             self.notifier.on_new_event(
                 "typing_key", token, rooms=[row.room_id for row in rows]
             )
+        elif stream_name == PushRulesStream.NAME:
+            self.notifier.on_new_event(
+                "push_rules_key", token, users=[row.user_id for row in rows]
+            )
+        elif stream_name in (AccountDataStream.NAME, TagAccountDataStream.NAME):
+            self.notifier.on_new_event(
+                "account_data_key", token, users=[row.user_id for row in rows]
+            )
+        elif stream_name == ReceiptsStream.NAME:
+            self.notifier.on_new_event(
+                "receipt_key", token, rooms=[row.room_id for row in rows]
+            )
+            await self._pusher_pool.on_new_receipts(
+                token, token, {row.room_id for row in rows}
+            )
+        elif stream_name == ToDeviceStream.NAME:
+            entities = [row.entity for row in rows if row.entity.startswith("@")]
+            if entities:
+                self.notifier.on_new_event("to_device_key", token, users=entities)
+        elif stream_name == DeviceListsStream.NAME:
+            all_room_ids = set()  # type: Set[str]
+            for row in rows:
+                if row.entity.startswith("@"):
+                    room_ids = await self.store.get_rooms_for_user(row.entity)
+                    all_room_ids.update(room_ids)
+            self.notifier.on_new_event("device_list_key", token, rooms=all_room_ids)
+        elif stream_name == GroupServerStream.NAME:
+            self.notifier.on_new_event(
+                "groups_key", token, users=[row.user_id for row in rows]
+            )
+        elif stream_name == PushersStream.NAME:
+            for row in rows:
+                if row.deleted:
+                    self.stop_pusher(row.user_id, row.app_id, row.pushkey)
+                else:
+                    await self.start_pusher(row.user_id, row.app_id, row.pushkey)
 
         if stream_name == EventsStream.NAME:
             # We shouldn't get multiple rows per token for events stream, so
@@ -197,6 +246,8 @@ class ReplicationDataHandler:
         # may be streaming.
         self.notifier.notify_replication()
 
+        await self.on_rdata(stream_name, instance_name, token, [])
+
     def on_remote_server_up(self, server: str):
         """Called when get a new REMOTE_SERVER_UP command."""
 
@@ -236,3 +287,23 @@ class ReplicationDataHandler:
             logger.info(
                 "Finished waiting for repl stream %r to reach %s", stream_name, position
             )
+
+    def stop_pusher(self, user_id, app_id, pushkey):
+        if not self._notify_pushers:
+            return
+
+        key = "%s:%s" % (app_id, pushkey)
+        pushers_for_user = self._pusher_pool.pushers.get(user_id, {})
+        pusher = pushers_for_user.pop(key, None)
+        if pusher is None:
+            return
+        logger.info("Stopping pusher %r / %r", user_id, key)
+        pusher.on_stop()
+
+    async def start_pusher(self, user_id, app_id, pushkey):
+        if not self._notify_pushers:
+            return
+
+        key = "%s:%s" % (app_id, pushkey)
+        logger.info("Starting pusher %r / %r", user_id, key)
+        return await self._pusher_pool.start_pusher_by_id(app_id, pushkey, user_id)
