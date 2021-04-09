@@ -125,7 +125,9 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        self.identity_handler.ratelimit_request_token_requests(request, "email", email)
+        await self.identity_handler.ratelimit_request_token_requests(
+            request, "email", email
+        )
 
         existing_user_id = await self.hs.get_datastore().get_user_id_by_threepid(
             "email", email
@@ -207,7 +209,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        self.identity_handler.ratelimit_request_token_requests(
+        await self.identity_handler.ratelimit_request_token_requests(
             request, "msisdn", msisdn
         )
 
@@ -405,7 +407,7 @@ class RegisterRestServlet(RestServlet):
 
         client_addr = request.getClientIP()
 
-        self.ratelimiter.ratelimit(client_addr, update=False)
+        await self.ratelimiter.ratelimit(None, client_addr, update=False)
 
         kind = b"user"
         if b"kind" in request.args:

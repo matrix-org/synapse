@@ -320,8 +320,8 @@ class PersistEventsStore:
         txn: LoggingTransaction,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
         backfilled: bool,
-        state_delta_for_room: Dict[str, DeltaState] = {},
-        new_forward_extremeties: Dict[str, List[str]] = {},
+        state_delta_for_room: Optional[Dict[str, DeltaState]] = None,
+        new_forward_extremeties: Optional[Dict[str, List[str]]] = None,
     ):
         """Insert some number of room events into the necessary database tables.
 
@@ -342,6 +342,9 @@ class PersistEventsStore:
                 extremities.
 
         """
+        state_delta_for_room = state_delta_for_room or {}
+        new_forward_extremeties = new_forward_extremeties or {}
+
         all_events_and_contexts = events_and_contexts
 
         min_stream_order = events_and_contexts[0][0].internal_metadata.stream_ordering
@@ -1270,8 +1273,10 @@ class PersistEventsStore:
                     logger.exception("")
                     raise
 
+                # update the stored internal_metadata to update the "outlier" flag.
+                # TODO: This is unused as of Synapse 1.31. Remove it once we are happy
+                #  to drop backwards-compatibility with 1.30.
                 metadata_json = json_encoder.encode(event.internal_metadata.get_dict())
-
                 sql = "UPDATE event_json SET internal_metadata = ? WHERE event_id = ?"
                 txn.execute(sql, (metadata_json, event.event_id))
 
@@ -1319,6 +1324,19 @@ class PersistEventsStore:
             d.pop("redacted_because", None)
             return d
 
+        def get_internal_metadata(event):
+            im = event.internal_metadata.get_dict()
+
+            # temporary hack for database compatibility with Synapse 1.30 and earlier:
+            # store the `outlier` flag inside the internal_metadata json as well as in
+            # the `events` table, so that if anyone rolls back to an older Synapse,
+            # things keep working. This can be removed once we are happy to drop support
+            # for that
+            if event.internal_metadata.is_outlier():
+                im["outlier"] = True
+
+            return im
+
         self.db_pool.simple_insert_many_txn(
             txn,
             table="event_json",
@@ -1327,7 +1345,7 @@ class PersistEventsStore:
                     "event_id": event.event_id,
                     "room_id": event.room_id,
                     "internal_metadata": json_encoder.encode(
-                        event.internal_metadata.get_dict()
+                        get_internal_metadata(event)
                     ),
                     "json": json_encoder.encode(event_dict(event)),
                     "format_version": event.format_version,

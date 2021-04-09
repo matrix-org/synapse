@@ -59,7 +59,7 @@ from synapse.logging.opentracing import (
     start_active_span,
     tags,
 )
-from synapse.types import JsonDict
+from synapse.types import ISynapseReactor, JsonDict
 from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.metrics import Measure
@@ -237,14 +237,14 @@ class MatrixFederationHttpClient:
         # addresses, to prevent DNS rebinding.
         self.reactor = BlacklistingReactorWrapper(
             hs.get_reactor(), None, hs.config.federation_ip_range_blacklist
-        )
+        )  # type: ISynapseReactor
 
         user_agent = hs.version_string
         if hs.config.user_agent_suffix:
             user_agent = "%s %s" % (user_agent, hs.config.user_agent_suffix)
         user_agent = user_agent.encode("ascii")
 
-        self.agent = MatrixFederationAgent(
+        federation_agent = MatrixFederationAgent(
             self.reactor,
             tls_client_options_factory,
             user_agent,
@@ -254,7 +254,7 @@ class MatrixFederationHttpClient:
         # Use a BlacklistingAgentWrapper to prevent circumventing the IP
         # blacklist via IP literals in server names
         self.agent = BlacklistingAgentWrapper(
-            self.agent,
+            federation_agent,
             ip_blacklist=hs.config.federation_ip_range_blacklist,
         )
 
@@ -534,9 +534,10 @@ class MatrixFederationHttpClient:
                             response.code, response_phrase, body
                         )
 
-                        # Retry if the error is a 429 (Too Many Requests),
-                        # otherwise just raise a standard HttpResponseException
-                        if response.code == 429:
+                        # Retry if the error is a 5xx or a 429 (Too Many
+                        # Requests), otherwise just raise a standard
+                        # `HttpResponseException`
+                        if 500 <= response.code < 600 or response.code == 429:
                             raise RequestSendFailed(exc, can_retry=True) from exc
                         else:
                             raise exc

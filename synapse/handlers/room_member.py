@@ -20,7 +20,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 
 from synapse import types
-from synapse.api.constants import AccountDataTypes, EventTypes, Membership
+from synapse.api.constants import AccountDataTypes, EventTypes, JoinRules, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -29,6 +29,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.api.ratelimiting import Ratelimiter
+from synapse.api.room_versions import RoomVersion
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.types import JsonDict, Requester, RoomAlias, RoomID, StateMap, UserID
@@ -75,22 +76,26 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.allow_per_room_profiles = self.config.allow_per_room_profiles
 
         self._join_rate_limiter_local = Ratelimiter(
+            store=self.store,
             clock=self.clock,
             rate_hz=hs.config.ratelimiting.rc_joins_local.per_second,
             burst_count=hs.config.ratelimiting.rc_joins_local.burst_count,
         )
         self._join_rate_limiter_remote = Ratelimiter(
+            store=self.store,
             clock=self.clock,
             rate_hz=hs.config.ratelimiting.rc_joins_remote.per_second,
             burst_count=hs.config.ratelimiting.rc_joins_remote.burst_count,
         )
 
         self._invites_per_room_limiter = Ratelimiter(
+            store=self.store,
             clock=self.clock,
             rate_hz=hs.config.ratelimiting.rc_invites_per_room.per_second,
             burst_count=hs.config.ratelimiting.rc_invites_per_room.burst_count,
         )
         self._invites_per_user_limiter = Ratelimiter(
+            store=self.store,
             clock=self.clock,
             rate_hz=hs.config.ratelimiting.rc_invites_per_user.per_second,
             burst_count=hs.config.ratelimiting.rc_invites_per_user.burst_count,
@@ -155,15 +160,80 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         """
         raise NotImplementedError()
 
-    def ratelimit_invite(self, room_id: Optional[str], invitee_user_id: str):
+    @abc.abstractmethod
+    async def forget(self, user: UserID, room_id: str) -> None:
+        raise NotImplementedError()
+
+    async def ratelimit_invite(
+        self,
+        requester: Optional[Requester],
+        room_id: Optional[str],
+        invitee_user_id: str,
+    ):
         """Ratelimit invites by room and by target user.
 
         If room ID is missing then we just rate limit by target user.
         """
         if room_id:
-            self._invites_per_room_limiter.ratelimit(room_id)
+            await self._invites_per_room_limiter.ratelimit(requester, room_id)
 
-        self._invites_per_user_limiter.ratelimit(invitee_user_id)
+        await self._invites_per_user_limiter.ratelimit(requester, invitee_user_id)
+
+    async def _can_join_without_invite(
+        self, state_ids: StateMap[str], room_version: RoomVersion, user_id: str
+    ) -> bool:
+        """
+        Check whether a user can join a room without an invite.
+
+        When joining a room with restricted joined rules (as defined in MSC3083),
+        the membership of spaces must be checked during join.
+
+        Args:
+            state_ids: The state of the room as it currently is.
+            room_version: The room version of the room being joined.
+            user_id: The user joining the room.
+
+        Returns:
+            True if the user can join the room, false otherwise.
+        """
+        # This only applies to room versions which support the new join rule.
+        if not room_version.msc3083_join_rules:
+            return True
+
+        # If there's no join rule, then it defaults to public (so this doesn't apply).
+        join_rules_event_id = state_ids.get((EventTypes.JoinRules, ""), None)
+        if not join_rules_event_id:
+            return True
+
+        # If the join rule is not restricted, this doesn't apply.
+        join_rules_event = await self.store.get_event(join_rules_event_id)
+        if join_rules_event.content.get("join_rule") != JoinRules.MSC3083_RESTRICTED:
+            return True
+
+        # If allowed is of the wrong form, then only allow invited users.
+        allowed_spaces = join_rules_event.content.get("allow", [])
+        if not isinstance(allowed_spaces, list):
+            return False
+
+        # Get the list of joined rooms and see if there's an overlap.
+        joined_rooms = await self.store.get_rooms_for_user(user_id)
+
+        # Pull out the other room IDs, invalid data gets filtered.
+        for space in allowed_spaces:
+            if not isinstance(space, dict):
+                continue
+
+            space_id = space.get("space")
+            if not isinstance(space_id, str):
+                continue
+
+            # The user was joined to one of the spaces specified, they can join
+            # this room!
+            if space_id in joined_rooms:
+                return True
+
+        # The user was not in any of the required spaces.
+        return False
 
     async def _local_membership_update(
         self,
@@ -222,9 +292,25 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         if event.membership == Membership.JOIN:
             newly_joined = True
+            user_is_invited = False
             if prev_member_event_id:
                 prev_member_event = await self.store.get_event(prev_member_event_id)
                 newly_joined = prev_member_event.membership != Membership.JOIN
+                user_is_invited = prev_member_event.membership == Membership.INVITE
+
+            # If the member is not already in the room and is not accepting an invite,
+            # check if they should be allowed access via membership in a space.
+            if (
+                newly_joined
+                and not user_is_invited
+                and not await self._can_join_without_invite(
+                    prev_state_ids, event.room_version, user_id
+                )
+            ):
+                raise AuthError(
+                    403,
+                    "You do not belong to any of the required spaces to join this room.",
+                )
 
             # Only rate-limit if the user actually joined the room, otherwise we'll end
             # up blocking profile updates.
@@ -233,7 +319,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 (
                     allowed,
                     time_allowed,
-                ) = self._join_rate_limiter_local.can_requester_do_action(requester)
+                ) = await self._join_rate_limiter_local.can_do_action(requester)
 
                 if not allowed:
                     raise LimitExceededError(
@@ -417,9 +503,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         if effective_membership_state == Membership.INVITE:
             target_id = target.to_string()
             if ratelimit:
-                # Don't ratelimit application services.
-                if not requester.app_service or requester.app_service.is_rate_limited():
-                    self.ratelimit_invite(room_id, target_id)
+                await self.ratelimit_invite(requester, room_id, target_id)
 
             # block any attempts to invite the server notices mxid
             if target_id == self._server_notices_mxid:
@@ -530,7 +614,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     (
                         allowed,
                         time_allowed,
-                    ) = self._join_rate_limiter_remote.can_requester_do_action(
+                    ) = await self._join_rate_limiter_remote.can_do_action(
                         requester,
                     )
 

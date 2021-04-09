@@ -12,11 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import itertools
+
 import logging
 import threading
 from collections import namedtuple
-from typing import Dict, Iterable, List, Optional, Tuple, overload
+from typing import Container, Dict, Iterable, List, Optional, Tuple, overload
 
 from constantly import NamedConstant, Names
 from typing_extensions import Literal
@@ -544,7 +544,7 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_stripped_room_state_from_event_context(
         self,
         context: EventContext,
-        state_types_to_include: List[EventTypes],
+        state_types_to_include: Container[str],
         membership_user_id: Optional[str] = None,
     ) -> List[JsonDict]:
         """
@@ -799,6 +799,7 @@ class EventsWorkerStore(SQLBaseStore):
                 rejected_reason=rejected_reason,
             )
             original_ev.internal_metadata.stream_ordering = row["stream_ordering"]
+            original_ev.internal_metadata.outlier = row["outlier"]
 
             event_map[event_id] = original_ev
 
@@ -905,7 +906,8 @@ class EventsWorkerStore(SQLBaseStore):
                   ej.json,
                   ej.format_version,
                   r.room_version,
-                  rej.reason
+                  rej.reason,
+                  e.outlier
                 FROM events AS e
                   JOIN event_json AS ej USING (event_id)
                   LEFT JOIN rooms r ON r.room_id = e.room_id
@@ -929,6 +931,7 @@ class EventsWorkerStore(SQLBaseStore):
                     "room_version_id": row[5],
                     "rejected_reason": row[6],
                     "redactions": [],
+                    "outlier": row[7],
                 }
 
             # check for redactions
@@ -1044,7 +1047,8 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
             set[str]: The events we have already seen.
         """
-        results = set()
+        # if the event cache contains the event, obviously we've seen it.
+        results = {x for x in event_ids if self._get_event_cache.contains(x)}
 
         def have_seen_events_txn(txn, chunk):
             sql = "SELECT event_id FROM events as e WHERE "
@@ -1052,12 +1056,9 @@ class EventsWorkerStore(SQLBaseStore):
                 txn.database_engine, "e.event_id", chunk
             )
             txn.execute(sql + clause, args)
-            for (event_id,) in txn:
-                results.add(event_id)
+            results.update(row[0] for row in txn)
 
-        # break the input up into chunks of 100
-        input_iterator = iter(event_ids)
-        for chunk in iter(lambda: list(itertools.islice(input_iterator, 100)), []):
+        for chunk in batch_iter((x for x in event_ids if x not in results), 100):
             await self.db_pool.runInteraction(
                 "have_seen_events", have_seen_events_txn, chunk
             )

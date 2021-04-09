@@ -27,6 +27,7 @@ import yaml
 from netaddr import AddrFormatError, IPNetwork, IPSet
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.util.module_loader import load_module
 from synapse.util.stringutils import parse_and_validate_server_name
 
 from ._base import Config, ConfigError
@@ -238,7 +239,20 @@ class ServerConfig(Config):
         self.public_baseurl = config.get("public_baseurl")
 
         # Whether to enable user presence.
-        self.use_presence = config.get("use_presence", True)
+        presence_config = config.get("presence") or {}
+        self.use_presence = presence_config.get("enabled")
+        if self.use_presence is None:
+            self.use_presence = config.get("use_presence", True)
+
+        # Custom presence router module
+        self.presence_router_module_class = None
+        self.presence_router_config = None
+        presence_router_config = presence_config.get("presence_router")
+        if presence_router_config:
+            (
+                self.presence_router_module_class,
+                self.presence_router_config,
+            ) = load_module(presence_router_config, ("presence", "presence_router"))
 
         # Whether to update the user directory or not. This should be set to
         # false only if we are updating the user directory in a worker
@@ -834,15 +848,33 @@ class ServerConfig(Config):
         #
         #soft_file_limit: 0
 
-        # Set to false to disable presence tracking on this homeserver.
+        # Presence tracking allows users to see the state (e.g online/offline)
+        # of other local and remote users.
         #
-        #use_presence: false
+        presence:
+          # Uncomment to disable presence tracking on this homeserver. This option
+          # replaces the previous top-level 'use_presence' option.
+          #
+          #enabled: false
+
+          # Presence routers are third-party modules that can specify additional logic
+          # to where presence updates from users are routed.
+          #
+          presence_router:
+            # The custom module's class. Uncomment to use a custom presence router module.
+            #
+            #module: "my_custom_router.PresenceRouter"
+
+            # Configuration options of the custom module. Refer to your module's
+            # documentation for available options.
+            #
+            #config:
+            #  example_option: 'something'
 
         # Whether to require authentication to retrieve profile data (avatars,
         # display names) of other users through the client API. Defaults to
         # 'false'. Note that profile data is also available via the federation
-        # API, so this setting is of limited value if federation is enabled on
-        # the server.
+        # API, unless allow_profile_lookup_over_federation is set to false.
         #
         #require_auth_for_profile_requests: true
 

@@ -17,7 +17,7 @@ import logging
 import threading
 from collections import OrderedDict
 from contextlib import contextmanager
-from typing import Dict, List, Optional, Set, Tuple, Union
+from typing import Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import attr
 
@@ -91,7 +91,14 @@ class StreamIdGenerator:
             # ... persist event ...
     """
 
-    def __init__(self, db_conn, table, column, extra_tables=[], step=1):
+    def __init__(
+        self,
+        db_conn,
+        table,
+        column,
+        extra_tables: Iterable[Tuple[str, str]] = (),
+        step=1,
+    ):
         assert step != 0
         self._lock = threading.Lock()
         self._step = step

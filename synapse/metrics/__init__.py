@@ -214,7 +214,12 @@ class GaugeBucketCollector:
     Prometheus, and optimise for that case.
     """
 
-    __slots__ = ("_name", "_documentation", "_bucket_bounds", "_metric")
+    __slots__ = (
+        "_name",
+        "_documentation",
+        "_bucket_bounds",
+        "_metric",
+    )
 
     def __init__(
         self,
@@ -242,11 +247,16 @@ class GaugeBucketCollector:
         if self._bucket_bounds[-1] != float("inf"):
             self._bucket_bounds.append(float("inf"))
 
-        self._metric = self._values_to_metric([])
+        # We initially set this to None. We won't report metrics until
+        # this has been initialised after a successful data update
+        self._metric = None  # type: Optional[GaugeHistogramMetricFamily]
+
         registry.register(self)
 
     def collect(self):
-        yield self._metric
+        # Don't report metrics unless we've already collected some data
+        if self._metric is not None:
+            yield self._metric
 
     def update_data(self, values: Iterable[float]):
         """Update the data to be reported by the metric

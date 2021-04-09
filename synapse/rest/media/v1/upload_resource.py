@@ -22,11 +22,12 @@ from twisted.web.server import Request
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import DirectServeJsonResource, respond_with_json
 from synapse.http.servlet import parse_string
+from synapse.http.site import SynapseRequest
 from synapse.rest.media.v1.media_storage import SpamMediaException
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
     from synapse.rest.media.v1.media_repository import MediaRepository
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ class UploadResource(DirectServeJsonResource):
     async def _async_render_OPTIONS(self, request: Request) -> None:
         respond_with_json(request, 200, {}, send_cors=True)
 
-    async def _async_render_POST(self, request: Request) -> None:
+    async def _async_render_POST(self, request: SynapseRequest) -> None:
         requester = await self.auth.get_user_by_req(request)
         # TODO: The checks here are a bit late. The content will have
         # already been uploaded to a tmp file at this point

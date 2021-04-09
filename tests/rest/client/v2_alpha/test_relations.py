@@ -16,6 +16,7 @@
 import itertools
 import json
 import urllib
+from typing import Optional
 
 from synapse.api.constants import EventTypes, RelationTypes
 from synapse.rest import admin
@@ -39,6 +40,11 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         # We need to enable msc1849 support for aggregations
         config = self.default_config()
         config["experimental_msc1849_support_enabled"] = True
+
+        # We enable frozen dicts as relations/edits change event contents, so we
+        # want to test that we don't modify the events in the caches.
+        config["use_frozen_dicts"] = True
+
         return self.setup_test_homeserver(config=config)
 
     def prepare(self, reactor, clock, hs):
@@ -518,6 +524,63 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
         )
 
+    def test_edit_reply(self):
+        """Test that editing a reply works."""
+
+        # Create a reply to edit.
+        channel = self._send_relation(
+            RelationTypes.REFERENCE,
+            "m.room.message",
+            content={"msgtype": "m.text", "body": "A reply!"},
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        reply = channel.json_body["event_id"]
+
+        new_body = {"msgtype": "m.text", "body": "I've been edited!"}
+        channel = self._send_relation(
+            RelationTypes.REPLACE,
+            "m.room.message",
+            content={"msgtype": "m.text", "body": "foo", "m.new_content": new_body},
+            parent_id=reply,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        edit_event_id = channel.json_body["event_id"]
+
+        channel = self.make_request(
+            "GET",
+            "/rooms/%s/event/%s" % (self.room, reply),
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        # We expect to see the new body in the dict, as well as the reference
+        # metadata sill intact.
+        self.assertDictContainsSubset(new_body, channel.json_body["content"])
+        self.assertDictContainsSubset(
+            {
+                "m.relates_to": {
+                    "event_id": self.parent_id,
+                    "key": None,
+                    "rel_type": "m.reference",
+                }
+            },
+            channel.json_body["content"],
+        )
+
+        # We expect that the edit relation appears in the unsigned relations
+        # section.
+        relations_dict = channel.json_body["unsigned"].get("m.relations")
+        self.assertIn(RelationTypes.REPLACE, relations_dict)
+
+        m_replace_dict = relations_dict[RelationTypes.REPLACE]
+        for key in ["event_id", "sender", "origin_server_ts"]:
+            self.assertIn(key, m_replace_dict)
+
+        self.assert_dict(
+            {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
+        )
+
     def test_relations_redaction_redacts_edits(self):
         """Test that edits of an event are redacted when the original event
         is redacted.
@@ -619,7 +682,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         relation_type,
         event_type,
         key=None,
-        content={},
+        content: Optional[dict] = None,
         access_token=None,
         parent_id=None,
     ):
@@ -651,7 +714,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             "POST",
             "/_matrix/client/unstable/rooms/%s/send_relation/%s/%s/%s%s"
             % (self.room, original_id, relation_type, event_type, query),
-            json.dumps(content).encode("utf-8"),
+            json.dumps(content or {}).encode("utf-8"),
             access_token=access_token,
         )
         return channel

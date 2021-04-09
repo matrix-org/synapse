@@ -35,6 +35,7 @@ from synapse.api.errors import (
 from synapse.config._base import ConfigError
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.types import UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import random_string
@@ -57,7 +58,7 @@ from .thumbnailer import Thumbnailer, ThumbnailError
 from .upload_resource import UploadResource
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +146,7 @@ class MediaRepository:
         upload_name: Optional[str],
         content: IO,
         content_length: int,
-        auth_user: str,
+        auth_user: UserID,
     ) -> str:
         """Store uploaded content for a local user and return the mxc URL
 

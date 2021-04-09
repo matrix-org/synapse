@@ -12,10 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import base64
 import logging
 import re
+from typing import Optional, Tuple
 from urllib.request import getproxies_environment, proxy_bypass_environment
 
+import attr
 from zope.interface import implementer
 
 from twisted.internet import defer
@@ -23,13 +26,30 @@ from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
 from twisted.python.failure import Failure
 from twisted.web.client import URI, BrowserLikePolicyForHTTPS, _AgentBase
 from twisted.web.error import SchemeNotSupported
-from twisted.web.iweb import IAgent
+from twisted.web.http_headers import Headers
+from twisted.web.iweb import IAgent, IPolicyForHTTPS
 
 from synapse.http.connectproxyclient import HTTPConnectProxyEndpoint
 
 logger = logging.getLogger(__name__)
 
 _VALID_URI = re.compile(br"\A[\x21-\x7e]+\Z")
+
+
+@attr.s
+class ProxyCredentials:
+    username_password = attr.ib(type=bytes)
+
+    def as_proxy_authorization_value(self) -> bytes:
+        """
+        Return the value for a Proxy-Authorization header (i.e. 'Basic abdef==').
+
+        Returns:
+            A transformation of the authentication string the encoded value for
+            a Proxy-Authorization header.
+        """
+        # Encode as base64 and prepend the authorization type
+        return b"Basic " + base64.encodebytes(self.username_password)
 
 
 @implementer(IAgent)
@@ -68,12 +88,14 @@ class ProxyAgent(_AgentBase):
         self,
         reactor,
         proxy_reactor=None,
-        contextFactory=BrowserLikePolicyForHTTPS(),
+        contextFactory: Optional[IPolicyForHTTPS] = None,
         connectTimeout=None,
         bindAddress=None,
         pool=None,
         use_proxy=False,
     ):
+        contextFactory = contextFactory or BrowserLikePolicyForHTTPS()
+
         _AgentBase.__init__(self, reactor, pool)
 
         if proxy_reactor is None:
@@ -95,6 +117,9 @@ class ProxyAgent(_AgentBase):
             http_proxy = proxies["http"].encode() if "http" in proxies else None
             https_proxy = proxies["https"].encode() if "https" in proxies else None
             no_proxy = proxies["no"] if "no" in proxies else None
+
+        # Parse credentials from https proxy connection string if present
+        self.https_proxy_creds, https_proxy = parse_username_password(https_proxy)
 
         self.http_proxy_endpoint = _http_proxy_endpoint(
             http_proxy, self.proxy_reactor, **self._endpoint_kwargs
@@ -175,11 +200,22 @@ class ProxyAgent(_AgentBase):
             and self.https_proxy_endpoint
             and not should_skip_proxy
         ):
+            connect_headers = Headers()
+
+            # Determine whether we need to set Proxy-Authorization headers
+            if self.https_proxy_creds:
+                # Set a Proxy-Authorization header
+                connect_headers.addRawHeader(
+                    b"Proxy-Authorization",
+                    self.https_proxy_creds.as_proxy_authorization_value(),
+                )
+
             endpoint = HTTPConnectProxyEndpoint(
                 self.proxy_reactor,
                 self.https_proxy_endpoint,
                 parsed_uri.host,
                 parsed_uri.port,
+                headers=connect_headers,
             )
         else:
             # not using a proxy
@@ -208,12 +244,16 @@ class ProxyAgent(_AgentBase):
         )
 
 
-def _http_proxy_endpoint(proxy, reactor, **kwargs):
+def _http_proxy_endpoint(proxy: Optional[bytes], reactor, **kwargs):
     """Parses an http proxy setting and returns an endpoint for the proxy
 
     Args:
-        proxy (bytes|None):  the proxy setting
+        proxy: the proxy setting in the form: [<username>:<password>@]<host>[:<port>]
+            Note that compared to other apps, this function currently lacks support
+            for specifying a protocol schema (i.e. protocol://...).
+
         reactor: reactor to be used to connect to the proxy
+
         kwargs: other args to be passed to HostnameEndpoint
 
     Returns:
@@ -223,16 +263,43 @@ def _http_proxy_endpoint(proxy, reactor, **kwargs):
     if proxy is None:
         return None
 
-    # currently we only support hostname:port. Some apps also support
-    # protocol://<host>[:port], which allows a way of requiring a TLS connection to the
-    # proxy.
-
+    # Parse the connection string
     host, port = parse_host_port(proxy, default_port=1080)
     return HostnameEndpoint(reactor, host, port, **kwargs)
 
 
-def parse_host_port(hostport, default_port=None):
-    # could have sworn we had one of these somewhere else...
+def parse_username_password(proxy: bytes) -> Tuple[Optional[ProxyCredentials], bytes]:
+    """
+    Parses the username and password from a proxy declaration e.g
+    username:password@hostname:port.
+
+    Args:
+        proxy: The proxy connection string.
+
+    Returns
+        An instance of ProxyCredentials and the proxy connection string with any credentials
+        stripped, i.e u:p@host:port -> host:port. If no credentials were found, the
+        ProxyCredentials instance is replaced with None.
+    """
+    if proxy and b"@" in proxy:
+        # We use rsplit here as the password could contain an @ character
+        credentials, proxy_without_credentials = proxy.rsplit(b"@", 1)
+        return ProxyCredentials(credentials), proxy_without_credentials
+
+    return None, proxy
+
+
+def parse_host_port(hostport: bytes, default_port: int = None) -> Tuple[bytes, int]:
+    """
+    Parse the hostname and port from a proxy connection byte string.
+
+    Args:
+        hostport: The proxy connection string. Must be in the form 'host[:port]'.
+        default_port: The default port to return if one is not found in `hostport`.
+
+    Returns:
+        A tuple containing the hostname and port. Uses `default_port` if one was not found.
+    """
     if b":" in hostport:
         host, port = hostport.rsplit(b":", 1)
         try:
