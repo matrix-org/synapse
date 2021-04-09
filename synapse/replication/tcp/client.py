@@ -27,6 +27,7 @@ from synapse.replication.tcp.streams import (
     AccountDataStream,
     DeviceListsStream,
     GroupServerStream,
+    PresenceStream,
     PushersStream,
     PushRulesStream,
     ReceiptsStream,
@@ -118,6 +119,7 @@ class ReplicationDataHandler:
 
         self._notify_pushers = hs.config.start_pushers
         self._pusher_pool = hs.get_pusherpool()
+        self._presence_handler = hs.get_presence_handler()
 
         # Map from stream to list of deferreds waiting for the stream to
         # arrive at a particular position. The lists are sorted by stream position.
@@ -180,6 +182,8 @@ class ReplicationDataHandler:
                     self.stop_pusher(row.user_id, row.app_id, row.pushkey)
                 else:
                     await self.start_pusher(row.user_id, row.app_id, row.pushkey)
+        elif stream_name == PresenceStream.NAME:
+            await self._presence_handler.process_replication_rows(token, rows)
 
         if stream_name == EventsStream.NAME:
             # We shouldn't get multiple rows per token for events stream, so

@@ -246,6 +246,10 @@ class BasePresenceHandler(abc.ABC):
         """
         pass
 
+    async def process_replication_rows(self, token, rows):
+        """Process presence stream rows received over replication."""
+        pass
+
 
 class _NullContextManager(ContextManager[None]):
     """A context manager which does nothing."""

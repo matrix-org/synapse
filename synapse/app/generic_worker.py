@@ -69,7 +69,6 @@ from synapse.replication.slave.storage.transactions import SlavedTransactionStor
 from synapse.replication.tcp.client import ReplicationDataHandler
 from synapse.replication.tcp.streams import (
     DeviceListsStream,
-    PresenceStream,
     ReceiptsStream,
     ToDeviceStream,
 )
@@ -461,9 +460,6 @@ class GenericWorkerReplicationHandler(ReplicationDataHandler):
                 await self.send_handler.process_replication_rows(
                     stream_name, token, rows
                 )
-
-            if stream_name == PresenceStream.NAME:
-                await self.presence_handler.process_replication_rows(token, rows)
         except Exception:
             logger.exception("Error processing replication")
 
