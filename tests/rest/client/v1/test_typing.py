@@ -16,7 +16,7 @@
 
 """Tests REST events for /rooms paths."""
 
-from mock import Mock
+from unittest.mock import Mock
 
 from synapse.rest.client.v1 import room
 from synapse.types import UserID

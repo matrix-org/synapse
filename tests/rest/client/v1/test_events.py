@@ -15,7 +15,7 @@
 
 """ Tests REST events for /events paths."""
 
-from mock import Mock
+from unittest.mock import Mock
 
 import synapse.rest.admin
 from synapse.rest.client.v1 import events, login, room
