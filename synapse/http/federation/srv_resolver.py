@@ -21,6 +21,7 @@ from typing import List
 
 import attr
 
+from twisted.internet import defer
 from twisted.internet.error import ConnectError
 from twisted.names import client, dns
 from twisted.names.error import DNSNameError, DomainError
@@ -135,7 +136,7 @@ class SrvResolver:
 
         try:
             answers, _, _ = await make_deferred_yieldable(
-                self._dns_client.lookupService(service_name)
+                self._dns_client.lookupService(service_name, timeout=(1, 3, 11, 35))
             )
         except DNSNameError:
             # TODO: cache this. We can get the SOA out of the exception, and use
@@ -152,6 +153,10 @@ class SrvResolver:
                 return list(cache_entry)
             else:
                 raise e
+        except defer.TimeoutError as e:
+            raise defer.TimeoutError(
+                f"Could not resolve DNS for SRV record {service_name!r} due to timeout (50s total)"
+            ) from e
 
         if (
             len(answers) == 1
