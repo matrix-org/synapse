@@ -1052,12 +1052,14 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="update_access_token_last_validated",
         )
 
-    async def lookup_refresh_token(self, token: str) -> Optional[RefreshTokenLookupResult]:
-        """Lookup a refresh token with hints about its validity.
-        """
+    async def lookup_refresh_token(
+        self, token: str
+    ) -> Optional[RefreshTokenLookupResult]:
+        """Lookup a refresh token with hints about its validity."""
 
         def _lookup_refresh_token_txn(txn) -> Optional[RefreshTokenLookupResult]:
-            txn.execute("""
+            txn.execute(
+                """
                 SELECT
                     rt.id token_id,
                     rt.user_id,
@@ -1069,7 +1071,9 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 LEFT JOIN refresh_tokens nrt ON rt.next_token_id = nrt.id
                 LEFT JOIN access_tokens at ON at.refresh_token_id = nrt.id
                 WHERE rt.token = ?
-            """, (token,))
+            """,
+                (token,),
+            )
             row = txn.fetchone()
 
             if row is None:
@@ -1084,7 +1088,9 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 has_next_access_token_been_used=row[5],
             )
 
-        return await self.db_pool.runInteraction("lookup_refresh_token", _lookup_refresh_token_txn)
+        return await self.db_pool.runInteraction(
+            "lookup_refresh_token", _lookup_refresh_token_txn
+        )
 
     async def replace_refresh_token(self, token_id: int, next_token_id: int) -> None:
         await self.db_pool.simple_update_one(

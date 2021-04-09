@@ -691,6 +691,7 @@ class RegistrationHandler(BaseHandler):
             is_guest: Whether this is a guest account
             auth_provider_id: The SSO IdP the user used, if any (just used for the
                 prometheus metrics).
+            should_issue_refresh_token: Whether it should also issue a refresh token
         Returns:
             Tuple of device ID, access token, access token expiration time and refresh token
         """

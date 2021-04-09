@@ -781,7 +781,10 @@ class AuthHandler(BaseHandler):
         if existing_token is None:
             raise SynapseError(400, "refresh token does not exist")
 
-        if existing_token.has_next_access_token_been_used or existing_token.has_next_refresh_token_been_refreshed:
+        if (
+            existing_token.has_next_access_token_been_used
+            or existing_token.has_next_refresh_token_been_refreshed
+        ):
             raise SynapseError(400, "refresh token isn't valid anymore")
 
         (
@@ -796,7 +799,9 @@ class AuthHandler(BaseHandler):
             valid_until_ms=valid_until_ms,
             refresh_token_id=new_refresh_token_id,
         )
-        await self.store.replace_refresh_token(existing_token.token_id, new_refresh_token_id)
+        await self.store.replace_refresh_token(
+            existing_token.token_id, new_refresh_token_id
+        )
         return access_token, new_refresh_token
 
     async def get_refresh_token_for_user_id(

@@ -285,7 +285,7 @@ class RegistrationConfig(Config):
         # By default, this is infinite.
         #
         #session_lifetime: 24h
-        
+
         # MSC2918
         # TODO: docs
         access_token_lifetime: 5m

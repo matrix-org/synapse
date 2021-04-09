@@ -724,7 +724,12 @@ class RegisterRestServlet(RestServlet):
         # we have nowhere to store it.
         device_id = synapse.api.auth.GUEST_DEVICE_ID
         initial_display_name = params.get("initial_device_display_name")
-        device_id, access_token, valid_until_ms, refresh_token = await self.registration_handler.register_device(
+        (
+            device_id,
+            access_token,
+            valid_until_ms,
+            refresh_token,
+        ) = await self.registration_handler.register_device(
             user_id, device_id, initial_display_name, is_guest=True
         )
 

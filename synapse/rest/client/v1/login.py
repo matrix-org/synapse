@@ -15,7 +15,7 @@
 
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional, cast
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, Optional
 
 from typing_extensions import TypedDict
 
@@ -158,11 +158,12 @@ class LoginRestServlet(RestServlet):
     async def on_POST(self, request: SynapseRequest):
         login_submission = parse_json_object_from_request(request)
 
-        refresh_token_param = cast(
-            List[bytes],
-            request.args.get(bytes(LoginRestServlet.REFRESH_TOKEN_PARAM, "utf-8"), []),
+        param = bytes(LoginRestServlet.REFRESH_TOKEN_PARAM, "utf-8")
+        should_issue_refresh_token = (
+            request.args is not None
+            and param in request.args
+            and request.args[param][0] == b"true"
         )
-        should_issue_refresh_token = any((i == b"true" for i in refresh_token_param))
 
         try:
             if login_submission["type"] == LoginRestServlet.APPSERVICE_TYPE:
