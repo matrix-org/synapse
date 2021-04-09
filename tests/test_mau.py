@@ -245,7 +245,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST",
             "/register",
-            json.dumps(request_data),
+            request_data,
             access_token=token,
         )
 
