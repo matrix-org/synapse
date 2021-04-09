@@ -276,7 +276,7 @@ class Notifier:
         event: EventBase,
         event_pos: PersistedEventPosition,
         max_room_stream_token: RoomStreamToken,
-        extra_users: Collection[UserID] = [],
+        extra_users: Optional[Collection[UserID]] = None,
     ):
         """Unwraps event and calls `on_new_room_event_args`."""
         self.on_new_room_event_args(
@@ -286,7 +286,7 @@ class Notifier:
             state_key=event.get("state_key"),
             membership=event.content.get("membership"),
             max_room_stream_token=max_room_stream_token,
-            extra_users=extra_users,
+            extra_users=extra_users or [],
         )
 
     def on_new_room_event_args(
@@ -297,7 +297,7 @@ class Notifier:
         membership: Optional[str],
         event_pos: PersistedEventPosition,
         max_room_stream_token: RoomStreamToken,
-        extra_users: Collection[UserID] = [],
+        extra_users: Optional[Collection[UserID]] = None,
     ):
         """Used by handlers to inform the notifier something has happened
         in the room, room event wise.
@@ -313,7 +313,7 @@ class Notifier:
         self.pending_new_room_events.append(
             _PendingRoomEventEntry(
                 event_pos=event_pos,
-                extra_users=extra_users,
+                extra_users=extra_users or [],
                 room_id=room_id,
                 type=event_type,
                 state_key=state_key,
@@ -382,14 +382,14 @@ class Notifier:
         self,
         stream_key: str,
         new_token: Union[int, RoomStreamToken],
-        users: Collection[Union[str, UserID]] = [],
+        users: Optional[Collection[Union[str, UserID]]] = None,
     ):
         try:
             stream_token = None
             if isinstance(new_token, int):
                 stream_token = new_token
             self.appservice_handler.notify_interested_services_ephemeral(
-                stream_key, stream_token, users
+                stream_key, stream_token, users or []
             )
         except Exception:
             logger.exception("Error notifying application services of event")
@@ -404,13 +404,16 @@ class Notifier:
         self,
         stream_key: str,
         new_token: Union[int, RoomStreamToken],
-        users: Collection[Union[str, UserID]] = [],
-        rooms: Collection[str] = [],
+        users: Optional[Collection[Union[str, UserID]]] = None,
+        rooms: Optional[Collection[str]] = None,
     ):
         """Used to inform listeners that something has happened event wise.
 
         Will wake up all listeners for the given users and rooms.
         """
+        users = users or []
+        rooms = rooms or []
+
         with Measure(self.clock, "on_new_event"):
             user_streams = set()
 
@@ -548,7 +551,7 @@ class Notifier:
         pagination_config: PaginationConfig,
         timeout: int,
         is_guest: bool = False,
-        explicit_room_id: str = None,
+        explicit_room_id: Optional[str] = None,
     ) -> EventStreamResult:
         """For the given user and rooms, return any new events for them. If
         there are no new events wait for up to `timeout` milliseconds for any

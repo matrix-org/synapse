@@ -18,11 +18,9 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 DISTS = (
-    "debian:stretch",
     "debian:buster",
     "debian:bullseye",
     "debian:sid",
-    "ubuntu:xenial",
     "ubuntu:bionic",
     "ubuntu:focal",
     "ubuntu:groovy",

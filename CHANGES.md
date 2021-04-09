@@ -1,9 +1,26 @@
-Synapse 1.31.0rc1 (2021-03-30)
-==============================
+Synapse 1.31.0 (2021-04-06)
+===========================
 
-**Note:** As announced in v1.25.0, and in line with the deprecation policy for platform dependencies, this is the last release to support Python 3.5 and PostgreSQL 9.5. Future versions of Synapse will require Python 3.6+ and PostgreSQL 9.6+.
+**Note:** As announced in v1.25.0, and in line with the deprecation policy for platform dependencies, this is the last release to support Python 3.5 and PostgreSQL 9.5. Future versions of Synapse will require Python 3.6+ and PostgreSQL 9.6+, as per our [deprecation policy](docs/deprecation_policy.md).
 
 This is also the last release that the Synapse team will be publishing packages for Debian Stretch and Ubuntu Xenial.
+
+
+Improved Documentation
+----------------------
+
+- Add a document describing the deprecation policy for platform dependencies. ([\#9723](https://github.com/matrix-org/synapse/issues/9723))
+
+
+Internal Changes
+----------------
+
+- Revert using `dmypy run` in lint script. ([\#9720](https://github.com/matrix-org/synapse/issues/9720))
+- Pin flake8-bugbear's version. ([\#9734](https://github.com/matrix-org/synapse/issues/9734))
+
+
+Synapse 1.31.0rc1 (2021-03-30)
+==============================
 
 Features
 --------

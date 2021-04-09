@@ -252,13 +252,13 @@ class SyncHandler:
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
 
-        # ExpiringCache((User, Device)) -> LruCache(state_key => event_id)
+        # ExpiringCache((User, Device)) -> LruCache(user_id => event_id)
         self.lazy_loaded_members_cache = ExpiringCache(
             "lazy_loaded_members_cache",
             self.clock,
             max_len=0,
             expiry_ms=LAZY_LOADED_MEMBERS_CACHE_MAX_AGE,
-        )
+        )  # type: ExpiringCache[Tuple[str, Optional[str]], LruCache[str, str]]
 
     async def wait_for_sync_for_user(
         self,
@@ -548,7 +548,7 @@ class SyncHandler:
         )
 
     async def get_state_after_event(
-        self, event: EventBase, state_filter: StateFilter = StateFilter.all()
+        self, event: EventBase, state_filter: Optional[StateFilter] = None
     ) -> StateMap[str]:
         """
         Get the room state after the given event
@@ -558,7 +558,7 @@ class SyncHandler:
             state_filter: The state filter used to fetch state from the database.
         """
         state_ids = await self.state_store.get_state_ids_for_event(
-            event.event_id, state_filter=state_filter
+            event.event_id, state_filter=state_filter or StateFilter.all()
         )
         if event.is_state():
             state_ids = dict(state_ids)
@@ -569,7 +569,7 @@ class SyncHandler:
         self,
         room_id: str,
         stream_position: StreamToken,
-        state_filter: StateFilter = StateFilter.all(),
+        state_filter: Optional[StateFilter] = None,
     ) -> StateMap[str]:
         """Get the room state at a particular stream position
 
@@ -589,7 +589,7 @@ class SyncHandler:
         if last_events:
             last_event = last_events[-1]
             state = await self.get_state_after_event(
-                last_event, state_filter=state_filter
+                last_event, state_filter=state_filter or StateFilter.all()
             )
 
         else:
@@ -733,8 +733,10 @@ class SyncHandler:
 
     def get_lazy_loaded_members_cache(
         self, cache_key: Tuple[str, Optional[str]]
-    ) -> LruCache:
-        cache = self.lazy_loaded_members_cache.get(cache_key)
+    ) -> LruCache[str, str]:
+        cache = self.lazy_loaded_members_cache.get(
+            cache_key
+        )  # type: Optional[LruCache[str, str]]
         if cache is None:
             logger.debug("creating LruCache for %r", cache_key)
             cache = LruCache(LAZY_LOADED_MEMBERS_CACHE_MAX_SIZE)
