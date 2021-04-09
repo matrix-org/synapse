@@ -88,18 +88,15 @@ for example:
 Upgrading to v1.32.0
 ====================
 
-Removal old List Accounts Admin API
------------------------------------
+Removal of old List Accounts Admin API
+--------------------------------------
 
-Remove old List Accounts Admin API:
+The deprecated v1 "list accounts" admin API (``GET /_synapse/admin/v1/users/<user_id>``) has been removed in this version.
 
-* ``GET /_synapse/admin/v1/users/<user_id>``
+The `v2 list accounts API <https://github.com/matrix-org/synapse/blob/master/docs/admin_api/user_admin_api.rst#list-accounts>`_
+has been available since Synapse 1.7.0 (2019-12-13), and is accessible under ``GET /_synapse/admin/v2/users``.
 
-The new `List Accounts Admin API <https://github.com/matrix-org/synapse/blob/master/docs/admin_api/user_admin_api.rst#list-accounts>`_
-is accessible under ``GET /_synapse/admin/v2/users``.
-The new API is available since Synapse 1.7.0 (2019-12-13).
-
-The deprecation of the old endpoints was announced with Synapse 1.28.0 (released on 2021-02-25).
+The deprecation of the old endpoint was announced with Synapse 1.28.0 (released on 2021-02-25).
 
 Upgrading to v1.29.0
 ====================
