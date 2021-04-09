@@ -1,1 +1,1 @@
-/register now expects a `body.type` value of `m.login.appservice` when registering appservice users, to conform to the spec.
+Make `/_matrix/client/r0/register` expect a login type of `m.login.application_service` when an Application Service registers a user, to align with [the relevant spec](https://spec.matrix.org/unstable/application-service-api/#server-admin-style-permissions).
