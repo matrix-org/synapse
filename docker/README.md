@@ -8,7 +8,7 @@ The image also does *not* provide a TURN server.
 
 ## Volumes
 
-By default, the image expects a single volume, located at ``/data``, that will hold:
+By default, the image expects a single volume, located at `/data`, that will hold:
 
 * configuration files;
 * uploaded media and thumbnails;
@@ -16,11 +16,11 @@ By default, the image expects a single volume, located at ``/data``, that will h
 * the appservices configuration.
 
 You are free to use separate volumes depending on storage endpoints at your
-disposal. For instance, ``/data/media`` could be stored on a large but low
+disposal. For instance, `/data/media` could be stored on a large but low
 performance hdd storage while other files could be stored on high performance
 endpoints.
 
-In order to setup an application service, simply create an ``appservices``
+In order to setup an application service, simply create an `appservices`
 directory in the data volume and write the application service Yaml
 configuration file there. Multiple application services are supported.
 
@@ -212,56 +212,3 @@ healthcheck:
 
 Jemalloc is embedded in the image and will be used instead of the default allocator.
 You can read about jemalloc by reading the Synapse [README](../README.md).
-
-### Running all worker processes in a single container for testing
-
-Anyone looking to run Synapse workers with docker in production should use one container
-per Synapse process, specifying a different worker config per container.
-Running all Synapse processes is possible, but is currently only used for testing 
-purposes. [Dockerfile-workers](Dockerfile-workers) will produce an image bundling
-all necessary components together for a workerised homeserver instance.
-
-This includes any desired Synapse worker processes, a nginx to route traffic accordingly,
-a redis for worker communication and a supervisord instance to start up and monitor all
-processes. You will need to provide your own postgres container to connect to. TLS is not
-handled by the container. A external reverse proxy should be placed in front the exposed
-HTTP port for the purposes of TLS termination.
-
-Note that the worker Dockerfile is based off the main `[Dockerfile](Dockerfile)`. If you
-would like to build from the current checkout, first build the main Synapse docker image
-using the instructions in [Building the image](#building-the-image), then afterwards build
-the worker image:
-
-```
-docker build -t matrixdotorg/synapse-workers -f docker/Dockerfile-workers .
-```
-
-To start a container, use the following:
-
-```
-docker run -d --name synapse \
-    --mount type=volume,src=synapse-data,dst=/data \
-    -p 8008:8008 \
-    -e SYNAPSE_SERVER_NAME=my.matrix.host \
-    -e SYNAPSE_REPORT_STATS=yes \
-    -e SYNAPSE_WORKERS=synchrotron,media_repository,user_dir \
-    matrixdotorg/synapse:workers
-```
-
-The `SYNAPSE_WORKERS` environment variable is a comma-separated list of workers to use
-when running the container. All possible worker names are defined by the keys of the
-`WORKERS_CONFIG` variable in [this script](configure_workers_and_start.py), which the
-Dockerfile makes use of to generate appropriate worker, nginx and supervisord config files.
-
-Sharding is supported for a subset of workers, in line with the [worker documentation]
-(../docs/workers.md). To run multiple instances of a given worker type, simply specify 
-the type multiple times in `SYNAPSE_WORKERS`
-(e.g `SYNAPSE_WORKERS=event_creator,event_creator...`).
-
-Otherwise, `SYNAPSE_WORKERS` can either be left empty or unset to spawn no workers 
-(leaving only the main process). The container is configured to use redis-based worker
-mode.
-
-Setting `SYNAPSE_WORKERS_WRITE_LOGS_TO_DISK=1` will cause worker logs to be written to 
-`<data_dir>/logs/<worker_name>.log`. Logs are kept for 1 week and rotate every day at 
-00:00, according to the container's clock.
