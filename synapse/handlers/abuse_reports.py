@@ -33,7 +33,6 @@ from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.state import StateHandler
 from synapse.storage import DataStore, Storage
 from synapse.types import (
-    EventID,
     JsonDict,
     RoomID,
     UserID,
@@ -85,7 +84,7 @@ class AbuseReportHandler:
         user_id: UserID,
         body: dict,
         room_id_: str,
-        event_id_: str,
+        event_id: str,
     ):
         # Create a requester for the rate limiter.
         requester = create_requester(user_id)
@@ -101,11 +100,6 @@ class AbuseReportHandler:
             )
 
         room_id = RoomID.from_string(room_id_)
-        event_id = None
-        try:
-            event_id = EventID.from_string(event_id_)
-        except Exception:
-            event_id = EventID.from_string("%s:%s" % (event_id_, self.hs.hostname))
         assert_params_in_dict(body, ("reason", "score"))
 
         if not isinstance(body["reason"], str):
@@ -124,7 +118,7 @@ class AbuseReportHandler:
         target = body.get("org.matrix.msc2938.target", "homeserver-admins")
 
         if target == "room-moderators":
-            # Report event to room moderators.
+            # Report event to room moderators as a server notice.
             # This branch has further safety checks (e.g. can the user actually see the event?)
             return await self._report_to_room_moderators(
                 room_id=room_id,
@@ -135,6 +129,8 @@ class AbuseReportHandler:
                 nature=body.get("nature", None),
             )
         elif target == "homeserver-admins":
+            # Store the event so that a homeserver admin can
+            # later access it through the report API.
             return await self._report_to_homeserver_admin(
                 room_id=room_id,
                 event_id=event_id,
@@ -152,7 +148,7 @@ class AbuseReportHandler:
     async def _report_to_homeserver_admin(
         self,
         room_id: RoomID,
-        event_id: EventID,
+        event_id: str,
         user_id: UserID,
         reason: str,
         content: JsonDict,
@@ -174,7 +170,7 @@ class AbuseReportHandler:
         # Store event report for later investigation by the homeserver admin.
         await self.store.add_event_report(
             room_id=room_id.to_string(),
-            event_id=event_id.to_string(),
+            event_id=event_id,
             user_id=user_id.to_string(),
             reason=reason,
             content=content,
@@ -186,7 +182,7 @@ class AbuseReportHandler:
     async def _report_to_room_moderators(
         self,
         room_id: RoomID,
-        event_id: EventID,
+        event_id: str,
         user_id: UserID,
         reason: str,
         score: Optional[int],
@@ -213,7 +209,7 @@ class AbuseReportHandler:
 
         # A little sanity check on the event itself.
         event = await self.store.get_event(
-            event_id="$%s" % event_id.localpart, check_room_id=None
+            event_id=event_id, check_room_id=None
         )
         if event.room_id != room_id.to_string():
             raise SynapseError(
@@ -237,7 +233,7 @@ class AbuseReportHandler:
             "body": "User has reported content",
             "msgtype": "org.matrix.m.server_notice.content_report",
             "roomId": room_id.to_string(),
-            "eventId": event_id.to_string(),
+            "eventId": event_id,
             "userId": user_id.to_string(),
             "score": score,
             "reason": reason,
@@ -329,7 +325,7 @@ class AbuseReportHandler:
         # - Did we actually participate in this event?
         event = None
         try:
-            event = await self.store.get_event(event_id.to_string())
+            event = await self.store.get_event(event_id)
         except Exception:
             pass
         if event is None:

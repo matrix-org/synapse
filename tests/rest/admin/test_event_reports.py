@@ -760,14 +760,13 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
                 [partial_event_id, _, room_id] = current_room.events[
                     len(current_room.events) // 2
                 ]
-                event_id = "%s:%s" % (partial_event_id, self.hs.hostname)
 
                 # Post report
                 reason = uuid.uuid4().hex
                 score = random.randrange(-100, 0)
                 channel = self.make_request(
                     "POST",
-                    "/_matrix/client/r0/rooms/%s/report/%s" % (room_id, event_id),
+                    "/_matrix/client/r0/rooms/%s/report/%s" % (room_id, partial_event_id),
                     {
                         "score": score,
                         "reason": reason,
@@ -783,10 +782,10 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
                     )
                 else:
                     # Everybody else can post the report
-                    reports_for_id = sent_reports_by_id.get(event_id, None)
+                    reports_for_id = sent_reports_by_id.get(partial_event_id, None)
                     if reports_for_id is None:
                         reports_for_id = {}
-                        sent_reports_by_id[event_id] = reports_for_id
+                        sent_reports_by_id[partial_event_id] = reports_for_id
                     reports_for_id[user.mxid] = (current_room, score, reason)
                     self.assertEqual(
                         200, int(channel.result["code"]), msg=channel.result["body"]
@@ -850,7 +849,7 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
                 access_token=user.tok,
             )
             self.assertEqual(
-                400, int(channel.result["code"]), msg=channel.result["body"]
+                404, int(channel.result["code"]), msg=channel.result["body"]
             )
 
     @override_config(
@@ -865,14 +864,13 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
                 [partial_event_id, _, room_id] = current_room.events[
                     len(current_room.events) // 2
                 ]
-                event_id = "%s:%s" % (partial_event_id, self.hs.hostname)
 
                 # Post report
                 reason = uuid.uuid4().hex
                 score = random.randrange(-100, 0)
                 channel = self.make_request(
                     "POST",
-                    "/_matrix/client/r0/rooms/%s/report/%s" % (room_id, event_id),
+                    "/_matrix/client/r0/rooms/%s/report/%s" % (room_id, partial_event_id),
                     {
                         "score": score,
                         "reason": reason,
