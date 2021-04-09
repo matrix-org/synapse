@@ -1,0 +1,1 @@
+/register now expects a `body.type` value of `m.login.appservice` when registering appservice users, to conform to the spec.
