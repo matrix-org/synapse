@@ -274,7 +274,7 @@ class FederationSender(AbstractFederationSender):
                 ) -> Collection[str]:
                     """Computes the destinations to which this event must be sent.
 
-                    This returns None when there are no destinations to send to,
+                    This returns an empty tuple when there are no destinations to send to,
                     or if this event is not from this homeserver and it is not sending
                     it on behalf of another server.
 
@@ -357,7 +357,9 @@ class FederationSender(AbstractFederationSender):
                     events: Iterable[EventBase],
                 ) -> List[Tuple[EventBase, Collection[str]]]:
                     with Measure(self.clock, "get_destinations_for_events"):
-                        # Get destinations for events, skip if get_destinations_for_event returns None
+                        # Fetch federation destinations per event,
+                        # skip if get_destinations_for_event returns None,
+                        # return list of event->destinations pairs.
                         return [
                             (event, dests)
                             for (event, dests) in [
@@ -367,9 +369,7 @@ class FederationSender(AbstractFederationSender):
                             if dests
                         ]
 
-                events_and_dests = await get_federatable_events_and_destinations(
-                    events
-                )  # type: List[Tuple[EventBase, Collection[str]]]
+                events_and_dests = await get_federatable_events_and_destinations(events)
 
                 # Send corresponding events to each destination queue
                 await self._distribute_events(events_and_dests)
@@ -406,10 +406,13 @@ class FederationSender(AbstractFederationSender):
         self,
         events_and_dests: Iterable[Tuple[EventBase, Collection[str]]],
     ) -> None:
-        """Distribute events from the transmission loop.
+        """Distribute events to the respective per_destination queues.
+
+        Also persists last-seen per-room stream_ordering to 'destination_rooms'.
 
         Args:
-            events_and_dests: A list of tuples, which are (event, destinations).
+            events_and_dests: A list of tuples, which are (event: EventBase, destinations: Collection[str]).
+                              Every event is paired with its intended destinations (in federation).
         """
         # Tuples of room_id + destination to their max-seen stream_ordering
         room_with_dest_stream_ordering = {}  # type: Dict[Tuple[str, str], int]
