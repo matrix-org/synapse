@@ -44,6 +44,7 @@ from synapse.types import JsonDict, ReadReceipt, RoomStreamToken
 from synapse.util.metrics import Measure, measure_func
 
 if TYPE_CHECKING:
+    from synapse.events.presence_router import PresenceRouter
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -162,6 +163,7 @@ class FederationSender(AbstractFederationSender):
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
 
+        self._presence_router = None  # type: Optional[PresenceRouter]
         self._transaction_manager = TransactionManager(hs)
 
         self._instance_name = hs.get_instance_name()
@@ -584,7 +586,22 @@ class FederationSender(AbstractFederationSender):
         """Given a list of states populate self.pending_presence_by_dest and
         poke to send a new transaction to each destination
         """
-        hosts_and_states = await get_interested_remotes(self.store, states, self.state)
+        # We pull the presence router here instead of __init__
+        # to prevent a dependency cycle:
+        #
+        # AuthHandler -> Notifier -> FederationSender
+        # -> PresenceRouter -> ModuleApi -> AuthHandler
+        if self._presence_router is None:
+            self._presence_router = self.hs.get_presence_router()
+
+        assert self._presence_router is not None
+
+        hosts_and_states = await get_interested_remotes(
+            self.store,
+            self._presence_router,
+            states,
+            self.state,
+        )
 
         for destinations, states in hosts_and_states:
             for destination in destinations:
@@ -717,16 +734,18 @@ class FederationSender(AbstractFederationSender):
                 self._catchup_after_startup_timer = None
                 break
 
+            last_processed = destinations_to_wake[-1]
+
             destinations_to_wake = [
                 d
                 for d in destinations_to_wake
                 if self._federation_shard_config.should_handle(self._instance_name, d)
             ]
 
-            for last_processed in destinations_to_wake:
+            for destination in destinations_to_wake:
                 logger.info(
                     "Destination %s has outstanding catch-up, waking up.",
                     last_processed,
                 )
-                self.wake_destination(last_processed)
+                self.wake_destination(destination)
                 await self.clock.sleep(CATCH_UP_STARTUP_INTERVAL_SEC)

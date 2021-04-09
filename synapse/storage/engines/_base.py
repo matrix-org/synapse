@@ -44,14 +44,6 @@ class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
 
     @property
     @abc.abstractmethod
-    def supports_tuple_comparison(self) -> bool:
-        """
-        Do we support comparing tuples, i.e. `(a, b) > (c, d)`?
-        """
-        ...
-
-    @property
-    @abc.abstractmethod
     def supports_using_any_list(self) -> bool:
         """
         Do we support using `a = ANY(?)` and passing a list

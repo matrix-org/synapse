@@ -259,6 +259,14 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+class SynapseTags:
+    # The message ID of any to_device message processed
+    TO_DEVICE_MESSAGE_ID = "to_device.message_id"
+
+    # Whether the sync response has new data to be returned to the client.
+    SYNC_RESULT = "sync.new_data"
+
+
 # Block everything by default
 # A regex which matches the server_names to expose traces for.
 # None means 'block everything'.
@@ -478,7 +486,7 @@ def start_active_span_from_request(
 def start_active_span_from_edu(
     edu_content,
     operation_name,
-    references=[],
+    references: Optional[list] = None,
     tags=None,
     start_time=None,
     ignore_active_span=False,
@@ -493,6 +501,7 @@ def start_active_span_from_edu(
 
         For the other args see opentracing.tracer
     """
+    references = references or []
 
     if opentracing is None:
         return noop_context_manager()

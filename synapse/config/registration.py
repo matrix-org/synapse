@@ -298,9 +298,9 @@ class RegistrationConfig(Config):
         #
         #allowed_local_3pids:
         #  - medium: email
-        #    pattern: '.*@matrix\\.org'
+        #    pattern: '^[^@]+@matrix\\.org$'
         #  - medium: email
-        #    pattern: '.*@vector\\.im'
+        #    pattern: '^[^@]+@vector\\.im$'
         #  - medium: msisdn
         #    pattern: '\\+44'
 
