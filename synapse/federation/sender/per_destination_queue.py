@@ -155,7 +155,7 @@ class PerDestinationQueue:
             + len(self._pending_edus_keyed)
         )
 
-    def send_pdus(self, pdus: Collection[EventBase]) -> None:
+    def send_pdus(self, pdus: Iterable[EventBase]) -> None:
         """Add PDUs to the queue, and start the transmission loop if necessary
 
         Args:

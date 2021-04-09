@@ -356,7 +356,7 @@ class FederationSender(AbstractFederationSender):
                 async def get_federatable_events_and_destinations(
                     events: Iterable[EventBase],
                 ) -> List[Tuple[EventBase, Collection[str]]]:
-                    with Measure(self.clock, "fetch_destinations_for_events"):
+                    with Measure(self.clock, "get_destinations_for_events"):
                         # Get destinations for events, skip if get_destinations_for_event returns None
                         return [
                             (event, dests)
@@ -404,7 +404,7 @@ class FederationSender(AbstractFederationSender):
 
     async def _distribute_events(
         self,
-        events_and_dests: List[Tuple[EventBase, Collection[str]]],
+        events_and_dests: Iterable[Tuple[EventBase, Collection[str]]],
     ) -> None:
         """Distribute events from the transmission loop.
 
