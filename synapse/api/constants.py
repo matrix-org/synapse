@@ -70,8 +70,8 @@ class LoginType:
     DUMMY = "m.login.dummy"
 
 
-# This is not a login type as we cannot login with it, however
-# the spec says that this is a valid registration type for appservices.
+# This is used in the `type` parameter for /register when called by
+# an appservice to register a new user.
 APP_SERVICE_REGISTRATION_TYPE = "m.login.application_service"
 
 
