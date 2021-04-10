@@ -202,7 +202,7 @@ The following fields are returned in the JSON response body:
 - ``users`` - An array of objects, each containing information about an user.
   User objects contain the following fields:
 
-  - ``name`` - string - Fully-qualified user ID (ex. `@user:server.com`).
+  - ``name`` - string - Fully-qualified user ID (ex. ``@user:server.com``).
   - ``is_guest`` - bool - Status if that user is a guest account.
   - ``admin`` - bool - Status if that user is a server administrator.
   - ``user_type`` - string - Type of the user. Normal users are type ``None``.
@@ -902,10 +902,9 @@ The following parameters should be set in the URL:
 The following fields are returned in the JSON response body:
 
 - ``messages_per_second`` - integer - The number of actions that can
-  be performed in a second. `0` or `null` mean that ratelimiting is disabled
-  for this user.
-- ``burst_count`` - integer - How many actions that can be performed
-  before being limited.
+  be performed in a second. `0` mean that ratelimiting is disabled for this user.
+- ``burst_count`` - integer - How many actions that can be performed before
+  being limited.
 
 If **no** custom ratelimit is set, an empty JSON dict is returned.
 
@@ -954,8 +953,8 @@ The following fields are returned in the JSON response body:
 
 - ``messages_per_second`` - integer - The number of actions that can
   be performed in a second.
-- ``burst_count`` - integer - How many actions that can be performed
-  before being limited.
+- ``burst_count`` - integer - How many actions that can be performed before
+  being limited.
 
 Delete ratelimit
 ----------------

@@ -3205,6 +3205,32 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
+    def test_return_zero_when_null(self):
+        """
+        If values in database are `null` API should return an int `0`
+        """
+
+        self.get_success(
+            self.store.db_pool.simple_upsert(
+                table="ratelimit_override",
+                keyvalues={"user_id": self.other_user},
+                values={
+                    "messages_per_second": None,
+                    "burst_count": None,
+                },
+            )
+        )
+
+        # request status
+        channel = self.make_request(
+            "GET",
+            self.url,
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(0, channel.json_body["messages_per_second"])
+        self.assertEqual(0, channel.json_body["burst_count"])
+
     def test_success(self):
         """
         Rate-limiting (set/update/delete) should succeed for an admin.

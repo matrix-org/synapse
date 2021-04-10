@@ -1020,9 +1020,15 @@ class RateLimitRestServlet(RestServlet):
         ratelimit = await self.store.get_ratelimit_for_user(user_id)
 
         if ratelimit:
+            # convert `null` to `0` for consistency
+            # both values do the same in retelimit handler
             ret = {
-                "messages_per_second": ratelimit.messages_per_second,
-                "burst_count": ratelimit.burst_count,
+                "messages_per_second": 0
+                if ratelimit.messages_per_second is None
+                else ratelimit.messages_per_second,
+                "burst_count": 0
+                if ratelimit.burst_count is None
+                else ratelimit.burst_count,
             }
         else:
             ret = {}
