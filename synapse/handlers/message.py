@@ -856,8 +856,6 @@ class EventCreationHandler:
             if auth_event_ids:
                 old_state = await self.store.get_events_as_list(auth_event_ids)
 
-        logger.info("segrsegr old_state=%s", old_state)
-
         context = await self.state.compute_event_context(event, old_state=old_state)
         if requester:
             context.app_service = requester.app_service

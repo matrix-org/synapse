@@ -291,12 +291,6 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
 
         prev_events_from_query = parse_strings_from_args(request.args, "prev_event")
 
-        logger.info("body waewefaew %s", body)
-
-        # auth_event_ids = []
-        # create_event = await self.store.get_create_event_for_room(room_id)
-        # auth_event_ids.append(create_event.event_id)
-
         # For the event we are inserting next to (`prev_events_from_query`),
         # find the most recent auth events (derived from state events) that
         # allowed that message to be sent. We will use that as a base
@@ -312,16 +306,8 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
         # List of state event ID's
         prev_state_ids = list(prev_state_map.values())
         auth_event_ids = prev_state_ids
-        # auth_event_ids = self.auth.compute_auth_events(
-        #     event, prev_state_ids, for_verification=True
-        # )
-
-        logger.info(
-            "adsfds auth_event_ids=%s len=%s", auth_event_ids, len(prev_state_map)
-        )
 
         for stateEv in body["state_events_at_start"]:
-            logger.info("stateEv %s", stateEv)
             assert_params_in_dict(stateEv, ["type", "content", "sender"])
 
             event_dict = {
@@ -351,6 +337,8 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                     auth_event_ids=auth_event_ids,
                 )
             else:
+                # TODO: Add some complement tests that adds state that is not member joins
+                # and will use these code path
                 (
                     event,
                     _,
@@ -364,12 +352,9 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
 
             auth_event_ids.append(event_id)
 
-        logger.info("Done with state events grrtrsrdhh %s", auth_event_ids)
-
         event_ids = []
         prev_event_ids = prev_events_from_query
         for ev in body["events"]:
-            logger.info("ev %s", ev)
             assert_params_in_dict(ev, ["type", "content", "sender"])
 
             event_dict = {
@@ -380,11 +365,6 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                 "prev_events": prev_event_ids,
             }
 
-            # TODO
-            # Make sure backfilled
-            # Add all of the inherit_depth stuff
-            # Do we need to use `self.auth.compute_auth_events(...)` to filter the `auth_event_ids`?
-
             (
                 event,
                 _,
@@ -394,17 +374,13 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                 # TODO: Should these be an outlier?
                 # outlier=True,
                 inherit_depth=True,
+                # TODO: Do we need to use `self.auth.compute_auth_events(...)` to filter the `auth_event_ids`?
                 auth_event_ids=auth_event_ids,
             )
             event_id = event.event_id
 
             event_ids.append(event_id)
-
-            logger.info("event esrgegrerg %s", event)
-
             prev_event_ids = [event_id]
-
-        logger.info("Done with events afeefwaefw")
 
         return 200, {"state_events": auth_event_ids, "events": event_ids}
 

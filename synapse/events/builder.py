@@ -140,11 +140,6 @@ class EventBuilder:
             most_recent_prev_event_id,
             most_recent_prev_event_depth,
         ) = await self._store.get_max_depth_of(prev_event_ids)
-        logger.info(
-            "event_id_with_max_depth %s %s",
-            most_recent_prev_event_id,
-            most_recent_prev_event_depth,
-        )
 
         # We want to insert the historical event after the `prev_event` but before the successor event
         #
@@ -164,7 +159,6 @@ class EventBuilder:
             sucessor_event_ids = await self._store.get_successor_events(
                 [most_recent_prev_event_id]
             )
-            logger.info("sucessor_event_ids %s", sucessor_event_ids)
 
             # If we can't find any successor events, then it's a forward extremity of
             # historical messages nd we can just inherit from the previous historical
@@ -178,14 +172,10 @@ class EventBuilder:
                     oldest_successor_depth,
                 ) = await self._store.get_min_depth_of(sucessor_event_ids)
 
-                logger.info("oldest_successor_depth %s", oldest_successor_depth)
-
                 depth = oldest_successor_depth
         # Otherwise, progress the depth as normal
         else:
             depth = most_recent_prev_event_depth + 1
-
-        logger.info("depth %s", depth)
 
         # we cap depth of generated events, to ensure that they are not
         # rejected by other servers (and so that they can be persisted in
