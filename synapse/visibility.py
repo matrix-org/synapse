@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Dict, FrozenSet, Iterable, List, Optional
+from typing import Dict, FrozenSet, List, Optional
 
 from synapse.api.constants import (
     AccountDataTypes,
@@ -45,12 +45,6 @@ MEMBERSHIP_PRIORITY = (
     Membership.LEAVE,
     Membership.BAN,
 )
-
-
-def filter_historical_events(events: Iterable[EventBase]) -> List[EventBase]:
-    """Return a new list with historical events removed from the input."""
-    # return [e for e in events if not e.content.get("m.historical", None)]
-    return events
 
 
 async def filter_events_for_client(

@@ -269,11 +269,6 @@ class StateHandler:
             The event context.
         """
 
-        logger.info(
-            "compute_event_context is_outlier=%s event_id=%s",
-            event.internal_metadata.is_outlier(),
-            event.event_id,
-        )
         if event.internal_metadata.is_outlier():
             # If this is an outlier, then we know it shouldn't have any current
             # state. Certainly store.get_current_state won't return any, and

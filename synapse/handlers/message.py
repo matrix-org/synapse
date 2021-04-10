@@ -16,7 +16,7 @@
 # limitations under the License.
 import logging
 import random
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from canonicaljson import encode_canonical_json
 
@@ -454,11 +454,10 @@ class EventCreationHandler:
         event_dict: dict,
         txn_id: Optional[str] = None,
         prev_event_ids: Optional[List[str]] = None,
-        inherit_depth: bool = False,
         auth_event_ids: Optional[List[str]] = None,
-        state_for_events: Optional[Iterable[EventBase]] = None,
         require_consent: bool = True,
         outlier: bool = False,
+        inherit_depth: bool = False,
     ) -> Tuple[EventBase, EventContext]:
         """
         Given a dict from a client, create a new event.
@@ -477,9 +476,6 @@ class EventCreationHandler:
                 new event.
 
                 If None, they will be requested from the database.
-
-            inherit_depth: True to use the oldest depth from the prev_event_ids
-                (instead of calculating a new depth).
 
             auth_event_ids:
                 The event ids to use as the auth_events for the new event.
@@ -543,20 +539,14 @@ class EventCreationHandler:
         if txn_id is not None:
             builder.internal_metadata.txn_id = txn_id
 
-        logger.info("setting internal_metadata.outlier %s", outlier)
-        # Setting the outlier on the builder does not work to propogate it over to the event
-        # because `outlier` is not part of the `interal_metadata_dict` that is serialized later.
-        # Not sure why it is separate.
-        # See https://github.com/matrix-org/synapse/pull/9247#r607595779
         builder.internal_metadata.outlier = outlier
 
         event, context = await self.create_new_client_event(
             builder=builder,
             requester=requester,
             prev_event_ids=prev_event_ids,
-            inherit_depth=inherit_depth,
             auth_event_ids=auth_event_ids,
-            state_for_events=state_for_events,
+            inherit_depth=inherit_depth,
         )
 
         # In an ideal world we wouldn't need the second part of this condition. However,
@@ -713,13 +703,12 @@ class EventCreationHandler:
         self,
         requester: Requester,
         event_dict: dict,
-        inherit_depth: bool = False,
         auth_event_ids: Optional[List[str]] = None,
-        state_for_events: Optional[Iterable[EventBase]] = None,
         ratelimit: bool = True,
         txn_id: Optional[str] = None,
         ignore_shadow_ban: bool = False,
         outlier: bool = False,
+        inherit_depth: bool = False,
     ) -> Tuple[EventBase, int]:
         """
         Creates an event, then sends it.
@@ -729,8 +718,6 @@ class EventCreationHandler:
         Args:
             requester: The requester sending the event.
             event_dict: An entire event.
-            inherit_depth: True to use the oldest depth from the event_dict["prev_events"]
-                (instead of calculating a new depth).
             ratelimit: Whether to rate limit this send.
             txn_id: The transaction ID.
             ignore_shadow_ban: True if shadow-banned users should be allowed to
@@ -781,8 +768,8 @@ class EventCreationHandler:
                 txn_id=txn_id,
                 prev_event_ids=prev_events,
                 auth_event_ids=auth_event_ids,
-                inherit_depth=inherit_depth,
                 outlier=outlier,
+                inherit_depth=inherit_depth,
             )
 
             assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
@@ -813,9 +800,8 @@ class EventCreationHandler:
         builder: EventBuilder,
         requester: Optional[Requester] = None,
         prev_event_ids: Optional[List[str]] = None,
-        inherit_depth: bool = False,
         auth_event_ids: Optional[List[str]] = None,
-        state_for_events: Optional[Iterable[EventBase]] = None,
+        inherit_depth: bool = False,
     ) -> Tuple[EventBase, EventContext]:
         """Create a new event for a local client
 
@@ -827,9 +813,6 @@ class EventCreationHandler:
                 new event.
 
                 If None, they will be requested from the database.
-
-            inherit_depth: True to use the oldest depth from the prev_event_ids
-                (instead of calculating a new depth).
 
             auth_event_ids:
                 The event ids to use as the auth_events for the new event.
@@ -864,11 +847,18 @@ class EventCreationHandler:
             inherit_depth=inherit_depth,
         )
 
+        old_state = None
+
         # Pass on the outlier property from the builder to the event
+        # after it is created
         if builder.internal_metadata.outlier:
             event.internal_metadata.outlier = builder.internal_metadata.outlier
 
-        context = await self.state.compute_event_context(event, state_for_events)
+            # For outliers that pass in their own auth_event_ids, let's calculate the state for them
+            if auth_event_ids:
+                old_state = await self.store.get_events_as_list(auth_event_ids)
+
+        context = await self.state.compute_event_context(event, old_state=old_state)
         if requester:
             context.app_service = requester.app_service
 
@@ -982,7 +972,7 @@ class EventCreationHandler:
             # are invite rejections we have generated ourselves.
             assert event.type == EventTypes.Member
             assert event.content["membership"] == Membership.LEAVE
-        else:
+        else:  # if not event.internal_metadata.is_outlier():
             try:
                 await self.auth.check_from_context(room_version, event, context)
             except AuthError as err:
@@ -1281,8 +1271,6 @@ class EventCreationHandler:
         if event.content.get("m.historical", None):
             backfilled = True
 
-        logger.info("backfilled %s", backfilled)
-
         # Note that this returns the event that was persisted, which may not be
         # the same as we passed in if it was deduplicated due transaction IDs.
         (
@@ -1463,7 +1451,6 @@ class EventCreationHandler:
         event = await builder.build(
             prev_event_ids=original_event.prev_event_ids(),
             auth_event_ids=original_event.auth_event_ids(),
-            inherit_depth=False,
         )
 
         # we rebuild the event context, to be on the safe side. If nothing else,

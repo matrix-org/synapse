@@ -27,15 +27,10 @@ from synapse.api.errors import (
     Codes,
     HttpResponseException,
     InvalidClientCredentialsError,
-    NotFoundError,
     ShadowBanError,
     SynapseError,
 )
-from synapse.api.room_versions import (
-    KNOWN_ROOM_VERSIONS,
-)
 from synapse.api.filtering import Filter
-from synapse.events import make_event_from_dict
 from synapse.events.utils import format_event_for_client_v2
 from synapse.http.servlet import (
     RestServlet,
@@ -229,8 +224,6 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
 
-        self._msc2716_enabled = hs.config.experimental.msc2716_enabled
-
     def register(self, http_server):
         # /rooms/$roomid/send/$event_type[/$txn_id]
         PATTERNS = "/rooms/(?P<room_id>[^/]*)/send/(?P<event_type>[^/]*)"
@@ -247,20 +240,6 @@ class RoomSendEventRestServlet(TransactionRestServlet):
             "sender": requester.user.to_string(),
         }
 
-        inherit_depth = False
-        prev_events = parse_strings_from_args(request.args, "prev_event")
-        if self._msc2716_enabled:
-            if prev_events:
-                if not requester.app_service:
-                    raise AuthError(
-                        403,
-                        "Only application services can use the ?prev_event query paramtera",
-                    )
-
-                event_dict["prev_events"] = prev_events
-                # If backfilling old messages, let's just use the same depth of what we're inserting next to
-                inherit_depth = True
-
         if b"ts" in request.args and requester.app_service:
             event_dict["origin_server_ts"] = parse_integer(request, "ts", 0)
 
@@ -269,7 +248,7 @@ class RoomSendEventRestServlet(TransactionRestServlet):
                 event,
                 _,
             ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                requester, event_dict, txn_id=txn_id, inherit_depth=inherit_depth
+                requester, event_dict, txn_id=txn_id
             )
             event_id = event.event_id
         except ShadowBanError:
@@ -293,6 +272,7 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
         super().__init__(hs)
         self.store = hs.get_datastore()
+        self.state_store = hs.get_storage().state
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
@@ -311,68 +291,52 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
 
         prev_events_from_query = parse_strings_from_args(request.args, "prev_event")
 
-        logger.info("body waewefaew %s", body)
-
-        state_for_events = []
-        auth_event_ids = []
-
-        create_event = await self.store.get_create_event_for_room(room_id)
-        state_for_events.append(create_event)
-        auth_event_ids.append(create_event.event_id)
+        # For the event we are inserting next to (`prev_events_from_query`),
+        # find the most recent auth events (derived from state events) that
+        # allowed that message to be sent. We will use that as a base
+        # to auth our historical messages against.
+        (
+            most_recent_prev_event_id,
+            _,
+        ) = await self.store.get_max_depth_of(prev_events_from_query)
+        # mapping from (type, state_key) -> state_event_id
+        prev_state_map = await self.state_store.get_state_ids_for_event(
+            most_recent_prev_event_id
+        )
+        # List of state event ID's
+        prev_state_ids = list(prev_state_map.values())
+        auth_event_ids = prev_state_ids
 
         for stateEv in body["state_events_at_start"]:
-            logger.info("stateEv %s", stateEv)
             assert_params_in_dict(stateEv, ["type", "content", "sender"])
 
             event_dict = {
                 "type": stateEv["type"],
                 "content": stateEv["content"],
                 "room_id": room_id,
-                "sender": stateEv["sender"],  # requester.user.to_string(),
+                "sender": stateEv["sender"],
                 "state_key": stateEv["state_key"],
             }
 
-            # Make the events float off on their own
+            # Make the state events float off on their own
             fake_prev_event_id = "$" + random_string(43)
 
-            # # Also mark the event as an outlier outside of the normal DAG
-            # (event, _,) = await self.event_creation_handler.create_event(
-            #     requester, event_dict, prev_event_ids=[fake_prev_event_id], outlier=True
-            # )
-
-            try:
-                room_version_id = await self.store.get_room_version_id(
-                    event_dict["room_id"]
-                )
-                room_version = KNOWN_ROOM_VERSIONS.get(room_version_id)
-            except NotFoundError:
-                raise AuthError(403, "Unknown room")
-
-            current_state_ids = await self.store.get_current_state_ids(
-                event_dict["room_id"],
-            )
-            current_auth_event_ids = self.auth.compute_auth_events(
-                make_event_from_dict(event_dict, room_version),
-                current_state_ids,
-            )
-            current_auth_event_map = await self.store.get_events(current_auth_event_ids)
-            current_auth_events = current_auth_event_map.values()
-
-            if stateEv["type"] == EventTypes.Member:
-                membership = stateEv["content"].get("membership", None)
+            # TODO: This is pretty much the same as some other code to handle inserting state in this file
+            if event_dict["type"] == EventTypes.Member:
+                membership = event_dict["content"].get("membership", None)
                 event_id, _ = await self.room_member_handler.update_membership(
                     requester,
-                    target=UserID.from_string(stateEv["state_key"]),
+                    target=UserID.from_string(event_dict["state_key"]),
                     room_id=room_id,
                     action=membership,
-                    content=stateEv["content"],
+                    content=event_dict["content"],
                     outlier=True,
-                    state_for_events=current_auth_events,
+                    prev_event_ids=[fake_prev_event_id],
+                    auth_event_ids=auth_event_ids,
                 )
-                auth_event = await self.store.get_event(event_id)
-                state_for_events.append(auth_event)
-                auth_event_ids.append(event_id)
             else:
+                # TODO: Add some complement tests that adds state that is not member joins
+                # and will use this code path
                 (
                     event,
                     _,
@@ -380,17 +344,16 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                     requester,
                     event_dict,
                     outlier=True,
+                    prev_event_ids=[fake_prev_event_id],
+                    auth_event_ids=auth_event_ids,
                 )
-                state_for_events.append(event)
                 event_id = event.event_id
-                auth_event_ids.append(event_id)
 
-        logger.info("Done with state events grrtrsrdhh %s", auth_event_ids)
+            auth_event_ids.append(event_id)
 
         event_ids = []
         prev_event_ids = prev_events_from_query
         for ev in body["events"]:
-            logger.info("ev %s", ev)
             assert_params_in_dict(ev, ["type", "content", "sender"])
 
             event_dict = {
@@ -407,43 +370,16 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
             ) = await self.event_creation_handler.create_and_send_nonmember_event(
                 requester,
                 event_dict,
-                inherit_depth=True,
-                # We are allowed to post these messages because we are referencing the
-                # floating auth state events that we just created above
-                auth_event_ids=auth_event_ids,
-                # state_for_events=state_for_events,
+                # TODO: Should these be an outlier?
                 # outlier=True,
+                inherit_depth=True,
+                # TODO: Do we need to use `self.auth.compute_auth_events(...)` to filter the `auth_event_ids`?
+                auth_event_ids=auth_event_ids,
             )
-
-            # event, context = await self.event_creation_handler.create_event(
-            #     requester,
-            #     event_dict,
-            #     # We are allowed to post these messages because we are referencing the
-            #     # floating auth state events that we just created above
-            #     auth_event_ids=auth_event_ids,
-            #     prev_event_ids=prev_event_ids,
-            #     inherit_depth=True,
-            # )
-            # # await self.event_creation_handler.persist_and_notify_client_event(
-            # #     requester, event, context, ratelimit=False
-            # # )
-
-            # (
-            #     event,
-            #     _,
-            #     _,
-            # ) = await self.event_creation_handler.storage.persistence.persist_event(
-            #     event, context=context, backfilled=True
-            # )
-
             event_id = event.event_id
+
             event_ids.append(event_id)
-
-            logger.info("event esrgegrerg %s", event)
-
             prev_event_ids = [event_id]
-
-        logger.info("Done with events afeefwaefw")
 
         return 200, {"state_events": auth_event_ids, "events": event_ids}
 
