@@ -272,6 +272,7 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
         super().__init__(hs)
         self.store = hs.get_datastore()
+        self.state_store = hs.get_storage().state
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
@@ -292,10 +293,32 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
 
         logger.info("body waewefaew %s", body)
 
-        auth_event_ids = []
+        # auth_event_ids = []
+        # create_event = await self.store.get_create_event_for_room(room_id)
+        # auth_event_ids.append(create_event.event_id)
 
-        create_event = await self.store.get_create_event_for_room(room_id)
-        auth_event_ids.append(create_event.event_id)
+        # For the event we are inserting next to (`prev_events_from_query`),
+        # find the most recent auth events (derived from state events) that
+        # allowed that message to be sent. We will use that as a base
+        # to auth our historical messages against.
+        (
+            most_recent_prev_event_id,
+            _,
+        ) = await self.store.get_max_depth_of(prev_events_from_query)
+        # mapping from (type, state_key) -> state_event_id
+        prev_state_map = await self.state_store.get_state_ids_for_event(
+            most_recent_prev_event_id
+        )
+        # List of state event ID's
+        prev_state_ids = list(prev_state_map.values())
+        auth_event_ids = prev_state_ids
+        # auth_event_ids = self.auth.compute_auth_events(
+        #     event, prev_state_ids, for_verification=True
+        # )
+
+        logger.info(
+            "adsfds auth_event_ids=%s len=%s", auth_event_ids, len(prev_state_map)
+        )
 
         for stateEv in body["state_events_at_start"]:
             logger.info("stateEv %s", stateEv)
@@ -314,6 +337,7 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
 
             # TODO: Do we pop on the auth events for the `prev_events_from_query`?
 
+            # TODO: This is pretty much the same as some other code in this file
             if event_dict["type"] == EventTypes.Member:
                 membership = event_dict["content"].get("membership", None)
                 event_id, _ = await self.room_member_handler.update_membership(
@@ -324,6 +348,7 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                     content=event_dict["content"],
                     outlier=True,
                     prev_event_ids=[fake_prev_event_id],
+                    auth_event_ids=auth_event_ids,
                 )
             else:
                 (
@@ -333,6 +358,7 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                     requester,
                     event_dict,
                     # TODO: outlier
+                    # TODO: prev_event_ids
                 )
                 event_id = event.event_id
 
@@ -359,15 +385,15 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
             # Add all of the inherit_depth stuff
             # Do we need to use `self.auth.compute_auth_events(...)` to filter the `auth_event_ids`?
 
-            inherit_depth = True
-
             (
                 event,
                 _,
             ) = await self.event_creation_handler.create_and_send_nonmember_event(
                 requester,
                 event_dict,
-                inherit_depth=inherit_depth,
+                # TODO: Should these be an outlier?
+                # outlier=True,
+                inherit_depth=True,
                 auth_event_ids=auth_event_ids,
             )
             event_id = event.event_id

@@ -176,6 +176,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         room_id: str,
         membership: str,
         prev_event_ids: List[str],
+        auth_event_ids: Optional[List[str]] = None,
         txn_id: Optional[str] = None,
         ratelimit: bool = True,
         content: Optional[dict] = None,
@@ -204,13 +205,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             if existing_event_id:
                 event_pos = await self.store.get_position_for_event(existing_event_id)
                 return existing_event_id, event_pos.stream
-
-        # For outliers, we just need the create event in the auth chain
-        # for it to resolve correctly
-        auth_event_ids = None
-        if outlier:
-            create_event = await self.store.get_create_event_for_room(room_id)
-            auth_event_ids = [create_event.event_id]
 
         event, context = await self.event_creation_handler.create_event(
             requester,
@@ -324,6 +318,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         require_consent: bool = True,
         outlier: bool = False,
         prev_event_ids: Optional[List[str]] = None,
+        auth_event_ids: Optional[List[str]] = None,
     ) -> Tuple[str, int]:
         """Update a user's membership in a room.
 
@@ -366,6 +361,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 require_consent=require_consent,
                 outlier=outlier,
                 prev_event_ids=prev_event_ids,
+                auth_event_ids=auth_event_ids,
             )
 
         return result
@@ -384,6 +380,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         require_consent: bool = True,
         outlier: bool = False,
         prev_event_ids: Optional[List[str]] = None,
+        auth_event_ids: Optional[List[str]] = None,
     ) -> Tuple[str, int]:
         """Helper for update_membership.
 
@@ -647,6 +644,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             txn_id=txn_id,
             ratelimit=ratelimit,
             prev_event_ids=latest_event_ids,
+            auth_event_ids=auth_event_ids,
             content=content,
             require_consent=require_consent,
             outlier=outlier,

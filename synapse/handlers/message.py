@@ -455,6 +455,7 @@ class EventCreationHandler:
         auth_event_ids: Optional[List[str]] = None,
         require_consent: bool = True,
         outlier: bool = False,
+        inherit_depth: bool = False,
     ) -> Tuple[EventBase, EventContext]:
         """
         Given a dict from a client, create a new event.
@@ -543,6 +544,7 @@ class EventCreationHandler:
             requester=requester,
             prev_event_ids=prev_event_ids,
             auth_event_ids=auth_event_ids,
+            inherit_depth=inherit_depth,
         )
 
         # In an ideal world we wouldn't need the second part of this condition. However,
@@ -703,6 +705,8 @@ class EventCreationHandler:
         ratelimit: bool = True,
         txn_id: Optional[str] = None,
         ignore_shadow_ban: bool = False,
+        outlier: bool = False,
+        inherit_depth: bool = False,
     ) -> Tuple[EventBase, int]:
         """
         Creates an event, then sends it.
@@ -754,8 +758,16 @@ class EventCreationHandler:
                     assert event.internal_metadata.stream_ordering
                     return event, event.internal_metadata.stream_ordering
 
+            prev_events = event_dict.get("prev_events")
+
             event, context = await self.create_event(
-                requester, event_dict, txn_id=txn_id, auth_event_ids=auth_event_ids
+                requester,
+                event_dict,
+                txn_id=txn_id,
+                prev_event_ids=prev_events,
+                auth_event_ids=auth_event_ids,
+                outlier=outlier,
+                inherit_depth=inherit_depth,
             )
 
             assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
@@ -787,6 +799,7 @@ class EventCreationHandler:
         requester: Optional[Requester] = None,
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
+        inherit_depth: bool = False,
     ) -> Tuple[EventBase, EventContext]:
         """Create a new event for a local client
 
@@ -827,7 +840,9 @@ class EventCreationHandler:
         ), "Attempting to create an event with no prev_events"
 
         event = await builder.build(
-            prev_event_ids=prev_event_ids, auth_event_ids=auth_event_ids
+            prev_event_ids=prev_event_ids,
+            auth_event_ids=auth_event_ids,
+            inherit_depth=inherit_depth,
         )
 
         old_state = None
@@ -841,7 +856,7 @@ class EventCreationHandler:
             if auth_event_ids:
                 old_state = await self.store.get_events_as_list(auth_event_ids)
 
-        logger.info("asdfdfsa old_state=%s", old_state)
+        logger.info("segrsegr old_state=%s", old_state)
 
         context = await self.state.compute_event_context(event, old_state=old_state)
         if requester:
@@ -956,7 +971,7 @@ class EventCreationHandler:
             # are invite rejections we have generated ourselves.
             assert event.type == EventTypes.Member
             assert event.content["membership"] == Membership.LEAVE
-        elif not event.internal_metadata.is_outlier():
+        else:  # if not event.internal_metadata.is_outlier():
             try:
                 await self.auth.check_from_context(room_version, event, context)
             except AuthError as err:
@@ -1249,13 +1264,19 @@ class EventCreationHandler:
             if prev_state_ids:
                 raise AuthError(403, "Changing the room create event is forbidden")
 
+        backfilled = False
+        if event.content.get("m.historical", None):
+            backfilled = True
+
         # Note that this returns the event that was persisted, which may not be
         # the same as we passed in if it was deduplicated due transaction IDs.
         (
             event,
             event_pos,
             max_stream_token,
-        ) = await self.storage.persistence.persist_event(event, context=context)
+        ) = await self.storage.persistence.persist_event(
+            event, context=context, backfilled=backfilled
+        )
 
         if self._ephemeral_events_enabled:
             # If there's an expiry timestamp on the event, schedule its expiry.
