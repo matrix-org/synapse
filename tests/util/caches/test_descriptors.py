@@ -15,8 +15,7 @@
 # limitations under the License.
 import logging
 from typing import Set
-
-import mock
+from unittest import mock
 
 from twisted.internet import defer, reactor
 
@@ -661,14 +660,13 @@ class CachedListDescriptorTestCase(unittest.TestCase):
 
             @descriptors.cachedList("fn", "args1")
             async def list_fn(self, args1, arg2):
-                assert current_context().request == "c1"
+                assert current_context().name == "c1"
                 # we want this to behave like an asynchronous function
                 await run_on_reactor()
-                assert current_context().request == "c1"
+                assert current_context().name == "c1"
                 return self.mock(args1, arg2)
 
-        with LoggingContext() as c1:
-            c1.request = "c1"
+        with LoggingContext("c1") as c1:
             obj = Cls()
             obj.mock.return_value = {10: "fish", 20: "chips"}
             d1 = obj.list_fn([10, 20], 2)

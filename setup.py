@@ -99,7 +99,7 @@ CONDITIONAL_REQUIREMENTS["lint"] = [
     "isort==5.7.0",
     "black==20.8b1",
     "flake8-comprehensions",
-    "flake8-bugbear",
+    "flake8-bugbear==21.3.2",
     "flake8",
 ]
 
@@ -110,7 +110,7 @@ CONDITIONAL_REQUIREMENTS["mypy"] = ["mypy==0.812", "mypy-zope==0.2.13"]
 # Tests assume that all optional dependencies are installed.
 #
 # parameterized_class decorator was introduced in parameterized 0.7.0
-CONDITIONAL_REQUIREMENTS["test"] = ["mock>=2.0", "parameterized>=0.7.0"]
+CONDITIONAL_REQUIREMENTS["test"] = ["parameterized>=0.7.0"]
 
 setup(
     name="matrix-synapse",
@@ -123,7 +123,7 @@ setup(
     zip_safe=False,
     long_description=long_description,
     long_description_content_type="text/x-rst",
-    python_requires="~=3.5",
+    python_requires="~=3.6",
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Topic :: Communications :: Chat",
