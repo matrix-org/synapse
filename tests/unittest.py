@@ -21,8 +21,7 @@ import inspect
 import logging
 import time
 from typing import Callable, Dict, Iterable, Optional, Tuple, Type, TypeVar, Union
-
-from mock import Mock, patch
+from unittest.mock import Mock, patch
 
 from canonicaljson import json
 
@@ -471,7 +470,7 @@ class HomeserverTestCase(TestCase):
         kwargs["config"] = config_obj
 
         async def run_bg_updates():
-            with LoggingContext("run_bg_updates", request="run_bg_updates-1"):
+            with LoggingContext("run_bg_updates"):
                 while not await stor.db_pool.updates.has_completed_background_updates():
                     await stor.db_pool.updates.do_next_background_update(1)
 

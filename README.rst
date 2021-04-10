@@ -393,7 +393,12 @@ massive excess of outgoing federation requests (see `discussion
 indicate that your server is also issuing far more outgoing federation
 requests than can be accounted for by your users' activity, this is a
 likely cause. The misbehavior can be worked around by setting
-``use_presence: false`` in the Synapse config file.
+the following in the Synapse config file:
+
+.. code-block:: yaml
+
+   presence:
+       enabled: false
 
 People can't accept room invitations from me
 --------------------------------------------
