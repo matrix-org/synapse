@@ -321,9 +321,7 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
             # Make the state events float off on their own
             fake_prev_event_id = "$" + random_string(43)
 
-            # TODO: Do we pop on the auth events for the `prev_events_from_query`?
-
-            # TODO: This is pretty much the same as some other code in this file
+            # TODO: This is pretty much the same as some other code to handle inserting state in this file
             if event_dict["type"] == EventTypes.Member:
                 membership = event_dict["content"].get("membership", None)
                 event_id, _ = await self.room_member_handler.update_membership(
@@ -338,15 +336,16 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                 )
             else:
                 # TODO: Add some complement tests that adds state that is not member joins
-                # and will use these code path
+                # and will use this code path
                 (
                     event,
                     _,
                 ) = await self.event_creation_handler.create_and_send_nonmember_event(
                     requester,
                     event_dict,
-                    # TODO: outlier
-                    # TODO: prev_event_ids
+                    outlier=True,
+                    prev_event_ids=[fake_prev_event_id],
+                    auth_event_ids=auth_event_ids,
                 )
                 event_id = event.event_id
 
