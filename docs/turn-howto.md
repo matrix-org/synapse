@@ -16,13 +16,13 @@ The following sections describe how to install [coturn](<https://github.com/cotu
 For TURN relaying with `coturn` to work, it must be hosted on a server/endpoint with a public IP.
 
 Hosting TURN behind a NAT (even with appropriate port forwarding) is known to cause issues
-and to often not work.
+and to often not work, it's simply more complex to setup.
 
 ## `coturn` setup
 
 ### Initial installation
 
-The TURN daemon `coturn` is available from a variety of sources such as native package managers, or installation from source.
+The TURN daemon `coturn` is available from a variety of sources such as native package managers, docker or installation from source.
 
 #### Debian installation
 
@@ -51,6 +51,34 @@ This will install and start a systemd service called `coturn`.
 
         make
         make install
+        
+#### Docker installation
+
+There are coturn docker images available, configuration is either done via a config file or via command line parameters and it largely the same as below.
+
+This is a running setup, behind NAT using Docker, all config options on the Docker commandline, but of course it's possible to keep them in a config file as well:
+
+        docker run -d -p 3478:3478/udp -p 3478:3478/tcp -p 49100-49200:49100-49200/udp \
+        --name="<fill in container name for easy access in CLI>" -v /etc/localtime:/etc/localtime:ro \
+        --mount type=tmpfs,destination=/var/lib/coturn \
+        --restart=unless-stopped instrumentisto/coturn \
+        --total-quota=1200 --realm=<your turn server domain, ie turn.domain.tld> \
+        --external-ip='$(detect-external-ip)' \
+        --user-quota=12 --no-multicast-peers --fingerprint \
+        --min-port=49100 --max-port=49200 --use-auth-secret --verbose \
+        --no-tcp-relay --denied-peer-ip=240.0.0.0-255.255.255.255 \
+        --denied-peer-ip=10.0.0.0-10.255.255.255 --denied-peer-ip=127.0.0.0-127.255.255.255 --denied-peer-ip=169.254.0.0-169.254.255.255 \
+        --denied-peer-ip=0.0.0.0-0.255.255.255 --denied-peer-ip=172.16.0.0-172.31.255.255 --denied-peer-ip=192.168.0.0-192.168.255.255 \
+        --allowed-peer-ip=<your internal lan segment for clients> --static-auth-secret=<some secret you also specify in Synapse>
+
+Some tips / explanations:
+- The denied-peer-ip rules are to prevent peer configuration into your network, especially the machines where you run services.
+- The allowed peer range is to allow for internal LAN clients to use the TURN server (ie, one client inside the network the other outside).
+- Use "no-tcp-relay" since the Matrix media streams are UDP-only, makes possible attack vectors smaller.
+- The auth-secret is used in the synapse config, it creates temporary user/passwd for the TURN clients to use the server.
+- Use a smaller UDP port range (port forwarded in the firewall) for the media streams (49100-49200).
+- Make sure to open 3478 both TCP (also for the REST interface) and UDP, otherwise it won't work for Synapse to setup the sessions.
+- The "detect-external-ip" automatically detects the external IP used, don't set the relay-ip, it's automatically configured when you start the container.
 
 ### Configuration
 
