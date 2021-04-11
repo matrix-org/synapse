@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 Will Hunt <will@half-shot.uk>
 # Copyright 2020-2021 The Matrix.org Foundation C.I.C.
 #
