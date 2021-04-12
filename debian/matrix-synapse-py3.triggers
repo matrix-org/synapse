@@ -1,9 +1,10 @@
 # Register interest in Python interpreter changes and
 # don't make the Python package dependent on the virtualenv package
 # processing (noawait)
-interest-noawait /usr/bin/python3.5
 interest-noawait /usr/bin/python3.6
 interest-noawait /usr/bin/python3.7
+interest-noawait /usr/bin/python3.8
+interest-noawait /usr/bin/python3.9
 
 # Also provide a symbolic trigger for all dh-virtualenv packages
 interest dh-virtualenv-interpreter-update

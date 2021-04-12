@@ -14,32 +14,29 @@ ARG distro=""
 
 ###
 ### Stage 0: build a dh-virtualenv
+### Based on https://github.com/spotify/dh-virtualenv/blob/master/Dockerfile
 ###
+
 FROM ${distro} as builder
 
-RUN apt-get update -qq -o Acquire::Languages=none
-RUN env DEBIAN_FRONTEND=noninteractive apt-get install \
-        -yqq --no-install-recommends \
-        build-essential \
-        ca-certificates \
-        devscripts \
-        equivs \
-        wget
-
-# fetch and unpack the package
-# TODO: Upgrade to 1.2.2 once xenial is dropped
-RUN mkdir /dh-virtualenv
-RUN wget -q -O /dh-virtualenv.tar.gz https://github.com/spotify/dh-virtualenv/archive/ac6e1b1.tar.gz
-RUN tar -xv --strip-components=1 -C /dh-virtualenv -f /dh-virtualenv.tar.gz
-
-# install its build deps. We do another apt-cache-update here, because we might
-# be using a stale cache from docker build.
 RUN apt-get update -qq -o Acquire::Languages=none \
-    && cd /dh-virtualenv \
-    && env DEBIAN_FRONTEND=noninteractive mk-build-deps -ri -t "apt-get -y --no-install-recommends"
+    && env DEBIAN_FRONTEND=noninteractive apt-get install \
+        -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
+        build-essential debhelper devscripts equivs lsb-release \
+        python3-setuptools \
+        python3-sphinx python3-mock dh-exec dh-python python3-sphinx-rtd-theme \
+    && if test "$(lsb_release -cs)" = 'bionic' ; then \
+        apt-get install -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
+                        -t bionic-backports debhelper; fi \
+    && apt-get clean && rm -rf "/var/lib/apt/lists"/*
 
-# build it
-RUN cd /dh-virtualenv && dpkg-buildpackage -us -uc -b
+# fetch and unpack dh-virtualenv 1.2.2 (commit hash used to ensure integrity)
+ADD https://github.com/spotify/dh-virtualenv/archive/96963cff2e569bf0a15933f773a8bea7a762e2c4.tar.gz /dh-virtualenv.tar.gz
+
+RUN mkdir /dh-virtualenv \
+    && cd /dh-virtualenv \
+    && tar --strip-components=1 -xvf /dh-virtualenv.tar.gz \
+    && dpkg-buildpackage -us -uc -b
 
 ###
 ### Stage 1
@@ -55,17 +52,18 @@ ENV distro ${distro}
 # http://bugs.python.org/issue19846
 ENV LANG C.UTF-8
 
+COPY --from=builder /dh-virtualenv_*.deb /
+
 # Install the build dependencies
 #
 # NB: keep this list in sync with the list of build-deps in debian/control
 # TODO: it would be nice to do that automatically.
-# TODO: Remove the dh-systemd stanza after dropping support for Ubuntu xenial
-#       it's a transitional package on all other, more recent releases
 RUN apt-get update -qq -o Acquire::Languages=none \
     && env DEBIAN_FRONTEND=noninteractive apt-get install \
         -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
         build-essential \
         debhelper \
+        dh-python \
         devscripts \
         libsystemd-dev \
         lsb-release \
@@ -77,16 +75,8 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         sqlite3 \
         libpq-dev \
         xmlsec1 \
-    && ( env DEBIAN_FRONTEND=noninteractive apt-get install \
-         -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
-         dh-systemd || true )
-
-COPY --from=builder /dh-virtualenv_1.2~dev-1_all.deb /
-
-# install dhvirtualenv. Update the apt cache again first, in case we got a
-# cached cache from docker the first time.
-RUN apt-get update -qq -o Acquire::Languages=none \
-    && apt-get install -yq /dh-virtualenv_1.2~dev-1_all.deb
+        /dh-virtualenv_*.deb \
+    && apt-get clean && rm -rf "/var/lib/apt/lists"/*
 
 WORKDIR /synapse/source
 ENTRYPOINT ["bash","/synapse/source/docker/build_debian.sh"]
