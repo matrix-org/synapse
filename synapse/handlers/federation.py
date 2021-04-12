@@ -2240,18 +2240,14 @@ class FederationHandler(BaseHandler):
                 if c and c.type == EventTypes.Create:
                     auth_events[(c.type, c.state_key)] = c
 
-        context = await self.do_auth(origin, event, context, auth_events=auth_events)
-
-        if not context.rejected:
-            await self._check_for_soft_fail(event, state, backfilled)
-
-        if event.type == EventTypes.GuestAccess and not context.rejected:
-            await self.maybe_kick_guest_users(event)
-
-        # If we are going to send this event over federation we precaclculate
-        # the joined hosts.
-        if event.internal_metadata.get_send_on_behalf_of():
-            await self.event_creation_handler.cache_joined_hosts_for_event(event)
+        context = await self.do_auth(
+            origin,
+            event,
+            context,
+            state=state,
+            auth_events=auth_events,
+            backfilled=backfilled,
+        )
 
         return context
 
@@ -2370,14 +2366,18 @@ class FederationHandler(BaseHandler):
         origin: str,
         event: EventBase,
         context: EventContext,
+        state: Optional[Iterable[EventBase]],
         auth_events: MutableStateMap[EventBase],
+        backfilled: bool,
     ) -> EventContext:
         """
 
         Args:
-            origin:
-            event:
-            context:
+            origin: The host the event originates from.
+            event: The event itself.
+            context: The event context.
+            state: The state events to calculate the event context from. This is
+                ignored if context is provided.
             auth_events:
                 Map from (event_type, state_key) to event
 
@@ -2387,6 +2387,7 @@ class FederationHandler(BaseHandler):
                 server.
 
                 Also NB that this function adds entries to it.
+            backfilled: True if the event was backfilled.
         Returns:
             updated context object
         """
@@ -2413,6 +2414,17 @@ class FederationHandler(BaseHandler):
         except AuthError as e:
             logger.warning("Failed auth resolution for %r because %s", event, e)
             context.rejected = RejectedReason.AUTH_ERROR
+
+        if not context.rejected:
+            await self._check_for_soft_fail(event, state, backfilled)
+
+        if event.type == EventTypes.GuestAccess and not context.rejected:
+            await self.maybe_kick_guest_users(event)
+
+        # If we are going to send this event over federation we precaclculate
+        # the joined hosts.
+        if event.internal_metadata.get_send_on_behalf_of():
+            await self.event_creation_handler.cache_joined_hosts_for_event(event)
 
         return context
 
