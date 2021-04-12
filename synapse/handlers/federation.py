@@ -808,8 +808,10 @@ class FederationHandler(BaseHandler):
         logger.debug("Processing event: %s", event)
 
         try:
-            context = await self._prep_event(origin, event, state=state)
-            await self._handle_new_event(event, context)
+            context, auth_events = await self._prep_event(event, state=state)
+            await self._handle_new_event(
+                origin, event, context, auth_events=auth_events, state=state
+            )
         except AuthError as e:
             raise FederationError("ERROR", e.code, e.msg, affected=event.event_id)
 
@@ -1025,12 +1027,14 @@ class FederationHandler(BaseHandler):
             # non-outliers
             assert not event.internal_metadata.is_outlier()
 
-            context = await self._prep_event(dest, event, backfilled=True)
+            context, context_auth_events = await self._prep_event(event)
 
             # We store these one at a time since each event depends on the
             # previous to work out the state.
             # TODO: We can probably do something more clever here.
-            await self._handle_new_event(event, context, backfilled=True)
+            await self._handle_new_event(
+                dest, event, context, auth_events=context_auth_events, backfilled=True
+            )
 
         return events
 
@@ -1671,10 +1675,12 @@ class FederationHandler(BaseHandler):
         event.internal_metadata.send_on_behalf_of = origin
 
         # Calculate the event context and persist the event.
-        context = await self._prep_event(
-            origin, event, state=None, auth_events=None, backfilled=False
+        context, auth_events = await self._prep_event(
+            event, state=None, auth_events=None
         )
-        context = await self._handle_new_event(event, context)
+        context = await self._handle_new_event(
+            origin, event, context, auth_events=auth_events, backfilled=False
+        )
 
         logger.debug(
             "on_send_join_request: After _handle_new_event: %s, sigs: %s",
@@ -1886,8 +1892,8 @@ class FederationHandler(BaseHandler):
 
         event.internal_metadata.outlier = False
 
-        context = await self._prep_event(origin, event)
-        await self._handle_new_event(event, context)
+        context, auth_events = await self._prep_event(event)
+        await self._handle_new_event(origin, event, context, auth_events=auth_events)
 
         logger.debug(
             "on_send_leave_request: After _handle_new_event: %s, sigs: %s",
@@ -2000,21 +2006,42 @@ class FederationHandler(BaseHandler):
 
     async def _handle_new_event(
         self,
+        origin: str,
         event: EventBase,
         context: EventContext,
+        auth_events: MutableStateMap[EventBase],
+        state: Optional[Iterable[EventBase]] = None,
         backfilled: bool = False,
     ) -> EventContext:
         """
         Process an event.
 
         Args:
+            origin: The host the event originates from.
             event: The event itself.
             context: The event context.
+            state: The state events used to auth the event.
+            auth_events:
+                Map from (event_type, state_key) to event
+
+                Normally, our calculated auth_events based on the state of the room
+                at the event's position in the DAG, though occasionally (eg if the
+                event is an outlier), may be the auth events claimed by the remote
+                server.
             backfilled: True if the event was backfilled.
 
         Returns:
              The event context.
         """
+        context = await self.do_auth(
+            origin,
+            event,
+            context,
+            state=state,
+            auth_events=auth_events,
+            backfilled=backfilled,
+        )
+
         try:
             if (
                 not event.internal_metadata.is_outlier()
@@ -2054,11 +2081,17 @@ class FederationHandler(BaseHandler):
         async def prep(ev_info: _NewEventInfo):
             event = ev_info.event
             with nested_logging_context(suffix=event.event_id):
-                res = await self._prep_event(
-                    origin,
+                res, auth_events = await self._prep_event(
                     event,
                     state=ev_info.state,
                     auth_events=ev_info.auth_events,
+                )
+                res = await self.do_auth(
+                    origin,
+                    event,
+                    res,
+                    state=ev_info.state,
+                    auth_events=auth_events,
                     backfilled=backfilled,
                 )
             return res
@@ -2193,17 +2226,14 @@ class FederationHandler(BaseHandler):
 
     async def _prep_event(
         self,
-        origin: str,
         event: EventBase,
         state: Optional[Iterable[EventBase]] = None,
         auth_events: Optional[MutableStateMap[EventBase]] = None,
-        backfilled: bool = False,
-    ) -> EventContext:
+    ) -> Tuple[EventContext, MutableStateMap[EventBase]]:
         """
         Prepare an event for sending over federation.
 
         Args:
-            origin: The host the event originates from.
             event: The event itself.
             state: The state events to calculate the event context from.
             auth_events:
@@ -2215,10 +2245,9 @@ class FederationHandler(BaseHandler):
                 server.
 
                 Also NB that this function adds entries to it.
-            backfilled: True if the event was backfilled.
 
         Returns:
-             The event context.
+             The event context and auth events.
         """
         context = await self.state_handler.compute_event_context(event, old_state=state)
 
@@ -2240,16 +2269,7 @@ class FederationHandler(BaseHandler):
                 if c and c.type == EventTypes.Create:
                     auth_events[(c.type, c.state_key)] = c
 
-        context = await self.do_auth(
-            origin,
-            event,
-            context,
-            state=state,
-            auth_events=auth_events,
-            backfilled=backfilled,
-        )
-
-        return context
+        return context, auth_events
 
     async def _check_for_soft_fail(
         self, event: EventBase, state: Optional[Iterable[EventBase]], backfilled: bool
@@ -2511,14 +2531,16 @@ class FederationHandler(BaseHandler):
                             (e.type, e.state_key): e
                             for e in remote_auth_chain
                             if e.event_id in auth_ids or e.type == EventTypes.Create
-                        }
+                        }  # type: MutableStateMap[EventBase]
                         e.internal_metadata.outlier = True
 
                         logger.debug(
                             "do_auth %s missing_auth: %s", event.event_id, e.event_id
                         )
-                        context = await self._prep_event(origin, e, auth_events=auth)
-                        await self._handle_new_event(e, context)
+                        context, auth = await self._prep_event(e, auth_events=auth)
+                        await self._handle_new_event(
+                            origin, e, context, auth_events=auth
+                        )
 
                         if e.event_id in event_auth_events:
                             auth_events[(e.type, e.state_key)] = e
