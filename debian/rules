@@ -49,7 +49,7 @@ override_dh_shlibdeps:
 override_dh_virtualenv:
 	./debian/build_virtualenv
 
+# TODO: Experiment with --buildsystem=dh_virtualenv
+# https://dh-virtualenv.readthedocs.io/en/latest/usage.html#experimental-buildsystem-support
 %:
-	# TODO: Experiment with --buildsystem=dh_virtualenv
-	# https://dh-virtualenv.readthedocs.io/en/latest/usage.html#experimental-buildsystem-support
 	dh $@ --with python-virtualenv --buildsystem=pybuild
