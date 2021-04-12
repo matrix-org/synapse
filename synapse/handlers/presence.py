@@ -1322,7 +1322,7 @@ class PresenceEventSource:
 
         # Find the users who share a room with this user
         users_who_share_room = await self.store.get_users_who_share_room_with_user(
-            user_id, on_invalidate=cache_context.invalidate
+            user_id, False, on_invalidate=cache_context.invalidate
         )
         users_interested_in.update(users_who_share_room)
 

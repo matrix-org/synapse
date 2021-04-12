@@ -127,7 +127,7 @@ class DeviceWorkerHandler(BaseHandler):
         # First we check if any devices have changed for users that we share
         # rooms with.
         users_who_share_room = await self.store.get_users_who_share_room_with_user(
-            user_id
+            user_id, True
         )
 
         tracked_users = set(users_who_share_room)
@@ -454,7 +454,7 @@ class DeviceHandler(DeviceWorkerHandler):
             return
 
         users_who_share_room = await self.store.get_users_who_share_room_with_user(
-            user_id
+            user_id, True
         )
 
         hosts = set()  # type: Set[str]

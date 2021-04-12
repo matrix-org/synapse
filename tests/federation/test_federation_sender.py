@@ -174,7 +174,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         # stub out get_users_who_share_room_with_user so that it claims that
         # `@user2:host2` is in the room
-        def get_users_who_share_room_with_user(user_id):
+        def get_users_who_share_room_with_user(user_id, encrypted_only):
             return defer.succeed({"@user2:host2"})
 
         hs.get_datastore().get_users_who_share_room_with_user = (

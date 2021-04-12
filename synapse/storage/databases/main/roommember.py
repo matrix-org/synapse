@@ -488,12 +488,15 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     @cached(max_entries=500000, cache_context=True, iterable=True)
     async def get_users_who_share_room_with_user(
-        self, user_id: str, cache_context: _CacheContext
+        self, user_id: str, encrypted_only: bool, cache_context: _CacheContext
     ) -> Set[str]:
         """Returns the set of users who share a room with `user_id`"""
         room_ids = await self.get_rooms_for_user(
             user_id, on_invalidate=cache_context.invalidate
         )
+
+        if encrypted_only:
+            room_ids = await self._filter_encrypted_rooms(room_ids)
 
         user_who_share_room = set()
         for room_id in room_ids:
@@ -503,6 +506,24 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             user_who_share_room.update(user_ids)
 
         return user_who_share_room
+
+    async def _filter_encrypted_rooms(self, rooms: Iterable[str]) -> Collection[str]:
+        def _filter_encrypted_rooms_txn(txn, rooms: Iterable[str]) -> Collection[str]:
+            sql = """SELECT room_id FROM current_state_events WHERE type = 'm.room.encrypted' AND """
+
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "room_id", rooms
+            )
+
+            txn.execute(sql + clause, args)
+
+            return [room_id for room_id, in txn]
+
+        return await self.db_pool.runInteraction(
+            "_filter_encrypted_rooms",
+            _filter_encrypted_rooms_txn,
+            rooms,
+        )
 
     async def get_joined_users_from_context(
         self, event: EventBase, context: EventContext

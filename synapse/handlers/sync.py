@@ -1163,7 +1163,7 @@ class SyncHandler:
             # that were in a room we've left.
 
             users_who_share_room = await self.store.get_users_who_share_room_with_user(
-                user_id
+                user_id, True
             )
 
             # Always tell the user about their own devices. We check as the user
