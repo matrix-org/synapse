@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2014-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,10 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Optional
 
 from canonicaljson import json
-
-from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import RoomVersions
@@ -50,10 +48,15 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         self.depth = 1
 
     def inject_room_member(
-        self, room, user, membership, replaces_state=None, extra_content={}
+        self,
+        room,
+        user,
+        membership,
+        replaces_state=None,
+        extra_content: Optional[dict] = None,
     ):
         content = {"membership": membership}
-        content.update(extra_content)
+        content.update(extra_content or {})
         builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {
@@ -230,10 +233,9 @@ class RedactionTestCase(unittest.HomeserverTestCase):
                 self._base_builder = base_builder
                 self._event_id = event_id
 
-            @defer.inlineCallbacks
-            def build(self, prev_event_ids, auth_event_ids):
-                built_event = yield defer.ensureDeferred(
-                    self._base_builder.build(prev_event_ids, auth_event_ids)
+            async def build(self, prev_event_ids, auth_event_ids):
+                built_event = await self._base_builder.build(
+                    prev_event_ids, auth_event_ids
                 )
 
                 built_event._event_id = self._event_id

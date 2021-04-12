@@ -59,6 +59,8 @@ class JoinRules:
     KNOCK = "knock"
     INVITE = "invite"
     PRIVATE = "private"
+    # As defined for MSC3083.
+    MSC3083_RESTRICTED = "restricted"
 
 
 class LoginType:
@@ -69,6 +71,11 @@ class LoginType:
     TERMS = "m.login.terms"
     SSO = "m.login.sso"
     DUMMY = "m.login.dummy"
+
+
+# This is used in the `type` parameter for /register when called by
+# an appservice to register a new user.
+APP_SERVICE_REGISTRATION_TYPE = "m.login.application_service"
 
 
 class EventTypes:

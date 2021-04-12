@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-
-from mock import patch
+from unittest.mock import patch
 
 from synapse.api.room_versions import RoomVersion
 from synapse.rest import admin

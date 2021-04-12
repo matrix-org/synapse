@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import Optional
-
-from mock import Mock
+from unittest.mock import Mock
 
 from signedjson import key, sign
 from signedjson.types import BaseKey, SigningKey

@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import hmac
 import logging
 import random
@@ -22,7 +21,7 @@ from typing import List, Union
 import synapse
 import synapse.api.auth
 import synapse.types
-from synapse.api.constants import LoginType
+from synapse.api.constants import APP_SERVICE_REGISTRATION_TYPE, LoginType
 from synapse.api.errors import (
     Codes,
     InteractiveAuthIncompleteError,
@@ -126,7 +125,9 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        self.identity_handler.ratelimit_request_token_requests(request, "email", email)
+        await self.identity_handler.ratelimit_request_token_requests(
+            request, "email", email
+        )
 
         existing_user_id = await self.hs.get_datastore().get_user_id_by_threepid(
             "email", email
@@ -208,7 +209,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        self.identity_handler.ratelimit_request_token_requests(
+        await self.identity_handler.ratelimit_request_token_requests(
             request, "msisdn", msisdn
         )
 
@@ -406,7 +407,7 @@ class RegisterRestServlet(RestServlet):
 
         client_addr = request.getClientIP()
 
-        self.ratelimiter.ratelimit(client_addr, update=False)
+        await self.ratelimiter.ratelimit(None, client_addr, update=False)
 
         kind = b"user"
         if b"kind" in request.args:
@@ -428,15 +429,20 @@ class RegisterRestServlet(RestServlet):
                 raise SynapseError(400, "Invalid username")
             desired_username = body["username"]
 
-        appservice = None
-        if self.auth.has_access_token(request):
-            appservice = self.auth.get_appservice_by_req(request)
-
         # fork off as soon as possible for ASes which have completely
         # different registration flows to normal users
 
         # == Application Service Registration ==
-        if appservice:
+        if body.get("type") == APP_SERVICE_REGISTRATION_TYPE:
+            if not self.auth.has_access_token(request):
+                raise SynapseError(
+                    400,
+                    "Appservice token must be provided when using a type of m.login.application_service",
+                )
+
+            # Verify the AS
+            self.auth.get_appservice_by_req(request)
+
             # Set the desired user according to the AS API (which uses the
             # 'user' key not 'username'). Since this is a new addition, we'll
             # fallback to 'username' if they gave one.
@@ -457,6 +463,11 @@ class RegisterRestServlet(RestServlet):
             )
 
             return 200, result
+        elif self.auth.has_access_token(request):
+            raise SynapseError(
+                400,
+                "An access token should not be provided on requests to /register (except if type is m.login.application_service)",
+            )
 
         # == Normal User Registration == (everyone else)
         if not self._registration_enabled:
