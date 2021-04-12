@@ -854,7 +854,7 @@ class EventCreationHandler:
         if builder.internal_metadata.outlier:
             event.internal_metadata.outlier = builder.internal_metadata.outlier
 
-            # For outliers that pass in their own auth_event_ids, let's calculate the state for them
+            # Calculate the state for outliers that pass in their own `auth_event_ids`
             if auth_event_ids:
                 old_state = await self.store.get_events_as_list(auth_event_ids)
 
@@ -972,7 +972,7 @@ class EventCreationHandler:
             # are invite rejections we have generated ourselves.
             assert event.type == EventTypes.Member
             assert event.content["membership"] == Membership.LEAVE
-        else:  # if not event.internal_metadata.is_outlier():
+        else:
             try:
                 await self.auth.check_from_context(room_version, event, context)
             except AuthError as err:
@@ -1267,6 +1267,8 @@ class EventCreationHandler:
             if prev_state_ids:
                 raise AuthError(403, "Changing the room create event is forbidden")
 
+        # Mark any `m.historical` messages as backfilled so they don't appear
+        # in `/sync` and have the proper decrementing `stream_ordering` as we import
         backfilled = False
         if event.content.get("m.historical", None):
             backfilled = True

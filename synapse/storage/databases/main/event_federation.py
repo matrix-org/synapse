@@ -15,7 +15,7 @@
 import itertools
 import logging
 from queue import Empty, PriorityQueue
-from typing import Optional, Dict, Iterable, List, Set, Tuple
+from typing import Dict, Iterable, List, Set, Tuple
 
 from synapse.api.constants import MAX_DEPTH
 from synapse.api.errors import StoreError

@@ -161,7 +161,7 @@ class EventBuilder:
             )
 
             # If we can't find any successor events, then it's a forward extremity of
-            # historical messages nd we can just inherit from the previous historical
+            # historical messages and we can just inherit from the previous historical
             # event which we can already assume has the correct depth where we want
             # to insert into.
             if not sucessor_event_ids:

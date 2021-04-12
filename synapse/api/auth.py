@@ -88,7 +88,7 @@ class Auth:
         self, room_version: str, event, context, do_sig_check=True
     ):
         auth_event_ids = event.auth_event_ids()
-        if auth_event_ids == None:
+        if auth_event_ids is None:
             prev_state_ids = await context.get_prev_state_ids()
             auth_event_ids = self.compute_auth_events(
                 event, prev_state_ids, for_verification=True
