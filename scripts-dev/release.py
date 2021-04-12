@@ -14,9 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""An interactive script to walk through the initial stages of creating a
-release, including creating release branch, updating changelog and pushing to
-GitHub.
+"""An interactive script for doing a release. See `run()` below.
 """
 
 import subprocess
@@ -29,25 +27,17 @@ from packaging import version
 from redbaron import RedBaron
 
 
-def find_ref(repo: git.Repo, ref_name: str) -> Optional[git.HEAD]:
-    """Find the branch/ref, looking first locally then in the remote."""
-    if ref_name in repo.refs:
-        return repo.refs[ref_name]
-    elif ref_name in repo.remote().refs:
-        return repo.remote().refs[ref_name]
-    else:
-        return None
-
-
-def update_branch(repo: git.Repo):
-    """Ensure branch is up to date if it has a remote"""
-    if repo.active_branch.tracking_branch():
-        repo.git.merge(repo.active_branch.tracking_branch().name)
-
-
 @click.command()
-def release():
-    """Main release command"""
+def run():
+    """An interactive script to walk through the initial stages of creating a
+    release, including creating release branch, updating changelog and pushing to
+    GitHub.
+
+    Requires the dev dependencies be installed, which can be done via:
+
+        pip install -e .[dev]
+
+    """
 
     # Make sure we're in a git repo.
     try:
@@ -234,5 +224,21 @@ def release():
     )
 
 
+def find_ref(repo: git.Repo, ref_name: str) -> Optional[git.HEAD]:
+    """Find the branch/ref, looking first locally then in the remote."""
+    if ref_name in repo.refs:
+        return repo.refs[ref_name]
+    elif ref_name in repo.remote().refs:
+        return repo.remote().refs[ref_name]
+    else:
+        return None
+
+
+def update_branch(repo: git.Repo):
+    """Ensure branch is up to date if it has a remote"""
+    if repo.active_branch.tracking_branch():
+        repo.git.merge(repo.active_branch.tracking_branch().name)
+
+
 if __name__ == "__main__":
-    release()
+    run()
