@@ -25,7 +25,7 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         build-essential debhelper devscripts equivs lsb-release \
         python3-setuptools \
         python3-sphinx python3-mock dh-exec dh-python python3-sphinx-rtd-theme \
-    && if test "$(lsb_release -cs)" = 'bionic' ; then \
+    && if test "$(lsb_release -cs)" = "bionic" ; then \
         apt-get install -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
                         -t bionic-backports debhelper; fi \
     && apt-get clean && rm -rf "/var/lib/apt/lists"/*
