@@ -1,8 +1,9 @@
 matrix-synapse-py3 (1.31.0+nmu1) UNRELEASED; urgency=medium
 
+  * Skip tests when DEB_BUILD_OPTIONS contains "nocheck".
   * Update Debian build scripts for debhelper-compat level 12.
 
- -- Dan Callahan <danc@element.io>  Mon, 12 Apr 2021 10:39:59 +0000
+ -- Dan Callahan <danc@element.io>  Mon, 12 Apr 2021 13:07:36 +0000
 
 matrix-synapse-py3 (1.31.0) stable; urgency=medium
 
