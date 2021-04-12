@@ -1,0 +1,1 @@
+Speed up `/sync` by ignoring non-encrypted rooms when updating devicelists.
