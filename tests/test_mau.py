@@ -15,9 +15,7 @@
 
 """Tests REST events for /rooms paths."""
 
-import json
-
-from synapse.api.constants import LoginType
+from synapse.api.constants import APP_SERVICE_REGISTRATION_TYPE, LoginType
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.appservice import ApplicationService
 from synapse.rest.client.v2_alpha import register, sync
@@ -113,7 +111,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
             )
         )
 
-        self.create_user("as_kermit4", token=as_token)
+        self.create_user("as_kermit4", token=as_token, appservice=True)
 
     def test_allowed_after_a_month_mau(self):
         # Create and sync so that the MAU counts get updated
@@ -232,14 +230,15 @@ class TestMauLimit(unittest.HomeserverTestCase):
         self.reactor.advance(100)
         self.assertEqual(2, self.successResultOf(count))
 
-    def create_user(self, localpart, token=None):
-        request_data = json.dumps(
-            {
-                "username": localpart,
-                "password": "monkey",
-                "auth": {"type": LoginType.DUMMY},
-            }
-        )
+    def create_user(self, localpart, token=None, appservice=False):
+        request_data = {
+            "username": localpart,
+            "password": "monkey",
+            "auth": {"type": LoginType.DUMMY},
+        }
+
+        if appservice:
+            request_data["type"] = APP_SERVICE_REGISTRATION_TYPE
 
         channel = self.make_request(
             "POST",
