@@ -22,6 +22,7 @@ from twisted.internet.protocol import ReconnectingClientFactory
 
 from synapse.api.constants import EventTypes
 from synapse.federation import send_queue
+from synapse.federation.sender import FederationSender
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.tcp.protocol import ClientReplicationStreamProtocol
@@ -336,14 +337,22 @@ class FederationSenderHandler:
     """
 
     def __init__(self, hs: "HomeServer"):
+        assert hs.should_send_federation()
+
         self.store = hs.get_datastore()
         self._is_mine_id = hs.is_mine_id
         self._hs = hs
-        self.federation_sender = hs.get_federation_sender()
+
+        # We need to make a temporary value to ensure that mypy picks up the
+        # right type. We know we should have a federation sender instance since
+        # `should_send_federation` is True.
+        sender = hs.get_federation_sender()
+        assert isinstance(sender, FederationSender)
+        self.federation_sender = sender
 
         # Stores the latest position in the federation stream we've gotten up
         # to. This is always set before we use it.
-        self.federation_position = None
+        self.federation_position = None  # type: Optional[int]
 
         self._fed_position_linearizer = Linearizer(name="_fed_position_linearizer")
 
@@ -421,6 +430,9 @@ class FederationSenderHandler:
         """Save the current federation position in the database and send an ACK
         to master with where we're up to.
         """
+        # We should only be calling this once we've got a token.
+        assert self.federation_position is not None
+
         try:
             # We linearize here to ensure we don't have races updating the token
             #
