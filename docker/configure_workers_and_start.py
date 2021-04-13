@@ -20,9 +20,9 @@
 # The environment variables it reads are:
 #   * SYNAPSE_SERVER_NAME: The desired server_name of the homeserver.
 #   * SYNAPSE_REPORT_STATS: Whether to report stats.
-#   * SYNAPSE_WORKERS: A comma separated list of worker names as specified in WORKER_CONFIG
-#                      below. Leave empty for no workers, or set to '*' for all possible
-#                      workers.
+#   * SYNAPSE_WORKER_TYPES: A comma separated list of worker names as specified in WORKER_CONFIG
+#                           below. Leave empty for no workers, or set to '*' for all possible
+#                           workers.
 #
 # NOTE: According to Complement's ENTRYPOINT expectations for a homeserver image (as defined
 # in the project's README), this script may be run multiple times, and functionality should
@@ -369,7 +369,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     nginx_locations = {}
 
     # Read the desired worker configuration from the environment
-    worker_types = environ.get("SYNAPSE_WORKERS")
+    worker_types = environ.get("SYNAPSE_WORKER_TYPES")
     if worker_types is None:
         # No workers, just the main process
         worker_types = []
