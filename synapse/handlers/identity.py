@@ -16,7 +16,6 @@
 # limitations under the License.
 
 """Utilities for interacting with Identity Servers"""
-
 import logging
 import urllib.parse
 from typing import Awaitable, Callable, Dict, List, Optional, Tuple
@@ -35,7 +34,11 @@ from synapse.http.site import SynapseRequest
 from synapse.types import JsonDict, Requester
 from synapse.util import json_decoder
 from synapse.util.hash import sha256_and_url_safe_base64
-from synapse.util.stringutils import assert_valid_client_secret, random_string
+from synapse.util.stringutils import (
+    assert_valid_client_secret,
+    parse_and_validate_server_name,
+    random_string,
+)
 
 from ._base import BaseHandler
 
@@ -74,10 +77,7 @@ class IdentityHandler(BaseHandler):
         )
 
     async def ratelimit_request_token_requests(
-        self,
-        request: SynapseRequest,
-        medium: str,
-        address: str,
+        self, request: SynapseRequest, medium: str, address: str,
     ):
         """Used to ratelimit requests to `/requestToken` by IP and address.
 
@@ -173,6 +173,11 @@ class IdentityHandler(BaseHandler):
                 server with, if necessary. Required if use_v2 is true
             use_v2: Whether to use v2 Identity Service API endpoints. Defaults to True
 
+        Raises:
+            SynapseError: On any of the following conditions
+                - the supplied id_server is not a valid Matrix server name
+                - we failed to contact the supplied identity server
+
         Returns:
             The response from the identity server
         """
@@ -181,6 +186,11 @@ class IdentityHandler(BaseHandler):
         # If an id_access_token is not supplied, force usage of v1
         if id_access_token is None:
             use_v2 = False
+
+        try:
+            parse_and_validate_server_name(id_server)
+        except ValueError:
+            raise SynapseError(400, "id_server must be a valid Matrix server name")
 
         # Decide which API endpoint URLs to use
         headers = {}
@@ -270,12 +280,20 @@ class IdentityHandler(BaseHandler):
             id_server: Identity server to unbind from
 
         Raises:
-            SynapseError: If we failed to contact the identity server
+            SynapseError: On any of the following conditions
+                - the supplied id_server is not a valid Matrix server name
+                - we failed to contact the supplied identity server
 
         Returns:
             True on success, otherwise False if the identity
             server doesn't support unbinding
         """
+
+        try:
+            parse_and_validate_server_name(id_server)
+        except ValueError:
+            raise SynapseError(400, "id_server must be a valid Matrix server name")
+
         url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
         url_bytes = "/_matrix/identity/api/v1/3pid/unbind".encode("ascii")
 
