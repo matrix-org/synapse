@@ -21,8 +21,7 @@ import re
 import time
 import urllib.parse
 from typing import Any, Dict, Mapping, MutableMapping, Optional
-
-from mock import patch
+from unittest.mock import patch
 
 import attr
 

@@ -1,4 +1,4 @@
-from mock import Mock, call
+from unittest.mock import Mock, call
 
 from twisted.internet import defer, reactor
 

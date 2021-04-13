@@ -488,7 +488,7 @@ class DatabasePool:
         exception_callbacks: List[_CallbackListEntry],
         func: "Callable[..., R]",
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> R:
         """Start a new database transaction with the given connection.
 
@@ -622,7 +622,7 @@ class DatabasePool:
         func: "Callable[..., R]",
         *args: Any,
         db_autocommit: bool = False,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> R:
         """Starts a transaction on the database and runs a given function
 
@@ -682,7 +682,7 @@ class DatabasePool:
         func: "Callable[..., R]",
         *args: Any,
         db_autocommit: bool = False,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> R:
         """Wraps the .runWithConnection() method on the underlying db_pool.
 
@@ -775,7 +775,7 @@ class DatabasePool:
         desc: str,
         decoder: Optional[Callable[[Cursor], R]],
         query: str,
-        *args: Any
+        *args: Any,
     ) -> R:
         """Runs a single query for a result set.
 

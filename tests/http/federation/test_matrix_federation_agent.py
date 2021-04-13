@@ -14,8 +14,7 @@
 # limitations under the License.
 import logging
 from typing import Optional
-
-from mock import Mock
+from unittest.mock import Mock
 
 import treq
 from netaddr import IPSet

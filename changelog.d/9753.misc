@@ -1,1 +1,0 @@
-Check that a `ConfigError` is raised, rather than simply `Exception`, when appropriate in homeserver config file generation tests.

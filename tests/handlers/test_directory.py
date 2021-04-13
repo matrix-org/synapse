@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-from mock import Mock
+from unittest.mock import Mock
 
 import synapse
 import synapse.api.errors

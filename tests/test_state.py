@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import List, Optional
-
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.internet import defer
 
@@ -39,7 +38,7 @@ def create_event(
     depth=2,
     event_id=None,
     prev_events: Optional[List[str]] = None,
-    **kwargs
+    **kwargs,
 ):
     global _next_event_id
 

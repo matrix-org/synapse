@@ -1,1 +1,0 @@
-Remove old admin API `GET /_synapse/admin/v1/users/<user_id>`.
