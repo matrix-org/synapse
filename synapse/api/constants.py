@@ -51,6 +51,7 @@ class PresenceState:
     OFFLINE = "offline"
     UNAVAILABLE = "unavailable"
     ONLINE = "online"
+    BUSY = "org.matrix.msc3026.busy"
 
 
 class JoinRules:
@@ -58,6 +59,8 @@ class JoinRules:
     KNOCK = "knock"
     INVITE = "invite"
     PRIVATE = "private"
+    # As defined for MSC3083.
+    MSC3083_RESTRICTED = "restricted"
 
 
 class LoginType:
@@ -99,6 +102,9 @@ class EventTypes:
     Retention = "m.room.retention"
 
     Dummy = "org.matrix.dummy_event"
+
+    MSC1772_SPACE_CHILD = "org.matrix.msc1772.space.child"
+    MSC1772_SPACE_PARENT = "org.matrix.msc1772.space.parent"
 
 
 class EduTypes:
@@ -159,6 +165,9 @@ class EventContentFields:
     # Timestamp to delete the event after
     # cf https://github.com/matrix-org/matrix-doc/pull/2228
     SELF_DESTRUCT_AFTER = "org.matrix.self_destruct_after"
+
+    # cf https://github.com/matrix-org/matrix-doc/pull/1772
+    MSC1772_ROOM_TYPE = "org.matrix.msc1772.type"
 
 
 class RoomEncryptionAlgorithms:

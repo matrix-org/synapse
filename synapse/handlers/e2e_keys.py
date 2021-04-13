@@ -38,11 +38,10 @@ from synapse.types import (
 )
 from synapse.util import json_decoder, unwrapFirstError
 from synapse.util.async_helpers import Linearizer
-from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.retryutils import NotRetryingDestination
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -1008,7 +1007,7 @@ class E2eKeysHandler:
         return signature_list, failures
 
     async def _get_e2e_cross_signing_verify_key(
-        self, user_id: str, key_type: str, from_user_id: str = None
+        self, user_id: str, key_type: str, from_user_id: Optional[str] = None
     ) -> Tuple[JsonDict, str, VerifyKey]:
         """Fetch locally or remotely query for a cross-signing public key.
 
@@ -1291,17 +1290,6 @@ class SigningKeyEduUpdater:
 
         # user_id -> list of updates waiting to be handled.
         self._pending_updates = {}  # type: Dict[str, List[Tuple[JsonDict, JsonDict]]]
-
-        # Recently seen stream ids. We don't bother keeping these in the DB,
-        # but they're useful to have them about to reduce the number of spurious
-        # resyncs.
-        self._seen_updates = ExpiringCache(
-            cache_name="signing_key_update_edu",
-            clock=self.clock,
-            max_len=10000,
-            expiry_ms=30 * 60 * 1000,
-            iterable=True,
-        )
 
     async def incoming_signing_key_update(
         self, origin: str, edu_content: JsonDict

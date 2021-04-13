@@ -36,6 +36,7 @@ from synapse.rest.admin._base import (
 )
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.databases.main.media_repository import MediaSortOrder
+from synapse.storage.databases.main.stats import UserSortOrder
 from synapse.types import JsonDict, UserID
 
 if TYPE_CHECKING:
@@ -117,8 +118,26 @@ class UsersRestServletV2(RestServlet):
         guests = parse_boolean(request, "guests", default=True)
         deactivated = parse_boolean(request, "deactivated", default=False)
 
+        order_by = parse_string(
+            request,
+            "order_by",
+            default=UserSortOrder.NAME.value,
+            allowed_values=(
+                UserSortOrder.NAME.value,
+                UserSortOrder.DISPLAYNAME.value,
+                UserSortOrder.GUEST.value,
+                UserSortOrder.ADMIN.value,
+                UserSortOrder.DEACTIVATED.value,
+                UserSortOrder.USER_TYPE.value,
+                UserSortOrder.AVATAR_URL.value,
+                UserSortOrder.SHADOW_BANNED.value,
+            ),
+        )
+
+        direction = parse_string(request, "dir", default="f", allowed_values=("f", "b"))
+
         users, total = await self.store.get_users_paginate(
-            start, limit, user_id, name, guests, deactivated
+            start, limit, user_id, name, guests, deactivated, order_by, direction
         )
         ret = {"users": users, "total": total}
         if (start + limit) < total:
@@ -271,7 +290,7 @@ class UserRestServletV2(RestServlet):
                 elif not deactivate and user["deactivated"]:
                     if (
                         "password" not in body
-                        and self.hs.config.password_localdb_enabled
+                        and self.auth_handler.can_change_password()
                     ):
                         raise SynapseError(
                             400, "Must provide a password to re-activate an account."
@@ -833,6 +852,9 @@ class UserMediaRestServlet(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
+        # This will always be set by the time Twisted calls us.
+        assert request.args is not None
+
         await assert_requester_is_admin(self.auth, request)
 
         if not self.is_mine(UserID.from_string(user_id)):

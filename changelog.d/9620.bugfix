@@ -1,1 +1,0 @@
-Fix a bug introduced in v1.28.0 where the OpenID Connect callback endpoint could error with a `MacaroonInitException`.

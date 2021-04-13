@@ -16,7 +16,7 @@
 import logging
 import threading
 from collections import namedtuple
-from typing import Dict, Iterable, List, Optional, Tuple, overload
+from typing import Container, Dict, Iterable, List, Optional, Tuple, overload
 
 from constantly import NamedConstant, Names
 from typing_extensions import Literal
@@ -544,7 +544,7 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_stripped_room_state_from_event_context(
         self,
         context: EventContext,
-        state_types_to_include: List[EventTypes],
+        state_types_to_include: Container[str],
         membership_user_id: Optional[str] = None,
     ) -> List[JsonDict]:
         """
@@ -799,6 +799,7 @@ class EventsWorkerStore(SQLBaseStore):
                 rejected_reason=rejected_reason,
             )
             original_ev.internal_metadata.stream_ordering = row["stream_ordering"]
+            original_ev.internal_metadata.outlier = row["outlier"]
 
             event_map[event_id] = original_ev
 
@@ -905,7 +906,8 @@ class EventsWorkerStore(SQLBaseStore):
                   ej.json,
                   ej.format_version,
                   r.room_version,
-                  rej.reason
+                  rej.reason,
+                  e.outlier
                 FROM events AS e
                   JOIN event_json AS ej USING (event_id)
                   LEFT JOIN rooms r ON r.room_id = e.room_id
@@ -929,6 +931,7 @@ class EventsWorkerStore(SQLBaseStore):
                     "room_version_id": row[5],
                     "rejected_reason": row[6],
                     "redactions": [],
+                    "outlier": row[7],
                 }
 
             # check for redactions

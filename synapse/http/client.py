@@ -77,7 +77,7 @@ from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -590,7 +590,7 @@ class SimpleHttpClient:
         uri: str,
         json_body: Any,
         args: Optional[QueryParams] = None,
-        headers: RawHeaders = None,
+        headers: Optional[RawHeaders] = None,
     ) -> Any:
         """Puts some json to the given URI.
 

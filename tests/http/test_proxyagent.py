@@ -12,8 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import base64
 import logging
 import os
+from typing import Optional
 from unittest.mock import patch
 
 import treq
@@ -242,6 +244,21 @@ class MatrixFederationAgentTests(TestCase):
 
     @patch.dict(os.environ, {"https_proxy": "proxy.com", "no_proxy": "unused.com"})
     def test_https_request_via_proxy(self):
+        """Tests that TLS-encrypted requests can be made through a proxy"""
+        self._do_https_request_via_proxy(auth_credentials=None)
+
+    @patch.dict(
+        os.environ,
+        {"https_proxy": "bob:pinkponies@proxy.com", "no_proxy": "unused.com"},
+    )
+    def test_https_request_via_proxy_with_auth(self):
+        """Tests that authenticated, TLS-encrypted requests can be made through a proxy"""
+        self._do_https_request_via_proxy(auth_credentials="bob:pinkponies")
+
+    def _do_https_request_via_proxy(
+        self,
+        auth_credentials: Optional[str] = None,
+    ):
         agent = ProxyAgent(
             self.reactor,
             contextFactory=get_test_https_policy(),
@@ -278,6 +295,22 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual(request.method, b"CONNECT")
         self.assertEqual(request.path, b"test.com:443")
 
+        # Check whether auth credentials have been supplied to the proxy
+        proxy_auth_header_values = request.requestHeaders.getRawHeaders(
+            b"Proxy-Authorization"
+        )
+
+        if auth_credentials is not None:
+            # Compute the correct header value for Proxy-Authorization
+            encoded_credentials = base64.b64encode(b"bob:pinkponies")
+            expected_header_value = b"Basic " + encoded_credentials
+
+            # Validate the header's value
+            self.assertIn(expected_header_value, proxy_auth_header_values)
+        else:
+            # Check that the Proxy-Authorization header has not been supplied to the proxy
+            self.assertIsNone(proxy_auth_header_values)
+
         # tell the proxy server not to close the connection
         proxy_server.persistent = True
 
@@ -312,6 +345,13 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual(request.method, b"GET")
         self.assertEqual(request.path, b"/abc")
         self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [b"test.com"])
+
+        # Check that the destination server DID NOT receive proxy credentials
+        proxy_auth_header_values = request.requestHeaders.getRawHeaders(
+            b"Proxy-Authorization"
+        )
+        self.assertIsNone(proxy_auth_header_values)
+
         request.write(b"result")
         request.finish()
 

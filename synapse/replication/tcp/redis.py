@@ -60,7 +60,7 @@ class ConstantProperty(Generic[T, V]):
 
     constant = attr.ib()  # type: V
 
-    def __get__(self, obj: Optional[T], objtype: Type[T] = None) -> V:
+    def __get__(self, obj: Optional[T], objtype: Optional[Type[T]] = None) -> V:
         return self.constant
 
     def __set__(self, obj: Optional[T], value: V):

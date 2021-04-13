@@ -149,6 +149,9 @@ class OidcHandler:
         Args:
             request: the incoming request from the browser.
         """
+        # This will always be set by the time Twisted calls us.
+        assert request.args is not None
+
         # The provider might redirect with an error.
         # In that case, just display it as-is.
         if b"error" in request.args:
@@ -280,6 +283,7 @@ class OidcProvider:
         self._config = provider
         self._callback_url = hs.config.oidc_callback_url  # type: str
 
+        self._oidc_attribute_requirements = provider.attribute_requirements
         self._scopes = provider.scopes
         self._user_profile_method = provider.user_profile_method
 
@@ -859,6 +863,18 @@ class OidcProvider:
             )
 
         # otherwise, it's a login
+        logger.debug("Userinfo for OIDC login: %s", userinfo)
+
+        # Ensure that the attributes of the logged in user meet the required
+        # attributes by checking the userinfo against attribute_requirements
+        # In order to deal with the fact that OIDC userinfo can contain many
+        # types of data, we wrap non-list values in lists.
+        if not self._sso_handler.check_required_attributes(
+            request,
+            {k: v if isinstance(v, list) else [v] for k, v in userinfo.items()},
+            self._oidc_attribute_requirements,
+        ):
+            return
 
         # Call the mapper to register/login the user
         try:
