@@ -38,14 +38,12 @@ from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.config.server import ListenerConfig
-from synapse.federation import send_queue
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.server import JsonResource, OptionsResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
-from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
@@ -66,12 +64,6 @@ from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
-from synapse.replication.tcp.client import ReplicationDataHandler
-from synapse.replication.tcp.streams import (
-    DeviceListsStream,
-    ReceiptsStream,
-    ToDeviceStream,
-)
 from synapse.rest.admin import register_servlets_for_media_repo
 from synapse.rest.client.v1 import events, login, room
 from synapse.rest.client.v1.initial_sync import InitialSyncRestServlet
@@ -110,7 +102,7 @@ from synapse.rest.client.versions import VersionsRestServlet
 from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
-from synapse.server import HomeServer, cache_in_self
+from synapse.server import HomeServer
 from synapse.storage.databases.main.censor_events import CensorEventsStore
 from synapse.storage.databases.main.client_ips import ClientIpWorkerStore
 from synapse.storage.databases.main.e2e_room_keys import EndToEndRoomKeyStore
@@ -124,8 +116,6 @@ from synapse.storage.databases.main.stats import StatsStore
 from synapse.storage.databases.main.transactions import TransactionWorkerStore
 from synapse.storage.databases.main.ui_auth import UIAuthWorkerStore
 from synapse.storage.databases.main.user_directory import UserDirectoryStore
-from synapse.types import ReadReceipt
-from synapse.util.async_helpers import Linearizer
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.versionstring import get_version_string
 
@@ -429,166 +419,6 @@ class GenericWorkerServer(HomeServer):
                 logger.warning("Unsupported listener type: %s", listener.type)
 
         self.get_tcp_replication().start_replication(self)
-
-    @cache_in_self
-    def get_replication_data_handler(self):
-        return GenericWorkerReplicationHandler(self)
-
-
-class GenericWorkerReplicationHandler(ReplicationDataHandler):
-    def __init__(self, hs):
-        super().__init__(hs)
-
-        self.store = hs.get_datastore()
-        self.presence_handler = hs.get_presence_handler()
-        self.notifier = hs.get_notifier()
-
-        self.notify_pushers = hs.config.start_pushers
-        self.pusher_pool = hs.get_pusherpool()
-
-        self.send_handler = None  # type: Optional[FederationSenderHandler]
-        if hs.config.send_federation:
-            self.send_handler = FederationSenderHandler(hs)
-
-    async def on_rdata(self, stream_name, instance_name, token, rows):
-        await super().on_rdata(stream_name, instance_name, token, rows)
-        await self._process_and_notify(stream_name, instance_name, token, rows)
-
-    async def _process_and_notify(self, stream_name, instance_name, token, rows):
-        try:
-            if self.send_handler:
-                await self.send_handler.process_replication_rows(
-                    stream_name, token, rows
-                )
-        except Exception:
-            logger.exception("Error processing replication")
-
-    def on_remote_server_up(self, server: str):
-        """Called when get a new REMOTE_SERVER_UP command."""
-
-        # Let's wake up the transaction queue for the server in case we have
-        # pending stuff to send to it.
-        if self.send_handler:
-            self.send_handler.wake_destination(server)
-
-
-class FederationSenderHandler:
-    """Processes the fedration replication stream
-
-    This class is only instantiate on the worker responsible for sending outbound
-    federation transactions. It receives rows from the replication stream and forwards
-    the appropriate entries to the FederationSender class.
-    """
-
-    def __init__(self, hs: GenericWorkerServer):
-        self.store = hs.get_datastore()
-        self._is_mine_id = hs.is_mine_id
-        self.federation_sender = hs.get_federation_sender()
-        self._hs = hs
-
-        # Stores the latest position in the federation stream we've gotten up
-        # to. This is always set before we use it.
-        self.federation_position = None
-
-        self._fed_position_linearizer = Linearizer(name="_fed_position_linearizer")
-
-    def wake_destination(self, server: str):
-        self.federation_sender.wake_destination(server)
-
-    async def process_replication_rows(self, stream_name, token, rows):
-        # The federation stream contains things that we want to send out, e.g.
-        # presence, typing, etc.
-        if stream_name == "federation":
-            send_queue.process_rows_for_federation(self.federation_sender, rows)
-            await self.update_token(token)
-
-        # ... and when new receipts happen
-        elif stream_name == ReceiptsStream.NAME:
-            await self._on_new_receipts(rows)
-
-        # ... as well as device updates and messages
-        elif stream_name == DeviceListsStream.NAME:
-            # The entities are either user IDs (starting with '@') whose devices
-            # have changed, or remote servers that we need to tell about
-            # changes.
-            hosts = {row.entity for row in rows if not row.entity.startswith("@")}
-            for host in hosts:
-                self.federation_sender.send_device_messages(host)
-
-        elif stream_name == ToDeviceStream.NAME:
-            # The to_device stream includes stuff to be pushed to both local
-            # clients and remote servers, so we ignore entities that start with
-            # '@' (since they'll be local users rather than destinations).
-            hosts = {row.entity for row in rows if not row.entity.startswith("@")}
-            for host in hosts:
-                self.federation_sender.send_device_messages(host)
-
-    async def _on_new_receipts(self, rows):
-        """
-        Args:
-            rows (Iterable[synapse.replication.tcp.streams.ReceiptsStream.ReceiptsStreamRow]):
-                new receipts to be processed
-        """
-        for receipt in rows:
-            # we only want to send on receipts for our own users
-            if not self._is_mine_id(receipt.user_id):
-                continue
-            receipt_info = ReadReceipt(
-                receipt.room_id,
-                receipt.receipt_type,
-                receipt.user_id,
-                [receipt.event_id],
-                receipt.data,
-            )
-            await self.federation_sender.send_read_receipt(receipt_info)
-
-    async def update_token(self, token):
-        """Update the record of where we have processed to in the federation stream.
-
-        Called after we have processed a an update received over replication. Sends
-        a FEDERATION_ACK back to the master, and stores the token that we have processed
-         in `federation_stream_position` so that we can restart where we left off.
-        """
-        self.federation_position = token
-
-        # We save and send the ACK to master asynchronously, so we don't block
-        # processing on persistence. We don't need to do this operation for
-        # every single RDATA we receive, we just need to do it periodically.
-
-        if self._fed_position_linearizer.is_queued(None):
-            # There is already a task queued up to save and send the token, so
-            # no need to queue up another task.
-            return
-
-        run_as_background_process("_save_and_send_ack", self._save_and_send_ack)
-
-    async def _save_and_send_ack(self):
-        """Save the current federation position in the database and send an ACK
-        to master with where we're up to.
-        """
-        try:
-            # We linearize here to ensure we don't have races updating the token
-            #
-            # XXX this appears to be redundant, since the ReplicationCommandHandler
-            # has a linearizer which ensures that we only process one line of
-            # replication data at a time. Should we remove it, or is it doing useful
-            # service for robustness? Or could we replace it with an assertion that
-            # we're not being re-entered?
-
-            with (await self._fed_position_linearizer.queue(None)):
-                # We persist and ack the same position, so we take a copy of it
-                # here as otherwise it can get modified from underneath us.
-                current_position = self.federation_position
-
-                await self.store.update_federation_out_pos(
-                    "federation", current_position
-                )
-
-                # We ACK this token over replication so that the master can drop
-                # its in memory queues
-                self._hs.get_tcp_replication().send_federation_ack(current_position)
-        except Exception:
-            logger.exception("Error updating federation stream position")
 
 
 def start(config_options):
