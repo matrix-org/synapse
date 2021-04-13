@@ -21,9 +21,8 @@ import time
 import uuid
 import warnings
 from typing import Type
+from unittest.mock import Mock, patch
 from urllib import parse as urlparse
-
-from mock import Mock, patch
 
 from twisted.internet import defer
 
@@ -191,7 +190,7 @@ def setup_test_homeserver(
     config=None,
     reactor=None,
     homeserver_to_use: Type[HomeServer] = TestHomeServer,
-    **kwargs
+    **kwargs,
 ):
     """
     Setup a homeserver suitable for running tests against.  Keyword arguments

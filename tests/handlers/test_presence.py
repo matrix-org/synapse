@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-from mock import Mock, call
+from unittest.mock import Mock, call
 
 from signedjson.key import generate_signing_key
 
