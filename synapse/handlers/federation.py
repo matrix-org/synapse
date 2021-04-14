@@ -2019,8 +2019,8 @@ class FederationHandler(BaseHandler):
 
                 NB that this function potentially modifies it.
             state:
-                The state events used to auth the event. If this is not provided
-                the current state events will be used.
+                The state events used to check the event for soft-fail. If this is
+                not provided the current state events will be used.
             auth_events:
                 Map from (event_type, state_key) to event
 
@@ -2352,8 +2352,8 @@ class FederationHandler(BaseHandler):
 
                 NB that this function potentially modifies it.
             state:
-                The state events used to auth the event. If this is not provided
-                the current state events will be used.
+                The state events used to check the event for soft-fail. If this is
+                not provided the current state events will be used.
             auth_events:
                 Map from (event_type, state_key) to event
 
@@ -2363,6 +2363,8 @@ class FederationHandler(BaseHandler):
                 server.
 
                 Also NB that this function adds entries to it.
+
+                If this is not provided, it is calculated from the previous state IDs.
             backfilled: True if the event was backfilled.
 
         Returns:
