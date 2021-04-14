@@ -1878,7 +1878,7 @@ saml2_config:
 #       sub-properties:
 #
 #       module: The class name of a custom mapping module. Default is
-#           'synapse.handlers.oidc_handler.JinjaOidcMappingProvider'.
+#           'synapse.handlers.oidc.JinjaOidcMappingProvider'.
 #           See https://github.com/matrix-org/synapse/blob/master/docs/sso_mapping_providers.md#openid-mapping-providers
 #           for information on implementing a custom mapping provider.
 #
