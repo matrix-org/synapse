@@ -2018,7 +2018,9 @@ class FederationHandler(BaseHandler):
                 The event context.
 
                 NB that this function potentially modifies it.
-            state: The state events used to auth the event.
+            state:
+                The state events used to auth the event. If this is not provided
+                the current state events will be used.
             auth_events:
                 Map from (event_type, state_key) to event
 
@@ -2349,8 +2351,9 @@ class FederationHandler(BaseHandler):
                 The event context.
 
                 NB that this function potentially modifies it.
-            state: The state events to calculate the event context from. This is
-                ignored if context is provided.
+            state:
+                The state events used to auth the event. If this is not provided
+                the current state events will be used.
             auth_events:
                 Map from (event_type, state_key) to event
 
