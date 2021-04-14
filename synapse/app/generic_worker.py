@@ -63,7 +63,7 @@ from synapse.replication.slave.storage.registration import SlavedRegistrationSto
 from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.rest.admin import register_servlets_for_media_repo
-from synapse.rest.client.v1 import events, login, room
+from synapse.rest.client.v1 import events, login, presence, room
 from synapse.rest.client.v1.initial_sync import InitialSyncRestServlet
 from synapse.rest.client.v1.profile import (
     ProfileAvatarURLRestServlet,
@@ -326,6 +326,8 @@ class GenericWorkerServer(HomeServer):
                     SendToDeviceRestServlet(self).register(resource)
 
                     user_directory.register_servlets(self, resource)
+
+                    presence.register_servlets(self, resource)
 
                     # If presence is disabled, use the stub servlet that does
                     # not allow sending presence
