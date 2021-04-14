@@ -308,10 +308,13 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
         auth_event_ids = prev_state_ids
 
         for stateEv in body["state_events_at_start"]:
-            assert_params_in_dict(stateEv, ["type", "content", "sender"])
+            assert_params_in_dict(
+                stateEv, ["type", "origin_server_ts", "content", "sender"]
+            )
 
             event_dict = {
                 "type": stateEv["type"],
+                "origin_server_ts": stateEv["origin_server_ts"],
                 "content": stateEv["content"],
                 "room_id": room_id,
                 "sender": stateEv["sender"],
@@ -354,10 +357,11 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
         event_ids = []
         prev_event_ids = prev_events_from_query
         for ev in body["events"]:
-            assert_params_in_dict(ev, ["type", "content", "sender"])
+            assert_params_in_dict(ev, ["type", "origin_server_ts", "content", "sender"])
 
             event_dict = {
                 "type": ev["type"],
+                "origin_server_ts": ev["origin_server_ts"],
                 "content": ev["content"],
                 "room_id": room_id,
                 "sender": ev["sender"],  # requester.user.to_string(),

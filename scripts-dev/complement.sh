@@ -37,8 +37,7 @@ docker build -t matrixdotorg/synapse -f docker/Dockerfile .
 # Build the Synapse monolith image from Complement, based on the above image we just built
 docker build -t complement-synapse -f "$COMPLEMENT_DIR/dockerfiles/Synapse.Dockerfile" "$COMPLEMENT_DIR/dockerfiles"
 
-# Download Complement
-cd ../complement
+cd "$COMPLEMENT_DIR"
 
 EXTRA_COMPLEMENT_ARGS=""
 if [[ -n "$1" ]]; then
