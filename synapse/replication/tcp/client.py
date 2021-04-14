@@ -253,13 +253,11 @@ class ReplicationDataHandler:
         waiting_list[:] = waiting_list[index_of_first_deferred_not_called:]
 
     async def on_position(self, stream_name: str, instance_name: str, token: int):
-        self.store.process_replication_rows(stream_name, instance_name, token, [])
+        await self.on_rdata(stream_name, instance_name, token, [])
 
         # We poke the generic "replication" notifier to wake anything up that
         # may be streaming.
         self.notifier.notify_replication()
-
-        await self.on_rdata(stream_name, instance_name, token, [])
 
     def on_remote_server_up(self, server: str):
         """Called when get a new REMOTE_SERVER_UP command."""
