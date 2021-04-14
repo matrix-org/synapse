@@ -779,7 +779,7 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
                 if user.role == "exterior":
                     # The exterior cannot post the report because they can't witness the event.
                     self.assertEqual(
-                        400, int(channel.result["code"]), msg=channel.result["body"]
+                        404, int(channel.result["code"]), msg=channel.result["body"]
                     )
                 else:
                     # Everybody else can post the report
@@ -802,13 +802,13 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
             else:
                 # The moderator should receive all the messages.
                 for message in messages:
-                    reported_event_id = message["content"]["eventId"]
-                    reporter_user_id = message["content"]["userId"]
+                    reported_event_id = message["content"]["event_id"]
+                    reporter_user_id = message["content"]["user_id"]
 
                     sent_reports_for_event_id = sent_reports_by_id[reported_event_id]
                     sent_report = sent_reports_for_event_id[reporter_user_id]
 
-                    self.assertEqual(sent_report[0].mxid, message["content"]["roomId"])
+                    self.assertEqual(sent_report[0].mxid, message["content"]["room_id"])
                     self.assertEqual(sent_report[1], int(message["content"]["score"]))
                     self.assertEqual(sent_report[2], message["content"]["reason"])
 
@@ -884,7 +884,7 @@ class ReportToModeratorTestCase(unittest.HomeserverTestCase):
                 if user.role == "exterior":
                     # The exterior cannot post the report because they can't witness the event.
                     self.assertEqual(
-                        400, int(channel.result["code"]), msg=channel.result["body"]
+                        404, int(channel.result["code"]), msg=channel.result["body"]
                     )
                 else:
                     # Everybody else can post the report (although it will be ignored

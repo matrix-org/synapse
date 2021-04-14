@@ -50,7 +50,7 @@ class ReportEventRestServlet(RestServlet):
     async def on_POST(self, request: SynapseRequest, room_id, event_id):
         requester = await self.auth.get_user_by_req(request)
         body = parse_json_object_from_request(request)
-        self._rate_limiter.ratelimit(requester=requester)
+        await self._rate_limiter.ratelimit(requester=requester)
 
         if not isinstance(body["reason"], str):
             raise SynapseError(
