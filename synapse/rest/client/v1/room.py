@@ -277,8 +277,6 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
-        self._msc2716_enabled = hs.config.experimental.msc2716_enabled
-
     def register(self, http_server):
         # /rooms/$roomid/bulksend
         PATTERNS = "/rooms/(?P<room_id>[^/]*)/bulksend"
@@ -286,6 +284,13 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
 
     async def on_POST(self, request, room_id):
         requester = await self.auth.get_user_by_req(request, allow_guest=False)
+
+        if not requester.app_service:
+            raise AuthError(
+                403,
+                "Only application services can use the /bulksend endpoint",
+            )
+
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ["state_events_at_start", "events"])
 
@@ -1177,6 +1182,8 @@ class RoomSpaceSummaryRestServlet(RestServlet):
 
 
 def register_servlets(hs: "HomeServer", http_server, is_worker=False):
+    msc2716_enabled = hs.config.experimental.msc2716_enabled
+
     RoomStateEventRestServlet(hs).register(http_server)
     RoomMemberListRestServlet(hs).register(http_server)
     JoinedRoomMemberListRestServlet(hs).register(http_server)
@@ -1184,7 +1191,8 @@ def register_servlets(hs: "HomeServer", http_server, is_worker=False):
     JoinRoomAliasServlet(hs).register(http_server)
     RoomMembershipRestServlet(hs).register(http_server)
     RoomSendEventRestServlet(hs).register(http_server)
-    RoomBulkSendEventRestServlet(hs).register(http_server)
+    if msc2716_enabled:
+        RoomBulkSendEventRestServlet(hs).register(http_server)
     PublicRoomListRestServlet(hs).register(http_server)
     RoomStateRestServlet(hs).register(http_server)
     RoomRedactEventRestServlet(hs).register(http_server)
