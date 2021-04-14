@@ -36,3 +36,6 @@ class ExperimentalConfig(Config):
 
         # MSC3026 (busy presence state)
         self.msc3026_enabled = experimental.get("msc3026_enabled", False)  # type: bool
+
+        # MSC2938 (report to moderator)
+        self.msc2938_enabled = experimental.get("msc2938_enabled", False)  # type: bool

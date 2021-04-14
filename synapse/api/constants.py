@@ -110,6 +110,7 @@ class EventTypes:
 class EduTypes:
     Presence = "m.presence"
     RoomKeyRequest = "m.room_key_request"
+    ContentReport = "org.matrix.msc2938.content_report"
 
 
 class RejectedReason:
@@ -129,6 +130,7 @@ class ThirdPartyEntityKind:
 
 ServerNoticeMsgType = "m.server_notice"
 ServerNoticeLimitReached = "m.server_notice.usage_limit_reached"
+ServerNoticeContentReport = "org.matrix.msc2938.content_report"
 
 
 class UserTypes:

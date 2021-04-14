@@ -772,7 +772,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         )
 
     @cache_in_self
-    def get_abuse_reporter(self) -> AbuseReportHandler:
+    def get_abuse_report_handler(self) -> AbuseReportHandler:
         return AbuseReportHandler(self)
 
     def should_send_federation(self) -> bool:
