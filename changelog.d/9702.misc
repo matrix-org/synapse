@@ -1,1 +1,1 @@
-Speed up Federation by using less database calls.
+Speed up federation transmission by using fewer database calls. Contributed by @ShadowJonathan.
