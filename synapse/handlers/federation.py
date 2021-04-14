@@ -2040,7 +2040,7 @@ class FederationHandler(BaseHandler):
         state: Optional[Iterable[EventBase]] = None,
         auth_events: Optional[MutableStateMap[EventBase]] = None,
         backfilled: bool = False,
-    ) -> EventContext:
+    ) -> None:
         """
         Process an event by performing auth checks and then persisting to the database.
 
@@ -2062,9 +2062,6 @@ class FederationHandler(BaseHandler):
                 event is an outlier), may be the auth events claimed by the remote
                 server.
             backfilled: True if the event was backfilled.
-
-        Returns:
-             The event context.
         """
         context = await self._check_event_auth(
             origin,
@@ -2093,8 +2090,6 @@ class FederationHandler(BaseHandler):
                 self.store.remove_push_actions_from_staging, event.event_id
             )
             raise
-
-        return context
 
     async def _auth_and_persist_events(
         self,
