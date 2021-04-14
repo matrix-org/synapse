@@ -38,7 +38,7 @@ def create_event(
     depth=2,
     event_id=None,
     prev_events: Optional[List[str]] = None,
-    **kwargs
+    **kwargs,
 ):
     global _next_event_id
 

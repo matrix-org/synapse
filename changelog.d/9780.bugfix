@@ -1,1 +1,0 @@
-Fix duplicate logging of exceptions thrown during federation transaction processing.
