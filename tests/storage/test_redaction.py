@@ -237,7 +237,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
                 self,
                 prev_event_ids,
                 auth_event_ids,
-                inherit_depth: bool,
+                inherit_depth: bool = False,
             ):
                 built_event = await self._base_builder.build(
                     prev_event_ids, auth_event_ids, inherit_depth
@@ -256,6 +256,10 @@ class RedactionTestCase(unittest.HomeserverTestCase):
             @property
             def type(self):
                 return self._base_builder.type
+
+            @property
+            def internal_metadata(self):
+                return self._base_builder.internal_metadata
 
         event_1, context_1 = self.get_success(
             self.event_creation_handler.create_new_client_event(
