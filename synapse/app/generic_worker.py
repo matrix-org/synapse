@@ -15,7 +15,7 @@
 # limitations under the License.
 import logging
 import sys
-from typing import Dict, Iterable, Optional
+from typing import Dict, Optional
 
 from twisted.internet import address
 from twisted.web.resource import IResource
@@ -374,8 +374,8 @@ class GenericWorkerServer(HomeServer):
 
         logger.info("Synapse worker now listening on port %d", port)
 
-    def start_listening(self, listeners: Iterable[ListenerConfig]):
-        for listener in listeners:
+    def start_listening(self):
+        for listener in self.config.worker_listeners:
             if listener.type == "http":
                 self._listen_http(listener)
             elif listener.type == "manhole":
@@ -468,7 +468,7 @@ def start(config_options):
     # streams. Will no-op if no streams can be written to by this worker.
     hs.get_replication_streamer()
 
-    register_start(_base.start, hs, config.worker_listeners)
+    register_start(_base.start, hs)
 
     _base.start_worker_reactor("synapse-generic-worker", config)
 

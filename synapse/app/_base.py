@@ -32,7 +32,6 @@ from twisted.protocols.tls import TLSMemoryBIOFactory
 import synapse
 from synapse.app import check_bind_error
 from synapse.app.phone_stats_home import start_phone_stats_home
-from synapse.config.server import ListenerConfig
 from synapse.crypto import context_factory
 from synapse.logging.context import PreserveLoggingContext
 from synapse.metrics.background_process_metrics import wrap_as_background_process
@@ -288,7 +287,7 @@ def refresh_certificate(hs):
         logger.info("Context factories updated.")
 
 
-async def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerConfig]):
+async def start(hs: "synapse.server.HomeServer"):
     """
     Start a Synapse server or worker.
 
@@ -300,7 +299,6 @@ async def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerCon
 
     Args:
         hs: homeserver instance
-        listeners: Listener configuration ('listeners' in homeserver.yaml)
     """
     # Set up the SIGHUP machinery.
     if hasattr(signal, "SIGHUP"):
@@ -336,7 +334,7 @@ async def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerCon
     synapse.logging.opentracing.init_tracer(hs)  # type: ignore[attr-defined] # noqa
 
     # It is now safe to start your Synapse.
-    hs.start_listening(listeners)
+    hs.start_listening()
     hs.get_datastore().db_pool.start_profiling()
     hs.get_pusherpool().start()
 

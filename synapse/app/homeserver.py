@@ -17,7 +17,7 @@
 import logging
 import os
 import sys
-from typing import Iterable, Iterator
+from typing import Iterator
 
 from twisted.internet import reactor
 from twisted.web.resource import EncodingResourceWrapper, IResource
@@ -268,14 +268,14 @@ class SynapseHomeServer(HomeServer):
 
         return resources
 
-    def start_listening(self, listeners: Iterable[ListenerConfig]):
+    def start_listening(self):
         if self.config.redis_enabled:
             # If redis is enabled we connect via the replication command handler
             # in the same way as the workers (since we're effectively a client
             # rather than a server).
             self.get_tcp_replication().start_replication(self)
 
-        for listener in listeners:
+        for listener in self.config.server.listeners:
             if listener.type == "http":
                 self._listening_services.extend(
                     self._listener_http(self.config, listener)
@@ -407,7 +407,7 @@ def setup(config_options):
             # Loading the provider metadata also ensures the provider config is valid.
             await oidc.load_metadata()
 
-        await _base.start(hs, config.listeners)
+        await _base.start(hs)
 
         hs.get_datastore().db_pool.updates.start_doing_background_updates()
 
