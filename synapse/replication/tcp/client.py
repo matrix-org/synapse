@@ -194,8 +194,7 @@ class ReplicationDataHandler:
                     await self.start_pusher(row.user_id, row.app_id, row.pushkey)
         elif stream_name == PresenceStream.NAME:
             await self._presence_handler.process_replication_rows(token, rows)
-
-        if stream_name == EventsStream.NAME:
+        elif stream_name == EventsStream.NAME:
             # We shouldn't get multiple rows per token for events stream, so
             # we don't need to optimise this for multiple rows.
             for row in rows:
