@@ -1674,11 +1674,8 @@ class FederationHandler(BaseHandler):
         # would introduce the danger of backwards-compatibility problems.
         event.internal_metadata.send_on_behalf_of = origin
 
-        # Calculate the event context and persist the event.
         context = await self.state_handler.compute_event_context(event)
-        context = await self._auth_and_persist_event(
-            origin, event, context, backfilled=False
-        )
+        context = await self._auth_and_persist_event(origin, event, context)
 
         logger.debug(
             "on_send_join_request: After _auth_and_persist_event: %s, sigs: %s",
@@ -2506,7 +2503,7 @@ class FederationHandler(BaseHandler):
                             (e.type, e.state_key): e
                             for e in remote_auth_chain
                             if e.event_id in auth_ids or e.type == EventTypes.Create
-                        }  # type: MutableStateMap[EventBase]
+                        }
                         e.internal_metadata.outlier = True
 
                         logger.debug(
