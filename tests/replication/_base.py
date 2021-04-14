@@ -21,13 +21,11 @@ from twisted.web.http import HTTPChannel
 from twisted.web.resource import Resource
 from twisted.web.server import Request, Site
 
-from synapse.app.generic_worker import (
-    GenericWorkerReplicationHandler,
-    GenericWorkerServer,
-)
+from synapse.app.generic_worker import GenericWorkerServer
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.replication.http import ReplicationRestResource
+from synapse.replication.tcp.client import ReplicationDataHandler
 from synapse.replication.tcp.handler import ReplicationCommandHandler
 from synapse.replication.tcp.protocol import ClientReplicationStreamProtocol
 from synapse.replication.tcp.resource import (
@@ -431,7 +429,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
             server_protocol.makeConnection(server_to_client_transport)
 
 
-class TestReplicationDataHandler(GenericWorkerReplicationHandler):
+class TestReplicationDataHandler(ReplicationDataHandler):
     """Drop-in for ReplicationDataHandler which just collects RDATA rows"""
 
     def __init__(self, hs: HomeServer):
