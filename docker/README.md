@@ -4,9 +4,10 @@ This Docker image will run Synapse as a single process. By default it uses a
 sqlite database; for production use you should connect it to a separate
 postgres database. The image also does *not* provide a TURN server.
 
-Running this image is supported on all platforms that are supported by Docker upstream.
-Note that as such, Docker's experimental WS1-backend Linux Containers on Windows
-platform is [not supported](https://github.com/docker/for-win/issues/6470).
+This image should work on all platforms that are supported by Docker upstream.
+Note that Docker's WS1-backend Linux Containers on Windows
+platform is [experimental](https://github.com/docker/for-win/issues/6470) and
+is not supported by this image.
 
 ## Volumes
 
