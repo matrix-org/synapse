@@ -55,7 +55,6 @@ from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.filtering import SlavedFilteringStore
 from synapse.replication.slave.storage.groups import SlavedGroupServerStore
 from synapse.replication.slave.storage.keys import SlavedKeyStore
-from synapse.replication.slave.storage.presence import SlavedPresenceStore
 from synapse.replication.slave.storage.profile import SlavedProfileStore
 from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.pushers import SlavedPusherStore
@@ -110,6 +109,7 @@ from synapse.storage.databases.main.metrics import ServerMetricsStore
 from synapse.storage.databases.main.monthly_active_users import (
     MonthlyActiveUsersWorkerStore,
 )
+from synapse.storage.databases.main.presence import PresenceStore
 from synapse.storage.databases.main.search import SearchWorkerStore
 from synapse.storage.databases.main.stats import StatsStore
 from synapse.storage.databases.main.transactions import TransactionWorkerStore
@@ -241,6 +241,7 @@ class GenericWorkerSlavedStore(
     StatsStore,
     UIAuthWorkerStore,
     EndToEndRoomKeyStore,
+    PresenceStore,
     SlavedDeviceInboxStore,
     SlavedDeviceStore,
     SlavedReceiptsStore,
@@ -259,7 +260,6 @@ class GenericWorkerSlavedStore(
     SlavedTransactionStore,
     SlavedProfileStore,
     SlavedClientIpStore,
-    SlavedPresenceStore,
     SlavedFilteringStore,
     MonthlyActiveUsersWorkerStore,
     MediaRepositoryStore,
