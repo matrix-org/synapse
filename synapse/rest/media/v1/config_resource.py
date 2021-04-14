@@ -30,7 +30,7 @@ class MediaConfigResource(DirectServeJsonResource):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
-        config = hs.get_config()
+        config = hs.config
         self.clock = hs.get_clock()
         self.auth = hs.get_auth()
         self.limits_dict = {"m.upload.size": config.max_upload_size}
