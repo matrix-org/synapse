@@ -11,7 +11,7 @@ is not supported by this image.
 
 ## Volumes
 
-By default, the image expects a single volume, located at ``/data``, that will hold:
+By default, the image expects a single volume, located at `/data`, that will hold:
 
 * configuration files;
 * uploaded media and thumbnails;
@@ -19,11 +19,11 @@ By default, the image expects a single volume, located at ``/data``, that will h
 * the appservices configuration.
 
 You are free to use separate volumes depending on storage endpoints at your
-disposal. For instance, ``/data/media`` could be stored on a large but low
+disposal. For instance, `/data/media` could be stored on a large but low
 performance hdd storage while other files could be stored on high performance
 endpoints.
 
-In order to setup an application service, simply create an ``appservices``
+In order to setup an application service, simply create an `appservices`
 directory in the data volume and write the application service Yaml
 configuration file there. Multiple application services are supported.
 
@@ -56,6 +56,8 @@ The following environment variables are supported in `generate` mode:
 * `SYNAPSE_SERVER_NAME` (mandatory): the server public hostname.
 * `SYNAPSE_REPORT_STATS` (mandatory, `yes` or `no`): whether to enable
   anonymous statistics reporting.
+* `SYNAPSE_HTTP_PORT`: the port Synapse should listen on for http traffic.
+      Defaults to `8008`.
 * `SYNAPSE_CONFIG_DIR`: where additional config files (such as the log config
   and event signing key) will be stored. Defaults to `/data`.
 * `SYNAPSE_CONFIG_PATH`: path to the file to be generated. Defaults to
@@ -75,6 +77,8 @@ docker run -d --name synapse \
     -p 8008:8008 \
     matrixdotorg/synapse:latest
 ```
+
+(assuming 8008 is the port Synapse is configured to listen on for http traffic.)
 
 You can then check that it has started correctly with:
 
@@ -211,4 +215,4 @@ healthcheck:
 ## Using jemalloc
 
 Jemalloc is embedded in the image and will be used instead of the default allocator.
-You can read about jemalloc by reading the Synapse [README](../README.md)
+You can read about jemalloc by reading the Synapse [README](../README.md).
