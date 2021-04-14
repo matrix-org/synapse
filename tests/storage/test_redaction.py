@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Optional
 
 from canonicaljson import json
 
@@ -47,10 +48,15 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         self.depth = 1
 
     def inject_room_member(
-        self, room, user, membership, replaces_state=None, extra_content={}
+        self,
+        room,
+        user,
+        membership,
+        replaces_state=None,
+        extra_content: Optional[dict] = None,
     ):
         content = {"membership": membership}
-        content.update(extra_content)
+        content.update(extra_content or {})
         builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {

@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from mock import Mock
+from unittest.mock import Mock
 
 from synapse.api.constants import EduTypes
 from synapse.events import EventBase
@@ -358,7 +358,8 @@ class ModuleApiTestCase(FederatingHomeserverTestCase):
             self.hs.get_federation_transport_client().send_transaction.call_args_list
         )
         for call in calls:
-            federation_transaction = call.args[0]  # type: Transaction
+            call_args = call[0]
+            federation_transaction = call_args[0]  # type: Transaction
 
             # Get the sent EDUs in this transaction
             edus = federation_transaction.get_dict()["edus"]

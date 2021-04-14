@@ -73,6 +73,11 @@ class LoginType:
     DUMMY = "m.login.dummy"
 
 
+# This is used in the `type` parameter for /register when called by
+# an appservice to register a new user.
+APP_SERVICE_REGISTRATION_TYPE = "m.login.application_service"
+
+
 class EventTypes:
     Member = "m.room.member"
     Create = "m.room.create"
