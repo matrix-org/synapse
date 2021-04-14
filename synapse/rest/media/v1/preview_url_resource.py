@@ -513,10 +513,6 @@ class PreviewUrlResource(DirectServeJsonResource):
 
                 if b"Content-Type" in headers:
                     media_type = headers[b"Content-Type"][0].decode("ascii")
-                    if media_type.startswith("image/"):
-                        scpos = media_type.find(";")
-                        if scpos > 0:
-                            media_type = media_type[:scpos]
                 else:
                     media_type = "application/octet-stream"
 
