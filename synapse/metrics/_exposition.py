@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015-2019 Prometheus Python Client Developers
 # Copyright 2019 Matrix.org Foundation C.I.C.
 #
