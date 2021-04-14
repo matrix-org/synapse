@@ -643,7 +643,7 @@ class GenericWorkerServer(HomeServer):
                     listener.bind_addresses, listener.port, manhole_globals={"hs": self}
                 )
             elif listener.type == "metrics":
-                if not self.get_config().enable_metrics:
+                if not self.config.enable_metrics:
                     logger.warning(
                         (
                             "Metrics listener configured, but "

@@ -319,9 +319,6 @@ class HomeServer(metaclass=abc.ABCMeta):
 
         return self.datastores
 
-    def get_config(self) -> HomeServerConfig:
-        return self.config
-
     @cache_in_self
     def get_distributor(self) -> Distributor:
         return Distributor()

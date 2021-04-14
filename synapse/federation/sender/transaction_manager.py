@@ -56,7 +56,7 @@ class TransactionManager:
         self._transport_layer = hs.get_federation_transport_client()
 
         self._federation_metrics_domains = (
-            hs.get_config().federation.federation_metrics_domains
+            hs.config.federation.federation_metrics_domains
         )
 
         # HACK to get unique tx id
