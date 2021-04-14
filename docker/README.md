@@ -54,6 +54,7 @@ The following environment variables are supported in `generate` mode:
 * `SYNAPSE_REPORT_STATS` (mandatory, `yes` or `no`): whether to enable
   anonymous statistics reporting.
 * `SYNAPSE_HTTP_PORT`: the port Synapse should listen on for http traffic.
+      Defaults to `8008`.
 * `SYNAPSE_CONFIG_DIR`: where additional config files (such as the log config
   and event signing key) will be stored. Defaults to `/data`.
 * `SYNAPSE_CONFIG_PATH`: path to the file to be generated. Defaults to
@@ -74,7 +75,7 @@ docker run -d --name synapse \
     matrixdotorg/synapse:latest
 ```
 
-assuming 8008 is the port Synapse is configured to listen on for http traffic.
+(assuming 8008 is the port Synapse is configured to listen on for http traffic.)
 
 You can then check that it has started correctly with:
 

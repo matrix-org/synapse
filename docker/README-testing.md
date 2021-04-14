@@ -66,7 +66,9 @@ This will build an image with the tag` matrixdotorg/synapse-workers`.
 
 It's worth noting at this point that this image is fully functional, and 
 can be used for testing against locally. See instructions for using the container 
-under [Running the Dockerfile-worker image](#Running the Dockerfile-worker image) below.
+under
+[Running the Dockerfile-worker image standalone](#running-the-dockerfile-worker-image-standalone)
+below.
 
 Finally, build the Synapse image for Complement, which is based on
 `matrixdotorg/synapse-workers`. You will need a local checkout of Complement. Change to
@@ -102,13 +104,15 @@ docker run -d --name synapse \
     -p 8008:8008 \
     -e SYNAPSE_SERVER_NAME=my.matrix.host \
     -e SYNAPSE_REPORT_STATS=no \
-    -e POSTGRES_HOST=postgres -e POSTGRES_USER=postgres POSTGRES_PASSWORD=somesecret \
+    -e POSTGRES_HOST=postgres \
+    -e POSTGRES_USER=postgres \
+    -e POSTGRES_PASSWORD=somesecret \
     -e SYNAPSE_WORKER_TYPES=synchrotron,media_repository,user_dir \
     -e SYNAPSE_WORKERS_WRITE_LOGS_TO_DISK=1 \
     matrixdotorg/synapse-workers
 ```
 
-Substituting `POSTGRES*` variables for those that match a postgres host you have 
+...substituting `POSTGRES*` variables for those that match a postgres host you have 
 available (usually a running postgres docker container).
 
 The `SYNAPSE_WORKER_TYPES` environment variable is a comma-separated list of workers to
@@ -117,9 +121,9 @@ use when running the container. All possible worker names are defined by the key
 Dockerfile makes use of to generate appropriate worker, nginx and supervisord config
 files.
 
-Sharding is supported for a subset of workers, in line with the [worker documentation]
-(../docs/workers.md). To run multiple instances of a given worker type, simply specify
-the type multiple times in `SYNAPSE_WORKER_TYPES`
+Sharding is supported for a subset of workers, in line with the
+[worker documentation](../docs/workers.md). To run multiple instances of a given worker
+type, simply specify the type multiple times in `SYNAPSE_WORKER_TYPES`
 (e.g `SYNAPSE_WORKER_TYPES=event_creator,event_creator...`).
 
 Otherwise, `SYNAPSE_WORKER_TYPES` can either be left empty or unset to spawn no workers
