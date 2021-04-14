@@ -249,6 +249,7 @@ class MatrixFederationHttpClient:
             tls_client_options_factory,
             user_agent,
             hs.config.federation_ip_range_blacklist,
+            hs.config.static_server_name_resolution_map,
         )
 
         # Use a BlacklistingAgentWrapper to prevent circumventing the IP

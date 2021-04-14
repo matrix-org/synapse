@@ -45,6 +45,12 @@ class FederationConfig(Config):
             "allow_profile_lookup_over_federation", True
         )
 
+        static_server_name_resolution_map = config.get("static_server_name_resolution_map", {})
+        if type(static_server_name_resolution_map) is dict:
+            self.static_server_name_resolution_map = {
+                server_name.encode("ascii"): hostname.encode("ascii") for server_name, hostname in static_server_name_resolution_map.items()
+            }
+
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
         ## Federation ##
@@ -76,6 +82,14 @@ class FederationConfig(Config):
         # on this homeserver. Defaults to 'true'.
         #
         #allow_profile_lookup_over_federation: false
+
+        # Static server name to hostname resolution
+        # Use this map from “stored server name” to “current hostname” when your
+        # hostname can change and consequently can't be used as homeserver name.
+        # This map is looked up just before "well known" delegation.
+        # If not specified, defaults to empty, no static resolution is applied.
+        #static_server_name_resolution_map:
+        #  "123456789.mycompany.com": "example.com"
         """
 
 

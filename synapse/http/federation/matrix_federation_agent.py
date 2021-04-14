@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 import urllib.parse
-from typing import Any, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
 from netaddr import AddrFormatError, IPAddress, IPSet
 from zope.interface import implementer
@@ -57,6 +57,9 @@ class MatrixFederationAgent:
         user_agent:
             The user agent header to use for federation requests.
 
+        static_server_name_resolution_map:
+            Static server name to hostname resolution map
+
         _srv_resolver:
             SrvResolver implementation to use for looking up SRV records. None
             to use a default implementation.
@@ -72,6 +75,7 @@ class MatrixFederationAgent:
         tls_client_options_factory: Optional[FederationPolicyForHTTPS],
         user_agent: bytes,
         ip_blacklist: IPSet,
+        static_server_name_resolution_map: Dict[str, str],
         _srv_resolver: Optional[SrvResolver] = None,
         _well_known_resolver: Optional[WellKnownResolver] = None,
     ):
@@ -81,6 +85,7 @@ class MatrixFederationAgent:
         self._pool.retryAutomatically = False
         self._pool.maxPersistentPerHost = 5
         self._pool.cachedConnectionTimeout = 2 * 60
+        self._static_server_name_resolution_map = static_server_name_resolution_map
 
         self._agent = Agent.usingEndpointFactory(
             self._reactor,
@@ -141,6 +146,20 @@ class MatrixFederationAgent:
 
         # There must be a valid hostname.
         assert parsed_uri.hostname
+
+        mapped_hostname = self._static_server_name_resolution_map.get(parsed_uri.hostname)
+        if mapped_hostname:
+            uri = urllib.parse.urlunparse(
+                (
+                    parsed_uri.scheme,
+                    mapped_hostname,
+                    parsed_uri.path,
+                    parsed_uri.params,
+                    parsed_uri.query,
+                    parsed_uri.fragment,
+                )
+            )
+            parsed_uri = urllib.parse.urlparse(uri)
 
         # If this is a matrix:// URI check if the server has delegated matrix
         # traffic using well-known delegation.
