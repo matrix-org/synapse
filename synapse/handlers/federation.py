@@ -808,12 +808,10 @@ class FederationHandler(BaseHandler):
         logger.debug("Processing event: %s", event)
 
         try:
-            context, auth_events = await self._calculate_event_context(
-                event, state=state
+            context = await self.state_handler.compute_event_context(
+                event, old_state=state
             )
-            await self._auth_and_persist_event(
-                origin, event, context, auth_events=auth_events, state=state
-            )
+            await self._auth_and_persist_event(origin, event, context, state=state)
         except AuthError as e:
             raise FederationError("ERROR", e.code, e.msg, affected=event.event_id)
 
@@ -1031,14 +1029,12 @@ class FederationHandler(BaseHandler):
             # non-outliers
             assert not event.internal_metadata.is_outlier()
 
-            context, context_auth_events = await self._calculate_event_context(event)
+            context = await self.state_handler.compute_event_context(event)
 
             # We store these one at a time since each event depends on the
             # previous to work out the state.
             # TODO: We can probably do something more clever here.
-            await self._auth_and_persist_event(
-                dest, event, context, auth_events=context_auth_events, backfilled=True
-            )
+            await self._auth_and_persist_event(dest, event, context, backfilled=True)
 
         return events
 
@@ -1679,11 +1675,9 @@ class FederationHandler(BaseHandler):
         event.internal_metadata.send_on_behalf_of = origin
 
         # Calculate the event context and persist the event.
-        context, auth_events = await self._calculate_event_context(
-            event, state=None, auth_events=None
-        )
+        context = await self.state_handler.compute_event_context(event)
         context = await self._auth_and_persist_event(
-            origin, event, context, auth_events=auth_events, backfilled=False
+            origin, event, context, backfilled=False
         )
 
         logger.debug(
@@ -1896,10 +1890,8 @@ class FederationHandler(BaseHandler):
 
         event.internal_metadata.outlier = False
 
-        context, auth_events = await self._calculate_event_context(event)
-        await self._auth_and_persist_event(
-            origin, event, context, auth_events=auth_events
-        )
+        context = await self.state_handler.compute_event_context(event)
+        await self._auth_and_persist_event(origin, event, context)
 
         logger.debug(
             "on_send_leave_request: After _auth_and_persist_event: %s, sigs: %s",
@@ -2015,8 +2007,8 @@ class FederationHandler(BaseHandler):
         origin: str,
         event: EventBase,
         context: EventContext,
-        auth_events: MutableStateMap[EventBase],
         state: Optional[Iterable[EventBase]] = None,
+        auth_events: Optional[MutableStateMap[EventBase]] = None,
         backfilled: bool = False,
     ) -> EventContext:
         """
@@ -2090,17 +2082,15 @@ class FederationHandler(BaseHandler):
         async def prep(ev_info: _NewEventInfo):
             event = ev_info.event
             with nested_logging_context(suffix=event.event_id):
-                res, auth_events = await self._calculate_event_context(
-                    event,
-                    state=ev_info.state,
-                    auth_events=ev_info.auth_events,
+                res = await self.state_handler.compute_event_context(
+                    event, old_state=ev_info.state
                 )
                 res = await self._check_event_auth(
                     origin,
                     event,
                     res,
                     state=ev_info.state,
-                    auth_events=auth_events,
+                    auth_events=ev_info.auth_events,
                     backfilled=backfilled,
                 )
             return res
@@ -2233,53 +2223,6 @@ class FederationHandler(BaseHandler):
             room_id, [(event, new_event_context)]
         )
 
-    async def _calculate_event_context(
-        self,
-        event: EventBase,
-        state: Optional[Iterable[EventBase]] = None,
-        auth_events: Optional[MutableStateMap[EventBase]] = None,
-    ) -> Tuple[EventContext, MutableStateMap[EventBase]]:
-        """
-        Calculate the context and auth events for a given event.
-
-        Args:
-            event: The event itself.
-            state: The state events to calculate the event context from.
-            auth_events:
-                Map from (event_type, state_key) to event
-
-                Normally, our calculated auth_events based on the state of the room
-                at the event's position in the DAG, though occasionally (eg if the
-                event is an outlier), may be the auth events claimed by the remote
-                server.
-
-                Also NB that this function adds entries to it.
-
-        Returns:
-             The event context and auth events.
-        """
-        context = await self.state_handler.compute_event_context(event, old_state=state)
-
-        if not auth_events:
-            prev_state_ids = await context.get_prev_state_ids()
-            auth_events_ids = self.auth.compute_auth_events(
-                event, prev_state_ids, for_verification=True
-            )
-            auth_events_x = await self.store.get_events(auth_events_ids)
-            auth_events = {(e.type, e.state_key): e for e in auth_events_x.values()}
-
-        # This is a hack to fix some old rooms where the initial join event
-        # didn't reference the create event in its auth events.
-        if event.type == EventTypes.Member and not event.auth_event_ids():
-            if len(event.prev_event_ids()) == 1 and event.depth < 5:
-                c = await self.store.get_event(
-                    event.prev_event_ids()[0], allow_none=True
-                )
-                if c and c.type == EventTypes.Create:
-                    auth_events[(c.type, c.state_key)] = c
-
-        return context, auth_events
-
     async def _check_for_soft_fail(
         self, event: EventBase, state: Optional[Iterable[EventBase]], backfilled: bool
     ) -> None:
@@ -2396,7 +2339,7 @@ class FederationHandler(BaseHandler):
         event: EventBase,
         context: EventContext,
         state: Optional[Iterable[EventBase]],
-        auth_events: MutableStateMap[EventBase],
+        auth_events: Optional[MutableStateMap[EventBase]],
         backfilled: bool,
     ) -> EventContext:
         """
@@ -2427,6 +2370,24 @@ class FederationHandler(BaseHandler):
         """
         room_version = await self.store.get_room_version_id(event.room_id)
         room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+
+        if not auth_events:
+            prev_state_ids = await context.get_prev_state_ids()
+            auth_events_ids = self.auth.compute_auth_events(
+                event, prev_state_ids, for_verification=True
+            )
+            auth_events_x = await self.store.get_events(auth_events_ids)
+            auth_events = {(e.type, e.state_key): e for e in auth_events_x.values()}
+
+        # This is a hack to fix some old rooms where the initial join event
+        # didn't reference the create event in its auth events.
+        if event.type == EventTypes.Member and not event.auth_event_ids():
+            if len(event.prev_event_ids()) == 1 and event.depth < 5:
+                c = await self.store.get_event(
+                    event.prev_event_ids()[0], allow_none=True
+                )
+                if c and c.type == EventTypes.Create:
+                    auth_events[(c.type, c.state_key)] = c
 
         try:
             context = await self._update_auth_events_and_context_for_auth(
@@ -2553,9 +2514,7 @@ class FederationHandler(BaseHandler):
                             event.event_id,
                             e.event_id,
                         )
-                        context, auth = await self._calculate_event_context(
-                            e, auth_events=auth
-                        )
+                        context = await self.state_handler.compute_event_context(e)
                         await self._auth_and_persist_event(
                             origin, e, context, auth_events=auth
                         )
