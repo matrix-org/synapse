@@ -78,6 +78,7 @@ from synapse.handlers.devicemessage import DeviceMessageHandler
 from synapse.handlers.directory import DirectoryHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.e2e_room_keys import E2eRoomKeysHandler
+from synapse.handlers.event_auth import EventAuthHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.federation import FederationHandler
 from synapse.handlers.groups_local import GroupsLocalHandler, GroupsLocalWorkerHandler
@@ -742,6 +743,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_space_summary_handler(self) -> SpaceSummaryHandler:
         return SpaceSummaryHandler(self)
+
+    @cache_in_self
+    def get_event_auth_handler(self) -> EventAuthHandler:
+        return EventAuthHandler(self)
 
     @cache_in_self
     def get_external_cache(self) -> ExternalCache:

@@ -147,6 +147,7 @@ class FederationHandler(BaseHandler):
         self.is_mine_id = hs.is_mine_id
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.event_auth_handler = hs.get_event_auth_handler()
         self._message_handler = hs.get_message_handler()
         self._server_notices_mxid = hs.config.server_notices_mxid
         self.config = hs.config
@@ -1690,15 +1691,12 @@ class FederationHandler(BaseHandler):
             newly_joined = prev_member_event.membership != Membership.JOIN
             is_invite = prev_member_event.membership == Membership.INVITE
 
-        # We retrieve the room member handler here as to not cause a cyclic dependency
-        member_handler = self.hs.get_room_member_handler()
-
         # If the member is not already in the room, and not invited, check if
         # they should be allowed access via membership in a space.
         if (
             newly_joined
             and not is_invite
-            and not await member_handler.can_join_without_invite(
+            and not await self.event_auth_handler.can_join_without_invite(
                 prev_state_ids,
                 event.room_version,
                 user_id,
