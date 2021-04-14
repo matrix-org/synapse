@@ -484,6 +484,13 @@ class EventCreationHandler:
 
             require_consent: Whether to check if the requester has
                 consented to the privacy policy.
+
+            outlier: Indicates whether the event is an `outlier`, i.e. if
+                it's from an arbitrary point and floating in the DAG as
+                opposed to being inline with the current DAG.
+
+            inherit_depth: True to inherit the depth from the successor of the most
+                recent event from prev_event_ids. False to progress the depth as normal.
         Raises:
             ResourceLimitError if server is blocked to some resource being
             exceeded
@@ -718,10 +725,19 @@ class EventCreationHandler:
         Args:
             requester: The requester sending the event.
             event_dict: An entire event.
+            auth_event_ids:
+                The event ids to use as the auth_events for the new event.
+                Should normally be left as None, which will cause them to be calculated
+                based on the room state at the prev_events.
             ratelimit: Whether to rate limit this send.
             txn_id: The transaction ID.
             ignore_shadow_ban: True if shadow-banned users should be allowed to
                 send this event.
+            outlier: Indicates whether the event is an `outlier`, i.e. if
+                it's from an arbitrary point and floating in the DAG as
+                opposed to being inline with the current DAG.
+            inherit_depth: True to inherit the depth from the successor of the most
+                recent event from prev_event_ids. False to progress the depth as normal.
 
         Returns:
             The event, and its stream ordering (if deduplication happened,
@@ -818,6 +834,9 @@ class EventCreationHandler:
                 The event ids to use as the auth_events for the new event.
                 Should normally be left as None, which will cause them to be calculated
                 based on the room state at the prev_events.
+
+            inherit_depth: True to inherit the depth from the successor of the most
+                recent event from prev_event_ids. False to progress the depth as normal.
 
         Returns:
             Tuple of created event, context

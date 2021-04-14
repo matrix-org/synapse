@@ -249,6 +249,35 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         require_consent: bool = True,
         outlier: bool = False,
     ) -> Tuple[str, int]:
+        """
+        Internal membership update function to get an existing event or create
+        and persist a new event for the new membership change.
+
+        Args:
+            requester:
+            target:
+            room_id:
+            membership:
+            prev_event_ids: The event IDs to use as the prev events
+
+            auth_event_ids:
+                The event ids to use as the auth_events for the new event.
+                Should normally be left as None, which will cause them to be calculated
+                based on the room state at the prev_events.
+
+            txn_id:
+            ratelimit:
+            content:
+            require_consent:
+
+            outlier: Indicates whether the event is an `outlier`, i.e. if
+                it's from an arbitrary point and floating in the DAG as
+                opposed to being inline with the current DAG.
+
+        Returns:
+            Tuple of event ID and stream ordering position
+        """
+
         user_id = target.to_string()
 
         if content is None:
@@ -415,6 +444,14 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             ratelimit: Whether to rate limit the request.
             content: The content of the created event.
             require_consent: Whether consent is required.
+            outlier: Indicates whether the event is an `outlier`, i.e. if
+                it's from an arbitrary point and floating in the DAG as
+                opposed to being inline with the current DAG.
+            prev_event_ids: The event IDs to use as the prev events
+            auth_event_ids:
+                The event ids to use as the auth_events for the new event.
+                Should normally be left as None, which will cause them to be calculated
+                based on the room state at the prev_events.
 
         Returns:
             A tuple of the new event ID and stream ID.
@@ -467,6 +504,29 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         """Helper for update_membership.
 
         Assumes that the membership linearizer is already held for the room.
+
+        Args:
+            requester:
+            target:
+            room_id:
+            action:
+            txn_id:
+            remote_room_hosts:
+            third_party_signed:
+            ratelimit:
+            content:
+            require_consent:
+            outlier: Indicates whether the event is an `outlier`, i.e. if
+                it's from an arbitrary point and floating in the DAG as
+                opposed to being inline with the current DAG.
+            prev_event_ids: The event IDs to use as the prev events
+            auth_event_ids:
+                The event ids to use as the auth_events for the new event.
+                Should normally be left as None, which will cause them to be calculated
+                based on the room state at the prev_events.
+
+        Returns:
+            A tuple of the new event ID and stream ID.
         """
         content_specified = bool(content)
         if content is None:

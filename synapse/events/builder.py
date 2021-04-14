@@ -113,6 +113,8 @@ class EventBuilder:
             auth_event_ids: The event IDs to use as the auth events.
                 Should normally be set to None, which will cause them to be calculated
                 based on the room state at the prev_events.
+            inherit_depth: True to inherit the depth from the successor of the most
+                recent event from prev_event_ids. False to progress the depth as normal.
 
         Returns:
             The signed and hashed event.
