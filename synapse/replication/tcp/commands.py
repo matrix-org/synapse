@@ -297,33 +297,6 @@ class ClearUserSyncsCommand(Command):
         return self.instance_id
 
 
-class FederationAckCommand(Command):
-    """Sent by the client when it has processed up to a given point in the
-    federation stream. This allows the master to drop in-memory caches of the
-    federation stream.
-
-    This must only be sent from one worker (i.e. the one sending federation)
-
-    Format::
-
-        FEDERATION_ACK <instance_name> <token>
-    """
-
-    NAME = "FEDERATION_ACK"
-
-    def __init__(self, instance_name: str, token: int):
-        self.instance_name = instance_name
-        self.token = token
-
-    @classmethod
-    def from_line(cls, line: str) -> "FederationAckCommand":
-        instance_name, token = line.split(" ")
-        return cls(instance_name, int(token))
-
-    def to_line(self) -> str:
-        return "%s %s" % (self.instance_name, self.token)
-
-
 class UserIpCommand(Command):
     """Sent periodically when a worker sees activity from a client.
 
@@ -389,7 +362,6 @@ _COMMANDS = (
     NameCommand,
     ReplicateCommand,
     UserSyncCommand,
-    FederationAckCommand,
     UserIpCommand,
     RemoteServerUpCommand,
     ClearUserSyncsCommand,
@@ -415,7 +387,6 @@ VALID_CLIENT_COMMANDS = (
     PingCommand.NAME,
     UserSyncCommand.NAME,
     ClearUserSyncsCommand.NAME,
-    FederationAckCommand.NAME,
     UserIpCommand.NAME,
     ErrorCommand.NAME,
     RemoteServerUpCommand.NAME,

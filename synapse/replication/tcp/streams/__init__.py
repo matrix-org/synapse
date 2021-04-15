@@ -43,7 +43,6 @@ from synapse.replication.tcp.streams._base import (
     UserSignatureStream,
 )
 from synapse.replication.tcp.streams.events import EventsStream
-from synapse.replication.tcp.streams.federation import FederationStream
 
 STREAMS_MAP = {
     stream.NAME: stream
@@ -60,7 +59,6 @@ STREAMS_MAP = {
         PublicRoomsStream,
         DeviceListsStream,
         ToDeviceStream,
-        FederationStream,
         TagAccountDataStream,
         AccountDataStream,
         GroupServerStream,

@@ -39,7 +39,6 @@ from synapse.replication.tcp.client import DirectTcpReplicationClientFactory
 from synapse.replication.tcp.commands import (
     ClearUserSyncsCommand,
     Command,
-    FederationAckCommand,
     PositionCommand,
     RdataCommand,
     RemoteServerUpCommand,
@@ -54,7 +53,6 @@ from synapse.replication.tcp.streams import (
     BackfillStream,
     CachesStream,
     EventsStream,
-    FederationStream,
     ReceiptsStream,
     Stream,
     TagAccountDataStream,
@@ -73,7 +71,6 @@ inbound_rdata_count = Counter(
     "synapse_replication_tcp_protocol_inbound_rdata_count", "", ["stream_name"]
 )
 user_sync_counter = Counter("synapse_replication_tcp_resource_user_sync", "")
-federation_ack_counter = Counter("synapse_replication_tcp_resource_federation_ack", "")
 remove_pusher_counter = Counter("synapse_replication_tcp_resource_remove_pusher", "")
 
 user_ip_cache_counter = Counter("synapse_replication_tcp_resource_user_ip_cache", "")
@@ -155,11 +152,6 @@ class ReplicationCommandHandler:
 
             # Only add any other streams if we're on master.
             if hs.config.worker_app is not None:
-                continue
-
-            if stream.NAME == FederationStream.NAME and hs.config.send_federation:
-                # We only support federation stream if federation sending
-                # has been disabled on the master.
                 continue
 
             self._streams_to_replicate.append(stream)
@@ -364,14 +356,6 @@ class ReplicationCommandHandler:
             return self._presence_handler.update_external_syncs_clear(cmd.instance_id)
         else:
             return None
-
-    def on_FEDERATION_ACK(
-        self, conn: IReplicationConnection, cmd: FederationAckCommand
-    ):
-        federation_ack_counter.inc()
-
-        if self._federation_sender:
-            self._federation_sender.federation_ack(cmd.instance_name, cmd.token)
 
     def on_USER_IP(
         self, conn: IReplicationConnection, cmd: UserIpCommand
@@ -654,12 +638,6 @@ class ReplicationCommandHandler:
                     )
         else:
             logger.warning("Dropping command as not connected: %r", cmd.NAME)
-
-    def send_federation_ack(self, token: int):
-        """Ack data for the federation stream. This allows the master to drop
-        data stored purely in memory.
-        """
-        self.send_command(FederationAckCommand(self._instance_name, token))
 
     def send_user_sync(
         self, instance_id: str, user_id: str, is_syncing: bool, last_sync_ms: int

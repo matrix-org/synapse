@@ -216,10 +216,6 @@ Asks the server for the current position of all streams.
 
    This is used when a worker is shutting down.
 
-#### FEDERATION_ACK (C)
-
-   Acknowledge receipt of some federation data
-
 ### REMOTE_SERVER_UP (S, C)
 
    Inform other processes that a remote server may have come back online.

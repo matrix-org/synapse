@@ -20,10 +20,8 @@ from twisted.internet.defer import Deferred
 from twisted.internet.protocol import ReconnectingClientFactory
 
 from synapse.api.constants import EventTypes
-from synapse.federation import send_queue
 from synapse.federation.sender import FederationSender
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
-from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.tcp.protocol import ClientReplicationStreamProtocol
 from synapse.replication.tcp.streams import (
     AccountDataStream,
@@ -358,14 +356,8 @@ class FederationSenderHandler:
         self.federation_sender.wake_destination(server)
 
     async def process_replication_rows(self, stream_name, token, rows):
-        # The federation stream contains things that we want to send out, e.g.
-        # presence, typing, etc.
-        if stream_name == "federation":
-            send_queue.process_rows_for_federation(self.federation_sender, rows)
-            await self.update_token(token)
-
         # ... and when new receipts happen
-        elif stream_name == ReceiptsStream.NAME:
+        if stream_name == ReceiptsStream.NAME:
             await self._on_new_receipts(rows)
 
         # ... as well as device updates and messages
@@ -403,54 +395,3 @@ class FederationSenderHandler:
                 receipt.data,
             )
             await self.federation_sender.send_read_receipt(receipt_info)
-
-    async def update_token(self, token):
-        """Update the record of where we have processed to in the federation stream.
-
-        Called after we have processed a an update received over replication. Sends
-        a FEDERATION_ACK back to the master, and stores the token that we have processed
-         in `federation_stream_position` so that we can restart where we left off.
-        """
-        self.federation_position = token
-
-        # We save and send the ACK to master asynchronously, so we don't block
-        # processing on persistence. We don't need to do this operation for
-        # every single RDATA we receive, we just need to do it periodically.
-
-        if self._fed_position_linearizer.is_queued(None):
-            # There is already a task queued up to save and send the token, so
-            # no need to queue up another task.
-            return
-
-        run_as_background_process("_save_and_send_ack", self._save_and_send_ack)
-
-    async def _save_and_send_ack(self):
-        """Save the current federation position in the database and send an ACK
-        to master with where we're up to.
-        """
-        # We should only be calling this once we've got a token.
-        assert self.federation_position is not None
-
-        try:
-            # We linearize here to ensure we don't have races updating the token
-            #
-            # XXX this appears to be redundant, since the ReplicationCommandHandler
-            # has a linearizer which ensures that we only process one line of
-            # replication data at a time. Should we remove it, or is it doing useful
-            # service for robustness? Or could we replace it with an assertion that
-            # we're not being re-entered?
-
-            with (await self._fed_position_linearizer.queue(None)):
-                # We persist and ack the same position, so we take a copy of it
-                # here as otherwise it can get modified from underneath us.
-                current_position = self.federation_position
-
-                await self.store.update_federation_out_pos(
-                    "federation", current_position
-                )
-
-                # We ACK this token over replication so that the master can drop
-                # its in memory queues
-                self._hs.get_tcp_replication().send_federation_ack(current_position)
-        except Exception:
-            logger.exception("Error updating federation stream position")
