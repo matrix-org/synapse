@@ -212,7 +212,7 @@ class PresenceStore(SQLBaseStore):
                 WHERE added_ms < ?
             """
             txn.execute(
-                sql, (time_now - USERS_TO_SEND_FULL_PRESENCE_TO_ENTRY_LIFETIME_MS)
+                sql, (time_now - USERS_TO_SEND_FULL_PRESENCE_TO_ENTRY_LIFETIME_MS,)
             )
 
         await self.db_pool.runInteraction(
