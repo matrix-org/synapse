@@ -28,6 +28,8 @@ from synapse.util.stringutils import parse_and_validate_mxc_uri
 from ._base import Config, ConfigError, read_file
 
 DEFAULT_USER_MAPPING_PROVIDER = "synapse.handlers.oidc.JinjaOidcMappingProvider"
+# The module that JinjaOidcMappingProvider is in was renamed, we want to
+# transparently handle both the same.
 LEGACY_USER_MAPPING_PROVIDER = "synapse.handlers.oidc_handler.JinjaOidcMappingProvider"
 
 

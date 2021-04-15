@@ -26,6 +26,8 @@ from ._util import validate_config
 logger = logging.getLogger(__name__)
 
 DEFAULT_USER_MAPPING_PROVIDER = "synapse.handlers.saml.DefaultSamlMappingProvider"
+# The module that DefaultSamlMappingProvider is in was renamed, we want to
+# transparently handle both the same.
 LEGACY_USER_MAPPING_PROVIDER = (
     "synapse.handlers.saml_handler.DefaultSamlMappingProvider"
 )
