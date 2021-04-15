@@ -1298,11 +1298,10 @@ class PresenceEventSource:
         #
         #   Presence -> Notifier -> PresenceEventSource -> Presence
         #
-        # Same with get_module_api, get_presence_router
+        # Same with get_presence_router:
         #
         #   AuthHandler -> Notifier -> PresenceEventSource -> ModuleApi -> AuthHandler
         self.get_presence_handler = hs.get_presence_handler
-        self.get_module_api = hs.get_module_api
         self.get_presence_router = hs.get_presence_router
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
@@ -1333,8 +1332,13 @@ class PresenceEventSource:
         user_id = user.to_string()
         stream_change_cache = self.store.presence_stream_cache
 
+        # Check if this user should receive all current, online user presence
+        user_in_users_to_send_full_presence_to = (
+            await self.store.is_user_in_users_to_send_full_presence_to(user_id)
+        )
+
         with Measure(self.clock, "presence.get_new_events"):
-            if user_id in self.get_module_api()._send_full_presence_to_local_users:
+            if user_in_users_to_send_full_presence_to:
                 # This user has been specified by a module to receive all current, online
                 # user presence. Removing from_key and setting include_offline to false
                 # will do effectively this.
@@ -1378,8 +1382,8 @@ class PresenceEventSource:
                 )
 
                 # Remove the user from the list of users to receive all presence
-                if user_id in self.get_module_api()._send_full_presence_to_local_users:
-                    self.get_module_api()._send_full_presence_to_local_users.remove(
+                if user_in_users_to_send_full_presence_to:
+                    await self.store.remove_user_from_users_to_send_full_presence_to(
                         user_id
                     )
 
@@ -1433,8 +1437,8 @@ class PresenceEventSource:
             presence_updates = list(users_to_state.values())
 
         # Remove the user from the list of users to receive all presence
-        if user_id in self.get_module_api()._send_full_presence_to_local_users:
-            self.get_module_api()._send_full_presence_to_local_users.remove(user_id)
+        if user_in_users_to_send_full_presence_to:
+            await self.store.remove_user_from_users_to_send_full_presence_to(user_id)
 
         if not include_offline:
             # Filter out offline presence states
