@@ -12,12 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, List, Tuple
+from typing import Dict, Iterable, List, Tuple
 
 from synapse.api.presence import UserPresenceState
 from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
 from synapse.util.caches.descriptors import cached, cachedList
+from synapse.util.constants import HOUR_IN_MS
 from synapse.util.iterutils import batch_iter
+
+# How long to keep entries in the users_to_send_full_presence_to db table
+USERS_TO_SEND_FULL_PRESENCE_TO_ENTRY_LIFETIME_MS = 14 * 24 * HOUR_IN_MS
 
 
 class PresenceStore(SQLBaseStore):
@@ -155,6 +159,79 @@ class PresenceStore(SQLBaseStore):
             row["currently_active"] = bool(row["currently_active"])
 
         return {row["user_id"]: UserPresenceState(**row) for row in rows}
+
+    async def is_user_in_users_to_send_full_presence_to(self, user_id: str) -> bool:
+        """Check whether the given user is one we need to send full presence to.
+
+        Args:
+            user_id: The ID of the user to check.
+
+        Returns:
+            True if the user should have full presence sent to them, False otherwise.
+        """
+
+        def _is_user_in_users_to_send_full_presence_to_txn(txn):
+            sql = """
+                SELECT 1 FROM users_to_send_full_presence_to
+                WHERE user_id = ?
+            """
+            txn.execute(sql, (user_id,))
+            return bool(txn.fetchone())
+
+        return await self.db_pool.runInteraction(
+            "is_user_in_users_to_send_full_presence_to",
+            _is_user_in_users_to_send_full_presence_to_txn,
+        )
+
+    async def add_users_to_send_full_presence_to(self, user_ids: Iterable[str]):
+        """Adds to the list of users who should receive a full snapshot of presence
+        upon their next sync.
+
+        Entries are kept for at least USERS_TO_SEND_FULL_PRESENCE_TO_ENTRY_LIFETIME_MS,
+        and are culled whenever this method is called.
+
+        Args:
+            user_ids: An iterable of user IDs.
+        """
+        time_now = self.hs.get_clock().time_msec()
+
+        def _add_users_to_send_full_presence_to_txn(txn):
+            # Add user entries to the table (or update their added_ms if they already exist)
+            self.db_pool.simple_upsert_many_txn(
+                txn,
+                table="users_to_send_full_presence_to",
+                key_names=("user_id",),
+                key_values=((user_id,) for user_id in user_ids),
+                value_names=("added_ms",),
+                value_values=((time_now,) for _ in user_ids),
+            )
+
+            # Delete entries in the table that have expired
+            sql = """
+                DELETE FROM users_to_send_full_presence_to
+                WHERE added_ms < ?
+            """
+            txn.execute(
+                sql, (time_now - USERS_TO_SEND_FULL_PRESENCE_TO_ENTRY_LIFETIME_MS)
+            )
+
+        await self.db_pool.runInteraction(
+            "add_users_to_send_full_presence_to",
+            _add_users_to_send_full_presence_to_txn,
+        )
+
+    async def remove_user_from_users_to_send_full_presence_to(self, user_id: str):
+        """Removes a user from those to send full presence to. This should only be done
+        once we have sent full presence to them following a successful sync.
+
+        Args:
+            user_id: The ID of the user to remove from the table.
+        """
+        await self.db_pool.simple_delete(
+            table="users_to_send_full_presence_to",
+            keyvalues={"user_id": user_id},
+            desc="remove_user_from_users_to_send_full_presence_to",
+        )
 
     async def get_presence_for_all_users(
         self,
