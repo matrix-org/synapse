@@ -1957,7 +1957,10 @@ class PresenceFederationQueue:
         assert self._presence_writer
 
         if self._federation:
-            self._federation.send_presence_to_destinations(states, destinations)
+            self._federation.send_presence_to_destinations(
+                states=states,
+                destinations=destinations,
+            )
 
         if not self._queue_presence_updates:
             return
@@ -2048,4 +2051,7 @@ class PresenceFederationQueue:
 
         for host, user_ids in hosts_to_users.items():
             states = await self._presence_handler.current_state_for_users(user_ids)
-            self._federation.send_presence_to_destinations(states.values(), [host])
+            self._federation.send_presence_to_destinations(
+                states=states.values(),
+                destinations=[host],
+            )
