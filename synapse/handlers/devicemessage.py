@@ -51,9 +51,7 @@ class DeviceMessageHandler:
         # same instance. Other federation sender instances will get notified by
         # `synapse.app.generic_worker.FederationSenderHandler` when it sees it
         # in the to-device replication stream.
-        self.federation_sender = None
-        if hs.should_send_federation():
-            self.federation_sender = hs.get_federation_sender()
+        self.federation_sender = hs.get_federation_sender()
 
         # If we can handle the to device EDUs we do so, otherwise we route them
         # to the appropriate worker.

@@ -227,9 +227,7 @@ class Notifier:
         self.appservice_handler = hs.get_application_service_handler()
         self._pusher_pool = hs.get_pusherpool()
 
-        self.federation_sender = None
-        if hs.should_send_federation():
-            self.federation_sender = hs.get_federation_sender()
+        self.federation_sender = hs.get_federation_sender()
 
         self.state_handler = hs.get_state_handler()
 

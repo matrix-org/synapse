@@ -484,7 +484,7 @@ class DeviceHandler(DeviceWorkerHandler):
             "device_list_key", position, users=[user_id], rooms=room_ids
         )
 
-        if hosts:
+        if hosts and self.federation_sender:
             logger.info(
                 "Sending device list update notif for %r to: %r", user_id, hosts
             )

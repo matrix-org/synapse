@@ -287,9 +287,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
         self.notifier = hs.get_notifier()
         self.instance_id = hs.get_instance_id()
 
-        self._federation = None
-        if hs.should_send_federation():
-            self._federation = hs.get_federation_sender()
+        self._federation = hs.get_federation_sender()
 
         # user_id -> last_sync_ms. Lists the users that have stopped syncing
         # but we haven't notified the master of that yet
@@ -506,9 +504,7 @@ class PresenceHandler(BasePresenceHandler):
         self.presence_router = hs.get_presence_router()
         self._presence_enabled = hs.config.use_presence
 
-        self.federation_sender = None
-        if hs.should_send_federation():
-            self.federation_sender = hs.get_federation_sender()
+        self.federation_sender = hs.get_federation_sender()
 
         federation_registry = hs.get_federation_registry()
 
@@ -1900,11 +1896,9 @@ class PresenceFederationQueue:
         self._queue_presence_updates = True
 
         # The federation sender if this instance is a federation sender.
-        self._federation = None
+        self._federation = hs.get_federation_sender()
 
-        if hs.should_send_federation():
-            self._federation = hs.get_federation_sender()
-
+        if self._federation:
             # We don't bother queuing up presence states if only this instance
             # is sending federation.
             if hs.config.worker.federation_shard_config.instances == [

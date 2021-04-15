@@ -54,9 +54,7 @@ class ModuleApi:
         self._state = hs.get_state_handler()
         self._presence_router = hs.get_presence_router()
 
-        self._federation = None
-        if hs.should_send_federation():
-            self._federation = self._hs.get_federation_sender()
+        self._federation = self._hs.get_federation_sender()
 
         # We expose these as properties below in order to attach a helpful docstring.
         self._http_client = hs.get_simple_http_client()  # type: SimpleHttpClient

@@ -57,9 +57,7 @@ class FollowerTypingHandler:
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
 
-        self.federation = None
-        if hs.should_send_federation():
-            self.federation = hs.get_federation_sender()
+        self.federation = hs.get_federation_sender()
 
         if hs.config.worker.writers.typing != hs.get_instance_name():
             hs.get_federation_registry().register_instance_for_edu(
