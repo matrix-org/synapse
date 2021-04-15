@@ -1702,8 +1702,9 @@ class FederationHandler(BaseHandler):
             )
         ):
             raise SynapseError(
-                400,
+                403,
                 "You do not belong to any of the required spaces to join this room.",
+                Codes.FORBIDDEN,
             )
 
         # Persist the event.
