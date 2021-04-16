@@ -133,6 +133,35 @@ def parse_and_validate_server_name(server_name: str) -> Tuple[str, Optional[int]
     return host, port
 
 
+def valid_id_server_location(id_server: str) -> bool:
+    """Check whether an identity server location, such as the one passed as the
+    `id_server` parameter to `/_matrix/client/r0/account/3pid/bind`, is valid.
+
+    A valid identity server location consists of a valid hostname and optional
+    port number, optionally followed by any number of `/` delimited path
+    components, without any fragment or query string parts.
+
+    Args:
+        id_server: identity server location string to validate
+
+    Returns:
+        True if valid, False otherwise.
+    """
+
+    components = id_server.split("/")
+
+    host = components[0]
+
+    try:
+        parse_and_validate_server_name(host)
+    except ValueError:
+        return False
+
+    path = components[1:]
+
+    return not path or all("#" not in p and "?" not in p for p in path)
+
+
 def parse_and_validate_mxc_uri(mxc: str) -> Tuple[str, Optional[int], str]:
     """Parse the given string as an MXC URI
 

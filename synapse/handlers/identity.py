@@ -36,8 +36,8 @@ from synapse.util import json_decoder
 from synapse.util.hash import sha256_and_url_safe_base64
 from synapse.util.stringutils import (
     assert_valid_client_secret,
-    parse_and_validate_server_name,
     random_string,
+    valid_id_server_location,
 )
 
 from ._base import BaseHandler
@@ -178,7 +178,7 @@ class IdentityHandler(BaseHandler):
 
         Raises:
             SynapseError: On any of the following conditions
-                - the supplied id_server is not a valid Matrix server name
+                - the supplied id_server is not a valid identity server name
                 - we failed to contact the supplied identity server
 
         Returns:
@@ -190,10 +190,11 @@ class IdentityHandler(BaseHandler):
         if id_access_token is None:
             use_v2 = False
 
-        try:
-            parse_and_validate_server_name(id_server)
-        except ValueError:
-            raise SynapseError(400, "id_server must be a valid Matrix server name")
+        if not valid_id_server_location(id_server):
+            raise SynapseError(
+                400,
+                "id_server must be a valid hostname with optional port and path components",
+            )
 
         # Decide which API endpoint URLs to use
         headers = {}
@@ -284,7 +285,7 @@ class IdentityHandler(BaseHandler):
 
         Raises:
             SynapseError: On any of the following conditions
-                - the supplied id_server is not a valid Matrix server name
+                - the supplied id_server is not a valid identity server name
                 - we failed to contact the supplied identity server
 
         Returns:
@@ -292,10 +293,11 @@ class IdentityHandler(BaseHandler):
             server doesn't support unbinding
         """
 
-        try:
-            parse_and_validate_server_name(id_server)
-        except ValueError:
-            raise SynapseError(400, "id_server must be a valid Matrix server name")
+        if not valid_id_server_location(id_server):
+            raise SynapseError(
+                400,
+                "id_server must be a valid hostname with optional port and path components",
+            )
 
         url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
         url_bytes = "/_matrix/identity/api/v1/3pid/unbind".encode("ascii")
