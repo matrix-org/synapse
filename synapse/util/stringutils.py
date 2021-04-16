@@ -148,7 +148,7 @@ def valid_id_server_location(id_server: str) -> bool:
         True if valid, False otherwise.
     """
 
-    components = id_server.split("/")
+    components = id_server.split("/", 1)
 
     host = components[0]
 
@@ -157,9 +157,12 @@ def valid_id_server_location(id_server: str) -> bool:
     except ValueError:
         return False
 
-    path = components[1:]
+    if len(components) < 2:
+        # no path
+        return True
 
-    return not path or all("#" not in p and "?" not in p for p in path)
+    path = components[1]
+    return "#" not in path and "?" not in path
 
 
 def parse_and_validate_mxc_uri(mxc: str) -> Tuple[str, Optional[int], str]:
