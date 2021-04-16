@@ -65,7 +65,7 @@ class SpamChecker:
     async def user_may_invite(
         self,
         inviter_userid: str,
-        invitee_userid: str,
+        invitee_userid: Optional[str],
         third_party_invite: Optional[Dict],
         room_id: str,
         new_room: bool,
@@ -104,7 +104,8 @@ class SpamChecker:
                         new_room,
                         published_room,
                     )
-                ) is False
+                )
+                is False
             ):
                 return False
 
@@ -139,7 +140,8 @@ class SpamChecker:
                     spam_checker.user_may_create_room(
                         userid, invite_list, third_party_invite_list, cloning
                     )
-                ) is False
+                )
+                is False
             ):
                 return False
 
