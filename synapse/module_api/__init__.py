@@ -18,7 +18,6 @@ from typing import TYPE_CHECKING, Any, Generator, Iterable, List, Optional, Tupl
 from twisted.internet import defer
 
 from synapse.events import EventBase
-from synapse.handlers.presence import get_interested_remotes
 from synapse.http.client import SimpleHttpClient
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
@@ -52,10 +51,6 @@ class ModuleApi:
         self._server_name = hs.hostname
         self._presence_stream = hs.get_event_sources().sources["presence"]
         self._state = hs.get_state_handler()
-
-        self._federation = None
-        if hs.should_send_federation():
-            self._federation = self._hs.get_federation_sender()
 
         # We expose these as properties below in order to attach a helpful docstring.
         self._http_client = hs.get_simple_http_client()  # type: SimpleHttpClient
@@ -429,25 +424,20 @@ class ModuleApi:
                 # Force a presence initial_sync for this user next time
                 self._send_full_presence_to_local_users.add(user)
             else:
-                if not self._federation:
-                    continue
-
                 # Retrieve presence state for currently online users that this user
                 # is considered interested in
                 presence_events, _ = await self._presence_stream.get_new_events(
                     UserID.from_string(user), from_key=None, include_offline=False
                 )
 
-                # Send to remote destinations
-                hosts_and_states = await get_interested_remotes(
-                    self._store,
-                    self._hs.get_presence_router(),
-                    presence_events,
-                    self._state,
-                )
+                # Send to remote destinations.
 
-                for destinations, states in hosts_and_states:
-                    self._federation.send_presence_to_destinations(states, destinations)
+                # We pull out the presence handler here to break a cyclic
+                # dependency between the presence router and module API.
+                presence_handler = self._hs.get_presence_handler()
+                await presence_handler.maybe_send_presence_to_interested_destinations(
+                    presence_events
+                )
 
 
 class PublicRoomListManager:
