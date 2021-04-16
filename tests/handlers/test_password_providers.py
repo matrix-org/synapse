@@ -551,7 +551,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 400, channel.result)
 
     def _get_login_flows(self) -> JsonDict:
-        _, channel = self.make_request("GET", "/_matrix/client/r0/login")
+        channel = self.make_request("GET", "/_matrix/client/r0/login")
         self.assertEqual(channel.code, 200, channel.result)
         return channel.json_body["flows"]
 
@@ -560,7 +560,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
 
     def _send_login(self, type, user, **params) -> FakeChannel:
         params.update({"identifier": {"type": "m.id.user", "user": user}, "type": type})
-        _, channel = self.make_request("POST", "/_matrix/client/r0/login", params)
+        channel = self.make_request("POST", "/_matrix/client/r0/login", params)
         return channel
 
     def _start_delete_device_session(self, access_token, device_id) -> str:
@@ -597,7 +597,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self, access_token: str, device: str, body: Union[JsonDict, bytes] = b"",
     ) -> FakeChannel:
         """Delete an individual device."""
-        _, channel = self.make_request(
+        channel = self.make_request(
             "DELETE", "devices/" + device, body, access_token=access_token
         )
         return channel

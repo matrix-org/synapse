@@ -628,7 +628,7 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         self.helper.join(room, user=u2)
 
         # Assert user directory is not empty
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", b"user_directory/search", b'{"search_term":"user2"}'
         )
         self.assertEquals(200, channel.code, channel.result)
@@ -636,7 +636,7 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
 
         # Disable user directory and check search returns nothing
         self.config.user_directory_search_enabled = False
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", b"user_directory/search", b'{"search_term":"user2"}'
         )
         self.assertEquals(200, channel.code, channel.result)

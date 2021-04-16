@@ -125,9 +125,7 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
         self.tok = self.login("kermit", "monkey")
 
     def test_3pid_invite_enabled(self):
-        request, channel = self.make_request(
-            b"POST", "/createRoom", b"{}", access_token=self.tok
-        )
+        channel = self.make_request(b"POST", "/createRoom", b"{}", access_token=self.tok)
         self.assertEquals(channel.result["code"], b"200", channel.result)
         room_id = channel.json_body["room_id"]
 
@@ -138,7 +136,7 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
         }
         request_data = json.dumps(params)
         request_url = ("/rooms/%s/invite" % (room_id)).encode("ascii")
-        request, channel = self.make_request(
+        channel = self.make_request(
             b"POST", request_url, request_data, access_token=self.tok
         )
 

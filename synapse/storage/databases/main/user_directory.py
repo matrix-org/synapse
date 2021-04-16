@@ -17,7 +17,7 @@ import logging
 import re
 from typing import Any, Dict, Iterable, Optional, Set, Tuple
 
-from synapse.api.constants import EventTypes, JoinRules
+from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.state import StateFilter
 from synapse.storage.databases.main.state_deltas import StateDeltasStore
@@ -360,7 +360,10 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         if hist_vis_id:
             hist_vis_ev = await self.get_event(hist_vis_id, allow_none=True)
             if hist_vis_ev:
-                if hist_vis_ev.content.get("history_visibility") == "world_readable":
+                if (
+                    hist_vis_ev.content.get("history_visibility")
+                    == HistoryVisibility.WORLD_READABLE
+                ):
                     return True
 
         return False

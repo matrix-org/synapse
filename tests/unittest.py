@@ -20,7 +20,7 @@ import hmac
 import inspect
 import logging
 import time
-from typing import Dict, Optional, Tuple, Type, TypeVar, Union, overload
+from typing import Dict, Optional, Type, TypeVar, Union
 
 from mock import Mock, patch
 
@@ -372,24 +372,6 @@ class HomeserverTestCase(TestCase):
         Function to optionally be overridden in subclasses.
         """
 
-    # Annoyingly mypy doesn't seem to pick up the fact that T is SynapseRequest
-    # when the `request` arg isn't given, so we define an explicit override to
-    # cover that case.
-    @overload
-    def make_request(
-        self,
-        method: Union[bytes, str],
-        path: Union[bytes, str],
-        content: Union[bytes, dict] = b"",
-        access_token: Optional[str] = None,
-        shorthand: bool = True,
-        federation_auth_origin: str = None,
-        content_is_form: bool = False,
-        await_result: bool = True,
-    ) -> Tuple[SynapseRequest, FakeChannel]:
-        ...
-
-    @overload
     def make_request(
         self,
         method: Union[bytes, str],
@@ -401,21 +383,7 @@ class HomeserverTestCase(TestCase):
         federation_auth_origin: str = None,
         content_is_form: bool = False,
         await_result: bool = True,
-    ) -> Tuple[T, FakeChannel]:
-        ...
-
-    def make_request(
-        self,
-        method: Union[bytes, str],
-        path: Union[bytes, str],
-        content: Union[bytes, dict] = b"",
-        access_token: Optional[str] = None,
-        request: Type[T] = SynapseRequest,
-        shorthand: bool = True,
-        federation_auth_origin: str = None,
-        content_is_form: bool = False,
-        await_result: bool = True,
-    ) -> Tuple[T, FakeChannel]:
+    ) -> FakeChannel:
         """
         Create a SynapseRequest at the path using the method and containing the
         given content.
@@ -438,7 +406,7 @@ class HomeserverTestCase(TestCase):
                  tells the channel the request is finished.
 
         Returns:
-            Tuple[synapse.http.site.SynapseRequest, channel]
+            The FakeChannel object which stores the result of the request.
         """
         return make_request(
             self.reactor,
@@ -568,7 +536,7 @@ class HomeserverTestCase(TestCase):
         self.hs.config.registration_shared_secret = "shared"
 
         # Create the user
-        request, channel = self.make_request("GET", "/_synapse/admin/v1/register")
+        channel = self.make_request("GET", "/_synapse/admin/v1/register")
         self.assertEqual(channel.code, 200, msg=channel.result)
         nonce = channel.json_body["nonce"]
 
@@ -593,7 +561,7 @@ class HomeserverTestCase(TestCase):
                 "inhibit_login": True,
             }
         )
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", "/_synapse/admin/v1/register", body.encode("utf8")
         )
         self.assertEqual(channel.code, 200, channel.json_body)
@@ -611,7 +579,7 @@ class HomeserverTestCase(TestCase):
         if device_id:
             body["device_id"] = device_id
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", "/_matrix/client/r0/login", json.dumps(body).encode("utf8")
         )
         self.assertEqual(channel.code, 200, channel.result)
@@ -679,7 +647,7 @@ class HomeserverTestCase(TestCase):
         """
         body = {"type": "m.login.password", "user": username, "password": password}
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", "/_matrix/client/r0/login", json.dumps(body).encode("utf8")
         )
         self.assertEqual(channel.code, 403, channel.result)

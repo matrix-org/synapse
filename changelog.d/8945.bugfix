@@ -1,0 +1,1 @@
+Fix a bug where 500 errors would be returned if the `m.room_history_visibility` event had invalid content.

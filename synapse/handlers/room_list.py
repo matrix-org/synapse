@@ -20,7 +20,7 @@ from typing import Any, Dict, Optional
 import msgpack
 from unpaddedbase64 import decode_base64, encode_base64
 
-from synapse.api.constants import EventTypes, JoinRules
+from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules
 from synapse.api.errors import Codes, HttpResponseException
 from synapse.types import ThirdPartyInstanceID
 from synapse.util.caches.descriptors import cached
@@ -159,7 +159,8 @@ class RoomListHandler(BaseHandler):
                 "canonical_alias": room["canonical_alias"],
                 "num_joined_members": room["joined_members"],
                 "avatar_url": room["avatar"],
-                "world_readable": room["history_visibility"] == "world_readable",
+                "world_readable": room["history_visibility"]
+                == HistoryVisibility.WORLD_READABLE,
                 "guest_can_join": room["guest_access"] == "can_join",
                 "join_rule": room["join_rules"],
             }
@@ -318,7 +319,7 @@ class RoomListHandler(BaseHandler):
         visibility = None
         if visibility_event:
             visibility = visibility_event.content.get("history_visibility", None)
-        result["world_readable"] = visibility == "world_readable"
+        result["world_readable"] = visibility == HistoryVisibility.WORLD_READABLE
 
         guest_event = current_state.get((EventTypes.GuestAccess, ""))
         guest = None

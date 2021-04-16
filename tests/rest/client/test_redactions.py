@@ -69,16 +69,12 @@ class RedactionsTestCase(HomeserverTestCase):
         """
         path = "/_matrix/client/r0/rooms/%s/redact/%s" % (room_id, event_id)
 
-        request, channel = self.make_request(
-            "POST", path, content={}, access_token=access_token
-        )
+        channel = self.make_request("POST", path, content={}, access_token=access_token)
         self.assertEqual(int(channel.result["code"]), expect_code)
         return channel.json_body
 
     def _sync_room_timeline(self, access_token, room_id):
-        request, channel = self.make_request(
-            "GET", "sync", access_token=self.mod_access_token
-        )
+        channel = self.make_request("GET", "sync", access_token=self.mod_access_token)
         self.assertEqual(channel.result["code"], b"200")
         room_sync = channel.json_body["rooms"]["join"][room_id]
         return room_sync["timeline"]["events"]

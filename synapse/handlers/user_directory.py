@@ -16,7 +16,7 @@
 import logging
 
 import synapse.metrics
-from synapse.api.constants import EventTypes, JoinRules, Membership
+from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules, Membership
 from synapse.handlers.state_deltas import StateDeltasHandler
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.roommember import ProfileInfo
@@ -250,7 +250,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                 prev_event_id,
                 event_id,
                 key_name="history_visibility",
-                public_value="world_readable",
+                public_value=HistoryVisibility.WORLD_READABLE,
             )
         elif typ == EventTypes.JoinRules:
             change = await self._get_key_change(

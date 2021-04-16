@@ -23,7 +23,7 @@ from twisted.web.server import Request
 import synapse.types
 from synapse import event_auth
 from synapse.api.auth_blocking import AuthBlocking
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -653,7 +653,8 @@ class Auth:
             )
             if (
                 visibility
-                and visibility.content["history_visibility"] == "world_readable"
+                and visibility.content.get("history_visibility")
+                == HistoryVisibility.WORLD_READABLE
             ):
                 return Membership.JOIN, None
             raise AuthError(

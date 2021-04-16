@@ -14,24 +14,70 @@
 # limitations under the License.
 
 import abc
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
-from synapse.types import RoomStreamToken
+import attr
+
+from synapse.types import JsonDict, RoomStreamToken
 
 if TYPE_CHECKING:
     from synapse.app.homeserver import HomeServer
 
 
+@attr.s(slots=True)
+class PusherConfig:
+    """Parameters necessary to configure a pusher."""
+
+    id = attr.ib(type=Optional[str])
+    user_name = attr.ib(type=str)
+    access_token = attr.ib(type=Optional[int])
+    profile_tag = attr.ib(type=str)
+    kind = attr.ib(type=str)
+    app_id = attr.ib(type=str)
+    app_display_name = attr.ib(type=str)
+    device_display_name = attr.ib(type=str)
+    pushkey = attr.ib(type=str)
+    ts = attr.ib(type=int)
+    lang = attr.ib(type=Optional[str])
+    data = attr.ib(type=Optional[JsonDict])
+    last_stream_ordering = attr.ib(type=Optional[int])
+    last_success = attr.ib(type=Optional[int])
+    failing_since = attr.ib(type=Optional[int])
+
+    def as_dict(self) -> Dict[str, Any]:
+        """Information that can be retrieved about a pusher after creation."""
+        return {
+            "app_display_name": self.app_display_name,
+            "app_id": self.app_id,
+            "data": self.data,
+            "device_display_name": self.device_display_name,
+            "kind": self.kind,
+            "lang": self.lang,
+            "profile_tag": self.profile_tag,
+            "pushkey": self.pushkey,
+        }
+
+
+@attr.s(slots=True)
+class ThrottleParams:
+    """Parameters for controlling the rate of sending pushes via email."""
+
+    last_sent_ts = attr.ib(type=int)
+    throttle_ms = attr.ib(type=int)
+
+
 class Pusher(metaclass=abc.ABCMeta):
-    def __init__(self, hs: "HomeServer", pusherdict: Dict[str, Any]):
+    def __init__(self, hs: "HomeServer", pusher_config: PusherConfig):
         self.hs = hs
         self.store = self.hs.get_datastore()
         self.clock = self.hs.get_clock()
 
-        self.pusher_id = pusherdict["id"]
-        self.user_id = pusherdict["user_name"]
-        self.app_id = pusherdict["app_id"]
-        self.pushkey = pusherdict["pushkey"]
+        self.pusher_id = pusher_config.id
+        self.user_id = pusher_config.user_name
+        self.app_id = pusher_config.app_id
+        self.pushkey = pusher_config.pushkey
+
+        self.last_stream_ordering = pusher_config.last_stream_ordering
 
         # This is the highest stream ordering we know it's safe to process.
         # When new events arrive, we'll be given a window of new events: we
