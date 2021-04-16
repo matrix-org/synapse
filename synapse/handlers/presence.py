@@ -127,8 +127,10 @@ class BasePresenceHandler(abc.ABC):
         self.state = hs.get_state_handler()
 
         self._federation = None
-        if hs.should_send_federation():
+        if hs.should_send_federation() or not hs.config.worker_app:
             self._federation = hs.get_federation_sender()
+
+        self._send_federation = hs.should_send_federation()
 
         self._busy_presence_enabled = hs.config.experimental.msc3026_enabled
 
@@ -262,8 +264,11 @@ class BasePresenceHandler(abc.ABC):
         destinations that are interested.
         """
 
-        if not self._federation:
+        if not self._send_federation:
             return
+
+        # If this worker sends federation we must have a FederationSender.
+        assert self._federation
 
         hosts_and_states = await get_interested_remotes(
             self.store,
@@ -491,7 +496,6 @@ class PresenceHandler(BasePresenceHandler):
         self.server_name = hs.hostname
         self.wheel_timer = WheelTimer()
         self.notifier = hs.get_notifier()
-        self.federation = hs.get_federation_sender()
         self._presence_enabled = hs.config.use_presence
 
         federation_registry = hs.get_federation_registry()
@@ -713,8 +717,12 @@ class PresenceHandler(BasePresenceHandler):
                     self.state,
                 )
 
+                # Since this is master we know that we have a federation sender or
+                # queue, and so this will be defined.
+                assert self._federation
+
                 for destinations, states in hosts_and_states:
-                    self.federation.send_presence_to_destinations(states, destinations)
+                    self._federation.send_presence_to_destinations(states, destinations)
 
     async def _handle_timeouts(self):
         """Checks the presence of users that have timed out and updates as
@@ -1193,9 +1201,13 @@ class PresenceHandler(BasePresenceHandler):
                     user_presence_states
                 )
 
+        # Since this is master we know that we have a federation sender or
+        # queue, and so this will be defined.
+        assert self._federation
+
         # Send out user presence updates for each destination
         for destination, user_state_set in presence_destinations.items():
-            self.federation.send_presence_to_destinations(
+            self._federation.send_presence_to_destinations(
                 destinations=[destination], states=user_state_set
             )
 
