@@ -1378,17 +1378,21 @@ class PersistEventsStore:
             ],
         )
 
-        for event, _ in events_and_contexts:
-            if not event.internal_metadata.is_redacted():
-                # If we're persisting an unredacted event we go and ensure
-                # that we mark any redactions that reference this event as
-                # requiring censoring.
-                self.db_pool.simple_update_txn(
-                    txn,
-                    table="redactions",
-                    keyvalues={"redacts": event.event_id},
-                    updatevalues={"have_censored": False},
+        # If we're persisting an unredacted event we go and ensure
+        # that we mark any redactions that reference this event as
+        # requiring censoring.
+        sql = "UPDATE redactions SET have_censored = ? WHERE redacts = ?"
+        txn.execute_batch(
+            sql,
+            (
+                (
+                    False,
+                    event.event_id,
                 )
+                for event, _ in events_and_contexts
+                if not event.internal_metadata.is_redacted()
+            ),
+        )
 
         state_events_and_contexts = [
             ec for ec in events_and_contexts if ec[0].is_state()
@@ -1881,19 +1885,27 @@ class PersistEventsStore:
                 ),
             )
 
-        for event, _ in events_and_contexts:
-            user_ids = self.db_pool.simple_select_onecol_txn(
-                txn,
-                table="event_push_actions_staging",
-                keyvalues={"event_id": event.event_id},
-                retcol="user_id",
-            )
+            room_to_event_ids = {}  # type: Dict[str, List[str]]
+            for e, _ in events_and_contexts:
+                room_to_event_ids.setdefault(e.room_id, []).append(e.event_id)
 
-            for uid in user_ids:
-                txn.call_after(
-                    self.store.get_unread_event_push_actions_by_room_for_user.invalidate_many,
-                    (event.room_id, uid),
+            for room_id, event_ids in room_to_event_ids.items():
+                rows = self.db_pool.simple_select_many_txn(
+                    txn,
+                    table="event_push_actions_staging",
+                    column="event_id",
+                    iterable=event_ids,
+                    keyvalues={},
+                    retcols=("user_id",),
                 )
+
+                user_ids = {row["user_id"] for row in rows}
+
+                for user_id in user_ids:
+                    txn.call_after(
+                        self.store.get_unread_event_push_actions_by_room_for_user.invalidate_many,
+                        (room_id, user_id),
+                    )
 
         # Now we delete the staging area for *all* events that were being
         # persisted.
