@@ -702,6 +702,13 @@ class PresenceHandler(BasePresenceHandler):
             self.unpersisted_users_changes |= {s.user_id for s in new_states}
             self.unpersisted_users_changes -= set(to_notify.keys())
 
+            # Check if we need to resend any presence states to remote hosts. We
+            # only do this for states that haven't been updated in a while to
+            # ensure that the remote host doesn't time the presence state out.
+            #
+            # Note that since these are states that have *not* been updated,
+            # they won't get sent down the normal presence replication stream,
+            # and so we have to explicitly send them via the federation stream.
             to_federation_ping = {
                 user_id: state
                 for user_id, state in to_federation_ping.items()
