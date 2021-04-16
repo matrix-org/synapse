@@ -445,7 +445,7 @@ class RestHelper:
         return channel.json_body
 
 
-# an 'oidc_config' suitable for login_with_oidc.
+# an 'oidc_config' suitable for login_via_oidc.
 TEST_OIDC_CONFIG = {
     "enabled": True,
     "discover": False,
