@@ -1,3 +1,14 @@
+# Contents
+- [List all media in a room](#list-all-media-in-a-room)
+- [Quarantine media](#quarantine-media)
+  * [Quarantining media by ID](#quarantining-media-by-id)
+  * [Quarantining media in a room](#quarantining-media-in-a-room)
+  * [Quarantining all media of a user](#quarantining-all-media-of-a-user)
+- [Delete local media](#delete-local-media)
+  * [Delete a specific local media](#delete-a-specific-local-media)
+  * [Delete local media by date or size](#delete-local-media-by-date-or-size)
+- [Purge Remote Media API](#purge-remote-media-api)
+
 # List all media in a room
 
 This API gets a list of known media in a room.
@@ -11,16 +22,16 @@ To use it, you will need to authenticate by providing an `access_token` for a
 server admin: see [README.rst](README.rst).
 
 The API returns a JSON body like the following:
-```
+```json
 {
-    "local": [
-        "mxc://localhost/xwvutsrqponmlkjihgfedcba",
-        "mxc://localhost/abcdefghijklmnopqrstuvwx"
-    ],
-    "remote": [
-        "mxc://matrix.org/xwvutsrqponmlkjihgfedcba",
-        "mxc://matrix.org/abcdefghijklmnopqrstuvwx"
-    ]
+  "local": [
+    "mxc://localhost/xwvutsrqponmlkjihgfedcba",
+    "mxc://localhost/abcdefghijklmnopqrstuvwx"
+  ],
+  "remote": [
+    "mxc://matrix.org/xwvutsrqponmlkjihgfedcba",
+    "mxc://matrix.org/abcdefghijklmnopqrstuvwx"
+  ]
 }
 ```
 
@@ -48,7 +59,7 @@ form of `abcdefg12345...`.
 
 Response:
 
-```
+```json
 {}
 ```
 
@@ -68,14 +79,18 @@ Where `room_id` is in the form of `!roomid12345:example.org`.
 
 Response:
 
-```
+```json
 {
-  "num_quarantined": 10  # The number of media items successfully quarantined
+  "num_quarantined": 10
 }
 ```
 
+The following fields are returned in the JSON response body:
+
+* `num_quarantined`: integer - The number of media items successfully quarantined
+
 Note that there is a legacy endpoint, `POST
-/_synapse/admin/v1/quarantine_media/<room_id >`, that operates the same.
+/_synapse/admin/v1/quarantine_media/<room_id>`, that operates the same.
 However, it is deprecated and may be removed in a future release.
 
 ## Quarantining all media of a user
@@ -92,15 +107,21 @@ POST /_synapse/admin/v1/user/<user_id>/media/quarantine
 {}
 ```
 
-Where `user_id` is in the form of `@bob:example.org`.
+URL Parameters
+
+* `user_id`: string - User ID in the form of `@bob:example.org`
 
 Response:
 
-```
+```json
 {
-  "num_quarantined": 10  # The number of media items successfully quarantined
+  "num_quarantined": 10
 }
 ```
+
+The following fields are returned in the JSON response body:
+
+* `num_quarantined`: integer - The number of media items successfully quarantined
 
 # Delete local media
 This API deletes the *local* media from the disk of your own server.
@@ -108,7 +129,7 @@ This includes any local thumbnails and copies of media downloaded from
 remote homeservers.
 This API will not affect media that has been uploaded to external
 media repositories (e.g https://github.com/turt2live/matrix-media-repo/).
-See also [purge_remote_media.rst](purge_remote_media.rst).
+See also [Purge Remote Media API](#purge-remote-media-api).
 
 ## Delete a specific local media
 Delete a specific `media_id`.
@@ -129,12 +150,12 @@ URL Parameters
 Response:
 
 ```json
-    {
-       "deleted_media": [
-          "abcdefghijklmnopqrstuvwx"
-       ],
-       "total": 1
-    }
+{
+  "deleted_media": [
+    "abcdefghijklmnopqrstuvwx"
+  ],
+  "total": 1
+}
 ```
 
 The following fields are returned in the JSON response body:
@@ -167,16 +188,51 @@ If `false` these files will be deleted. Defaults to `true`.
 Response:
 
 ```json
-    {
-       "deleted_media": [
-          "abcdefghijklmnopqrstuvwx",
-          "abcdefghijklmnopqrstuvwz"
-       ],
-       "total": 2
-    }
+{
+  "deleted_media": [
+    "abcdefghijklmnopqrstuvwx",
+    "abcdefghijklmnopqrstuvwz"
+  ],
+  "total": 2
+}
 ```
 
 The following fields are returned in the JSON response body:
 
 * `deleted_media`: an array of strings - List of deleted `media_id`
 * `total`: integer - Total number of deleted `media_id`
+
+# Purge Remote Media API
+
+The purge remote media API allows server admins to purge old cached remote media.
+
+The API is:
+
+```
+POST /_synapse/admin/v1/purge_media_cache?before_ts=<unix_timestamp_in_ms>
+
+{}
+```
+
+URL Parameters
+
+* `unix_timestamp_in_ms`: string representing a positive integer - Unix timestamp in ms.
+All cached media that was last accessed before this timestamp will be removed.
+
+Response:
+
+```json
+{
+  "deleted": 10
+}
+```
+
+The following fields are returned in the JSON response body:
+
+* `deleted`: integer - The number of media items successfully deleted
+
+To use it, you will need to authenticate by providing an `access_token` for a
+server admin: see [README.rst](README.rst).
+
+If the user re-requests purged remote media, synapse will re-request the media
+from the originating server.
