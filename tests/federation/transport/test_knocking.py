@@ -227,7 +227,7 @@ class FederationKnockingTestCase(
             self.hs, room_id, user_id
         )
 
-        _, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/_matrix/federation/unstable/%s/make_knock/%s/%s?ver=%s"
             % (
@@ -271,7 +271,7 @@ class FederationKnockingTestCase(
         )
 
         # Send the signed knock event into the room
-        _, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/federation/unstable/%s/send_knock/%s/%s"
             % (KNOCK_UNSTABLE_IDENTIFIER, room_id, signed_knock_event.event_id),

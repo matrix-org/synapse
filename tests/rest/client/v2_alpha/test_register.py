@@ -545,9 +545,7 @@ class AccountValidityUserDirectoryTestCase(unittest.HomeserverTestCase):
             "enable_renewal_emails": False,
         }
         request_data = json.dumps(params)
-        request, channel = self.make_request(
-            b"POST", url, request_data, access_token=admin_tok
-        )
+        channel = self.make_request(b"POST", url, request_data, access_token=admin_tok)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # Mock the homeserver's HTTP client
@@ -585,9 +583,7 @@ class AccountValidityUserDirectoryTestCase(unittest.HomeserverTestCase):
             "enable_renewal_emails": False,
         }
         request_data = json.dumps(params)
-        request, channel = self.make_request(
-            b"POST", url, request_data, access_token=admin_tok
-        )
+        channel = self.make_request(b"POST", url, request_data, access_token=admin_tok)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # Wait for the background job to run which hides expired users in the directory
@@ -618,9 +614,7 @@ class AccountValidityUserDirectoryTestCase(unittest.HomeserverTestCase):
             "enable_renewal_emails": False,
         }
         request_data = json.dumps(params)
-        request, channel = self.make_request(
-            b"POST", url, request_data, access_token=admin_tok
-        )
+        channel = self.make_request(b"POST", url, request_data, access_token=admin_tok)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         self.pump(10)
@@ -732,7 +726,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
         # Move 1 day forward. Try to renew with the same token again.
         url = "/_matrix/client/unstable/account_validity/renew?token=%s" % renewal_token
-        request, channel = self.make_request(b"GET", url)
+        channel = self.make_request(b"GET", url)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # Check that we're getting HTML back.

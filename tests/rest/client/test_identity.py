@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
-
 from mock import Mock
 
 from twisted.internet import defer
@@ -50,22 +48,17 @@ class IdentityDisabledTestCase(unittest.HomeserverTestCase):
         self.tok = self.login("kermit", "monkey")
 
     def test_3pid_invite_disabled(self):
-        request, channel = self.make_request(
-            b"POST", "/createRoom", b"{}", access_token=self.tok
-        )
+        channel = self.make_request(b"POST", "/createRoom", {}, access_token=self.tok)
         self.assertEquals(channel.result["code"], b"200", channel.result)
         room_id = channel.json_body["room_id"]
 
-        params = {
+        data = {
             "id_server": "testis",
             "medium": "email",
             "address": "test@example.com",
         }
-        request_data = json.dumps(params)
         request_url = ("/rooms/%s/invite" % (room_id)).encode("ascii")
-        request, channel = self.make_request(
-            b"POST", request_url, request_data, access_token=self.tok
-        )
+        channel = self.make_request(b"POST", request_url, data, access_token=self.tok)
         self.assertEquals(channel.result["code"], b"403", channel.result)
 
     def test_3pid_lookup_disabled(self):
@@ -73,7 +66,7 @@ class IdentityDisabledTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/unstable/account/3pid/lookup"
             "?id_server=testis&medium=email&address=foo@bar.baz"
         )
-        request, channel = self.make_request("GET", url, access_token=self.tok)
+        channel = self.make_request("GET", url, access_token=self.tok)
         self.assertEqual(channel.result["code"], b"403", channel.result)
 
     def test_3pid_bulk_lookup_disabled(self):
@@ -82,10 +75,7 @@ class IdentityDisabledTestCase(unittest.HomeserverTestCase):
             "id_server": "testis",
             "threepids": [["email", "foo@bar.baz"], ["email", "john.doe@matrix.org"]],
         }
-        request_data = json.dumps(data)
-        request, channel = self.make_request(
-            "POST", url, request_data, access_token=self.tok
-        )
+        channel = self.make_request("POST", url, data, access_token=self.tok)
         self.assertEqual(channel.result["code"], b"403", channel.result)
 
 
@@ -125,20 +115,19 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
         self.tok = self.login("kermit", "monkey")
 
     def test_3pid_invite_enabled(self):
-        channel = self.make_request(b"POST", "/createRoom", b"{}", access_token=self.tok)
+        channel = self.make_request(
+            b"POST", "/createRoom", b"{}", access_token=self.tok
+        )
         self.assertEquals(channel.result["code"], b"200", channel.result)
         room_id = channel.json_body["room_id"]
 
-        params = {
+        data = {
             "id_server": "testis",
             "medium": "email",
             "address": "test@example.com",
         }
-        request_data = json.dumps(params)
         request_url = ("/rooms/%s/invite" % (room_id)).encode("ascii")
-        channel = self.make_request(
-            b"POST", request_url, request_data, access_token=self.tok
-        )
+        channel = self.make_request(b"POST", request_url, data, access_token=self.tok)
 
         get_json = self.hs.get_identity_handler().http_client.get_json
         get_json.assert_called_once_with(
@@ -166,8 +155,7 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
             "id_server": "testis",
             "threepids": [["email", "foo@bar.baz"], ["email", "john.doe@matrix.org"]],
         }
-        request_data = json.dumps(data)
-        self.make_request("POST", url, request_data, access_token=self.tok)
+        self.make_request("POST", url, data, access_token=self.tok)
 
         post_json = self.hs.get_simple_http_client().post_json_get_json
         post_json.assert_called_once_with(

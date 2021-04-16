@@ -672,7 +672,7 @@ class UserInfoTestCase(unittest.FederatingHomeserverTestCase):
         user_one, user_two, user_three, user_three_token = self.setup_test_users()
 
         # Request info about each user from user_three
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             path="/_matrix/client/unstable/users/info",
             content={"user_ids": [user_one, user_two, user_three]},
@@ -703,7 +703,7 @@ class UserInfoTestCase(unittest.FederatingHomeserverTestCase):
         user_one, user_two, user_three, user_three_token = self.setup_test_users()
 
         # Request information about our local users from the perspective of a remote server
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             path="/_matrix/federation/unstable/users/info",
             content={"user_ids": [user_one, user_two, user_three]},
@@ -756,9 +756,7 @@ class UserInfoTestCase(unittest.FederatingHomeserverTestCase):
             "expiration_ts": 0,
             "enable_renewal_emails": False,
         }
-        request, channel = self.make_request(
-            "POST", url, request_data, access_token=admin_tok
-        )
+        channel = self.make_request("POST", url, request_data, access_token=admin_tok)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
     def deactivate(self, user_id, tok):
@@ -766,7 +764,7 @@ class UserInfoTestCase(unittest.FederatingHomeserverTestCase):
             "auth": {"type": "m.login.password", "user": user_id, "password": "pass"},
             "erase": False,
         }
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", "account/deactivate", request_data, access_token=tok
         )
-        self.assertEqual(request.code, 200)
+        self.assertEqual(channel.code, 200)

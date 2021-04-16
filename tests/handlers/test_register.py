@@ -18,7 +18,6 @@ from mock import Mock
 from synapse.api.auth import Auth
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, ResourceLimitError, SynapseError
-from synapse.http.site import SynapseRequest
 from synapse.rest.client.v2_alpha.register import (
     _map_email_to_displayname,
     register_servlets,
@@ -619,11 +618,9 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
     def uia_register(self, expected_response: int, body: dict) -> FakeChannel:
         """Make a register request."""
-        request, channel = self.make_request(
-            "POST", "register", body
-        )  # type: SynapseRequest, FakeChannel
+        channel = self.make_request("POST", "register", body)
 
-        self.assertEqual(request.code, expected_response)
+        self.assertEqual(channel.code, expected_response)
         return channel
 
     async def get_or_create_user(

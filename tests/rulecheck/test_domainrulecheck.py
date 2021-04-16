@@ -22,7 +22,6 @@ from synapse.rest.client.v1 import login, room
 from synapse.rulecheck.domain_rule_checker import DomainRuleChecker
 
 from tests import unittest
-from tests.server import make_request
 
 
 class DomainRuleCheckerTestCase(unittest.TestCase):
@@ -311,7 +310,7 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
             expect_code=403,
         )
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "rooms/%s/invite" % (room_id),
             {"address": "foo@bar.com", "medium": "email", "id_server": "localhost"},
@@ -322,12 +321,8 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
     def _create_room(self, token, content={}):
         path = "/_matrix/client/r0/createRoom?access_token=%s" % (token,)
 
-        request, channel = make_request(
-            self.hs.get_reactor(),
-            self.site,
-            "POST",
-            path,
-            content=json.dumps(content).encode("utf8"),
+        channel = self.make_request(
+            "POST", path, content=json.dumps(content).encode("utf8"),
         )
 
         return channel

@@ -273,7 +273,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         )
 
         # List preset_room_id in the public room list
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/directory/list/room/%s" % (preset_room_id,),
             {"visibility": "public"},
@@ -282,7 +282,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.result)
 
         # List init_state_room_id in the public room list
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/directory/list/room/%s" % (init_state_room_id,),
             {"visibility": "public"},
@@ -361,14 +361,14 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         url = "/_matrix/client/r0/directory/list/room/%s" % self.restricted_room
         data = {"visibility": "public"}
 
-        request, channel = self.make_request("PUT", url, data, access_token=self.tok)
+        channel = self.make_request("PUT", url, data, access_token=self.tok)
         self.assertEqual(channel.code, 200, channel.result)
 
         # We are allowed to remove the room from the public room list
         url = "/_matrix/client/r0/directory/list/room/%s" % self.restricted_room
         data = {"visibility": "private"}
 
-        request, channel = self.make_request("PUT", url, data, access_token=self.tok)
+        channel = self.make_request("PUT", url, data, access_token=self.tok)
         self.assertEqual(channel.code, 200, channel.result)
 
     def test_direct(self):
@@ -470,7 +470,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         url = "/_matrix/client/r0/directory/list/room/%s" % self.direct_rooms[0]
         data = {"visibility": "public"}
 
-        request, channel = self.make_request("PUT", url, data, access_token=self.tok)
+        channel = self.make_request("PUT", url, data, access_token=self.tok)
         self.assertEqual(channel.code, 403, channel.result)
 
     def test_unrestricted(self):
@@ -549,7 +549,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         url = "/_matrix/client/r0/directory/list/room/%s" % self.unrestricted_room
         data = {"visibility": "public"}
 
-        request, channel = self.make_request("PUT", url, data, access_token=self.tok)
+        channel = self.make_request("PUT", url, data, access_token=self.tok)
         self.assertEqual(channel.code, 403, channel.result)
 
     def test_change_rules(self):
@@ -607,7 +607,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         url = "/_matrix/client/r0/directory/list/room/%s" % test_room_id
         data = {"visibility": "public"}
 
-        request, channel = self.make_request("PUT", url, data, access_token=self.tok)
+        channel = self.make_request("PUT", url, data, access_token=self.tok)
         self.assertEqual(channel.code, 200, channel.result)
 
         # Attempt to switch the room to "unrestricted"
@@ -1001,7 +1001,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         if power_levels_content_override:
             content["power_levels_content_override"] = power_levels_content_override
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", "/_matrix/client/r0/createRoom", content, access_token=self.tok,
         )
 
@@ -1011,7 +1011,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             return channel.json_body["room_id"]
 
     def current_rule_in_room(self, room_id):
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/_matrix/client/r0/rooms/%s/state/%s" % (room_id, ACCESS_RULES_TYPE),
             access_token=self.tok,
@@ -1022,7 +1022,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
 
     def change_rule_in_room(self, room_id, new_rule, expected_code=200):
         data = {"rule": new_rule}
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/rooms/%s/state/%s" % (room_id, ACCESS_RULES_TYPE),
             json.dumps(data),
@@ -1033,7 +1033,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
 
     def change_join_rule_in_room(self, room_id, new_join_rule, expected_code=200):
         data = {"join_rule": new_join_rule}
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/rooms/%s/state/%s" % (room_id, EventTypes.JoinRules),
             json.dumps(data),
@@ -1045,7 +1045,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
     def send_threepid_invite(self, address, room_id, expected_code=200):
         params = {"id_server": "testis", "medium": "email", "address": address}
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/%s/invite" % room_id,
             json.dumps(params),
@@ -1062,9 +1062,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             state_key,
         )
 
-        request, channel = self.make_request(
-            "PUT", path, json.dumps(body), access_token=tok
-        )
+        channel = self.make_request("PUT", path, json.dumps(body), access_token=tok)
 
         self.assertEqual(channel.code, expect_code, channel.result)
 
