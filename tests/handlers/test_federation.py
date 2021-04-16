@@ -126,7 +126,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             room_version,
         )
 
-        with LoggingContext(request="send_rejected"):
+        with LoggingContext("send_rejected"):
             d = run_in_background(self.handler.on_receive_pdu, OTHER_SERVER, ev)
         self.get_success(d)
 
@@ -178,7 +178,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             room_version,
         )
 
-        with LoggingContext(request="send_rejected"):
+        with LoggingContext("send_rejected"):
             d = run_in_background(self.handler.on_receive_pdu, OTHER_SERVER, ev)
         self.get_success(d)
 
@@ -198,7 +198,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
         # the auth code requires that a signature exists, but doesn't check that
         # signature... go figure.
         join_event.signatures[other_server] = {"x": "y"}
-        with LoggingContext(request="send_join"):
+        with LoggingContext("send_join"):
             d = run_in_background(
                 self.handler.on_send_join_request, other_server, join_event
             )
