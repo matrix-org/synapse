@@ -100,7 +100,13 @@ configuration file there, for example turnserver.conf.
 
         pwgen -s 64 1
 
-1.  Consider your security settings. TURN lets users request a relay which will
+2.  You will most likely want to configure coturn to write logs somewhere. The easiest way is normally to send them to the syslog:
+
+        syslog
+
+    (in which case, the logs will be available via journalctl -u coturn on a systemd system). Alternatively, coturn can be configured to write to a logfile - check the example config file supplied with coturn.
+
+3.  Consider your security settings. TURN lets users request a relay which will
     connect to arbitrary IP addresses and ports. The following configuration is
     suggested as a minimum starting point:
     
@@ -137,13 +143,35 @@ configuration file there, for example turnserver.conf.
         user-quota=12 # 4 streams per video call, so 12 streams = 3 simultaneous relayed calls per user.
         total-quota=1200 #total number of simultaneous calls
 
-1.  Ensure your firewall allows traffic into the TURN server on the ports
+4.  Also consider supporting TLS/DTLS. To do this, add the following settings to turnserver.conf:
+
+        # TLS certificates, including intermediate certs.
+        # For Let's Encrypt certificates, use `fullchain.pem` here.
+        cert=/path/to/fullchain.pem
+
+        # TLS private key file
+        pkey=/path/to/privkey.pem
+
+5.  Ensure your firewall allows traffic into the TURN server on the ports
     you've configured it to listen on (remember to allow both TCP and UDP TURN
     traffic), in this example 3478 (both UDP and TCP).
     Also allows UDP traffic on the specified port-range, in this example 49100-49500.
 
-1.  If you've configured coturn to support TLS/DTLS, generate or import your
+6.  If you've configured coturn to support TLS/DTLS, generate or import your
     private key and certificate.
+
+7. (Re)start the turn server:
+
+    If you used the Debian package (or have set up a systemd unit yourself):
+
+        systemctl restart coturn
+
+    If you installed from source:
+
+        bin/turnserver -o
+
+    For Docker instructions, see the run command above under "Docker"
+
 
 ## synapse Setup
 
@@ -169,17 +197,15 @@ Your home server configuration file needs the following extra keys:
     connect to arbitrary endpoints without having gone through a
     CAPTCHA or similar to register a real account.
 
-As an example, here is the relevant section of the config file for matrix.org:
+As an example, here is the relevant section of the config file for matrix.org.
+The turn_uris are appropriate for TURN servers listening on the default ports, with no TLS.
 
     turn_uris: [ "turn:turn.matrix.org:3478?transport=udp", "turn:turn.matrix.org:3478?transport=tcp" ]
     turn_shared_secret: n0t4ctuAllymatr1Xd0TorgSshar3d5ecret4obvIousreAsons
     turn_user_lifetime: 86400000
     turn_allow_guests: True
 
-After updating the homeserver configuration, you must restart synapse:
-
-    cd /where/you/run/synapse
-    ./synctl restart
+After updating the homeserver configuration, you must restart synapse.
 
 ..and your Home Server now supports VoIP relaying!
 
