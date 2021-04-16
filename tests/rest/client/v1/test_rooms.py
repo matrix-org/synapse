@@ -26,6 +26,7 @@ from mock import Mock
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.handlers.pagination import PurgeStatus
+from synapse.rest import admin
 from synapse.rest.client.v1 import directory, login, profile, room
 from synapse.rest.client.v2_alpha import account
 from synapse.types import JsonDict, RoomAlias, UserID
@@ -625,6 +626,7 @@ class RoomJoinRatelimitTestCase(RoomBase):
     user_id = "@sid1:red"
 
     servlets = [
+        admin.register_servlets,
         profile.register_servlets,
         room.register_servlets,
     ]
@@ -702,6 +704,20 @@ class RoomJoinRatelimitTestCase(RoomBase):
             for i in range(4):
                 request, channel = self.make_request("POST", path % room_id, {})
                 self.assertEquals(channel.code, 200)
+
+    @unittest.override_config(
+        {
+            "rc_joins": {"local": {"per_second": 0.5, "burst_count": 3}},
+            "auto_join_rooms": ["#room:red", "#room2:red", "#room3:red", "#room4:red"],
+            "autocreate_auto_join_rooms": True,
+        },
+    )
+    def test_autojoin_rooms(self):
+        user_id = self.register_user("testuser", "password")
+
+        # Check that the new user successfully joined the four rooms
+        rooms = self.get_success(self.hs.get_datastore().get_rooms_for_user(user_id))
+        self.assertEqual(len(rooms), 4)
 
 
 class RoomMessagesTestCase(RoomBase):

@@ -31,7 +31,9 @@ from synapse.api.errors import (
     MissingClientTokenError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.appservice import ApplicationService
 from synapse.events import EventBase
+from synapse.http.site import SynapseRequest
 from synapse.logging import opentracing as opentracing
 from synapse.storage.databases.main.registration import TokenLookupResult
 from synapse.types import StateMap, UserID
@@ -479,7 +481,7 @@ class Auth:
         now = self.hs.get_clock().time_msec()
         return now < expiry
 
-    def get_appservice_by_req(self, request):
+    def get_appservice_by_req(self, request: SynapseRequest) -> ApplicationService:
         token = self.get_access_token_from_request(request)
         service = self.store.get_app_service_by_token(token)
         if not service:

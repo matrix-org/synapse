@@ -1666,7 +1666,7 @@ class FederationHandler(BaseHandler):
 
         is_published = await self.store.is_room_published(event.room_id)
 
-        if not self.spam_checker.user_may_invite(
+        if not await self.spam_checker.user_may_invite(
             event.sender,
             event.state_key,
             None,

@@ -57,6 +57,38 @@ class DeviceWorkerStore(SQLBaseStore):
                 self._prune_old_outbound_device_pokes, 60 * 60 * 1000
             )
 
+    async def count_devices_by_users(self, user_ids: Optional[List[str]] = None) -> int:
+        """Retrieve number of all devices of given users.
+        Only returns number of devices that are not marked as hidden.
+
+        Args:
+            user_ids: The IDs of the users which owns devices
+        Returns:
+            Number of devices of this users.
+        """
+
+        def count_devices_by_users_txn(txn, user_ids):
+            sql = """
+                SELECT count(*)
+                FROM devices
+                WHERE
+                    hidden = '0' AND
+            """
+
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "user_id", user_ids
+            )
+
+            txn.execute(sql + clause, args)
+            return txn.fetchone()[0]
+
+        if not user_ids:
+            return 0
+
+        return await self.db_pool.runInteraction(
+            "count_devices_by_users", count_devices_by_users_txn, user_ids
+        )
+
     async def get_device(self, user_id: str, device_id: str) -> Dict[str, Any]:
         """Retrieve a device. Only returns devices that are not marked as
         hidden.

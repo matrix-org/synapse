@@ -15,10 +15,12 @@
 # limitations under the License.
 
 import collections
+import inspect
 import logging
 from contextlib import contextmanager
 from typing import (
     Any,
+    Awaitable,
     Callable,
     Dict,
     Hashable,
@@ -542,11 +544,11 @@ class DoneAwaitable:
         raise StopIteration(self.value)
 
 
-def maybe_awaitable(value):
+def maybe_awaitable(value: Union[Awaitable[R], R]) -> Awaitable[R]:
     """Convert a value to an awaitable if not already an awaitable.
     """
-
-    if hasattr(value, "__await__"):
+    if inspect.isawaitable(value):
+        assert isinstance(value, Awaitable)
         return value
 
     return DoneAwaitable(value)

@@ -202,7 +202,7 @@ class RegistrationHandler(BaseHandler):
         """
         self.check_registration_ratelimit(address)
 
-        result = self.spam_checker.check_registration_for_spam(
+        result = await self.spam_checker.check_registration_for_spam(
             threepid, localpart, user_agent_ips or [],
         )
 

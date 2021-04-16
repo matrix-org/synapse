@@ -245,6 +245,8 @@ def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerConfig]):
         # Set up the SIGHUP machinery.
         if hasattr(signal, "SIGHUP"):
 
+            reactor = hs.get_reactor()
+
             @wrap_as_background_process("sighup")
             def handle_sighup(*args, **kwargs):
                 # Tell systemd our state, if we're using it. This will silently fail if
@@ -260,7 +262,9 @@ def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerConfig]):
             # is so that we're in a sane state, e.g. flushing the logs may fail
             # if the sighup happens in the middle of writing a log entry.
             def run_sighup(*args, **kwargs):
-                hs.get_clock().call_later(0, handle_sighup, *args, **kwargs)
+                # `callFromThread` should be "signal safe" as well as thread
+                # safe.
+                reactor.callFromThread(handle_sighup, *args, **kwargs)
 
             signal.signal(signal.SIGHUP, run_sighup)
 

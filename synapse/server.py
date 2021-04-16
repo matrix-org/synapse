@@ -632,7 +632,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return StatsHandler(self)
 
     @cache_in_self
-    def get_spam_checker(self):
+    def get_spam_checker(self) -> SpamChecker:
         return SpamChecker(self)
 
     @cache_in_self

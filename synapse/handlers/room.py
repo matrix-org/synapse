@@ -368,7 +368,7 @@ class RoomCreationHandler(BaseHandler):
         else:
             is_requester_admin = await self.auth.is_server_admin(requester.user)
 
-        if not is_requester_admin and not self.spam_checker.user_may_create_room(
+        if not is_requester_admin and not await self.spam_checker.user_may_create_room(
             user_id, invite_list=[], third_party_invite_list=[], cloning=True
         ):
             raise SynapseError(403, "You are not permitted to create rooms")
@@ -452,6 +452,7 @@ class RoomCreationHandler(BaseHandler):
             invite_list=[],
             initial_state=initial_state,
             creation_content=creation_content,
+            ratelimit=False,
         )
 
         # Transfer membership events
@@ -623,7 +624,7 @@ class RoomCreationHandler(BaseHandler):
         invite_list = config.get("invite", [])
         invite_3pid_list = config.get("invite_3pid", [])
 
-        if not is_requester_admin and not self.spam_checker.user_may_create_room(
+        if not is_requester_admin and not await self.spam_checker.user_may_create_room(
             user_id,
             invite_list=invite_list,
             third_party_invite_list=invite_3pid_list,
@@ -753,6 +754,7 @@ class RoomCreationHandler(BaseHandler):
             room_alias=room_alias,
             power_level_content_override=power_level_content_override,
             creator_join_profile=creator_join_profile,
+            ratelimit=ratelimit,
         )
 
         if "name" in config:
@@ -858,6 +860,7 @@ class RoomCreationHandler(BaseHandler):
         room_alias: Optional[RoomAlias] = None,
         power_level_content_override: Optional[JsonDict] = None,
         creator_join_profile: Optional[JsonDict] = None,
+        ratelimit: bool = True,
     ) -> int:
         """Sends the initial events into a new room.
 
@@ -904,7 +907,7 @@ class RoomCreationHandler(BaseHandler):
             creator.user,
             room_id,
             "join",
-            ratelimit=False,
+            ratelimit=ratelimit,
             content=creator_join_profile,
             new_room=True,
         )

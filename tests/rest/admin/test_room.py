@@ -1084,6 +1084,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.assertIn("canonical_alias", channel.json_body)
         self.assertIn("joined_members", channel.json_body)
         self.assertIn("joined_local_members", channel.json_body)
+        self.assertIn("joined_local_devices", channel.json_body)
         self.assertIn("version", channel.json_body)
         self.assertIn("creator", channel.json_body)
         self.assertIn("encryption", channel.json_body)
@@ -1095,6 +1096,39 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.assertIn("state_events", channel.json_body)
 
         self.assertEqual(room_id_1, channel.json_body["room_id"])
+
+    def test_single_room_devices(self):
+        """Test that `joined_local_devices` can be requested correctly"""
+        room_id_1 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+
+        url = "/_synapse/admin/v1/rooms/%s" % (room_id_1,)
+        request, channel = self.make_request(
+            "GET", url.encode("ascii"), access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(1, channel.json_body["joined_local_devices"])
+
+        # Have another user join the room
+        user_1 = self.register_user("foo", "pass")
+        user_tok_1 = self.login("foo", "pass")
+        self.helper.join(room_id_1, user_1, tok=user_tok_1)
+
+        url = "/_synapse/admin/v1/rooms/%s" % (room_id_1,)
+        request, channel = self.make_request(
+            "GET", url.encode("ascii"), access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(2, channel.json_body["joined_local_devices"])
+
+        # leave room
+        self.helper.leave(room_id_1, self.admin_user, tok=self.admin_user_tok)
+        self.helper.leave(room_id_1, user_1, tok=user_tok_1)
+        url = "/_synapse/admin/v1/rooms/%s" % (room_id_1,)
+        request, channel = self.make_request(
+            "GET", url.encode("ascii"), access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(0, channel.json_body["joined_local_devices"])
 
     def test_room_members(self):
         """Test that room members can be requested correctly"""
