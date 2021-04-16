@@ -199,7 +199,7 @@ def run_as_background_process(desc: str, func, *args, bg_start_span=True, **kwar
         _background_process_start_count.labels(desc).inc()
         _background_process_in_flight_count.labels(desc).inc()
 
-        with BackgroundProcessLoggingContext(desc, count) as context:
+        with BackgroundProcessLoggingContext("%s-%s" % (desc, count)) as context:
             try:
                 ctx = noop_context_manager()
                 if bg_start_span:
@@ -242,18 +242,11 @@ class BackgroundProcessLoggingContext(LoggingContext):
     processes.
     """
 
-    __slots__ = ["_id", "_proc"]
+    __slots__ = ["_proc"]
 
-    def __init__(self, name: str, id: Optional[Union[int, str]] = None):
+    def __init__(self, name: str):
         super().__init__(name)
-        self._id = id
-
         self._proc = _BackgroundProcess(name, self)
-
-    def __str__(self) -> str:
-        if self._id is not None:
-            return "%s-%s" % (self.name, self._id)
-        return "%s@%x" % (self.name, id(self))
 
     def start(self, rusage: "Optional[resource._RUsage]"):
         """Log context has started running (again)."""

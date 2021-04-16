@@ -119,7 +119,7 @@ class Measure:
             assert isinstance(curr_context, LoggingContext)
             parent_context = curr_context
         self._logging_context = LoggingContext(
-            "Measure[%s]" % (self.name,), parent_context
+            self.name, parent_context
         )
         self.start = None
 
