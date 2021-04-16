@@ -217,54 +217,54 @@ but get stuck at "call connecting". Unfortunately, troubleshooting this can be t
 
 Here are a few things to try:
 
-    Check that you have opened your firewall to allow TCP and UDP traffic to the TURN ports (normally 3478 and 5479).
+Check that you have opened your firewall to allow TCP and UDP traffic to the TURN ports (normally 3478 and 5479).
 
-    Check that you have opened your firewall to allow UDP traffic to the UDP relay ports (49152-65535 by default).
+Check that you have opened your firewall to allow UDP traffic to the UDP relay ports (49152-65535 by default).
 
-    Some WebRTC implementations (notably, that of Google Chrome) appear to get confused by TURN servers which are
-    reachable over IPv6 (this appears to be an unexpected side-effect of its handling of multiple IP addresses as
-    defined by draft-ietf-rtcweb-ip-handling).
+Some WebRTC implementations (notably, that of Google Chrome) appear to get confused by TURN servers which are
+reachable over IPv6 (this appears to be an unexpected side-effect of its handling of multiple IP addresses as
+defined by draft-ietf-rtcweb-ip-handling).
 
-    Try removing any AAAA records for your TURN server, so that it is only reachable over IPv4.
+Try removing any AAAA records for your TURN server, so that it is only reachable over IPv4.
 
-    Enable more verbose logging in coturn via the verbose setting:
+Enable more verbose logging in coturn via the verbose setting:
 
     verbose
 
-    ... and then see if there are any clues in its logs.
+... and then see if there are any clues in its logs.
 
-    If you are using a browser-based client under Chrome, check chrome://webrtc-internals/ for insights into the
-    internals of the negotiation. On Firefox, check the "Connection Log" on about:webrtc.
+If you are using a browser-based client under Chrome, check chrome://webrtc-internals/ for insights into the
+internals of the negotiation. On Firefox, check the "Connection Log" on about:webrtc.
 
-    (Understanding the output is beyond the scope of this document!)
+(Understanding the output is beyond the scope of this document!)
 
-    There is a WebRTC test tool at https://webrtc.github.io/samples/src/content/peerconnection/trickle-ice/
+There is a WebRTC test tool at https://webrtc.github.io/samples/src/content/peerconnection/trickle-ice/
     
-    To use it, you will need a username/password for your TURN server. You can either:
+To use it, you will need a username/password for your TURN server. You can either:
 
-        look for the GET /_matrix/client/r0/voip/turnServer request made by a matrix client to your homeserver in your browser's network inspector.
-        In the response you should see username and password. Or:
+look for the GET /_matrix/client/r0/voip/turnServer request made by a matrix client to your homeserver in your browser's network inspector.
+In the response you should see username and password. Or:
 
-        Use the following shell commands:
+Use the following shell commands:
 
-        secret=staticAuthSecretHere
+    secret=staticAuthSecretHere
 
-        u=$((`date +%s` + 3600)):test
-        p=$(echo -n $u | openssl dgst -hmac $secret -sha1 -binary | base64)
-        echo -e "username: $u\npassword: $p"
+    u=$((`date +%s` + 3600)):test
+    p=$(echo -n $u | openssl dgst -hmac $secret -sha1 -binary | base64)
+    echo -e "username: $u\npassword: $p"
 
-        Or:
+Or:
 
-        Temporarily configure coturn to accept a static username/password. To do this, comment out use-auth-secret
-        and static-auth-secret and add the following:
+Temporarily configure coturn to accept a static username/password. To do this, comment out use-auth-secret
+and static-auth-secret and add the following:
 
-        lt-cred-mech
-        user=username:password
+    lt-cred-mech
+    user=username:password
 
-        Note: these settings will not take effect unless use-auth-secret and static-auth-secret are disabled.
+Note: these settings will not take effect unless use-auth-secret and static-auth-secret are disabled.
 
-        Restart coturn after changing the configuration file.
+Restart coturn after changing the configuration file.
 
-        Remember to restore the original settings to go back to testing with Matrix clients!
+Remember to restore the original settings to go back to testing with Matrix clients!
 
-    If the TURN server is working correctly, you should see at least one relay entry in the results.
+If the TURN server is working correctly, you should see at least one relay entry in the results.
