@@ -382,6 +382,28 @@ class HomeServer(metaclass=abc.ABCMeta):
         return MatrixFederationHttpClient(self, tls_client_options_factory)
 
     @cache_in_self
+    def get_proxied_blacklisted_http_client(self) -> SimpleHttpClient:
+        """
+        An HTTP client that uses configured HTTP(S) proxies and blacklists IPs
+        based on the IP range blacklist.
+        """
+        return SimpleHttpClient(
+            self,
+            ip_blacklist=self.config.ip_range_blacklist,
+            use_proxy=True,
+        )
+
+    @cache_in_self
+    def get_federation_http_client(self) -> MatrixFederationHttpClient:
+        """
+        An HTTP client for federation.
+        """
+        tls_client_options_factory = context_factory.FederationPolicyForHTTPS(
+            self.config
+        )
+        return MatrixFederationHttpClient(self, tls_client_options_factory)
+
+    @cache_in_self
     def get_room_creation_handler(self) -> RoomCreationHandler:
         return RoomCreationHandler(self)
 

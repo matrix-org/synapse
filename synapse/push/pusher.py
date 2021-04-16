@@ -14,25 +14,31 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 
+from synapse.push import Pusher
 from synapse.push.emailpusher import EmailPusher
+from synapse.push.httppusher import HttpPusher
 from synapse.push.mailer import Mailer
 
-from .httppusher import HttpPusher
+if TYPE_CHECKING:
+    from synapse.app.homeserver import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
 class PusherFactory:
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.config = hs.config
 
-        self.pusher_types = {"http": HttpPusher}
+        self.pusher_types = {
+            "http": HttpPusher
+        }  # type: Dict[str, Callable[[HomeServer, dict], Pusher]]
 
         logger.info("email enable notifs: %r", hs.config.email_enable_notifs)
         if hs.config.email_enable_notifs:
-            self.mailers = {}  # app_name -> Mailer
+            self.mailers = {}  # type: Dict[str, Mailer]
 
             self._notif_template_html = hs.config.email_notif_template_html
             self._notif_template_text = hs.config.email_notif_template_text
@@ -41,7 +47,7 @@ class PusherFactory:
 
             logger.info("defined email pusher type")
 
-    def create_pusher(self, pusherdict):
+    def create_pusher(self, pusherdict: Dict[str, Any]) -> Optional[Pusher]:
         kind = pusherdict["kind"]
         f = self.pusher_types.get(kind, None)
         if not f:
@@ -49,7 +55,9 @@ class PusherFactory:
         logger.debug("creating %s pusher for %r", kind, pusherdict)
         return f(self.hs, pusherdict)
 
-    def _create_email_pusher(self, _hs, pusherdict):
+    def _create_email_pusher(
+        self, _hs: "HomeServer", pusherdict: Dict[str, Any]
+    ) -> EmailPusher:
         app_name = self._app_name_from_pusherdict(pusherdict)
         mailer = self.mailers.get(app_name)
         if not mailer:
@@ -62,7 +70,7 @@ class PusherFactory:
             self.mailers[app_name] = mailer
         return EmailPusher(self.hs, pusherdict, mailer)
 
-    def _app_name_from_pusherdict(self, pusherdict):
+    def _app_name_from_pusherdict(self, pusherdict: Dict[str, Any]) -> str:
         data = pusherdict["data"]
 
         if isinstance(data, dict):

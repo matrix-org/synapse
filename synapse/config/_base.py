@@ -24,7 +24,7 @@ from collections import OrderedDict
 from hashlib import sha256
 from io import open as io_open
 from textwrap import dedent
-from typing import Any, Callable, List, MutableMapping, Optional
+from typing import Any, Callable, Iterable, List, MutableMapping, Optional
 
 import attr
 import jinja2
@@ -33,7 +33,17 @@ import yaml
 
 
 class ConfigError(Exception):
-    pass
+    """Represents a problem parsing the configuration
+
+    Args:
+        msg:  A textual description of the error.
+        path: Where appropriate, an indication of where in the configuration
+           the problem lies.
+    """
+
+    def __init__(self, msg: str, path: Optional[Iterable[str]] = None):
+        self.msg = msg
+        self.path = path
 
 
 # We split these messages out to allow packages to override with package

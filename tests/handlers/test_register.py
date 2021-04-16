@@ -580,7 +580,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
         # Mock Synapse's http json post method to check for the internal bind call
         post_json_get_json = Mock(return_value=make_awaitable(None))
-        self.hs.get_simple_http_client().post_json_get_json = post_json_get_json
+        self.hs.get_identity_handler().http_client.post_json_get_json = post_json_get_json
 
         # Retrieve a UIA session ID
         channel = self.uia_register(

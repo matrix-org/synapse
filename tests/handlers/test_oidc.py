@@ -17,29 +17,14 @@ from urllib.parse import parse_qs, urlparse
 
 from mock import Mock, patch
 
-import attr
 import pymacaroons
-
-from twisted.python.failure import Failure
-from twisted.web._newclient import ResponseDone
 
 from synapse.handlers.oidc_handler import OidcError, OidcMappingProvider
 from synapse.handlers.sso import MappingException
 from synapse.types import UserID
 
+from tests.test_utils import FakeResponse
 from tests.unittest import HomeserverTestCase, override_config
-
-
-@attr.s
-class FakeResponse:
-    code = attr.ib()
-    body = attr.ib()
-    phrase = attr.ib()
-
-    def deliverBody(self, protocol):
-        protocol.dataReceived(self.body)
-        protocol.connectionLost(Failure(ResponseDone()))
-
 
 # These are a few constants that are used as config parameters in the tests.
 ISSUER = "https://issuer/"

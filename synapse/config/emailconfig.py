@@ -390,9 +390,8 @@ class EmailConfig(Config):
           #validation_token_lifetime: 15m
 
           # Directory in which Synapse will try to find the template files below.
-          # If not set, default templates from within the Synapse package will be used.
-          #
-          # Do not uncomment this setting unless you want to customise the templates.
+          # If not set, or the files named below are not found within the template
+          # directory, default templates from within the Synapse package will be used.
           #
           # Synapse will look for the following templates in this directory:
           #

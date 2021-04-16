@@ -155,6 +155,11 @@ def add_file_headers(request, media_type, file_size, upload_name):
     request.setHeader(b"Cache-Control", b"public,max-age=86400,s-maxage=86400")
     request.setHeader(b"Content-Length", b"%d" % (file_size,))
 
+    # Tell web crawlers to not index, archive, or follow links in media. This
+    # should help to prevent things in the media repo from showing up in web
+    # search results.
+    request.setHeader(b"X-Robots-Tag", "noindex, nofollow, noarchive, noimageindex")
+
 
 # separators as defined in RFC2616. SP and HT are handled separately.
 # see _can_encode_filename_as_token.

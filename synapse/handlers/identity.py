@@ -47,7 +47,7 @@ class IdentityHandler(BaseHandler):
         super().__init__(hs)
 
         # An HTTP client for contacting trusted URLs.
-        self.http_client = hs.get_simple_http_client()
+        self.http_client = SimpleHttpClient(hs)
         # An HTTP client for contacting identity servers specified by clients.
         self.blacklisting_http_client = SimpleHttpClient(
             hs, ip_blacklist=hs.config.federation_ip_range_blacklist

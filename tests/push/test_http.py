@@ -18,6 +18,7 @@ from twisted.internet.defer import Deferred
 
 import synapse.rest.admin
 from synapse.logging.context import make_deferred_yieldable
+from synapse.push import PusherConfigException
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import receipts
 
@@ -34,6 +35,11 @@ class HTTPPusherTests(HomeserverTestCase):
     user_id = True
     hijack_auth = False
 
+    def default_config(self):
+        config = super().default_config()
+        config["start_pushers"] = True
+        return config
+
     def make_homeserver(self, reactor, clock):
         self.push_attempts = []
 
@@ -46,14 +52,48 @@ class HTTPPusherTests(HomeserverTestCase):
 
         m.post_json_get_json = post_json_get_json
 
-        config = self.default_config()
-        config["start_pushers"] = True
-
-        hs = self.setup_test_homeserver(
-            config=config, proxied_blacklisted_http_client=m
-        )
+        hs = self.setup_test_homeserver(proxied_blacklisted_http_client=m)
 
         return hs
+
+    def test_invalid_configuration(self):
+        """Invalid push configurations should be rejected."""
+        # Register the user who gets notified
+        user_id = self.register_user("user", "pass")
+        access_token = self.login("user", "pass")
+
+        # Register the pusher
+        user_tuple = self.get_success(
+            self.hs.get_datastore().get_user_by_access_token(access_token)
+        )
+        token_id = user_tuple.token_id
+
+        def test_data(data):
+            self.get_failure(
+                self.hs.get_pusherpool().add_pusher(
+                    user_id=user_id,
+                    access_token=token_id,
+                    kind="http",
+                    app_id="m.http",
+                    app_display_name="HTTP Push Notifications",
+                    device_display_name="pushy push",
+                    pushkey="a@example.com",
+                    lang=None,
+                    data=data,
+                ),
+                PusherConfigException,
+            )
+
+        # Data must be provided with a URL.
+        test_data(None)
+        test_data({})
+        test_data({"url": 1})
+        # A bare domain name isn't accepted.
+        test_data({"url": "example.com"})
+        # A URL without a path isn't accepted.
+        test_data({"url": "http://example.com"})
+        # A url with an incorrect path isn't accepted.
+        test_data({"url": "http://example.com/foo"})
 
     def test_sends_http(self):
         """
@@ -84,7 +124,7 @@ class HTTPPusherTests(HomeserverTestCase):
                 device_display_name="pushy push",
                 pushkey="a@example.com",
                 lang=None,
-                data={"url": "example.com"},
+                data={"url": "http://example.com/_matrix/push/v1/notify"},
             )
         )
 
@@ -119,7 +159,9 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # One push was attempted to be sent -- it'll be the first message
         self.assertEqual(len(self.push_attempts), 1)
-        self.assertEqual(self.push_attempts[0][1], "example.com")
+        self.assertEqual(
+            self.push_attempts[0][1], "http://example.com/_matrix/push/v1/notify"
+        )
         self.assertEqual(
             self.push_attempts[0][2]["notification"]["content"]["body"], "Hi!"
         )
@@ -139,7 +181,9 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Now it'll try and send the second push message, which will be the second one
         self.assertEqual(len(self.push_attempts), 2)
-        self.assertEqual(self.push_attempts[1][1], "example.com")
+        self.assertEqual(
+            self.push_attempts[1][1], "http://example.com/_matrix/push/v1/notify"
+        )
         self.assertEqual(
             self.push_attempts[1][2]["notification"]["content"]["body"], "There!"
         )
@@ -196,7 +240,7 @@ class HTTPPusherTests(HomeserverTestCase):
                 device_display_name="pushy push",
                 pushkey="a@example.com",
                 lang=None,
-                data={"url": "example.com"},
+                data={"url": "http://example.com/_matrix/push/v1/notify"},
             )
         )
 
@@ -232,7 +276,9 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Check our push made it with high priority
         self.assertEqual(len(self.push_attempts), 1)
-        self.assertEqual(self.push_attempts[0][1], "example.com")
+        self.assertEqual(
+            self.push_attempts[0][1], "http://example.com/_matrix/push/v1/notify"
+        )
         self.assertEqual(self.push_attempts[0][2]["notification"]["prio"], "high")
 
         # Add yet another person — we want to make this room not a 1:1
@@ -270,7 +316,9 @@ class HTTPPusherTests(HomeserverTestCase):
         # Advance time a bit, so the pusher will register something has happened
         self.pump()
         self.assertEqual(len(self.push_attempts), 2)
-        self.assertEqual(self.push_attempts[1][1], "example.com")
+        self.assertEqual(
+            self.push_attempts[1][1], "http://example.com/_matrix/push/v1/notify"
+        )
         self.assertEqual(self.push_attempts[1][2]["notification"]["prio"], "high")
 
     def test_sends_high_priority_for_one_to_one_only(self):
@@ -312,7 +360,7 @@ class HTTPPusherTests(HomeserverTestCase):
                 device_display_name="pushy push",
                 pushkey="a@example.com",
                 lang=None,
-                data={"url": "example.com"},
+                data={"url": "http://example.com/_matrix/push/v1/notify"},
             )
         )
 
@@ -328,7 +376,9 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Check our push made it with high priority — this is a one-to-one room
         self.assertEqual(len(self.push_attempts), 1)
-        self.assertEqual(self.push_attempts[0][1], "example.com")
+        self.assertEqual(
+            self.push_attempts[0][1], "http://example.com/_matrix/push/v1/notify"
+        )
         self.assertEqual(self.push_attempts[0][2]["notification"]["prio"], "high")
 
         # Yet another user joins
@@ -347,7 +397,9 @@ class HTTPPusherTests(HomeserverTestCase):
         # Advance time a bit, so the pusher will register something has happened
         self.pump()
         self.assertEqual(len(self.push_attempts), 2)
-        self.assertEqual(self.push_attempts[1][1], "example.com")
+        self.assertEqual(
+            self.push_attempts[1][1], "http://example.com/_matrix/push/v1/notify"
+        )
 
         # check that this is high-priority
         self.assertEqual(self.push_attempts[1][2]["notification"]["prio"], "high")
@@ -394,7 +446,7 @@ class HTTPPusherTests(HomeserverTestCase):
                 device_display_name="pushy push",
                 pushkey="a@example.com",
                 lang=None,
-                data={"url": "example.com"},
+                data={"url": "http://example.com/_matrix/push/v1/notify"},
             )
         )
 
@@ -410,7 +462,9 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Check our push made it with high priority
         self.assertEqual(len(self.push_attempts), 1)
-        self.assertEqual(self.push_attempts[0][1], "example.com")
+        self.assertEqual(
+            self.push_attempts[0][1], "http://example.com/_matrix/push/v1/notify"
+        )
         self.assertEqual(self.push_attempts[0][2]["notification"]["prio"], "high")
 
         # Send another event, this time with no mention
@@ -419,7 +473,9 @@ class HTTPPusherTests(HomeserverTestCase):
         # Advance time a bit, so the pusher will register something has happened
         self.pump()
         self.assertEqual(len(self.push_attempts), 2)
-        self.assertEqual(self.push_attempts[1][1], "example.com")
+        self.assertEqual(
+            self.push_attempts[1][1], "http://example.com/_matrix/push/v1/notify"
+        )
 
         # check that this is high-priority
         self.assertEqual(self.push_attempts[1][2]["notification"]["prio"], "high")
@@ -467,7 +523,7 @@ class HTTPPusherTests(HomeserverTestCase):
                 device_display_name="pushy push",
                 pushkey="a@example.com",
                 lang=None,
-                data={"url": "example.com"},
+                data={"url": "http://example.com/_matrix/push/v1/notify"},
             )
         )
 
@@ -487,7 +543,9 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Check our push made it with high priority
         self.assertEqual(len(self.push_attempts), 1)
-        self.assertEqual(self.push_attempts[0][1], "example.com")
+        self.assertEqual(
+            self.push_attempts[0][1], "http://example.com/_matrix/push/v1/notify"
+        )
         self.assertEqual(self.push_attempts[0][2]["notification"]["prio"], "high")
 
         # Send another event, this time as someone without the power of @room
@@ -498,7 +556,9 @@ class HTTPPusherTests(HomeserverTestCase):
         # Advance time a bit, so the pusher will register something has happened
         self.pump()
         self.assertEqual(len(self.push_attempts), 2)
-        self.assertEqual(self.push_attempts[1][1], "example.com")
+        self.assertEqual(
+            self.push_attempts[1][1], "http://example.com/_matrix/push/v1/notify"
+        )
 
         # check that this is high-priority
         self.assertEqual(self.push_attempts[1][2]["notification"]["prio"], "high")
@@ -572,7 +632,7 @@ class HTTPPusherTests(HomeserverTestCase):
                 device_display_name="pushy push",
                 pushkey="a@example.com",
                 lang=None,
-                data={"url": "example.com"},
+                data={"url": "http://example.com/_matrix/push/v1/notify"},
             )
         )
 
@@ -591,7 +651,9 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Check our push made it
         self.assertEqual(len(self.push_attempts), 1)
-        self.assertEqual(self.push_attempts[0][1], "example.com")
+        self.assertEqual(
+            self.push_attempts[0][1], "http://example.com/_matrix/push/v1/notify"
+        )
 
         # Check that the unread count for the room is 0
         #

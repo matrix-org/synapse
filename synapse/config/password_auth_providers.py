@@ -36,7 +36,7 @@ class PasswordAuthProviderConfig(Config):
             providers.append({"module": LDAP_PROVIDER, "config": ldap_config})
 
         providers.extend(config.get("password_providers") or [])
-        for provider in providers:
+        for i, provider in enumerate(providers):
             mod_name = provider["module"]
 
             # This is for backwards compat when the ldap auth provider resided
@@ -45,7 +45,8 @@ class PasswordAuthProviderConfig(Config):
                 mod_name = LDAP_PROVIDER
 
             (provider_class, provider_config) = load_module(
-                {"module": mod_name, "config": provider["config"]}
+                {"module": mod_name, "config": provider["config"]},
+                ("password_providers", "<item %i>" % i),
             )
 
             self.password_providers.append((provider_class, provider_config))

@@ -69,7 +69,8 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         python3-setuptools \
         python3-venv \
         sqlite3 \
-        libpq-dev
+        libpq-dev \
+        xmlsec1
 
 COPY --from=builder /dh-virtualenv_1.2~dev-1_all.deb /
 
