@@ -134,13 +134,24 @@ class AccountValidityConfig(Config):
           #template_dir: "res/templates"
 
           # File within 'template_dir' giving the HTML to be displayed to the user after
-          # they successfully renewed their account. If not set, default text is used.
+          # they successfully renewed their account.
+          #
+          # If not set, the file is assumed to be named "account_renewed.html".
           #
           #account_renewed_html_path: "account_renewed.html"
 
+          # File within 'template_dir' giving the HTML to be displayed to the user if
+          # they attempt to renew their account with a token that is valid, but that
+          # has already been used. The account is not renewed again in this case.
+          #
+          # If not set, the file is assumed to be named "account_previously_renewed.html".
+          #
+          #account_previously_renewed_html_path: "account_previously_renewed.html"
+
           # File within 'template_dir' giving the HTML to be displayed when the user
-          # tries to renew an account with an invalid renewal token. If not set,
-          # default text is used.
+          # tries to renew an account with an invalid renewal token.
+          #
+          # If not set, the file is assumed to be named "invalid_token.html".
           #
           #invalid_token_html_path: "invalid_token.html"
         """
