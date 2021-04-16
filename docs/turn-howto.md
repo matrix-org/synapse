@@ -186,11 +186,59 @@ After updating the homeserver configuration, you must restart synapse:
 
 # Troubleshooting
 
-1. Start with disabling the client setting "Use fallback Voip server"
-   to make sure you're using your own TURN server.
-2. Clear client caches
-3. Run the TURN server with the 'verbose' option to get more verbose
-   logging and check what's happening
-4. Last resort is always running a tcpdump on the TURN server with
-   a udp filter and follow traffic flows (both control on 3478 as
-   well as media streams)
+The normal symptoms of a misconfigured TURN server are that calls between devices on different networks ring,
+but get stuck at "call connecting". Unfortunately, troubleshooting this can be tricky.
+
+Here are a few things to try:
+
+    Check that you have opened your firewall to allow TCP and UDP traffic to the TURN ports (normally 3478 and 5479).
+
+    Check that you have opened your firewall to allow UDP traffic to the UDP relay ports (49152-65535 by default).
+
+    Some WebRTC implementations (notably, that of Google Chrome) appear to get confused by TURN servers which are
+    reachable over IPv6 (this appears to be an unexpected side-effect of its handling of multiple IP addresses as
+    defined by draft-ietf-rtcweb-ip-handling).
+
+    Try removing any AAAA records for your TURN server, so that it is only reachable over IPv4.
+
+    Enable more verbose logging in coturn via the verbose setting:
+
+    verbose
+
+    ... and then see if there are any clues in its logs.
+
+    If you are using a browser-based client under Chrome, check chrome://webrtc-internals/ for insights into the
+    internals of the negotiation. On Firefox, check the "Connection Log" on about:webrtc.
+
+    (Understanding the output is beyond the scope of this document!)
+
+    There is a WebRTC test tool at https://webrtc.github.io/samples/src/content/peerconnection/trickle-ice/
+    
+    To use it, you will need a username/password for your TURN server. You can either:
+
+        look for the GET /_matrix/client/r0/voip/turnServer request made by a matrix client to your homeserver in your browser's network inspector.
+        In the response you should see username and password. Or:
+
+        Use the following shell commands:
+
+        secret=staticAuthSecretHere
+
+        u=$((`date +%s` + 3600)):test
+        p=$(echo -n $u | openssl dgst -hmac $secret -sha1 -binary | base64)
+        echo -e "username: $u\npassword: $p"
+
+        Or:
+
+        Temporarily configure coturn to accept a static username/password. To do this, comment out use-auth-secret
+        and static-auth-secret and add the following:
+
+        lt-cred-mech
+        user=username:password
+
+        Note: these settings will not take effect unless use-auth-secret and static-auth-secret are disabled.
+
+        Restart coturn after changing the configuration file.
+
+        Remember to restore the original settings to go back to testing with Matrix clients!
+
+    If the TURN server is working correctly, you should see at least one relay entry in the results.
