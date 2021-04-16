@@ -48,7 +48,7 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
         self.user_id = self.register_user("user", "pass")
         self.access_token = self.login("user", "pass")
 
-        self.reactor.lookups["example.com"] = "127.0.0.2"
+        self.reactor.lookups["example.com"] = "1.2.3.4"
 
     def default_config(self):
         conf = super().default_config()

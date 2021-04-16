@@ -385,10 +385,11 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_proxied_blacklisted_http_client(self) -> SimpleHttpClient:
         """
         An HTTP client that uses configured HTTP(S) proxies and blacklists IPs
-        based on the IP range blacklist.
+        based on the IP range blacklist/whitelist.
         """
         return SimpleHttpClient(
             self,
+            ip_whitelist=self.config.ip_range_whitelist,
             ip_blacklist=self.config.ip_range_blacklist,
             use_proxy=True,
         )

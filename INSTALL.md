@@ -557,10 +557,9 @@ This is critical from a security perspective to stop arbitrary Matrix users
 spidering 'internal' URLs on your network. At the very least we recommend that
 your loopback and RFC1918 IP addresses are blacklisted.
 
-This also requires the optional `lxml` and `netaddr` python dependencies to be
-installed. This in turn requires the `libxml2` library to be available - on
-Debian/Ubuntu this means `apt-get install libxml2-dev`, or equivalent for
-your OS.
+This also requires the optional `lxml` python dependency to be  installed. This
+in turn requires the `libxml2` library to be available - on  Debian/Ubuntu this
+means `apt-get install libxml2-dev`, or equivalent for your OS.
 
 # Troubleshooting Installation
 
