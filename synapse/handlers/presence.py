@@ -123,6 +123,7 @@ class BasePresenceHandler(abc.ABC):
     def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
+        self.state = hs.get_state_handler()
 
         self._busy_presence_enabled = hs.config.experimental.msc3026_enabled
 
@@ -263,6 +264,10 @@ class WorkerPresenceHandler(BasePresenceHandler):
         self.hs = hs
         self.is_mine_id = hs.is_mine_id
 
+        self._federation = None
+        if hs.should_send_federation():
+            self._federation = hs.get_federation_sender()
+
         self.presence_router = hs.get_presence_router()
         self._presence_enabled = hs.config.use_presence
 
@@ -388,6 +393,20 @@ class WorkerPresenceHandler(BasePresenceHandler):
             users=users_to_states.keys(),
         )
 
+        # If this is a federation sender, notify about presence updates.
+        if not self._federation:
+            return
+
+        hosts_and_states = await get_interested_remotes(
+            self.store,
+            self.presence_router,
+            states,
+            self.state,
+        )
+
+        for destinations, states in hosts_and_states:
+            self._federation.send_presence_to_destinations(states, destinations)
+
     async def process_replication_rows(self, token, rows):
         states = [
             UserPresenceState(
@@ -464,9 +483,10 @@ class PresenceHandler(BasePresenceHandler):
         self.wheel_timer = WheelTimer()
         self.notifier = hs.get_notifier()
         self.federation = hs.get_federation_sender()
-        self.state = hs.get_state_handler()
         self.presence_router = hs.get_presence_router()
         self._presence_enabled = hs.config.use_presence
+
+        self._send_federation = hs.should_send_federation()
 
         federation_registry = hs.get_federation_registry()
 
@@ -680,7 +700,15 @@ class PresenceHandler(BasePresenceHandler):
             if to_federation_ping:
                 federation_presence_out_counter.inc(len(to_federation_ping))
 
-                await self._push_to_remotes(to_federation_ping.values())
+                hosts_and_states = await get_interested_remotes(
+                    self.store,
+                    self.presence_router,
+                    list(to_federation_ping.values()),
+                    self.state,
+                )
+
+                for destinations, states in hosts_and_states:
+                    self.federation.send_presence_to_destinations(states, destinations)
 
     async def _handle_timeouts(self):
         """Checks the presence of users that have timed out and updates as
@@ -920,14 +948,12 @@ class PresenceHandler(BasePresenceHandler):
             users=[UserID.from_string(u) for u in users_to_states],
         )
 
-        await self._push_to_remotes(states)
+        # We only want to poke the local federation sender, if any, as other
+        # workers will receive the presence updates via the presence replication
+        # stream.
+        if not self._send_federation:
+            return
 
-    async def _push_to_remotes(self, states):
-        """Sends state updates to remote servers.
-
-        Args:
-            states (list(UserPresenceState))
-        """
         hosts_and_states = await get_interested_remotes(
             self.store,
             self.presence_router,
