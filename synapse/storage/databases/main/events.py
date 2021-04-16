@@ -1899,10 +1899,12 @@ class PersistEventsStore:
                     retcols=("user_id",),
                 )
 
-                for row in rows:
+                user_ids = {row["user_id"] for row in rows}
+
+                for user_id in user_ids:
                     txn.call_after(
                         self.store.get_unread_event_push_actions_by_room_for_user.invalidate_many,
-                        (room_id, row["user_id"]),
+                        (room_id, user_id),
                     )
 
         # Now we delete the staging area for *all* events that were being
