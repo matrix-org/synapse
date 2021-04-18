@@ -1,7 +1,6 @@
 matrix-synapse-py3 (1.31.0+nmu1) UNRELEASED; urgency=medium
 
   * Skip tests when DEB_BUILD_OPTIONS contains "nocheck".
-  * Harden the systemd unit file
 
  -- Dan Callahan <danc@element.io>  Mon, 12 Apr 2021 13:07:36 +0000
 
