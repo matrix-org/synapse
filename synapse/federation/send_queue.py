@@ -567,10 +567,10 @@ def process_rows_for_federation(
             states=[state], destinations=destinations
         )
 
-    for destination, edu_map in buff.keyed_edus.items():
+    for edu_map in buff.keyed_edus.values():
         for key, edu in edu_map.items():
             transaction_queue.send_edu(edu, key)
 
-    for destination, edu_list in buff.edus.items():
+    for edu_list in buff.edus.values():
         for edu in edu_list:
             transaction_queue.send_edu(edu, None)
