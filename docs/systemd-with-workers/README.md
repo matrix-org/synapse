@@ -65,3 +65,37 @@ systemctl restart matrix-synapse-worker@federation_reader.service
 systemctl enable matrix-synapse-worker@federation_writer.service
 systemctl restart matrix-synapse.target
 ```
+
+## Hardening
+
+**Optional:** If further hardening is desired, the file
+`override-hardened.conf` may be copied from
+`contrib/systemd/override-hardened.conf` in this repository to the location
+`/etc/systemd/system/matrix-synapse.service.d/override-hardened.conf` (the
+directory will have to be created). It enables certain sandboxing features in
+systemd to further secure the synapse service. You may read the comments to
+understand what the override file is doing. A similar override file at
+`contrib/systemd-with-workers/override-hardened-worker.conf` may be copied to
+`/etc/systemd/system/matrix-synapse-worker@.service.d/override-hardened-worker.conf`
+(this directory will also have to be created) in order to apply the same
+hardening options to any worker processes.
+
+Once these files have been copied to their appropriate locations, simply run
+the following commands to apply the hardening options. They will automatically
+be applied at every restart as long as the override files are present at the
+specified locations.
+
+```sh
+systemctl daemon-reload
+
+# Restart the master
+systemctl restart matrix-synapse.service
+
+# If using a worker-based setup, restart the workers too.
+# To restart a specific worker (eg. federation_reader):
+systemctl restart matrix-synapse-worker@federation_reader.service
+```
+
+In order to see their effect, you may run `systemd-analyze security
+matrix-synapse.service` before and after applying the hardening options to see
+the changes being applied at a glance.
