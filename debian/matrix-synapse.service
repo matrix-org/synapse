@@ -45,8 +45,8 @@ ProtectSystem=strict
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
-ProtectHostname=true
 ProtectClock=true
+ProtectHostname=true
 
 # Prevent access to the following:
 # - /home directory
