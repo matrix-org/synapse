@@ -971,7 +971,7 @@ class PresenceHandler(BasePresenceHandler):
 
         # We only want to poke the local federation sender, if any, as other
         # workers will receive the presence updates via the presence replication
-        # stream.
+        # stream (which is updated by `store.update_presence`).
         await self.maybe_send_presence_to_interested_destinations(states)
 
     async def incoming_presence(self, origin, content):
