@@ -652,7 +652,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         return hs
 
     def default_config(self):
-        config = unittest.default_config("test")
+        config = super().default_config()
         config["send_federation"] = True
         return config
 
