@@ -230,7 +230,8 @@ def _glob_to_re(glob: str, word_boundary: bool) -> Pattern:
     if IS_GLOB.search(glob):
         r = re.escape(glob)
 
-        r = r.replace(r"\*", ".*?")
+        # replace 1 or more repeats of `\*` with `.*?`
+        r = re.sub(r"(\\\*)+", ".*?", r)
         r = r.replace(r"\?", ".")
 
         # handle [abc], [a-z] and [!a-z] style ranges.
