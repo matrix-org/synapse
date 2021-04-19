@@ -244,7 +244,7 @@ class BinaryIOWrapper:
         self.decoder = codecs.getincrementaldecoder(encoding)(errors)
         self.file = file
 
-    def write(self, b: Union[bytes, bytearray]) -> Optional[int]:
+    def write(self, b: Union[bytes, bytearray]) -> int:
         self.file.write(self.decoder.decode(b))
         return len(b)
 
