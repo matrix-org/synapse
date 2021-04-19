@@ -92,7 +92,7 @@ Account Validity HTML templates can now display a user's expiration date
 ------------------------------------------------------------------------
 
 This may affect you if you have enabled the account validity feature, and have made use of a
-custom HTML template specified by the ``account_validity.template_dir`` and ``account_validity.account_renewed_html_path``
+custom HTML template specified by the ``account_validity.template_dir`` or ``account_validity.account_renewed_html_path``
 Synapse config options.
 
 The template can now accept an ``expiration_ts`` variable, which represents the unix timestamp in milliseconds for the
