@@ -97,13 +97,13 @@ Synapse config options.
 
 The template can now accept an ``expiration_ts`` variable, which represents the unix timestamp in milliseconds for the
 future date of which their account has been renewed until. See the
-`default template <https://github.com/matrix-org/synapse/blob/release-v1.33.0/synapse/res/templates/account_renewed.html>`
+`default template <https://github.com/matrix-org/synapse/blob/release-v1.33.0/synapse/res/templates/account_renewed.html>`_
 for an example of usage.
 
 Relatedly, note that in this update a new HTML template has been added which is shown to users when they
 attempt to renew their account with a valid renewal token that has already been used before. The default template
 contents can been found
-`here <https://github.com/matrix-org/synapse/blob/release-v1.33.0/synapse/res/templates/account_previously_renewed.html>`, and
+`here <https://github.com/matrix-org/synapse/blob/release-v1.33.0/synapse/res/templates/account_previously_renewed.html>`_, and
 can also accept an ``expiration_ts`` variable. This template replaces the error message users would previously see upon
 attempting to use a token more than once.
 

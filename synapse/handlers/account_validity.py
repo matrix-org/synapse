@@ -241,7 +241,7 @@ class AccountValidityHandler:
         Returns:
             A tuple containing:
               * A bool representing whether the token is valid and unused.
-              * A bool representing whether the token is stale.
+              * A bool which is `True` if the token is valid, but stale.
               * An int representing the user's expiry timestamp as milliseconds since the
                 epoch, or 0 if the token was invalid.
         """
