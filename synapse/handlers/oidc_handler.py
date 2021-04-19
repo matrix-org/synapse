@@ -285,9 +285,15 @@ class OidcProvider:
         # TODO: This is pretty much a hack to get the path specified by public_baseurl.
         # It'd probably be nicer to have a config option that lets you specify a custom
         # path, which we'd then use here.
-        self._callback_path_prefix = urlparse(hs.config.public_baseurl).path
-        if self._callback_path_prefix.endswith("/"):
-            self._callback_path_prefix = self._callback_path_prefix[:-1]
+        public_baseurl_path = urlparse(hs.config.public_baseurl).path
+        if public_baseurl_path.endswith("/"):
+            public_baseurl_path = public_baseurl_path[:-1]
+
+        # Calculate the prefix for OIDC callback paths based on the public_baseurl.
+        # We'll insert this into the Path= parameter of any session cookies we set.
+        self._callback_path_prefix = (
+            public_baseurl_path.encode("utf-8") + b"/_synapse/client/oidc"
+        )
 
         self._oidc_attribute_requirements = provider.attribute_requirements
         self._scopes = provider.scopes
@@ -793,8 +799,7 @@ class OidcProvider:
                 % (
                     cookie_name,
                     cookie.encode("utf-8"),
-                    self._callback_path_prefix.encode("utf-8")
-                    + b"/_synapse/client/oidc",
+                    self._callback_path_prefix,
                     options,
                 )
             )
