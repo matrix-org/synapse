@@ -100,12 +100,12 @@ future date of which their account has been renewed until. See the
 `default template <https://github.com/matrix-org/synapse/blob/release-v1.33.0/synapse/res/templates/account_renewed.html>`_
 for an example of usage.
 
-Relatedly, note that in this update a new HTML template has been added which is shown to users when they
-attempt to renew their account with a valid renewal token that has already been used before. The default template
-contents can been found
-`here <https://github.com/matrix-org/synapse/blob/release-v1.33.0/synapse/res/templates/account_previously_renewed.html>`_, and
-can also accept an ``expiration_ts`` variable. This template replaces the error message users would previously see upon
-attempting to use a token more than once.
+ALso note that a new HTML template, ``account_previously_renewed.html``, has been added. This is is shown to users
+when they attempt to renew their account with a valid renewal token that has already been used before. The default
+template contents can been found
+`here <https://github.com/matrix-org/synapse/blob/release-v1.33.0/synapse/res/templates/account_previously_renewed.html>`_,
+and can also accept an ``expiration_ts`` variable. This template replaces the error message users would previously see
+upon attempting to use a valid renewal token more than once.
 
 
 Upgrading to v1.32.0
