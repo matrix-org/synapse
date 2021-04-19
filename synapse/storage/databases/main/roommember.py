@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -173,6 +172,33 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         txn.execute(sql, (room_id, Membership.JOIN))
         return [r[0] for r in txn]
+
+    @cached(max_entries=100000, iterable=True)
+    async def get_users_in_room_with_profiles(
+        self, room_id: str
+    ) -> Dict[str, ProfileInfo]:
+        """Get a mapping from user ID to profile information for all users in a given room.
+
+        Args:
+            room_id: The ID of the room to retrieve the users of.
+
+        Returns:
+            A mapping from user ID to ProfileInfo.
+        """
+
+        def _get_users_in_room_with_profiles(txn) -> Dict[str, ProfileInfo]:
+            sql = """
+                SELECT user_id, display_name, avatar_url FROM room_memberships
+                WHERE room_id = ? AND membership = ?
+            """
+            txn.execute(sql, (room_id, Membership.JOIN))
+
+            return {r[0]: ProfileInfo(display_name=r[1], avatar_url=r[2]) for r in txn}
+
+        return await self.db_pool.runInteraction(
+            "get_users_in_room_with_profiles",
+            _get_users_in_room_with_profiles,
+        )
 
     @cached(max_entries=100000)
     async def get_room_summary(self, room_id: str) -> Dict[str, MemberSummary]:

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -225,14 +224,16 @@ class HomeServer(ReplicationHandler):
         destinations = yield self.get_servers_for_context(room_name)
 
         try:
-            yield self.replication_layer.send_pdu(
-                Pdu.create_new(
-                    context=room_name,
-                    pdu_type="sy.room.message",
-                    content={"sender": sender, "body": body},
-                    origin=self.server_name,
-                    destinations=destinations,
-                )
+            yield self.replication_layer.send_pdus(
+                [
+                    Pdu.create_new(
+                        context=room_name,
+                        pdu_type="sy.room.message",
+                        content={"sender": sender, "body": body},
+                        origin=self.server_name,
+                        destinations=destinations,
+                    )
+                ]
             )
         except Exception as e:
             logger.exception(e)
@@ -254,7 +255,7 @@ class HomeServer(ReplicationHandler):
                 origin=self.server_name,
                 destinations=destinations,
             )
-            yield self.replication_layer.send_pdu(pdu)
+            yield self.replication_layer.send_pdus([pdu])
         except Exception as e:
             logger.exception(e)
 
@@ -266,16 +267,18 @@ class HomeServer(ReplicationHandler):
         destinations = yield self.get_servers_for_context(room_name)
 
         try:
-            yield self.replication_layer.send_pdu(
-                Pdu.create_new(
-                    context=room_name,
-                    is_state=True,
-                    pdu_type="sy.room.member",
-                    state_key=invitee,
-                    content={"membership": "invite"},
-                    origin=self.server_name,
-                    destinations=destinations,
-                )
+            yield self.replication_layer.send_pdus(
+                [
+                    Pdu.create_new(
+                        context=room_name,
+                        is_state=True,
+                        pdu_type="sy.room.member",
+                        state_key=invitee,
+                        content={"membership": "invite"},
+                        origin=self.server_name,
+                        destinations=destinations,
+                    )
+                ]
             )
         except Exception as e:
             logger.exception(e)
