@@ -761,7 +761,7 @@ class ByteWriteable(typing.Protocol):
     Typically this is a file object.
     """
 
-    def write(self, data: bytes) -> None:
+    def write(self, data: bytes) -> int:
         pass
 
 
