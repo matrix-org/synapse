@@ -1988,7 +1988,7 @@ class PresenceFederationQueue:
         of each row bounded (rather than returning the sets in a row).
         """
         if instance_name != self._instance_name:
-            # If not local we query over replication.
+            # If not local we query over http replication from the master
             result = await self._repl_client(
                 instance_name=instance_name,
                 stream_name=PresenceFederationStream.NAME,
