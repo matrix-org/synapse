@@ -130,10 +130,8 @@ class BasePresenceHandler(abc.ABC):
         self.state = hs.get_state_handler()
 
         self._federation = None
-        if hs.should_send_federation() or not hs.config.worker_app:
+        if hs.should_send_federation():
             self._federation = hs.get_federation_sender()
-
-        self._send_federation = hs.should_send_federation()
 
         self._federation_queue = PresenceFederationQueue(hs, self)
 
@@ -277,11 +275,8 @@ class BasePresenceHandler(abc.ABC):
         destinations that are interested.
         """
 
-        if not self._send_federation:
+        if not self._federation:
             return
-
-        # If this worker sends federation we must have a FederationSender.
-        assert self._federation
 
         hosts_and_states = await get_interested_remotes(
             self.store,
