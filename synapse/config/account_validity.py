@@ -71,6 +71,7 @@ class AccountValidityConfig(Config):
         ) = self.read_templates(
             [
                 account_renewed_template_filename,
+                "account_previously_renewed.html",
                 invalid_token_template_filename,
             ],
             account_validity_template_dir,
