@@ -80,7 +80,7 @@ class AccountValidityConfig(Config):
     def generate_config_section(self, **kwargs):
         return """\
         ## Account Validity ##
-        
+
         # Optional account validity configuration. This allows for accounts to be denied
         # any request after a given period.
         #
