@@ -54,8 +54,8 @@ class AccountValidityConfig(Config):
                 raise ConfigError("Can't send renewal emails without 'public_baseurl'")
 
         # Load account validity templates.
-        # We do this here instead of in AccountValidityConfig as read_templates
-        # relies on state that hasn't been initialised in AccountValidityConfig
+        account_validity_template_dir = account_validity_config.get("template_dir")
+
         account_renewed_template_filename = account_validity_config.get(
             "account_renewed_html_path", "account_renewed.html"
         )
@@ -65,6 +65,8 @@ class AccountValidityConfig(Config):
         invalid_token_template_filename = account_validity_config.get(
             "invalid_token_html_path", "invalid_token.html"
         )
+
+        # Read and store template content
         (
             self.account_validity_account_renewed_template,
             self.account_validity_account_previously_renewed_template,
@@ -74,7 +76,8 @@ class AccountValidityConfig(Config):
                 account_renewed_template_filename,
                 account_previously_renewed_template_filename,
                 invalid_token_template_filename,
-            ]
+            ],
+            account_validity_template_dir,
         )
 
     def generate_config_section(self, **kwargs):
