@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018-2021 The Matrix.org Foundation C.I.C.
 #
@@ -468,6 +467,9 @@ class MediaRepository:
         return media_info
 
     def _get_thumbnail_requirements(self, media_type):
+        scpos = media_type.find(";")
+        if scpos > 0:
+            media_type = media_type[:scpos]
         return self.thumbnail_requirements.get(media_type, ())
 
     def _generate_thumbnail(

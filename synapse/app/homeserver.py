@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
 #
@@ -192,7 +191,7 @@ class SynapseHomeServer(HomeServer):
                 }
             )
 
-            if self.get_config().threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
                 from synapse.rest.synapse.client.password_reset import (
                     PasswordResetSubmitTokenResource,
                 )
@@ -231,7 +230,7 @@ class SynapseHomeServer(HomeServer):
             )
 
         if name in ["media", "federation", "client"]:
-            if self.get_config().enable_media_repo:
+            if self.config.enable_media_repo:
                 media_repo = self.get_media_repository_resource()
                 resources.update(
                     {MEDIA_PREFIX: media_repo, LEGACY_MEDIA_PREFIX: media_repo}
@@ -245,7 +244,7 @@ class SynapseHomeServer(HomeServer):
             resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
 
         if name == "webclient":
-            webclient_loc = self.get_config().web_client_location
+            webclient_loc = self.config.web_client_location
 
             if webclient_loc is None:
                 logger.warning(
@@ -266,7 +265,7 @@ class SynapseHomeServer(HomeServer):
                 # https://twistedmatrix.com/trac/ticket/7678
                 resources[WEB_CLIENT_PREFIX] = File(webclient_loc)
 
-        if name == "metrics" and self.get_config().enable_metrics:
+        if name == "metrics" and self.config.enable_metrics:
             resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
 
         if name == "replication":
@@ -275,9 +274,7 @@ class SynapseHomeServer(HomeServer):
         return resources
 
     def start_listening(self, listeners: Iterable[ListenerConfig]):
-        config = self.get_config()
-
-        if config.redis_enabled:
+        if self.config.redis_enabled:
             # If redis is enabled we connect via the replication command handler
             # in the same way as the workers (since we're effectively a client
             # rather than a server).
@@ -285,7 +282,9 @@ class SynapseHomeServer(HomeServer):
 
         for listener in listeners:
             if listener.type == "http":
-                self._listening_services.extend(self._listener_http(config, listener))
+                self._listening_services.extend(
+                    self._listener_http(self.config, listener)
+                )
             elif listener.type == "manhole":
                 _base.listen_manhole(
                     listener.bind_addresses, listener.port, manhole_globals={"hs": self}
@@ -299,7 +298,7 @@ class SynapseHomeServer(HomeServer):
                 for s in services:
                     reactor.addSystemEventTrigger("before", "shutdown", s.stopListening)
             elif listener.type == "metrics":
-                if not self.get_config().enable_metrics:
+                if not self.config.enable_metrics:
                     logger.warning(
                         (
                             "Metrics listener configured, but "

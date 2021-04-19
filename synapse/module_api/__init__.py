@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 New Vector Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -51,6 +50,7 @@ class ModuleApi:
         self._auth_handler = auth_handler
         self._server_name = hs.hostname
         self._presence_stream = hs.get_event_sources().sources["presence"]
+        self._state = hs.get_state_handler()
 
         # We expose these as properties below in order to attach a helpful docstring.
         self._http_client = hs.get_simple_http_client()  # type: SimpleHttpClient
@@ -430,11 +430,13 @@ class ModuleApi:
                     UserID.from_string(user), from_key=None, include_offline=False
                 )
 
-                # Send to remote destinations
-                await make_deferred_yieldable(
-                    # We pull the federation sender here as we can only do so on workers
-                    # that support sending presence
-                    self._hs.get_federation_sender().send_presence(presence_events)
+                # Send to remote destinations.
+
+                # We pull out the presence handler here to break a cyclic
+                # dependency between the presence router and module API.
+                presence_handler = self._hs.get_presence_handler()
+                await presence_handler.maybe_send_presence_to_interested_destinations(
+                    presence_events
                 )
 
 
