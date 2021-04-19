@@ -1878,6 +1878,10 @@ class PresenceFederationQueue:
     Only the last N minutes will be queued, so if a federation sender instance
     is down for longer then some updates will be dropped. This is OK as presence
     is ephemeral, and so it will self correct eventually.
+
+    On workers the class tracks the last received position of the stream from
+    replication, and handles querying for missed updates over HTTP replication,
+    c.f. `get_current_token` and `get_replication_rows`.
     """
 
     # How long to keep entries in the queue for. Workers that are down for
@@ -1946,6 +1950,8 @@ class PresenceFederationQueue:
 
         Will forward to the local federation sender (if there is one) and queue
         to send over replication (if there are other federation sender instances.).
+
+        Must only be called on the master process.
         """
 
         # This should only be called on a presence writer.
@@ -1970,6 +1976,11 @@ class PresenceFederationQueue:
         self._notifier.notify_replication()
 
     def get_current_token(self, instance_name: str) -> int:
+        """Get the current position of the stream.
+
+        On workers this returns the last stream ID received from replication.
+        """
+
         if instance_name == self._instance_name:
             return self._next_id - 1
         else:
@@ -1986,6 +1997,8 @@ class PresenceFederationQueue:
 
         We return rows in the form of `(destination, user_id)` to keep the size
         of each row bounded (rather than returning the sets in a row).
+
+        On workers this will query the master process via HTTP replication.
         """
         if instance_name != self._instance_name:
             # If not local we query over http replication from the master
