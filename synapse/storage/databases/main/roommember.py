@@ -13,7 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Dict, FrozenSet, Iterable, List, Optional, Set, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    FrozenSet,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+)
+
+import attr
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.events import EventBase
@@ -33,7 +45,12 @@ from synapse.storage.roommember import (
     ProfileInfo,
     RoomsForUser,
 )
-from synapse.types import Collection, PersistedEventPosition, get_domain_from_id
+from synapse.types import (
+    Collection,
+    PersistedEventPosition,
+    StateMap,
+    get_domain_from_id,
+)
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import intern_string
 from synapse.util.caches.descriptors import _CacheContext, cached, cachedList
@@ -52,6 +69,8 @@ _CURRENT_STATE_MEMBERSHIP_UPDATE_NAME = "current_state_events_membership"
 class RoomMemberWorkerStore(EventsWorkerStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
+
+        self._joined_host_linearizer = Linearizer("_JoinedHostsCache")
 
         # Is the current_state_events.membership up to date? Or is the
         # background update still running?
@@ -730,19 +749,62 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     @cached(num_args=2, max_entries=10000, iterable=True)
     async def _get_joined_hosts(
-        self, room_id, state_group, current_state_ids, state_entry
-    ):
+        self,
+        room_id: str,
+        state_group: int,
+        current_state_ids: StateMap[str],
+        state_entry: "_StateCacheEntry",
+    ) -> FrozenSet[str]:
         # We don't use `state_group`, its there so that we can cache based
         # on it. However, its important that its never None, since two current_state's
         # with a state_group of None are likely to be different.
         assert state_group is not None
 
         cache = await self._get_joined_hosts_cache(room_id)
-        return await cache.get_destinations(state_entry)
+
+        if state_entry.state_group == cache.state_group:
+            return frozenset(cache.hosts_to_joined_users)
+
+        with (await self._joined_host_linearizer.queue(room_id)):
+            if state_entry.state_group == cache.state_group:
+                pass
+            elif state_entry.prev_group == cache.state_group:
+                for (typ, state_key), event_id in state_entry.delta_ids.items():
+                    if typ != EventTypes.Member:
+                        continue
+
+                    host = intern_string(get_domain_from_id(state_key))
+                    user_id = state_key
+                    known_joins = cache.hosts_to_joined_users.setdefault(host, set())
+
+                    event = await self.get_event(event_id)
+                    if event.membership == Membership.JOIN:
+                        known_joins.add(user_id)
+                    else:
+                        known_joins.discard(user_id)
+
+                        if not known_joins:
+                            cache.hosts_to_joined_users.pop(host, None)
+            else:
+                joined_users = await self.get_joined_users_from_state(
+                    room_id, state_entry
+                )
+
+                cache.hosts_to_joined_users = {}
+                for user_id in joined_users:
+                    host = intern_string(get_domain_from_id(user_id))
+                    cache.hosts_to_joined_users.setdefault(host, set()).add(user_id)
+
+            if state_entry.state_group:
+                cache.state_group = state_entry.state_group
+            else:
+                cache.state_group = object()
+
+        return frozenset(cache.hosts_to_joined_users)
 
     @cached(max_entries=10000)
     def _get_joined_hosts_cache(self, room_id: str) -> "_JoinedHostsCache":
-        return _JoinedHostsCache(self, room_id)
+        return _JoinedHostsCache()
 
     @cached(num_args=2)
     async def did_forget(self, user_id: str, room_id: str) -> bool:
@@ -1052,71 +1114,14 @@ class RoomMemberStore(RoomMemberWorkerStore, RoomMemberBackgroundUpdateStore):
         await self.db_pool.runInteraction("forget_membership", f)
 
 
+@attr.s(slots=True)
 class _JoinedHostsCache:
     """Cache for joined hosts in a room that is optimised to handle updates
     via state deltas.
     """
 
-    def __init__(self, store, room_id):
-        self.store = store
-        self.room_id = room_id
-
-        self.hosts_to_joined_users = {}
-
-        self.state_group = object()
-
-        self.linearizer = Linearizer("_JoinedHostsCache")
-
-        self._len = 0
-
-    async def get_destinations(self, state_entry: "_StateCacheEntry") -> Set[str]:
-        """Get set of destinations for a state entry
-
-        Args:
-            state_entry
-
-        Returns:
-            The destinations as a set.
-        """
-        if state_entry.state_group == self.state_group:
-            return frozenset(self.hosts_to_joined_users)
-
-        with (await self.linearizer.queue(())):
-            if state_entry.state_group == self.state_group:
-                pass
-            elif state_entry.prev_group == self.state_group:
-                for (typ, state_key), event_id in state_entry.delta_ids.items():
-                    if typ != EventTypes.Member:
-                        continue
-
-                    host = intern_string(get_domain_from_id(state_key))
-                    user_id = state_key
-                    known_joins = self.hosts_to_joined_users.setdefault(host, set())
-
-                    event = await self.store.get_event(event_id)
-                    if event.membership == Membership.JOIN:
-                        known_joins.add(user_id)
-                    else:
-                        known_joins.discard(user_id)
-
-                        if not known_joins:
-                            self.hosts_to_joined_users.pop(host, None)
-            else:
-                joined_users = await self.store.get_joined_users_from_state(
-                    self.room_id, state_entry
-                )
-
-                self.hosts_to_joined_users = {}
-                for user_id in joined_users:
-                    host = intern_string(get_domain_from_id(user_id))
-                    self.hosts_to_joined_users.setdefault(host, set()).add(user_id)
-
-            if state_entry.state_group:
-                self.state_group = state_entry.state_group
-            else:
-                self.state_group = object()
-            self._len = sum(len(v) for v in self.hosts_to_joined_users.values())
-        return frozenset(self.hosts_to_joined_users)
+    hosts_to_joined_users = attr.ib(type=Dict[str, Set[str]], factory=dict)
+    state_group = attr.ib(type=Union[object, int], factory=object)
 
     def __len__(self):
-        return self._len
+        return sum(len(v) for v in self.hosts_to_joined_users.values())
