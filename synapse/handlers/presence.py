@@ -1901,7 +1901,7 @@ class PresenceFederationQueue:
         # Whether this instance is a presence writer.
         self._presence_writer = hs.config.worker.worker_app is None
 
-        # The federation sender if this instance is a federation sender.
+        # The FederationSender instance, if this process sends federation traffic directly.
         self._federation = None
 
         if hs.should_send_federation():
