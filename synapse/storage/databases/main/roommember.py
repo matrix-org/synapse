@@ -760,15 +760,26 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # with a state_group of None are likely to be different.
         assert state_group is not None
 
+        # We use a secondary cache of previous work to allow us to build up the
+        # joined hosts for the given state group based on previous state groups.
+        #
+        # We cache one object per room containing the results of the last state
+        # group we got joined hosts for, with the idea being that generally
+        # `get_joined_hosts` with the "current" state group for the room.
         cache = await self._get_joined_hosts_cache(room_id)
 
+        # If the state group in the cache matches then its a no-op.
         if state_entry.state_group == cache.state_group:
             return frozenset(cache.hosts_to_joined_users)
 
+        # Since we'll mutate the cache we need to lock.
         with (await self._joined_host_linearizer.queue(room_id)):
             if state_entry.state_group == cache.state_group:
+                # Same state group, so nothing to do
                 pass
             elif state_entry.prev_group == cache.state_group:
+                # The cache work is for the previous state group, so we work out
+                # the delta.
                 for (typ, state_key), event_id in state_entry.delta_ids.items():
                     if typ != EventTypes.Member:
                         continue
@@ -786,6 +797,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                         if not known_joins:
                             cache.hosts_to_joined_users.pop(host, None)
             else:
+                # The cache doesn't match the state group or prev state group,
+                # so we calculate the result from first principles.
                 joined_users = await self.get_joined_users_from_state(
                     room_id, state_entry
                 )
@@ -1120,6 +1133,7 @@ class _JoinedHostsCache:
     via state deltas.
     """
 
+    # Dict of host to the set of their users in the room at the state group.
     hosts_to_joined_users = attr.ib(type=Dict[str, Set[str]], factory=dict)
     state_group = attr.ib(type=Union[object, int], factory=object)
 
