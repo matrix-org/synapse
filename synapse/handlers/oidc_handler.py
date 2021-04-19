@@ -284,13 +284,9 @@ class OidcProvider:
 
         # Calculate the prefix for OIDC callback paths based on the public_baseurl.
         # We'll insert this into the Path= parameter of any session cookies we set.
-
         public_baseurl_path = urlparse(hs.config.server.public_baseurl).path
-        if public_baseurl_path.endswith("/"):
-            public_baseurl_path = public_baseurl_path[:-1]
-
         self._callback_path_prefix = (
-            public_baseurl_path.encode("utf-8") + b"/_synapse/client/oidc"
+            public_baseurl_path.encode("utf-8") + b"_synapse/client/oidc"
         )
 
         self._oidc_attribute_requirements = provider.attribute_requirements
