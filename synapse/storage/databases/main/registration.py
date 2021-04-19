@@ -91,13 +91,17 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             id_column=None,
         )
 
-        self._account_validity_enabled = hs.config.account_validity_enabled
+        self._account_validity_enabled = (
+            hs.config.account_validity.account_validity_enabled
+        )
         self._account_validity_period = None
         self._account_validity_startup_job_max_delta = None
         if self._account_validity_enabled:
-            self._account_validity_period = hs.config.account_validity_period
+            self._account_validity_period = (
+                hs.config.account_validity.account_validity_period
+            )
             self._account_validity_startup_job_max_delta = (
-                hs.config.account_validity_startup_job_max_delta
+                hs.config.account_validity.account_validity_startup_job_max_delta
             )
 
             if hs.config.run_background_tasks:
