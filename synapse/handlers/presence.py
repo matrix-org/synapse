@@ -265,7 +265,7 @@ class BasePresenceHandler(abc.ABC):
         )
 
     def get_federation_queue(self) -> "PresenceFederationQueue":
-        """Get the presence federation queue, if any."""
+        """Get the presence federation queue."""
         return self._federation_queue
 
     async def maybe_send_presence_to_interested_destinations(
