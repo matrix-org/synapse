@@ -88,8 +88,8 @@ for example:
 Upgrading to v1.32.0
 ====================
 
-Dropping support for end-of-life Python, Postgres and SQLite versions
----------------------------------------------------------------------
+Dropping support for old Python, Postgres and SQLite versions
+-------------------------------------------------------------
 
 In line with our `deprecation policy <https://github.com/matrix-org/synapse/blob/release-v1.32.0/docs/deprecation_policy.md>`_,
 we've dropped support for Python 3.5 and PostgreSQL 9.5, as they are no longer supported upstream.
