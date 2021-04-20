@@ -1980,7 +1980,6 @@ class PresenceFederationQueue:
 
         On workers this returns the last stream ID received from replication.
         """
-
         if instance_name == self._instance_name:
             return self._next_id - 1
         else:
@@ -2045,7 +2044,7 @@ class PresenceFederationQueue:
         if stream_name != PresenceFederationStream.NAME:
             return
 
-        # We keep track of the current tokens
+        # We keep track of the current tokens (so that we can catch up with anything we missed after a disconnect)
         self._current_tokens[instance_name] = token
 
         # If we're a federation sender we pull out the presence states to send
