@@ -109,7 +109,7 @@ class SynapseHomeserverOpenIDListenerTests(HomeserverTestCase):
         }
 
         # Listen with the config
-        self.hs._listener_http(self.hs.get_config(), parse_listener_def(config))
+        self.hs._listener_http(self.hs.config, parse_listener_def(config))
 
         # Grab the resource from the site that was told to listen
         site = self.reactor.tcpServers[0][1]

@@ -85,8 +85,39 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+Upgrading to v1.33.0
+====================
+
+Account Validity HTML templates can now display a user's expiration date
+------------------------------------------------------------------------
+
+This may affect you if you have enabled the account validity feature, and have made use of a
+custom HTML template specified by the ``account_validity.template_dir`` or ``account_validity.account_renewed_html_path``
+Synapse config options.
+
+The template can now accept an ``expiration_ts`` variable, which represents the unix timestamp in milliseconds for the
+future date of which their account has been renewed until. See the
+`default template <https://github.com/matrix-org/synapse/blob/release-v1.33.0/synapse/res/templates/account_renewed.html>`_
+for an example of usage.
+
+ALso note that a new HTML template, ``account_previously_renewed.html``, has been added. This is is shown to users
+when they attempt to renew their account with a valid renewal token that has already been used before. The default
+template contents can been found
+`here <https://github.com/matrix-org/synapse/blob/release-v1.33.0/synapse/res/templates/account_previously_renewed.html>`_,
+and can also accept an ``expiration_ts`` variable. This template replaces the error message users would previously see
+upon attempting to use a valid renewal token more than once.
+
+
 Upgrading to v1.32.0
 ====================
+
+Dropping support for old Python, Postgres and SQLite versions
+-------------------------------------------------------------
+
+In line with our `deprecation policy <https://github.com/matrix-org/synapse/blob/release-v1.32.0/docs/deprecation_policy.md>`_,
+we've dropped support for Python 3.5 and PostgreSQL 9.5, as they are no longer supported upstream.
+
+This release of Synapse requires Python 3.6+ and PostgresSQL 9.6+ or SQLite 3.22+.
 
 Removal of old List Accounts Admin API
 --------------------------------------
@@ -97,6 +128,16 @@ The `v2 list accounts API <https://github.com/matrix-org/synapse/blob/master/doc
 has been available since Synapse 1.7.0 (2019-12-13), and is accessible under ``GET /_synapse/admin/v2/users``.
 
 The deprecation of the old endpoint was announced with Synapse 1.28.0 (released on 2021-02-25).
+
+Application Services must use type ``m.login.application_service`` when registering users
+-----------------------------------------------------------------------------------------
+
+In compliance with the
+`Application Service spec <https://matrix.org/docs/spec/application_service/r0.1.2#server-admin-style-permissions>`_,
+Application Services are now required to use the ``m.login.application_service`` type when registering users via the
+``/_matrix/client/r0/register`` endpoint. This behaviour was deprecated in Synapse v1.30.0.
+
+Please ensure your Application Services are up to date.
 
 Upgrading to v1.29.0
 ====================

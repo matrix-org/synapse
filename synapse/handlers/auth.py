@@ -1248,7 +1248,7 @@ class AuthHandler(BaseHandler):
 
         # see if any of our auth providers want to know about this
         for provider in self.password_providers:
-            for token, token_id, device_id in tokens_and_devices:
+            for token, _, device_id in tokens_and_devices:
                 await provider.on_logged_out(
                     user_id=user_id, device_id=device_id, access_token=token
                 )

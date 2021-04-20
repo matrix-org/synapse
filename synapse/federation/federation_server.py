@@ -136,7 +136,7 @@ class FederationServer(FederationBase):
         )  # type: ResponseCache[Tuple[str, str]]
 
         self._federation_metrics_domains = (
-            hs.get_config().federation.federation_metrics_domains
+            hs.config.federation.federation_metrics_domains
         )
 
     async def on_backfill_request(
