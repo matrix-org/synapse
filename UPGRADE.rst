@@ -112,7 +112,7 @@ Application Services must use type ``m.login.application`` when registering user
 In compliance with the
 `Application Service spec <https://matrix.org/docs/spec/application_service/r0.1.2#server-admin-style-permissions>`_,
 Application Services are now required to use the ``m.login.application_service`` type when registering users via the
-``/_matrix/client/r0/register`` endpoint.
+``/_matrix/client/r0/register`` endpoint. This behaviour was deprecated in Synapse v1.30.0.
 
 Please ensure your Application Services are up to date.
 
