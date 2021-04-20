@@ -22,6 +22,9 @@ if TYPE_CHECKING:
 
 
 class EventAuthHandler:
+    """
+    This class contains methods for authenticating events added to room graphs.
+    """
     def __init__(self, hs: "HomeServer"):
         self._store = hs.get_datastore()
 
