@@ -231,8 +231,7 @@ class DescriptorTestCase(unittest.TestCase):
 
         @defer.inlineCallbacks
         def do_lookup():
-            with LoggingContext() as c1:
-                c1.name = "c1"
+            with LoggingContext("c1") as c1:
                 r = yield obj.fn(1)
                 self.assertEqual(current_context(), c1)
             return r
@@ -274,8 +273,7 @@ class DescriptorTestCase(unittest.TestCase):
 
         @defer.inlineCallbacks
         def do_lookup():
-            with LoggingContext() as c1:
-                c1.name = "c1"
+            with LoggingContext("c1") as c1:
                 try:
                     d = obj.fn(1)
                     self.assertEqual(
