@@ -46,7 +46,7 @@ class EventAuthHandler:
         if not room_version.msc3083_join_rules:
             return True
 
-        # If there's no join rule, then it defaults to public (so this doesn't apply).
+        # If there's no join rule, then it defaults to invite (so this doesn't apply).
         join_rules_event_id = state_ids.get((EventTypes.JoinRules, ""), None)
         if not join_rules_event_id:
             return True
