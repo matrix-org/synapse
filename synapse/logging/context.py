@@ -277,7 +277,7 @@ class LoggingContext:
 
     def __init__(
         self,
-        name: Optional[str] = None,
+        name: str,
         parent_context: "Optional[LoggingContext]" = None,
         request: Optional[ContextRequest] = None,
     ) -> None:
@@ -315,9 +315,7 @@ class LoggingContext:
             self.request = request
 
     def __str__(self) -> str:
-        if self.request:
-            return self.request.request_id
-        return "%s@%x" % (self.name, id(self))
+        return self.name
 
     @classmethod
     def current_context(cls) -> LoggingContextOrSentinel:
@@ -694,17 +692,13 @@ def nested_logging_context(suffix: str) -> LoggingContext:
             "Starting nested logging context from sentinel context: metrics will be lost"
         )
         parent_context = None
-        prefix = ""
-        request = None
     else:
         assert isinstance(curr_context, LoggingContext)
         parent_context = curr_context
-        prefix = str(parent_context.name)
-        request = parent_context.request
+    prefix = str(curr_context)
     return LoggingContext(
         prefix + "-" + suffix,
         parent_context=parent_context,
-        request=request,
     )
 
 
@@ -895,7 +889,7 @@ def defer_to_threadpool(reactor, threadpool, f, *args, **kwargs):
         parent_context = curr_context
 
     def g():
-        with LoggingContext(parent_context=parent_context):
+        with LoggingContext(str(curr_context), parent_context=parent_context):
             return f(*args, **kwargs)
 
     return make_deferred_yieldable(threads.deferToThreadPool(reactor, threadpool, g))
