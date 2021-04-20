@@ -134,7 +134,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
             }
         )
 
-        with LoggingContext():
+        with LoggingContext("test-context"):
             failure = self.get_failure(
                 self.handler.on_receive_pdu(
                     "test.serv", lying_event, sent_to_us_directly=True
