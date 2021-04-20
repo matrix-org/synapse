@@ -1,0 +1,1 @@
+Add some sanity checks to identity server passed to 3PID bind/unbind endpoints.

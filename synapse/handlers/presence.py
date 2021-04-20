@@ -128,6 +128,7 @@ class BasePresenceHandler(abc.ABC):
         self.store = hs.get_datastore()
         self.presence_router = hs.get_presence_router()
         self.state = hs.get_state_handler()
+        self.is_mine_id = hs.is_mine_id
 
         self._federation = None
         if hs.should_send_federation():
@@ -272,10 +273,16 @@ class BasePresenceHandler(abc.ABC):
         self, states: List[UserPresenceState]
     ):
         """If this instance is a federation sender, send the states to all
-        destinations that are interested.
+        destinations that are interested. Filters out any states for remote
+        users.
         """
 
         if not self._federation:
+            return
+
+        states = [s for s in states if self.is_mine_id(s.user_id)]
+
+        if not states:
             return
 
         hosts_and_states = await get_interested_remotes(
@@ -300,7 +307,6 @@ class WorkerPresenceHandler(BasePresenceHandler):
     def __init__(self, hs):
         super().__init__(hs)
         self.hs = hs
-        self.is_mine_id = hs.is_mine_id
 
         self._presence_enabled = hs.config.use_presence
 
@@ -507,7 +513,6 @@ class PresenceHandler(BasePresenceHandler):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.hs = hs
-        self.is_mine_id = hs.is_mine_id
         self.server_name = hs.hostname
         self.wheel_timer = WheelTimer()
         self.notifier = hs.get_notifier()
