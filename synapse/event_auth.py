@@ -670,7 +670,7 @@ def _verify_third_party_invite(event: EventBase, auth_events: StateMap[EventBase
         public_key = public_key_object["public_key"]
         try:
             for server, signature_block in signed["signatures"].items():
-                for key_name, encoded_signature in signature_block.items():
+                for key_name in signature_block.keys():
                     if not key_name.startswith("ed25519:"):
                         continue
                     verify_key = decode_verify_key_bytes(
