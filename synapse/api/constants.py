@@ -95,6 +95,8 @@ class EventTypes:
 
     Presence = "m.presence"
 
+    Dummy = "org.matrix.dummy_event"
+
 
 class RejectedReason:
     AUTH_ERROR = "auth_error"

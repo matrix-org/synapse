@@ -712,6 +712,7 @@ class RegistrationHandler(BaseHandler):
         device_id: Optional[str],
         initial_display_name: Optional[str],
         is_guest: bool = False,
+        is_appservice_ghost: bool = False,
     ) -> Tuple[str, str]:
         """Register a device for a user and generate an access token.
 
@@ -733,6 +734,7 @@ class RegistrationHandler(BaseHandler):
                 device_id=device_id,
                 initial_display_name=initial_display_name,
                 is_guest=is_guest,
+                is_appservice_ghost=is_appservice_ghost,
             )
             return r["device_id"], r["access_token"]
 
@@ -754,7 +756,10 @@ class RegistrationHandler(BaseHandler):
             )
         else:
             access_token = await self._auth_handler.get_access_token_for_user_id(
-                user_id, device_id=registered_device_id, valid_until_ms=valid_until_ms
+                user_id,
+                device_id=registered_device_id,
+                valid_until_ms=valid_until_ms,
+                is_appservice_ghost=is_appservice_ghost,
             )
 
         return (registered_device_id, access_token)

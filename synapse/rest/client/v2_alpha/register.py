@@ -742,7 +742,9 @@ class RegisterRestServlet(RestServlet):
         user_id = await self.registration_handler.appservice_register(
             username, as_token, password, display_name
         )
-        result = await self._create_registration_details(user_id, body)
+        result = await self._create_registration_details(
+            user_id, body, is_appservice_ghost=True,
+        )
 
         auth_result = body.get("auth_result")
         if auth_result and LoginType.EMAIL_IDENTITY in auth_result:
@@ -759,7 +761,9 @@ class RegisterRestServlet(RestServlet):
 
         return result
 
-    async def _create_registration_details(self, user_id, params):
+    async def _create_registration_details(
+        self, user_id, params, is_appservice_ghost=False
+    ):
         """Complete registration of newly-registered user
 
         Allocates device_id if one was not given; also creates access_token.
@@ -776,7 +780,11 @@ class RegisterRestServlet(RestServlet):
             device_id = params.get("device_id")
             initial_display_name = params.get("initial_device_display_name")
             device_id, access_token = await self.registration_handler.register_device(
-                user_id, device_id, initial_display_name, is_guest=False
+                user_id,
+                device_id,
+                initial_display_name,
+                is_guest=False,
+                is_appservice_ghost=is_appservice_ghost,
             )
 
             result.update({"access_token": access_token, "device_id": device_id})
