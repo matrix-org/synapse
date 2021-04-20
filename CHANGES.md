@@ -1,6 +1,12 @@
 Synapse 1.32.0 (2021-04-20)
 ===========================
 
+**Note:** This release introduces [a regression](https://githubcom/matrix-org/synapse/issues/9853)
+that can overwhelm connected Prometheus instances. This issue was not present in
+Synapse v1.32.0rc1. It is recommended not to update to this release. If you have
+upgraded to v1.32.0 already, please downgrade to v1.31.0. This issue will be
+resolved in a subsequent release version shortly.
+
 **Note:** This release requires Python 3.6+ and Postgres 9.6+ or SQLite 3.22+.
 
 This release removes the deprecated `GET /_synapse/admin/v1/users/<user_id>` admin API. Please use the [v2 API](https://github.com/matrix-org/synapse/blob/develop/docs/admin_api/user_admin_api.rst#query-user-account) instead, which has improved capabilities.
