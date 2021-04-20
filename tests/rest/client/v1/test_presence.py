@@ -60,12 +60,12 @@ class PresenceTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(self.hs.get_presence_handler().set_state.call_count, 1)
 
+    @unittest.override_config({"use_presence": False})
     def test_put_presence_disabled(self):
         """
         PUT to the status endpoint with use_presence disabled will NOT call
         set_state on the presence handler.
         """
-        self.hs.config.use_presence = False
 
         body = {"presence": "here", "status_msg": "beep boop"}
         channel = self.make_request(

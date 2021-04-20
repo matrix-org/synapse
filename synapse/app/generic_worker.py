@@ -121,26 +121,6 @@ from synapse.util.versionstring import get_version_string
 logger = logging.getLogger("synapse.app.generic_worker")
 
 
-class PresenceStatusStubServlet(RestServlet):
-    """If presence is disabled this servlet can be used to stub out setting
-    presence status.
-    """
-
-    PATTERNS = client_patterns("/presence/(?P<user_id>[^/]*)/status")
-
-    def __init__(self, hs):
-        super().__init__()
-        self.auth = hs.get_auth()
-
-    async def on_GET(self, request, user_id):
-        await self.auth.get_user_by_req(request)
-        return 200, {"presence": "offline"}
-
-    async def on_PUT(self, request, user_id):
-        await self.auth.get_user_by_req(request)
-        return 200, {}
-
-
 class KeyUploadServlet(RestServlet):
     """An implementation of the `KeyUploadServlet` that responds to read only
     requests, but otherwise proxies through to the master instance.
@@ -328,11 +308,6 @@ class GenericWorkerServer(HomeServer):
                     user_directory.register_servlets(self, resource)
 
                     presence.register_servlets(self, resource)
-
-                    # If presence is disabled, use the stub servlet that does
-                    # not allow sending presence
-                    if not self.config.use_presence:
-                        PresenceStatusStubServlet(self).register(resource)
 
                     groups.register_servlets(self, resource)
 
