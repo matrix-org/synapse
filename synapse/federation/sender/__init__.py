@@ -539,6 +539,10 @@ class FederationSender(AbstractFederationSender):
             # No-op if presence is disabled.
             return
 
+        # Ensure we only send out presence states for local users.
+        for state in states:
+            assert self.is_mine_id(state.user_id)
+
         for destination in destinations:
             if destination == self.server_name:
                 continue
