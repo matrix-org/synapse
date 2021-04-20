@@ -719,11 +719,14 @@ class SimpleHttpClient:
 
         try:
             length = await make_deferred_yieldable(
-                readBodyToFile(response, output_stream, max_size)
+                read_body_with_max_size(response, output_stream, max_size)
             )
-        except SynapseError:
-            # This can happen e.g. because the body is too large.
-            raise
+        except BodyExceededMaxSize:
+            SynapseError(
+                502,
+                "Requested file is too large > %r bytes" % (max_size,),
+                Codes.TOO_LARGE,
+            )
         except Exception as e:
             raise SynapseError(502, ("Failed to download remote body: %s" % e)) from e
 
@@ -747,7 +750,11 @@ def _timeout_to_request_timed_out_error(f: Failure):
     return f
 
 
-class _ReadBodyToFileProtocol(protocol.Protocol):
+class BodyExceededMaxSize(Exception):
+    """The maximum allowed size of the HTTP body was exceeded."""
+
+
+class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
     def __init__(
         self, stream: BinaryIO, deferred: defer.Deferred, max_size: Optional[int]
     ):
@@ -760,13 +767,7 @@ class _ReadBodyToFileProtocol(protocol.Protocol):
         self.stream.write(data)
         self.length += len(data)
         if self.max_size is not None and self.length >= self.max_size:
-            self.deferred.errback(
-                SynapseError(
-                    502,
-                    "Requested file is too large > %r bytes" % (self.max_size,),
-                    Codes.TOO_LARGE,
-                )
-            )
+            self.deferred.errback(BodyExceededMaxSize())
             self.deferred = defer.Deferred()
             self.transport.loseConnection()
 
@@ -781,11 +782,14 @@ class _ReadBodyToFileProtocol(protocol.Protocol):
             self.deferred.errback(reason)
 
 
-def readBodyToFile(
+def read_body_with_max_size(
     response: IResponse, stream: BinaryIO, max_size: Optional[int]
 ) -> defer.Deferred:
     """
     Read a HTTP response body to a file-object. Optionally enforcing a maximum file size.
+
+    If the maximum file size is reached, the returned Deferred will resolve to a
+    Failure with a BodyExceededMaxSize exception.
 
     Args:
         response: The HTTP response to read from.
@@ -797,7 +801,7 @@ def readBodyToFile(
     """
 
     d = defer.Deferred()
-    response.deliverBody(_ReadBodyToFileProtocol(stream, d, max_size))
+    response.deliverBody(_ReadBodyWithMaxSizeProtocol(stream, d, max_size))
     return d
 
 

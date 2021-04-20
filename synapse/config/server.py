@@ -838,6 +838,18 @@ class ServerConfig(Config):
         #ip_range_blacklist:
 %(ip_range_blacklist)s
 
+        # List of IP address CIDR ranges that should be allowed for federation,
+        # identity servers, push servers, and for checking key validity for
+        # third-party invite events. This is useful for specifying exceptions to
+        # wide-ranging blacklisted target IP ranges - e.g. for communication with
+        # a push server only visible in your network.
+        #
+        # This whitelist overrides ip_range_blacklist and defaults to an empty
+        # list.
+        #
+        #ip_range_whitelist:
+        #   - '192.168.1.1'
+
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.
         #

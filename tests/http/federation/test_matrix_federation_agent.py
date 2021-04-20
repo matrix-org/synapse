@@ -36,6 +36,7 @@ from synapse.crypto.context_factory import FederationPolicyForHTTPS
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.http.federation.srv_resolver import Server
 from synapse.http.federation.well_known_resolver import (
+    WELL_KNOWN_MAX_SIZE,
     WellKnownResolver,
     _cache_period_from_headers,
 )
@@ -1106,6 +1107,32 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
         r = self.successResultOf(fetch_d)
         self.assertEqual(r.delegated_server, None)
+
+    def test_well_known_too_large(self):
+        """A well-known query that returns a result which is too large should be rejected."""
+        self.reactor.lookups["testserv"] = "1.2.3.4"
+
+        fetch_d = defer.ensureDeferred(
+            self.well_known_resolver.get_well_known(b"testserv")
+        )
+
+        # there should be an attempt to connect on port 443 for the .well-known
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, client_factory, _timeout, _bindAddress) = clients.pop(0)
+        self.assertEqual(host, "1.2.3.4")
+        self.assertEqual(port, 443)
+
+        self._handle_well_known_connection(
+            client_factory,
+            expected_sni=b"testserv",
+            response_headers={b"Cache-Control": b"max-age=1000"},
+            content=b'{ "m.server": "' + (b"a" * WELL_KNOWN_MAX_SIZE) + b'" }',
+        )
+
+        # The result is sucessful, but disabled delegation.
+        r = self.successResultOf(fetch_d)
+        self.assertIsNone(r.delegated_server)
 
     def test_srv_fallbacks(self):
         """Test that other SRV results are tried if the first one fails.
