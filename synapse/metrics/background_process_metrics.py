@@ -249,7 +249,7 @@ class BackgroundProcessLoggingContext(LoggingContext):
 
         Args:
             name: The name of the background process. Each distinct `name` gets a
-                separate prometheus data series.
+                separate prometheus time series.
 
             instance_id: an identifer to add to `name` to distinguish this instance of
                 the named background process, to distinguish them in the logs. If
