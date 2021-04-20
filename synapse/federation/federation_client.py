@@ -535,7 +535,6 @@ class FederationClient(FederationBase):
                     "Failed to %s via %s", description, destination, exc_info=True
                 )
             except Exception:
-                logger.warning("POMP POMP POMP POMP POMP")
                 logger.warning(
                     "Failed to %s via %s", description, destination, exc_info=True
                 )
