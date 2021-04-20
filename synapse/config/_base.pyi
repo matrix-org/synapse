@@ -1,6 +1,7 @@
 from typing import Any, Iterable, List, Optional
 
 from synapse.config import (
+    account_validity,
     api,
     appservice,
     auth,
@@ -59,6 +60,7 @@ class RootConfig:
     captcha: captcha.CaptchaConfig
     voip: voip.VoipConfig
     registration: registration.RegistrationConfig
+    account_validity: account_validity.AccountValidityConfig
     metrics: metrics.MetricsConfig
     api: api.ApiConfig
     appservice: appservice.AppServiceConfig

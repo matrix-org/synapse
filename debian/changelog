@@ -1,8 +1,12 @@
-matrix-synapse-py3 (1.31.0+nmu1) UNRELEASED; urgency=medium
+matrix-synapse-py3 (1.32.0) stable; urgency=medium
 
+  [ Dan Callahan ]
   * Skip tests when DEB_BUILD_OPTIONS contains "nocheck".
 
- -- Dan Callahan <danc@element.io>  Mon, 12 Apr 2021 13:07:36 +0000
+  [ Synapse Packaging team ]
+  * New synapse release 1.32.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 20 Apr 2021 14:28:39 +0100
 
 matrix-synapse-py3 (1.31.0) stable; urgency=medium
 
