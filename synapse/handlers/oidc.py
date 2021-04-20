@@ -37,10 +37,7 @@ from twisted.web.client import readBody
 from twisted.web.http_headers import Headers
 
 from synapse.config import ConfigError
-from synapse.config.oidc_config import (
-    OidcProviderClientSecretJwtKey,
-    OidcProviderConfig,
-)
+from synapse.config.oidc import OidcProviderClientSecretJwtKey, OidcProviderConfig
 from synapse.handlers.sso import MappingException, UserAttributes
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
