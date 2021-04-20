@@ -16,7 +16,7 @@
 import logging
 import threading
 from functools import wraps
-from typing import TYPE_CHECKING, Dict, Optional, Set, Union
+from typing import TYPE_CHECKING, Dict, Optional, Set
 
 from prometheus_client.core import REGISTRY, Counter, Gauge
 
