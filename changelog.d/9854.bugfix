@@ -1,0 +1,1 @@
+Fix a regression in Synapse 1.32.0 which caused Synapse to report large numbers of Prometheus data series, potentially overwhelming Prometheus instances.
