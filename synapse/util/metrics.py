@@ -105,7 +105,13 @@ class Measure:
         "start",
     ]
 
-    def __init__(self, clock, name):
+    def __init__(self, clock, name: str):
+        """
+        Args:
+            clock: A n object with a "time()" method, which returns the current
+                time in seconds.
+            name: The name of the metric to report.
+        """
         self.clock = clock
         self.name = name
         curr_context = current_context()
@@ -115,12 +121,12 @@ class Measure:
                 name,
             )
             parent_context = None
+            log_name = ""
         else:
             assert isinstance(curr_context, LoggingContext)
             parent_context = curr_context
-        self._logging_context = LoggingContext(
-            self.name, parent_context
-        )
+            log_name = parent_context.name
+        self._logging_context = LoggingContext(log_name, parent_context)
         self.start = None
 
     def __enter__(self) -> "Measure":
