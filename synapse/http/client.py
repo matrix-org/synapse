@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import typing
 import urllib.parse
 from io import BytesIO
 from typing import (
@@ -34,6 +33,7 @@ import treq
 from canonicaljson import encode_canonical_json
 from netaddr import AddrFormatError, IPAddress, IPSet
 from prometheus_client import Counter
+from typing_extensions import Protocol
 from zope.interface import implementer, provider
 
 from OpenSSL import SSL
@@ -755,7 +755,7 @@ def _timeout_to_request_timed_out_error(f: Failure):
     return f
 
 
-class ByteWriteable(typing.Protocol):
+class ByteWriteable(Protocol):
     """The type of object which must be passed into read_body_with_max_size.
 
     Typically this is a file object.
