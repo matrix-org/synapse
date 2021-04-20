@@ -121,13 +121,11 @@ class Measure:
                 name,
             )
             parent_context = None
-            log_name = ""
         else:
             assert isinstance(curr_context, LoggingContext)
             parent_context = curr_context
-            log_name = parent_context.name
-        self._logging_context = LoggingContext(log_name, parent_context)
-        self.start = None
+        self._logging_context = LoggingContext(str(curr_context), parent_context)
+        self.start = None  # type: Optional[int]
 
     def __enter__(self) -> "Measure":
         if self.start is not None:

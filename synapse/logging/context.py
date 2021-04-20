@@ -692,11 +692,10 @@ def nested_logging_context(suffix: str) -> LoggingContext:
             "Starting nested logging context from sentinel context: metrics will be lost"
         )
         parent_context = None
-        prefix = ""
     else:
         assert isinstance(curr_context, LoggingContext)
         parent_context = curr_context
-        prefix = parent_context.name
+    prefix = str(curr_context)
     return LoggingContext(
         prefix + "-" + suffix,
         parent_context=parent_context,
@@ -885,14 +884,12 @@ def defer_to_threadpool(reactor, threadpool, f, *args, **kwargs):
             "Calling defer_to_threadpool from sentinel context: metrics will be lost"
         )
         parent_context = None
-        name = ""
     else:
         assert isinstance(curr_context, LoggingContext)
         parent_context = curr_context
-        name = parent_context.name
 
     def g():
-        with LoggingContext(name, parent_context=parent_context):
+        with LoggingContext(str(curr_context), parent_context=parent_context):
             return f(*args, **kwargs)
 
     return make_deferred_yieldable(threads.deferToThreadPool(reactor, threadpool, g))
