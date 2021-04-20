@@ -146,7 +146,7 @@ class FederationHandler(BaseHandler):
         self.is_mine_id = hs.is_mine_id
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
-        self.event_auth_handler = hs.get_event_auth_handler()
+        self._event_auth_handler = hs.get_event_auth_handler()
         self._message_handler = hs.get_message_handler()
         self._server_notices_mxid = hs.config.server_notices_mxid
         self.config = hs.config
@@ -1684,18 +1684,18 @@ class FederationHandler(BaseHandler):
         user_id = event.state_key
         prev_member_event_id = prev_state_ids.get((EventTypes.Member, user_id), None)
         newly_joined = True
-        is_invite = False
+        user_is_invited = False
         if prev_member_event_id:
             prev_member_event = await self.store.get_event(prev_member_event_id)
             newly_joined = prev_member_event.membership != Membership.JOIN
-            is_invite = prev_member_event.membership == Membership.INVITE
+            user_is_invited = prev_member_event.membership == Membership.INVITE
 
         # If the member is not already in the room, and not invited, check if
         # they should be allowed access via membership in a space.
         if (
             newly_joined
-            and not is_invite
-            and not await self.event_auth_handler.can_join_without_invite(
+            and not user_is_invited
+            and not await self._event_auth_handler.can_join_without_invite(
                 prev_state_ids,
                 event.room_version,
                 user_id,
