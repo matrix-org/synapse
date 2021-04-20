@@ -106,8 +106,8 @@ has been available since Synapse 1.7.0 (2019-12-13), and is accessible under ``G
 
 The deprecation of the old endpoint was announced with Synapse 1.28.0 (released on 2021-02-25).
 
-Application Services must use type ``m.login.application`` when registering users
----------------------------------------------------------------------------------
+Application Services must use type ``m.login.application_service`` when registering users
+-----------------------------------------------------------------------------------------
 
 In compliance with the
 `Application Service spec <https://matrix.org/docs/spec/application_service/r0.1.2#server-admin-style-permissions>`_,
