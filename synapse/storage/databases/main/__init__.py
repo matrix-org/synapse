@@ -339,12 +339,13 @@ class DataStore(
             filters = []
             args = [self.hs.config.server_name]
 
+            # `name` is in database already in lower case
             if name:
-                filters.append("(name LIKE ? OR displayname LIKE ?)")
-                args.extend(["@%" + name + "%:%", "%" + name + "%"])
+                filters.append("(name LIKE ? OR LOWER(displayname) LIKE ?)")
+                args.extend(["@%" + name.lower() + "%:%", "%" + name.lower() + "%"])
             elif user_id:
                 filters.append("name LIKE ?")
-                args.extend(["%" + user_id + "%"])
+                args.extend(["%" + user_id.lower() + "%"])
 
             if not guests:
                 filters.append("is_guest = 0")

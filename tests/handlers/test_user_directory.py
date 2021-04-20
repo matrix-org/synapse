@@ -57,6 +57,10 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
                 user_id=support_user_id, password_hash=None, user_type=UserTypes.SUPPORT
             )
         )
+        regular_user_id = "@regular:test"
+        self.get_success(
+            self.store.register_user(user_id=regular_user_id, password_hash=None)
+        )
 
         self.get_success(
             self.handler.handle_local_profile_change(support_user_id, None)
@@ -66,12 +70,46 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         display_name = "display_name"
 
         profile_info = ProfileInfo(avatar_url="avatar_url", display_name=display_name)
-        regular_user_id = "@regular:test"
         self.get_success(
             self.handler.handle_local_profile_change(regular_user_id, profile_info)
         )
         profile = self.get_success(self.store.get_user_in_directory(regular_user_id))
         self.assertTrue(profile["display_name"] == display_name)
+
+    def test_handle_local_profile_change_with_deactivated_user(self):
+        # create user
+        r_user_id = "@regular:test"
+        self.get_success(
+            self.store.register_user(user_id=r_user_id, password_hash=None)
+        )
+
+        # update profile
+        display_name = "Regular User"
+        profile_info = ProfileInfo(avatar_url="avatar_url", display_name=display_name)
+        self.get_success(
+            self.handler.handle_local_profile_change(r_user_id, profile_info)
+        )
+
+        # profile is in directory
+        profile = self.get_success(self.store.get_user_in_directory(r_user_id))
+        self.assertTrue(profile["display_name"] == display_name)
+
+        # deactivate user
+        self.get_success(self.store.set_user_deactivated_status(r_user_id, True))
+        self.get_success(self.handler.handle_user_deactivated(r_user_id))
+
+        # profile is not in directory
+        profile = self.get_success(self.store.get_user_in_directory(r_user_id))
+        self.assertTrue(profile is None)
+
+        # update profile after deactivation
+        self.get_success(
+            self.handler.handle_local_profile_change(r_user_id, profile_info)
+        )
+
+        # profile is furthermore not in directory
+        profile = self.get_success(self.store.get_user_in_directory(r_user_id))
+        self.assertTrue(profile is None)
 
     def test_handle_user_deactivated_support_user(self):
         s_user_id = "@support:test"

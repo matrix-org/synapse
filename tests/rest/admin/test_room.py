@@ -1050,6 +1050,13 @@ class RoomTestCase(unittest.HomeserverTestCase):
         _search_test(room_id_2, "else")
         _search_test(room_id_2, "se")
 
+        # Test case insensitive
+        _search_test(room_id_1, "SOMETHING")
+        _search_test(room_id_1, "THING")
+
+        _search_test(room_id_2, "ELSE")
+        _search_test(room_id_2, "SE")
+
         _search_test(None, "foo")
         _search_test(None, "bar")
         _search_test(None, "", expected_http_code=400)

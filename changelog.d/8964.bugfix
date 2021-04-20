@@ -1,0 +1,1 @@
+Fix a bug where deactivated users appeared in the user directory when their profile information was updated.

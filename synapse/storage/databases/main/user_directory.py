@@ -396,9 +396,9 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                     sql = """
                         INSERT INTO user_directory_search(user_id, vector)
                         VALUES (?,
-                            setweight(to_tsvector('english', ?), 'A')
-                            || setweight(to_tsvector('english', ?), 'D')
-                            || setweight(to_tsvector('english', COALESCE(?, '')), 'B')
+                            setweight(to_tsvector('simple', ?), 'A')
+                            || setweight(to_tsvector('simple', ?), 'D')
+                            || setweight(to_tsvector('simple', COALESCE(?, '')), 'B')
                         ) ON CONFLICT (user_id) DO UPDATE SET vector=EXCLUDED.vector
                     """
                     txn.execute(
@@ -418,9 +418,9 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                         sql = """
                             INSERT INTO user_directory_search(user_id, vector)
                             VALUES (?,
-                                setweight(to_tsvector('english', ?), 'A')
-                                || setweight(to_tsvector('english', ?), 'D')
-                                || setweight(to_tsvector('english', COALESCE(?, '')), 'B')
+                                setweight(to_tsvector('simple', ?), 'A')
+                                || setweight(to_tsvector('simple', ?), 'D')
+                                || setweight(to_tsvector('simple', COALESCE(?, '')), 'B')
                             )
                         """
                         txn.execute(
@@ -435,9 +435,9 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                     elif new_entry is False:
                         sql = """
                             UPDATE user_directory_search
-                            SET vector = setweight(to_tsvector('english', ?), 'A')
-                                || setweight(to_tsvector('english', ?), 'D')
-                                || setweight(to_tsvector('english', COALESCE(?, '')), 'B')
+                            SET vector = setweight(to_tsvector('simple', ?), 'A')
+                                || setweight(to_tsvector('simple', ?), 'D')
+                                || setweight(to_tsvector('simple', COALESCE(?, '')), 'B')
                             WHERE user_id = ?
                         """
                         txn.execute(
@@ -784,7 +784,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 INNER JOIN user_directory AS d USING (user_id)
                 WHERE
                     %(where_clause)s
-                    AND vector @@ to_tsquery('english', ?)
+                    AND vector @@ to_tsquery('simple', ?)
                 ORDER BY
                     (CASE WHEN d.user_id IS NOT NULL THEN 4.0 ELSE 1.0 END)
                     * (CASE WHEN display_name IS NOT NULL THEN 1.2 ELSE 1.0 END)
@@ -793,13 +793,13 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                         3 * ts_rank_cd(
                             '{0.1, 0.1, 0.9, 1.0}',
                             vector,
-                            to_tsquery('english', ?),
+                            to_tsquery('simple', ?),
                             8
                         )
                         + ts_rank_cd(
                             '{0.1, 0.1, 0.9, 1.0}',
                             vector,
-                            to_tsquery('english', ?),
+                            to_tsquery('simple', ?),
                             8
                         )
                     )
