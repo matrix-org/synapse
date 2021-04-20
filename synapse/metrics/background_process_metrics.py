@@ -252,8 +252,8 @@ class BackgroundProcessLoggingContext(LoggingContext):
                 separate prometheus time series.
 
             instance_id: an identifer to add to `name` to distinguish this instance of
-                the named background process, to distinguish them in the logs. If
-                this is `None`, one is made up based on id(self).
+                the named background process in the logs. If this is `None`, one is
+                made up based on id(self).
         """
         if instance_id is None:
             instance_id = id(self)
