@@ -1,1 +1,0 @@
-Fix bug where application services couldn't register new ghost users if the server had reached its MAU limit.
