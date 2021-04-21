@@ -768,7 +768,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # `get_joined_hosts` with the "current" state group for the room.
         cache = await self._get_joined_hosts_cache(room_id)
 
-        # If the state group in the cache matches then its a no-op.
+        # If the state group in the cache matches, we already have the data we need.
         if state_entry.state_group == cache.state_group:
             return frozenset(cache.hosts_to_joined_users)
 
@@ -778,7 +778,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 # Same state group, so nothing to do
                 pass
             elif state_entry.prev_group == cache.state_group:
-                # The cache work is for the previous state group, so we work out
+                # The cached work is for the previous state group, so we work out
                 # the delta.
                 for (typ, state_key), event_id in state_entry.delta_ids.items():
                     if typ != EventTypes.Member:

@@ -154,8 +154,8 @@ class BulkPushRuleEvaluator:
 
     @lru_cache()
     def _get_rules_for_room(self, room_id: str) -> "RulesForRoomData":
-        """Get the current RulesForRoom object for the given room id"""
-        # It's important that RulesForRoom gets added to self._get_rules_for_room.cache
+        """Get the current RulesForRoomData object for the given room id"""
+        # It's important that the RulesForRoomData object gets added to self._get_rules_for_room.cache
         # before any lookup methods get called on it as otherwise there may be
         # a race if invalidate_all gets called (which assumes its in the cache)
         return RulesForRoomData()
@@ -339,7 +339,8 @@ class RulesForRoom:
             rules_for_room_cache: The cache object that caches these
                 RoomsForUser objects.
             room_push_rule_cache_metrics: The metrics object
-            data
+            linearizer:
+            cached_data:
         """
         self.room_id = room_id
         self.is_mine_id = hs.is_mine_id
@@ -371,7 +372,7 @@ class RulesForRoom:
             self.room_push_rule_cache_metrics.inc_hits()
             return self.data.rules_by_user
 
-        with (await self.linearizer.queue(event.room_id)):
+        with (await self.linearizer.queue(self.room_id)):
             if state_group and self.data.state_group == state_group:
                 logger.debug("Using cached rules for %r", self.room_id)
                 self.room_push_rule_cache_metrics.inc_hits()
