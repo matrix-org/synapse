@@ -14,11 +14,12 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool, make_tuple_comparison_clause
+from synapse.types import UserID
 from synapse.util.caches.lrucache import LruCache
 
 logger = logging.getLogger(__name__)
@@ -546,7 +547,9 @@ class ClientIpStore(ClientIpWorkerStore):
                     }
         return ret
 
-    async def get_user_ip_and_agents(self, user):
+    async def get_user_ip_and_agents(
+        self, user: UserID
+    ) -> List[Dict[str, Union[str, int]]]:
         user_id = user.to_string()
         results = {}
 

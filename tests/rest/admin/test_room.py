@@ -1598,7 +1598,6 @@ PURGE_TABLES = [
     "event_push_summary",
     "pusher_throttle",
     "group_summary_rooms",
-    "local_invites",
     "room_account_data",
     "room_tags",
     # "state_groups",  # Current impl leaves orphaned state groups around.
