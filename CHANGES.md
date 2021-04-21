@@ -1,6 +1,8 @@
 Synapse 1.32.1 (2021-04-21)
 ===========================
 
+This release fixes the regression introduced in Synapse 
+
 Bugfixes
 --------
 
