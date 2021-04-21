@@ -30,7 +30,7 @@ from synapse.api.errors import (
 )
 from synapse.config import ConfigError
 from synapse.config.captcha import CaptchaConfig
-from synapse.config.consent_config import ConsentConfig
+from synapse.config.consent import ConsentConfig
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.config.registration import RegistrationConfig

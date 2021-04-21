@@ -70,7 +70,7 @@ from synapse.handlers.acme import AcmeHandler
 from synapse.handlers.admin import AdminHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler, MacaroonGenerator
-from synapse.handlers.cas_handler import CasHandler
+from synapse.handlers.cas import CasHandler
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
 from synapse.handlers.device import DeviceHandler, DeviceWorkerHandler
 from synapse.handlers.devicemessage import DeviceMessageHandler
@@ -145,8 +145,8 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from txredisapi import RedisProtocol
 
-    from synapse.handlers.oidc_handler import OidcHandler
-    from synapse.handlers.saml_handler import SamlHandler
+    from synapse.handlers.oidc import OidcHandler
+    from synapse.handlers.saml import SamlHandler
 
 
 T = TypeVar("T", bound=Callable[..., Any])
@@ -696,13 +696,13 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_saml_handler(self) -> "SamlHandler":
-        from synapse.handlers.saml_handler import SamlHandler
+        from synapse.handlers.saml import SamlHandler
 
         return SamlHandler(self)
 
     @cache_in_self
     def get_oidc_handler(self) -> "OidcHandler":
-        from synapse.handlers.oidc_handler import OidcHandler
+        from synapse.handlers.oidc import OidcHandler
 
         return OidcHandler(self)
 

@@ -111,6 +111,15 @@ upon attempting to use a valid renewal token more than once.
 Upgrading to v1.32.0
 ====================
 
+Regression causing connected Prometheus instances to become overwhelmed
+-----------------------------------------------------------------------
+
+This release introduces `a regression <https://githubcom/matrix-org/synapse/issues/9853>`_
+that can overwhelm connected Prometheus instances. This issue was not present in
+Synapse v1.32.0rc1. It is recommended not to update to this release. If you have
+upgraded to v1.32.0 already, please downgrade to v1.31.0. This issue will be
+resolved in a subsequent release version shortly.
+
 Dropping support for old Python, Postgres and SQLite versions
 -------------------------------------------------------------
 
