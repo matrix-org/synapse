@@ -264,14 +264,18 @@ class PasswordRestServlet(RestServlet):
                 logger.error("Auth succeeded but no known type! %r", result.keys())
                 raise SynapseError(500, "", Codes.UNKNOWN)
 
-        # If we have a password in this request, prefer it. Otherwise, there
-        # must be a password hash from an earlier request.
+        # If we have a password in this request, prefer it. Otherwise, use the
+        # password hash from an earlier request.
         if new_password:
             password_hash = await self.auth_handler.hash(new_password)
-        else:
+        elif session_id is not None:
             password_hash = await self.auth_handler.get_session_data(
                 session_id, "password_hash", None
             )
+        else:
+            # UI validation was skipped, but the request did not include a new
+            # password.
+            password_hash = None
         if not password_hash:
             raise SynapseError(400, "Missing params: password", Codes.MISSING_PARAM)
 

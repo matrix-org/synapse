@@ -2005,9 +2005,10 @@ oidc_config:
       #   * user: The claims returned by the UserInfo Endpoint and/or in the ID
       #     Token
       #
-      # This must be configured if using the default mapping provider.
+      # If this is not set, the user will be prompted to choose their
+      # own username.
       #
-      localpart_template: "{{ user.preferred_username }}"
+      #localpart_template: "{{ user.preferred_username }}"
 
       # Jinja2 template for the display name to set on first login.
       #
@@ -2247,6 +2248,21 @@ password_config:
       # Defaults to 'false'.
       #
       #require_uppercase: true
+
+ui_auth:
+    # The number of milliseconds to allow a user-interactive authentication
+    # session to be active.
+    #
+    # This defaults to 0, meaning the user is queried for their credentials
+    # before every action, but this can be overridden to alow a single
+    # validation to be re-used.  This weakens the protections afforded by
+    # the user-interactive authentication process, by allowing for multiple
+    # (and potentially different) operations to use the same validation session.
+    #
+    # Uncomment below to allow for credential validation to last for 15
+    # seconds.
+    #
+    #session_timeout: 15000
 
 
 # Configuration for sending emails from Synapse.

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Union
+from typing import Union
 
 from twisted.internet.defer import succeed
 
@@ -177,13 +177,8 @@ class UIAuthTests(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.user_pass = "pass"
         self.user = self.register_user("test", self.user_pass)
-        self.user_tok = self.login("test", self.user_pass)
-
-    def get_device_ids(self, access_token: str) -> List[str]:
-        # Get the list of devices so one can be deleted.
-        channel = self.make_request("GET", "devices", access_token=access_token,)
-        self.assertEqual(channel.code, 200)
-        return [d["device_id"] for d in channel.json_body["devices"]]
+        self.device_id = "dev1"
+        self.user_tok = self.login("test", self.user_pass, self.device_id)
 
     def delete_device(
         self,
@@ -219,11 +214,9 @@ class UIAuthTests(unittest.HomeserverTestCase):
         """
         Test user interactive authentication outside of registration.
         """
-        device_id = self.get_device_ids(self.user_tok)[0]
-
         # Attempt to delete this device.
         # Returns a 401 as per the spec
-        channel = self.delete_device(self.user_tok, device_id, 401)
+        channel = self.delete_device(self.user_tok, self.device_id, 401)
 
         # Grab the session
         session = channel.json_body["session"]
@@ -233,7 +226,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
         # Make another request providing the UI auth flow.
         self.delete_device(
             self.user_tok,
-            device_id,
+            self.device_id,
             200,
             {
                 "auth": {
@@ -252,14 +245,13 @@ class UIAuthTests(unittest.HomeserverTestCase):
         UIA - check that still works.
         """
 
-        device_id = self.get_device_ids(self.user_tok)[0]
-        channel = self.delete_device(self.user_tok, device_id, 401)
+        channel = self.delete_device(self.user_tok, self.device_id, 401)
         session = channel.json_body["session"]
 
         # Make another request providing the UI auth flow.
         self.delete_device(
             self.user_tok,
-            device_id,
+            self.device_id,
             200,
             {
                 "auth": {
@@ -282,14 +274,11 @@ class UIAuthTests(unittest.HomeserverTestCase):
         session ID should be rejected.
         """
         # Create a second login.
-        self.login("test", self.user_pass)
-
-        device_ids = self.get_device_ids(self.user_tok)
-        self.assertEqual(len(device_ids), 2)
+        self.login("test", self.user_pass, "dev2")
 
         # Attempt to delete the first device.
         # Returns a 401 as per the spec
-        channel = self.delete_devices(401, {"devices": [device_ids[0]]})
+        channel = self.delete_devices(401, {"devices": [self.device_id]})
 
         # Grab the session
         session = channel.json_body["session"]
@@ -301,7 +290,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
         self.delete_devices(
             200,
             {
-                "devices": [device_ids[1]],
+                "devices": ["dev2"],
                 "auth": {
                     "type": "m.login.password",
                     "identifier": {"type": "m.id.user", "user": self.user},
@@ -316,14 +305,11 @@ class UIAuthTests(unittest.HomeserverTestCase):
         The initial requested URI cannot be modified during the user interactive authentication session.
         """
         # Create a second login.
-        self.login("test", self.user_pass)
-
-        device_ids = self.get_device_ids(self.user_tok)
-        self.assertEqual(len(device_ids), 2)
+        self.login("test", self.user_pass, "dev2")
 
         # Attempt to delete the first device.
         # Returns a 401 as per the spec
-        channel = self.delete_device(self.user_tok, device_ids[0], 401)
+        channel = self.delete_device(self.user_tok, self.device_id, 401)
 
         # Grab the session
         session = channel.json_body["session"]
@@ -332,9 +318,11 @@ class UIAuthTests(unittest.HomeserverTestCase):
 
         # Make another request providing the UI auth flow, but try to delete the
         # second device. This results in an error.
+        #
+        # This makes use of the fact that the device ID is embedded into the URL.
         self.delete_device(
             self.user_tok,
-            device_ids[1],
+            "dev2",
             403,
             {
                 "auth": {
@@ -345,6 +333,52 @@ class UIAuthTests(unittest.HomeserverTestCase):
                 },
             },
         )
+
+    @unittest.override_config({"ui_auth": {"session_timeout": 5 * 1000}})
+    def test_can_reuse_session(self):
+        """
+        The session can be reused if configured.
+
+        Compare to test_cannot_change_uri.
+        """
+        # Create a second and third login.
+        self.login("test", self.user_pass, "dev2")
+        self.login("test", self.user_pass, "dev3")
+
+        # Attempt to delete a device. This works since the user just logged in.
+        self.delete_device(self.user_tok, "dev2", 200)
+
+        # Move the clock forward past the validation timeout.
+        self.reactor.advance(6)
+
+        # Deleting another devices throws the user into UI auth.
+        channel = self.delete_device(self.user_tok, "dev3", 401)
+
+        # Grab the session
+        session = channel.json_body["session"]
+        # Ensure that flows are what is expected.
+        self.assertIn({"stages": ["m.login.password"]}, channel.json_body["flows"])
+
+        # Make another request providing the UI auth flow.
+        self.delete_device(
+            self.user_tok,
+            "dev3",
+            200,
+            {
+                "auth": {
+                    "type": "m.login.password",
+                    "identifier": {"type": "m.id.user", "user": self.user},
+                    "password": self.user_pass,
+                    "session": session,
+                },
+            },
+        )
+
+        # Make another request, but try to delete the first device. This works
+        # due to re-using the previous session.
+        #
+        # Note that *no auth* information is provided, not even a session iD!
+        self.delete_device(self.user_tok, self.device_id, 200)
 
     def test_does_not_offer_password_for_sso_user(self):
         login_resp = self.helper.login_via_oidc("username")
@@ -361,8 +395,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
     def test_does_not_offer_sso_for_password_user(self):
         # now call the device deletion API: we should get the option to auth with SSO
         # and not password.
-        device_ids = self.get_device_ids(self.user_tok)
-        channel = self.delete_device(self.user_tok, device_ids[0], 401)
+        channel = self.delete_device(self.user_tok, self.device_id, 401)
 
         flows = channel.json_body["flows"]
         self.assertEqual(flows, [{"stages": ["m.login.password"]}])
@@ -373,8 +406,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
         login_resp = self.helper.login_via_oidc(UserID.from_string(self.user).localpart)
         self.assertEqual(login_resp["user_id"], self.user)
 
-        device_ids = self.get_device_ids(self.user_tok)
-        channel = self.delete_device(self.user_tok, device_ids[0], 401)
+        channel = self.delete_device(self.user_tok, self.device_id, 401)
 
         flows = channel.json_body["flows"]
         # we have no particular expectations of ordering here

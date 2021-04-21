@@ -486,7 +486,11 @@ class Mailer:
     def add_image_message_vars(
         self, messagevars: Dict[str, Any], event: EventBase
     ) -> None:
-        messagevars["image_url"] = event.content["url"]
+        """
+        Potentially add an image URL to the message variables.
+        """
+        if "url" in event.content:
+            messagevars["image_url"] = event.content["url"]
 
     async def make_summary_text(
         self,

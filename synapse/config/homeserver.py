@@ -17,6 +17,7 @@ from ._base import RootConfig
 from .account_validity import AccountValidityConfig
 from .api import ApiConfig
 from .appservice import AppServiceConfig
+from .auth import AuthConfig
 from .cache import CacheConfig
 from .captcha import CaptchaConfig
 from .cas import CasConfig
@@ -31,7 +32,6 @@ from .key import KeyConfig
 from .logger import LoggingConfig
 from .metrics import MetricsConfig
 from .oidc_config import OIDCConfig
-from .password import PasswordConfig
 from .password_auth_providers import PasswordAuthProviderConfig
 from .push import PushConfig
 from .ratelimiting import RatelimitConfig
@@ -79,7 +79,7 @@ class HomeServerConfig(RootConfig):
         CasConfig,
         SSOConfig,
         JWTConfig,
-        PasswordConfig,
+        AuthConfig,
         EmailConfig,
         PasswordAuthProviderConfig,
         PushConfig,
