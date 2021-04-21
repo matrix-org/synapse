@@ -26,8 +26,10 @@ from synapse.rest.oidc import OIDCResource
 from synapse.types import JsonDict, UserID
 
 from tests import unittest
+from tests.handlers.test_oidc import HAS_OIDC
 from tests.rest.client.v1.utils import TEST_OIDC_CONFIG
 from tests.server import FakeChannel
+from tests.unittest import override_config, skip_unless
 
 
 class DummyRecaptchaChecker(UserInteractiveAuthChecker):
@@ -158,20 +160,22 @@ class UIAuthTests(unittest.HomeserverTestCase):
 
     def default_config(self):
         config = super().default_config()
-
-        # we enable OIDC as a way of testing SSO flows
-        oidc_config = {}
-        oidc_config.update(TEST_OIDC_CONFIG)
-        oidc_config["allow_existing_users"] = True
-
-        config["oidc_config"] = oidc_config
         config["public_baseurl"] = "https://synapse.test"
+
+        if HAS_OIDC:
+            # we enable OIDC as a way of testing SSO flows
+            oidc_config = {}
+            oidc_config.update(TEST_OIDC_CONFIG)
+            oidc_config["allow_existing_users"] = True
+            config["oidc_config"] = oidc_config
+
         return config
 
     def create_resource_dict(self):
         resource_dict = super().create_resource_dict()
-        # mount the OIDC resource at /_synapse/oidc
-        resource_dict["/_synapse/oidc"] = OIDCResource(self.hs)
+        if HAS_OIDC:
+            # mount the OIDC resource at /_synapse/oidc
+            resource_dict["/_synapse/oidc"] = OIDCResource(self.hs)
         return resource_dict
 
     def prepare(self, reactor, clock, hs):
@@ -380,6 +384,8 @@ class UIAuthTests(unittest.HomeserverTestCase):
         # Note that *no auth* information is provided, not even a session iD!
         self.delete_device(self.user_tok, self.device_id, 200)
 
+    @skip_unless(HAS_OIDC, "requires OIDC")
+    @override_config({"oidc_config": TEST_OIDC_CONFIG})
     def test_does_not_offer_password_for_sso_user(self):
         login_resp = self.helper.login_via_oidc("username")
         user_tok = login_resp["access_token"]
@@ -393,13 +399,13 @@ class UIAuthTests(unittest.HomeserverTestCase):
         self.assertEqual(flows, [{"stages": ["m.login.sso"]}])
 
     def test_does_not_offer_sso_for_password_user(self):
-        # now call the device deletion API: we should get the option to auth with SSO
-        # and not password.
         channel = self.delete_device(self.user_tok, self.device_id, 401)
 
         flows = channel.json_body["flows"]
         self.assertEqual(flows, [{"stages": ["m.login.password"]}])
 
+    @skip_unless(HAS_OIDC, "requires OIDC")
+    @override_config({"oidc_config": TEST_OIDC_CONFIG})
     def test_offers_both_flows_for_upgraded_user(self):
         """A user that had a password and then logged in with SSO should get both flows
         """

@@ -24,7 +24,6 @@ import pymacaroons
 from twisted.web.resource import Resource
 
 from synapse.api.errors import RedirectException
-from synapse.handlers.oidc_handler import OidcError
 from synapse.handlers.sso import MappingException
 from synapse.rest.client.v1 import login
 from synapse.rest.synapse.client.pick_username import pick_username_resource
@@ -33,6 +32,14 @@ from synapse.types import UserID
 
 from tests.test_utils import FakeResponse, simple_async_mock
 from tests.unittest import HomeserverTestCase, override_config
+
+try:
+    import authlib  # noqa: F401
+
+    HAS_OIDC = True
+except ImportError:
+    HAS_OIDC = False
+
 
 # These are a few constants that are used as config parameters in the tests.
 ISSUER = "https://issuer/"
@@ -113,6 +120,9 @@ async def get_json(url):
 
 
 class OidcHandlerTestCase(HomeserverTestCase):
+    if not HAS_OIDC:
+        skip = "requires OIDC"
+
     def default_config(self):
         config = super().default_config()
         config["public_baseurl"] = BASE_URL
@@ -458,6 +468,8 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertRenderedError("fetch_error")
 
         # Handle code exchange failure
+        from synapse.handlers.oidc_handler import OidcError
+
         self.handler._exchange_code = simple_async_mock(
             raises=OidcError("invalid_request")
         )
@@ -538,6 +550,8 @@ class OidcHandlerTestCase(HomeserverTestCase):
                 body=b'{"error": "foo", "error_description": "bar"}',
             )
         )
+        from synapse.handlers.oidc_handler import OidcError
+
         exc = self.get_failure(self.handler._exchange_code(code), OidcError)
         self.assertEqual(exc.value.error, "foo")
         self.assertEqual(exc.value.error_description, "bar")
@@ -829,6 +843,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
 
 class UsernamePickerTestCase(HomeserverTestCase):
+    if not HAS_OIDC:
+        skip = "requires OIDC"
+
     servlets = [login.register_servlets]
 
     def default_config(self):

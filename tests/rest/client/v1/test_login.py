@@ -4,7 +4,10 @@ import urllib.parse
 
 from mock import Mock
 
-import jwt
+try:
+    import jwt
+except ImportError:
+    jwt = None
 
 import synapse.rest.admin
 from synapse.appservice import ApplicationService
@@ -460,6 +463,9 @@ class CASTestCase(unittest.HomeserverTestCase):
 
 
 class JWTTestCase(unittest.HomeserverTestCase):
+    if not jwt:
+        skip = "requires jwt"
+
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
@@ -628,6 +634,9 @@ class JWTTestCase(unittest.HomeserverTestCase):
 # RSS256, with a public key configured in synapse as "jwt_secret", and tokens
 # signed by the private key.
 class JWTPubKeyTestCase(unittest.HomeserverTestCase):
+    if not jwt:
+        skip = "requires jwt"
+
     servlets = [
         login.register_servlets,
     ]
