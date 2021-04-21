@@ -1,3 +1,12 @@
+Synapse 1.32.1 (2021-04-21)
+===========================
+
+Bugfixes
+--------
+
+- Fix a regression in Synapse 1.32.0 which caused Synapse to report large numbers of Prometheus time series, potentially overwhelming Prometheus instances. ([\#9854](https://github.com/matrix-org/synapse/issues/9854))
+
+
 Synapse 1.32.0 (2021-04-20)
 ===========================
 
