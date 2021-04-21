@@ -20,6 +20,11 @@ Synapse 1.32.0 (2021-04-20)
 that can overwhelm connected Prometheus instances. This issue was not present in
 1.32.0rc1, and is fixed in 1.32.1. See the changelog for 1.32.1 above for more information.
 
+**Note:** This release also introduces a change that may affected Synapse modules that
+import `synapse.logging.context.LoggingContext`, such as
+[synapse-s3-storage-provider](https://github.com/matrix-org/synapse-s3-storage-provider).
+This will be fixed in a later Synapse version.
+
 **Note:** This release requires Python 3.6+ and Postgres 9.6+ or SQLite 3.22+.
 
 This release removes the deprecated `GET /_synapse/admin/v1/users/<user_id>` admin API. Please use the [v2 API](https://github.com/matrix-org/synapse/blob/develop/docs/admin_api/user_admin_api.rst#query-user-account) instead, which has improved capabilities.
