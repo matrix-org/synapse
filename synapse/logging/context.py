@@ -315,9 +315,9 @@ class LoggingContext:
             self.request = request
 
         # if we don't have a `name`, but do have a parent context, use its name.
-        if self.parent_context and not name:
+        if self.parent_context and name is None:
             name = str(self.parent_context)
-        if not name:
+        if name is None:
             raise ValueError(
                 "LoggingContext must be given either a name or a parent context"
             )
