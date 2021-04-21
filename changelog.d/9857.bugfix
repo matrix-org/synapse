@@ -1,1 +1,0 @@
-Fix a regression in Synapse v1.32.1 which caused `LoggingContext` errors in plugins.

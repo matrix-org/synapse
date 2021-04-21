@@ -1,3 +1,14 @@
+Synapse 1.32.2 (2021-04-21)
+===========================
+
+This release includes fixes for the two regressions introduced in 1.32.0.
+
+Bugfixes
+--------
+
+- Fix a regression in Synapse v1.32.1 which caused `LoggingContext` errors in plugins. ([\#9857](https://github.com/matrix-org/synapse/issues/9857))
+
+
 Synapse 1.32.1 (2021-04-21)
 ===========================
 
