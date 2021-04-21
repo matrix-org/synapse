@@ -31,7 +31,7 @@ easy to run CAS implementation built on top of Django.
 You should now have a Django project configured to serve CAS authentication with
 a single user created.
 
-## Configure Synapse (and Riot) to use CAS
+## Configure Synapse (and Element) to use CAS
 
 1. Modify your `homeserver.yaml` to enable CAS and point it to your locally
    running Django test server:
@@ -51,9 +51,9 @@ and that the CAS server is on port 8000, both on localhost.
 
 ## Testing the configuration
 
-Then in Riot:
+Then in Element:
 
-1. Visit the login page with a Riot pointing at your homeserver.
+1. Visit the login page with a Element pointing at your homeserver.
 2. Click the Single Sign-On button.
 3. Login using the credentials created with `createsuperuser`.
 4. You should be logged in.

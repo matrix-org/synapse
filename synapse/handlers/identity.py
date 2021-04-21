@@ -55,12 +55,10 @@ class IdentityHandler(BaseHandler):
         self.federation_http_client = hs.get_federation_http_client()
         self.hs = hs
 
-        self.trusted_id_servers = set(hs.config.trusted_third_party_id_servers)
-        self.trust_any_id_server_just_for_testing_do_not_use = (
-            hs.config.use_insecure_ssl_client_just_for_testing_do_not_use
-        )
         self.rewrite_identity_server_urls = hs.config.rewrite_identity_server_urls
         self._enable_lookup = hs.config.enable_3pid_lookup
+
+        self._web_client_location = hs.config.invite_client_location
 
     async def threepid_from_creds(
         self, id_server_url: str, creds: Dict[str, str]
@@ -940,6 +938,9 @@ class IdentityHandler(BaseHandler):
             "sender_display_name": inviter_display_name,
             "sender_avatar_url": inviter_avatar_url,
         }
+        # If a custom web client location is available, include it in the request.
+        if self._web_client_location:
+            invite_config["org.matrix.web_client_location"] = self._web_client_location
 
         # Rewrite the identity server URL if necessary
         id_server_url = self.rewrite_id_server_url(id_server, add_https=True)

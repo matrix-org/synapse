@@ -2329,6 +2329,12 @@ email:
   #
   #validation_token_lifetime: 15m
 
+  # The web client location to direct users to during an invite. This is passed
+  # to the identity server as the org.matrix.web_client_location key. Defaults
+  # to unset, giving no guidance to the identity server.
+  #
+  #invite_client_location: https://app.element.io
+
   # Directory in which Synapse will try to find the template files below.
   # If not set, or the files named below are not found within the template
   # directory, default templates from within the Synapse package will be used.

@@ -20,6 +20,7 @@ from typing import List, Optional
 from mock import Mock
 
 import synapse.rest.admin
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import Codes
 from synapse.rest.client.v1 import directory, events, login, room
 
@@ -1430,6 +1431,143 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         )
         self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(private_room_id, channel.json_body["joined_rooms"][0])
+
+
+class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, homeserver):
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.creator = self.register_user("creator", "test")
+        self.creator_tok = self.login("creator", "test")
+
+        self.second_user_id = self.register_user("second", "test")
+        self.second_tok = self.login("second", "test")
+
+        self.public_room_id = self.helper.create_room_as(
+            self.creator, tok=self.creator_tok, is_public=True
+        )
+        self.url = "/_synapse/admin/v1/rooms/{}/make_room_admin".format(
+            self.public_room_id
+        )
+
+    def test_public_room(self):
+        """Test that getting admin in a public room works.
+        """
+        room_id = self.helper.create_room_as(
+            self.creator, tok=self.creator_tok, is_public=True
+        )
+
+        channel = self.make_request(
+            "POST",
+            "/_synapse/admin/v1/rooms/{}/make_room_admin".format(room_id),
+            content={},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # Now we test that we can join the room and ban a user.
+        self.helper.join(room_id, self.admin_user, tok=self.admin_user_tok)
+        self.helper.change_membership(
+            room_id,
+            self.admin_user,
+            "@test:test",
+            Membership.BAN,
+            tok=self.admin_user_tok,
+        )
+
+    def test_private_room(self):
+        """Test that getting admin in a private room works and we get invited.
+        """
+        room_id = self.helper.create_room_as(
+            self.creator, tok=self.creator_tok, is_public=False,
+        )
+
+        channel = self.make_request(
+            "POST",
+            "/_synapse/admin/v1/rooms/{}/make_room_admin".format(room_id),
+            content={},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # Now we test that we can join the room (we should have received an
+        # invite) and can ban a user.
+        self.helper.join(room_id, self.admin_user, tok=self.admin_user_tok)
+        self.helper.change_membership(
+            room_id,
+            self.admin_user,
+            "@test:test",
+            Membership.BAN,
+            tok=self.admin_user_tok,
+        )
+
+    def test_other_user(self):
+        """Test that giving admin in a public room works to a non-admin user works.
+        """
+        room_id = self.helper.create_room_as(
+            self.creator, tok=self.creator_tok, is_public=True
+        )
+
+        channel = self.make_request(
+            "POST",
+            "/_synapse/admin/v1/rooms/{}/make_room_admin".format(room_id),
+            content={"user_id": self.second_user_id},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # Now we test that we can join the room and ban a user.
+        self.helper.join(room_id, self.second_user_id, tok=self.second_tok)
+        self.helper.change_membership(
+            room_id,
+            self.second_user_id,
+            "@test:test",
+            Membership.BAN,
+            tok=self.second_tok,
+        )
+
+    def test_not_enough_power(self):
+        """Test that we get a sensible error if there are no local room admins.
+        """
+        room_id = self.helper.create_room_as(
+            self.creator, tok=self.creator_tok, is_public=True
+        )
+
+        # The creator drops admin rights in the room.
+        pl = self.helper.get_state(
+            room_id, EventTypes.PowerLevels, tok=self.creator_tok
+        )
+        pl["users"][self.creator] = 0
+        self.helper.send_state(
+            room_id, EventTypes.PowerLevels, body=pl, tok=self.creator_tok
+        )
+
+        channel = self.make_request(
+            "POST",
+            "/_synapse/admin/v1/rooms/{}/make_room_admin".format(room_id),
+            content={},
+            access_token=self.admin_user_tok,
+        )
+
+        # We expect this to fail with a 400 as there are no room admins.
+        #
+        # (Note we assert the error message to ensure that it's not denied for
+        # some other reason)
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(
+            channel.json_body["error"],
+            "No local admin user in room with power to update power levels.",
+        )
 
 
 PURGE_TABLES = [
