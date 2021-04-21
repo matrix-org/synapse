@@ -108,6 +108,7 @@ from synapse.rest.client.v2_alpha.account_data import (
 )
 from synapse.rest.client.v2_alpha.keys import KeyChangesServlet, KeyQueryServlet
 from synapse.rest.client.v2_alpha.register import RegisterRestServlet
+from synapse.rest.client.v2_alpha.sendtodevice import SendToDeviceRestServlet
 from synapse.rest.client.versions import VersionsRestServlet
 from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
@@ -519,6 +520,8 @@ class GenericWorkerServer(HomeServer):
                     room.register_servlets(self, resource, True)
                     room.register_deprecated_servlets(self, resource)
                     InitialSyncRestServlet(self).register(resource)
+
+                    SendToDeviceRestServlet(self).register(resource)
 
                     user_directory.register_servlets(self, resource)
 

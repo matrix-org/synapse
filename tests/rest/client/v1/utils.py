@@ -444,6 +444,7 @@ class RestHelper:
 
 
 # an 'oidc_config' suitable for login_via_oidc.
+TEST_OIDC_AUTH_ENDPOINT = "https://issuer.test/auth"
 TEST_OIDC_CONFIG = {
     "enabled": True,
     "discover": False,
@@ -451,7 +452,7 @@ TEST_OIDC_CONFIG = {
     "client_id": "test-client-id",
     "client_secret": "test-client-secret",
     "scopes": ["profile"],
-    "authorization_endpoint": "https://z",
+    "authorization_endpoint": TEST_OIDC_AUTH_ENDPOINT,
     "token_endpoint": "https://issuer.test/token",
     "userinfo_endpoint": "https://issuer.test/userinfo",
     "user_mapping_provider": {"config": {"localpart_template": "{{ user.sub }}"}},
