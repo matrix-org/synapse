@@ -18,7 +18,7 @@ Synapse 1.32.0 (2021-04-20)
 
 **Note:** This release introduces [a regression](https://github.com/matrix-org/synapse/issues/9853)
 that can overwhelm connected Prometheus instances. This issue was not present in
-1.32.0rc1. If affeected, it is recommended to downgrade to 1.31.0 in the meantime, and 
+1.32.0rc1. If affected, it is recommended to downgrade to 1.31.0 in the meantime, and 
 follow [these instructions](https://github.com/matrix-org/synapse/pull/9854#issuecomment-823472183)
 to clean up any excess writeahead logs.
 
