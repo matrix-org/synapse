@@ -20,8 +20,8 @@ Synapse 1.32.0 (2021-04-20)
 that can overwhelm connected Prometheus instances. This issue was not present in
 1.32.0rc1, and is fixed in 1.32.1. See the changelog for 1.32.1 above for more information.
 
-**Note:** This release also introduces a change that may affected Synapse modules that
-import `synapse.logging.context.LoggingContext`, such as
+**Note:** This release also mistakenly included a change that may affected Synapse 
+modules that import `synapse.logging.context.LoggingContext`, such as
 [synapse-s3-storage-provider](https://github.com/matrix-org/synapse-s3-storage-provider).
 This will be fixed in a later Synapse version.
 
