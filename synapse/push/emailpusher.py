@@ -18,9 +18,11 @@ from typing import TYPE_CHECKING, Dict, List, Optional
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 from twisted.internet.interfaces import IDelayedCall
 
+from synapse.api.errors import SynapseError
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import Pusher, PusherConfig, ThrottleParams
 from synapse.push.mailer import Mailer
+from synapse.util.threepids import validate_email
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -70,6 +72,12 @@ class EmailPusher(Pusher):
         self._inited = False
 
         self._is_processing = False
+
+        # Make sure that the email is valid.
+        try:
+            validate_email(self.email)
+        except ValueError:
+            raise SynapseError(400, "Invalid email")
 
     def on_started(self, should_check_for_notifs: bool) -> None:
         """Called when this pusher has been started.

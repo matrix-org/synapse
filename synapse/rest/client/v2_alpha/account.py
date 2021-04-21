@@ -39,7 +39,11 @@ from synapse.metrics import threepid_send_requests
 from synapse.push.mailer import Mailer
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import assert_valid_client_secret, random_string
-from synapse.util.threepids import canonicalise_email, check_3pid_allowed
+from synapse.util.threepids import (
+    canonicalise_email,
+    check_3pid_allowed,
+    validate_email,
+)
 
 from ._base import client_patterns, interactive_auth_handler
 
@@ -92,6 +96,8 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         # Stored in the database "foo@bar.com"
         # User requests with "FOO@bar.com" would raise a Not Found error
         try:
+            email = body["email"]
+            validate_email(email)
             email = canonicalise_email(body["email"])
         except ValueError as e:
             raise SynapseError(400, str(e))
@@ -247,6 +253,7 @@ class PasswordRestServlet(RestServlet):
                     # We store all email addresses canonicalised in the DB.
                     # (See add_threepid in synapse/handlers/auth.py)
                     try:
+                        validate_email(threepid["address"])
                         threepid["address"] = canonicalise_email(threepid["address"])
                     except ValueError as e:
                         raise SynapseError(400, str(e))
@@ -375,6 +382,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         # Otherwise the email will be sent to "FOO@bar.com" and stored as
         # "foo@bar.com" in database.
         try:
+            validate_email(body["email"])
             email = canonicalise_email(body["email"])
         except ValueError as e:
             raise SynapseError(400, str(e))
