@@ -185,7 +185,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         # a logcontext which we use for processing incoming commands. We declare it as a
         # background process so that the CPU stats get reported to prometheus.
         self._logging_context = BackgroundProcessLoggingContext(
-            "replication-conn-%s" % (self.conn_id,)
+            "replication-conn", self.conn_id
         )
 
     def connectionMade(self):
