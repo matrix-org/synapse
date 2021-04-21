@@ -673,7 +673,7 @@ class FederationClient(FederationBase):
             if create_event is None:
                 # If the state doesn't have a create event then the room is
                 # invalid, and it would fail auth checks anyway.
-                raise SynapseError(400, "No create event in state")
+                raise InvalidResponseError("No create event in state")
 
             # the room version should be sane.
             create_room_version = create_event.content.get(
