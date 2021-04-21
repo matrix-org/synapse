@@ -88,15 +88,6 @@ for example:
 Upgrading to v1.32.0
 ====================
 
-Changes to synapse.logging.context.LoggingContext affecting some Synapse modules
---------------------------------------------------------------------------------
-
-This release is incompatible with the current version (commit hash ``3c3fafd``) of
-`synapse-s3-storage-provider <https://github.com/matrix-org/synapse-s3-storage-provider/>`_. The
-module makes use of ``synapse.logging.context.LoggingContext``, which changed its signature in this release.
-
-A future release will provide backwards compatibility for this usage.
-
 Regression causing connected Prometheus instances to become overwhelmed
 -----------------------------------------------------------------------
 
