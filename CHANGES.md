@@ -1,4 +1,4 @@
-Synapse 1.32.2 (2021-04-21)
+Synapse 1.32.2 (2021-04-22)
 ===========================
 
 This release includes fixes for the two regressions introduced in 1.32.0.
