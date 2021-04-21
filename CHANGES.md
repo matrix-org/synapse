@@ -1,7 +1,11 @@
 Synapse 1.32.1 (2021-04-21)
 ===========================
 
-This release fixes the regression introduced in Synapse 
+This release fixes [a regression](https://github.com/matrix-org/synapse/issues/9853)
+in Synapse 1.32.0 that caused connected Prometheus instances to become unstable. If you
+ran Synapse 1.32.0 with Prometheus metrics, first upgrade to Synapse 1.32.1 and follow
+[these instructions](https://github.com/matrix-org/synapse/pull/9854#issuecomment-823472183)
+to clean up any excess writeahead logs.
 
 Bugfixes
 --------
@@ -12,7 +16,7 @@ Bugfixes
 Synapse 1.32.0 (2021-04-20)
 ===========================
 
-**Note:** This release introduces [a regression](https://githubcom/matrix-org/synapse/issues/9853)
+**Note:** This release introduces [a regression](https://github.com/matrix-org/synapse/issues/9853)
 that can overwhelm connected Prometheus instances. This issue was not present in
 Synapse v1.32.0rc1. It is recommended not to update to this release. If you have
 upgraded to v1.32.0 already, please downgrade to v1.31.0. This issue will be
