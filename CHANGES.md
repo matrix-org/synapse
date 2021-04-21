@@ -1,5 +1,24 @@
+Synapse 1.32.1 (2021-04-21)
+===========================
+
+This release fixes [a regression](https://github.com/matrix-org/synapse/issues/9853)
+in Synapse 1.32.0 that caused connected Prometheus instances to become unstable. If you
+ran Synapse 1.32.0 with Prometheus metrics, first upgrade to Synapse 1.32.1 and follow
+[these instructions](https://github.com/matrix-org/synapse/pull/9854#issuecomment-823472183)
+to clean up any excess writeahead logs.
+
+Bugfixes
+--------
+
+- Fix a regression in Synapse 1.32.0 which caused Synapse to report large numbers of Prometheus time series, potentially overwhelming Prometheus instances. ([\#9854](https://github.com/matrix-org/synapse/issues/9854))
+
+
 Synapse 1.32.0 (2021-04-20)
 ===========================
+
+**Note:** This release introduces [a regression](https://github.com/matrix-org/synapse/issues/9853)
+that can overwhelm connected Prometheus instances. This issue was not present in
+1.32.0rc1, and is fixed in 1.32.1. See the changelog for 1.32.1 above for more information.
 
 **Note:** This release requires Python 3.6+ and Postgres 9.6+ or SQLite 3.22+.
 
