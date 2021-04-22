@@ -233,7 +233,7 @@ async def filter_events_for_client(
 
         elif visibility == HistoryVisibility.SHARED and is_peeking:
             # if the visibility is shared, users cannot see the event unless
-            # they have *subequently* joined the room (or were members at the
+            # they have *subsequently* joined the room (or were members at the
             # time, of course)
             #
             # XXX: if the user has subsequently joined and then left again,

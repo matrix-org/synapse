@@ -169,6 +169,7 @@ pid_file: DATADIR/homeserver.pid
 #  - '100.64.0.0/10'
 #  - '192.0.0.0/24'
 #  - '169.254.0.0/16'
+#  - '192.88.99.0/24'
 #  - '198.18.0.0/15'
 #  - '192.0.2.0/24'
 #  - '198.51.100.0/24'
@@ -177,6 +178,9 @@ pid_file: DATADIR/homeserver.pid
 #  - '::1/128'
 #  - 'fe80::/10'
 #  - 'fc00::/7'
+#  - '2001:db8::/32'
+#  - 'ff00::/8'
+#  - 'fec0::/10'
 
 # List of IP address CIDR ranges that should be allowed for federation,
 # identity servers, push servers, and for checking key validity for
@@ -1092,6 +1096,7 @@ media_store_path: "DATADIR/media_store"
 #  - '100.64.0.0/10'
 #  - '192.0.0.0/24'
 #  - '169.254.0.0/16'
+#  - '192.88.99.0/24'
 #  - '198.18.0.0/15'
 #  - '192.0.2.0/24'
 #  - '198.51.100.0/24'
@@ -1100,6 +1105,9 @@ media_store_path: "DATADIR/media_store"
 #  - '::1/128'
 #  - 'fe80::/10'
 #  - 'fc00::/7'
+#  - '2001:db8::/32'
+#  - 'ff00::/8'
+#  - 'fec0::/10'
 
 # List of IP address CIDR ranges that the URL preview spider is allowed
 # to access even if they are specified in url_preview_ip_range_blacklist.
@@ -1406,6 +1414,8 @@ account_threepid_delegates:
 # By default, any room aliases included in this list will be created
 # as a publicly joinable room when the first user registers for the
 # homeserver. This behaviour can be customised with the settings below.
+# If the room already exists, make certain it is a publicly joinable
+# room. The join rule of the room must be set to 'public'.
 #
 #auto_join_rooms:
 #  - "#example:example.com"
@@ -2041,9 +2051,9 @@ oidc_providers:
   #  user_mapping_provider:
   #    config:
   #      subject_claim: "id"
-  #      localpart_template: "{ user.login }"
-  #      display_name_template: "{ user.name }"
-  #      email_template: "{ user.email }"
+  #      localpart_template: "{{ user.login }}"
+  #      display_name_template: "{{ user.name }}"
+  #      email_template: "{{ user.email }}"
 
   # For use with Keycloak
   #
@@ -2070,8 +2080,8 @@ oidc_providers:
   #  user_mapping_provider:
   #    config:
   #      subject_claim: "id"
-  #      localpart_template: "{ user.login }"
-  #      display_name_template: "{ user.name }"
+  #      localpart_template: "{{ user.login }}"
+  #      display_name_template: "{{ user.name }}"
 
 
 # Enable Central Authentication Service (CAS) for registration and login.
@@ -2140,8 +2150,7 @@ sso:
     #
     #   When rendering, this template is given the following variables:
     #     * redirect_url: the URL that the user will be redirected to after
-    #       login. Needs manual escaping (see
-    #       https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+    #       login.
     #
     #     * server_name: the homeserver's name.
     #
@@ -2219,15 +2228,12 @@ sso:
     #
     #   When rendering, this template is given the following variables:
     #
-    #     * redirect_url: the URL the user is about to be redirected to. Needs
-    #                     manual escaping (see
-    #                     https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+    #     * redirect_url: the URL the user is about to be redirected to.
     #
     #     * display_url: the same as `redirect_url`, but with the query
     #                    parameters stripped. The intention is to have a
     #                    human-readable URL to show to users, not to use it as
-    #                    the final address to redirect to. Needs manual escaping
-    #                    (see https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+    #                    the final address to redirect to.
     #
     #     * server_name: the homeserver's name.
     #
@@ -2247,9 +2253,7 @@ sso:
     #   process: 'sso_auth_confirm.html'.
     #
     #   When rendering, this template is given the following variables:
-    #     * redirect_url: the URL the user is about to be redirected to. Needs
-    #                     manual escaping (see
-    #                     https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+    #     * redirect_url: the URL the user is about to be redirected to.
     #
     #     * description: the operation which the user is being asked to confirm
     #
